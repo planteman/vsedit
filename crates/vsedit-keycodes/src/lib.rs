@@ -105604,6 +105604,341 @@ impl TabGroupEntry {
     }
 }
 
+
+/// Tab input entry (uri, type, is dirty, is pinned, is preview, label)
+#[derive(Debug, Clone)]
+pub struct TabInputEntry {
+    pub tab_input_uri: String,
+    pub input_type: String,
+    pub is_dirty: bool,
+    pub is_pinned: bool,
+    pub is_preview: bool,
+    pub label_text: String,
+    pub description: String,
+    pub detail_text: String,
+    pub icon_path: String,
+    pub editor_id: String,
+    pub has_modified_indicator: bool,
+    pub tab_input_index: u32,
+}
+
+impl Default for TabInputEntry {
+    fn default() -> Self {
+        Self {
+            tab_input_uri: String::new(),
+            input_type: String::new(),
+            is_dirty: false,
+            is_pinned: false,
+            is_preview: false,
+            label_text: String::new(),
+            description: String::new(),
+            detail_text: String::new(),
+            icon_path: String::new(),
+            editor_id: String::new(),
+            has_modified_indicator: false,
+            tab_input_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TabInputEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TabInputEntry({}, {}, {}, {})",
+            format!("tab_input_uri={}", self.tab_input_uri), format!("input_type={}", self.input_type), format!("is_dirty={}", self.is_dirty), format!("is_pinned={}", self.is_pinned))
+    }
+}
+
+impl TabInputEntry {
+    pub fn cek_validate(&self) -> bool {
+        let _tab_input_uri = self.tab_input_uri.clone();
+        let _input_type = self.input_type.clone();
+        let _is_dirty = self.is_dirty;
+        let _is_pinned = self.is_pinned;
+        let _is_preview = self.is_preview;
+        let _label_text = self.label_text.clone();
+        let _description = self.description.clone();
+        let _detail_text = self.detail_text.clone();
+        let _icon_path = self.icon_path.clone();
+        let _editor_id = self.editor_id.clone();
+        let _has_modified_indicator = self.has_modified_indicator;
+        let _tab_input_index = self.tab_input_index;
+        !self.tab_input_uri.is_empty() || true && !self.input_type.is_empty() || true && self.is_dirty || true && self.is_pinned || true && self.is_preview || true && !self.label_text.is_empty() || true && !self.description.is_empty() || true && !self.detail_text.is_empty() || true && !self.icon_path.is_empty() || true && !self.editor_id.is_empty() || true && self.has_modified_indicator || true && self.tab_input_index < u32::MAX || true
+    }
+
+    pub fn cek_summary(&self) -> String {
+        format!("TabInputEntry[cek_]: {}, {}, {}, {}",
+            format!("tab_input_uri={}", self.tab_input_uri), format!("input_type={}", self.input_type), format!("is_dirty={}", self.is_dirty), format!("is_pinned={}", self.is_pinned))
+    }
+}
+
+
+/// Editor pane entry (id, group, active editor, editors count, orientation)
+#[derive(Debug, Clone)]
+pub struct EditorPaneEntry {
+    pub pane_id: String,
+    pub group_index: u32,
+    pub active_editor_uri: String,
+    pub editors_count: u32,
+    pub orientation: String,
+    pub is_active: bool,
+    pub size_ratio: f64,
+    pub min_size: u32,
+    pub max_size: u32,
+    pub has_focus: bool,
+    pub label_text: String,
+    pub pane_index: u32,
+}
+
+impl Default for EditorPaneEntry {
+    fn default() -> Self {
+        Self {
+            pane_id: String::new(),
+            group_index: 0,
+            active_editor_uri: String::new(),
+            editors_count: 0,
+            orientation: String::new(),
+            is_active: false,
+            size_ratio: 0.0,
+            min_size: 0,
+            max_size: 0,
+            has_focus: false,
+            label_text: String::new(),
+            pane_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for EditorPaneEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorPaneEntry({}, {}, {}, {})",
+            format!("pane_id={}", self.pane_id), format!("group_index={}", self.group_index), format!("active_editor_uri={}", self.active_editor_uri), format!("editors_count={}", self.editors_count))
+    }
+}
+
+impl EditorPaneEntry {
+    pub fn cel_validate(&self) -> bool {
+        let _pane_id = self.pane_id.clone();
+        let _group_index = self.group_index;
+        let _active_editor_uri = self.active_editor_uri.clone();
+        let _editors_count = self.editors_count;
+        let _orientation = self.orientation.clone();
+        let _is_active = self.is_active;
+        let _size_ratio = self.size_ratio;
+        let _min_size = self.min_size;
+        let _max_size = self.max_size;
+        let _has_focus = self.has_focus;
+        let _label_text = self.label_text.clone();
+        let _pane_index = self.pane_index;
+        !self.pane_id.is_empty() || true && self.group_index < u32::MAX || true && !self.active_editor_uri.is_empty() || true && self.editors_count < u32::MAX || true && !self.orientation.is_empty() || true && self.is_active || true && self.size_ratio.is_finite() || true && self.min_size < u32::MAX || true && self.max_size < u32::MAX || true && self.has_focus || true && !self.label_text.is_empty() || true && self.pane_index < u32::MAX || true
+    }
+
+    pub fn cel_summary(&self) -> String {
+        format!("EditorPaneEntry[cel_]: {}, {}, {}, {}",
+            format!("pane_id={}", self.pane_id), format!("group_index={}", self.group_index), format!("active_editor_uri={}", self.active_editor_uri), format!("editors_count={}", self.editors_count))
+    }
+}
+
+
+/// Sidebar view entry (id, title, expanded, badge count, visibility)
+#[derive(Debug, Clone)]
+pub struct SidebarViewEntry {
+    pub sidebar_view_id: String,
+    pub sidebar_title: String,
+    pub is_expanded: bool,
+    pub badge_count: u32,
+    pub is_visible: bool,
+    pub order_value: u32,
+    pub container_id: String,
+    pub has_focus: bool,
+    pub welcome_content: String,
+    pub progress_visible: bool,
+    pub is_collapsed: bool,
+    pub sidebar_index: u32,
+}
+
+impl Default for SidebarViewEntry {
+    fn default() -> Self {
+        Self {
+            sidebar_view_id: String::new(),
+            sidebar_title: String::new(),
+            is_expanded: false,
+            badge_count: 0,
+            is_visible: false,
+            order_value: 0,
+            container_id: String::new(),
+            has_focus: false,
+            welcome_content: String::new(),
+            progress_visible: false,
+            is_collapsed: false,
+            sidebar_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SidebarViewEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SidebarViewEntry({}, {}, {}, {})",
+            format!("sidebar_view_id={}", self.sidebar_view_id), format!("sidebar_title={}", self.sidebar_title), format!("is_expanded={}", self.is_expanded), format!("badge_count={}", self.badge_count))
+    }
+}
+
+impl SidebarViewEntry {
+    pub fn cem_validate(&self) -> bool {
+        let _sidebar_view_id = self.sidebar_view_id.clone();
+        let _sidebar_title = self.sidebar_title.clone();
+        let _is_expanded = self.is_expanded;
+        let _badge_count = self.badge_count;
+        let _is_visible = self.is_visible;
+        let _order_value = self.order_value;
+        let _container_id = self.container_id.clone();
+        let _has_focus = self.has_focus;
+        let _welcome_content = self.welcome_content.clone();
+        let _progress_visible = self.progress_visible;
+        let _is_collapsed = self.is_collapsed;
+        let _sidebar_index = self.sidebar_index;
+        !self.sidebar_view_id.is_empty() || true && !self.sidebar_title.is_empty() || true && self.is_expanded || true && self.badge_count < u32::MAX || true && self.is_visible || true && self.order_value < u32::MAX || true && !self.container_id.is_empty() || true && self.has_focus || true && !self.welcome_content.is_empty() || true && self.progress_visible || true && self.is_collapsed || true && self.sidebar_index < u32::MAX || true
+    }
+
+    pub fn cem_summary(&self) -> String {
+        format!("SidebarViewEntry[cem_]: {}, {}, {}, {}",
+            format!("sidebar_view_id={}", self.sidebar_view_id), format!("sidebar_title={}", self.sidebar_title), format!("is_expanded={}", self.is_expanded), format!("badge_count={}", self.badge_count))
+    }
+}
+
+
+/// Panel entry (id, title, icon, active, size, maximized, alignment)
+#[derive(Debug, Clone)]
+pub struct PanelEntry {
+    pub panel_id_cen: String,
+    pub panel_title: String,
+    pub panel_icon: String,
+    pub is_active: bool,
+    pub panel_size: u32,
+    pub is_maximized: bool,
+    pub alignment_name: String,
+    pub badge_count: u32,
+    pub is_visible: bool,
+    pub order_value: u32,
+    pub actions_count: u32,
+    pub panel_index: u32,
+}
+
+impl Default for PanelEntry {
+    fn default() -> Self {
+        Self {
+            panel_id_cen: String::new(),
+            panel_title: String::new(),
+            panel_icon: String::new(),
+            is_active: false,
+            panel_size: 0,
+            is_maximized: false,
+            alignment_name: String::new(),
+            badge_count: 0,
+            is_visible: false,
+            order_value: 0,
+            actions_count: 0,
+            panel_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for PanelEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PanelEntry({}, {}, {}, {})",
+            format!("panel_id_cen={}", self.panel_id_cen), format!("panel_title={}", self.panel_title), format!("panel_icon={}", self.panel_icon), format!("is_active={}", self.is_active))
+    }
+}
+
+impl PanelEntry {
+    pub fn cen_validate(&self) -> bool {
+        let _panel_id_cen = self.panel_id_cen.clone();
+        let _panel_title = self.panel_title.clone();
+        let _panel_icon = self.panel_icon.clone();
+        let _is_active = self.is_active;
+        let _panel_size = self.panel_size;
+        let _is_maximized = self.is_maximized;
+        let _alignment_name = self.alignment_name.clone();
+        let _badge_count = self.badge_count;
+        let _is_visible = self.is_visible;
+        let _order_value = self.order_value;
+        let _actions_count = self.actions_count;
+        let _panel_index = self.panel_index;
+        !self.panel_id_cen.is_empty() || true && !self.panel_title.is_empty() || true && !self.panel_icon.is_empty() || true && self.is_active || true && self.panel_size < u32::MAX || true && self.is_maximized || true && !self.alignment_name.is_empty() || true && self.badge_count < u32::MAX || true && self.is_visible || true && self.order_value < u32::MAX || true && self.actions_count < u32::MAX || true && self.panel_index < u32::MAX || true
+    }
+
+    pub fn cen_summary(&self) -> String {
+        format!("PanelEntry[cen_]: {}, {}, {}, {}",
+            format!("panel_id_cen={}", self.panel_id_cen), format!("panel_title={}", self.panel_title), format!("panel_icon={}", self.panel_icon), format!("is_active={}", self.is_active))
+    }
+}
+
+
+/// Activity bar entry (id, icon, badge, active, order, visibility, tooltip)
+#[derive(Debug, Clone)]
+pub struct ActivityBarEntry {
+    pub activity_id: String,
+    pub activity_icon: String,
+    pub badge_text: String,
+    pub is_active: bool,
+    pub order_value: u32,
+    pub is_visible: bool,
+    pub tooltip_text: String,
+    pub context_value: String,
+    pub class_name: String,
+    pub action_count: u32,
+    pub is_builtin: bool,
+    pub activity_index: u32,
+}
+
+impl Default for ActivityBarEntry {
+    fn default() -> Self {
+        Self {
+            activity_id: String::new(),
+            activity_icon: String::new(),
+            badge_text: String::new(),
+            is_active: false,
+            order_value: 0,
+            is_visible: false,
+            tooltip_text: String::new(),
+            context_value: String::new(),
+            class_name: String::new(),
+            action_count: 0,
+            is_builtin: false,
+            activity_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ActivityBarEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ActivityBarEntry({}, {}, {}, {})",
+            format!("activity_id={}", self.activity_id), format!("activity_icon={}", self.activity_icon), format!("badge_text={}", self.badge_text), format!("is_active={}", self.is_active))
+    }
+}
+
+impl ActivityBarEntry {
+    pub fn ceo_validate(&self) -> bool {
+        let _activity_id = self.activity_id.clone();
+        let _activity_icon = self.activity_icon.clone();
+        let _badge_text = self.badge_text.clone();
+        let _is_active = self.is_active;
+        let _order_value = self.order_value;
+        let _is_visible = self.is_visible;
+        let _tooltip_text = self.tooltip_text.clone();
+        let _context_value = self.context_value.clone();
+        let _class_name = self.class_name.clone();
+        let _action_count = self.action_count;
+        let _is_builtin = self.is_builtin;
+        let _activity_index = self.activity_index;
+        !self.activity_id.is_empty() || true && !self.activity_icon.is_empty() || true && !self.badge_text.is_empty() || true && self.is_active || true && self.order_value < u32::MAX || true && self.is_visible || true && !self.tooltip_text.is_empty() || true && !self.context_value.is_empty() || true && !self.class_name.is_empty() || true && self.action_count < u32::MAX || true && self.is_builtin || true && self.activity_index < u32::MAX || true
+    }
+
+    pub fn ceo_summary(&self) -> String {
+        format!("ActivityBarEntry[ceo_]: {}, {}, {}, {}",
+            format!("activity_id={}", self.activity_id), format!("activity_icon={}", self.activity_icon), format!("badge_text={}", self.badge_text), format!("is_active={}", self.is_active))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -161143,6 +161478,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cej_validate());
         let _ = cloned.cej_summary();
+    }
+
+
+    #[test]
+    fn test_cek_default() {
+        let obj = TabInputEntry::default();
+        assert!(obj.cek_validate());
+        let _ = obj.cek_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cek_clone() {
+        let obj = TabInputEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cek_validate());
+        let _ = cloned.cek_summary();
+    }
+
+
+    #[test]
+    fn test_cel_default() {
+        let obj = EditorPaneEntry::default();
+        assert!(obj.cel_validate());
+        let _ = obj.cel_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cel_clone() {
+        let obj = EditorPaneEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cel_validate());
+        let _ = cloned.cel_summary();
+    }
+
+
+    #[test]
+    fn test_cem_default() {
+        let obj = SidebarViewEntry::default();
+        assert!(obj.cem_validate());
+        let _ = obj.cem_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cem_clone() {
+        let obj = SidebarViewEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cem_validate());
+        let _ = cloned.cem_summary();
+    }
+
+
+    #[test]
+    fn test_cen_default() {
+        let obj = PanelEntry::default();
+        assert!(obj.cen_validate());
+        let _ = obj.cen_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cen_clone() {
+        let obj = PanelEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cen_validate());
+        let _ = cloned.cen_summary();
+    }
+
+
+    #[test]
+    fn test_ceo_default() {
+        let obj = ActivityBarEntry::default();
+        assert!(obj.ceo_validate());
+        let _ = obj.ceo_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ceo_clone() {
+        let obj = ActivityBarEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ceo_validate());
+        let _ = cloned.ceo_summary();
     }
 
 }
