@@ -65353,3 +65353,198 @@ mod bcr_tests {
         assert_eq!(c.render(5).len(), 5);
     }
 }
+
+
+// --- bcs_: Editor SCM/source control view model ---
+
+/// SCM file change status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcsChangeKind { Modified, Added, Deleted, Renamed, Untracked, Conflicted }
+
+/// A single SCM resource (changed file).
+#[derive(Debug, Clone)]
+pub struct BcsScmResource {
+    pub path: String,
+    pub kind: BcsChangeKind,
+    pub original_path: Option<String>,
+}
+
+impl BcsScmResource {
+    pub fn new(path: &str, kind: BcsChangeKind) -> Self {
+        Self { path: path.to_string(), kind, original_path: None }
+    }
+
+    pub fn renamed(old: &str, new: &str) -> Self {
+        Self { path: new.to_string(), kind: BcsChangeKind::Renamed, original_path: Some(old.to_string()) }
+    }
+
+    pub fn icon(&self) -> char {
+        match self.kind {
+            BcsChangeKind::Modified => 'M',
+            BcsChangeKind::Added => 'A',
+            BcsChangeKind::Deleted => 'D',
+            BcsChangeKind::Renamed => 'R',
+            BcsChangeKind::Untracked => 'U',
+            BcsChangeKind::Conflicted => 'C',
+        }
+    }
+
+    pub fn filename(&self) -> &str { self.path.rsplit('/').next().unwrap_or(&self.path) }
+
+    pub fn display(&self) -> String {
+        if let Some(old) = &self.original_path {
+            format!("{} {} → {}", self.icon(), old, self.path)
+        } else {
+            format!("{} {}", self.icon(), self.path)
+        }
+    }
+}
+
+/// A resource group (e.g., staged, unstaged, merge changes).
+#[derive(Debug, Clone)]
+pub struct BcsResourceGroup {
+    pub id: String,
+    pub label: String,
+    pub resources: Vec<BcsScmResource>,
+}
+
+impl BcsResourceGroup {
+    pub fn new(id: &str, label: &str) -> Self { Self { id: id.to_string(), label: label.to_string(), resources: Vec::new() } }
+    pub fn add(&mut self, r: BcsScmResource) { self.resources.push(r); }
+    pub fn count(&self) -> usize { self.resources.len() }
+}
+
+/// The SCM view model.
+#[derive(Debug)]
+pub struct BcsScmView {
+    provider_label: String,
+    groups: Vec<BcsResourceGroup>,
+    commit_message: String,
+    branch: Option<String>,
+    cursor_group: usize,
+    cursor_resource: usize,
+}
+
+impl BcsScmView {
+    pub fn new(provider: &str) -> Self {
+        Self { provider_label: provider.to_string(), groups: Vec::new(), commit_message: String::new(), branch: None, cursor_group: 0, cursor_resource: 0 }
+    }
+
+    pub fn add_group(&mut self, g: BcsResourceGroup) { self.groups.push(g); }
+    pub fn groups(&self) -> &[BcsResourceGroup] { &self.groups }
+    pub fn provider(&self) -> &str { &self.provider_label }
+
+    pub fn set_commit_message(&mut self, msg: &str) { self.commit_message = msg.to_string(); }
+    pub fn commit_message(&self) -> &str { &self.commit_message }
+    pub fn set_branch(&mut self, b: &str) { self.branch = Some(b.to_string()); }
+    pub fn branch(&self) -> Option<&str> { self.branch.as_deref() }
+
+    pub fn total_changes(&self) -> usize { self.groups.iter().map(|g| g.count()).sum() }
+
+    pub fn has_conflicts(&self) -> bool {
+        self.groups.iter().any(|g| g.resources.iter().any(|r| r.kind == BcsChangeKind::Conflicted))
+    }
+
+    pub fn current_resource(&self) -> Option<&BcsScmResource> {
+        self.groups.get(self.cursor_group).and_then(|g| g.resources.get(self.cursor_resource))
+    }
+
+    pub fn move_cursor(&mut self, delta: i32) {
+        if self.groups.is_empty() { return; }
+        let total: usize = self.groups.iter().map(|g| g.count()).sum();
+        if total == 0 { return; }
+        let mut flat_idx = self.groups[..self.cursor_group].iter().map(|g| g.count()).sum::<usize>() + self.cursor_resource;
+        flat_idx = ((flat_idx as i32 + delta).rem_euclid(total as i32)) as usize;
+        let mut acc = 0;
+        for (gi, g) in self.groups.iter().enumerate() {
+            if flat_idx < acc + g.count() {
+                self.cursor_group = gi;
+                self.cursor_resource = flat_idx - acc;
+                return;
+            }
+            acc += g.count();
+        }
+    }
+}
+
+#[cfg(test)]
+mod bcs_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcs_resource() {
+        let r = BcsScmResource::new("src/main.rs", BcsChangeKind::Modified);
+        assert_eq!(r.icon(), 'M');
+        assert_eq!(r.filename(), "main.rs");
+    }
+
+    #[test]
+    fn test_bcs_renamed() {
+        let r = BcsScmResource::renamed("old.rs", "new.rs");
+        assert!(r.display().contains("→"));
+    }
+
+    #[test]
+    fn test_bcs_group() {
+        let mut g = BcsResourceGroup::new("staged", "Staged Changes");
+        g.add(BcsScmResource::new("a.rs", BcsChangeKind::Added));
+        assert_eq!(g.count(), 1);
+    }
+
+    #[test]
+    fn test_bcs_view() {
+        let mut v = BcsScmView::new("Git");
+        v.set_branch("main");
+        assert_eq!(v.branch(), Some("main"));
+        assert_eq!(v.provider(), "Git");
+    }
+
+    #[test]
+    fn test_bcs_total() {
+        let mut v = BcsScmView::new("Git");
+        let mut g = BcsResourceGroup::new("unstaged", "Changes");
+        g.add(BcsScmResource::new("a.rs", BcsChangeKind::Modified));
+        g.add(BcsScmResource::new("b.rs", BcsChangeKind::Deleted));
+        v.add_group(g);
+        assert_eq!(v.total_changes(), 2);
+    }
+
+    #[test]
+    fn test_bcs_conflicts() {
+        let mut v = BcsScmView::new("Git");
+        let mut g = BcsResourceGroup::new("merge", "Merge");
+        g.add(BcsScmResource::new("c.rs", BcsChangeKind::Conflicted));
+        v.add_group(g);
+        assert!(v.has_conflicts());
+    }
+
+    #[test]
+    fn test_bcs_cursor() {
+        let mut v = BcsScmView::new("Git");
+        let mut g = BcsResourceGroup::new("s", "S");
+        g.add(BcsScmResource::new("a.rs", BcsChangeKind::Added));
+        g.add(BcsScmResource::new("b.rs", BcsChangeKind::Modified));
+        v.add_group(g);
+        v.move_cursor(1);
+        assert_eq!(v.current_resource().unwrap().path, "b.rs");
+    }
+
+    #[test]
+    fn test_bcs_commit_msg() {
+        let mut v = BcsScmView::new("Git");
+        v.set_commit_message("fix bug");
+        assert_eq!(v.commit_message(), "fix bug");
+    }
+
+    #[test]
+    fn test_bcs_no_conflicts() {
+        let v = BcsScmView::new("Git");
+        assert!(!v.has_conflicts());
+    }
+
+    #[test]
+    fn test_bcs_untracked() {
+        let r = BcsScmResource::new("new.txt", BcsChangeKind::Untracked);
+        assert_eq!(r.icon(), 'U');
+    }
+}
