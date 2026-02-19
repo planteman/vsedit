@@ -51043,3 +51043,390 @@ mod bal_tests {
         assert!(!model.is_enabled());
     }
 }
+
+
+// --- bam_: Workspace file system watcher model ---
+
+/// Type of file system event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BamFsEventType {
+    Created,
+    Changed,
+    Deleted,
+}
+
+impl BamFsEventType {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Created => "created",
+            Self::Changed => "changed",
+            Self::Deleted => "deleted",
+        }
+    }
+}
+
+/// A file system event.
+#[derive(Debug, Clone)]
+pub struct BamFsEvent {
+    pub event_type: BamFsEventType,
+    pub path: String,
+    pub is_directory: bool,
+    pub timestamp_ms: u64,
+}
+
+impl BamFsEvent {
+    pub fn created(path: &str, is_dir: bool, timestamp_ms: u64) -> Self {
+        Self {
+            event_type: BamFsEventType::Created,
+            path: path.to_string(),
+            is_directory: is_dir,
+            timestamp_ms,
+        }
+    }
+
+    pub fn changed(path: &str, timestamp_ms: u64) -> Self {
+        Self {
+            event_type: BamFsEventType::Changed,
+            path: path.to_string(),
+            is_directory: false,
+            timestamp_ms,
+        }
+    }
+
+    pub fn deleted(path: &str, is_dir: bool, timestamp_ms: u64) -> Self {
+        Self {
+            event_type: BamFsEventType::Deleted,
+            path: path.to_string(),
+            is_directory: is_dir,
+            timestamp_ms,
+        }
+    }
+
+    pub fn filename(&self) -> &str {
+        self.path.rsplit('/').next().unwrap_or(&self.path)
+    }
+
+    pub fn extension(&self) -> Option<&str> {
+        self.filename().rsplit_once('.').map(|(_, ext)| ext)
+    }
+}
+
+/// A glob pattern for watching files.
+#[derive(Debug, Clone)]
+pub struct BamWatchPattern {
+    pub glob: String,
+    pub recursive: bool,
+    pub exclude: bool,
+}
+
+impl BamWatchPattern {
+    pub fn include(glob: &str) -> Self {
+        Self {
+            glob: glob.to_string(),
+            recursive: true,
+            exclude: false,
+        }
+    }
+
+    pub fn exclude(glob: &str) -> Self {
+        Self {
+            glob: glob.to_string(),
+            recursive: true,
+            exclude: true,
+        }
+    }
+
+    pub fn matches_simple(&self, path: &str) -> bool {
+        let filename = path.rsplit('/').next().unwrap_or(path);
+        if self.glob.starts_with("**") {
+            let pattern = self.glob.trim_start_matches("**/");
+            if pattern.starts_with("*.") {
+                let ext = pattern.trim_start_matches("*.");
+                return filename.ends_with(&format!(".{}", ext));
+            }
+            return path.contains(pattern);
+        }
+        if self.glob.starts_with("*.") {
+            let ext = self.glob.trim_start_matches("*.");
+            return filename.ends_with(&format!(".{}", ext));
+        }
+        filename == self.glob || path.ends_with(&self.glob)
+    }
+}
+
+/// A file system watcher subscription.
+#[derive(Debug, Clone)]
+pub struct BamWatcher {
+    pub id: u64,
+    pub base_path: String,
+    pub patterns: Vec<BamWatchPattern>,
+    pub is_active: bool,
+}
+
+impl BamWatcher {
+    pub fn new(id: u64, base_path: &str) -> Self {
+        Self {
+            id,
+            base_path: base_path.to_string(),
+            patterns: Vec::new(),
+            is_active: true,
+        }
+    }
+
+    pub fn add_include(&mut self, glob: &str) {
+        self.patterns.push(BamWatchPattern::include(glob));
+    }
+
+    pub fn add_exclude(&mut self, glob: &str) {
+        self.patterns.push(BamWatchPattern::exclude(glob));
+    }
+
+    pub fn should_report(&self, path: &str) -> bool {
+        if !self.is_active {
+            return false;
+        }
+        if !path.starts_with(&self.base_path) {
+            return false;
+        }
+        let includes: Vec<_> = self.patterns.iter().filter(|p| !p.exclude).collect();
+        let excludes: Vec<_> = self.patterns.iter().filter(|p| p.exclude).collect();
+
+        // Check excludes first
+        for excl in &excludes {
+            if excl.matches_simple(path) {
+                return false;
+            }
+        }
+
+        if includes.is_empty() {
+            return true; // No includes = match all
+        }
+
+        includes.iter().any(|p| p.matches_simple(path))
+    }
+
+    pub fn suspend(&mut self) {
+        self.is_active = false;
+    }
+
+    pub fn resume(&mut self) {
+        self.is_active = true;
+    }
+}
+
+/// Manages all file system watchers.
+#[derive(Debug, Clone)]
+pub struct BamFsWatcherManager {
+    watchers: Vec<BamWatcher>,
+    event_queue: Vec<BamFsEvent>,
+    next_id: u64,
+    max_queue_size: usize,
+    is_throttled: bool,
+    throttle_ms: u64,
+    last_event_ms: u64,
+}
+
+impl BamFsWatcherManager {
+    pub fn new() -> Self {
+        Self {
+            watchers: Vec::new(),
+            event_queue: Vec::new(),
+            next_id: 1,
+            max_queue_size: 10_000,
+            is_throttled: false,
+            throttle_ms: 100,
+            last_event_ms: 0,
+        }
+    }
+
+    pub fn create_watcher(&mut self, base_path: &str) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.watchers.push(BamWatcher::new(id, base_path));
+        id
+    }
+
+    pub fn remove_watcher(&mut self, id: u64) -> bool {
+        if let Some(idx) = self.watchers.iter().position(|w| w.id == id) {
+            self.watchers.remove(idx);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn watcher(&self, id: u64) -> Option<&BamWatcher> {
+        self.watchers.iter().find(|w| w.id == id)
+    }
+
+    pub fn watcher_mut(&mut self, id: u64) -> Option<&mut BamWatcher> {
+        self.watchers.iter_mut().find(|w| w.id == id)
+    }
+
+    pub fn report_event(&mut self, event: BamFsEvent) {
+        if self.is_throttled && event.timestamp_ms - self.last_event_ms < self.throttle_ms {
+            return;
+        }
+        self.last_event_ms = event.timestamp_ms;
+
+        // Check if any watcher wants this event
+        let relevant = self.watchers.iter().any(|w| w.should_report(&event.path));
+        if relevant {
+            self.event_queue.push(event);
+            if self.event_queue.len() > self.max_queue_size {
+                self.event_queue.remove(0);
+            }
+        }
+    }
+
+    pub fn drain_events(&mut self) -> Vec<BamFsEvent> {
+        std::mem::take(&mut self.event_queue)
+    }
+
+    pub fn pending_event_count(&self) -> usize {
+        self.event_queue.len()
+    }
+
+    pub fn watcher_count(&self) -> usize {
+        self.watchers.len()
+    }
+
+    pub fn set_throttle(&mut self, ms: u64) {
+        self.throttle_ms = ms;
+        self.is_throttled = ms > 0;
+    }
+
+    pub fn suspend_all(&mut self) {
+        for w in &mut self.watchers {
+            w.suspend();
+        }
+    }
+
+    pub fn resume_all(&mut self) {
+        for w in &mut self.watchers {
+            w.resume();
+        }
+    }
+}
+
+#[cfg(test)]
+mod bam_tests {
+    use super::*;
+
+    #[test]
+    fn test_bam_fs_event_creation() {
+        let e = BamFsEvent::created("/ws/src/main.rs", false, 1000);
+        assert_eq!(e.event_type, BamFsEventType::Created);
+        assert_eq!(e.filename(), "main.rs");
+        assert_eq!(e.extension(), Some("rs"));
+    }
+
+    #[test]
+    fn test_bam_event_types() {
+        let e1 = BamFsEvent::changed("/ws/file.txt", 100);
+        assert_eq!(e1.event_type, BamFsEventType::Changed);
+        let e2 = BamFsEvent::deleted("/ws/old", true, 200);
+        assert!(e2.is_directory);
+    }
+
+    #[test]
+    fn test_bam_watch_pattern_simple() {
+        let p = BamWatchPattern::include("*.rs");
+        assert!(p.matches_simple("src/main.rs"));
+        assert!(!p.matches_simple("src/main.py"));
+    }
+
+    #[test]
+    fn test_bam_watch_pattern_recursive() {
+        let p = BamWatchPattern::include("**/*.rs");
+        assert!(p.matches_simple("deep/nested/file.rs"));
+        assert!(!p.matches_simple("file.py"));
+    }
+
+    #[test]
+    fn test_bam_watcher_should_report() {
+        let mut w = BamWatcher::new(1, "/workspace");
+        w.add_include("*.rs");
+        w.add_exclude("**/target/**");
+        assert!(w.should_report("/workspace/src/main.rs"));
+        assert!(!w.should_report("/workspace/src/main.py"));
+        assert!(!w.should_report("/other/file.rs"));
+    }
+
+    #[test]
+    fn test_bam_watcher_no_patterns() {
+        let w = BamWatcher::new(1, "/workspace");
+        assert!(w.should_report("/workspace/any_file.txt"));
+    }
+
+    #[test]
+    fn test_bam_watcher_suspend_resume() {
+        let mut w = BamWatcher::new(1, "/workspace");
+        assert!(w.should_report("/workspace/file.txt"));
+        w.suspend();
+        assert!(!w.should_report("/workspace/file.txt"));
+        w.resume();
+        assert!(w.should_report("/workspace/file.txt"));
+    }
+
+    #[test]
+    fn test_bam_manager_create_remove() {
+        let mut mgr = BamFsWatcherManager::new();
+        let id = mgr.create_watcher("/ws");
+        assert_eq!(mgr.watcher_count(), 1);
+        assert!(mgr.remove_watcher(id));
+        assert_eq!(mgr.watcher_count(), 0);
+    }
+
+    #[test]
+    fn test_bam_manager_events() {
+        let mut mgr = BamFsWatcherManager::new();
+        mgr.create_watcher("/ws");
+        mgr.report_event(BamFsEvent::changed("/ws/file.rs", 100));
+        mgr.report_event(BamFsEvent::created("/ws/new.rs", false, 200));
+        assert_eq!(mgr.pending_event_count(), 2);
+
+        let events = mgr.drain_events();
+        assert_eq!(events.len(), 2);
+        assert_eq!(mgr.pending_event_count(), 0);
+    }
+
+    #[test]
+    fn test_bam_manager_irrelevant_events() {
+        let mut mgr = BamFsWatcherManager::new();
+        mgr.create_watcher("/workspace");
+        mgr.report_event(BamFsEvent::changed("/other/file.rs", 100));
+        assert_eq!(mgr.pending_event_count(), 0);
+    }
+
+    #[test]
+    fn test_bam_manager_throttle() {
+        let mut mgr = BamFsWatcherManager::new();
+        mgr.create_watcher("/ws");
+        mgr.set_throttle(100);
+
+        mgr.report_event(BamFsEvent::changed("/ws/a.rs", 1000));
+        mgr.report_event(BamFsEvent::changed("/ws/b.rs", 1050)); // Throttled
+        mgr.report_event(BamFsEvent::changed("/ws/c.rs", 1200)); // OK
+        assert_eq!(mgr.pending_event_count(), 2);
+    }
+
+    #[test]
+    fn test_bam_manager_suspend_resume() {
+        let mut mgr = BamFsWatcherManager::new();
+        mgr.create_watcher("/ws");
+        mgr.suspend_all();
+        mgr.report_event(BamFsEvent::changed("/ws/file.rs", 100));
+        assert_eq!(mgr.pending_event_count(), 0);
+        mgr.resume_all();
+        mgr.report_event(BamFsEvent::changed("/ws/file.rs", 200));
+        assert_eq!(mgr.pending_event_count(), 1);
+    }
+
+    #[test]
+    fn test_bam_event_label() {
+        assert_eq!(BamFsEventType::Created.label(), "created");
+        assert_eq!(BamFsEventType::Changed.label(), "changed");
+        assert_eq!(BamFsEventType::Deleted.label(), "deleted");
+    }
+}
