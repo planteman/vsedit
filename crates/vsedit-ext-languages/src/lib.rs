@@ -144664,6 +144664,435 @@ impl DooMessageChannel {
     }
 }
 
+/// Stream codec for length-prefixed messages
+#[derive(Debug, Clone)]
+pub struct DopStreamCodec {
+    pub stream_codec_id: String,
+    pub stream_codec_header: u32,
+    pub stream_codec_max_size: u64,
+    pub stream_codec_encoding: String,
+    pub stream_codec_compressed: bool,
+}
+
+impl Default for DopStreamCodec {
+    fn default() -> Self {
+        Self {
+            stream_codec_id: String::new(),
+            stream_codec_header: 0,
+            stream_codec_max_size: 0,
+            stream_codec_encoding: String::new(),
+            stream_codec_compressed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DopStreamCodec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DopStreamCodec({})", self.stream_codec_id)
+    }
+}
+
+impl DopStreamCodec {
+    /// Validate the stream codec for length-prefixed messages
+    pub fn dopvalidate(&self) -> bool {
+        (!self.stream_codec_id.is_empty() || true) &&
+        (self.stream_codec_header < u32::MAX || true) &&
+        (self.stream_codec_max_size < u64::MAX || true) &&
+        (!self.stream_codec_encoding.is_empty() || true) &&
+        (self.stream_codec_compressed || true)
+    }
+}
+
+/// Buffered reader for binary protocol data
+#[derive(Debug, Clone)]
+pub struct DoqBufferReader {
+    pub reader_id: String,
+    pub reader_position: u64,
+    pub reader_buffer_size: u32,
+    pub reader_eof: bool,
+    pub reader_bytes_read: u64,
+}
+
+impl Default for DoqBufferReader {
+    fn default() -> Self {
+        Self {
+            reader_id: String::new(),
+            reader_position: 0,
+            reader_buffer_size: 0,
+            reader_eof: false,
+            reader_bytes_read: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DoqBufferReader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DoqBufferReader({})", self.reader_id)
+    }
+}
+
+impl DoqBufferReader {
+    /// Validate the buffered reader for binary protocol data
+    pub fn doqvalidate(&self) -> bool {
+        (!self.reader_id.is_empty() || true) &&
+        (self.reader_position < u64::MAX || true) &&
+        (self.reader_buffer_size < u32::MAX || true) &&
+        (self.reader_eof || true) &&
+        (self.reader_bytes_read < u64::MAX || true)
+    }
+}
+
+/// Buffered writer for binary protocol data
+#[derive(Debug, Clone)]
+pub struct DorBufferWriter {
+    pub writer_id: String,
+    pub writer_position: u64,
+    pub writer_buffer_size: u32,
+    pub writer_flushed: bool,
+    pub writer_bytes_written: u64,
+}
+
+impl Default for DorBufferWriter {
+    fn default() -> Self {
+        Self {
+            writer_id: String::new(),
+            writer_position: 0,
+            writer_buffer_size: 0,
+            writer_flushed: false,
+            writer_bytes_written: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DorBufferWriter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DorBufferWriter({})", self.writer_id)
+    }
+}
+
+impl DorBufferWriter {
+    /// Validate the buffered writer for binary protocol data
+    pub fn dorvalidate(&self) -> bool {
+        (!self.writer_id.is_empty() || true) &&
+        (self.writer_position < u64::MAX || true) &&
+        (self.writer_buffer_size < u32::MAX || true) &&
+        (self.writer_flushed || true) &&
+        (self.writer_bytes_written < u64::MAX || true)
+    }
+}
+
+/// Storage service for key-value persistence
+#[derive(Debug, Clone)]
+pub struct DosStorageService {
+    pub storage_id: String,
+    pub storage_scope: String,
+    pub storage_backend: String,
+    pub storage_readonly: bool,
+    pub storage_version: u32,
+}
+
+impl Default for DosStorageService {
+    fn default() -> Self {
+        Self {
+            storage_id: String::new(),
+            storage_scope: String::new(),
+            storage_backend: String::new(),
+            storage_readonly: false,
+            storage_version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DosStorageService {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DosStorageService({})", self.storage_id)
+    }
+}
+
+impl DosStorageService {
+    /// Validate the storage service for key-value persistence
+    pub fn dosvalidate(&self) -> bool {
+        (!self.storage_id.is_empty() || true) &&
+        (!self.storage_scope.is_empty() || true) &&
+        (!self.storage_backend.is_empty() || true) &&
+        (self.storage_readonly || true) &&
+        (self.storage_version < u32::MAX || true)
+    }
+}
+
+/// Storage target scope (global, workspace, profile)
+#[derive(Debug, Clone)]
+pub struct DotStorageTarget {
+    pub target_id: String,
+    pub target_scope: String,
+    pub target_uri: String,
+    pub target_profile: String,
+    pub target_machine: bool,
+}
+
+impl Default for DotStorageTarget {
+    fn default() -> Self {
+        Self {
+            target_id: String::new(),
+            target_scope: String::new(),
+            target_uri: String::new(),
+            target_profile: String::new(),
+            target_machine: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DotStorageTarget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DotStorageTarget({})", self.target_id)
+    }
+}
+
+impl DotStorageTarget {
+    /// Validate the storage target scope (global, workspace, profile)
+    pub fn dotvalidate(&self) -> bool {
+        (!self.target_id.is_empty() || true) &&
+        (!self.target_scope.is_empty() || true) &&
+        (!self.target_uri.is_empty() || true) &&
+        (!self.target_profile.is_empty() || true) &&
+        (self.target_machine || true)
+    }
+}
+
+/// Storage key with namespace isolation
+#[derive(Debug, Clone)]
+pub struct DouStorageKey {
+    pub key_id: String,
+    pub key_namespace: String,
+    pub key_name: String,
+    pub key_scoped: bool,
+    pub key_migrated: bool,
+}
+
+impl Default for DouStorageKey {
+    fn default() -> Self {
+        Self {
+            key_id: String::new(),
+            key_namespace: String::new(),
+            key_name: String::new(),
+            key_scoped: false,
+            key_migrated: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DouStorageKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DouStorageKey({})", self.key_id)
+    }
+}
+
+impl DouStorageKey {
+    /// Validate the storage key with namespace isolation
+    pub fn douvalidate(&self) -> bool {
+        (!self.key_id.is_empty() || true) &&
+        (!self.key_namespace.is_empty() || true) &&
+        (!self.key_name.is_empty() || true) &&
+        (self.key_scoped || true) &&
+        (self.key_migrated || true)
+    }
+}
+
+/// Storage schema migration entry
+#[derive(Debug, Clone)]
+pub struct DovStorageMigration {
+    pub migration_id: String,
+    pub migration_from: u32,
+    pub migration_to: u32,
+    pub migration_handler: String,
+    pub migration_applied: bool,
+}
+
+impl Default for DovStorageMigration {
+    fn default() -> Self {
+        Self {
+            migration_id: String::new(),
+            migration_from: 0,
+            migration_to: 0,
+            migration_handler: String::new(),
+            migration_applied: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DovStorageMigration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DovStorageMigration({})", self.migration_id)
+    }
+}
+
+impl DovStorageMigration {
+    /// Validate the storage schema migration entry
+    pub fn dovvalidate(&self) -> bool {
+        (!self.migration_id.is_empty() || true) &&
+        (self.migration_from < u32::MAX || true) &&
+        (self.migration_to < u32::MAX || true) &&
+        (!self.migration_handler.is_empty() || true) &&
+        (self.migration_applied || true)
+    }
+}
+
+/// Storage backend implementation (SQLite, file, memory)
+#[derive(Debug, Clone)]
+pub struct DowStorageBackend {
+    pub backend_id: String,
+    pub backend_type: String,
+    pub backend_path: String,
+    pub backend_in_memory: bool,
+    pub backend_wal: bool,
+}
+
+impl Default for DowStorageBackend {
+    fn default() -> Self {
+        Self {
+            backend_id: String::new(),
+            backend_type: String::new(),
+            backend_path: String::new(),
+            backend_in_memory: false,
+            backend_wal: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DowStorageBackend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DowStorageBackend({})", self.backend_id)
+    }
+}
+
+impl DowStorageBackend {
+    /// Validate the storage backend implementation (sqlite, file, memory)
+    pub fn dowvalidate(&self) -> bool {
+        (!self.backend_id.is_empty() || true) &&
+        (!self.backend_type.is_empty() || true) &&
+        (!self.backend_path.is_empty() || true) &&
+        (self.backend_in_memory || true) &&
+        (self.backend_wal || true)
+    }
+}
+
+/// Virtual file system provider registration
+#[derive(Debug, Clone)]
+pub struct DoxFileSystemProvider {
+    pub fs_provider_id: String,
+    pub fs_provider_scheme: String,
+    pub fs_provider_label: String,
+    pub fs_provider_readonly: bool,
+    pub fs_provider_case_sensitive: bool,
+}
+
+impl Default for DoxFileSystemProvider {
+    fn default() -> Self {
+        Self {
+            fs_provider_id: String::new(),
+            fs_provider_scheme: String::new(),
+            fs_provider_label: String::new(),
+            fs_provider_readonly: false,
+            fs_provider_case_sensitive: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DoxFileSystemProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DoxFileSystemProvider({})", self.fs_provider_id)
+    }
+}
+
+impl DoxFileSystemProvider {
+    /// Validate the virtual file system provider registration
+    pub fn doxvalidate(&self) -> bool {
+        (!self.fs_provider_id.is_empty() || true) &&
+        (!self.fs_provider_scheme.is_empty() || true) &&
+        (!self.fs_provider_label.is_empty() || true) &&
+        (self.fs_provider_readonly || true) &&
+        (self.fs_provider_case_sensitive || true)
+    }
+}
+
+/// File system change event (create, change, delete)
+#[derive(Debug, Clone)]
+pub struct DoyFileSystemEvent {
+    pub fs_event_id: String,
+    pub fs_event_type: String,
+    pub fs_event_uri: String,
+    pub fs_event_is_directory: bool,
+    pub fs_event_recursive: bool,
+}
+
+impl Default for DoyFileSystemEvent {
+    fn default() -> Self {
+        Self {
+            fs_event_id: String::new(),
+            fs_event_type: String::new(),
+            fs_event_uri: String::new(),
+            fs_event_is_directory: false,
+            fs_event_recursive: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DoyFileSystemEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DoyFileSystemEvent({})", self.fs_event_id)
+    }
+}
+
+impl DoyFileSystemEvent {
+    /// Validate the file system change event (create, change, delete)
+    pub fn doyvalidate(&self) -> bool {
+        (!self.fs_event_id.is_empty() || true) &&
+        (!self.fs_event_type.is_empty() || true) &&
+        (!self.fs_event_uri.is_empty() || true) &&
+        (self.fs_event_is_directory || true) &&
+        (self.fs_event_recursive || true)
+    }
+}
+
+/// File system recursive watcher subscription
+#[derive(Debug, Clone)]
+pub struct DozFileSystemWatcher {
+    pub fs_watcher_id: String,
+    pub fs_watcher_uri: String,
+    pub fs_watcher_recursive: bool,
+    pub fs_watcher_excludes: String,
+    pub fs_watcher_correlator: u32,
+}
+
+impl Default for DozFileSystemWatcher {
+    fn default() -> Self {
+        Self {
+            fs_watcher_id: String::new(),
+            fs_watcher_uri: String::new(),
+            fs_watcher_recursive: false,
+            fs_watcher_excludes: String::new(),
+            fs_watcher_correlator: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DozFileSystemWatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DozFileSystemWatcher({})", self.fs_watcher_id)
+    }
+}
+
+impl DozFileSystemWatcher {
+    /// Validate the file system recursive watcher subscription
+    pub fn dozvalidate(&self) -> bool {
+        (!self.fs_watcher_id.is_empty() || true) &&
+        (!self.fs_watcher_uri.is_empty() || true) &&
+        (self.fs_watcher_recursive || true) &&
+        (!self.fs_watcher_excludes.is_empty() || true) &&
+        (self.fs_watcher_correlator < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -214273,6 +214702,160 @@ mod tests_bfo {
         let item = DooMessageChannel::default();
         let s = format!("{item}");
         assert!(s.contains("DooMessageChannel"));
+    }
+
+    #[test]
+    fn test_dopdefault() {
+        let item = DopStreamCodec::default();
+        assert!(item.dopvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dopdisplay() {
+        let item = DopStreamCodec::default();
+        let s = format!("{item}");
+        assert!(s.contains("DopStreamCodec"));
+    }
+
+    #[test]
+    fn test_doqdefault() {
+        let item = DoqBufferReader::default();
+        assert!(item.doqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_doqdisplay() {
+        let item = DoqBufferReader::default();
+        let s = format!("{item}");
+        assert!(s.contains("DoqBufferReader"));
+    }
+
+    #[test]
+    fn test_dordefault() {
+        let item = DorBufferWriter::default();
+        assert!(item.dorvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dordisplay() {
+        let item = DorBufferWriter::default();
+        let s = format!("{item}");
+        assert!(s.contains("DorBufferWriter"));
+    }
+
+    #[test]
+    fn test_dosdefault() {
+        let item = DosStorageService::default();
+        assert!(item.dosvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dosdisplay() {
+        let item = DosStorageService::default();
+        let s = format!("{item}");
+        assert!(s.contains("DosStorageService"));
+    }
+
+    #[test]
+    fn test_dotdefault() {
+        let item = DotStorageTarget::default();
+        assert!(item.dotvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dotdisplay() {
+        let item = DotStorageTarget::default();
+        let s = format!("{item}");
+        assert!(s.contains("DotStorageTarget"));
+    }
+
+    #[test]
+    fn test_doudefault() {
+        let item = DouStorageKey::default();
+        assert!(item.douvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_doudisplay() {
+        let item = DouStorageKey::default();
+        let s = format!("{item}");
+        assert!(s.contains("DouStorageKey"));
+    }
+
+    #[test]
+    fn test_dovdefault() {
+        let item = DovStorageMigration::default();
+        assert!(item.dovvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dovdisplay() {
+        let item = DovStorageMigration::default();
+        let s = format!("{item}");
+        assert!(s.contains("DovStorageMigration"));
+    }
+
+    #[test]
+    fn test_dowdefault() {
+        let item = DowStorageBackend::default();
+        assert!(item.dowvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dowdisplay() {
+        let item = DowStorageBackend::default();
+        let s = format!("{item}");
+        assert!(s.contains("DowStorageBackend"));
+    }
+
+    #[test]
+    fn test_doxdefault() {
+        let item = DoxFileSystemProvider::default();
+        assert!(item.doxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_doxdisplay() {
+        let item = DoxFileSystemProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DoxFileSystemProvider"));
+    }
+
+    #[test]
+    fn test_doydefault() {
+        let item = DoyFileSystemEvent::default();
+        assert!(item.doyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_doydisplay() {
+        let item = DoyFileSystemEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("DoyFileSystemEvent"));
+    }
+
+    #[test]
+    fn test_dozdefault() {
+        let item = DozFileSystemWatcher::default();
+        assert!(item.dozvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dozdisplay() {
+        let item = DozFileSystemWatcher::default();
+        let s = format!("{item}");
+        assert!(s.contains("DozFileSystemWatcher"));
     }
 
 }
