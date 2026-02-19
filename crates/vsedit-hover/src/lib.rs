@@ -86609,6 +86609,67 @@ pub struct BljQuickPickStep { pub title: String, pub step: usize, pub total_step
 #[derive(Debug, Clone)]
 pub struct BljQuickPickResult { pub selected_indices: Vec<usize>, pub cancelled: bool }
 
+
+// Input box model — input validation, password mode, step navigation, value persistence
+#[derive(Debug, Clone)]
+pub struct BlkInputBoxOptions { pub prompt: String, pub placeholder: Option<String>, pub value: String, pub password: bool, pub ignore_focus_out: bool }
+#[derive(Debug, Clone)]
+pub struct BlkInputValidation { pub message: String, pub severity: u8 }
+#[derive(Debug, Clone)]
+pub struct BlkInputBoxState { pub value: String, pub selection_start: usize, pub selection_end: usize, pub valid: bool }
+#[derive(Debug, Clone)]
+pub struct BlkInputBoxStep { pub title: String, pub step: usize, pub total_steps: usize, pub options: BlkInputBoxOptions }
+#[derive(Debug, Clone)]
+pub struct BlkInputBoxResult { pub value: Option<String>, pub cancelled: bool }
+
+// Dialog model — message dialog, open file dialog, save file dialog, confirm dialog
+#[derive(Debug, Clone)]
+pub struct BllMessageDialog { pub message: String, pub detail: Option<String>, pub buttons: Vec<String>, pub default_button: usize }
+#[derive(Debug, Clone)]
+pub struct BllOpenDialog { pub title: String, pub can_select_files: bool, pub can_select_folders: bool, pub can_select_many: bool, pub filters: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BllSaveDialog { pub title: String, pub default_name: Option<String>, pub filters: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BllConfirmDialog { pub message: String, pub confirm_label: String, pub cancel_label: String }
+#[derive(Debug, Clone)]
+pub struct BllDialogResult { pub button_index: Option<usize>, pub paths: Vec<String>, pub cancelled: bool }
+
+// Tree view model — tree items, expand/collapse, virtual scrolling, drag-drop reorder
+#[derive(Debug, Clone)]
+pub struct BlmTreeItem { pub id: String, pub label: String, pub icon: Option<String>, pub collapsible: bool, pub expanded: bool }
+#[derive(Debug, Clone)]
+pub struct BlmTreeItemState { pub selected: bool, pub focused: bool, pub cut: bool, pub highlighted: bool }
+#[derive(Debug, Clone)]
+pub struct BlmTreeViewConfig { pub multi_select: bool, pub drag_and_drop: bool, pub show_collapse_all: bool }
+#[derive(Debug, Clone)]
+pub struct BlmTreeViewState { pub root_items: Vec<String>, pub expanded_ids: Vec<String>, pub selected_ids: Vec<String>, pub scroll_top: usize }
+#[derive(Debug, Clone)]
+pub struct BlmTreeViewAction { pub action: u8, pub item_id: String }
+
+// Table/list view — table columns, sorting, filtering, virtual scrolling, cell rendering
+#[derive(Debug, Clone)]
+pub struct BlnTableColumn { pub id: String, pub label: String, pub width: usize, pub sortable: bool, pub resizable: bool }
+#[derive(Debug, Clone)]
+pub struct BlnTableRow { pub id: String, pub cells: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BlnTableSort { pub column_id: String, pub ascending: bool }
+#[derive(Debug, Clone)]
+pub struct BlnTableFilter { pub column_id: String, pub value: String, pub operator: u8 }
+#[derive(Debug, Clone)]
+pub struct BlnTableState { pub columns: Vec<BlnTableColumn>, pub row_count: usize, pub sort: Option<BlnTableSort>, pub scroll_top: usize }
+
+// Webview panel model — webview content, message passing, resource URIs, state persistence
+#[derive(Debug, Clone)]
+pub struct BloWebviewOptions { pub enable_scripts: bool, pub enable_forms: bool, pub local_resource_roots: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BloWebviewContent { pub html: String, pub title: String, pub icon_path: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BloWebviewMessage { pub command: String, pub payload: String }
+#[derive(Debug, Clone)]
+pub struct BloWebviewState { pub panel_id: String, pub active: bool, pub visible: bool, pub view_column: u8 }
+#[derive(Debug, Clone)]
+pub struct BloWebviewPersistence { pub state_json: Option<String>, pub view_type: String }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -95829,4 +95890,104 @@ mod tests_bfo {
     fn test_blj_result_selected() { let r = BljQuickPickResult { selected_indices: vec![0, 2], cancelled: false }; assert_eq!(r.selected_indices.len(), 2); }
     #[test]
     fn test_blj_result_cancelled() { let r = BljQuickPickResult { selected_indices: vec![], cancelled: true }; assert!(r.cancelled); }
+    #[test]
+    fn test_blk_basic_options() { let o = BlkInputBoxOptions { prompt: "Enter name".into(), placeholder: Some("name".into()), value: String::new(), password: false, ignore_focus_out: false }; assert!(!o.password); }
+    #[test]
+    fn test_blk_password_mode() { let o = BlkInputBoxOptions { prompt: "Password".into(), placeholder: None, value: String::new(), password: true, ignore_focus_out: true }; assert!(o.password); }
+    #[test]
+    fn test_blk_validation_error() { let v = BlkInputValidation { message: "Required".into(), severity: 2 }; assert_eq!(v.severity, 2); }
+    #[test]
+    fn test_blk_validation_warning() { let v = BlkInputValidation { message: "Unusual".into(), severity: 1 }; assert_eq!(v.severity, 1); }
+    #[test]
+    fn test_blk_state_empty() { let s = BlkInputBoxState { value: String::new(), selection_start: 0, selection_end: 0, valid: true }; assert!(s.valid); }
+    #[test]
+    fn test_blk_state_with_value() { let s = BlkInputBoxState { value: "hello".into(), selection_start: 0, selection_end: 5, valid: true }; assert_eq!(s.selection_end, 5); }
+    #[test]
+    fn test_blk_step_first() { let o = BlkInputBoxOptions { prompt: "P".into(), placeholder: None, value: String::new(), password: false, ignore_focus_out: false }; let s = BlkInputBoxStep { title: "Step 1".into(), step: 1, total_steps: 3, options: o }; assert_eq!(s.step, 1); }
+    #[test]
+    fn test_blk_result_ok() { let r = BlkInputBoxResult { value: Some("entered".into()), cancelled: false }; assert!(r.value.is_some()); }
+    #[test]
+    fn test_blk_result_cancelled() { let r = BlkInputBoxResult { value: None, cancelled: true }; assert!(r.cancelled); }
+    #[test]
+    fn test_blk_invalid_state() { let s = BlkInputBoxState { value: "bad".into(), selection_start: 0, selection_end: 3, valid: false }; assert!(!s.valid); }
+    #[test]
+    fn test_bll_message_basic() { let d = BllMessageDialog { message: "Save changes?".into(), detail: None, buttons: vec!["Save".into(), "Don't Save".into(), "Cancel".into()], default_button: 0 }; assert_eq!(d.buttons.len(), 3); }
+    #[test]
+    fn test_bll_message_with_detail() { let d = BllMessageDialog { message: "Error".into(), detail: Some("File not found".into()), buttons: vec!["OK".into()], default_button: 0 }; assert!(d.detail.is_some()); }
+    #[test]
+    fn test_bll_open_file() { let d = BllOpenDialog { title: "Open".into(), can_select_files: true, can_select_folders: false, can_select_many: false, filters: vec!["*.rs".into()] }; assert!(d.can_select_files); }
+    #[test]
+    fn test_bll_open_folder() { let d = BllOpenDialog { title: "Open Folder".into(), can_select_files: false, can_select_folders: true, can_select_many: false, filters: vec![] }; assert!(d.can_select_folders); }
+    #[test]
+    fn test_bll_open_many() { let d = BllOpenDialog { title: "Select".into(), can_select_files: true, can_select_folders: false, can_select_many: true, filters: vec![] }; assert!(d.can_select_many); }
+    #[test]
+    fn test_bll_save_dialog() { let d = BllSaveDialog { title: "Save As".into(), default_name: Some("untitled.rs".into()), filters: vec!["*.rs".into()] }; assert!(d.default_name.is_some()); }
+    #[test]
+    fn test_bll_save_no_default() { let d = BllSaveDialog { title: "Save".into(), default_name: None, filters: vec![] }; assert!(d.default_name.is_none()); }
+    #[test]
+    fn test_bll_confirm_dialog() { let d = BllConfirmDialog { message: "Delete?".into(), confirm_label: "Delete".into(), cancel_label: "Cancel".into() }; assert_eq!(d.confirm_label, "Delete"); }
+    #[test]
+    fn test_bll_result_button() { let r = BllDialogResult { button_index: Some(1), paths: vec![], cancelled: false }; assert_eq!(r.button_index, Some(1)); }
+    #[test]
+    fn test_bll_result_cancelled() { let r = BllDialogResult { button_index: None, paths: vec![], cancelled: true }; assert!(r.cancelled); }
+    #[test]
+    fn test_blm_leaf_item() { let i = BlmTreeItem { id: "file1".into(), label: "main.rs".into(), icon: Some("file".into()), collapsible: false, expanded: false }; assert!(!i.collapsible); }
+    #[test]
+    fn test_blm_folder_item() { let i = BlmTreeItem { id: "src".into(), label: "src".into(), icon: Some("folder".into()), collapsible: true, expanded: true }; assert!(i.expanded); }
+    #[test]
+    fn test_blm_item_state_default() { let s = BlmTreeItemState { selected: false, focused: false, cut: false, highlighted: false }; assert!(!s.selected); }
+    #[test]
+    fn test_blm_item_selected() { let s = BlmTreeItemState { selected: true, focused: true, cut: false, highlighted: false }; assert!(s.selected); }
+    #[test]
+    fn test_blm_item_cut() { let s = BlmTreeItemState { selected: true, focused: false, cut: true, highlighted: false }; assert!(s.cut); }
+    #[test]
+    fn test_blm_config_basic() { let c = BlmTreeViewConfig { multi_select: true, drag_and_drop: true, show_collapse_all: true }; assert!(c.multi_select); }
+    #[test]
+    fn test_blm_config_simple() { let c = BlmTreeViewConfig { multi_select: false, drag_and_drop: false, show_collapse_all: false }; assert!(!c.drag_and_drop); }
+    #[test]
+    fn test_blm_view_state() { let s = BlmTreeViewState { root_items: vec!["a".into()], expanded_ids: vec!["a".into()], selected_ids: vec![], scroll_top: 0 }; assert_eq!(s.root_items.len(), 1); }
+    #[test]
+    fn test_blm_action_expand() { let a = BlmTreeViewAction { action: 0, item_id: "src".into() }; assert_eq!(a.action, 0); }
+    #[test]
+    fn test_blm_action_select() { let a = BlmTreeViewAction { action: 1, item_id: "file1".into() }; assert_eq!(a.action, 1); }
+    #[test]
+    fn test_bln_column_basic() { let c = BlnTableColumn { id: "name".into(), label: "Name".into(), width: 200, sortable: true, resizable: true }; assert!(c.sortable); }
+    #[test]
+    fn test_bln_column_fixed() { let c = BlnTableColumn { id: "icon".into(), label: "".into(), width: 24, sortable: false, resizable: false }; assert!(!c.resizable); }
+    #[test]
+    fn test_bln_row_basic() { let r = BlnTableRow { id: "r1".into(), cells: vec!["file.rs".into(), "1024".into()] }; assert_eq!(r.cells.len(), 2); }
+    #[test]
+    fn test_bln_sort_asc() { let s = BlnTableSort { column_id: "name".into(), ascending: true }; assert!(s.ascending); }
+    #[test]
+    fn test_bln_sort_desc() { let s = BlnTableSort { column_id: "size".into(), ascending: false }; assert!(!s.ascending); }
+    #[test]
+    fn test_bln_filter_equals() { let f = BlnTableFilter { column_id: "type".into(), value: "file".into(), operator: 0 }; assert_eq!(f.operator, 0); }
+    #[test]
+    fn test_bln_filter_contains() { let f = BlnTableFilter { column_id: "name".into(), value: "test".into(), operator: 1 }; assert_eq!(f.operator, 1); }
+    #[test]
+    fn test_bln_state_empty() { let s = BlnTableState { columns: vec![], row_count: 0, sort: None, scroll_top: 0 }; assert_eq!(s.row_count, 0); }
+    #[test]
+    fn test_bln_state_sorted() { let sort = BlnTableSort { column_id: "name".into(), ascending: true }; let s = BlnTableState { columns: vec![], row_count: 100, sort: Some(sort), scroll_top: 0 }; assert!(s.sort.is_some()); }
+    #[test]
+    fn test_bln_state_scrolled() { let s = BlnTableState { columns: vec![], row_count: 1000, sort: None, scroll_top: 500 }; assert_eq!(s.scroll_top, 500); }
+    #[test]
+    fn test_blo_options_scripts() { let o = BloWebviewOptions { enable_scripts: true, enable_forms: false, local_resource_roots: vec![] }; assert!(o.enable_scripts); }
+    #[test]
+    fn test_blo_options_forms() { let o = BloWebviewOptions { enable_scripts: true, enable_forms: true, local_resource_roots: vec!["/ext".into()] }; assert!(o.enable_forms); }
+    #[test]
+    fn test_blo_content_basic() { let c = BloWebviewContent { html: "<h1>Hello</h1>".into(), title: "Preview".into(), icon_path: None }; assert!(c.html.contains("Hello")); }
+    #[test]
+    fn test_blo_content_with_icon() { let c = BloWebviewContent { html: String::new(), title: "X".into(), icon_path: Some("/icons/x.svg".into()) }; assert!(c.icon_path.is_some()); }
+    #[test]
+    fn test_blo_message_basic() { let m = BloWebviewMessage { command: "update".into(), payload: "{}".into() }; assert_eq!(m.command, "update"); }
+    #[test]
+    fn test_blo_state_active() { let s = BloWebviewState { panel_id: "p1".into(), active: true, visible: true, view_column: 1 }; assert!(s.active); }
+    #[test]
+    fn test_blo_state_background() { let s = BloWebviewState { panel_id: "p2".into(), active: false, visible: false, view_column: 2 }; assert!(!s.visible); }
+    #[test]
+    fn test_blo_persistence_with_state() { let p = BloWebviewPersistence { state_json: Some("{\"scroll\": 100}".into()), view_type: "preview".into() }; assert!(p.state_json.is_some()); }
+    #[test]
+    fn test_blo_persistence_no_state() { let p = BloWebviewPersistence { state_json: None, view_type: "welcome".into() }; assert!(p.state_json.is_none()); }
+    #[test]
+    fn test_blo_message_complex() { let m = BloWebviewMessage { command: "navigate".into(), payload: "{\"url\": \"https://example.com\"}".into() }; assert!(m.payload.contains("url")); }
 }
