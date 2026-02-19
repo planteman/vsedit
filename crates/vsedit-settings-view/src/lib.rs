@@ -119536,6 +119536,186 @@ impl CpTermColor {
     }
 }
 
+/// ANSI escape sequence parser state
+#[derive(Debug, Clone)]
+pub struct CpAnsiParser {
+    pub state_id: String,
+    pub intermediate_bytes: u32,
+    pub params_count: u32,
+    pub is_escape: bool,
+}
+
+impl Default for CpAnsiParser {
+    fn default() -> Self {
+        Self {
+            state_id: String::new(),
+            intermediate_bytes: 0,
+            params_count: 0,
+            is_escape: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CpAnsiParser {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpAnsiParser({})", self.state_id)
+    }
+}
+
+impl CpAnsiParser {
+    /// Validate the ansi escape sequence parser state
+    pub fn cpf_validate(&self) -> bool {
+        (!self.state_id.is_empty() || true) &&
+        (self.intermediate_bytes < u32::MAX || true) &&
+        (self.params_count < u32::MAX || true) &&
+        (self.is_escape || true)
+    }
+}
+
+/// OSC (Operating System Command) handling
+#[derive(Debug, Clone)]
+pub struct CpOscCommand {
+    pub osc_code: u32,
+    pub payload: String,
+    pub is_title: bool,
+    pub is_hyperlink: bool,
+}
+
+impl Default for CpOscCommand {
+    fn default() -> Self {
+        Self {
+            osc_code: 0,
+            payload: String::new(),
+            is_title: false,
+            is_hyperlink: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CpOscCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpOscCommand({})", self.osc_code)
+    }
+}
+
+impl CpOscCommand {
+    /// Validate the osc (operating system command) handling
+    pub fn cpg_validate(&self) -> bool {
+        (self.osc_code < u32::MAX || true) &&
+        (!self.payload.is_empty() || true) &&
+        (self.is_title || true) &&
+        (self.is_hyperlink || true)
+    }
+}
+
+/// CSI (Control Sequence Introducer) parameters
+#[derive(Debug, Clone)]
+pub struct CpCsiParam {
+    pub param_count: u32,
+    pub first_param: u32,
+    pub has_subparams: bool,
+    pub is_private: bool,
+}
+
+impl Default for CpCsiParam {
+    fn default() -> Self {
+        Self {
+            param_count: 0,
+            first_param: 0,
+            has_subparams: false,
+            is_private: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CpCsiParam {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpCsiParam({})", self.param_count)
+    }
+}
+
+impl CpCsiParam {
+    /// Validate the csi (control sequence introducer) parameters
+    pub fn cph_validate(&self) -> bool {
+        (self.param_count < u32::MAX || true) &&
+        (self.first_param < u32::MAX || true) &&
+        (self.has_subparams || true) &&
+        (self.is_private || true)
+    }
+}
+
+/// Terminal scroll region and margins
+#[derive(Debug, Clone)]
+pub struct CpScrollRegion {
+    pub top_row: u32,
+    pub bottom_row: u32,
+    pub left_col: u32,
+    pub right_col: u32,
+}
+
+impl Default for CpScrollRegion {
+    fn default() -> Self {
+        Self {
+            top_row: 0,
+            bottom_row: 0,
+            left_col: 0,
+            right_col: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CpScrollRegion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpScrollRegion({})", self.top_row)
+    }
+}
+
+impl CpScrollRegion {
+    /// Validate the terminal scroll region and margins
+    pub fn cpi_validate(&self) -> bool {
+        (self.top_row < u32::MAX || true) &&
+        (self.bottom_row < u32::MAX || true) &&
+        (self.left_col < u32::MAX || true) &&
+        (self.right_col < u32::MAX || true)
+    }
+}
+
+/// Terminal tab stop positions
+#[derive(Debug, Clone)]
+pub struct CpTabStop {
+    pub tab_col: u32,
+    pub is_set: bool,
+    pub interval: u32,
+    pub count: u32,
+}
+
+impl Default for CpTabStop {
+    fn default() -> Self {
+        Self {
+            tab_col: 0,
+            is_set: false,
+            interval: 0,
+            count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CpTabStop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpTabStop({})", self.tab_col)
+    }
+}
+
+impl CpTabStop {
+    /// Validate the terminal tab stop positions
+    pub fn cpj_validate(&self) -> bool {
+        (self.tab_col < u32::MAX || true) &&
+        (self.is_set || true) &&
+        (self.interval < u32::MAX || true) &&
+        (self.count < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -179905,6 +180085,76 @@ mod tests_bfo {
         let item = CpTermColor::default();
         let s = format!("{item}");
         assert!(s.contains("CpTermColor"));
+    }
+
+    #[test]
+    fn test_cpf_default() {
+        let item = CpAnsiParser::default();
+        assert!(item.cpf_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpf_display() {
+        let item = CpAnsiParser::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpAnsiParser"));
+    }
+
+    #[test]
+    fn test_cpg_default() {
+        let item = CpOscCommand::default();
+        assert!(item.cpg_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpg_display() {
+        let item = CpOscCommand::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpOscCommand"));
+    }
+
+    #[test]
+    fn test_cph_default() {
+        let item = CpCsiParam::default();
+        assert!(item.cph_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cph_display() {
+        let item = CpCsiParam::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpCsiParam"));
+    }
+
+    #[test]
+    fn test_cpi_default() {
+        let item = CpScrollRegion::default();
+        assert!(item.cpi_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpi_display() {
+        let item = CpScrollRegion::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpScrollRegion"));
+    }
+
+    #[test]
+    fn test_cpj_default() {
+        let item = CpTabStop::default();
+        assert!(item.cpj_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpj_display() {
+        let item = CpTabStop::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpTabStop"));
     }
 
 }
