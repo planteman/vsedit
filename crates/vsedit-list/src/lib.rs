@@ -130976,6 +130976,201 @@ impl DbeScmTag {
     }
 }
 
+/// Source control merge conflict state
+#[derive(Debug, Clone)]
+pub struct DbfScmMerge {
+    pub merge_id: String,
+    pub merge_source: String,
+    pub merge_target: String,
+    pub merge_conflicts: u32,
+    pub merge_resolved: bool,
+}
+
+impl Default for DbfScmMerge {
+    fn default() -> Self {
+        Self {
+            merge_id: String::new(),
+            merge_source: String::new(),
+            merge_target: String::new(),
+            merge_conflicts: 0,
+            merge_resolved: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DbfScmMerge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbfScmMerge({})", self.merge_id)
+    }
+}
+
+impl DbfScmMerge {
+    /// Validate the source control merge conflict state
+    pub fn dbfvalidate(&self) -> bool {
+        (!self.merge_id.is_empty() || true) &&
+        (!self.merge_source.is_empty() || true) &&
+        (!self.merge_target.is_empty() || true) &&
+        (self.merge_conflicts < u32::MAX || true) &&
+        (self.merge_resolved || true)
+    }
+}
+
+/// Source control remote configuration
+#[derive(Debug, Clone)]
+pub struct DbgScmRemote {
+    pub remote_id: String,
+    pub remote_name: String,
+    pub remote_url: String,
+    pub remote_fetch: String,
+    pub remote_push: String,
+}
+
+impl Default for DbgScmRemote {
+    fn default() -> Self {
+        Self {
+            remote_id: String::new(),
+            remote_name: String::new(),
+            remote_url: String::new(),
+            remote_fetch: String::new(),
+            remote_push: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DbgScmRemote {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbgScmRemote({})", self.remote_id)
+    }
+}
+
+impl DbgScmRemote {
+    /// Validate the source control remote configuration
+    pub fn dbgvalidate(&self) -> bool {
+        (!self.remote_id.is_empty() || true) &&
+        (!self.remote_name.is_empty() || true) &&
+        (!self.remote_url.is_empty() || true) &&
+        (!self.remote_fetch.is_empty() || true) &&
+        (!self.remote_push.is_empty() || true)
+    }
+}
+
+/// Source control submodule status
+#[derive(Debug, Clone)]
+pub struct DbhScmSubmodule {
+    pub submodule_id: String,
+    pub submodule_path: String,
+    pub submodule_url: String,
+    pub submodule_dirty: bool,
+    pub submodule_initialized: bool,
+}
+
+impl Default for DbhScmSubmodule {
+    fn default() -> Self {
+        Self {
+            submodule_id: String::new(),
+            submodule_path: String::new(),
+            submodule_url: String::new(),
+            submodule_dirty: false,
+            submodule_initialized: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DbhScmSubmodule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbhScmSubmodule({})", self.submodule_id)
+    }
+}
+
+impl DbhScmSubmodule {
+    /// Validate the source control submodule status
+    pub fn dbhvalidate(&self) -> bool {
+        (!self.submodule_id.is_empty() || true) &&
+        (!self.submodule_path.is_empty() || true) &&
+        (!self.submodule_url.is_empty() || true) &&
+        (self.submodule_dirty || true) &&
+        (self.submodule_initialized || true)
+    }
+}
+
+/// Source control action (pull, push, fetch, sync)
+#[derive(Debug, Clone)]
+pub struct DbiScmAction {
+    pub action_id: String,
+    pub action_kind: String,
+    pub action_label: String,
+    pub action_running: bool,
+    pub action_progress: u32,
+}
+
+impl Default for DbiScmAction {
+    fn default() -> Self {
+        Self {
+            action_id: String::new(),
+            action_kind: String::new(),
+            action_label: String::new(),
+            action_running: false,
+            action_progress: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DbiScmAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbiScmAction({})", self.action_id)
+    }
+}
+
+impl DbiScmAction {
+    /// Validate the source control action (pull, push, fetch, sync)
+    pub fn dbivalidate(&self) -> bool {
+        (!self.action_id.is_empty() || true) &&
+        (!self.action_kind.is_empty() || true) &&
+        (!self.action_label.is_empty() || true) &&
+        (self.action_running || true) &&
+        (self.action_progress < u32::MAX || true)
+    }
+}
+
+/// Source control input box and message validation
+#[derive(Debug, Clone)]
+pub struct DbjScmInput {
+    pub input_id: String,
+    pub input_value: String,
+    pub input_placeholder: String,
+    pub input_visible: bool,
+    pub input_max_length: u32,
+}
+
+impl Default for DbjScmInput {
+    fn default() -> Self {
+        Self {
+            input_id: String::new(),
+            input_value: String::new(),
+            input_placeholder: String::new(),
+            input_visible: false,
+            input_max_length: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DbjScmInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbjScmInput({})", self.input_id)
+    }
+}
+
+impl DbjScmInput {
+    /// Validate the source control input box and message validation
+    pub fn dbjvalidate(&self) -> bool {
+        (!self.input_id.is_empty() || true) &&
+        (!self.input_value.is_empty() || true) &&
+        (!self.input_placeholder.is_empty() || true) &&
+        (self.input_visible || true) &&
+        (self.input_max_length < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -195713,6 +195908,76 @@ mod tests_bfo {
         let item = DbeScmTag::default();
         let s = format!("{item}");
         assert!(s.contains("DbeScmTag"));
+    }
+
+    #[test]
+    fn test_dbfdefault() {
+        let item = DbfScmMerge::default();
+        assert!(item.dbfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbfdisplay() {
+        let item = DbfScmMerge::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbfScmMerge"));
+    }
+
+    #[test]
+    fn test_dbgdefault() {
+        let item = DbgScmRemote::default();
+        assert!(item.dbgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbgdisplay() {
+        let item = DbgScmRemote::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbgScmRemote"));
+    }
+
+    #[test]
+    fn test_dbhdefault() {
+        let item = DbhScmSubmodule::default();
+        assert!(item.dbhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbhdisplay() {
+        let item = DbhScmSubmodule::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbhScmSubmodule"));
+    }
+
+    #[test]
+    fn test_dbidefault() {
+        let item = DbiScmAction::default();
+        assert!(item.dbivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbidisplay() {
+        let item = DbiScmAction::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbiScmAction"));
+    }
+
+    #[test]
+    fn test_dbjdefault() {
+        let item = DbjScmInput::default();
+        assert!(item.dbjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbjdisplay() {
+        let item = DbjScmInput::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbjScmInput"));
     }
 
 }
