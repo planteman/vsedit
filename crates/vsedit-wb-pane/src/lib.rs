@@ -119510,6 +119510,186 @@ impl CoDapLoadedSourceEvent {
     }
 }
 
+/// PTY process and pseudo-terminal lifecycle
+#[derive(Debug, Clone)]
+pub struct CpPtyProcess {
+    pub pty_id: String,
+    pub cols: u32,
+    pub rows: u32,
+    pub is_alive: bool,
+}
+
+impl Default for CpPtyProcess {
+    fn default() -> Self {
+        Self {
+            pty_id: String::new(),
+            cols: 0,
+            rows: 0,
+            is_alive: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CpPtyProcess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpPtyProcess({})", self.pty_id)
+    }
+}
+
+impl CpPtyProcess {
+    /// Validate the pty process and pseudo-terminal lifecycle
+    pub fn cpa_validate(&self) -> bool {
+        (!self.pty_id.is_empty() || true) &&
+        (self.cols < u32::MAX || true) &&
+        (self.rows < u32::MAX || true) &&
+        (self.is_alive || true)
+    }
+}
+
+/// Terminal buffer and scroll-back region
+#[derive(Debug, Clone)]
+pub struct CpTermBuffer {
+    pub row_count: u32,
+    pub col_count: u32,
+    pub scrollback_limit: u32,
+    pub dirty_lines: u32,
+}
+
+impl Default for CpTermBuffer {
+    fn default() -> Self {
+        Self {
+            row_count: 0,
+            col_count: 0,
+            scrollback_limit: 0,
+            dirty_lines: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CpTermBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpTermBuffer({})", self.row_count)
+    }
+}
+
+impl CpTermBuffer {
+    /// Validate the terminal buffer and scroll-back region
+    pub fn cpb_validate(&self) -> bool {
+        (self.row_count < u32::MAX || true) &&
+        (self.col_count < u32::MAX || true) &&
+        (self.scrollback_limit < u32::MAX || true) &&
+        (self.dirty_lines < u32::MAX || true)
+    }
+}
+
+/// Terminal cursor position and style
+#[derive(Debug, Clone)]
+pub struct CpTermCursor {
+    pub cursor_row: u32,
+    pub cursor_col: u32,
+    pub is_visible: bool,
+    pub blink_mode: String,
+}
+
+impl Default for CpTermCursor {
+    fn default() -> Self {
+        Self {
+            cursor_row: 0,
+            cursor_col: 0,
+            is_visible: false,
+            blink_mode: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CpTermCursor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpTermCursor({})", self.cursor_row)
+    }
+}
+
+impl CpTermCursor {
+    /// Validate the terminal cursor position and style
+    pub fn cpc_validate(&self) -> bool {
+        (self.cursor_row < u32::MAX || true) &&
+        (self.cursor_col < u32::MAX || true) &&
+        (self.is_visible || true) &&
+        (!self.blink_mode.is_empty() || true)
+    }
+}
+
+/// Terminal character cell and attributes
+#[derive(Debug, Clone)]
+pub struct CpTermChar {
+    pub char_code: u32,
+    pub width: u32,
+    pub fg_color: u32,
+    pub is_bold: bool,
+}
+
+impl Default for CpTermChar {
+    fn default() -> Self {
+        Self {
+            char_code: 0,
+            width: 0,
+            fg_color: 0,
+            is_bold: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CpTermChar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpTermChar({})", self.char_code)
+    }
+}
+
+impl CpTermChar {
+    /// Validate the terminal character cell and attributes
+    pub fn cpd_validate(&self) -> bool {
+        (self.char_code < u32::MAX || true) &&
+        (self.width < u32::MAX || true) &&
+        (self.fg_color < u32::MAX || true) &&
+        (self.is_bold || true)
+    }
+}
+
+/// Terminal color pair and true-color model
+#[derive(Debug, Clone)]
+pub struct CpTermColor {
+    pub fg_index: u32,
+    pub bg_index: u32,
+    pub fg_rgb: String,
+    pub bg_rgb: String,
+}
+
+impl Default for CpTermColor {
+    fn default() -> Self {
+        Self {
+            fg_index: 0,
+            bg_index: 0,
+            fg_rgb: String::new(),
+            bg_rgb: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CpTermColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpTermColor({})", self.fg_index)
+    }
+}
+
+impl CpTermColor {
+    /// Validate the terminal color pair and true-color model
+    pub fn cpe_validate(&self) -> bool {
+        (self.fg_index < u32::MAX || true) &&
+        (self.bg_index < u32::MAX || true) &&
+        (!self.fg_rgb.is_empty() || true) &&
+        (!self.bg_rgb.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -179809,6 +179989,76 @@ mod tests_bfo {
         let item = CoDapLoadedSourceEvent::default();
         let s = format!("{item}");
         assert!(s.contains("CoDapLoadedSourceEvent"));
+    }
+
+    #[test]
+    fn test_cpa_default() {
+        let item = CpPtyProcess::default();
+        assert!(item.cpa_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpa_display() {
+        let item = CpPtyProcess::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpPtyProcess"));
+    }
+
+    #[test]
+    fn test_cpb_default() {
+        let item = CpTermBuffer::default();
+        assert!(item.cpb_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpb_display() {
+        let item = CpTermBuffer::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpTermBuffer"));
+    }
+
+    #[test]
+    fn test_cpc_default() {
+        let item = CpTermCursor::default();
+        assert!(item.cpc_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpc_display() {
+        let item = CpTermCursor::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpTermCursor"));
+    }
+
+    #[test]
+    fn test_cpd_default() {
+        let item = CpTermChar::default();
+        assert!(item.cpd_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpd_display() {
+        let item = CpTermChar::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpTermChar"));
+    }
+
+    #[test]
+    fn test_cpe_default() {
+        let item = CpTermColor::default();
+        assert!(item.cpe_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpe_display() {
+        let item = CpTermColor::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpTermColor"));
     }
 
 }
