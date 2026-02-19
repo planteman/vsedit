@@ -58321,3 +58321,204 @@ mod bbj_tests {
         assert_eq!(height, 1.0);
     }
 }
+
+
+// --- bbk_: Editor scroll model ---
+
+/// Scroll direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BbkScrollDir { Up, Down, Left, Right }
+
+/// Scroll type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BbkScrollType { Lines, Pages, HalfPage, Editor }
+
+/// Smooth scroll configuration.
+#[derive(Debug, Clone, Copy)]
+pub struct BbkSmoothScroll {
+    pub enabled: bool,
+    pub speed_ms: u32,
+}
+
+impl BbkSmoothScroll {
+    pub fn new(enabled: bool, speed: u32) -> Self { Self { enabled, speed_ms: speed } }
+    pub fn default_config() -> Self { Self::new(true, 100) }
+}
+
+/// Scroll state.
+#[derive(Debug)]
+pub struct BbkScrollState {
+    pub top_line: u32,
+    pub left_col: u32,
+    pub viewport_lines: u32,
+    pub viewport_cols: u32,
+    pub total_lines: u32,
+    pub max_col: u32,
+    smooth: BbkSmoothScroll,
+    target_top: Option<u32>,
+    scroll_beyond_last: bool,
+    fast_scroll_sensitivity: u32,
+}
+
+impl BbkScrollState {
+    pub fn new(viewport_lines: u32, viewport_cols: u32) -> Self {
+        Self {
+            top_line: 0, left_col: 0, viewport_lines, viewport_cols,
+            total_lines: 0, max_col: 0, smooth: BbkSmoothScroll::default_config(),
+            target_top: None, scroll_beyond_last: true, fast_scroll_sensitivity: 5,
+        }
+    }
+
+    pub fn set_total_lines(&mut self, n: u32) { self.total_lines = n; }
+    pub fn set_max_col(&mut self, c: u32) { self.max_col = c; }
+
+    pub fn max_top_line(&self) -> u32 {
+        if self.scroll_beyond_last {
+            self.total_lines.saturating_sub(1)
+        } else {
+            self.total_lines.saturating_sub(self.viewport_lines)
+        }
+    }
+
+    pub fn scroll_lines(&mut self, dir: BbkScrollDir, count: u32) {
+        match dir {
+            BbkScrollDir::Up => self.top_line = self.top_line.saturating_sub(count),
+            BbkScrollDir::Down => self.top_line = (self.top_line + count).min(self.max_top_line()),
+            BbkScrollDir::Left => self.left_col = self.left_col.saturating_sub(count),
+            BbkScrollDir::Right => self.left_col = (self.left_col + count).min(self.max_col),
+        }
+    }
+
+    pub fn scroll_by_type(&mut self, dir: BbkScrollDir, scroll_type: BbkScrollType) {
+        let amount = match scroll_type {
+            BbkScrollType::Lines => 1,
+            BbkScrollType::HalfPage => self.viewport_lines / 2,
+            BbkScrollType::Pages => self.viewport_lines,
+            BbkScrollType::Editor => self.total_lines,
+        };
+        self.scroll_lines(dir, amount);
+    }
+
+    pub fn scroll_to_line(&mut self, line: u32) {
+        self.top_line = line.min(self.max_top_line());
+    }
+
+    pub fn ensure_visible(&mut self, line: u32) {
+        if line < self.top_line {
+            self.top_line = line;
+        } else if line >= self.top_line + self.viewport_lines {
+            self.top_line = line.saturating_sub(self.viewport_lines - 1);
+        }
+    }
+
+    pub fn bottom_line(&self) -> u32 {
+        (self.top_line + self.viewport_lines).min(self.total_lines)
+    }
+
+    pub fn is_at_top(&self) -> bool { self.top_line == 0 }
+    pub fn is_at_bottom(&self) -> bool { self.top_line >= self.max_top_line() }
+
+    pub fn visible_range(&self) -> (u32, u32) {
+        (self.top_line, self.bottom_line())
+    }
+
+    pub fn scroll_percentage(&self) -> f64 {
+        if self.total_lines == 0 { return 0.0; }
+        self.top_line as f64 / self.max_top_line().max(1) as f64
+    }
+
+    pub fn set_smooth_scroll(&mut self, s: BbkSmoothScroll) { self.smooth = s; }
+    pub fn set_scroll_beyond_last(&mut self, v: bool) { self.scroll_beyond_last = v; }
+}
+
+#[cfg(test)]
+mod bbk_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbk_scroll_down() {
+        let mut s = BbkScrollState::new(50, 80);
+        s.set_total_lines(1000);
+        s.scroll_lines(BbkScrollDir::Down, 10);
+        assert_eq!(s.top_line, 10);
+    }
+
+    #[test]
+    fn test_bbk_scroll_up_clamp() {
+        let mut s = BbkScrollState::new(50, 80);
+        s.set_total_lines(100);
+        s.scroll_lines(BbkScrollDir::Up, 10);
+        assert_eq!(s.top_line, 0);
+    }
+
+    #[test]
+    fn test_bbk_scroll_down_clamp() {
+        let mut s = BbkScrollState::new(50, 80);
+        s.set_total_lines(100);
+        s.scroll_lines(BbkScrollDir::Down, 200);
+        assert!(s.top_line <= 99);
+    }
+
+    #[test]
+    fn test_bbk_page_scroll() {
+        let mut s = BbkScrollState::new(50, 80);
+        s.set_total_lines(1000);
+        s.scroll_by_type(BbkScrollDir::Down, BbkScrollType::Pages);
+        assert_eq!(s.top_line, 50);
+    }
+
+    #[test]
+    fn test_bbk_half_page() {
+        let mut s = BbkScrollState::new(50, 80);
+        s.set_total_lines(1000);
+        s.scroll_by_type(BbkScrollDir::Down, BbkScrollType::HalfPage);
+        assert_eq!(s.top_line, 25);
+    }
+
+    #[test]
+    fn test_bbk_ensure_visible() {
+        let mut s = BbkScrollState::new(50, 80);
+        s.set_total_lines(1000);
+        s.ensure_visible(100);
+        assert!(s.top_line > 0);
+        assert!(100 >= s.top_line && 100 < s.top_line + 50);
+    }
+
+    #[test]
+    fn test_bbk_at_top_bottom() {
+        let mut s = BbkScrollState::new(50, 80);
+        s.set_total_lines(100);
+        assert!(s.is_at_top());
+        s.scroll_to_line(99);
+        assert!(s.is_at_bottom());
+    }
+
+    #[test]
+    fn test_bbk_visible_range() {
+        let mut s = BbkScrollState::new(50, 80);
+        s.set_total_lines(1000);
+        s.scroll_to_line(100);
+        let (start, end) = s.visible_range();
+        assert_eq!(start, 100);
+        assert_eq!(end, 150);
+    }
+
+    #[test]
+    fn test_bbk_percentage() {
+        let mut s = BbkScrollState::new(50, 80);
+        s.set_total_lines(100);
+        assert_eq!(s.scroll_percentage(), 0.0);
+        s.scroll_to_line(50);
+        assert!(s.scroll_percentage() > 0.0);
+    }
+
+    #[test]
+    fn test_bbk_horizontal() {
+        let mut s = BbkScrollState::new(50, 80);
+        s.set_max_col(200);
+        s.scroll_lines(BbkScrollDir::Right, 30);
+        assert_eq!(s.left_col, 30);
+        s.scroll_lines(BbkScrollDir::Left, 10);
+        assert_eq!(s.left_col, 20);
+    }
+}
