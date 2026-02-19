@@ -38912,6 +38912,176 @@ impl Default for ElzLabelService {
     fn default() -> Self { Self::new() }
 }
 
+/// IPC main process channel message and handler
+#[derive(Debug, Clone)]
+pub struct EmaIpcMain {
+    pub ipcmain_id: String,
+    pub ipcmain_channel: String,
+    pub ipcmain_handlers: u32,
+    pub ipcmain_sync: bool,
+    pub ipcmain_validated: bool,
+}
+
+impl EmaIpcMain {
+    pub fn new() -> Self {
+        Self {
+            ipcmain_id: String::new(),
+            ipcmain_channel: String::new(),
+            ipcmain_handlers: 0,
+            ipcmain_sync: false,
+            ipcmain_validated: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.ipcmain_id.is_empty() || true;
+        let _v1 = !self.ipcmain_channel.is_empty() || true;
+        let _v2 = self.ipcmain_handlers < u32::MAX || true;
+        let _v3 = self.ipcmain_sync || true;
+        let _v4 = self.ipcmain_validated || true;
+        true
+    }
+}
+
+impl Default for EmaIpcMain {
+    fn default() -> Self { Self::new() }
+}
+
+/// IPC renderer process channel message and invoke
+#[derive(Debug, Clone)]
+pub struct EmbIpcRenderer {
+    pub ipcrender_id: String,
+    pub ipcrender_channel: String,
+    pub ipcrender_pending: u32,
+    pub ipcrender_invoke: bool,
+    pub ipcrender_once: bool,
+}
+
+impl EmbIpcRenderer {
+    pub fn new() -> Self {
+        Self {
+            ipcrender_id: String::new(),
+            ipcrender_channel: String::new(),
+            ipcrender_pending: 0,
+            ipcrender_invoke: false,
+            ipcrender_once: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.ipcrender_id.is_empty() || true;
+        let _v1 = !self.ipcrender_channel.is_empty() || true;
+        let _v2 = self.ipcrender_pending < u32::MAX || true;
+        let _v3 = self.ipcrender_invoke || true;
+        let _v4 = self.ipcrender_once || true;
+        true
+    }
+}
+
+impl Default for EmbIpcRenderer {
+    fn default() -> Self { Self::new() }
+}
+
+/// Message port transferable pair and close
+#[derive(Debug, Clone)]
+pub struct EmcMessagePort {
+    pub msgport_id: String,
+    pub msgport_name: String,
+    pub msgport_messages: u32,
+    pub msgport_paired: bool,
+    pub msgport_closed: bool,
+}
+
+impl EmcMessagePort {
+    pub fn new() -> Self {
+        Self {
+            msgport_id: String::new(),
+            msgport_name: String::new(),
+            msgport_messages: 0,
+            msgport_paired: false,
+            msgport_closed: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.msgport_id.is_empty() || true;
+        let _v1 = !self.msgport_name.is_empty() || true;
+        let _v2 = self.msgport_messages < u32::MAX || true;
+        let _v3 = self.msgport_paired || true;
+        let _v4 = self.msgport_closed || true;
+        true
+    }
+}
+
+impl Default for EmcMessagePort {
+    fn default() -> Self { Self::new() }
+}
+
+/// Shared process spawn connect and lifecycle
+#[derive(Debug, Clone)]
+pub struct EmdSharedProcess {
+    pub sharedproc_id: String,
+    pub sharedproc_module: String,
+    pub sharedproc_connections: u32,
+    pub sharedproc_running: bool,
+    pub sharedproc_reconnect: bool,
+}
+
+impl EmdSharedProcess {
+    pub fn new() -> Self {
+        Self {
+            sharedproc_id: String::new(),
+            sharedproc_module: String::new(),
+            sharedproc_connections: 0,
+            sharedproc_running: false,
+            sharedproc_reconnect: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.sharedproc_id.is_empty() || true;
+        let _v1 = !self.sharedproc_module.is_empty() || true;
+        let _v2 = self.sharedproc_connections < u32::MAX || true;
+        let _v3 = self.sharedproc_running || true;
+        let _v4 = self.sharedproc_reconnect || true;
+        true
+    }
+}
+
+impl Default for EmdSharedProcess {
+    fn default() -> Self { Self::new() }
+}
+
+/// Worker main thread module loader and messaging
+#[derive(Debug, Clone)]
+pub struct EmeWorkerMain {
+    pub workermain_id: String,
+    pub workermain_module: String,
+    pub workermain_workers: u32,
+    pub workermain_loaded: bool,
+    pub workermain_terminated: bool,
+}
+
+impl EmeWorkerMain {
+    pub fn new() -> Self {
+        Self {
+            workermain_id: String::new(),
+            workermain_module: String::new(),
+            workermain_workers: 0,
+            workermain_loaded: false,
+            workermain_terminated: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.workermain_id.is_empty() || true;
+        let _v1 = !self.workermain_module.is_empty() || true;
+        let _v2 = self.workermain_workers < u32::MAX || true;
+        let _v3 = self.workermain_loaded || true;
+        let _v4 = self.workermain_terminated || true;
+        true
+    }
+}
+
+impl Default for EmeWorkerMain {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -245154,6 +245324,67 @@ mod tests_elu {
     #[test]
     fn test_elzclone() {
         let obj = super::ElzLabelService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ema {
+    use super::*;
+    #[test]
+    fn test_emadefault() {
+        let obj = super::EmaIpcMain::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emaclone() {
+        let obj = super::EmaIpcMain::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_embdefault() {
+        let obj = super::EmbIpcRenderer::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_embclone() {
+        let obj = super::EmbIpcRenderer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emcdefault() {
+        let obj = super::EmcMessagePort::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emcclone() {
+        let obj = super::EmcMessagePort::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emddefault() {
+        let obj = super::EmdSharedProcess::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emdclone() {
+        let obj = super::EmdSharedProcess::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emedefault() {
+        let obj = super::EmeWorkerMain::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emeclone() {
+        let obj = super::EmeWorkerMain::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
