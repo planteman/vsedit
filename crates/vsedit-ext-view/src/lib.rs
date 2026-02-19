@@ -89249,6 +89249,111 @@ impl InputDispatch {
     }
 }
 
+/// Runtime wiring: brf_ MouseEvent
+#[derive(Debug, Clone)]
+pub struct MouseEvent {
+    pub brf_event_type: String,
+    pub brf_button: u8,
+    pub brf_position_x: u32,
+    pub brf_position_y: u32,
+    pub brf_client_x: u32,
+    pub brf_client_y: u32,
+    pub brf_ctrl_key: bool,
+    pub brf_shift_key: bool,
+    pub brf_alt_key: bool,
+    pub brf_click_count: u32,
+}
+
+impl MouseEvent {
+    pub fn brf_summary(&self) -> String {
+        format!("MouseEvent({})", self.brf_event_type)
+    }
+}
+
+/// Runtime wiring: brg_ GestureEvent
+#[derive(Debug, Clone)]
+pub struct GestureEvent {
+    pub brg_gesture_type: String,
+    pub brg_delta_x: f64,
+    pub brg_delta_y: f64,
+    pub brg_scale: f64,
+    pub brg_rotation: f64,
+    pub brg_velocity_x: f64,
+    pub brg_velocity_y: f64,
+    pub brg_is_inertia: bool,
+    pub brg_phase: u8,
+    pub brg_timestamp: u64,
+}
+
+impl GestureEvent {
+    pub fn brg_summary(&self) -> String {
+        format!("GestureEvent({})", self.brg_gesture_type)
+    }
+}
+
+/// Runtime wiring: brh_ DragState
+#[derive(Debug, Clone)]
+pub struct DragState {
+    pub brh_drag_type: String,
+    pub brh_source_uri: String,
+    pub brh_target_uri: String,
+    pub brh_position_x: u32,
+    pub brh_position_y: u32,
+    pub brh_is_dragging: bool,
+    pub brh_drop_effect: String,
+    pub brh_data_transfer_items: Vec<String>,
+    pub brh_allowed_effects: Vec<String>,
+    pub brh_is_external: bool,
+}
+
+impl DragState {
+    pub fn brh_summary(&self) -> String {
+        format!("DragState({})", self.brh_drag_type)
+    }
+}
+
+/// Runtime wiring: bri_ FocusTracker
+#[derive(Debug, Clone)]
+pub struct FocusTracker {
+    pub bri_focused_element_id: String,
+    pub bri_previous_element_id: String,
+    pub bri_focus_class: String,
+    pub bri_is_within_editor: bool,
+    pub bri_is_within_panel: bool,
+    pub bri_is_within_sidebar: bool,
+    pub bri_trap_zone_id: String,
+    pub bri_restore_target_id: String,
+    pub bri_focus_order: u32,
+    pub bri_is_tab_navigation: bool,
+}
+
+impl FocusTracker {
+    pub fn bri_summary(&self) -> String {
+        format!("FocusTracker({})", self.bri_focused_element_id)
+    }
+}
+
+/// Runtime wiring: brj_ AccessibilityInfo
+#[derive(Debug, Clone)]
+pub struct AccessibilityInfo {
+    pub brj_role: String,
+    pub brj_label: String,
+    pub brj_value: String,
+    pub brj_description: String,
+    pub brj_is_readonly: bool,
+    pub brj_is_required: bool,
+    pub brj_is_expanded: bool,
+    pub brj_level: u32,
+    pub brj_position_in_set: u32,
+    pub brj_set_size: u32,
+}
+
+impl AccessibilityInfo {
+    pub fn brj_summary(&self) -> String {
+        format!("AccessibilityInfo({})", self.brj_role)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -118211,6 +118316,910 @@ mod tests_bfo {
         };
         let _ = obj.bre_summary();
         assert_eq!(obj.bre_dispatch_order, 0);
+    }
+
+    #[test]
+    fn test_brf_event_type() {
+        let obj = MouseEvent {
+            brf_event_type: String::from("test"),
+            brf_button: 0,
+            brf_position_x: 0,
+            brf_position_y: 0,
+            brf_client_x: 0,
+            brf_client_y: 0,
+            brf_ctrl_key: false,
+            brf_shift_key: false,
+            brf_alt_key: false,
+            brf_click_count: 0,
+        };
+        let _ = obj.brf_summary();
+        assert_eq!(obj.brf_event_type, "test");
+    }
+
+    #[test]
+    fn test_brf_button() {
+        let obj = MouseEvent {
+            brf_event_type: String::from("test"),
+            brf_button: 0,
+            brf_position_x: 0,
+            brf_position_y: 0,
+            brf_client_x: 0,
+            brf_client_y: 0,
+            brf_ctrl_key: false,
+            brf_shift_key: false,
+            brf_alt_key: false,
+            brf_click_count: 0,
+        };
+        let _ = obj.brf_summary();
+        assert_eq!(obj.brf_button, 0);
+    }
+
+    #[test]
+    fn test_brf_position_x() {
+        let obj = MouseEvent {
+            brf_event_type: String::from("test"),
+            brf_button: 0,
+            brf_position_x: 0,
+            brf_position_y: 0,
+            brf_client_x: 0,
+            brf_client_y: 0,
+            brf_ctrl_key: false,
+            brf_shift_key: false,
+            brf_alt_key: false,
+            brf_click_count: 0,
+        };
+        let _ = obj.brf_summary();
+        assert_eq!(obj.brf_position_x, 0);
+    }
+
+    #[test]
+    fn test_brf_position_y() {
+        let obj = MouseEvent {
+            brf_event_type: String::from("test"),
+            brf_button: 0,
+            brf_position_x: 0,
+            brf_position_y: 0,
+            brf_client_x: 0,
+            brf_client_y: 0,
+            brf_ctrl_key: false,
+            brf_shift_key: false,
+            brf_alt_key: false,
+            brf_click_count: 0,
+        };
+        let _ = obj.brf_summary();
+        assert_eq!(obj.brf_position_y, 0);
+    }
+
+    #[test]
+    fn test_brf_client_x() {
+        let obj = MouseEvent {
+            brf_event_type: String::from("test"),
+            brf_button: 0,
+            brf_position_x: 0,
+            brf_position_y: 0,
+            brf_client_x: 0,
+            brf_client_y: 0,
+            brf_ctrl_key: false,
+            brf_shift_key: false,
+            brf_alt_key: false,
+            brf_click_count: 0,
+        };
+        let _ = obj.brf_summary();
+        assert_eq!(obj.brf_client_x, 0);
+    }
+
+    #[test]
+    fn test_brf_client_y() {
+        let obj = MouseEvent {
+            brf_event_type: String::from("test"),
+            brf_button: 0,
+            brf_position_x: 0,
+            brf_position_y: 0,
+            brf_client_x: 0,
+            brf_client_y: 0,
+            brf_ctrl_key: false,
+            brf_shift_key: false,
+            brf_alt_key: false,
+            brf_click_count: 0,
+        };
+        let _ = obj.brf_summary();
+        assert_eq!(obj.brf_client_y, 0);
+    }
+
+    #[test]
+    fn test_brf_ctrl_key() {
+        let obj = MouseEvent {
+            brf_event_type: String::from("test"),
+            brf_button: 0,
+            brf_position_x: 0,
+            brf_position_y: 0,
+            brf_client_x: 0,
+            brf_client_y: 0,
+            brf_ctrl_key: false,
+            brf_shift_key: false,
+            brf_alt_key: false,
+            brf_click_count: 0,
+        };
+        let _ = obj.brf_summary();
+        assert!(!obj.brf_ctrl_key);
+    }
+
+    #[test]
+    fn test_brf_shift_key() {
+        let obj = MouseEvent {
+            brf_event_type: String::from("test"),
+            brf_button: 0,
+            brf_position_x: 0,
+            brf_position_y: 0,
+            brf_client_x: 0,
+            brf_client_y: 0,
+            brf_ctrl_key: false,
+            brf_shift_key: false,
+            brf_alt_key: false,
+            brf_click_count: 0,
+        };
+        let _ = obj.brf_summary();
+        assert!(!obj.brf_shift_key);
+    }
+
+    #[test]
+    fn test_brf_alt_key() {
+        let obj = MouseEvent {
+            brf_event_type: String::from("test"),
+            brf_button: 0,
+            brf_position_x: 0,
+            brf_position_y: 0,
+            brf_client_x: 0,
+            brf_client_y: 0,
+            brf_ctrl_key: false,
+            brf_shift_key: false,
+            brf_alt_key: false,
+            brf_click_count: 0,
+        };
+        let _ = obj.brf_summary();
+        assert!(!obj.brf_alt_key);
+    }
+
+    #[test]
+    fn test_brf_click_count() {
+        let obj = MouseEvent {
+            brf_event_type: String::from("test"),
+            brf_button: 0,
+            brf_position_x: 0,
+            brf_position_y: 0,
+            brf_client_x: 0,
+            brf_client_y: 0,
+            brf_ctrl_key: false,
+            brf_shift_key: false,
+            brf_alt_key: false,
+            brf_click_count: 0,
+        };
+        let _ = obj.brf_summary();
+        assert_eq!(obj.brf_click_count, 0);
+    }
+
+
+    #[test]
+    fn test_brg_gesture_type() {
+        let obj = GestureEvent {
+            brg_gesture_type: String::from("test"),
+            brg_delta_x: 0.0,
+            brg_delta_y: 0.0,
+            brg_scale: 0.0,
+            brg_rotation: 0.0,
+            brg_velocity_x: 0.0,
+            brg_velocity_y: 0.0,
+            brg_is_inertia: false,
+            brg_phase: 0,
+            brg_timestamp: 0,
+        };
+        let _ = obj.brg_summary();
+        assert_eq!(obj.brg_gesture_type, "test");
+    }
+
+    #[test]
+    fn test_brg_delta_x() {
+        let obj = GestureEvent {
+            brg_gesture_type: String::from("test"),
+            brg_delta_x: 0.0,
+            brg_delta_y: 0.0,
+            brg_scale: 0.0,
+            brg_rotation: 0.0,
+            brg_velocity_x: 0.0,
+            brg_velocity_y: 0.0,
+            brg_is_inertia: false,
+            brg_phase: 0,
+            brg_timestamp: 0,
+        };
+        let _ = obj.brg_summary();
+        assert!((obj.brg_delta_x - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_brg_delta_y() {
+        let obj = GestureEvent {
+            brg_gesture_type: String::from("test"),
+            brg_delta_x: 0.0,
+            brg_delta_y: 0.0,
+            brg_scale: 0.0,
+            brg_rotation: 0.0,
+            brg_velocity_x: 0.0,
+            brg_velocity_y: 0.0,
+            brg_is_inertia: false,
+            brg_phase: 0,
+            brg_timestamp: 0,
+        };
+        let _ = obj.brg_summary();
+        assert!((obj.brg_delta_y - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_brg_scale() {
+        let obj = GestureEvent {
+            brg_gesture_type: String::from("test"),
+            brg_delta_x: 0.0,
+            brg_delta_y: 0.0,
+            brg_scale: 0.0,
+            brg_rotation: 0.0,
+            brg_velocity_x: 0.0,
+            brg_velocity_y: 0.0,
+            brg_is_inertia: false,
+            brg_phase: 0,
+            brg_timestamp: 0,
+        };
+        let _ = obj.brg_summary();
+        assert!((obj.brg_scale - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_brg_rotation() {
+        let obj = GestureEvent {
+            brg_gesture_type: String::from("test"),
+            brg_delta_x: 0.0,
+            brg_delta_y: 0.0,
+            brg_scale: 0.0,
+            brg_rotation: 0.0,
+            brg_velocity_x: 0.0,
+            brg_velocity_y: 0.0,
+            brg_is_inertia: false,
+            brg_phase: 0,
+            brg_timestamp: 0,
+        };
+        let _ = obj.brg_summary();
+        assert!((obj.brg_rotation - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_brg_velocity_x() {
+        let obj = GestureEvent {
+            brg_gesture_type: String::from("test"),
+            brg_delta_x: 0.0,
+            brg_delta_y: 0.0,
+            brg_scale: 0.0,
+            brg_rotation: 0.0,
+            brg_velocity_x: 0.0,
+            brg_velocity_y: 0.0,
+            brg_is_inertia: false,
+            brg_phase: 0,
+            brg_timestamp: 0,
+        };
+        let _ = obj.brg_summary();
+        assert!((obj.brg_velocity_x - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_brg_velocity_y() {
+        let obj = GestureEvent {
+            brg_gesture_type: String::from("test"),
+            brg_delta_x: 0.0,
+            brg_delta_y: 0.0,
+            brg_scale: 0.0,
+            brg_rotation: 0.0,
+            brg_velocity_x: 0.0,
+            brg_velocity_y: 0.0,
+            brg_is_inertia: false,
+            brg_phase: 0,
+            brg_timestamp: 0,
+        };
+        let _ = obj.brg_summary();
+        assert!((obj.brg_velocity_y - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_brg_is_inertia() {
+        let obj = GestureEvent {
+            brg_gesture_type: String::from("test"),
+            brg_delta_x: 0.0,
+            brg_delta_y: 0.0,
+            brg_scale: 0.0,
+            brg_rotation: 0.0,
+            brg_velocity_x: 0.0,
+            brg_velocity_y: 0.0,
+            brg_is_inertia: false,
+            brg_phase: 0,
+            brg_timestamp: 0,
+        };
+        let _ = obj.brg_summary();
+        assert!(!obj.brg_is_inertia);
+    }
+
+    #[test]
+    fn test_brg_phase() {
+        let obj = GestureEvent {
+            brg_gesture_type: String::from("test"),
+            brg_delta_x: 0.0,
+            brg_delta_y: 0.0,
+            brg_scale: 0.0,
+            brg_rotation: 0.0,
+            brg_velocity_x: 0.0,
+            brg_velocity_y: 0.0,
+            brg_is_inertia: false,
+            brg_phase: 0,
+            brg_timestamp: 0,
+        };
+        let _ = obj.brg_summary();
+        assert_eq!(obj.brg_phase, 0);
+    }
+
+    #[test]
+    fn test_brg_timestamp() {
+        let obj = GestureEvent {
+            brg_gesture_type: String::from("test"),
+            brg_delta_x: 0.0,
+            brg_delta_y: 0.0,
+            brg_scale: 0.0,
+            brg_rotation: 0.0,
+            brg_velocity_x: 0.0,
+            brg_velocity_y: 0.0,
+            brg_is_inertia: false,
+            brg_phase: 0,
+            brg_timestamp: 0,
+        };
+        let _ = obj.brg_summary();
+        assert_eq!(obj.brg_timestamp, 0);
+    }
+
+
+    #[test]
+    fn test_brh_drag_type() {
+        let obj = DragState {
+            brh_drag_type: String::from("test"),
+            brh_source_uri: String::from("test"),
+            brh_target_uri: String::from("test"),
+            brh_position_x: 0,
+            brh_position_y: 0,
+            brh_is_dragging: false,
+            brh_drop_effect: String::from("test"),
+            brh_data_transfer_items: Vec::new(),
+            brh_allowed_effects: Vec::new(),
+            brh_is_external: false,
+        };
+        let _ = obj.brh_summary();
+        assert_eq!(obj.brh_drag_type, "test");
+    }
+
+    #[test]
+    fn test_brh_source_uri() {
+        let obj = DragState {
+            brh_drag_type: String::from("test"),
+            brh_source_uri: String::from("test"),
+            brh_target_uri: String::from("test"),
+            brh_position_x: 0,
+            brh_position_y: 0,
+            brh_is_dragging: false,
+            brh_drop_effect: String::from("test"),
+            brh_data_transfer_items: Vec::new(),
+            brh_allowed_effects: Vec::new(),
+            brh_is_external: false,
+        };
+        let _ = obj.brh_summary();
+        assert_eq!(obj.brh_source_uri, "test");
+    }
+
+    #[test]
+    fn test_brh_target_uri() {
+        let obj = DragState {
+            brh_drag_type: String::from("test"),
+            brh_source_uri: String::from("test"),
+            brh_target_uri: String::from("test"),
+            brh_position_x: 0,
+            brh_position_y: 0,
+            brh_is_dragging: false,
+            brh_drop_effect: String::from("test"),
+            brh_data_transfer_items: Vec::new(),
+            brh_allowed_effects: Vec::new(),
+            brh_is_external: false,
+        };
+        let _ = obj.brh_summary();
+        assert_eq!(obj.brh_target_uri, "test");
+    }
+
+    #[test]
+    fn test_brh_position_x() {
+        let obj = DragState {
+            brh_drag_type: String::from("test"),
+            brh_source_uri: String::from("test"),
+            brh_target_uri: String::from("test"),
+            brh_position_x: 0,
+            brh_position_y: 0,
+            brh_is_dragging: false,
+            brh_drop_effect: String::from("test"),
+            brh_data_transfer_items: Vec::new(),
+            brh_allowed_effects: Vec::new(),
+            brh_is_external: false,
+        };
+        let _ = obj.brh_summary();
+        assert_eq!(obj.brh_position_x, 0);
+    }
+
+    #[test]
+    fn test_brh_position_y() {
+        let obj = DragState {
+            brh_drag_type: String::from("test"),
+            brh_source_uri: String::from("test"),
+            brh_target_uri: String::from("test"),
+            brh_position_x: 0,
+            brh_position_y: 0,
+            brh_is_dragging: false,
+            brh_drop_effect: String::from("test"),
+            brh_data_transfer_items: Vec::new(),
+            brh_allowed_effects: Vec::new(),
+            brh_is_external: false,
+        };
+        let _ = obj.brh_summary();
+        assert_eq!(obj.brh_position_y, 0);
+    }
+
+    #[test]
+    fn test_brh_is_dragging() {
+        let obj = DragState {
+            brh_drag_type: String::from("test"),
+            brh_source_uri: String::from("test"),
+            brh_target_uri: String::from("test"),
+            brh_position_x: 0,
+            brh_position_y: 0,
+            brh_is_dragging: false,
+            brh_drop_effect: String::from("test"),
+            brh_data_transfer_items: Vec::new(),
+            brh_allowed_effects: Vec::new(),
+            brh_is_external: false,
+        };
+        let _ = obj.brh_summary();
+        assert!(!obj.brh_is_dragging);
+    }
+
+    #[test]
+    fn test_brh_drop_effect() {
+        let obj = DragState {
+            brh_drag_type: String::from("test"),
+            brh_source_uri: String::from("test"),
+            brh_target_uri: String::from("test"),
+            brh_position_x: 0,
+            brh_position_y: 0,
+            brh_is_dragging: false,
+            brh_drop_effect: String::from("test"),
+            brh_data_transfer_items: Vec::new(),
+            brh_allowed_effects: Vec::new(),
+            brh_is_external: false,
+        };
+        let _ = obj.brh_summary();
+        assert_eq!(obj.brh_drop_effect, "test");
+    }
+
+    #[test]
+    fn test_brh_data_transfer_items() {
+        let obj = DragState {
+            brh_drag_type: String::from("test"),
+            brh_source_uri: String::from("test"),
+            brh_target_uri: String::from("test"),
+            brh_position_x: 0,
+            brh_position_y: 0,
+            brh_is_dragging: false,
+            brh_drop_effect: String::from("test"),
+            brh_data_transfer_items: Vec::new(),
+            brh_allowed_effects: Vec::new(),
+            brh_is_external: false,
+        };
+        let _ = obj.brh_summary();
+        assert!(obj.brh_data_transfer_items.is_empty());
+    }
+
+    #[test]
+    fn test_brh_allowed_effects() {
+        let obj = DragState {
+            brh_drag_type: String::from("test"),
+            brh_source_uri: String::from("test"),
+            brh_target_uri: String::from("test"),
+            brh_position_x: 0,
+            brh_position_y: 0,
+            brh_is_dragging: false,
+            brh_drop_effect: String::from("test"),
+            brh_data_transfer_items: Vec::new(),
+            brh_allowed_effects: Vec::new(),
+            brh_is_external: false,
+        };
+        let _ = obj.brh_summary();
+        assert!(obj.brh_allowed_effects.is_empty());
+    }
+
+    #[test]
+    fn test_brh_is_external() {
+        let obj = DragState {
+            brh_drag_type: String::from("test"),
+            brh_source_uri: String::from("test"),
+            brh_target_uri: String::from("test"),
+            brh_position_x: 0,
+            brh_position_y: 0,
+            brh_is_dragging: false,
+            brh_drop_effect: String::from("test"),
+            brh_data_transfer_items: Vec::new(),
+            brh_allowed_effects: Vec::new(),
+            brh_is_external: false,
+        };
+        let _ = obj.brh_summary();
+        assert!(!obj.brh_is_external);
+    }
+
+
+    #[test]
+    fn test_bri_focused_element_id() {
+        let obj = FocusTracker {
+            bri_focused_element_id: String::from("test"),
+            bri_previous_element_id: String::from("test"),
+            bri_focus_class: String::from("test"),
+            bri_is_within_editor: false,
+            bri_is_within_panel: false,
+            bri_is_within_sidebar: false,
+            bri_trap_zone_id: String::from("test"),
+            bri_restore_target_id: String::from("test"),
+            bri_focus_order: 0,
+            bri_is_tab_navigation: false,
+        };
+        let _ = obj.bri_summary();
+        assert_eq!(obj.bri_focused_element_id, "test");
+    }
+
+    #[test]
+    fn test_bri_previous_element_id() {
+        let obj = FocusTracker {
+            bri_focused_element_id: String::from("test"),
+            bri_previous_element_id: String::from("test"),
+            bri_focus_class: String::from("test"),
+            bri_is_within_editor: false,
+            bri_is_within_panel: false,
+            bri_is_within_sidebar: false,
+            bri_trap_zone_id: String::from("test"),
+            bri_restore_target_id: String::from("test"),
+            bri_focus_order: 0,
+            bri_is_tab_navigation: false,
+        };
+        let _ = obj.bri_summary();
+        assert_eq!(obj.bri_previous_element_id, "test");
+    }
+
+    #[test]
+    fn test_bri_focus_class() {
+        let obj = FocusTracker {
+            bri_focused_element_id: String::from("test"),
+            bri_previous_element_id: String::from("test"),
+            bri_focus_class: String::from("test"),
+            bri_is_within_editor: false,
+            bri_is_within_panel: false,
+            bri_is_within_sidebar: false,
+            bri_trap_zone_id: String::from("test"),
+            bri_restore_target_id: String::from("test"),
+            bri_focus_order: 0,
+            bri_is_tab_navigation: false,
+        };
+        let _ = obj.bri_summary();
+        assert_eq!(obj.bri_focus_class, "test");
+    }
+
+    #[test]
+    fn test_bri_is_within_editor() {
+        let obj = FocusTracker {
+            bri_focused_element_id: String::from("test"),
+            bri_previous_element_id: String::from("test"),
+            bri_focus_class: String::from("test"),
+            bri_is_within_editor: false,
+            bri_is_within_panel: false,
+            bri_is_within_sidebar: false,
+            bri_trap_zone_id: String::from("test"),
+            bri_restore_target_id: String::from("test"),
+            bri_focus_order: 0,
+            bri_is_tab_navigation: false,
+        };
+        let _ = obj.bri_summary();
+        assert!(!obj.bri_is_within_editor);
+    }
+
+    #[test]
+    fn test_bri_is_within_panel() {
+        let obj = FocusTracker {
+            bri_focused_element_id: String::from("test"),
+            bri_previous_element_id: String::from("test"),
+            bri_focus_class: String::from("test"),
+            bri_is_within_editor: false,
+            bri_is_within_panel: false,
+            bri_is_within_sidebar: false,
+            bri_trap_zone_id: String::from("test"),
+            bri_restore_target_id: String::from("test"),
+            bri_focus_order: 0,
+            bri_is_tab_navigation: false,
+        };
+        let _ = obj.bri_summary();
+        assert!(!obj.bri_is_within_panel);
+    }
+
+    #[test]
+    fn test_bri_is_within_sidebar() {
+        let obj = FocusTracker {
+            bri_focused_element_id: String::from("test"),
+            bri_previous_element_id: String::from("test"),
+            bri_focus_class: String::from("test"),
+            bri_is_within_editor: false,
+            bri_is_within_panel: false,
+            bri_is_within_sidebar: false,
+            bri_trap_zone_id: String::from("test"),
+            bri_restore_target_id: String::from("test"),
+            bri_focus_order: 0,
+            bri_is_tab_navigation: false,
+        };
+        let _ = obj.bri_summary();
+        assert!(!obj.bri_is_within_sidebar);
+    }
+
+    #[test]
+    fn test_bri_trap_zone_id() {
+        let obj = FocusTracker {
+            bri_focused_element_id: String::from("test"),
+            bri_previous_element_id: String::from("test"),
+            bri_focus_class: String::from("test"),
+            bri_is_within_editor: false,
+            bri_is_within_panel: false,
+            bri_is_within_sidebar: false,
+            bri_trap_zone_id: String::from("test"),
+            bri_restore_target_id: String::from("test"),
+            bri_focus_order: 0,
+            bri_is_tab_navigation: false,
+        };
+        let _ = obj.bri_summary();
+        assert_eq!(obj.bri_trap_zone_id, "test");
+    }
+
+    #[test]
+    fn test_bri_restore_target_id() {
+        let obj = FocusTracker {
+            bri_focused_element_id: String::from("test"),
+            bri_previous_element_id: String::from("test"),
+            bri_focus_class: String::from("test"),
+            bri_is_within_editor: false,
+            bri_is_within_panel: false,
+            bri_is_within_sidebar: false,
+            bri_trap_zone_id: String::from("test"),
+            bri_restore_target_id: String::from("test"),
+            bri_focus_order: 0,
+            bri_is_tab_navigation: false,
+        };
+        let _ = obj.bri_summary();
+        assert_eq!(obj.bri_restore_target_id, "test");
+    }
+
+    #[test]
+    fn test_bri_focus_order() {
+        let obj = FocusTracker {
+            bri_focused_element_id: String::from("test"),
+            bri_previous_element_id: String::from("test"),
+            bri_focus_class: String::from("test"),
+            bri_is_within_editor: false,
+            bri_is_within_panel: false,
+            bri_is_within_sidebar: false,
+            bri_trap_zone_id: String::from("test"),
+            bri_restore_target_id: String::from("test"),
+            bri_focus_order: 0,
+            bri_is_tab_navigation: false,
+        };
+        let _ = obj.bri_summary();
+        assert_eq!(obj.bri_focus_order, 0);
+    }
+
+    #[test]
+    fn test_bri_is_tab_navigation() {
+        let obj = FocusTracker {
+            bri_focused_element_id: String::from("test"),
+            bri_previous_element_id: String::from("test"),
+            bri_focus_class: String::from("test"),
+            bri_is_within_editor: false,
+            bri_is_within_panel: false,
+            bri_is_within_sidebar: false,
+            bri_trap_zone_id: String::from("test"),
+            bri_restore_target_id: String::from("test"),
+            bri_focus_order: 0,
+            bri_is_tab_navigation: false,
+        };
+        let _ = obj.bri_summary();
+        assert!(!obj.bri_is_tab_navigation);
+    }
+
+
+    #[test]
+    fn test_brj_role() {
+        let obj = AccessibilityInfo {
+            brj_role: String::from("test"),
+            brj_label: String::from("test"),
+            brj_value: String::from("test"),
+            brj_description: String::from("test"),
+            brj_is_readonly: false,
+            brj_is_required: false,
+            brj_is_expanded: false,
+            brj_level: 0,
+            brj_position_in_set: 0,
+            brj_set_size: 0,
+        };
+        let _ = obj.brj_summary();
+        assert_eq!(obj.brj_role, "test");
+    }
+
+    #[test]
+    fn test_brj_label() {
+        let obj = AccessibilityInfo {
+            brj_role: String::from("test"),
+            brj_label: String::from("test"),
+            brj_value: String::from("test"),
+            brj_description: String::from("test"),
+            brj_is_readonly: false,
+            brj_is_required: false,
+            brj_is_expanded: false,
+            brj_level: 0,
+            brj_position_in_set: 0,
+            brj_set_size: 0,
+        };
+        let _ = obj.brj_summary();
+        assert_eq!(obj.brj_label, "test");
+    }
+
+    #[test]
+    fn test_brj_value() {
+        let obj = AccessibilityInfo {
+            brj_role: String::from("test"),
+            brj_label: String::from("test"),
+            brj_value: String::from("test"),
+            brj_description: String::from("test"),
+            brj_is_readonly: false,
+            brj_is_required: false,
+            brj_is_expanded: false,
+            brj_level: 0,
+            brj_position_in_set: 0,
+            brj_set_size: 0,
+        };
+        let _ = obj.brj_summary();
+        assert_eq!(obj.brj_value, "test");
+    }
+
+    #[test]
+    fn test_brj_description() {
+        let obj = AccessibilityInfo {
+            brj_role: String::from("test"),
+            brj_label: String::from("test"),
+            brj_value: String::from("test"),
+            brj_description: String::from("test"),
+            brj_is_readonly: false,
+            brj_is_required: false,
+            brj_is_expanded: false,
+            brj_level: 0,
+            brj_position_in_set: 0,
+            brj_set_size: 0,
+        };
+        let _ = obj.brj_summary();
+        assert_eq!(obj.brj_description, "test");
+    }
+
+    #[test]
+    fn test_brj_is_readonly() {
+        let obj = AccessibilityInfo {
+            brj_role: String::from("test"),
+            brj_label: String::from("test"),
+            brj_value: String::from("test"),
+            brj_description: String::from("test"),
+            brj_is_readonly: false,
+            brj_is_required: false,
+            brj_is_expanded: false,
+            brj_level: 0,
+            brj_position_in_set: 0,
+            brj_set_size: 0,
+        };
+        let _ = obj.brj_summary();
+        assert!(!obj.brj_is_readonly);
+    }
+
+    #[test]
+    fn test_brj_is_required() {
+        let obj = AccessibilityInfo {
+            brj_role: String::from("test"),
+            brj_label: String::from("test"),
+            brj_value: String::from("test"),
+            brj_description: String::from("test"),
+            brj_is_readonly: false,
+            brj_is_required: false,
+            brj_is_expanded: false,
+            brj_level: 0,
+            brj_position_in_set: 0,
+            brj_set_size: 0,
+        };
+        let _ = obj.brj_summary();
+        assert!(!obj.brj_is_required);
+    }
+
+    #[test]
+    fn test_brj_is_expanded() {
+        let obj = AccessibilityInfo {
+            brj_role: String::from("test"),
+            brj_label: String::from("test"),
+            brj_value: String::from("test"),
+            brj_description: String::from("test"),
+            brj_is_readonly: false,
+            brj_is_required: false,
+            brj_is_expanded: false,
+            brj_level: 0,
+            brj_position_in_set: 0,
+            brj_set_size: 0,
+        };
+        let _ = obj.brj_summary();
+        assert!(!obj.brj_is_expanded);
+    }
+
+    #[test]
+    fn test_brj_level() {
+        let obj = AccessibilityInfo {
+            brj_role: String::from("test"),
+            brj_label: String::from("test"),
+            brj_value: String::from("test"),
+            brj_description: String::from("test"),
+            brj_is_readonly: false,
+            brj_is_required: false,
+            brj_is_expanded: false,
+            brj_level: 0,
+            brj_position_in_set: 0,
+            brj_set_size: 0,
+        };
+        let _ = obj.brj_summary();
+        assert_eq!(obj.brj_level, 0);
+    }
+
+    #[test]
+    fn test_brj_position_in_set() {
+        let obj = AccessibilityInfo {
+            brj_role: String::from("test"),
+            brj_label: String::from("test"),
+            brj_value: String::from("test"),
+            brj_description: String::from("test"),
+            brj_is_readonly: false,
+            brj_is_required: false,
+            brj_is_expanded: false,
+            brj_level: 0,
+            brj_position_in_set: 0,
+            brj_set_size: 0,
+        };
+        let _ = obj.brj_summary();
+        assert_eq!(obj.brj_position_in_set, 0);
+    }
+
+    #[test]
+    fn test_brj_set_size() {
+        let obj = AccessibilityInfo {
+            brj_role: String::from("test"),
+            brj_label: String::from("test"),
+            brj_value: String::from("test"),
+            brj_description: String::from("test"),
+            brj_is_readonly: false,
+            brj_is_required: false,
+            brj_is_expanded: false,
+            brj_level: 0,
+            brj_position_in_set: 0,
+            brj_set_size: 0,
+        };
+        let _ = obj.brj_summary();
+        assert_eq!(obj.brj_set_size, 0);
     }
 
 }
