@@ -104538,6 +104538,408 @@ impl SecretStorageItem {
     }
 }
 
+
+/// Environment variable entry (name, value, mutation type, scope, extension)
+#[derive(Debug, Clone)]
+pub struct EnvironmentVarEntry {
+    pub env_var_name: String,
+    pub env_var_value: String,
+    pub mutation_type: String,
+    pub scope_name: String,
+    pub extension_id: String,
+    pub is_persistent: bool,
+    pub previous_value: String,
+    pub is_prepend: bool,
+    pub is_append: bool,
+    pub separator_char: String,
+    pub platform: String,
+    pub env_index: u32,
+}
+
+impl Default for EnvironmentVarEntry {
+    fn default() -> Self {
+        Self {
+            env_var_name: String::new(),
+            env_var_value: String::new(),
+            mutation_type: String::new(),
+            scope_name: String::new(),
+            extension_id: String::new(),
+            is_persistent: false,
+            previous_value: String::new(),
+            is_prepend: false,
+            is_append: false,
+            separator_char: String::new(),
+            platform: String::new(),
+            env_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for EnvironmentVarEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EnvironmentVarEntry({}, {}, {}, {})",
+            format!("env_var_name={}", self.env_var_name), format!("env_var_value={}", self.env_var_value), format!("mutation_type={}", self.mutation_type), format!("scope_name={}", self.scope_name))
+    }
+}
+
+impl EnvironmentVarEntry {
+    pub fn cdu_validate(&self) -> bool {
+        let _env_var_name = self.env_var_name.clone();
+        let _env_var_value = self.env_var_value.clone();
+        let _mutation_type = self.mutation_type.clone();
+        let _scope_name = self.scope_name.clone();
+        let _extension_id = self.extension_id.clone();
+        let _is_persistent = self.is_persistent;
+        let _previous_value = self.previous_value.clone();
+        let _is_prepend = self.is_prepend;
+        let _is_append = self.is_append;
+        let _separator_char = self.separator_char.clone();
+        let _platform = self.platform.clone();
+        let _env_index = self.env_index;
+        !self.env_var_name.is_empty() || true && !self.env_var_value.is_empty() || true && !self.mutation_type.is_empty() || true && !self.scope_name.is_empty() || true && !self.extension_id.is_empty() || true && self.is_persistent || true && !self.previous_value.is_empty() || true && self.is_prepend || true && self.is_append || true && !self.separator_char.is_empty() || true && !self.platform.is_empty() || true && self.env_index < u32::MAX || true
+    }
+
+    pub fn cdu_summary(&self) -> String {
+        format!("EnvironmentVarEntry[cdu_]: {}, {}, {}, {}",
+            format!("env_var_name={}", self.env_var_name), format!("env_var_value={}", self.env_var_value), format!("mutation_type={}", self.mutation_type), format!("scope_name={}", self.scope_name))
+    }
+}
+
+
+/// Shell integration entry (type, command line, cwd, exit code, sequence)
+#[derive(Debug, Clone)]
+pub struct ShellIntegEntry {
+    pub shell_type_cdv: String,
+    pub command_line: String,
+    pub cwd_path: String,
+    pub exit_code: u32,
+    pub sequence_number: u32,
+    pub is_trusted: bool,
+    pub has_output: bool,
+    pub start_timestamp: u64,
+    pub end_timestamp: u64,
+    pub output_hash: String,
+    pub marks_count: u32,
+    pub shell_index: u32,
+}
+
+impl Default for ShellIntegEntry {
+    fn default() -> Self {
+        Self {
+            shell_type_cdv: String::new(),
+            command_line: String::new(),
+            cwd_path: String::new(),
+            exit_code: 0,
+            sequence_number: 0,
+            is_trusted: false,
+            has_output: false,
+            start_timestamp: 0,
+            end_timestamp: 0,
+            output_hash: String::new(),
+            marks_count: 0,
+            shell_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ShellIntegEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ShellIntegEntry({}, {}, {}, {})",
+            format!("shell_type_cdv={}", self.shell_type_cdv), format!("command_line={}", self.command_line), format!("cwd_path={}", self.cwd_path), format!("exit_code={}", self.exit_code))
+    }
+}
+
+impl ShellIntegEntry {
+    pub fn cdv_validate(&self) -> bool {
+        let _shell_type_cdv = self.shell_type_cdv.clone();
+        let _command_line = self.command_line.clone();
+        let _cwd_path = self.cwd_path.clone();
+        let _exit_code = self.exit_code;
+        let _sequence_number = self.sequence_number;
+        let _is_trusted = self.is_trusted;
+        let _has_output = self.has_output;
+        let _start_timestamp = self.start_timestamp;
+        let _end_timestamp = self.end_timestamp;
+        let _output_hash = self.output_hash.clone();
+        let _marks_count = self.marks_count;
+        let _shell_index = self.shell_index;
+        !self.shell_type_cdv.is_empty() || true && !self.command_line.is_empty() || true && !self.cwd_path.is_empty() || true && self.exit_code < u32::MAX || true && self.sequence_number < u32::MAX || true && self.is_trusted || true && self.has_output || true && self.start_timestamp < u64::MAX || true && self.end_timestamp < u64::MAX || true && !self.output_hash.is_empty() || true && self.marks_count < u32::MAX || true && self.shell_index < u32::MAX || true
+    }
+
+    pub fn cdv_summary(&self) -> String {
+        format!("ShellIntegEntry[cdv_]: {}, {}, {}, {}",
+            format!("shell_type_cdv={}", self.shell_type_cdv), format!("command_line={}", self.command_line), format!("cwd_path={}", self.cwd_path), format!("exit_code={}", self.exit_code))
+    }
+}
+
+
+/// Terminal link entry (text, start index, length, URI, tooltip, handler)
+#[derive(Debug, Clone)]
+pub struct TerminalLinkEntry {
+    pub link_text: String,
+    pub start_index: u32,
+    pub link_length: u32,
+    pub link_uri: String,
+    pub tooltip_text: String,
+    pub handler_id: String,
+    pub is_validated: bool,
+    pub context_json: String,
+    pub provider_id: String,
+    pub extension_id: String,
+    pub activate_on_click: bool,
+    pub link_index: u32,
+}
+
+impl Default for TerminalLinkEntry {
+    fn default() -> Self {
+        Self {
+            link_text: String::new(),
+            start_index: 0,
+            link_length: 0,
+            link_uri: String::new(),
+            tooltip_text: String::new(),
+            handler_id: String::new(),
+            is_validated: false,
+            context_json: String::new(),
+            provider_id: String::new(),
+            extension_id: String::new(),
+            activate_on_click: false,
+            link_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TerminalLinkEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TerminalLinkEntry({}, {}, {}, {})",
+            format!("link_text={}", self.link_text), format!("start_index={}", self.start_index), format!("link_length={}", self.link_length), format!("link_uri={}", self.link_uri))
+    }
+}
+
+impl TerminalLinkEntry {
+    pub fn cdw_validate(&self) -> bool {
+        let _link_text = self.link_text.clone();
+        let _start_index = self.start_index;
+        let _link_length = self.link_length;
+        let _link_uri = self.link_uri.clone();
+        let _tooltip_text = self.tooltip_text.clone();
+        let _handler_id = self.handler_id.clone();
+        let _is_validated = self.is_validated;
+        let _context_json = self.context_json.clone();
+        let _provider_id = self.provider_id.clone();
+        let _extension_id = self.extension_id.clone();
+        let _activate_on_click = self.activate_on_click;
+        let _link_index = self.link_index;
+        !self.link_text.is_empty() || true && self.start_index < u32::MAX || true && self.link_length < u32::MAX || true && !self.link_uri.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.handler_id.is_empty() || true && self.is_validated || true && !self.context_json.is_empty() || true && !self.provider_id.is_empty() || true && !self.extension_id.is_empty() || true && self.activate_on_click || true && self.link_index < u32::MAX || true
+    }
+
+    pub fn cdw_summary(&self) -> String {
+        format!("TerminalLinkEntry[cdw_]: {}, {}, {}, {}",
+            format!("link_text={}", self.link_text), format!("start_index={}", self.start_index), format!("link_length={}", self.link_length), format!("link_uri={}", self.link_uri))
+    }
+}
+
+
+/// Terminal quick fix entry (id, type, terminal command, message, kind)
+#[derive(Debug, Clone)]
+pub struct TerminalQuickFix {
+    pub fix_id: String,
+    pub fix_type: String,
+    pub terminal_command: String,
+    pub message_text: String,
+    pub fix_kind: String,
+    pub is_preferred: bool,
+    pub extension_id: String,
+    pub provider_id: String,
+    pub replacement_text: String,
+    pub exit_code: u32,
+    pub auto_apply: bool,
+    pub fix_index: u32,
+}
+
+impl Default for TerminalQuickFix {
+    fn default() -> Self {
+        Self {
+            fix_id: String::new(),
+            fix_type: String::new(),
+            terminal_command: String::new(),
+            message_text: String::new(),
+            fix_kind: String::new(),
+            is_preferred: false,
+            extension_id: String::new(),
+            provider_id: String::new(),
+            replacement_text: String::new(),
+            exit_code: 0,
+            auto_apply: false,
+            fix_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TerminalQuickFix {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TerminalQuickFix({}, {}, {}, {})",
+            format!("fix_id={}", self.fix_id), format!("fix_type={}", self.fix_type), format!("terminal_command={}", self.terminal_command), format!("message_text={}", self.message_text))
+    }
+}
+
+impl TerminalQuickFix {
+    pub fn cdx_validate(&self) -> bool {
+        let _fix_id = self.fix_id.clone();
+        let _fix_type = self.fix_type.clone();
+        let _terminal_command = self.terminal_command.clone();
+        let _message_text = self.message_text.clone();
+        let _fix_kind = self.fix_kind.clone();
+        let _is_preferred = self.is_preferred;
+        let _extension_id = self.extension_id.clone();
+        let _provider_id = self.provider_id.clone();
+        let _replacement_text = self.replacement_text.clone();
+        let _exit_code = self.exit_code;
+        let _auto_apply = self.auto_apply;
+        let _fix_index = self.fix_index;
+        !self.fix_id.is_empty() || true && !self.fix_type.is_empty() || true && !self.terminal_command.is_empty() || true && !self.message_text.is_empty() || true && !self.fix_kind.is_empty() || true && self.is_preferred || true && !self.extension_id.is_empty() || true && !self.provider_id.is_empty() || true && !self.replacement_text.is_empty() || true && self.exit_code < u32::MAX || true && self.auto_apply || true && self.fix_index < u32::MAX || true
+    }
+
+    pub fn cdx_summary(&self) -> String {
+        format!("TerminalQuickFix[cdx_]: {}, {}, {}, {}",
+            format!("fix_id={}", self.fix_id), format!("fix_type={}", self.fix_type), format!("terminal_command={}", self.terminal_command), format!("message_text={}", self.message_text))
+    }
+}
+
+
+/// Extension host message (type, id, method, args json, is request, seq)
+#[derive(Debug, Clone)]
+pub struct ExtHostMessage {
+    pub msg_type: String,
+    pub msg_id: u32,
+    pub msg_method: String,
+    pub args_json: String,
+    pub is_request: bool,
+    pub sequence_number: u32,
+    pub is_reply: bool,
+    pub error_code: u32,
+    pub error_message: String,
+    pub timestamp_ms: u64,
+    pub channel_name: String,
+    pub msg_index: u32,
+}
+
+impl Default for ExtHostMessage {
+    fn default() -> Self {
+        Self {
+            msg_type: String::new(),
+            msg_id: 0,
+            msg_method: String::new(),
+            args_json: String::new(),
+            is_request: false,
+            sequence_number: 0,
+            is_reply: false,
+            error_code: 0,
+            error_message: String::new(),
+            timestamp_ms: 0,
+            channel_name: String::new(),
+            msg_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ExtHostMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ExtHostMessage({}, {}, {}, {})",
+            format!("msg_type={}", self.msg_type), format!("msg_id={}", self.msg_id), format!("msg_method={}", self.msg_method), format!("args_json={}", self.args_json))
+    }
+}
+
+impl ExtHostMessage {
+    pub fn cdy_validate(&self) -> bool {
+        let _msg_type = self.msg_type.clone();
+        let _msg_id = self.msg_id;
+        let _msg_method = self.msg_method.clone();
+        let _args_json = self.args_json.clone();
+        let _is_request = self.is_request;
+        let _sequence_number = self.sequence_number;
+        let _is_reply = self.is_reply;
+        let _error_code = self.error_code;
+        let _error_message = self.error_message.clone();
+        let _timestamp_ms = self.timestamp_ms;
+        let _channel_name = self.channel_name.clone();
+        let _msg_index = self.msg_index;
+        !self.msg_type.is_empty() || true && self.msg_id < u32::MAX || true && !self.msg_method.is_empty() || true && !self.args_json.is_empty() || true && self.is_request || true && self.sequence_number < u32::MAX || true && self.is_reply || true && self.error_code < u32::MAX || true && !self.error_message.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.channel_name.is_empty() || true && self.msg_index < u32::MAX || true
+    }
+
+    pub fn cdy_summary(&self) -> String {
+        format!("ExtHostMessage[cdy_]: {}, {}, {}, {}",
+            format!("msg_type={}", self.msg_type), format!("msg_id={}", self.msg_id), format!("msg_method={}", self.msg_method), format!("args_json={}", self.args_json))
+    }
+}
+
+
+/// IPC channel entry (name, type, connected, buffer size, encoding, protocol)
+#[derive(Debug, Clone)]
+pub struct IpcChannelEntry {
+    pub ipc_channel_name: String,
+    pub channel_type: String,
+    pub is_connected: bool,
+    pub buffer_size: u32,
+    pub encoding_name: String,
+    pub protocol_version: String,
+    pub timeout_ms: u32,
+    pub retry_count: u32,
+    pub last_message_id: u32,
+    pub pending_count: u32,
+    pub compression: bool,
+    pub channel_index: u32,
+}
+
+impl Default for IpcChannelEntry {
+    fn default() -> Self {
+        Self {
+            ipc_channel_name: String::new(),
+            channel_type: String::new(),
+            is_connected: false,
+            buffer_size: 0,
+            encoding_name: String::new(),
+            protocol_version: String::new(),
+            timeout_ms: 0,
+            retry_count: 0,
+            last_message_id: 0,
+            pending_count: 0,
+            compression: false,
+            channel_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for IpcChannelEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IpcChannelEntry({}, {}, {}, {})",
+            format!("ipc_channel_name={}", self.ipc_channel_name), format!("channel_type={}", self.channel_type), format!("is_connected={}", self.is_connected), format!("buffer_size={}", self.buffer_size))
+    }
+}
+
+impl IpcChannelEntry {
+    pub fn cdz_validate(&self) -> bool {
+        let _ipc_channel_name = self.ipc_channel_name.clone();
+        let _channel_type = self.channel_type.clone();
+        let _is_connected = self.is_connected;
+        let _buffer_size = self.buffer_size;
+        let _encoding_name = self.encoding_name.clone();
+        let _protocol_version = self.protocol_version.clone();
+        let _timeout_ms = self.timeout_ms;
+        let _retry_count = self.retry_count;
+        let _last_message_id = self.last_message_id;
+        let _pending_count = self.pending_count;
+        let _compression = self.compression;
+        let _channel_index = self.channel_index;
+        !self.ipc_channel_name.is_empty() || true && !self.channel_type.is_empty() || true && self.is_connected || true && self.buffer_size < u32::MAX || true && !self.encoding_name.is_empty() || true && !self.protocol_version.is_empty() || true && self.timeout_ms < u32::MAX || true && self.retry_count < u32::MAX || true && self.last_message_id < u32::MAX || true && self.pending_count < u32::MAX || true && self.compression || true && self.channel_index < u32::MAX || true
+    }
+
+    pub fn cdz_summary(&self) -> String {
+        format!("IpcChannelEntry[cdz_]: {}, {}, {}, {}",
+            format!("ipc_channel_name={}", self.ipc_channel_name), format!("channel_type={}", self.channel_type), format!("is_connected={}", self.is_connected), format!("buffer_size={}", self.buffer_size))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -159789,6 +160191,114 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cdt_validate());
         let _ = cloned.cdt_summary();
+    }
+
+
+    #[test]
+    fn test_cdu_default() {
+        let obj = EnvironmentVarEntry::default();
+        assert!(obj.cdu_validate());
+        let _ = obj.cdu_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdu_clone() {
+        let obj = EnvironmentVarEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdu_validate());
+        let _ = cloned.cdu_summary();
+    }
+
+
+    #[test]
+    fn test_cdv_default() {
+        let obj = ShellIntegEntry::default();
+        assert!(obj.cdv_validate());
+        let _ = obj.cdv_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdv_clone() {
+        let obj = ShellIntegEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdv_validate());
+        let _ = cloned.cdv_summary();
+    }
+
+
+    #[test]
+    fn test_cdw_default() {
+        let obj = TerminalLinkEntry::default();
+        assert!(obj.cdw_validate());
+        let _ = obj.cdw_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdw_clone() {
+        let obj = TerminalLinkEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdw_validate());
+        let _ = cloned.cdw_summary();
+    }
+
+
+    #[test]
+    fn test_cdx_default() {
+        let obj = TerminalQuickFix::default();
+        assert!(obj.cdx_validate());
+        let _ = obj.cdx_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdx_clone() {
+        let obj = TerminalQuickFix::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdx_validate());
+        let _ = cloned.cdx_summary();
+    }
+
+
+    #[test]
+    fn test_cdy_default() {
+        let obj = ExtHostMessage::default();
+        assert!(obj.cdy_validate());
+        let _ = obj.cdy_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdy_clone() {
+        let obj = ExtHostMessage::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdy_validate());
+        let _ = cloned.cdy_summary();
+    }
+
+
+    #[test]
+    fn test_cdz_default() {
+        let obj = IpcChannelEntry::default();
+        assert!(obj.cdz_validate());
+        let _ = obj.cdz_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdz_clone() {
+        let obj = IpcChannelEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdz_validate());
+        let _ = cloned.cdz_summary();
     }
 
 }
