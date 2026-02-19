@@ -57900,3 +57900,222 @@ mod bbh_tests {
         assert_eq!(m.height(), 2);
     }
 }
+
+
+// --- bbi_: Editor cursor blinking model ---
+
+/// Cursor style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbiCursorStyle {
+    Line,
+    Block,
+    Underline,
+    LineThin,
+    BlockOutline,
+    UnderlineThin,
+}
+
+impl BbiCursorStyle {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Line => "Line", Self::Block => "Block", Self::Underline => "Underline",
+            Self::LineThin => "Line Thin", Self::BlockOutline => "Block Outline",
+            Self::UnderlineThin => "Underline Thin",
+        }
+    }
+
+    pub fn is_block(&self) -> bool { matches!(self, Self::Block | Self::BlockOutline) }
+    pub fn is_line(&self) -> bool { matches!(self, Self::Line | Self::LineThin) }
+    pub fn is_thin(&self) -> bool { matches!(self, Self::LineThin | Self::UnderlineThin) }
+
+    pub fn terminal_escape(&self) -> &'static str {
+        match self {
+            Self::Block => "\x1b[2 q", Self::BlockOutline => "\x1b[0 q",
+            Self::Underline => "\x1b[4 q", Self::UnderlineThin => "\x1b[3 q",
+            Self::Line => "\x1b[6 q", Self::LineThin => "\x1b[5 q",
+        }
+    }
+}
+
+/// Cursor blink mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbiBlinkMode {
+    Blink,
+    Smooth,
+    Phase,
+    Expand,
+    Solid,
+}
+
+impl BbiBlinkMode {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Blink => "Blink", Self::Smooth => "Smooth", Self::Phase => "Phase",
+            Self::Expand => "Expand", Self::Solid => "Solid",
+        }
+    }
+
+    pub fn should_blink(&self) -> bool { !matches!(self, Self::Solid) }
+}
+
+/// Cursor blinking state.
+#[derive(Debug)]
+pub struct BbiBlinkState {
+    pub visible: bool,
+    pub elapsed_ms: u64,
+    pub period_ms: u64,
+    pub mode: BbiBlinkMode,
+}
+
+impl BbiBlinkState {
+    pub fn new(mode: BbiBlinkMode) -> Self {
+        Self { visible: true, elapsed_ms: 0, period_ms: 530, mode }
+    }
+
+    pub fn tick(&mut self, delta_ms: u64) {
+        if !self.mode.should_blink() { self.visible = true; return; }
+        self.elapsed_ms += delta_ms;
+        if self.elapsed_ms >= self.period_ms {
+            self.visible = !self.visible;
+            self.elapsed_ms = 0;
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.visible = true;
+        self.elapsed_ms = 0;
+    }
+
+    pub fn opacity(&self) -> f32 {
+        if !self.mode.should_blink() { return 1.0; }
+        match self.mode {
+            BbiBlinkMode::Solid => 1.0,
+            BbiBlinkMode::Blink => if self.visible { 1.0 } else { 0.0 },
+            BbiBlinkMode::Smooth | BbiBlinkMode::Phase => {
+                let t = self.elapsed_ms as f32 / self.period_ms as f32;
+                if self.visible { 1.0 - t * 0.5 } else { 0.5 + t * 0.5 }
+            }
+            BbiBlinkMode::Expand => {
+                if self.visible { 1.0 } else { 0.3 }
+            }
+        }
+    }
+}
+
+/// The cursor model.
+#[derive(Debug)]
+pub struct BbiCursorModel {
+    style: BbiCursorStyle,
+    blink: BbiBlinkState,
+    width: u32,
+    smooth_caret: bool,
+}
+
+impl BbiCursorModel {
+    pub fn new(style: BbiCursorStyle, mode: BbiBlinkMode) -> Self {
+        Self { style, blink: BbiBlinkState::new(mode), width: 2, smooth_caret: true }
+    }
+
+    pub fn style(&self) -> BbiCursorStyle { self.style }
+    pub fn set_style(&mut self, s: BbiCursorStyle) { self.style = s; }
+
+    pub fn blink_mode(&self) -> BbiBlinkMode { self.blink.mode }
+    pub fn set_blink_mode(&mut self, m: BbiBlinkMode) { self.blink.mode = m; }
+
+    pub fn tick(&mut self, delta_ms: u64) { self.blink.tick(delta_ms); }
+    pub fn reset_blink(&mut self) { self.blink.reset(); }
+
+    pub fn is_visible(&self) -> bool { self.blink.visible }
+    pub fn opacity(&self) -> f32 { self.blink.opacity() }
+
+    pub fn set_smooth_caret(&mut self, v: bool) { self.smooth_caret = v; }
+    pub fn smooth_caret(&self) -> bool { self.smooth_caret }
+
+    pub fn set_width(&mut self, w: u32) { self.width = w; }
+    pub fn width(&self) -> u32 { self.width }
+
+    pub fn terminal_escape(&self) -> &'static str { self.style.terminal_escape() }
+}
+
+#[cfg(test)]
+mod bbi_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbi_cursor_style() {
+        assert!(BbiCursorStyle::Block.is_block());
+        assert!(BbiCursorStyle::Line.is_line());
+        assert!(BbiCursorStyle::LineThin.is_thin());
+        assert!(!BbiCursorStyle::Block.is_thin());
+    }
+
+    #[test]
+    fn test_bbi_cursor_escape() {
+        assert!(!BbiCursorStyle::Block.terminal_escape().is_empty());
+        assert!(!BbiCursorStyle::Line.terminal_escape().is_empty());
+    }
+
+    #[test]
+    fn test_bbi_blink_mode() {
+        assert!(BbiBlinkMode::Blink.should_blink());
+        assert!(!BbiBlinkMode::Solid.should_blink());
+    }
+
+    #[test]
+    fn test_bbi_blink_tick() {
+        let mut s = BbiBlinkState::new(BbiBlinkMode::Blink);
+        assert!(s.visible);
+        s.tick(600);
+        assert!(!s.visible);
+        s.tick(600);
+        assert!(s.visible);
+    }
+
+    #[test]
+    fn test_bbi_blink_solid() {
+        let mut s = BbiBlinkState::new(BbiBlinkMode::Solid);
+        s.tick(1000);
+        assert!(s.visible); // always visible
+    }
+
+    #[test]
+    fn test_bbi_blink_reset() {
+        let mut s = BbiBlinkState::new(BbiBlinkMode::Blink);
+        s.tick(600);
+        s.reset();
+        assert!(s.visible);
+    }
+
+    #[test]
+    fn test_bbi_opacity() {
+        let s = BbiBlinkState::new(BbiBlinkMode::Solid);
+        assert_eq!(s.opacity(), 1.0);
+        let mut s2 = BbiBlinkState::new(BbiBlinkMode::Blink);
+        assert_eq!(s2.opacity(), 1.0);
+        s2.tick(600);
+        assert_eq!(s2.opacity(), 0.0);
+    }
+
+    #[test]
+    fn test_bbi_model() {
+        let mut m = BbiCursorModel::new(BbiCursorStyle::Line, BbiBlinkMode::Blink);
+        assert_eq!(m.style(), BbiCursorStyle::Line);
+        assert!(m.is_visible());
+        m.tick(600);
+        assert!(!m.is_visible());
+        m.reset_blink();
+        assert!(m.is_visible());
+    }
+
+    #[test]
+    fn test_bbi_model_smooth() {
+        let m = BbiCursorModel::new(BbiCursorStyle::Block, BbiBlinkMode::Smooth);
+        assert!(m.smooth_caret());
+    }
+
+    #[test]
+    fn test_bbi_style_labels() {
+        assert_eq!(BbiCursorStyle::Line.label(), "Line");
+        assert_eq!(BbiCursorStyle::BlockOutline.label(), "Block Outline");
+    }
+}
