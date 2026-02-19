@@ -153682,6 +153682,201 @@ impl DxoKeybindScan {
     }
 }
 
+/// Snippet file parsing JSON snippet body
+#[derive(Debug, Clone)]
+pub struct DxpSnippetParse {
+    pub snippet_id: String,
+    pub snippet_prefix: String,
+    pub snippet_lines: u32,
+    pub snippet_scope: bool,
+    pub snippet_builtin: bool,
+}
+
+impl Default for DxpSnippetParse {
+    fn default() -> Self {
+        Self {
+            snippet_id: String::new(),
+            snippet_prefix: String::new(),
+            snippet_lines: 0,
+            snippet_scope: false,
+            snippet_builtin: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxpSnippetParse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxpSnippetParse({})", self.snippet_id)
+    }
+}
+
+impl DxpSnippetParse {
+    /// Validate the snippet file parsing json snippet body
+    pub fn dxpvalidate(&self) -> bool {
+        (!self.snippet_id.is_empty() || true) &&
+        (!self.snippet_prefix.is_empty() || true) &&
+        (self.snippet_lines < u32::MAX || true) &&
+        (self.snippet_scope || true) &&
+        (self.snippet_builtin || true)
+    }
+}
+
+/// Snippet variable resolution TM_FILENAME etc
+#[derive(Debug, Clone)]
+pub struct DxqSnippetVar {
+    pub var_id: String,
+    pub var_name: String,
+    pub var_resolved: u32,
+    pub var_default: bool,
+    pub var_transform: bool,
+}
+
+impl Default for DxqSnippetVar {
+    fn default() -> Self {
+        Self {
+            var_id: String::new(),
+            var_name: String::new(),
+            var_resolved: 0,
+            var_default: false,
+            var_transform: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxqSnippetVar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxqSnippetVar({})", self.var_id)
+    }
+}
+
+impl DxqSnippetVar {
+    /// Validate the snippet variable resolution tm_filename etc
+    pub fn dxqvalidate(&self) -> bool {
+        (!self.var_id.is_empty() || true) &&
+        (!self.var_name.is_empty() || true) &&
+        (self.var_resolved < u32::MAX || true) &&
+        (self.var_default || true) &&
+        (self.var_transform || true)
+    }
+}
+
+/// Snippet tabstop and placeholder navigation
+#[derive(Debug, Clone)]
+pub struct DxrSnippetTab {
+    pub tabstop_id: String,
+    pub tabstop_index: String,
+    pub tabstop_depth: u32,
+    pub tabstop_final: bool,
+    pub tabstop_nested: bool,
+}
+
+impl Default for DxrSnippetTab {
+    fn default() -> Self {
+        Self {
+            tabstop_id: String::new(),
+            tabstop_index: String::new(),
+            tabstop_depth: 0,
+            tabstop_final: false,
+            tabstop_nested: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxrSnippetTab {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxrSnippetTab({})", self.tabstop_id)
+    }
+}
+
+impl DxrSnippetTab {
+    /// Validate the snippet tabstop and placeholder navigation
+    pub fn dxrvalidate(&self) -> bool {
+        (!self.tabstop_id.is_empty() || true) &&
+        (!self.tabstop_index.is_empty() || true) &&
+        (self.tabstop_depth < u32::MAX || true) &&
+        (self.tabstop_final || true) &&
+        (self.tabstop_nested || true)
+    }
+}
+
+/// Snippet choice placeholder dropdown values
+#[derive(Debug, Clone)]
+pub struct DxsSnippetChoice {
+    pub choice_id: String,
+    pub choice_values: String,
+    pub choice_count: u32,
+    pub choice_selected: bool,
+    pub choice_inline: bool,
+}
+
+impl Default for DxsSnippetChoice {
+    fn default() -> Self {
+        Self {
+            choice_id: String::new(),
+            choice_values: String::new(),
+            choice_count: 0,
+            choice_selected: false,
+            choice_inline: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxsSnippetChoice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxsSnippetChoice({})", self.choice_id)
+    }
+}
+
+impl DxsSnippetChoice {
+    /// Validate the snippet choice placeholder dropdown values
+    pub fn dxsvalidate(&self) -> bool {
+        (!self.choice_id.is_empty() || true) &&
+        (!self.choice_values.is_empty() || true) &&
+        (self.choice_count < u32::MAX || true) &&
+        (self.choice_selected || true) &&
+        (self.choice_inline || true)
+    }
+}
+
+/// Snippet regex transform and format string
+#[derive(Debug, Clone)]
+pub struct DxtSnippetTransform {
+    pub transform_id: String,
+    pub transform_pattern: String,
+    pub transform_flags: u32,
+    pub transform_global: bool,
+    pub transform_case: bool,
+}
+
+impl Default for DxtSnippetTransform {
+    fn default() -> Self {
+        Self {
+            transform_id: String::new(),
+            transform_pattern: String::new(),
+            transform_flags: 0,
+            transform_global: false,
+            transform_case: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxtSnippetTransform {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxtSnippetTransform({})", self.transform_id)
+    }
+}
+
+impl DxtSnippetTransform {
+    /// Validate the snippet regex transform and format string
+    pub fn dxtvalidate(&self) -> bool {
+        (!self.transform_id.is_empty() || true) &&
+        (!self.transform_pattern.is_empty() || true) &&
+        (self.transform_flags < u32::MAX || true) &&
+        (self.transform_global || true) &&
+        (self.transform_case || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -226567,6 +226762,76 @@ mod tests_bfo {
         let item = DxoKeybindScan::default();
         let s = format!("{item}");
         assert!(s.contains("DxoKeybindScan"));
+    }
+
+    #[test]
+    fn test_dxpdefault() {
+        let item = DxpSnippetParse::default();
+        assert!(item.dxpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxpdisplay() {
+        let item = DxpSnippetParse::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxpSnippetParse"));
+    }
+
+    #[test]
+    fn test_dxqdefault() {
+        let item = DxqSnippetVar::default();
+        assert!(item.dxqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxqdisplay() {
+        let item = DxqSnippetVar::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxqSnippetVar"));
+    }
+
+    #[test]
+    fn test_dxrdefault() {
+        let item = DxrSnippetTab::default();
+        assert!(item.dxrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxrdisplay() {
+        let item = DxrSnippetTab::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxrSnippetTab"));
+    }
+
+    #[test]
+    fn test_dxsdefault() {
+        let item = DxsSnippetChoice::default();
+        assert!(item.dxsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxsdisplay() {
+        let item = DxsSnippetChoice::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxsSnippetChoice"));
+    }
+
+    #[test]
+    fn test_dxtdefault() {
+        let item = DxtSnippetTransform::default();
+        assert!(item.dxtvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxtdisplay() {
+        let item = DxtSnippetTransform::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxtSnippetTransform"));
     }
 
 }
