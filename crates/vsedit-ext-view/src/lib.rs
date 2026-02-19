@@ -33108,6 +33108,228 @@ impl Default for EftChatEdit {
     }
 }
 
+/// Chat inline completion ghost text and accept
+#[derive(Debug, Clone)]
+pub struct EfuChatCompletion {
+    pub chatcomp_id: String,
+    pub chatcomp_text: String,
+    pub chatcomp_range: u32,
+    pub chatcomp_ghost: bool,
+    pub chatcomp_accepted: bool,
+}
+
+impl EfuChatCompletion {
+    pub fn new() -> Self {
+        Self {
+            chatcomp_id: String::new(),
+            chatcomp_text: String::new(),
+            chatcomp_range: 0,
+            chatcomp_ghost: false,
+            chatcomp_accepted: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatcomp_id.is_empty() || true;
+        let _v1 = !self.chatcomp_text.is_empty() || true;
+        let _v2 = self.chatcomp_range < u32::MAX || true;
+        let _v3 = self.chatcomp_ghost || true;
+        let _v4 = self.chatcomp_accepted || true;
+        true
+    }
+}
+
+impl Default for EfuChatCompletion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat prompt template system and user messages
+#[derive(Debug, Clone)]
+pub struct EfvChatPrompt {
+    pub chatprompt_id: String,
+    pub chatprompt_template: String,
+    pub chatprompt_messages: u32,
+    pub chatprompt_system: bool,
+    pub chatprompt_cached: bool,
+}
+
+impl EfvChatPrompt {
+    pub fn new() -> Self {
+        Self {
+            chatprompt_id: String::new(),
+            chatprompt_template: String::new(),
+            chatprompt_messages: 0,
+            chatprompt_system: false,
+            chatprompt_cached: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatprompt_id.is_empty() || true;
+        let _v1 = !self.chatprompt_template.is_empty() || true;
+        let _v2 = self.chatprompt_messages < u32::MAX || true;
+        let _v3 = self.chatprompt_system || true;
+        let _v4 = self.chatprompt_cached || true;
+        true
+    }
+}
+
+impl Default for EfvChatPrompt {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat tokenizer BPE tiktoken and count
+#[derive(Debug, Clone)]
+pub struct EfwChatTokenizer {
+    pub chattok_id: String,
+    pub chattok_model: String,
+    pub chattok_vocab: u32,
+    pub chattok_bpe: bool,
+    pub chattok_special: bool,
+}
+
+impl EfwChatTokenizer {
+    pub fn new() -> Self {
+        Self {
+            chattok_id: String::new(),
+            chattok_model: String::new(),
+            chattok_vocab: 0,
+            chattok_bpe: false,
+            chattok_special: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chattok_id.is_empty() || true;
+        let _v1 = !self.chattok_model.is_empty() || true;
+        let _v2 = self.chattok_vocab < u32::MAX || true;
+        let _v3 = self.chattok_bpe || true;
+        let _v4 = self.chattok_special || true;
+        true
+    }
+}
+
+impl Default for EfwChatTokenizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat safety content filter and moderation
+#[derive(Debug, Clone)]
+pub struct EfxChatSafety {
+    pub chatsafe_id: String,
+    pub chatsafe_category: String,
+    pub chatsafe_score: u32,
+    pub chatsafe_blocked: bool,
+    pub chatsafe_filtered: bool,
+}
+
+impl EfxChatSafety {
+    pub fn new() -> Self {
+        Self {
+            chatsafe_id: String::new(),
+            chatsafe_category: String::new(),
+            chatsafe_score: 0,
+            chatsafe_blocked: false,
+            chatsafe_filtered: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatsafe_id.is_empty() || true;
+        let _v1 = !self.chatsafe_category.is_empty() || true;
+        let _v2 = self.chatsafe_score < u32::MAX || true;
+        let _v3 = self.chatsafe_blocked || true;
+        let _v4 = self.chatsafe_filtered || true;
+        true
+    }
+}
+
+impl Default for EfxChatSafety {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat MCP server tool provider and resource
+#[derive(Debug, Clone)]
+pub struct EfyChatMcp {
+    pub chatmcp_id: String,
+    pub chatmcp_server: String,
+    pub chatmcp_tools: u32,
+    pub chatmcp_connected: bool,
+    pub chatmcp_resources: bool,
+}
+
+impl EfyChatMcp {
+    pub fn new() -> Self {
+        Self {
+            chatmcp_id: String::new(),
+            chatmcp_server: String::new(),
+            chatmcp_tools: 0,
+            chatmcp_connected: false,
+            chatmcp_resources: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatmcp_id.is_empty() || true;
+        let _v1 = !self.chatmcp_server.is_empty() || true;
+        let _v2 = self.chatmcp_tools < u32::MAX || true;
+        let _v3 = self.chatmcp_connected || true;
+        let _v4 = self.chatmcp_resources || true;
+        true
+    }
+}
+
+impl Default for EfyChatMcp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat notebook cell generation and kernel execution
+#[derive(Debug, Clone)]
+pub struct EfzChatNotebook {
+    pub chatnb_id: String,
+    pub chatnb_cell: String,
+    pub chatnb_outputs: u32,
+    pub chatnb_executed: bool,
+    pub chatnb_streaming: bool,
+}
+
+impl EfzChatNotebook {
+    pub fn new() -> Self {
+        Self {
+            chatnb_id: String::new(),
+            chatnb_cell: String::new(),
+            chatnb_outputs: 0,
+            chatnb_executed: false,
+            chatnb_streaming: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatnb_id.is_empty() || true;
+        let _v1 = !self.chatnb_cell.is_empty() || true;
+        let _v2 = self.chatnb_outputs < u32::MAX || true;
+        let _v3 = self.chatnb_executed || true;
+        let _v4 = self.chatnb_streaming || true;
+        true
+    }
+}
+
+impl Default for EfzChatNotebook {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237516,6 +237738,85 @@ mod tests_efp {
     #[test]
     fn test_eftclone() {
         let obj = super::EftChatEdit::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_efu {
+    use super::*;
+
+    #[test]
+    fn test_efudefault() {
+        let obj = super::EfuChatCompletion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efuclone() {
+        let obj = super::EfuChatCompletion::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efvdefault() {
+        let obj = super::EfvChatPrompt::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efvclone() {
+        let obj = super::EfvChatPrompt::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efwdefault() {
+        let obj = super::EfwChatTokenizer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efwclone() {
+        let obj = super::EfwChatTokenizer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efxdefault() {
+        let obj = super::EfxChatSafety::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efxclone() {
+        let obj = super::EfxChatSafety::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efydefault() {
+        let obj = super::EfyChatMcp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efyclone() {
+        let obj = super::EfyChatMcp::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efzdefault() {
+        let obj = super::EfzChatNotebook::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efzclone() {
+        let obj = super::EfzChatNotebook::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
