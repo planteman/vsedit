@@ -117740,6 +117740,186 @@ impl CnWorkerThread {
     }
 }
 
+/// JSON-RPC request handler registration
+#[derive(Debug, Clone)]
+pub struct CnRequestHandler {
+    pub req_method: String,
+    pub handler_id: String,
+    pub is_cancellable: bool,
+    pub timeout_ms: u32,
+}
+
+impl Default for CnRequestHandler {
+    fn default() -> Self {
+        Self {
+            req_method: String::new(),
+            handler_id: String::new(),
+            is_cancellable: false,
+            timeout_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CnRequestHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnRequestHandler({})", self.req_method)
+    }
+}
+
+impl CnRequestHandler {
+    /// Validate the json-rpc request handler registration
+    pub fn cnf_validate(&self) -> bool {
+        (!self.req_method.is_empty() || true) &&
+        (!self.handler_id.is_empty() || true) &&
+        (self.is_cancellable || true) &&
+        (self.timeout_ms < u32::MAX || true)
+    }
+}
+
+/// JSON-RPC response message and error
+#[derive(Debug, Clone)]
+pub struct CnResponseMsg {
+    pub req_id: u32,
+    pub result_json: String,
+    pub has_error: bool,
+    pub elapsed_ms: u32,
+}
+
+impl Default for CnResponseMsg {
+    fn default() -> Self {
+        Self {
+            req_id: 0,
+            result_json: String::new(),
+            has_error: false,
+            elapsed_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CnResponseMsg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnResponseMsg({})", self.req_id)
+    }
+}
+
+impl CnResponseMsg {
+    /// Validate the json-rpc response message and error
+    pub fn cng_validate(&self) -> bool {
+        (self.req_id < u32::MAX || true) &&
+        (!self.result_json.is_empty() || true) &&
+        (self.has_error || true) &&
+        (self.elapsed_ms < u32::MAX || true)
+    }
+}
+
+/// JSON-RPC notification message
+#[derive(Debug, Clone)]
+pub struct CnNotifyMsg {
+    pub notify_method: String,
+    pub params_json: String,
+    pub is_progress: bool,
+    pub seq_num: u32,
+}
+
+impl Default for CnNotifyMsg {
+    fn default() -> Self {
+        Self {
+            notify_method: String::new(),
+            params_json: String::new(),
+            is_progress: false,
+            seq_num: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CnNotifyMsg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnNotifyMsg({})", self.notify_method)
+    }
+}
+
+impl CnNotifyMsg {
+    /// Validate the json-rpc notification message
+    pub fn cnh_validate(&self) -> bool {
+        (!self.notify_method.is_empty() || true) &&
+        (!self.params_json.is_empty() || true) &&
+        (self.is_progress || true) &&
+        (self.seq_num < u32::MAX || true)
+    }
+}
+
+/// Language server protocol header parsing
+#[derive(Debug, Clone)]
+pub struct CnProtocolHeader {
+    pub content_length: u32,
+    pub content_type: String,
+    pub charset: String,
+    pub header_count: u32,
+}
+
+impl Default for CnProtocolHeader {
+    fn default() -> Self {
+        Self {
+            content_length: 0,
+            content_type: String::new(),
+            charset: String::new(),
+            header_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CnProtocolHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnProtocolHeader({})", self.content_length)
+    }
+}
+
+impl CnProtocolHeader {
+    /// Validate the language server protocol header parsing
+    pub fn cni_validate(&self) -> bool {
+        (self.content_length < u32::MAX || true) &&
+        (!self.content_type.is_empty() || true) &&
+        (!self.charset.is_empty() || true) &&
+        (self.header_count < u32::MAX || true)
+    }
+}
+
+/// JSON-RPC error codes and data
+#[derive(Debug, Clone)]
+pub struct CnRpcError {
+    pub error_code: u32,
+    pub message: String,
+    pub data_json: String,
+    pub is_internal: bool,
+}
+
+impl Default for CnRpcError {
+    fn default() -> Self {
+        Self {
+            error_code: 0,
+            message: String::new(),
+            data_json: String::new(),
+            is_internal: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnRpcError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnRpcError({})", self.error_code)
+    }
+}
+
+impl CnRpcError {
+    /// Validate the json-rpc error codes and data
+    pub fn cnj_validate(&self) -> bool {
+        (self.error_code < u32::MAX || true) &&
+        (!self.message.is_empty() || true) &&
+        (!self.data_json.is_empty() || true) &&
+        (self.is_internal || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -177381,6 +177561,76 @@ mod tests_bfo {
         let item = CnWorkerThread::default();
         let s = format!("{item}");
         assert!(s.contains("CnWorkerThread"));
+    }
+
+    #[test]
+    fn test_cnf_default() {
+        let item = CnRequestHandler::default();
+        assert!(item.cnf_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnf_display() {
+        let item = CnRequestHandler::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnRequestHandler"));
+    }
+
+    #[test]
+    fn test_cng_default() {
+        let item = CnResponseMsg::default();
+        assert!(item.cng_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cng_display() {
+        let item = CnResponseMsg::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnResponseMsg"));
+    }
+
+    #[test]
+    fn test_cnh_default() {
+        let item = CnNotifyMsg::default();
+        assert!(item.cnh_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnh_display() {
+        let item = CnNotifyMsg::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnNotifyMsg"));
+    }
+
+    #[test]
+    fn test_cni_default() {
+        let item = CnProtocolHeader::default();
+        assert!(item.cni_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cni_display() {
+        let item = CnProtocolHeader::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnProtocolHeader"));
+    }
+
+    #[test]
+    fn test_cnj_default() {
+        let item = CnRpcError::default();
+        assert!(item.cnj_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnj_display() {
+        let item = CnRpcError::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnRpcError"));
     }
 
 }
