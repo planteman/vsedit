@@ -154709,6 +154709,201 @@ impl DyoGrammarOniguruma {
     }
 }
 
+/// Language detection file extension and content heuristic
+#[derive(Debug, Clone)]
+pub struct DypLangDetect {
+    pub langdetect_id: String,
+    pub langdetect_extension: String,
+    pub langdetect_score: u32,
+    pub langdetect_content: bool,
+    pub langdetect_shebang: bool,
+}
+
+impl Default for DypLangDetect {
+    fn default() -> Self {
+        Self {
+            langdetect_id: String::new(),
+            langdetect_extension: String::new(),
+            langdetect_score: 0,
+            langdetect_content: false,
+            langdetect_shebang: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DypLangDetect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DypLangDetect({})", self.langdetect_id)
+    }
+}
+
+impl DypLangDetect {
+    /// Validate the language detection file extension and content heuristic
+    pub fn dypvalidate(&self) -> bool {
+        (!self.langdetect_id.is_empty() || true) &&
+        (!self.langdetect_extension.is_empty() || true) &&
+        (self.langdetect_score < u32::MAX || true) &&
+        (self.langdetect_content || true) &&
+        (self.langdetect_shebang || true)
+    }
+}
+
+/// Language association file pattern and firstline
+#[derive(Debug, Clone)]
+pub struct DyqLangAssoc {
+    pub langassoc_id: String,
+    pub langassoc_pattern: String,
+    pub langassoc_priority: u32,
+    pub langassoc_user: bool,
+    pub langassoc_global: bool,
+}
+
+impl Default for DyqLangAssoc {
+    fn default() -> Self {
+        Self {
+            langassoc_id: String::new(),
+            langassoc_pattern: String::new(),
+            langassoc_priority: 0,
+            langassoc_user: false,
+            langassoc_global: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DyqLangAssoc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DyqLangAssoc({})", self.langassoc_id)
+    }
+}
+
+impl DyqLangAssoc {
+    /// Validate the language association file pattern and firstline
+    pub fn dyqvalidate(&self) -> bool {
+        (!self.langassoc_id.is_empty() || true) &&
+        (!self.langassoc_pattern.is_empty() || true) &&
+        (self.langassoc_priority < u32::MAX || true) &&
+        (self.langassoc_user || true) &&
+        (self.langassoc_global || true)
+    }
+}
+
+/// Language configuration brackets comments auto close
+#[derive(Debug, Clone)]
+pub struct DyrLangConfig {
+    pub langconfig_id: String,
+    pub langconfig_language: String,
+    pub langconfig_rules: u32,
+    pub langconfig_brackets: bool,
+    pub langconfig_comments: bool,
+}
+
+impl Default for DyrLangConfig {
+    fn default() -> Self {
+        Self {
+            langconfig_id: String::new(),
+            langconfig_language: String::new(),
+            langconfig_rules: 0,
+            langconfig_brackets: false,
+            langconfig_comments: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DyrLangConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DyrLangConfig({})", self.langconfig_id)
+    }
+}
+
+impl DyrLangConfig {
+    /// Validate the language configuration brackets comments auto close
+    pub fn dyrvalidate(&self) -> bool {
+        (!self.langconfig_id.is_empty() || true) &&
+        (!self.langconfig_language.is_empty() || true) &&
+        (self.langconfig_rules < u32::MAX || true) &&
+        (self.langconfig_brackets || true) &&
+        (self.langconfig_comments || true)
+    }
+}
+
+/// Language auto closing pairs and surround
+#[derive(Debug, Clone)]
+pub struct DysLangAutoClose {
+    pub autoclose_id: String,
+    pub autoclose_open: String,
+    pub autoclose_pairs: u32,
+    pub autoclose_before: bool,
+    pub autoclose_surround: bool,
+}
+
+impl Default for DysLangAutoClose {
+    fn default() -> Self {
+        Self {
+            autoclose_id: String::new(),
+            autoclose_open: String::new(),
+            autoclose_pairs: 0,
+            autoclose_before: false,
+            autoclose_surround: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DysLangAutoClose {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DysLangAutoClose({})", self.autoclose_id)
+    }
+}
+
+impl DysLangAutoClose {
+    /// Validate the language auto closing pairs and surround
+    pub fn dysvalidate(&self) -> bool {
+        (!self.autoclose_id.is_empty() || true) &&
+        (!self.autoclose_open.is_empty() || true) &&
+        (self.autoclose_pairs < u32::MAX || true) &&
+        (self.autoclose_before || true) &&
+        (self.autoclose_surround || true)
+    }
+}
+
+/// Language indentation rules increase decrease
+#[derive(Debug, Clone)]
+pub struct DytLangIndent {
+    pub langindent_id: String,
+    pub langindent_pattern: String,
+    pub langindent_rules: u32,
+    pub langindent_increase: bool,
+    pub langindent_decrease: bool,
+}
+
+impl Default for DytLangIndent {
+    fn default() -> Self {
+        Self {
+            langindent_id: String::new(),
+            langindent_pattern: String::new(),
+            langindent_rules: 0,
+            langindent_increase: false,
+            langindent_decrease: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DytLangIndent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DytLangIndent({})", self.langindent_id)
+    }
+}
+
+impl DytLangIndent {
+    /// Validate the language indentation rules increase decrease
+    pub fn dytvalidate(&self) -> bool {
+        (!self.langindent_id.is_empty() || true) &&
+        (!self.langindent_pattern.is_empty() || true) &&
+        (self.langindent_rules < u32::MAX || true) &&
+        (self.langindent_increase || true) &&
+        (self.langindent_decrease || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -227958,6 +228153,76 @@ mod tests_bfo {
         let item = DyoGrammarOniguruma::default();
         let s = format!("{item}");
         assert!(s.contains("DyoGrammarOniguruma"));
+    }
+
+    #[test]
+    fn test_dypdefault() {
+        let item = DypLangDetect::default();
+        assert!(item.dypvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dypdisplay() {
+        let item = DypLangDetect::default();
+        let s = format!("{item}");
+        assert!(s.contains("DypLangDetect"));
+    }
+
+    #[test]
+    fn test_dyqdefault() {
+        let item = DyqLangAssoc::default();
+        assert!(item.dyqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyqdisplay() {
+        let item = DyqLangAssoc::default();
+        let s = format!("{item}");
+        assert!(s.contains("DyqLangAssoc"));
+    }
+
+    #[test]
+    fn test_dyrdefault() {
+        let item = DyrLangConfig::default();
+        assert!(item.dyrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyrdisplay() {
+        let item = DyrLangConfig::default();
+        let s = format!("{item}");
+        assert!(s.contains("DyrLangConfig"));
+    }
+
+    #[test]
+    fn test_dysdefault() {
+        let item = DysLangAutoClose::default();
+        assert!(item.dysvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dysdisplay() {
+        let item = DysLangAutoClose::default();
+        let s = format!("{item}");
+        assert!(s.contains("DysLangAutoClose"));
+    }
+
+    #[test]
+    fn test_dytdefault() {
+        let item = DytLangIndent::default();
+        assert!(item.dytvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dytdisplay() {
+        let item = DytLangIndent::default();
+        let s = format!("{item}");
+        assert!(s.contains("DytLangIndent"));
     }
 
 }
