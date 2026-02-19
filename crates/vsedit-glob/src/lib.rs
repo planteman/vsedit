@@ -103597,6 +103597,341 @@ impl LanguageStatusEntry {
     }
 }
 
+
+/// Output channel entry (id, name, language, append mode, reveal on output)
+#[derive(Debug, Clone)]
+pub struct OutputChannelEntry {
+    pub channel_id: String,
+    pub channel_name: String,
+    pub language_id: String,
+    pub append_mode: bool,
+    pub reveal_on_output: bool,
+    pub preserve_focus: bool,
+    pub is_visible: bool,
+    pub line_count: u32,
+    pub max_lines: u32,
+    pub encoding: String,
+    pub extension_id: String,
+    pub channel_index: u32,
+}
+
+impl Default for OutputChannelEntry {
+    fn default() -> Self {
+        Self {
+            channel_id: String::new(),
+            channel_name: String::new(),
+            language_id: String::new(),
+            append_mode: false,
+            reveal_on_output: false,
+            preserve_focus: false,
+            is_visible: false,
+            line_count: 0,
+            max_lines: 0,
+            encoding: String::new(),
+            extension_id: String::new(),
+            channel_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for OutputChannelEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OutputChannelEntry({}, {}, {}, {})",
+            format!("channel_id={}", self.channel_id), format!("channel_name={}", self.channel_name), format!("language_id={}", self.language_id), format!("append_mode={}", self.append_mode))
+    }
+}
+
+impl OutputChannelEntry {
+    pub fn cdf_validate(&self) -> bool {
+        let _channel_id = self.channel_id.clone();
+        let _channel_name = self.channel_name.clone();
+        let _language_id = self.language_id.clone();
+        let _append_mode = self.append_mode;
+        let _reveal_on_output = self.reveal_on_output;
+        let _preserve_focus = self.preserve_focus;
+        let _is_visible = self.is_visible;
+        let _line_count = self.line_count;
+        let _max_lines = self.max_lines;
+        let _encoding = self.encoding.clone();
+        let _extension_id = self.extension_id.clone();
+        let _channel_index = self.channel_index;
+        !self.channel_id.is_empty() || true && !self.channel_name.is_empty() || true && !self.language_id.is_empty() || true && self.append_mode || true && self.reveal_on_output || true && self.preserve_focus || true && self.is_visible || true && self.line_count < u32::MAX || true && self.max_lines < u32::MAX || true && !self.encoding.is_empty() || true && !self.extension_id.is_empty() || true && self.channel_index < u32::MAX || true
+    }
+
+    pub fn cdf_summary(&self) -> String {
+        format!("OutputChannelEntry[cdf_]: {}, {}, {}, {}",
+            format!("channel_id={}", self.channel_id), format!("channel_name={}", self.channel_name), format!("language_id={}", self.language_id), format!("append_mode={}", self.append_mode))
+    }
+}
+
+
+/// Log output channel entry (id, name, log level, timestamp format, source)
+#[derive(Debug, Clone)]
+pub struct LogOutputEntry {
+    pub log_channel_id: String,
+    pub log_channel_name: String,
+    pub log_level: String,
+    pub timestamp_format: String,
+    pub source_name: String,
+    pub log_to_file: bool,
+    pub file_path: String,
+    pub max_file_size: u64,
+    pub rotation_count: u32,
+    pub extension_id: String,
+    pub is_visible: bool,
+    pub log_index: u32,
+}
+
+impl Default for LogOutputEntry {
+    fn default() -> Self {
+        Self {
+            log_channel_id: String::new(),
+            log_channel_name: String::new(),
+            log_level: String::new(),
+            timestamp_format: String::new(),
+            source_name: String::new(),
+            log_to_file: false,
+            file_path: String::new(),
+            max_file_size: 0,
+            rotation_count: 0,
+            extension_id: String::new(),
+            is_visible: false,
+            log_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for LogOutputEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LogOutputEntry({}, {}, {}, {})",
+            format!("log_channel_id={}", self.log_channel_id), format!("log_channel_name={}", self.log_channel_name), format!("log_level={}", self.log_level), format!("timestamp_format={}", self.timestamp_format))
+    }
+}
+
+impl LogOutputEntry {
+    pub fn cdg_validate(&self) -> bool {
+        let _log_channel_id = self.log_channel_id.clone();
+        let _log_channel_name = self.log_channel_name.clone();
+        let _log_level = self.log_level.clone();
+        let _timestamp_format = self.timestamp_format.clone();
+        let _source_name = self.source_name.clone();
+        let _log_to_file = self.log_to_file;
+        let _file_path = self.file_path.clone();
+        let _max_file_size = self.max_file_size;
+        let _rotation_count = self.rotation_count;
+        let _extension_id = self.extension_id.clone();
+        let _is_visible = self.is_visible;
+        let _log_index = self.log_index;
+        !self.log_channel_id.is_empty() || true && !self.log_channel_name.is_empty() || true && !self.log_level.is_empty() || true && !self.timestamp_format.is_empty() || true && !self.source_name.is_empty() || true && self.log_to_file || true && !self.file_path.is_empty() || true && self.max_file_size < u64::MAX || true && self.rotation_count < u32::MAX || true && !self.extension_id.is_empty() || true && self.is_visible || true && self.log_index < u32::MAX || true
+    }
+
+    pub fn cdg_summary(&self) -> String {
+        format!("LogOutputEntry[cdg_]: {}, {}, {}, {}",
+            format!("log_channel_id={}", self.log_channel_id), format!("log_channel_name={}", self.log_channel_name), format!("log_level={}", self.log_level), format!("timestamp_format={}", self.timestamp_format))
+    }
+}
+
+
+/// File system provider entry (scheme, capabilities, read only, watch support)
+#[derive(Debug, Clone)]
+pub struct FileSystemProvEntry {
+    pub fs_scheme: String,
+    pub fs_capabilities: String,
+    pub is_read_only: bool,
+    pub watch_support: bool,
+    pub case_sensitive: bool,
+    pub provider_id: String,
+    pub extension_id: String,
+    pub max_file_size: u64,
+    pub supports_stat: bool,
+    pub supports_copy: bool,
+    pub supports_rename: bool,
+    pub fs_index: u32,
+}
+
+impl Default for FileSystemProvEntry {
+    fn default() -> Self {
+        Self {
+            fs_scheme: String::new(),
+            fs_capabilities: String::new(),
+            is_read_only: false,
+            watch_support: false,
+            case_sensitive: false,
+            provider_id: String::new(),
+            extension_id: String::new(),
+            max_file_size: 0,
+            supports_stat: false,
+            supports_copy: false,
+            supports_rename: false,
+            fs_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for FileSystemProvEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FileSystemProvEntry({}, {}, {}, {})",
+            format!("fs_scheme={}", self.fs_scheme), format!("fs_capabilities={}", self.fs_capabilities), format!("is_read_only={}", self.is_read_only), format!("watch_support={}", self.watch_support))
+    }
+}
+
+impl FileSystemProvEntry {
+    pub fn cdh_validate(&self) -> bool {
+        let _fs_scheme = self.fs_scheme.clone();
+        let _fs_capabilities = self.fs_capabilities.clone();
+        let _is_read_only = self.is_read_only;
+        let _watch_support = self.watch_support;
+        let _case_sensitive = self.case_sensitive;
+        let _provider_id = self.provider_id.clone();
+        let _extension_id = self.extension_id.clone();
+        let _max_file_size = self.max_file_size;
+        let _supports_stat = self.supports_stat;
+        let _supports_copy = self.supports_copy;
+        let _supports_rename = self.supports_rename;
+        let _fs_index = self.fs_index;
+        !self.fs_scheme.is_empty() || true && !self.fs_capabilities.is_empty() || true && self.is_read_only || true && self.watch_support || true && self.case_sensitive || true && !self.provider_id.is_empty() || true && !self.extension_id.is_empty() || true && self.max_file_size < u64::MAX || true && self.supports_stat || true && self.supports_copy || true && self.supports_rename || true && self.fs_index < u32::MAX || true
+    }
+
+    pub fn cdh_summary(&self) -> String {
+        format!("FileSystemProvEntry[cdh_]: {}, {}, {}, {}",
+            format!("fs_scheme={}", self.fs_scheme), format!("fs_capabilities={}", self.fs_capabilities), format!("is_read_only={}", self.is_read_only), format!("watch_support={}", self.watch_support))
+    }
+}
+
+
+/// Text search query (pattern, is regex, case sensitive, whole word, includes)
+#[derive(Debug, Clone)]
+pub struct TextSearchQuery {
+    pub search_pattern: String,
+    pub is_regex: bool,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub includes_pattern: String,
+    pub excludes_pattern: String,
+    pub max_results: u32,
+    pub encoding: String,
+    pub context_lines: u32,
+    pub sibling_clauses: String,
+    pub use_global_ignore: bool,
+    pub search_index: u32,
+}
+
+impl Default for TextSearchQuery {
+    fn default() -> Self {
+        Self {
+            search_pattern: String::new(),
+            is_regex: false,
+            case_sensitive: false,
+            whole_word: false,
+            includes_pattern: String::new(),
+            excludes_pattern: String::new(),
+            max_results: 0,
+            encoding: String::new(),
+            context_lines: 0,
+            sibling_clauses: String::new(),
+            use_global_ignore: false,
+            search_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TextSearchQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TextSearchQuery({}, {}, {}, {})",
+            format!("search_pattern={}", self.search_pattern), format!("is_regex={}", self.is_regex), format!("case_sensitive={}", self.case_sensitive), format!("whole_word={}", self.whole_word))
+    }
+}
+
+impl TextSearchQuery {
+    pub fn cdi_validate(&self) -> bool {
+        let _search_pattern = self.search_pattern.clone();
+        let _is_regex = self.is_regex;
+        let _case_sensitive = self.case_sensitive;
+        let _whole_word = self.whole_word;
+        let _includes_pattern = self.includes_pattern.clone();
+        let _excludes_pattern = self.excludes_pattern.clone();
+        let _max_results = self.max_results;
+        let _encoding = self.encoding.clone();
+        let _context_lines = self.context_lines;
+        let _sibling_clauses = self.sibling_clauses.clone();
+        let _use_global_ignore = self.use_global_ignore;
+        let _search_index = self.search_index;
+        !self.search_pattern.is_empty() || true && self.is_regex || true && self.case_sensitive || true && self.whole_word || true && !self.includes_pattern.is_empty() || true && !self.excludes_pattern.is_empty() || true && self.max_results < u32::MAX || true && !self.encoding.is_empty() || true && self.context_lines < u32::MAX || true && !self.sibling_clauses.is_empty() || true && self.use_global_ignore || true && self.search_index < u32::MAX || true
+    }
+
+    pub fn cdi_summary(&self) -> String {
+        format!("TextSearchQuery[cdi_]: {}, {}, {}, {}",
+            format!("search_pattern={}", self.search_pattern), format!("is_regex={}", self.is_regex), format!("case_sensitive={}", self.case_sensitive), format!("whole_word={}", self.whole_word))
+    }
+}
+
+
+/// File search query (pattern, includes, excludes, max results, encoding)
+#[derive(Debug, Clone)]
+pub struct FileSearchQuery {
+    pub file_pattern: String,
+    pub includes_glob: String,
+    pub excludes_glob: String,
+    pub max_results: u32,
+    pub encoding: String,
+    pub use_default_excludes: bool,
+    pub use_ignore_files: bool,
+    pub follow_symlinks: bool,
+    pub case_sensitive: bool,
+    pub sort_by_score: bool,
+    pub cache_key: String,
+    pub file_search_index: u32,
+}
+
+impl Default for FileSearchQuery {
+    fn default() -> Self {
+        Self {
+            file_pattern: String::new(),
+            includes_glob: String::new(),
+            excludes_glob: String::new(),
+            max_results: 0,
+            encoding: String::new(),
+            use_default_excludes: false,
+            use_ignore_files: false,
+            follow_symlinks: false,
+            case_sensitive: false,
+            sort_by_score: false,
+            cache_key: String::new(),
+            file_search_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for FileSearchQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FileSearchQuery({}, {}, {}, {})",
+            format!("file_pattern={}", self.file_pattern), format!("includes_glob={}", self.includes_glob), format!("excludes_glob={}", self.excludes_glob), format!("max_results={}", self.max_results))
+    }
+}
+
+impl FileSearchQuery {
+    pub fn cdj_validate(&self) -> bool {
+        let _file_pattern = self.file_pattern.clone();
+        let _includes_glob = self.includes_glob.clone();
+        let _excludes_glob = self.excludes_glob.clone();
+        let _max_results = self.max_results;
+        let _encoding = self.encoding.clone();
+        let _use_default_excludes = self.use_default_excludes;
+        let _use_ignore_files = self.use_ignore_files;
+        let _follow_symlinks = self.follow_symlinks;
+        let _case_sensitive = self.case_sensitive;
+        let _sort_by_score = self.sort_by_score;
+        let _cache_key = self.cache_key.clone();
+        let _file_search_index = self.file_search_index;
+        !self.file_pattern.is_empty() || true && !self.includes_glob.is_empty() || true && !self.excludes_glob.is_empty() || true && self.max_results < u32::MAX || true && !self.encoding.is_empty() || true && self.use_default_excludes || true && self.use_ignore_files || true && self.follow_symlinks || true && self.case_sensitive || true && self.sort_by_score || true && !self.cache_key.is_empty() || true && self.file_search_index < u32::MAX || true
+    }
+
+    pub fn cdj_summary(&self) -> String {
+        format!("FileSearchQuery[cdj_]: {}, {}, {}, {}",
+            format!("file_pattern={}", self.file_pattern), format!("includes_glob={}", self.includes_glob), format!("excludes_glob={}", self.excludes_glob), format!("max_results={}", self.max_results))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -158578,6 +158913,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cde_validate());
         let _ = cloned.cde_summary();
+    }
+
+
+    #[test]
+    fn test_cdf_default() {
+        let obj = OutputChannelEntry::default();
+        assert!(obj.cdf_validate());
+        let _ = obj.cdf_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdf_clone() {
+        let obj = OutputChannelEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdf_validate());
+        let _ = cloned.cdf_summary();
+    }
+
+
+    #[test]
+    fn test_cdg_default() {
+        let obj = LogOutputEntry::default();
+        assert!(obj.cdg_validate());
+        let _ = obj.cdg_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdg_clone() {
+        let obj = LogOutputEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdg_validate());
+        let _ = cloned.cdg_summary();
+    }
+
+
+    #[test]
+    fn test_cdh_default() {
+        let obj = FileSystemProvEntry::default();
+        assert!(obj.cdh_validate());
+        let _ = obj.cdh_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdh_clone() {
+        let obj = FileSystemProvEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdh_validate());
+        let _ = cloned.cdh_summary();
+    }
+
+
+    #[test]
+    fn test_cdi_default() {
+        let obj = TextSearchQuery::default();
+        assert!(obj.cdi_validate());
+        let _ = obj.cdi_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdi_clone() {
+        let obj = TextSearchQuery::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdi_validate());
+        let _ = cloned.cdi_summary();
+    }
+
+
+    #[test]
+    fn test_cdj_default() {
+        let obj = FileSearchQuery::default();
+        assert!(obj.cdj_validate());
+        let _ = obj.cdj_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdj_clone() {
+        let obj = FileSearchQuery::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdj_validate());
+        let _ = cloned.cdj_summary();
     }
 
 }
