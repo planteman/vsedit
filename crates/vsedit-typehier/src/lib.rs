@@ -85873,6 +85873,173 @@ impl BjoDeclarationResult {
     }
 }
 
+
+/// Reference location (bjp_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjpReferenceLocation {
+    pub uri: String,
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub is_declaration: bool,
+}
+
+/// Reference result (bjp_)
+#[derive(Debug, Clone)]
+pub struct BjpReferenceResult {
+    pub locations: Vec<BjpReferenceLocation>,
+    pub include_declaration: bool,
+}
+
+impl BjpReferenceResult {
+    pub fn new(include_decl: bool) -> Self { Self { locations: Vec::new(), include_declaration: include_decl } }
+    pub fn add(&mut self, loc: BjpReferenceLocation) { self.locations.push(loc); }
+    pub fn count(&self) -> usize { self.locations.len() }
+    pub fn declarations(&self) -> Vec<&BjpReferenceLocation> { self.locations.iter().filter(|l| l.is_declaration).collect() }
+    pub fn references_only(&self) -> Vec<&BjpReferenceLocation> { self.locations.iter().filter(|l| !l.is_declaration).collect() }
+    pub fn by_file(&self) -> std::collections::HashMap<&str, Vec<&BjpReferenceLocation>> {
+        let mut m: std::collections::HashMap<&str, Vec<&BjpReferenceLocation>> = std::collections::HashMap::new();
+        for l in &self.locations { m.entry(&l.uri).or_default().push(l); }
+        m
+    }
+    pub fn file_count(&self) -> usize { self.by_file().len() }
+    pub fn is_empty(&self) -> bool { self.locations.is_empty() }
+}
+
+
+/// Highlight kind (bjq_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BjqHighlightKind { Text, Read, Write }
+
+/// Document highlight (bjq_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjqDocumentHighlight {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub kind: BjqHighlightKind,
+}
+
+/// Highlight result (bjq_)
+#[derive(Debug, Clone)]
+pub struct BjqHighlightResult {
+    pub highlights: Vec<BjqDocumentHighlight>,
+}
+
+impl BjqHighlightResult {
+    pub fn new() -> Self { Self { highlights: Vec::new() } }
+    pub fn add(&mut self, h: BjqDocumentHighlight) { self.highlights.push(h); }
+    pub fn reads(&self) -> Vec<&BjqDocumentHighlight> { self.highlights.iter().filter(|h| h.kind == BjqHighlightKind::Read).collect() }
+    pub fn writes(&self) -> Vec<&BjqDocumentHighlight> { self.highlights.iter().filter(|h| h.kind == BjqHighlightKind::Write).collect() }
+    pub fn count(&self) -> usize { self.highlights.len() }
+    pub fn is_empty(&self) -> bool { self.highlights.is_empty() }
+    pub fn on_line(&self, line: usize) -> Vec<&BjqDocumentHighlight> { self.highlights.iter().filter(|h| h.start_line == line).collect() }
+}
+
+
+/// On-type format edit (bjr_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjrFormatEdit {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub new_text: String,
+}
+
+/// On-type formatting provider (bjr_)
+#[derive(Debug, Clone)]
+pub struct BjrOnTypeFormattingProvider {
+    pub first_trigger: char,
+    pub more_triggers: Vec<char>,
+}
+
+impl BjrOnTypeFormattingProvider {
+    pub fn new(first: char, more: Vec<char>) -> Self { Self { first_trigger: first, more_triggers: more } }
+    pub fn all_triggers(&self) -> Vec<char> {
+        let mut v = vec![self.first_trigger];
+        v.extend(&self.more_triggers);
+        v
+    }
+    pub fn is_trigger(&self, ch: char) -> bool { ch == self.first_trigger || self.more_triggers.contains(&ch) }
+}
+
+/// On-type format result (bjr_)
+#[derive(Debug, Clone)]
+pub struct BjrOnTypeFormatResult {
+    pub edits: Vec<BjrFormatEdit>,
+}
+
+impl BjrOnTypeFormatResult {
+    pub fn new() -> Self { Self { edits: Vec::new() } }
+    pub fn add_edit(&mut self, edit: BjrFormatEdit) { self.edits.push(edit); }
+    pub fn edit_count(&self) -> usize { self.edits.len() }
+    pub fn is_empty(&self) -> bool { self.edits.is_empty() }
+}
+
+
+/// Rename range (bjs_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjsRenameRange {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub placeholder: String,
+}
+
+/// Rename edit (bjs_)
+#[derive(Debug, Clone)]
+pub struct BjsRenameEdit {
+    pub uri: String,
+    pub edits: Vec<(usize, usize, usize, usize, String)>,
+}
+
+/// Rename result (bjs_)
+#[derive(Debug, Clone)]
+pub struct BjsRenameResult {
+    pub file_edits: Vec<BjsRenameEdit>,
+}
+
+impl BjsRenameResult {
+    pub fn new() -> Self { Self { file_edits: Vec::new() } }
+    pub fn add_file_edit(&mut self, edit: BjsRenameEdit) { self.file_edits.push(edit); }
+    pub fn file_count(&self) -> usize { self.file_edits.len() }
+    pub fn total_edits(&self) -> usize { self.file_edits.iter().map(|f| f.edits.len()).sum() }
+    pub fn is_empty(&self) -> bool { self.file_edits.is_empty() }
+}
+
+
+/// Document symbol kind (bjt_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BjtSymbolKind { File, Module, Namespace, Package, Class, Method, Property, Field, Constructor, Enum, Interface, Function, Variable, Constant, String, Number, Boolean, Array, Object, Key, Null, EnumMember, Struct, Event, Operator, TypeParameter }
+
+/// Document symbol (bjt_)
+#[derive(Debug, Clone)]
+pub struct BjtDocumentSymbol {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: BjtSymbolKind,
+    pub range_start_line: usize,
+    pub range_end_line: usize,
+    pub selection_start_line: usize,
+    pub selection_start_col: usize,
+    pub children: Vec<BjtDocumentSymbol>,
+}
+
+impl BjtDocumentSymbol {
+    pub fn new(name: String, kind: BjtSymbolKind, start: usize, end: usize) -> Self {
+        Self { name, detail: None, kind, range_start_line: start, range_end_line: end, selection_start_line: start, selection_start_col: 0, children: Vec::new() }
+    }
+    pub fn add_child(&mut self, child: BjtDocumentSymbol) { self.children.push(child); }
+    pub fn child_count(&self) -> usize { self.children.len() }
+    fn total_recursive(&self) -> usize { 1 + self.children.iter().map(|c| c.total_recursive()).sum::<usize>() }
+    pub fn total_symbols(&self) -> usize { self.total_recursive() }
+    pub fn contains_line(&self, line: usize) -> bool { line >= self.range_start_line && line <= self.range_end_line }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -94142,5 +94309,115 @@ mod tests_bfo {
         let r = BjoDeclarationResult::new();
         assert!(r.in_same_file("x").is_empty());
     }
+
+
+    #[test]
+    fn test_bjp_result_new() { let r = BjpReferenceResult::new(true); assert!(r.is_empty()); assert!(r.include_declaration); }
+    #[test]
+    fn test_bjp_add() { let mut r = BjpReferenceResult::new(false); r.add(BjpReferenceLocation { uri: "a.rs".into(), start_line: 1, start_col: 0, end_line: 1, end_col: 5, is_declaration: false }); assert_eq!(r.count(), 1); }
+    #[test]
+    fn test_bjp_declarations() { let mut r = BjpReferenceResult::new(true); r.add(BjpReferenceLocation { uri: "a".into(), start_line: 1, start_col: 0, end_line: 1, end_col: 5, is_declaration: true }); r.add(BjpReferenceLocation { uri: "b".into(), start_line: 5, start_col: 0, end_line: 5, end_col: 5, is_declaration: false }); assert_eq!(r.declarations().len(), 1); }
+    #[test]
+    fn test_bjp_references_only() { let mut r = BjpReferenceResult::new(true); r.add(BjpReferenceLocation { uri: "a".into(), start_line: 1, start_col: 0, end_line: 1, end_col: 5, is_declaration: true }); r.add(BjpReferenceLocation { uri: "b".into(), start_line: 5, start_col: 0, end_line: 5, end_col: 5, is_declaration: false }); assert_eq!(r.references_only().len(), 1); }
+    #[test]
+    fn test_bjp_by_file() { let mut r = BjpReferenceResult::new(false); r.add(BjpReferenceLocation { uri: "a".into(), start_line: 1, start_col: 0, end_line: 1, end_col: 5, is_declaration: false }); r.add(BjpReferenceLocation { uri: "a".into(), start_line: 10, start_col: 0, end_line: 10, end_col: 5, is_declaration: false }); assert_eq!(r.file_count(), 1); }
+    #[test]
+    fn test_bjp_multiple_files() { let mut r = BjpReferenceResult::new(false); for i in 0..5 { r.add(BjpReferenceLocation { uri: format!("f{i}"), start_line: i, start_col: 0, end_line: i, end_col: 5, is_declaration: false }); } assert_eq!(r.file_count(), 5); }
+    #[test]
+    fn test_bjp_empty() { let r = BjpReferenceResult::new(false); assert!(r.is_empty()); assert_eq!(r.count(), 0); }
+    #[test]
+    fn test_bjp_is_declaration() { let l = BjpReferenceLocation { uri: "x".into(), start_line: 0, start_col: 0, end_line: 0, end_col: 5, is_declaration: true }; assert!(l.is_declaration); }
+    #[test]
+    fn test_bjp_location_uri() { let l = BjpReferenceLocation { uri: "lib.rs".into(), start_line: 42, start_col: 4, end_line: 42, end_col: 15, is_declaration: false }; assert_eq!(l.uri, "lib.rs"); }
+    #[test]
+    fn test_bjp_not_empty() { let mut r = BjpReferenceResult::new(true); r.add(BjpReferenceLocation { uri: "x".into(), start_line: 0, start_col: 0, end_line: 0, end_col: 0, is_declaration: false }); assert!(!r.is_empty()); }
+
+
+    #[test]
+    fn test_bjq_result_new() { let r = BjqHighlightResult::new(); assert!(r.is_empty()); }
+    #[test]
+    fn test_bjq_add() { let mut r = BjqHighlightResult::new(); r.add(BjqDocumentHighlight { start_line: 5, start_col: 10, end_line: 5, end_col: 15, kind: BjqHighlightKind::Read }); assert_eq!(r.count(), 1); }
+    #[test]
+    fn test_bjq_reads_writes() { let mut r = BjqHighlightResult::new(); r.add(BjqDocumentHighlight { start_line: 1, start_col: 0, end_line: 1, end_col: 5, kind: BjqHighlightKind::Read }); r.add(BjqDocumentHighlight { start_line: 5, start_col: 0, end_line: 5, end_col: 5, kind: BjqHighlightKind::Write }); assert_eq!(r.reads().len(), 1); assert_eq!(r.writes().len(), 1); }
+    #[test]
+    fn test_bjq_text_kind() { let h = BjqDocumentHighlight { start_line: 1, start_col: 0, end_line: 1, end_col: 5, kind: BjqHighlightKind::Text }; assert_eq!(h.kind, BjqHighlightKind::Text); }
+    #[test]
+    fn test_bjq_on_line() { let mut r = BjqHighlightResult::new(); r.add(BjqDocumentHighlight { start_line: 5, start_col: 0, end_line: 5, end_col: 3, kind: BjqHighlightKind::Read }); r.add(BjqDocumentHighlight { start_line: 5, start_col: 10, end_line: 5, end_col: 13, kind: BjqHighlightKind::Read }); r.add(BjqDocumentHighlight { start_line: 10, start_col: 0, end_line: 10, end_col: 3, kind: BjqHighlightKind::Write }); assert_eq!(r.on_line(5).len(), 2); }
+    #[test]
+    fn test_bjq_empty_line() { let r = BjqHighlightResult::new(); assert!(r.on_line(1).is_empty()); }
+    #[test]
+    fn test_bjq_count() { let mut r = BjqHighlightResult::new(); for i in 0..5 { r.add(BjqDocumentHighlight { start_line: i, start_col: 0, end_line: i, end_col: 5, kind: BjqHighlightKind::Read }); } assert_eq!(r.count(), 5); }
+    #[test]
+    fn test_bjq_not_empty() { let mut r = BjqHighlightResult::new(); r.add(BjqDocumentHighlight { start_line: 0, start_col: 0, end_line: 0, end_col: 1, kind: BjqHighlightKind::Text }); assert!(!r.is_empty()); }
+    #[test]
+    fn test_bjq_write_highlight() { let h = BjqDocumentHighlight { start_line: 10, start_col: 4, end_line: 10, end_col: 10, kind: BjqHighlightKind::Write }; assert_eq!(h.start_col, 4); }
+    #[test]
+    fn test_bjq_all_same_kind() { let mut r = BjqHighlightResult::new(); r.add(BjqDocumentHighlight { start_line: 1, start_col: 0, end_line: 1, end_col: 5, kind: BjqHighlightKind::Read }); assert_eq!(r.writes().len(), 0); }
+
+
+    #[test]
+    fn test_bjr_provider_new() { let p = BjrOnTypeFormattingProvider::new(';', vec!['}', '\n']); assert!(p.is_trigger(';')); assert!(p.is_trigger('}')); }
+    #[test]
+    fn test_bjr_all_triggers() { let p = BjrOnTypeFormattingProvider::new(';', vec!['}']); assert_eq!(p.all_triggers().len(), 2); }
+    #[test]
+    fn test_bjr_not_trigger() { let p = BjrOnTypeFormattingProvider::new(';', vec![]); assert!(!p.is_trigger('a')); }
+    #[test]
+    fn test_bjr_result_new() { let r = BjrOnTypeFormatResult::new(); assert!(r.is_empty()); }
+    #[test]
+    fn test_bjr_add_edit() { let mut r = BjrOnTypeFormatResult::new(); r.add_edit(BjrFormatEdit { start_line: 5, start_col: 0, end_line: 5, end_col: 0, new_text: "  ".into() }); assert_eq!(r.edit_count(), 1); }
+    #[test]
+    fn test_bjr_multiple_edits() { let mut r = BjrOnTypeFormatResult::new(); for i in 0..3 { r.add_edit(BjrFormatEdit { start_line: i, start_col: 0, end_line: i, end_col: 0, new_text: " ".into() }); } assert_eq!(r.edit_count(), 3); }
+    #[test]
+    fn test_bjr_edit_fields() { let e = BjrFormatEdit { start_line: 10, start_col: 5, end_line: 10, end_col: 8, new_text: "   ".into() }; assert_eq!(e.new_text, "   "); }
+    #[test]
+    fn test_bjr_not_empty() { let mut r = BjrOnTypeFormatResult::new(); r.add_edit(BjrFormatEdit { start_line: 0, start_col: 0, end_line: 0, end_col: 0, new_text: "x".into() }); assert!(!r.is_empty()); }
+    #[test]
+    fn test_bjr_first_trigger() { let p = BjrOnTypeFormattingProvider::new(';', vec![]); assert_eq!(p.first_trigger, ';'); }
+    #[test]
+    fn test_bjr_single_trigger() { let p = BjrOnTypeFormattingProvider::new('}', vec![]); assert_eq!(p.all_triggers().len(), 1); }
+
+
+    #[test]
+    fn test_bjs_result_new() { let r = BjsRenameResult::new(); assert!(r.is_empty()); }
+    #[test]
+    fn test_bjs_add_file_edit() { let mut r = BjsRenameResult::new(); r.add_file_edit(BjsRenameEdit { uri: "a.rs".into(), edits: vec![(1, 5, 1, 10, "newName".into())] }); assert_eq!(r.file_count(), 1); }
+    #[test]
+    fn test_bjs_total_edits() { let mut r = BjsRenameResult::new(); r.add_file_edit(BjsRenameEdit { uri: "a.rs".into(), edits: vec![(1, 0, 1, 5, "x".into()), (5, 0, 5, 5, "x".into())] }); r.add_file_edit(BjsRenameEdit { uri: "b.rs".into(), edits: vec![(10, 0, 10, 5, "x".into())] }); assert_eq!(r.total_edits(), 3); }
+    #[test]
+    fn test_bjs_rename_range() { let r = BjsRenameRange { start_line: 5, start_col: 4, end_line: 5, end_col: 10, placeholder: "oldName".into() }; assert_eq!(r.placeholder, "oldName"); }
+    #[test]
+    fn test_bjs_not_empty() { let mut r = BjsRenameResult::new(); r.add_file_edit(BjsRenameEdit { uri: "x".into(), edits: vec![] }); assert!(!r.is_empty()); }
+    #[test]
+    fn test_bjs_file_count() { let mut r = BjsRenameResult::new(); for i in 0..4 { r.add_file_edit(BjsRenameEdit { uri: format!("f{i}"), edits: vec![(0, 0, 0, 1, "r".into())] }); } assert_eq!(r.file_count(), 4); }
+    #[test]
+    fn test_bjs_empty_file_edit() { let r = BjsRenameResult::new(); assert_eq!(r.total_edits(), 0); }
+    #[test]
+    fn test_bjs_edit_fields() { let e = BjsRenameEdit { uri: "lib.rs".into(), edits: vec![(42, 8, 42, 15, "renamed".into())] }; assert_eq!(e.uri, "lib.rs"); }
+    #[test]
+    fn test_bjs_range_placeholder() { let r = BjsRenameRange { start_line: 1, start_col: 0, end_line: 1, end_col: 5, placeholder: "foo".into() }; assert_eq!(r.start_line, 1); }
+    #[test]
+    fn test_bjs_many_edits() { let mut r = BjsRenameResult::new(); r.add_file_edit(BjsRenameEdit { uri: "x".into(), edits: (0..20).map(|i| (i, 0, i, 5, "new".into())).collect() }); assert_eq!(r.total_edits(), 20); }
+
+
+    #[test]
+    fn test_bjt_symbol_new() { let s = BjtDocumentSymbol::new("main".into(), BjtSymbolKind::Function, 1, 10); assert_eq!(s.name, "main"); assert_eq!(s.child_count(), 0); }
+    #[test]
+    fn test_bjt_add_child() { let mut s = BjtDocumentSymbol::new("Struct".into(), BjtSymbolKind::Struct, 1, 20); s.add_child(BjtDocumentSymbol::new("field".into(), BjtSymbolKind::Field, 2, 2)); assert_eq!(s.child_count(), 1); }
+    #[test]
+    fn test_bjt_total_symbols() { let mut s = BjtDocumentSymbol::new("mod".into(), BjtSymbolKind::Module, 0, 100); s.add_child(BjtDocumentSymbol::new("fn a".into(), BjtSymbolKind::Function, 5, 10)); s.add_child(BjtDocumentSymbol::new("fn b".into(), BjtSymbolKind::Function, 15, 20)); assert_eq!(s.total_symbols(), 3); }
+    #[test]
+    fn test_bjt_contains_line() { let s = BjtDocumentSymbol::new("fn".into(), BjtSymbolKind::Function, 5, 15); assert!(s.contains_line(10)); assert!(!s.contains_line(20)); }
+    #[test]
+    fn test_bjt_detail() { let mut s = BjtDocumentSymbol::new("x".into(), BjtSymbolKind::Variable, 1, 1); s.detail = Some("i32".into()); assert_eq!(s.detail.as_deref(), Some("i32")); }
+    #[test]
+    fn test_bjt_nested() { let mut parent = BjtDocumentSymbol::new("impl".into(), BjtSymbolKind::Class, 1, 50); let mut child = BjtDocumentSymbol::new("method".into(), BjtSymbolKind::Method, 5, 15); child.add_child(BjtDocumentSymbol::new("var".into(), BjtSymbolKind::Variable, 7, 7)); parent.add_child(child); assert_eq!(parent.total_symbols(), 3); }
+    #[test]
+    fn test_bjt_enum_kind() { let s = BjtDocumentSymbol::new("Color".into(), BjtSymbolKind::Enum, 1, 5); assert_eq!(s.kind, BjtSymbolKind::Enum); }
+    #[test]
+    fn test_bjt_interface() { let s = BjtDocumentSymbol::new("Trait".into(), BjtSymbolKind::Interface, 1, 10); assert_eq!(s.kind, BjtSymbolKind::Interface); }
+    #[test]
+    fn test_bjt_boundary_line() { let s = BjtDocumentSymbol::new("fn".into(), BjtSymbolKind::Function, 5, 15); assert!(s.contains_line(5)); assert!(s.contains_line(15)); }
+    #[test]
+    fn test_bjt_constant() { let s = BjtDocumentSymbol::new("MAX".into(), BjtSymbolKind::Constant, 1, 1); assert_eq!(s.kind, BjtSymbolKind::Constant); }
 
 }
