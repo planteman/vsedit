@@ -88635,6 +88635,111 @@ impl ReferenceResult {
     }
 }
 
+/// Runtime wiring: bqa_ DebugBreakpoint
+#[derive(Debug, Clone)]
+pub struct DebugBreakpoint {
+    pub bqa_breakpoint_id: u64,
+    pub bqa_uri: String,
+    pub bqa_line_number: u32,
+    pub bqa_column: Option<u32>,
+    pub bqa_condition: String,
+    pub bqa_hit_condition: String,
+    pub bqa_log_message: String,
+    pub bqa_is_enabled: bool,
+    pub bqa_is_verified: bool,
+    pub bqa_hit_count: u64,
+}
+
+impl DebugBreakpoint {
+    pub fn bqa_summary(&self) -> String {
+        format!("DebugBreakpoint({})", self.bqa_breakpoint_id)
+    }
+}
+
+/// Runtime wiring: bqb_ DebugStackFrame
+#[derive(Debug, Clone)]
+pub struct DebugStackFrame {
+    pub bqb_frame_id: u64,
+    pub bqb_frame_name: String,
+    pub bqb_source_uri: String,
+    pub bqb_source_line: u32,
+    pub bqb_source_column: u32,
+    pub bqb_module_id: String,
+    pub bqb_presentation_hint: String,
+    pub bqb_can_restart: bool,
+    pub bqb_scopes_count: u32,
+    pub bqb_instruction_pointer: String,
+}
+
+impl DebugStackFrame {
+    pub fn bqb_summary(&self) -> String {
+        format!("DebugStackFrame({})", self.bqb_frame_id)
+    }
+}
+
+/// Runtime wiring: bqc_ DebugVariable
+#[derive(Debug, Clone)]
+pub struct DebugVariable {
+    pub bqc_variable_name: String,
+    pub bqc_variable_value: String,
+    pub bqc_variable_type: String,
+    pub bqc_variables_reference: u64,
+    pub bqc_named_variables: u32,
+    pub bqc_indexed_variables: u32,
+    pub bqc_evaluate_name: String,
+    pub bqc_memory_reference: String,
+    pub bqc_presentation_hint_kind: String,
+    pub bqc_is_lazy: bool,
+}
+
+impl DebugVariable {
+    pub fn bqc_summary(&self) -> String {
+        format!("DebugVariable({})", self.bqc_variable_name)
+    }
+}
+
+/// Runtime wiring: bqd_ DebugWatch
+#[derive(Debug, Clone)]
+pub struct DebugWatch {
+    pub bqd_watch_id: u64,
+    pub bqd_expression: String,
+    pub bqd_result_value: String,
+    pub bqd_result_type: String,
+    pub bqd_variables_reference: u64,
+    pub bqd_is_error: bool,
+    pub bqd_error_message: String,
+    pub bqd_frame_id: u64,
+    pub bqd_named_variables: u32,
+    pub bqd_indexed_variables: u32,
+}
+
+impl DebugWatch {
+    pub fn bqd_summary(&self) -> String {
+        format!("DebugWatch({})", self.bqd_watch_id)
+    }
+}
+
+/// Runtime wiring: bqe_ DebugExpression
+#[derive(Debug, Clone)]
+pub struct DebugExpression {
+    pub bqe_expression_id: u64,
+    pub bqe_expression_text: String,
+    pub bqe_result: String,
+    pub bqe_result_type: String,
+    pub bqe_variables_reference: u64,
+    pub bqe_context: String,
+    pub bqe_frame_id: u64,
+    pub bqe_is_error: bool,
+    pub bqe_memory_reference: String,
+    pub bqe_presentation_hint: String,
+}
+
+impl DebugExpression {
+    pub fn bqe_summary(&self) -> String {
+        format!("DebugExpression({})", self.bqe_expression_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -111992,6 +112097,910 @@ mod tests_bfo {
         };
         let _ = obj.bpz_summary();
         assert_eq!(obj.bpz_context_kind, "test");
+    }
+
+    #[test]
+    fn test_bqa_breakpoint_id() {
+        let obj = DebugBreakpoint {
+            bqa_breakpoint_id: 0,
+            bqa_uri: String::from("test"),
+            bqa_line_number: 0,
+            bqa_column: None,
+            bqa_condition: String::from("test"),
+            bqa_hit_condition: String::from("test"),
+            bqa_log_message: String::from("test"),
+            bqa_is_enabled: false,
+            bqa_is_verified: false,
+            bqa_hit_count: 0,
+        };
+        let _ = obj.bqa_summary();
+        assert_eq!(obj.bqa_breakpoint_id, 0);
+    }
+
+    #[test]
+    fn test_bqa_uri() {
+        let obj = DebugBreakpoint {
+            bqa_breakpoint_id: 0,
+            bqa_uri: String::from("test"),
+            bqa_line_number: 0,
+            bqa_column: None,
+            bqa_condition: String::from("test"),
+            bqa_hit_condition: String::from("test"),
+            bqa_log_message: String::from("test"),
+            bqa_is_enabled: false,
+            bqa_is_verified: false,
+            bqa_hit_count: 0,
+        };
+        let _ = obj.bqa_summary();
+        assert_eq!(obj.bqa_uri, "test");
+    }
+
+    #[test]
+    fn test_bqa_line_number() {
+        let obj = DebugBreakpoint {
+            bqa_breakpoint_id: 0,
+            bqa_uri: String::from("test"),
+            bqa_line_number: 0,
+            bqa_column: None,
+            bqa_condition: String::from("test"),
+            bqa_hit_condition: String::from("test"),
+            bqa_log_message: String::from("test"),
+            bqa_is_enabled: false,
+            bqa_is_verified: false,
+            bqa_hit_count: 0,
+        };
+        let _ = obj.bqa_summary();
+        assert_eq!(obj.bqa_line_number, 0);
+    }
+
+    #[test]
+    fn test_bqa_column() {
+        let obj = DebugBreakpoint {
+            bqa_breakpoint_id: 0,
+            bqa_uri: String::from("test"),
+            bqa_line_number: 0,
+            bqa_column: None,
+            bqa_condition: String::from("test"),
+            bqa_hit_condition: String::from("test"),
+            bqa_log_message: String::from("test"),
+            bqa_is_enabled: false,
+            bqa_is_verified: false,
+            bqa_hit_count: 0,
+        };
+        let _ = obj.bqa_summary();
+        assert!(obj.bqa_column.is_none());
+    }
+
+    #[test]
+    fn test_bqa_condition() {
+        let obj = DebugBreakpoint {
+            bqa_breakpoint_id: 0,
+            bqa_uri: String::from("test"),
+            bqa_line_number: 0,
+            bqa_column: None,
+            bqa_condition: String::from("test"),
+            bqa_hit_condition: String::from("test"),
+            bqa_log_message: String::from("test"),
+            bqa_is_enabled: false,
+            bqa_is_verified: false,
+            bqa_hit_count: 0,
+        };
+        let _ = obj.bqa_summary();
+        assert_eq!(obj.bqa_condition, "test");
+    }
+
+    #[test]
+    fn test_bqa_hit_condition() {
+        let obj = DebugBreakpoint {
+            bqa_breakpoint_id: 0,
+            bqa_uri: String::from("test"),
+            bqa_line_number: 0,
+            bqa_column: None,
+            bqa_condition: String::from("test"),
+            bqa_hit_condition: String::from("test"),
+            bqa_log_message: String::from("test"),
+            bqa_is_enabled: false,
+            bqa_is_verified: false,
+            bqa_hit_count: 0,
+        };
+        let _ = obj.bqa_summary();
+        assert_eq!(obj.bqa_hit_condition, "test");
+    }
+
+    #[test]
+    fn test_bqa_log_message() {
+        let obj = DebugBreakpoint {
+            bqa_breakpoint_id: 0,
+            bqa_uri: String::from("test"),
+            bqa_line_number: 0,
+            bqa_column: None,
+            bqa_condition: String::from("test"),
+            bqa_hit_condition: String::from("test"),
+            bqa_log_message: String::from("test"),
+            bqa_is_enabled: false,
+            bqa_is_verified: false,
+            bqa_hit_count: 0,
+        };
+        let _ = obj.bqa_summary();
+        assert_eq!(obj.bqa_log_message, "test");
+    }
+
+    #[test]
+    fn test_bqa_is_enabled() {
+        let obj = DebugBreakpoint {
+            bqa_breakpoint_id: 0,
+            bqa_uri: String::from("test"),
+            bqa_line_number: 0,
+            bqa_column: None,
+            bqa_condition: String::from("test"),
+            bqa_hit_condition: String::from("test"),
+            bqa_log_message: String::from("test"),
+            bqa_is_enabled: false,
+            bqa_is_verified: false,
+            bqa_hit_count: 0,
+        };
+        let _ = obj.bqa_summary();
+        assert!(!obj.bqa_is_enabled);
+    }
+
+    #[test]
+    fn test_bqa_is_verified() {
+        let obj = DebugBreakpoint {
+            bqa_breakpoint_id: 0,
+            bqa_uri: String::from("test"),
+            bqa_line_number: 0,
+            bqa_column: None,
+            bqa_condition: String::from("test"),
+            bqa_hit_condition: String::from("test"),
+            bqa_log_message: String::from("test"),
+            bqa_is_enabled: false,
+            bqa_is_verified: false,
+            bqa_hit_count: 0,
+        };
+        let _ = obj.bqa_summary();
+        assert!(!obj.bqa_is_verified);
+    }
+
+    #[test]
+    fn test_bqa_hit_count() {
+        let obj = DebugBreakpoint {
+            bqa_breakpoint_id: 0,
+            bqa_uri: String::from("test"),
+            bqa_line_number: 0,
+            bqa_column: None,
+            bqa_condition: String::from("test"),
+            bqa_hit_condition: String::from("test"),
+            bqa_log_message: String::from("test"),
+            bqa_is_enabled: false,
+            bqa_is_verified: false,
+            bqa_hit_count: 0,
+        };
+        let _ = obj.bqa_summary();
+        assert_eq!(obj.bqa_hit_count, 0);
+    }
+
+
+    #[test]
+    fn test_bqb_frame_id() {
+        let obj = DebugStackFrame {
+            bqb_frame_id: 0,
+            bqb_frame_name: String::from("test"),
+            bqb_source_uri: String::from("test"),
+            bqb_source_line: 0,
+            bqb_source_column: 0,
+            bqb_module_id: String::from("test"),
+            bqb_presentation_hint: String::from("test"),
+            bqb_can_restart: false,
+            bqb_scopes_count: 0,
+            bqb_instruction_pointer: String::from("test"),
+        };
+        let _ = obj.bqb_summary();
+        assert_eq!(obj.bqb_frame_id, 0);
+    }
+
+    #[test]
+    fn test_bqb_frame_name() {
+        let obj = DebugStackFrame {
+            bqb_frame_id: 0,
+            bqb_frame_name: String::from("test"),
+            bqb_source_uri: String::from("test"),
+            bqb_source_line: 0,
+            bqb_source_column: 0,
+            bqb_module_id: String::from("test"),
+            bqb_presentation_hint: String::from("test"),
+            bqb_can_restart: false,
+            bqb_scopes_count: 0,
+            bqb_instruction_pointer: String::from("test"),
+        };
+        let _ = obj.bqb_summary();
+        assert_eq!(obj.bqb_frame_name, "test");
+    }
+
+    #[test]
+    fn test_bqb_source_uri() {
+        let obj = DebugStackFrame {
+            bqb_frame_id: 0,
+            bqb_frame_name: String::from("test"),
+            bqb_source_uri: String::from("test"),
+            bqb_source_line: 0,
+            bqb_source_column: 0,
+            bqb_module_id: String::from("test"),
+            bqb_presentation_hint: String::from("test"),
+            bqb_can_restart: false,
+            bqb_scopes_count: 0,
+            bqb_instruction_pointer: String::from("test"),
+        };
+        let _ = obj.bqb_summary();
+        assert_eq!(obj.bqb_source_uri, "test");
+    }
+
+    #[test]
+    fn test_bqb_source_line() {
+        let obj = DebugStackFrame {
+            bqb_frame_id: 0,
+            bqb_frame_name: String::from("test"),
+            bqb_source_uri: String::from("test"),
+            bqb_source_line: 0,
+            bqb_source_column: 0,
+            bqb_module_id: String::from("test"),
+            bqb_presentation_hint: String::from("test"),
+            bqb_can_restart: false,
+            bqb_scopes_count: 0,
+            bqb_instruction_pointer: String::from("test"),
+        };
+        let _ = obj.bqb_summary();
+        assert_eq!(obj.bqb_source_line, 0);
+    }
+
+    #[test]
+    fn test_bqb_source_column() {
+        let obj = DebugStackFrame {
+            bqb_frame_id: 0,
+            bqb_frame_name: String::from("test"),
+            bqb_source_uri: String::from("test"),
+            bqb_source_line: 0,
+            bqb_source_column: 0,
+            bqb_module_id: String::from("test"),
+            bqb_presentation_hint: String::from("test"),
+            bqb_can_restart: false,
+            bqb_scopes_count: 0,
+            bqb_instruction_pointer: String::from("test"),
+        };
+        let _ = obj.bqb_summary();
+        assert_eq!(obj.bqb_source_column, 0);
+    }
+
+    #[test]
+    fn test_bqb_module_id() {
+        let obj = DebugStackFrame {
+            bqb_frame_id: 0,
+            bqb_frame_name: String::from("test"),
+            bqb_source_uri: String::from("test"),
+            bqb_source_line: 0,
+            bqb_source_column: 0,
+            bqb_module_id: String::from("test"),
+            bqb_presentation_hint: String::from("test"),
+            bqb_can_restart: false,
+            bqb_scopes_count: 0,
+            bqb_instruction_pointer: String::from("test"),
+        };
+        let _ = obj.bqb_summary();
+        assert_eq!(obj.bqb_module_id, "test");
+    }
+
+    #[test]
+    fn test_bqb_presentation_hint() {
+        let obj = DebugStackFrame {
+            bqb_frame_id: 0,
+            bqb_frame_name: String::from("test"),
+            bqb_source_uri: String::from("test"),
+            bqb_source_line: 0,
+            bqb_source_column: 0,
+            bqb_module_id: String::from("test"),
+            bqb_presentation_hint: String::from("test"),
+            bqb_can_restart: false,
+            bqb_scopes_count: 0,
+            bqb_instruction_pointer: String::from("test"),
+        };
+        let _ = obj.bqb_summary();
+        assert_eq!(obj.bqb_presentation_hint, "test");
+    }
+
+    #[test]
+    fn test_bqb_can_restart() {
+        let obj = DebugStackFrame {
+            bqb_frame_id: 0,
+            bqb_frame_name: String::from("test"),
+            bqb_source_uri: String::from("test"),
+            bqb_source_line: 0,
+            bqb_source_column: 0,
+            bqb_module_id: String::from("test"),
+            bqb_presentation_hint: String::from("test"),
+            bqb_can_restart: false,
+            bqb_scopes_count: 0,
+            bqb_instruction_pointer: String::from("test"),
+        };
+        let _ = obj.bqb_summary();
+        assert!(!obj.bqb_can_restart);
+    }
+
+    #[test]
+    fn test_bqb_scopes_count() {
+        let obj = DebugStackFrame {
+            bqb_frame_id: 0,
+            bqb_frame_name: String::from("test"),
+            bqb_source_uri: String::from("test"),
+            bqb_source_line: 0,
+            bqb_source_column: 0,
+            bqb_module_id: String::from("test"),
+            bqb_presentation_hint: String::from("test"),
+            bqb_can_restart: false,
+            bqb_scopes_count: 0,
+            bqb_instruction_pointer: String::from("test"),
+        };
+        let _ = obj.bqb_summary();
+        assert_eq!(obj.bqb_scopes_count, 0);
+    }
+
+    #[test]
+    fn test_bqb_instruction_pointer() {
+        let obj = DebugStackFrame {
+            bqb_frame_id: 0,
+            bqb_frame_name: String::from("test"),
+            bqb_source_uri: String::from("test"),
+            bqb_source_line: 0,
+            bqb_source_column: 0,
+            bqb_module_id: String::from("test"),
+            bqb_presentation_hint: String::from("test"),
+            bqb_can_restart: false,
+            bqb_scopes_count: 0,
+            bqb_instruction_pointer: String::from("test"),
+        };
+        let _ = obj.bqb_summary();
+        assert_eq!(obj.bqb_instruction_pointer, "test");
+    }
+
+
+    #[test]
+    fn test_bqc_variable_name() {
+        let obj = DebugVariable {
+            bqc_variable_name: String::from("test"),
+            bqc_variable_value: String::from("test"),
+            bqc_variable_type: String::from("test"),
+            bqc_variables_reference: 0,
+            bqc_named_variables: 0,
+            bqc_indexed_variables: 0,
+            bqc_evaluate_name: String::from("test"),
+            bqc_memory_reference: String::from("test"),
+            bqc_presentation_hint_kind: String::from("test"),
+            bqc_is_lazy: false,
+        };
+        let _ = obj.bqc_summary();
+        assert_eq!(obj.bqc_variable_name, "test");
+    }
+
+    #[test]
+    fn test_bqc_variable_value() {
+        let obj = DebugVariable {
+            bqc_variable_name: String::from("test"),
+            bqc_variable_value: String::from("test"),
+            bqc_variable_type: String::from("test"),
+            bqc_variables_reference: 0,
+            bqc_named_variables: 0,
+            bqc_indexed_variables: 0,
+            bqc_evaluate_name: String::from("test"),
+            bqc_memory_reference: String::from("test"),
+            bqc_presentation_hint_kind: String::from("test"),
+            bqc_is_lazy: false,
+        };
+        let _ = obj.bqc_summary();
+        assert_eq!(obj.bqc_variable_value, "test");
+    }
+
+    #[test]
+    fn test_bqc_variable_type() {
+        let obj = DebugVariable {
+            bqc_variable_name: String::from("test"),
+            bqc_variable_value: String::from("test"),
+            bqc_variable_type: String::from("test"),
+            bqc_variables_reference: 0,
+            bqc_named_variables: 0,
+            bqc_indexed_variables: 0,
+            bqc_evaluate_name: String::from("test"),
+            bqc_memory_reference: String::from("test"),
+            bqc_presentation_hint_kind: String::from("test"),
+            bqc_is_lazy: false,
+        };
+        let _ = obj.bqc_summary();
+        assert_eq!(obj.bqc_variable_type, "test");
+    }
+
+    #[test]
+    fn test_bqc_variables_reference() {
+        let obj = DebugVariable {
+            bqc_variable_name: String::from("test"),
+            bqc_variable_value: String::from("test"),
+            bqc_variable_type: String::from("test"),
+            bqc_variables_reference: 0,
+            bqc_named_variables: 0,
+            bqc_indexed_variables: 0,
+            bqc_evaluate_name: String::from("test"),
+            bqc_memory_reference: String::from("test"),
+            bqc_presentation_hint_kind: String::from("test"),
+            bqc_is_lazy: false,
+        };
+        let _ = obj.bqc_summary();
+        assert_eq!(obj.bqc_variables_reference, 0);
+    }
+
+    #[test]
+    fn test_bqc_named_variables() {
+        let obj = DebugVariable {
+            bqc_variable_name: String::from("test"),
+            bqc_variable_value: String::from("test"),
+            bqc_variable_type: String::from("test"),
+            bqc_variables_reference: 0,
+            bqc_named_variables: 0,
+            bqc_indexed_variables: 0,
+            bqc_evaluate_name: String::from("test"),
+            bqc_memory_reference: String::from("test"),
+            bqc_presentation_hint_kind: String::from("test"),
+            bqc_is_lazy: false,
+        };
+        let _ = obj.bqc_summary();
+        assert_eq!(obj.bqc_named_variables, 0);
+    }
+
+    #[test]
+    fn test_bqc_indexed_variables() {
+        let obj = DebugVariable {
+            bqc_variable_name: String::from("test"),
+            bqc_variable_value: String::from("test"),
+            bqc_variable_type: String::from("test"),
+            bqc_variables_reference: 0,
+            bqc_named_variables: 0,
+            bqc_indexed_variables: 0,
+            bqc_evaluate_name: String::from("test"),
+            bqc_memory_reference: String::from("test"),
+            bqc_presentation_hint_kind: String::from("test"),
+            bqc_is_lazy: false,
+        };
+        let _ = obj.bqc_summary();
+        assert_eq!(obj.bqc_indexed_variables, 0);
+    }
+
+    #[test]
+    fn test_bqc_evaluate_name() {
+        let obj = DebugVariable {
+            bqc_variable_name: String::from("test"),
+            bqc_variable_value: String::from("test"),
+            bqc_variable_type: String::from("test"),
+            bqc_variables_reference: 0,
+            bqc_named_variables: 0,
+            bqc_indexed_variables: 0,
+            bqc_evaluate_name: String::from("test"),
+            bqc_memory_reference: String::from("test"),
+            bqc_presentation_hint_kind: String::from("test"),
+            bqc_is_lazy: false,
+        };
+        let _ = obj.bqc_summary();
+        assert_eq!(obj.bqc_evaluate_name, "test");
+    }
+
+    #[test]
+    fn test_bqc_memory_reference() {
+        let obj = DebugVariable {
+            bqc_variable_name: String::from("test"),
+            bqc_variable_value: String::from("test"),
+            bqc_variable_type: String::from("test"),
+            bqc_variables_reference: 0,
+            bqc_named_variables: 0,
+            bqc_indexed_variables: 0,
+            bqc_evaluate_name: String::from("test"),
+            bqc_memory_reference: String::from("test"),
+            bqc_presentation_hint_kind: String::from("test"),
+            bqc_is_lazy: false,
+        };
+        let _ = obj.bqc_summary();
+        assert_eq!(obj.bqc_memory_reference, "test");
+    }
+
+    #[test]
+    fn test_bqc_presentation_hint_kind() {
+        let obj = DebugVariable {
+            bqc_variable_name: String::from("test"),
+            bqc_variable_value: String::from("test"),
+            bqc_variable_type: String::from("test"),
+            bqc_variables_reference: 0,
+            bqc_named_variables: 0,
+            bqc_indexed_variables: 0,
+            bqc_evaluate_name: String::from("test"),
+            bqc_memory_reference: String::from("test"),
+            bqc_presentation_hint_kind: String::from("test"),
+            bqc_is_lazy: false,
+        };
+        let _ = obj.bqc_summary();
+        assert_eq!(obj.bqc_presentation_hint_kind, "test");
+    }
+
+    #[test]
+    fn test_bqc_is_lazy() {
+        let obj = DebugVariable {
+            bqc_variable_name: String::from("test"),
+            bqc_variable_value: String::from("test"),
+            bqc_variable_type: String::from("test"),
+            bqc_variables_reference: 0,
+            bqc_named_variables: 0,
+            bqc_indexed_variables: 0,
+            bqc_evaluate_name: String::from("test"),
+            bqc_memory_reference: String::from("test"),
+            bqc_presentation_hint_kind: String::from("test"),
+            bqc_is_lazy: false,
+        };
+        let _ = obj.bqc_summary();
+        assert!(!obj.bqc_is_lazy);
+    }
+
+
+    #[test]
+    fn test_bqd_watch_id() {
+        let obj = DebugWatch {
+            bqd_watch_id: 0,
+            bqd_expression: String::from("test"),
+            bqd_result_value: String::from("test"),
+            bqd_result_type: String::from("test"),
+            bqd_variables_reference: 0,
+            bqd_is_error: false,
+            bqd_error_message: String::from("test"),
+            bqd_frame_id: 0,
+            bqd_named_variables: 0,
+            bqd_indexed_variables: 0,
+        };
+        let _ = obj.bqd_summary();
+        assert_eq!(obj.bqd_watch_id, 0);
+    }
+
+    #[test]
+    fn test_bqd_expression() {
+        let obj = DebugWatch {
+            bqd_watch_id: 0,
+            bqd_expression: String::from("test"),
+            bqd_result_value: String::from("test"),
+            bqd_result_type: String::from("test"),
+            bqd_variables_reference: 0,
+            bqd_is_error: false,
+            bqd_error_message: String::from("test"),
+            bqd_frame_id: 0,
+            bqd_named_variables: 0,
+            bqd_indexed_variables: 0,
+        };
+        let _ = obj.bqd_summary();
+        assert_eq!(obj.bqd_expression, "test");
+    }
+
+    #[test]
+    fn test_bqd_result_value() {
+        let obj = DebugWatch {
+            bqd_watch_id: 0,
+            bqd_expression: String::from("test"),
+            bqd_result_value: String::from("test"),
+            bqd_result_type: String::from("test"),
+            bqd_variables_reference: 0,
+            bqd_is_error: false,
+            bqd_error_message: String::from("test"),
+            bqd_frame_id: 0,
+            bqd_named_variables: 0,
+            bqd_indexed_variables: 0,
+        };
+        let _ = obj.bqd_summary();
+        assert_eq!(obj.bqd_result_value, "test");
+    }
+
+    #[test]
+    fn test_bqd_result_type() {
+        let obj = DebugWatch {
+            bqd_watch_id: 0,
+            bqd_expression: String::from("test"),
+            bqd_result_value: String::from("test"),
+            bqd_result_type: String::from("test"),
+            bqd_variables_reference: 0,
+            bqd_is_error: false,
+            bqd_error_message: String::from("test"),
+            bqd_frame_id: 0,
+            bqd_named_variables: 0,
+            bqd_indexed_variables: 0,
+        };
+        let _ = obj.bqd_summary();
+        assert_eq!(obj.bqd_result_type, "test");
+    }
+
+    #[test]
+    fn test_bqd_variables_reference() {
+        let obj = DebugWatch {
+            bqd_watch_id: 0,
+            bqd_expression: String::from("test"),
+            bqd_result_value: String::from("test"),
+            bqd_result_type: String::from("test"),
+            bqd_variables_reference: 0,
+            bqd_is_error: false,
+            bqd_error_message: String::from("test"),
+            bqd_frame_id: 0,
+            bqd_named_variables: 0,
+            bqd_indexed_variables: 0,
+        };
+        let _ = obj.bqd_summary();
+        assert_eq!(obj.bqd_variables_reference, 0);
+    }
+
+    #[test]
+    fn test_bqd_is_error() {
+        let obj = DebugWatch {
+            bqd_watch_id: 0,
+            bqd_expression: String::from("test"),
+            bqd_result_value: String::from("test"),
+            bqd_result_type: String::from("test"),
+            bqd_variables_reference: 0,
+            bqd_is_error: false,
+            bqd_error_message: String::from("test"),
+            bqd_frame_id: 0,
+            bqd_named_variables: 0,
+            bqd_indexed_variables: 0,
+        };
+        let _ = obj.bqd_summary();
+        assert!(!obj.bqd_is_error);
+    }
+
+    #[test]
+    fn test_bqd_error_message() {
+        let obj = DebugWatch {
+            bqd_watch_id: 0,
+            bqd_expression: String::from("test"),
+            bqd_result_value: String::from("test"),
+            bqd_result_type: String::from("test"),
+            bqd_variables_reference: 0,
+            bqd_is_error: false,
+            bqd_error_message: String::from("test"),
+            bqd_frame_id: 0,
+            bqd_named_variables: 0,
+            bqd_indexed_variables: 0,
+        };
+        let _ = obj.bqd_summary();
+        assert_eq!(obj.bqd_error_message, "test");
+    }
+
+    #[test]
+    fn test_bqd_frame_id() {
+        let obj = DebugWatch {
+            bqd_watch_id: 0,
+            bqd_expression: String::from("test"),
+            bqd_result_value: String::from("test"),
+            bqd_result_type: String::from("test"),
+            bqd_variables_reference: 0,
+            bqd_is_error: false,
+            bqd_error_message: String::from("test"),
+            bqd_frame_id: 0,
+            bqd_named_variables: 0,
+            bqd_indexed_variables: 0,
+        };
+        let _ = obj.bqd_summary();
+        assert_eq!(obj.bqd_frame_id, 0);
+    }
+
+    #[test]
+    fn test_bqd_named_variables() {
+        let obj = DebugWatch {
+            bqd_watch_id: 0,
+            bqd_expression: String::from("test"),
+            bqd_result_value: String::from("test"),
+            bqd_result_type: String::from("test"),
+            bqd_variables_reference: 0,
+            bqd_is_error: false,
+            bqd_error_message: String::from("test"),
+            bqd_frame_id: 0,
+            bqd_named_variables: 0,
+            bqd_indexed_variables: 0,
+        };
+        let _ = obj.bqd_summary();
+        assert_eq!(obj.bqd_named_variables, 0);
+    }
+
+    #[test]
+    fn test_bqd_indexed_variables() {
+        let obj = DebugWatch {
+            bqd_watch_id: 0,
+            bqd_expression: String::from("test"),
+            bqd_result_value: String::from("test"),
+            bqd_result_type: String::from("test"),
+            bqd_variables_reference: 0,
+            bqd_is_error: false,
+            bqd_error_message: String::from("test"),
+            bqd_frame_id: 0,
+            bqd_named_variables: 0,
+            bqd_indexed_variables: 0,
+        };
+        let _ = obj.bqd_summary();
+        assert_eq!(obj.bqd_indexed_variables, 0);
+    }
+
+
+    #[test]
+    fn test_bqe_expression_id() {
+        let obj = DebugExpression {
+            bqe_expression_id: 0,
+            bqe_expression_text: String::from("test"),
+            bqe_result: String::from("test"),
+            bqe_result_type: String::from("test"),
+            bqe_variables_reference: 0,
+            bqe_context: String::from("test"),
+            bqe_frame_id: 0,
+            bqe_is_error: false,
+            bqe_memory_reference: String::from("test"),
+            bqe_presentation_hint: String::from("test"),
+        };
+        let _ = obj.bqe_summary();
+        assert_eq!(obj.bqe_expression_id, 0);
+    }
+
+    #[test]
+    fn test_bqe_expression_text() {
+        let obj = DebugExpression {
+            bqe_expression_id: 0,
+            bqe_expression_text: String::from("test"),
+            bqe_result: String::from("test"),
+            bqe_result_type: String::from("test"),
+            bqe_variables_reference: 0,
+            bqe_context: String::from("test"),
+            bqe_frame_id: 0,
+            bqe_is_error: false,
+            bqe_memory_reference: String::from("test"),
+            bqe_presentation_hint: String::from("test"),
+        };
+        let _ = obj.bqe_summary();
+        assert_eq!(obj.bqe_expression_text, "test");
+    }
+
+    #[test]
+    fn test_bqe_result() {
+        let obj = DebugExpression {
+            bqe_expression_id: 0,
+            bqe_expression_text: String::from("test"),
+            bqe_result: String::from("test"),
+            bqe_result_type: String::from("test"),
+            bqe_variables_reference: 0,
+            bqe_context: String::from("test"),
+            bqe_frame_id: 0,
+            bqe_is_error: false,
+            bqe_memory_reference: String::from("test"),
+            bqe_presentation_hint: String::from("test"),
+        };
+        let _ = obj.bqe_summary();
+        assert_eq!(obj.bqe_result, "test");
+    }
+
+    #[test]
+    fn test_bqe_result_type() {
+        let obj = DebugExpression {
+            bqe_expression_id: 0,
+            bqe_expression_text: String::from("test"),
+            bqe_result: String::from("test"),
+            bqe_result_type: String::from("test"),
+            bqe_variables_reference: 0,
+            bqe_context: String::from("test"),
+            bqe_frame_id: 0,
+            bqe_is_error: false,
+            bqe_memory_reference: String::from("test"),
+            bqe_presentation_hint: String::from("test"),
+        };
+        let _ = obj.bqe_summary();
+        assert_eq!(obj.bqe_result_type, "test");
+    }
+
+    #[test]
+    fn test_bqe_variables_reference() {
+        let obj = DebugExpression {
+            bqe_expression_id: 0,
+            bqe_expression_text: String::from("test"),
+            bqe_result: String::from("test"),
+            bqe_result_type: String::from("test"),
+            bqe_variables_reference: 0,
+            bqe_context: String::from("test"),
+            bqe_frame_id: 0,
+            bqe_is_error: false,
+            bqe_memory_reference: String::from("test"),
+            bqe_presentation_hint: String::from("test"),
+        };
+        let _ = obj.bqe_summary();
+        assert_eq!(obj.bqe_variables_reference, 0);
+    }
+
+    #[test]
+    fn test_bqe_context() {
+        let obj = DebugExpression {
+            bqe_expression_id: 0,
+            bqe_expression_text: String::from("test"),
+            bqe_result: String::from("test"),
+            bqe_result_type: String::from("test"),
+            bqe_variables_reference: 0,
+            bqe_context: String::from("test"),
+            bqe_frame_id: 0,
+            bqe_is_error: false,
+            bqe_memory_reference: String::from("test"),
+            bqe_presentation_hint: String::from("test"),
+        };
+        let _ = obj.bqe_summary();
+        assert_eq!(obj.bqe_context, "test");
+    }
+
+    #[test]
+    fn test_bqe_frame_id() {
+        let obj = DebugExpression {
+            bqe_expression_id: 0,
+            bqe_expression_text: String::from("test"),
+            bqe_result: String::from("test"),
+            bqe_result_type: String::from("test"),
+            bqe_variables_reference: 0,
+            bqe_context: String::from("test"),
+            bqe_frame_id: 0,
+            bqe_is_error: false,
+            bqe_memory_reference: String::from("test"),
+            bqe_presentation_hint: String::from("test"),
+        };
+        let _ = obj.bqe_summary();
+        assert_eq!(obj.bqe_frame_id, 0);
+    }
+
+    #[test]
+    fn test_bqe_is_error() {
+        let obj = DebugExpression {
+            bqe_expression_id: 0,
+            bqe_expression_text: String::from("test"),
+            bqe_result: String::from("test"),
+            bqe_result_type: String::from("test"),
+            bqe_variables_reference: 0,
+            bqe_context: String::from("test"),
+            bqe_frame_id: 0,
+            bqe_is_error: false,
+            bqe_memory_reference: String::from("test"),
+            bqe_presentation_hint: String::from("test"),
+        };
+        let _ = obj.bqe_summary();
+        assert!(!obj.bqe_is_error);
+    }
+
+    #[test]
+    fn test_bqe_memory_reference() {
+        let obj = DebugExpression {
+            bqe_expression_id: 0,
+            bqe_expression_text: String::from("test"),
+            bqe_result: String::from("test"),
+            bqe_result_type: String::from("test"),
+            bqe_variables_reference: 0,
+            bqe_context: String::from("test"),
+            bqe_frame_id: 0,
+            bqe_is_error: false,
+            bqe_memory_reference: String::from("test"),
+            bqe_presentation_hint: String::from("test"),
+        };
+        let _ = obj.bqe_summary();
+        assert_eq!(obj.bqe_memory_reference, "test");
+    }
+
+    #[test]
+    fn test_bqe_presentation_hint() {
+        let obj = DebugExpression {
+            bqe_expression_id: 0,
+            bqe_expression_text: String::from("test"),
+            bqe_result: String::from("test"),
+            bqe_result_type: String::from("test"),
+            bqe_variables_reference: 0,
+            bqe_context: String::from("test"),
+            bqe_frame_id: 0,
+            bqe_is_error: false,
+            bqe_memory_reference: String::from("test"),
+            bqe_presentation_hint: String::from("test"),
+        };
+        let _ = obj.bqe_summary();
+        assert_eq!(obj.bqe_presentation_hint, "test");
     }
 
 }
