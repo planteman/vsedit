@@ -55032,3 +55032,319 @@ mod baw_tests {
         assert!(m.active_group().is_none());
     }
 }
+
+
+// --- bax_: Editor format-on-type/paste model ---
+
+/// Trigger for formatting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BaxFormatTrigger {
+    Manual,
+    OnType,
+    OnPaste,
+    OnSave,
+}
+
+impl BaxFormatTrigger {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Manual => "Format Document",
+            Self::OnType => "Format On Type",
+            Self::OnPaste => "Format On Paste",
+            Self::OnSave => "Format On Save",
+        }
+    }
+
+    pub fn is_automatic(&self) -> bool {
+        !matches!(self, Self::Manual)
+    }
+}
+
+/// A text edit from formatting.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BaxTextEdit {
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub new_text: String,
+}
+
+impl BaxTextEdit {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32, text: &str) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec, new_text: text.to_string() }
+    }
+
+    pub fn is_insert(&self) -> bool {
+        self.start_line == self.end_line && self.start_col == self.end_col
+    }
+
+    pub fn is_delete(&self) -> bool { self.new_text.is_empty() }
+
+    pub fn span_lines(&self) -> u32 {
+        self.end_line.saturating_sub(self.start_line) + 1
+    }
+}
+
+/// Format options.
+#[derive(Debug, Clone)]
+pub struct BaxFormatOptions {
+    pub tab_size: u32,
+    pub insert_spaces: bool,
+    pub trim_trailing_whitespace: bool,
+    pub insert_final_newline: bool,
+    pub trim_final_newlines: bool,
+}
+
+impl BaxFormatOptions {
+    pub fn new(tab_size: u32, insert_spaces: bool) -> Self {
+        Self {
+            tab_size,
+            insert_spaces,
+            trim_trailing_whitespace: true,
+            insert_final_newline: true,
+            trim_final_newlines: true,
+        }
+    }
+
+    pub fn indent_str(&self) -> String {
+        if self.insert_spaces {
+            " ".repeat(self.tab_size as usize)
+        } else {
+            "\t".to_string()
+        }
+    }
+
+    pub fn default_options() -> Self { Self::new(4, true) }
+}
+
+/// A formatting provider registration.
+#[derive(Debug, Clone)]
+pub struct BaxFormatProvider {
+    pub id: String,
+    pub language_ids: Vec<String>,
+    pub trigger_chars: Vec<char>,
+    pub supports_range: bool,
+    pub priority: i32,
+}
+
+impl BaxFormatProvider {
+    pub fn new(id: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            language_ids: Vec::new(),
+            trigger_chars: Vec::new(),
+            supports_range: false,
+            priority: 0,
+        }
+    }
+
+    pub fn for_language(mut self, lang: &str) -> Self {
+        self.language_ids.push(lang.to_string());
+        self
+    }
+
+    pub fn with_trigger(mut self, ch: char) -> Self {
+        self.trigger_chars.push(ch);
+        self
+    }
+
+    pub fn supports_language(&self, lang: &str) -> bool {
+        self.language_ids.iter().any(|l| l == lang)
+    }
+
+    pub fn is_trigger_char(&self, ch: char) -> bool {
+        self.trigger_chars.contains(&ch)
+    }
+}
+
+/// Formatting result.
+#[derive(Debug, Clone)]
+pub struct BaxFormatResult {
+    pub edits: Vec<BaxTextEdit>,
+    pub trigger: BaxFormatTrigger,
+    pub provider_id: String,
+    pub duration_ms: u64,
+}
+
+impl BaxFormatResult {
+    pub fn new(edits: Vec<BaxTextEdit>, trigger: BaxFormatTrigger, provider: &str) -> Self {
+        Self { edits, trigger, provider_id: provider.to_string(), duration_ms: 0 }
+    }
+
+    pub fn with_duration(mut self, ms: u64) -> Self { self.duration_ms = ms; self }
+    pub fn edit_count(&self) -> usize { self.edits.len() }
+    pub fn is_empty(&self) -> bool { self.edits.is_empty() }
+}
+
+/// The formatting model.
+#[derive(Debug)]
+pub struct BaxFormatModel {
+    providers: Vec<BaxFormatProvider>,
+    options: BaxFormatOptions,
+    format_on_type: bool,
+    format_on_paste: bool,
+    format_on_save: bool,
+    history: Vec<BaxFormatResult>,
+}
+
+impl BaxFormatModel {
+    pub fn new(options: BaxFormatOptions) -> Self {
+        Self {
+            providers: Vec::new(),
+            options,
+            format_on_type: true,
+            format_on_paste: true,
+            format_on_save: true,
+            history: Vec::new(),
+        }
+    }
+
+    pub fn register_provider(&mut self, p: BaxFormatProvider) {
+        self.providers.push(p);
+    }
+
+    pub fn provider_count(&self) -> usize { self.providers.len() }
+
+    pub fn find_provider(&self, lang: &str) -> Option<&BaxFormatProvider> {
+        let mut best: Option<&BaxFormatProvider> = None;
+        for p in &self.providers {
+            if p.supports_language(lang) {
+                if best.is_none() || p.priority > best.unwrap().priority {
+                    best = Some(p);
+                }
+            }
+        }
+        best
+    }
+
+    pub fn should_format(&self, trigger: BaxFormatTrigger) -> bool {
+        match trigger {
+            BaxFormatTrigger::Manual => true,
+            BaxFormatTrigger::OnType => self.format_on_type,
+            BaxFormatTrigger::OnPaste => self.format_on_paste,
+            BaxFormatTrigger::OnSave => self.format_on_save,
+        }
+    }
+
+    pub fn set_format_on_type(&mut self, v: bool) { self.format_on_type = v; }
+    pub fn set_format_on_paste(&mut self, v: bool) { self.format_on_paste = v; }
+    pub fn set_format_on_save(&mut self, v: bool) { self.format_on_save = v; }
+
+    pub fn options(&self) -> &BaxFormatOptions { &self.options }
+    pub fn set_options(&mut self, o: BaxFormatOptions) { self.options = o; }
+
+    pub fn record_result(&mut self, r: BaxFormatResult) { self.history.push(r); }
+    pub fn history_count(&self) -> usize { self.history.len() }
+    pub fn last_result(&self) -> Option<&BaxFormatResult> { self.history.last() }
+
+    pub fn clear_history(&mut self) { self.history.clear(); }
+
+    pub fn status_text(&self) -> String {
+        let mut parts = Vec::new();
+        if self.format_on_type { parts.push("type"); }
+        if self.format_on_paste { parts.push("paste"); }
+        if self.format_on_save { parts.push("save"); }
+        if parts.is_empty() { "Format: manual only".to_string() }
+        else { format!("Format on: {}", parts.join(", ")) }
+    }
+}
+
+#[cfg(test)]
+mod bax_tests {
+    use super::*;
+
+    #[test]
+    fn test_bax_trigger() {
+        assert!(BaxFormatTrigger::OnType.is_automatic());
+        assert!(!BaxFormatTrigger::Manual.is_automatic());
+        assert_eq!(BaxFormatTrigger::OnSave.label(), "Format On Save");
+    }
+
+    #[test]
+    fn test_bax_text_edit() {
+        let e = BaxTextEdit::new(1, 0, 1, 0, "hello");
+        assert!(e.is_insert());
+        let d = BaxTextEdit::new(1, 0, 1, 5, "");
+        assert!(d.is_delete());
+    }
+
+    #[test]
+    fn test_bax_format_options() {
+        let o = BaxFormatOptions::new(2, true);
+        assert_eq!(o.indent_str(), "  ");
+        let o2 = BaxFormatOptions::new(4, false);
+        assert_eq!(o2.indent_str(), "\t");
+    }
+
+    #[test]
+    fn test_bax_provider() {
+        let p = BaxFormatProvider::new("prettier")
+            .for_language("typescript")
+            .with_trigger(';');
+        assert!(p.supports_language("typescript"));
+        assert!(p.is_trigger_char(';'));
+        assert!(!p.supports_language("rust"));
+    }
+
+    #[test]
+    fn test_bax_format_result() {
+        let r = BaxFormatResult::new(
+            vec![BaxTextEdit::new(1, 0, 1, 5, "hello")],
+            BaxFormatTrigger::Manual,
+            "prettier"
+        ).with_duration(42);
+        assert_eq!(r.edit_count(), 1);
+        assert_eq!(r.duration_ms, 42);
+    }
+
+    #[test]
+    fn test_bax_model_provider_lookup() {
+        let mut m = BaxFormatModel::new(BaxFormatOptions::default_options());
+        m.register_provider(BaxFormatProvider::new("fmt1").for_language("rust"));
+        m.register_provider(BaxFormatProvider::new("fmt2").for_language("typescript"));
+        assert_eq!(m.find_provider("rust").unwrap().id, "fmt1");
+        assert!(m.find_provider("python").is_none());
+    }
+
+    #[test]
+    fn test_bax_model_should_format() {
+        let mut m = BaxFormatModel::new(BaxFormatOptions::default_options());
+        assert!(m.should_format(BaxFormatTrigger::OnType));
+        m.set_format_on_type(false);
+        assert!(!m.should_format(BaxFormatTrigger::OnType));
+    }
+
+    #[test]
+    fn test_bax_model_history() {
+        let mut m = BaxFormatModel::new(BaxFormatOptions::default_options());
+        m.record_result(BaxFormatResult::new(vec![], BaxFormatTrigger::Manual, "x"));
+        assert_eq!(m.history_count(), 1);
+        m.clear_history();
+        assert_eq!(m.history_count(), 0);
+    }
+
+    #[test]
+    fn test_bax_model_status() {
+        let m = BaxFormatModel::new(BaxFormatOptions::default_options());
+        assert_eq!(m.status_text(), "Format on: type, paste, save");
+    }
+
+    #[test]
+    fn test_bax_edit_span() {
+        let e = BaxTextEdit::new(1, 0, 3, 5, "x");
+        assert_eq!(e.span_lines(), 3);
+    }
+
+    #[test]
+    fn test_bax_provider_priority() {
+        let mut m = BaxFormatModel::new(BaxFormatOptions::default_options());
+        let mut p1 = BaxFormatProvider::new("low").for_language("ts");
+        p1.priority = 1;
+        let mut p2 = BaxFormatProvider::new("high").for_language("ts");
+        p2.priority = 10;
+        m.register_provider(p1);
+        m.register_provider(p2);
+        assert_eq!(m.find_provider("ts").unwrap().id, "high");
+    }
+}
