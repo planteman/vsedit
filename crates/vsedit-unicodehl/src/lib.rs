@@ -60195,3 +60195,227 @@ mod bbs_tests {
         assert_eq!(m.change_count(), 0);
     }
 }
+
+
+// --- bbt_: Editor call hierarchy model ---
+
+/// Call hierarchy direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BbtCallDirection { Incoming, Outgoing }
+
+impl BbtCallDirection {
+    pub fn label(&self) -> &'static str {
+        match self { Self::Incoming => "Callers", Self::Outgoing => "Calls" }
+    }
+
+    pub fn opposite(&self) -> Self {
+        match self { Self::Incoming => Self::Outgoing, Self::Outgoing => Self::Incoming }
+    }
+}
+
+/// A call hierarchy item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BbtCallItem {
+    pub name: String,
+    pub kind: u32, // symbol kind index
+    pub detail: Option<String>,
+    pub file_path: String,
+    pub line: u32,
+    pub col: u32,
+}
+
+impl BbtCallItem {
+    pub fn new(name: &str, kind: u32, path: &str, line: u32, col: u32) -> Self {
+        Self { name: name.to_string(), kind, detail: None, file_path: path.to_string(), line, col }
+    }
+
+    pub fn with_detail(mut self, d: &str) -> Self { self.detail = Some(d.to_string()); self }
+
+    pub fn display_text(&self) -> String {
+        match &self.detail {
+            Some(d) => format!("{} — {}", self.name, d),
+            None => self.name.clone(),
+        }
+    }
+
+    pub fn location_text(&self) -> String {
+        format!("{}:{}:{}", self.file_path, self.line, self.col)
+    }
+}
+
+/// A call hierarchy call (item + call sites).
+#[derive(Debug, Clone)]
+pub struct BbtCall {
+    pub item: BbtCallItem,
+    pub from_ranges: Vec<(u32, u32, u32, u32)>, // (start_line, start_col, end_line, end_col)
+}
+
+impl BbtCall {
+    pub fn new(item: BbtCallItem) -> Self { Self { item, from_ranges: Vec::new() } }
+
+    pub fn with_range(mut self, sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        self.from_ranges.push((sl, sc, el, ec)); self
+    }
+
+    pub fn call_site_count(&self) -> usize { self.from_ranges.len() }
+}
+
+/// The call hierarchy model.
+#[derive(Debug)]
+pub struct BbtCallModel {
+    root: Option<BbtCallItem>,
+    direction: BbtCallDirection,
+    calls: Vec<BbtCall>,
+    expanded: Vec<usize>,
+    selected: Option<usize>,
+}
+
+impl BbtCallModel {
+    pub fn new() -> Self {
+        Self { root: None, direction: BbtCallDirection::Incoming, calls: Vec::new(), expanded: Vec::new(), selected: None }
+    }
+
+    pub fn set_root(&mut self, item: BbtCallItem) { self.root = Some(item); }
+    pub fn root(&self) -> Option<&BbtCallItem> { self.root.as_ref() }
+
+    pub fn set_direction(&mut self, d: BbtCallDirection) { self.direction = d; }
+    pub fn direction(&self) -> BbtCallDirection { self.direction }
+    pub fn toggle_direction(&mut self) { self.direction = self.direction.opposite(); }
+
+    pub fn set_calls(&mut self, calls: Vec<BbtCall>) {
+        self.calls = calls;
+        self.expanded.clear();
+        self.selected = if self.calls.is_empty() { None } else { Some(0) };
+    }
+
+    pub fn calls(&self) -> &[BbtCall] { &self.calls }
+    pub fn call_count(&self) -> usize { self.calls.len() }
+
+    pub fn selected(&self) -> Option<&BbtCall> {
+        self.selected.map(|i| &self.calls[i])
+    }
+
+    pub fn select_next(&mut self) {
+        if self.calls.is_empty() { return; }
+        self.selected = Some(match self.selected {
+            Some(i) => (i + 1).min(self.calls.len() - 1),
+            None => 0,
+        });
+    }
+
+    pub fn select_prev(&mut self) {
+        if self.calls.is_empty() { return; }
+        self.selected = Some(match self.selected {
+            Some(i) => i.saturating_sub(1),
+            None => 0,
+        });
+    }
+
+    pub fn toggle_expand(&mut self, idx: usize) {
+        if self.expanded.contains(&idx) {
+            self.expanded.retain(|&i| i != idx);
+        } else {
+            self.expanded.push(idx);
+        }
+    }
+
+    pub fn is_expanded(&self, idx: usize) -> bool { self.expanded.contains(&idx) }
+
+    pub fn clear(&mut self) {
+        self.root = None;
+        self.calls.clear();
+        self.expanded.clear();
+        self.selected = None;
+    }
+
+    pub fn status_text(&self) -> String {
+        match (&self.root, self.calls.len()) {
+            (Some(r), n) => format!("{}: {} {}", r.name, n, self.direction.label()),
+            _ => String::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod bbt_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbt_direction() {
+        assert_eq!(BbtCallDirection::Incoming.label(), "Callers");
+        assert_eq!(BbtCallDirection::Incoming.opposite(), BbtCallDirection::Outgoing);
+    }
+
+    #[test]
+    fn test_bbt_item() {
+        let i = BbtCallItem::new("foo", 12, "src/lib.rs", 10, 4).with_detail("pub fn foo()");
+        assert_eq!(i.display_text(), "foo — pub fn foo()");
+        assert_eq!(i.location_text(), "src/lib.rs:10:4");
+    }
+
+    #[test]
+    fn test_bbt_call() {
+        let c = BbtCall::new(BbtCallItem::new("bar", 12, "x.rs", 5, 0))
+            .with_range(10, 4, 10, 7)
+            .with_range(20, 0, 20, 3);
+        assert_eq!(c.call_site_count(), 2);
+    }
+
+    #[test]
+    fn test_bbt_model_basic() {
+        let mut m = BbtCallModel::new();
+        m.set_root(BbtCallItem::new("main", 12, "src/main.rs", 1, 0));
+        m.set_calls(vec![
+            BbtCall::new(BbtCallItem::new("helper", 12, "x.rs", 5, 0)),
+            BbtCall::new(BbtCallItem::new("util", 12, "y.rs", 10, 0)),
+        ]);
+        assert_eq!(m.call_count(), 2);
+        assert_eq!(m.selected().unwrap().item.name, "helper");
+    }
+
+    #[test]
+    fn test_bbt_model_navigation() {
+        let mut m = BbtCallModel::new();
+        m.set_calls(vec![
+            BbtCall::new(BbtCallItem::new("a", 0, "", 0, 0)),
+            BbtCall::new(BbtCallItem::new("b", 0, "", 0, 0)),
+        ]);
+        m.select_next();
+        assert_eq!(m.selected().unwrap().item.name, "b");
+        m.select_prev();
+        assert_eq!(m.selected().unwrap().item.name, "a");
+    }
+
+    #[test]
+    fn test_bbt_model_toggle_dir() {
+        let mut m = BbtCallModel::new();
+        assert_eq!(m.direction(), BbtCallDirection::Incoming);
+        m.toggle_direction();
+        assert_eq!(m.direction(), BbtCallDirection::Outgoing);
+    }
+
+    #[test]
+    fn test_bbt_model_expand() {
+        let mut m = BbtCallModel::new();
+        m.toggle_expand(0);
+        assert!(m.is_expanded(0));
+        m.toggle_expand(0);
+        assert!(!m.is_expanded(0));
+    }
+
+    #[test]
+    fn test_bbt_model_status() {
+        let mut m = BbtCallModel::new();
+        m.set_root(BbtCallItem::new("foo", 12, "", 0, 0));
+        m.set_calls(vec![BbtCall::new(BbtCallItem::new("a", 0, "", 0, 0))]);
+        assert_eq!(m.status_text(), "foo: 1 Callers");
+    }
+
+    #[test]
+    fn test_bbt_model_clear() {
+        let mut m = BbtCallModel::new();
+        m.set_root(BbtCallItem::new("x", 0, "", 0, 0));
+        m.clear();
+        assert!(m.root().is_none());
+    }
+}
