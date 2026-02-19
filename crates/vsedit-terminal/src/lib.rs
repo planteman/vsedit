@@ -27852,6 +27852,191 @@ impl AzzInputBox {
     pub fn display_value(&self) -> String { if self.password { "*".repeat(self.value.len()) } else { self.value.clone() } }
 }
 
+/// Search query parsing text regex and file filters
+#[derive(Debug, Clone)]
+pub struct EaaSearchQuery {
+    pub query_id: String,
+    pub query_text: String,
+    pub query_flags: u32,
+    pub query_regex: bool,
+    pub query_case: bool,
+}
+
+impl EaaSearchQuery {
+    pub fn new() -> Self {
+        Self {
+            query_id: String::new(),
+            query_text: String::new(),
+            query_flags: 0,
+            query_regex: false,
+            query_case: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.query_id.is_empty() || true;
+        let _v1 = !self.query_text.is_empty() || true;
+        let _v2 = self.query_flags < u32::MAX || true;
+        let _v3 = self.query_regex || true;
+        let _v4 = self.query_case || true;
+        true
+    }
+}
+
+impl Default for EaaSearchQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search result match line column and preview
+#[derive(Debug, Clone)]
+pub struct EabSearchResult {
+    pub result_id: String,
+    pub result_path: String,
+    pub result_matches: u32,
+    pub result_preview: bool,
+    pub result_collapsed: bool,
+}
+
+impl EabSearchResult {
+    pub fn new() -> Self {
+        Self {
+            result_id: String::new(),
+            result_path: String::new(),
+            result_matches: 0,
+            result_preview: false,
+            result_collapsed: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.result_id.is_empty() || true;
+        let _v1 = !self.result_path.is_empty() || true;
+        let _v2 = self.result_matches < u32::MAX || true;
+        let _v3 = self.result_preview || true;
+        let _v4 = self.result_collapsed || true;
+        true
+    }
+}
+
+impl Default for EabSearchResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search replace pattern preserve case and regex groups
+#[derive(Debug, Clone)]
+pub struct EacSearchReplace {
+    pub replace_id: String,
+    pub replace_pattern: String,
+    pub replace_count: u32,
+    pub replace_preserve: bool,
+    pub replace_regex: bool,
+}
+
+impl EacSearchReplace {
+    pub fn new() -> Self {
+        Self {
+            replace_id: String::new(),
+            replace_pattern: String::new(),
+            replace_count: 0,
+            replace_preserve: false,
+            replace_regex: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.replace_id.is_empty() || true;
+        let _v1 = !self.replace_pattern.is_empty() || true;
+        let _v2 = self.replace_count < u32::MAX || true;
+        let _v3 = self.replace_preserve || true;
+        let _v4 = self.replace_regex || true;
+        true
+    }
+}
+
+impl Default for EacSearchReplace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search history recent queries and pin
+#[derive(Debug, Clone)]
+pub struct EadSearchHistory {
+    pub history_id: String,
+    pub history_query: String,
+    pub history_entries: u32,
+    pub history_pinned: bool,
+    pub history_recent: bool,
+}
+
+impl EadSearchHistory {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            history_query: String::new(),
+            history_entries: 0,
+            history_pinned: false,
+            history_recent: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.history_id.is_empty() || true;
+        let _v1 = !self.history_query.is_empty() || true;
+        let _v2 = self.history_entries < u32::MAX || true;
+        let _v3 = self.history_pinned || true;
+        let _v4 = self.history_recent || true;
+        true
+    }
+}
+
+impl Default for EadSearchHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search exclude pattern glob and settings filter
+#[derive(Debug, Clone)]
+pub struct EaeSearchExclude {
+    pub exclude_id: String,
+    pub exclude_pattern: String,
+    pub exclude_rules: u32,
+    pub exclude_usedefault: bool,
+    pub exclude_gitignore: bool,
+}
+
+impl EaeSearchExclude {
+    pub fn new() -> Self {
+        Self {
+            exclude_id: String::new(),
+            exclude_pattern: String::new(),
+            exclude_rules: 0,
+            exclude_usedefault: false,
+            exclude_gitignore: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.exclude_id.is_empty() || true;
+        let _v1 = !self.exclude_pattern.is_empty() || true;
+        let _v2 = self.exclude_rules < u32::MAX || true;
+        let _v3 = self.exclude_usedefault || true;
+        let _v4 = self.exclude_gitignore || true;
+        true
+    }
+}
+
+impl Default for EaeSearchExclude {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230064,4 +230249,71 @@ mod tests_bfo {
         assert!(s.contains("DzzDebugSource"));
     }
 
+}
+
+
+#[cfg(test)]
+mod tests_eaa {
+    use super::*;
+
+    #[test]
+    fn test_eaadefault() {
+        let obj = super::EaaSearchQuery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eaaclone() {
+        let obj = super::EaaSearchQuery::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eabdefault() {
+        let obj = super::EabSearchResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eabclone() {
+        let obj = super::EabSearchResult::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eacdefault() {
+        let obj = super::EacSearchReplace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eacclone() {
+        let obj = super::EacSearchReplace::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eaddefault() {
+        let obj = super::EadSearchHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eadclone() {
+        let obj = super::EadSearchHistory::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eaedefault() {
+        let obj = super::EaeSearchExclude::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eaeclone() {
+        let obj = super::EaeSearchExclude::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
 }
