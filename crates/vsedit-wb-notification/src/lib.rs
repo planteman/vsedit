@@ -85403,6 +85403,222 @@ impl BjeFileEventService {
     pub fn event_count(&self) -> usize { self.events.len() }
 }
 
+
+/// Label pattern match (bjf_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjfLabelPattern {
+    pub pattern: String,
+    pub label: String,
+}
+
+/// Editor label service (bjf_)
+#[derive(Debug, Clone)]
+pub struct BjfEditorLabelService {
+    pub patterns: Vec<BjfLabelPattern>,
+    pub separator: String,
+    pub show_path: bool,
+}
+
+impl BjfEditorLabelService {
+    pub fn new() -> Self {
+        Self { patterns: Vec::new(), separator: " — ".into(), show_path: true }
+    }
+    pub fn add_pattern(&mut self, p: BjfLabelPattern) { self.patterns.push(p); }
+    pub fn remove_pattern(&mut self, pattern: &str) { self.patterns.retain(|p| p.pattern != pattern); }
+    pub fn resolve_label(&self, uri: &str) -> String {
+        for p in &self.patterns {
+            if uri.contains(&p.pattern) { return p.label.clone(); }
+        }
+        // Default: filename from uri
+        uri.rsplit('/').next().unwrap_or(uri).to_string()
+    }
+    pub fn format_title(&self, label: &str, path: &str) -> String {
+        if self.show_path { format!("{}{}{}", label, self.separator, path) }
+        else { label.to_string() }
+    }
+    pub fn set_separator(&mut self, sep: String) { self.separator = sep; }
+    pub fn set_show_path(&mut self, show: bool) { self.show_path = show; }
+    pub fn pattern_count(&self) -> usize { self.patterns.len() }
+}
+
+
+/// Workspace symbol (bjg_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjgWorkspaceSymbol {
+    pub name: String,
+    pub kind: String,
+    pub uri: String,
+    pub range_start_line: usize,
+    pub container_name: Option<String>,
+}
+
+/// Workspace symbol provider (bjg_)
+#[derive(Debug, Clone)]
+pub struct BjgWorkspaceSymbolProvider {
+    pub symbols: Vec<BjgWorkspaceSymbol>,
+}
+
+impl BjgWorkspaceSymbolProvider {
+    pub fn new() -> Self { Self { symbols: Vec::new() } }
+    pub fn add_symbol(&mut self, s: BjgWorkspaceSymbol) { self.symbols.push(s); }
+    pub fn search(&self, query: &str) -> Vec<&BjgWorkspaceSymbol> {
+        let q = query.to_lowercase();
+        self.symbols.iter().filter(|s| s.name.to_lowercase().contains(&q)).collect()
+    }
+    pub fn by_kind(&self, kind: &str) -> Vec<&BjgWorkspaceSymbol> {
+        self.symbols.iter().filter(|s| s.kind == kind).collect()
+    }
+    pub fn by_file(&self, uri: &str) -> Vec<&BjgWorkspaceSymbol> {
+        self.symbols.iter().filter(|s| s.uri == uri).collect()
+    }
+    pub fn clear(&mut self) { self.symbols.clear(); }
+    pub fn symbol_count(&self) -> usize { self.symbols.len() }
+}
+
+
+/// Document link (bjh_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjhDocumentLink {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub target_uri: Option<String>,
+    pub tooltip: Option<String>,
+}
+
+/// Document link provider (bjh_)
+#[derive(Debug, Clone)]
+pub struct BjhDocumentLinkProvider {
+    pub links: std::collections::HashMap<String, Vec<BjhDocumentLink>>,
+}
+
+impl BjhDocumentLinkProvider {
+    pub fn new() -> Self { Self { links: std::collections::HashMap::new() } }
+    pub fn set_links(&mut self, uri: String, links: Vec<BjhDocumentLink>) {
+        self.links.insert(uri, links);
+    }
+    pub fn get_links(&self, uri: &str) -> &[BjhDocumentLink] {
+        self.links.get(uri).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+    pub fn link_at(&self, uri: &str, line: usize, col: usize) -> Option<&BjhDocumentLink> {
+        self.get_links(uri).iter().find(|l| {
+            (line > l.start_line || (line == l.start_line && col >= l.start_col)) &&
+            (line < l.end_line || (line == l.end_line && col <= l.end_col))
+        })
+    }
+    pub fn remove_links(&mut self, uri: &str) { self.links.remove(uri); }
+    pub fn total_links(&self) -> usize { self.links.values().map(|v| v.len()).sum() }
+    pub fn file_count(&self) -> usize { self.links.len() }
+}
+
+
+/// Color value (bji_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjiColorValue {
+    pub red: f64,
+    pub green: f64,
+    pub blue: f64,
+    pub alpha: f64,
+}
+
+/// Color information (bji_)
+#[derive(Debug, Clone)]
+pub struct BjiColorInfo {
+    pub color: BjiColorValue,
+    pub line: usize,
+    pub start_col: usize,
+    pub end_col: usize,
+}
+
+/// Color presentation (bji_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjiColorPresentation {
+    pub label: String,
+    pub text_edit: Option<String>,
+}
+
+/// Color info provider (bji_)
+#[derive(Debug, Clone)]
+pub struct BjiColorInfoProvider {
+    pub colors: std::collections::HashMap<String, Vec<BjiColorInfo>>,
+}
+
+impl BjiColorInfoProvider {
+    pub fn new() -> Self { Self { colors: std::collections::HashMap::new() } }
+    pub fn set_colors(&mut self, uri: String, colors: Vec<BjiColorInfo>) {
+        self.colors.insert(uri, colors);
+    }
+    pub fn get_colors(&self, uri: &str) -> &[BjiColorInfo] {
+        self.colors.get(uri).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+    pub fn color_at(&self, uri: &str, line: usize, col: usize) -> Option<&BjiColorInfo> {
+        self.get_colors(uri).iter().find(|c| c.line == line && col >= c.start_col && col <= c.end_col)
+    }
+    pub fn presentations(color: &BjiColorValue) -> Vec<BjiColorPresentation> {
+        let hex = format!("#{:02x}{:02x}{:02x}", (color.red * 255.0) as u8, (color.green * 255.0) as u8, (color.blue * 255.0) as u8);
+        let rgb = format!("rgb({}, {}, {})", (color.red * 255.0) as u8, (color.green * 255.0) as u8, (color.blue * 255.0) as u8);
+        vec![
+            BjiColorPresentation { label: hex.clone(), text_edit: Some(hex) },
+            BjiColorPresentation { label: rgb.clone(), text_edit: Some(rgb) },
+        ]
+    }
+    pub fn total_colors(&self) -> usize { self.colors.values().map(|v| v.len()).sum() }
+}
+
+
+/// Parameter info (bjj_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjjParameterInfo {
+    pub label: String,
+    pub documentation: Option<String>,
+}
+
+/// Signature info (bjj_)
+#[derive(Debug, Clone)]
+pub struct BjjSignatureInfo {
+    pub label: String,
+    pub documentation: Option<String>,
+    pub parameters: Vec<BjjParameterInfo>,
+}
+
+/// Signature help (bjj_)
+#[derive(Debug, Clone)]
+pub struct BjjSignatureHelp {
+    pub signatures: Vec<BjjSignatureInfo>,
+    pub active_signature: usize,
+    pub active_parameter: usize,
+}
+
+/// Signature help provider (bjj_)
+#[derive(Debug, Clone)]
+pub struct BjjSignatureHelpProvider {
+    pub trigger_characters: Vec<char>,
+    pub retrigger_characters: Vec<char>,
+}
+
+impl BjjSignatureHelp {
+    pub fn new() -> Self { Self { signatures: Vec::new(), active_signature: 0, active_parameter: 0 } }
+    pub fn add_signature(&mut self, sig: BjjSignatureInfo) { self.signatures.push(sig); }
+    pub fn set_active_signature(&mut self, idx: usize) {
+        if idx < self.signatures.len() { self.active_signature = idx; }
+    }
+    pub fn set_active_parameter(&mut self, idx: usize) { self.active_parameter = idx; }
+    pub fn active_sig(&self) -> Option<&BjjSignatureInfo> { self.signatures.get(self.active_signature) }
+    pub fn active_param(&self) -> Option<&BjjParameterInfo> {
+        self.active_sig().and_then(|s| s.parameters.get(self.active_parameter))
+    }
+    pub fn signature_count(&self) -> usize { self.signatures.len() }
+}
+
+impl BjjSignatureHelpProvider {
+    pub fn new(triggers: Vec<char>, retriggers: Vec<char>) -> Self {
+        Self { trigger_characters: triggers, retrigger_characters: retriggers }
+    }
+    pub fn is_trigger(&self, ch: char) -> bool { self.trigger_characters.contains(&ch) }
+    pub fn is_retrigger(&self, ch: char) -> bool { self.retrigger_characters.contains(&ch) }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -93050,6 +93266,318 @@ mod tests_bfo {
     fn test_bje_directory_event() {
         let e = BjeFileEvent { uri: "src/".into(), kind: BjeFileEventKind::Created, timestamp: 100, is_directory: true };
         assert!(e.is_directory);
+    }
+
+
+    #[test]
+    fn test_bjf_label_service_new() {
+        let s = BjfEditorLabelService::new();
+        assert_eq!(s.pattern_count(), 0);
+        assert!(s.show_path);
+    }
+    #[test]
+    fn test_bjf_add_pattern() {
+        let mut s = BjfEditorLabelService::new();
+        s.add_pattern(BjfLabelPattern { pattern: "Cargo.toml".into(), label: "📦 Cargo".into() });
+        assert_eq!(s.pattern_count(), 1);
+    }
+    #[test]
+    fn test_bjf_resolve_label_match() {
+        let mut s = BjfEditorLabelService::new();
+        s.add_pattern(BjfLabelPattern { pattern: ".test.".into(), label: "🧪 Test".into() });
+        assert_eq!(s.resolve_label("src/foo.test.rs"), "🧪 Test");
+    }
+    #[test]
+    fn test_bjf_resolve_label_default() {
+        let s = BjfEditorLabelService::new();
+        assert_eq!(s.resolve_label("src/main.rs"), "main.rs");
+    }
+    #[test]
+    fn test_bjf_format_title_with_path() {
+        let s = BjfEditorLabelService::new();
+        assert_eq!(s.format_title("main.rs", "src/main.rs"), "main.rs — src/main.rs");
+    }
+    #[test]
+    fn test_bjf_format_title_no_path() {
+        let mut s = BjfEditorLabelService::new();
+        s.set_show_path(false);
+        assert_eq!(s.format_title("main.rs", "src/main.rs"), "main.rs");
+    }
+    #[test]
+    fn test_bjf_separator() {
+        let mut s = BjfEditorLabelService::new();
+        s.set_separator(" | ".into());
+        assert_eq!(s.format_title("a", "b"), "a | b");
+    }
+    #[test]
+    fn test_bjf_remove_pattern() {
+        let mut s = BjfEditorLabelService::new();
+        s.add_pattern(BjfLabelPattern { pattern: "x".into(), label: "X".into() });
+        s.remove_pattern("x");
+        assert_eq!(s.pattern_count(), 0);
+    }
+    #[test]
+    fn test_bjf_first_match_wins() {
+        let mut s = BjfEditorLabelService::new();
+        s.add_pattern(BjfLabelPattern { pattern: ".rs".into(), label: "Rust".into() });
+        s.add_pattern(BjfLabelPattern { pattern: "main".into(), label: "Main".into() });
+        assert_eq!(s.resolve_label("main.rs"), "Rust");
+    }
+    #[test]
+    fn test_bjf_uri_no_slash() {
+        let s = BjfEditorLabelService::new();
+        assert_eq!(s.resolve_label("file.txt"), "file.txt");
+    }
+
+
+    #[test]
+    fn test_bjg_provider_new() {
+        let p = BjgWorkspaceSymbolProvider::new();
+        assert_eq!(p.symbol_count(), 0);
+    }
+    #[test]
+    fn test_bjg_add_symbol() {
+        let mut p = BjgWorkspaceSymbolProvider::new();
+        p.add_symbol(BjgWorkspaceSymbol { name: "MyStruct".into(), kind: "Struct".into(), uri: "src/lib.rs".into(), range_start_line: 10, container_name: None });
+        assert_eq!(p.symbol_count(), 1);
+    }
+    #[test]
+    fn test_bjg_search() {
+        let mut p = BjgWorkspaceSymbolProvider::new();
+        p.add_symbol(BjgWorkspaceSymbol { name: "FooBar".into(), kind: "Function".into(), uri: "a.rs".into(), range_start_line: 1, container_name: None });
+        p.add_symbol(BjgWorkspaceSymbol { name: "BazQux".into(), kind: "Function".into(), uri: "b.rs".into(), range_start_line: 5, container_name: None });
+        assert_eq!(p.search("foo").len(), 1);
+    }
+    #[test]
+    fn test_bjg_by_kind() {
+        let mut p = BjgWorkspaceSymbolProvider::new();
+        p.add_symbol(BjgWorkspaceSymbol { name: "A".into(), kind: "Struct".into(), uri: "a.rs".into(), range_start_line: 1, container_name: None });
+        p.add_symbol(BjgWorkspaceSymbol { name: "b".into(), kind: "Function".into(), uri: "a.rs".into(), range_start_line: 10, container_name: None });
+        assert_eq!(p.by_kind("Struct").len(), 1);
+    }
+    #[test]
+    fn test_bjg_by_file() {
+        let mut p = BjgWorkspaceSymbolProvider::new();
+        p.add_symbol(BjgWorkspaceSymbol { name: "A".into(), kind: "Struct".into(), uri: "a.rs".into(), range_start_line: 1, container_name: None });
+        p.add_symbol(BjgWorkspaceSymbol { name: "B".into(), kind: "Struct".into(), uri: "b.rs".into(), range_start_line: 1, container_name: None });
+        assert_eq!(p.by_file("a.rs").len(), 1);
+    }
+    #[test]
+    fn test_bjg_clear() {
+        let mut p = BjgWorkspaceSymbolProvider::new();
+        p.add_symbol(BjgWorkspaceSymbol { name: "A".into(), kind: "S".into(), uri: "a.rs".into(), range_start_line: 1, container_name: None });
+        p.clear();
+        assert_eq!(p.symbol_count(), 0);
+    }
+    #[test]
+    fn test_bjg_container_name() {
+        let s = BjgWorkspaceSymbol { name: "method".into(), kind: "Method".into(), uri: "a.rs".into(), range_start_line: 15, container_name: Some("MyStruct".into()) };
+        assert_eq!(s.container_name.as_deref(), Some("MyStruct"));
+    }
+    #[test]
+    fn test_bjg_case_insensitive_search() {
+        let mut p = BjgWorkspaceSymbolProvider::new();
+        p.add_symbol(BjgWorkspaceSymbol { name: "MyFunction".into(), kind: "Function".into(), uri: "a.rs".into(), range_start_line: 1, container_name: None });
+        assert_eq!(p.search("myfunction").len(), 1);
+    }
+    #[test]
+    fn test_bjg_empty_search() {
+        let mut p = BjgWorkspaceSymbolProvider::new();
+        p.add_symbol(BjgWorkspaceSymbol { name: "A".into(), kind: "S".into(), uri: "a.rs".into(), range_start_line: 1, container_name: None });
+        assert_eq!(p.search("").len(), 1);
+    }
+    #[test]
+    fn test_bjg_no_match_search() {
+        let mut p = BjgWorkspaceSymbolProvider::new();
+        p.add_symbol(BjgWorkspaceSymbol { name: "A".into(), kind: "S".into(), uri: "a.rs".into(), range_start_line: 1, container_name: None });
+        assert_eq!(p.search("zzz").len(), 0);
+    }
+
+
+    #[test]
+    fn test_bjh_provider_new() {
+        let p = BjhDocumentLinkProvider::new();
+        assert_eq!(p.total_links(), 0);
+    }
+    #[test]
+    fn test_bjh_set_get_links() {
+        let mut p = BjhDocumentLinkProvider::new();
+        p.set_links("f.rs".into(), vec![BjhDocumentLink { start_line: 1, start_col: 5, end_line: 1, end_col: 20, target_uri: Some("https://docs.rs".into()), tooltip: Some("Open docs".into()) }]);
+        assert_eq!(p.get_links("f.rs").len(), 1);
+    }
+    #[test]
+    fn test_bjh_link_at() {
+        let mut p = BjhDocumentLinkProvider::new();
+        p.set_links("f.rs".into(), vec![BjhDocumentLink { start_line: 5, start_col: 10, end_line: 5, end_col: 30, target_uri: Some("target".into()), tooltip: None }]);
+        assert!(p.link_at("f.rs", 5, 15).is_some());
+        assert!(p.link_at("f.rs", 5, 5).is_none());
+    }
+    #[test]
+    fn test_bjh_remove_links() {
+        let mut p = BjhDocumentLinkProvider::new();
+        p.set_links("f.rs".into(), vec![BjhDocumentLink { start_line: 1, start_col: 0, end_line: 1, end_col: 10, target_uri: None, tooltip: None }]);
+        p.remove_links("f.rs");
+        assert_eq!(p.file_count(), 0);
+    }
+    #[test]
+    fn test_bjh_total_links() {
+        let mut p = BjhDocumentLinkProvider::new();
+        p.set_links("a.rs".into(), vec![BjhDocumentLink { start_line: 1, start_col: 0, end_line: 1, end_col: 5, target_uri: None, tooltip: None }]);
+        p.set_links("b.rs".into(), vec![BjhDocumentLink { start_line: 1, start_col: 0, end_line: 1, end_col: 5, target_uri: None, tooltip: None }, BjhDocumentLink { start_line: 2, start_col: 0, end_line: 2, end_col: 5, target_uri: None, tooltip: None }]);
+        assert_eq!(p.total_links(), 3);
+    }
+    #[test]
+    fn test_bjh_empty_file() {
+        let p = BjhDocumentLinkProvider::new();
+        assert!(p.get_links("missing").is_empty());
+    }
+    #[test]
+    fn test_bjh_link_tooltip() {
+        let l = BjhDocumentLink { start_line: 1, start_col: 0, end_line: 1, end_col: 10, target_uri: Some("http://example.com".into()), tooltip: Some("Visit site".into()) };
+        assert_eq!(l.tooltip.as_deref(), Some("Visit site"));
+    }
+    #[test]
+    fn test_bjh_no_target() {
+        let l = BjhDocumentLink { start_line: 1, start_col: 0, end_line: 1, end_col: 10, target_uri: None, tooltip: None };
+        assert!(l.target_uri.is_none());
+    }
+    #[test]
+    fn test_bjh_file_count() {
+        let mut p = BjhDocumentLinkProvider::new();
+        p.set_links("a".into(), vec![]);
+        p.set_links("b".into(), vec![]);
+        assert_eq!(p.file_count(), 2);
+    }
+    #[test]
+    fn test_bjh_overwrite_links() {
+        let mut p = BjhDocumentLinkProvider::new();
+        p.set_links("f.rs".into(), vec![BjhDocumentLink { start_line: 1, start_col: 0, end_line: 1, end_col: 5, target_uri: None, tooltip: None }]);
+        p.set_links("f.rs".into(), vec![]);
+        assert!(p.get_links("f.rs").is_empty());
+    }
+
+
+    #[test]
+    fn test_bji_provider_new() {
+        let p = BjiColorInfoProvider::new();
+        assert_eq!(p.total_colors(), 0);
+    }
+    #[test]
+    fn test_bji_set_get_colors() {
+        let mut p = BjiColorInfoProvider::new();
+        p.set_colors("f.css".into(), vec![BjiColorInfo { color: BjiColorValue { red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0 }, line: 5, start_col: 10, end_col: 17 }]);
+        assert_eq!(p.get_colors("f.css").len(), 1);
+    }
+    #[test]
+    fn test_bji_color_at() {
+        let mut p = BjiColorInfoProvider::new();
+        p.set_colors("f.css".into(), vec![BjiColorInfo { color: BjiColorValue { red: 0.0, green: 1.0, blue: 0.0, alpha: 1.0 }, line: 3, start_col: 5, end_col: 12 }]);
+        assert!(p.color_at("f.css", 3, 8).is_some());
+        assert!(p.color_at("f.css", 3, 13).is_none());
+    }
+    #[test]
+    fn test_bji_presentations() {
+        let color = BjiColorValue { red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0 };
+        let pres = BjiColorInfoProvider::presentations(&color);
+        assert_eq!(pres.len(), 2);
+        assert_eq!(pres[0].label, "#ff0000");
+    }
+    #[test]
+    fn test_bji_total_colors() {
+        let mut p = BjiColorInfoProvider::new();
+        p.set_colors("a".into(), vec![BjiColorInfo { color: BjiColorValue { red: 0.0, green: 0.0, blue: 0.0, alpha: 1.0 }, line: 1, start_col: 0, end_col: 5 }]);
+        p.set_colors("b".into(), vec![BjiColorInfo { color: BjiColorValue { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 }, line: 1, start_col: 0, end_col: 5 }]);
+        assert_eq!(p.total_colors(), 2);
+    }
+    #[test]
+    fn test_bji_empty_file() {
+        let p = BjiColorInfoProvider::new();
+        assert!(p.get_colors("missing").is_empty());
+    }
+    #[test]
+    fn test_bji_color_value() {
+        let c = BjiColorValue { red: 0.5, green: 0.5, blue: 0.5, alpha: 0.8 };
+        assert_eq!(c.alpha, 0.8);
+    }
+    #[test]
+    fn test_bji_presentation_text_edit() {
+        let p = BjiColorPresentation { label: "#000".into(), text_edit: Some("#000000".into()) };
+        assert!(p.text_edit.is_some());
+    }
+    #[test]
+    fn test_bji_blue_color() {
+        let color = BjiColorValue { red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0 };
+        let pres = BjiColorInfoProvider::presentations(&color);
+        assert!(pres[0].label.contains("0000ff"));
+    }
+    #[test]
+    fn test_bji_rgb_presentation() {
+        let color = BjiColorValue { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 };
+        let pres = BjiColorInfoProvider::presentations(&color);
+        assert!(pres[1].label.starts_with("rgb("));
+    }
+
+
+    #[test]
+    fn test_bjj_sig_help_new() {
+        let h = BjjSignatureHelp::new();
+        assert_eq!(h.signature_count(), 0);
+    }
+    #[test]
+    fn test_bjj_add_signature() {
+        let mut h = BjjSignatureHelp::new();
+        h.add_signature(BjjSignatureInfo { label: "fn foo(x: i32, y: i32)".into(), documentation: None, parameters: vec![BjjParameterInfo { label: "x: i32".into(), documentation: None }, BjjParameterInfo { label: "y: i32".into(), documentation: Some("Y value".into()) }] });
+        assert_eq!(h.signature_count(), 1);
+    }
+    #[test]
+    fn test_bjj_active_sig() {
+        let mut h = BjjSignatureHelp::new();
+        h.add_signature(BjjSignatureInfo { label: "fn a()".into(), documentation: None, parameters: vec![] });
+        assert_eq!(h.active_sig().unwrap().label, "fn a()");
+    }
+    #[test]
+    fn test_bjj_active_param() {
+        let mut h = BjjSignatureHelp::new();
+        h.add_signature(BjjSignatureInfo { label: "fn f(a: i32, b: i32)".into(), documentation: None, parameters: vec![BjjParameterInfo { label: "a: i32".into(), documentation: None }, BjjParameterInfo { label: "b: i32".into(), documentation: None }] });
+        h.set_active_parameter(1);
+        assert_eq!(h.active_param().unwrap().label, "b: i32");
+    }
+    #[test]
+    fn test_bjj_set_active_signature() {
+        let mut h = BjjSignatureHelp::new();
+        h.add_signature(BjjSignatureInfo { label: "a".into(), documentation: None, parameters: vec![] });
+        h.add_signature(BjjSignatureInfo { label: "b".into(), documentation: None, parameters: vec![] });
+        h.set_active_signature(1);
+        assert_eq!(h.active_sig().unwrap().label, "b");
+    }
+    #[test]
+    fn test_bjj_trigger_chars() {
+        let p = BjjSignatureHelpProvider::new(vec!['(', ','], vec![')']);
+        assert!(p.is_trigger('('));
+        assert!(p.is_trigger(','));
+        assert!(!p.is_trigger(')'));
+    }
+    #[test]
+    fn test_bjj_retrigger_chars() {
+        let p = BjjSignatureHelpProvider::new(vec!['('], vec![',', ')']);
+        assert!(p.is_retrigger(','));
+        assert!(!p.is_retrigger('('));
+    }
+    #[test]
+    fn test_bjj_param_documentation() {
+        let p = BjjParameterInfo { label: "count: usize".into(), documentation: Some("Number of items".into()) };
+        assert_eq!(p.documentation.as_deref(), Some("Number of items"));
+    }
+    #[test]
+    fn test_bjj_empty_active() {
+        let h = BjjSignatureHelp::new();
+        assert!(h.active_sig().is_none());
+        assert!(h.active_param().is_none());
+    }
+    #[test]
+    fn test_bjj_sig_documentation() {
+        let s = BjjSignatureInfo { label: "fn f()".into(), documentation: Some("Does a thing".into()), parameters: vec![] };
+        assert!(s.documentation.is_some());
     }
 
 }
