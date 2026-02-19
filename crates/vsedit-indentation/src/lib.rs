@@ -64450,3 +64450,183 @@ mod bcn_tests {
         assert_eq!(tv.total_nodes(), 2);
     }
 }
+
+
+// --- bco_: Editor webview panel model ---
+
+/// Webview content security options.
+#[derive(Debug, Clone)]
+pub struct BcoContentSecurity {
+    pub allow_scripts: bool,
+    pub allow_forms: bool,
+    pub local_resource_roots: Vec<String>,
+}
+
+impl BcoContentSecurity {
+    pub fn default_policy() -> Self { Self { allow_scripts: false, allow_forms: false, local_resource_roots: Vec::new() } }
+    pub fn with_scripts(mut self) -> Self { self.allow_scripts = true; self }
+}
+
+/// A webview panel state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcoWebviewState { Active, Visible, Hidden, Disposed }
+
+/// Message between extension and webview.
+#[derive(Debug, Clone)]
+pub struct BcoWebviewMessage {
+    pub command: String,
+    pub payload: String,
+}
+
+impl BcoWebviewMessage {
+    pub fn new(cmd: &str, payload: &str) -> Self { Self { command: cmd.to_string(), payload: payload.to_string() } }
+}
+
+/// A webview panel.
+#[derive(Debug)]
+pub struct BcoWebviewPanel {
+    pub id: String,
+    pub view_type: String,
+    pub title: String,
+    pub html: String,
+    pub state: BcoWebviewState,
+    pub security: BcoContentSecurity,
+    pub retain_context: bool,
+    inbox: Vec<BcoWebviewMessage>,
+    outbox: Vec<BcoWebviewMessage>,
+}
+
+impl BcoWebviewPanel {
+    pub fn new(id: &str, view_type: &str, title: &str) -> Self {
+        Self { id: id.to_string(), view_type: view_type.to_string(), title: title.to_string(), html: String::new(), state: BcoWebviewState::Active, security: BcoContentSecurity::default_policy(), retain_context: false, inbox: Vec::new(), outbox: Vec::new() }
+    }
+
+    pub fn set_html(&mut self, html: &str) { self.html = html.to_string(); }
+    pub fn set_title(&mut self, t: &str) { self.title = t.to_string(); }
+
+    pub fn post_message(&mut self, msg: BcoWebviewMessage) { self.outbox.push(msg); }
+    pub fn receive_message(&mut self, msg: BcoWebviewMessage) { self.inbox.push(msg); }
+
+    pub fn drain_outbox(&mut self) -> Vec<BcoWebviewMessage> { self.outbox.drain(..).collect() }
+    pub fn drain_inbox(&mut self) -> Vec<BcoWebviewMessage> { self.inbox.drain(..).collect() }
+
+    pub fn reveal(&mut self) { self.state = BcoWebviewState::Active; }
+    pub fn hide(&mut self) { self.state = BcoWebviewState::Hidden; }
+    pub fn dispose(&mut self) { self.state = BcoWebviewState::Disposed; }
+
+    pub fn is_active(&self) -> bool { self.state == BcoWebviewState::Active }
+    pub fn is_disposed(&self) -> bool { self.state == BcoWebviewState::Disposed }
+}
+
+/// Manages all webview panels.
+#[derive(Debug)]
+pub struct BcoWebviewManager {
+    panels: Vec<BcoWebviewPanel>,
+}
+
+impl BcoWebviewManager {
+    pub fn new() -> Self { Self { panels: Vec::new() } }
+
+    pub fn create_panel(&mut self, id: &str, view_type: &str, title: &str) -> &mut BcoWebviewPanel {
+        self.panels.push(BcoWebviewPanel::new(id, view_type, title));
+        self.panels.last_mut().unwrap()
+    }
+
+    pub fn get_panel(&self, id: &str) -> Option<&BcoWebviewPanel> { self.panels.iter().find(|p| p.id == id) }
+    pub fn get_panel_mut(&mut self, id: &str) -> Option<&mut BcoWebviewPanel> { self.panels.iter_mut().find(|p| p.id == id) }
+
+    pub fn active_panels(&self) -> Vec<&BcoWebviewPanel> { self.panels.iter().filter(|p| !p.is_disposed()).collect() }
+    pub fn panel_count(&self) -> usize { self.panels.len() }
+
+    pub fn dispose_panel(&mut self, id: &str) {
+        if let Some(p) = self.panels.iter_mut().find(|p| p.id == id) { p.dispose(); }
+    }
+
+    pub fn cleanup(&mut self) { self.panels.retain(|p| !p.is_disposed()); }
+}
+
+#[cfg(test)]
+mod bco_tests {
+    use super::*;
+
+    #[test]
+    fn test_bco_panel_new() {
+        let p = BcoWebviewPanel::new("p1", "preview", "Preview");
+        assert!(p.is_active());
+        assert_eq!(p.title, "Preview");
+    }
+
+    #[test]
+    fn test_bco_html() {
+        let mut p = BcoWebviewPanel::new("p1", "preview", "Preview");
+        p.set_html("<h1>Hello</h1>");
+        assert!(p.html.contains("Hello"));
+    }
+
+    #[test]
+    fn test_bco_messaging() {
+        let mut p = BcoWebviewPanel::new("p1", "t", "T");
+        p.post_message(BcoWebviewMessage::new("update", "{}"));
+        let out = p.drain_outbox();
+        assert_eq!(out.len(), 1);
+        assert!(p.drain_outbox().is_empty());
+    }
+
+    #[test]
+    fn test_bco_lifecycle() {
+        let mut p = BcoWebviewPanel::new("p1", "t", "T");
+        p.hide();
+        assert_eq!(p.state, BcoWebviewState::Hidden);
+        p.reveal();
+        assert!(p.is_active());
+        p.dispose();
+        assert!(p.is_disposed());
+    }
+
+    #[test]
+    fn test_bco_security() {
+        let s = BcoContentSecurity::default_policy().with_scripts();
+        assert!(s.allow_scripts);
+    }
+
+    #[test]
+    fn test_bco_manager() {
+        let mut mgr = BcoWebviewManager::new();
+        mgr.create_panel("p1", "markdown", "Preview");
+        assert_eq!(mgr.panel_count(), 1);
+        assert!(mgr.get_panel("p1").is_some());
+    }
+
+    #[test]
+    fn test_bco_dispose() {
+        let mut mgr = BcoWebviewManager::new();
+        mgr.create_panel("p1", "t", "T");
+        mgr.dispose_panel("p1");
+        assert_eq!(mgr.active_panels().len(), 0);
+    }
+
+    #[test]
+    fn test_bco_cleanup() {
+        let mut mgr = BcoWebviewManager::new();
+        mgr.create_panel("p1", "t", "T");
+        mgr.dispose_panel("p1");
+        mgr.cleanup();
+        assert_eq!(mgr.panel_count(), 0);
+    }
+
+    #[test]
+    fn test_bco_retain() {
+        let mut p = BcoWebviewPanel::new("p1", "t", "T");
+        p.retain_context = true;
+        assert!(p.retain_context);
+    }
+
+    #[test]
+    fn test_bco_inbox() {
+        let mut p = BcoWebviewPanel::new("p1", "t", "T");
+        p.receive_message(BcoWebviewMessage::new("click", "btn1"));
+        let msgs = p.drain_inbox();
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0].command, "click");
+    }
+}
