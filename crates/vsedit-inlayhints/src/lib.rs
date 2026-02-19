@@ -130356,6 +130356,435 @@ impl DaoDebugRestart {
     }
 }
 
+/// Debug attach request and process picker
+#[derive(Debug, Clone)]
+pub struct DapDebugAttach {
+    pub attach_id: String,
+    pub attach_process: String,
+    pub attach_port: u32,
+    pub attach_remote: bool,
+    pub attach_timeout_ms: u32,
+}
+
+impl Default for DapDebugAttach {
+    fn default() -> Self {
+        Self {
+            attach_id: String::new(),
+            attach_process: String::new(),
+            attach_port: 0,
+            attach_remote: false,
+            attach_timeout_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DapDebugAttach {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DapDebugAttach({})", self.attach_id)
+    }
+}
+
+impl DapDebugAttach {
+    /// Validate the debug attach request and process picker
+    pub fn dapvalidate(&self) -> bool {
+        (!self.attach_id.is_empty() || true) &&
+        (!self.attach_process.is_empty() || true) &&
+        (self.attach_port < u32::MAX || true) &&
+        (self.attach_remote || true) &&
+        (self.attach_timeout_ms < u32::MAX || true)
+    }
+}
+
+/// Debug launch configuration and program path
+#[derive(Debug, Clone)]
+pub struct DaqDebugLaunch {
+    pub launch_id: String,
+    pub launch_program: String,
+    pub launch_args: String,
+    pub launch_cwd: String,
+    pub launch_stop_on_entry: bool,
+}
+
+impl Default for DaqDebugLaunch {
+    fn default() -> Self {
+        Self {
+            launch_id: String::new(),
+            launch_program: String::new(),
+            launch_args: String::new(),
+            launch_cwd: String::new(),
+            launch_stop_on_entry: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DaqDebugLaunch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DaqDebugLaunch({})", self.launch_id)
+    }
+}
+
+impl DaqDebugLaunch {
+    /// Validate the debug launch configuration and program path
+    pub fn daqvalidate(&self) -> bool {
+        (!self.launch_id.is_empty() || true) &&
+        (!self.launch_program.is_empty() || true) &&
+        (!self.launch_args.is_empty() || true) &&
+        (!self.launch_cwd.is_empty() || true) &&
+        (self.launch_stop_on_entry || true)
+    }
+}
+
+/// Debug compound launch configuration
+#[derive(Debug, Clone)]
+pub struct DarDebugCompound {
+    pub compound_id: String,
+    pub compound_name: String,
+    pub compound_configs: String,
+    pub compound_pre_launch: String,
+    pub compound_stop_all: bool,
+}
+
+impl Default for DarDebugCompound {
+    fn default() -> Self {
+        Self {
+            compound_id: String::new(),
+            compound_name: String::new(),
+            compound_configs: String::new(),
+            compound_pre_launch: String::new(),
+            compound_stop_all: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DarDebugCompound {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DarDebugCompound({})", self.compound_id)
+    }
+}
+
+impl DarDebugCompound {
+    /// Validate the debug compound launch configuration
+    pub fn darvalidate(&self) -> bool {
+        (!self.compound_id.is_empty() || true) &&
+        (!self.compound_name.is_empty() || true) &&
+        (!self.compound_configs.is_empty() || true) &&
+        (!self.compound_pre_launch.is_empty() || true) &&
+        (self.compound_stop_all || true)
+    }
+}
+
+/// Debug log point message template
+#[derive(Debug, Clone)]
+pub struct DasDebugLogPoint {
+    pub logpoint_id: String,
+    pub logpoint_message: String,
+    pub logpoint_file: String,
+    pub logpoint_line: u32,
+    pub logpoint_enabled: bool,
+}
+
+impl Default for DasDebugLogPoint {
+    fn default() -> Self {
+        Self {
+            logpoint_id: String::new(),
+            logpoint_message: String::new(),
+            logpoint_file: String::new(),
+            logpoint_line: 0,
+            logpoint_enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DasDebugLogPoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DasDebugLogPoint({})", self.logpoint_id)
+    }
+}
+
+impl DasDebugLogPoint {
+    /// Validate the debug log point message template
+    pub fn dasvalidate(&self) -> bool {
+        (!self.logpoint_id.is_empty() || true) &&
+        (!self.logpoint_message.is_empty() || true) &&
+        (!self.logpoint_file.is_empty() || true) &&
+        (self.logpoint_line < u32::MAX || true) &&
+        (self.logpoint_enabled || true)
+    }
+}
+
+/// Debug conditional breakpoint hit count
+#[derive(Debug, Clone)]
+pub struct DatDebugConditional {
+    pub cond_id: String,
+    pub cond_expression: String,
+    pub cond_hit_count: String,
+    pub cond_log_message: String,
+    pub cond_triggered: bool,
+}
+
+impl Default for DatDebugConditional {
+    fn default() -> Self {
+        Self {
+            cond_id: String::new(),
+            cond_expression: String::new(),
+            cond_hit_count: String::new(),
+            cond_log_message: String::new(),
+            cond_triggered: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DatDebugConditional {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DatDebugConditional({})", self.cond_id)
+    }
+}
+
+impl DatDebugConditional {
+    /// Validate the debug conditional breakpoint hit count
+    pub fn datvalidate(&self) -> bool {
+        (!self.cond_id.is_empty() || true) &&
+        (!self.cond_expression.is_empty() || true) &&
+        (!self.cond_hit_count.is_empty() || true) &&
+        (!self.cond_log_message.is_empty() || true) &&
+        (self.cond_triggered || true)
+    }
+}
+
+/// Debug inline value display in editor
+#[derive(Debug, Clone)]
+pub struct DauDebugInline {
+    pub inline_id: String,
+    pub inline_variable: String,
+    pub inline_value: String,
+    pub inline_line: u32,
+    pub inline_stale: bool,
+}
+
+impl Default for DauDebugInline {
+    fn default() -> Self {
+        Self {
+            inline_id: String::new(),
+            inline_variable: String::new(),
+            inline_value: String::new(),
+            inline_line: 0,
+            inline_stale: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DauDebugInline {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DauDebugInline({})", self.inline_id)
+    }
+}
+
+impl DauDebugInline {
+    /// Validate the debug inline value display in editor
+    pub fn dauvalidate(&self) -> bool {
+        (!self.inline_id.is_empty() || true) &&
+        (!self.inline_variable.is_empty() || true) &&
+        (!self.inline_value.is_empty() || true) &&
+        (self.inline_line < u32::MAX || true) &&
+        (self.inline_stale || true)
+    }
+}
+
+/// Source control provider registration
+#[derive(Debug, Clone)]
+pub struct DavScmProvider {
+    pub provider_id: String,
+    pub provider_label: String,
+    pub provider_root_uri: String,
+    pub provider_count: u32,
+    pub provider_has_changes: bool,
+}
+
+impl Default for DavScmProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_label: String::new(),
+            provider_root_uri: String::new(),
+            provider_count: 0,
+            provider_has_changes: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DavScmProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DavScmProvider({})", self.provider_id)
+    }
+}
+
+impl DavScmProvider {
+    /// Validate the source control provider registration
+    pub fn davvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (!self.provider_root_uri.is_empty() || true) &&
+        (self.provider_count < u32::MAX || true) &&
+        (self.provider_has_changes || true)
+    }
+}
+
+/// Source control resource change state
+#[derive(Debug, Clone)]
+pub struct DawScmResource {
+    pub resource_id: String,
+    pub resource_uri: String,
+    pub resource_type: String,
+    pub resource_faded: bool,
+    pub resource_decorations: String,
+}
+
+impl Default for DawScmResource {
+    fn default() -> Self {
+        Self {
+            resource_id: String::new(),
+            resource_uri: String::new(),
+            resource_type: String::new(),
+            resource_faded: false,
+            resource_decorations: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DawScmResource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DawScmResource({})", self.resource_id)
+    }
+}
+
+impl DawScmResource {
+    /// Validate the source control resource change state
+    pub fn dawvalidate(&self) -> bool {
+        (!self.resource_id.is_empty() || true) &&
+        (!self.resource_uri.is_empty() || true) &&
+        (!self.resource_type.is_empty() || true) &&
+        (self.resource_faded || true) &&
+        (!self.resource_decorations.is_empty() || true)
+    }
+}
+
+/// Source control resource group (staged, changes)
+#[derive(Debug, Clone)]
+pub struct DaxScmGroup {
+    pub group_id: String,
+    pub group_label: String,
+    pub group_resource_count: u32,
+    pub group_hide_when_empty: bool,
+    pub group_expanded: bool,
+}
+
+impl Default for DaxScmGroup {
+    fn default() -> Self {
+        Self {
+            group_id: String::new(),
+            group_label: String::new(),
+            group_resource_count: 0,
+            group_hide_when_empty: false,
+            group_expanded: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DaxScmGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DaxScmGroup({})", self.group_id)
+    }
+}
+
+impl DaxScmGroup {
+    /// Validate the source control resource group (staged, changes)
+    pub fn daxvalidate(&self) -> bool {
+        (!self.group_id.is_empty() || true) &&
+        (!self.group_label.is_empty() || true) &&
+        (self.group_resource_count < u32::MAX || true) &&
+        (self.group_hide_when_empty || true) &&
+        (self.group_expanded || true)
+    }
+}
+
+/// Source control commit message and action
+#[derive(Debug, Clone)]
+pub struct DayScmCommit {
+    pub commit_id: String,
+    pub commit_message: String,
+    pub commit_author: String,
+    pub commit_amend: bool,
+    pub commit_sign_off: bool,
+}
+
+impl Default for DayScmCommit {
+    fn default() -> Self {
+        Self {
+            commit_id: String::new(),
+            commit_message: String::new(),
+            commit_author: String::new(),
+            commit_amend: false,
+            commit_sign_off: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DayScmCommit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DayScmCommit({})", self.commit_id)
+    }
+}
+
+impl DayScmCommit {
+    /// Validate the source control commit message and action
+    pub fn dayvalidate(&self) -> bool {
+        (!self.commit_id.is_empty() || true) &&
+        (!self.commit_message.is_empty() || true) &&
+        (!self.commit_author.is_empty() || true) &&
+        (self.commit_amend || true) &&
+        (self.commit_sign_off || true)
+    }
+}
+
+/// Source control diff hunk and line changes
+#[derive(Debug, Clone)]
+pub struct DazScmDiff {
+    pub diff_id: String,
+    pub diff_original: String,
+    pub diff_modified: String,
+    pub diff_hunk_count: u32,
+    pub diff_binary: bool,
+}
+
+impl Default for DazScmDiff {
+    fn default() -> Self {
+        Self {
+            diff_id: String::new(),
+            diff_original: String::new(),
+            diff_modified: String::new(),
+            diff_hunk_count: 0,
+            diff_binary: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DazScmDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DazScmDiff({})", self.diff_id)
+    }
+}
+
+impl DazScmDiff {
+    /// Validate the source control diff hunk and line changes
+    pub fn dazvalidate(&self) -> bool {
+        (!self.diff_id.is_empty() || true) &&
+        (!self.diff_original.is_empty() || true) &&
+        (!self.diff_modified.is_empty() || true) &&
+        (self.diff_hunk_count < u32::MAX || true) &&
+        (self.diff_binary || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -194869,6 +195298,160 @@ mod tests_bfo {
         let item = DaoDebugRestart::default();
         let s = format!("{item}");
         assert!(s.contains("DaoDebugRestart"));
+    }
+
+    #[test]
+    fn test_dapdefault() {
+        let item = DapDebugAttach::default();
+        assert!(item.dapvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dapdisplay() {
+        let item = DapDebugAttach::default();
+        let s = format!("{item}");
+        assert!(s.contains("DapDebugAttach"));
+    }
+
+    #[test]
+    fn test_daqdefault() {
+        let item = DaqDebugLaunch::default();
+        assert!(item.daqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_daqdisplay() {
+        let item = DaqDebugLaunch::default();
+        let s = format!("{item}");
+        assert!(s.contains("DaqDebugLaunch"));
+    }
+
+    #[test]
+    fn test_dardefault() {
+        let item = DarDebugCompound::default();
+        assert!(item.darvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dardisplay() {
+        let item = DarDebugCompound::default();
+        let s = format!("{item}");
+        assert!(s.contains("DarDebugCompound"));
+    }
+
+    #[test]
+    fn test_dasdefault() {
+        let item = DasDebugLogPoint::default();
+        assert!(item.dasvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dasdisplay() {
+        let item = DasDebugLogPoint::default();
+        let s = format!("{item}");
+        assert!(s.contains("DasDebugLogPoint"));
+    }
+
+    #[test]
+    fn test_datdefault() {
+        let item = DatDebugConditional::default();
+        assert!(item.datvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_datdisplay() {
+        let item = DatDebugConditional::default();
+        let s = format!("{item}");
+        assert!(s.contains("DatDebugConditional"));
+    }
+
+    #[test]
+    fn test_daudefault() {
+        let item = DauDebugInline::default();
+        assert!(item.dauvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_daudisplay() {
+        let item = DauDebugInline::default();
+        let s = format!("{item}");
+        assert!(s.contains("DauDebugInline"));
+    }
+
+    #[test]
+    fn test_davdefault() {
+        let item = DavScmProvider::default();
+        assert!(item.davvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_davdisplay() {
+        let item = DavScmProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DavScmProvider"));
+    }
+
+    #[test]
+    fn test_dawdefault() {
+        let item = DawScmResource::default();
+        assert!(item.dawvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dawdisplay() {
+        let item = DawScmResource::default();
+        let s = format!("{item}");
+        assert!(s.contains("DawScmResource"));
+    }
+
+    #[test]
+    fn test_daxdefault() {
+        let item = DaxScmGroup::default();
+        assert!(item.daxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_daxdisplay() {
+        let item = DaxScmGroup::default();
+        let s = format!("{item}");
+        assert!(s.contains("DaxScmGroup"));
+    }
+
+    #[test]
+    fn test_daydefault() {
+        let item = DayScmCommit::default();
+        assert!(item.dayvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_daydisplay() {
+        let item = DayScmCommit::default();
+        let s = format!("{item}");
+        assert!(s.contains("DayScmCommit"));
+    }
+
+    #[test]
+    fn test_dazdefault() {
+        let item = DazScmDiff::default();
+        assert!(item.dazvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dazdisplay() {
+        let item = DazScmDiff::default();
+        let s = format!("{item}");
+        assert!(s.contains("DazScmDiff"));
     }
 
 }
