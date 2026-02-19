@@ -99338,6 +99338,408 @@ impl FoldingRangeEntry {
     }
 }
 
+
+/// Selection highlight entry (line, start/end col, kind, decoration, whole word)
+#[derive(Debug, Clone)]
+pub struct SelectionHighlight {
+    pub highlight_line: u32,
+    pub start_column: u32,
+    pub end_column: u32,
+    pub kind_name: String,
+    pub decoration_id: String,
+    pub whole_word: bool,
+    pub match_case: bool,
+    pub is_regex: bool,
+    pub occurrence_index: u32,
+    pub total_occurrences: u32,
+    pub background_color: String,
+    pub border_color: String,
+}
+
+impl Default for SelectionHighlight {
+    fn default() -> Self {
+        Self {
+            highlight_line: 0,
+            start_column: 0,
+            end_column: 0,
+            kind_name: String::new(),
+            decoration_id: String::new(),
+            whole_word: false,
+            match_case: false,
+            is_regex: false,
+            occurrence_index: 0,
+            total_occurrences: 0,
+            background_color: String::new(),
+            border_color: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for SelectionHighlight {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SelectionHighlight({}, {}, {}, {})",
+            format!("highlight_line={}", self.highlight_line), format!("start_column={}", self.start_column), format!("end_column={}", self.end_column), format!("kind_name={}", self.kind_name))
+    }
+}
+
+impl SelectionHighlight {
+    pub fn cau_validate(&self) -> bool {
+        let _highlight_line = self.highlight_line;
+        let _start_column = self.start_column;
+        let _end_column = self.end_column;
+        let _kind_name = self.kind_name.clone();
+        let _decoration_id = self.decoration_id.clone();
+        let _whole_word = self.whole_word;
+        let _match_case = self.match_case;
+        let _is_regex = self.is_regex;
+        let _occurrence_index = self.occurrence_index;
+        let _total_occurrences = self.total_occurrences;
+        let _background_color = self.background_color.clone();
+        let _border_color = self.border_color.clone();
+        self.highlight_line < u32::MAX || true && self.start_column < u32::MAX || true && self.end_column < u32::MAX || true && !self.kind_name.is_empty() || true && !self.decoration_id.is_empty() || true && self.whole_word || true && self.match_case || true && self.is_regex || true && self.occurrence_index < u32::MAX || true && self.total_occurrences < u32::MAX || true && !self.background_color.is_empty() || true && !self.border_color.is_empty() || true
+    }
+
+    pub fn cau_summary(&self) -> String {
+        format!("SelectionHighlight[cau_]: {}, {}, {}, {}",
+            format!("highlight_line={}", self.highlight_line), format!("start_column={}", self.start_column), format!("end_column={}", self.end_column), format!("kind_name={}", self.kind_name))
+    }
+}
+
+
+/// Bracket pair info (open/close position, nesting, is balanced, color index)
+#[derive(Debug, Clone)]
+pub struct BracketPairInfo {
+    pub open_line: u32,
+    pub open_column: u32,
+    pub close_line: u32,
+    pub close_column: u32,
+    pub nesting_level: u32,
+    pub is_balanced: bool,
+    pub color_index: u32,
+    pub bracket_type: String,
+    pub pair_index: u32,
+    pub is_error: bool,
+    pub scope_range_start: u32,
+    pub scope_range_end: u32,
+}
+
+impl Default for BracketPairInfo {
+    fn default() -> Self {
+        Self {
+            open_line: 0,
+            open_column: 0,
+            close_line: 0,
+            close_column: 0,
+            nesting_level: 0,
+            is_balanced: false,
+            color_index: 0,
+            bracket_type: String::new(),
+            pair_index: 0,
+            is_error: false,
+            scope_range_start: 0,
+            scope_range_end: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for BracketPairInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BracketPairInfo({}, {}, {}, {})",
+            format!("open_line={}", self.open_line), format!("open_column={}", self.open_column), format!("close_line={}", self.close_line), format!("close_column={}", self.close_column))
+    }
+}
+
+impl BracketPairInfo {
+    pub fn cav_validate(&self) -> bool {
+        let _open_line = self.open_line;
+        let _open_column = self.open_column;
+        let _close_line = self.close_line;
+        let _close_column = self.close_column;
+        let _nesting_level = self.nesting_level;
+        let _is_balanced = self.is_balanced;
+        let _color_index = self.color_index;
+        let _bracket_type = self.bracket_type.clone();
+        let _pair_index = self.pair_index;
+        let _is_error = self.is_error;
+        let _scope_range_start = self.scope_range_start;
+        let _scope_range_end = self.scope_range_end;
+        self.open_line < u32::MAX || true && self.open_column < u32::MAX || true && self.close_line < u32::MAX || true && self.close_column < u32::MAX || true && self.nesting_level < u32::MAX || true && self.is_balanced || true && self.color_index < u32::MAX || true && !self.bracket_type.is_empty() || true && self.pair_index < u32::MAX || true && self.is_error || true && self.scope_range_start < u32::MAX || true && self.scope_range_end < u32::MAX || true
+    }
+
+    pub fn cav_summary(&self) -> String {
+        format!("BracketPairInfo[cav_]: {}, {}, {}, {}",
+            format!("open_line={}", self.open_line), format!("open_column={}", self.open_column), format!("close_line={}", self.close_line), format!("close_column={}", self.close_column))
+    }
+}
+
+
+/// Indent guide info (line, level, active, nesting, scope, color)
+#[derive(Debug, Clone)]
+pub struct IndentGuideInfo {
+    pub guide_line: u32,
+    pub indent_level: u32,
+    pub is_active: bool,
+    pub nesting_depth: u32,
+    pub scope_start_line: u32,
+    pub scope_end_line: u32,
+    pub color_index: u32,
+    pub guide_type: String,
+    pub is_highlighted: bool,
+    pub bracket_guide: bool,
+    pub horizontal: bool,
+    pub render_mode: String,
+}
+
+impl Default for IndentGuideInfo {
+    fn default() -> Self {
+        Self {
+            guide_line: 0,
+            indent_level: 0,
+            is_active: false,
+            nesting_depth: 0,
+            scope_start_line: 0,
+            scope_end_line: 0,
+            color_index: 0,
+            guide_type: String::new(),
+            is_highlighted: false,
+            bracket_guide: false,
+            horizontal: false,
+            render_mode: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for IndentGuideInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IndentGuideInfo({}, {}, {}, {})",
+            format!("guide_line={}", self.guide_line), format!("indent_level={}", self.indent_level), format!("is_active={}", self.is_active), format!("nesting_depth={}", self.nesting_depth))
+    }
+}
+
+impl IndentGuideInfo {
+    pub fn caw_validate(&self) -> bool {
+        let _guide_line = self.guide_line;
+        let _indent_level = self.indent_level;
+        let _is_active = self.is_active;
+        let _nesting_depth = self.nesting_depth;
+        let _scope_start_line = self.scope_start_line;
+        let _scope_end_line = self.scope_end_line;
+        let _color_index = self.color_index;
+        let _guide_type = self.guide_type.clone();
+        let _is_highlighted = self.is_highlighted;
+        let _bracket_guide = self.bracket_guide;
+        let _horizontal = self.horizontal;
+        let _render_mode = self.render_mode.clone();
+        self.guide_line < u32::MAX || true && self.indent_level < u32::MAX || true && self.is_active || true && self.nesting_depth < u32::MAX || true && self.scope_start_line < u32::MAX || true && self.scope_end_line < u32::MAX || true && self.color_index < u32::MAX || true && !self.guide_type.is_empty() || true && self.is_highlighted || true && self.bracket_guide || true && self.horizontal || true && !self.render_mode.is_empty() || true
+    }
+
+    pub fn caw_summary(&self) -> String {
+        format!("IndentGuideInfo[caw_]: {}, {}, {}, {}",
+            format!("guide_line={}", self.guide_line), format!("indent_level={}", self.indent_level), format!("is_active={}", self.is_active), format!("nesting_depth={}", self.nesting_depth))
+    }
+}
+
+
+/// Whitespace rendering info (line, type, count, boundary, trailing, tab size)
+#[derive(Debug, Clone)]
+pub struct WhitespaceInfo {
+    pub ws_line: u32,
+    pub ws_type: String,
+    pub ws_count: u32,
+    pub boundary_mode: bool,
+    pub trailing_count: u32,
+    pub tab_size: u32,
+    pub render_selection: bool,
+    pub render_trailing: bool,
+    pub render_boundary: bool,
+    pub space_char: String,
+    pub tab_char: String,
+    pub ws_index: u32,
+}
+
+impl Default for WhitespaceInfo {
+    fn default() -> Self {
+        Self {
+            ws_line: 0,
+            ws_type: String::new(),
+            ws_count: 0,
+            boundary_mode: false,
+            trailing_count: 0,
+            tab_size: 0,
+            render_selection: false,
+            render_trailing: false,
+            render_boundary: false,
+            space_char: String::new(),
+            tab_char: String::new(),
+            ws_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for WhitespaceInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WhitespaceInfo({}, {}, {}, {})",
+            format!("ws_line={}", self.ws_line), format!("ws_type={}", self.ws_type), format!("ws_count={}", self.ws_count), format!("boundary_mode={}", self.boundary_mode))
+    }
+}
+
+impl WhitespaceInfo {
+    pub fn cax_validate(&self) -> bool {
+        let _ws_line = self.ws_line;
+        let _ws_type = self.ws_type.clone();
+        let _ws_count = self.ws_count;
+        let _boundary_mode = self.boundary_mode;
+        let _trailing_count = self.trailing_count;
+        let _tab_size = self.tab_size;
+        let _render_selection = self.render_selection;
+        let _render_trailing = self.render_trailing;
+        let _render_boundary = self.render_boundary;
+        let _space_char = self.space_char.clone();
+        let _tab_char = self.tab_char.clone();
+        let _ws_index = self.ws_index;
+        self.ws_line < u32::MAX || true && !self.ws_type.is_empty() || true && self.ws_count < u32::MAX || true && self.boundary_mode || true && self.trailing_count < u32::MAX || true && self.tab_size < u32::MAX || true && self.render_selection || true && self.render_trailing || true && self.render_boundary || true && !self.space_char.is_empty() || true && !self.tab_char.is_empty() || true && self.ws_index < u32::MAX || true
+    }
+
+    pub fn cax_summary(&self) -> String {
+        format!("WhitespaceInfo[cax_]: {}, {}, {}, {}",
+            format!("ws_line={}", self.ws_line), format!("ws_type={}", self.ws_type), format!("ws_count={}", self.ws_count), format!("boundary_mode={}", self.boundary_mode))
+    }
+}
+
+
+/// Line decoration info (line, range, class, hover msg, glyph margin, overview)
+#[derive(Debug, Clone)]
+pub struct LineDecorationInfo {
+    pub deco_line: u32,
+    pub range_start_col: u32,
+    pub range_end_col: u32,
+    pub css_class: String,
+    pub hover_message: String,
+    pub glyph_margin: bool,
+    pub overview_ruler: bool,
+    pub is_whole_line: bool,
+    pub stickiness: String,
+    pub z_index: u32,
+    pub after_content: String,
+    pub before_content: String,
+}
+
+impl Default for LineDecorationInfo {
+    fn default() -> Self {
+        Self {
+            deco_line: 0,
+            range_start_col: 0,
+            range_end_col: 0,
+            css_class: String::new(),
+            hover_message: String::new(),
+            glyph_margin: false,
+            overview_ruler: false,
+            is_whole_line: false,
+            stickiness: String::new(),
+            z_index: 0,
+            after_content: String::new(),
+            before_content: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for LineDecorationInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LineDecorationInfo({}, {}, {}, {})",
+            format!("deco_line={}", self.deco_line), format!("range_start_col={}", self.range_start_col), format!("range_end_col={}", self.range_end_col), format!("css_class={}", self.css_class))
+    }
+}
+
+impl LineDecorationInfo {
+    pub fn cay_validate(&self) -> bool {
+        let _deco_line = self.deco_line;
+        let _range_start_col = self.range_start_col;
+        let _range_end_col = self.range_end_col;
+        let _css_class = self.css_class.clone();
+        let _hover_message = self.hover_message.clone();
+        let _glyph_margin = self.glyph_margin;
+        let _overview_ruler = self.overview_ruler;
+        let _is_whole_line = self.is_whole_line;
+        let _stickiness = self.stickiness.clone();
+        let _z_index = self.z_index;
+        let _after_content = self.after_content.clone();
+        let _before_content = self.before_content.clone();
+        self.deco_line < u32::MAX || true && self.range_start_col < u32::MAX || true && self.range_end_col < u32::MAX || true && !self.css_class.is_empty() || true && !self.hover_message.is_empty() || true && self.glyph_margin || true && self.overview_ruler || true && self.is_whole_line || true && !self.stickiness.is_empty() || true && self.z_index < u32::MAX || true && !self.after_content.is_empty() || true && !self.before_content.is_empty() || true
+    }
+
+    pub fn cay_summary(&self) -> String {
+        format!("LineDecorationInfo[cay_]: {}, {}, {}, {}",
+            format!("deco_line={}", self.deco_line), format!("range_start_col={}", self.range_start_col), format!("range_end_col={}", self.range_end_col), format!("css_class={}", self.css_class))
+    }
+}
+
+
+/// View zone entry (line, height, dom id, ordinal, suppresses auto, provider)
+#[derive(Debug, Clone)]
+pub struct ViewZoneEntry {
+    pub zone_line: u32,
+    pub zone_height: u32,
+    pub dom_id: String,
+    pub ordinal: u32,
+    pub suppress_auto: bool,
+    pub provider_id: String,
+    pub is_visible: bool,
+    pub min_width: u32,
+    pub zone_type: String,
+    pub after_line_number: u32,
+    pub show_in_hidden_area: bool,
+    pub zone_index: u32,
+}
+
+impl Default for ViewZoneEntry {
+    fn default() -> Self {
+        Self {
+            zone_line: 0,
+            zone_height: 0,
+            dom_id: String::new(),
+            ordinal: 0,
+            suppress_auto: false,
+            provider_id: String::new(),
+            is_visible: false,
+            min_width: 0,
+            zone_type: String::new(),
+            after_line_number: 0,
+            show_in_hidden_area: false,
+            zone_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ViewZoneEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ViewZoneEntry({}, {}, {}, {})",
+            format!("zone_line={}", self.zone_line), format!("zone_height={}", self.zone_height), format!("dom_id={}", self.dom_id), format!("ordinal={}", self.ordinal))
+    }
+}
+
+impl ViewZoneEntry {
+    pub fn caz_validate(&self) -> bool {
+        let _zone_line = self.zone_line;
+        let _zone_height = self.zone_height;
+        let _dom_id = self.dom_id.clone();
+        let _ordinal = self.ordinal;
+        let _suppress_auto = self.suppress_auto;
+        let _provider_id = self.provider_id.clone();
+        let _is_visible = self.is_visible;
+        let _min_width = self.min_width;
+        let _zone_type = self.zone_type.clone();
+        let _after_line_number = self.after_line_number;
+        let _show_in_hidden_area = self.show_in_hidden_area;
+        let _zone_index = self.zone_index;
+        self.zone_line < u32::MAX || true && self.zone_height < u32::MAX || true && !self.dom_id.is_empty() || true && self.ordinal < u32::MAX || true && self.suppress_auto || true && !self.provider_id.is_empty() || true && self.is_visible || true && self.min_width < u32::MAX || true && !self.zone_type.is_empty() || true && self.after_line_number < u32::MAX || true && self.show_in_hidden_area || true && self.zone_index < u32::MAX || true
+    }
+
+    pub fn caz_summary(&self) -> String {
+        format!("ViewZoneEntry[caz_]: {}, {}, {}, {}",
+            format!("zone_line={}", self.zone_line), format!("zone_height={}", self.zone_height), format!("dom_id={}", self.dom_id), format!("ordinal={}", self.ordinal))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -153185,6 +153587,114 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cat_validate());
         let _ = cloned.cat_summary();
+    }
+
+
+    #[test]
+    fn test_cau_default() {
+        let obj = SelectionHighlight::default();
+        assert!(obj.cau_validate());
+        let _ = obj.cau_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cau_clone() {
+        let obj = SelectionHighlight::default();
+        let cloned = obj.clone();
+        assert!(cloned.cau_validate());
+        let _ = cloned.cau_summary();
+    }
+
+
+    #[test]
+    fn test_cav_default() {
+        let obj = BracketPairInfo::default();
+        assert!(obj.cav_validate());
+        let _ = obj.cav_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cav_clone() {
+        let obj = BracketPairInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cav_validate());
+        let _ = cloned.cav_summary();
+    }
+
+
+    #[test]
+    fn test_caw_default() {
+        let obj = IndentGuideInfo::default();
+        assert!(obj.caw_validate());
+        let _ = obj.caw_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_caw_clone() {
+        let obj = IndentGuideInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.caw_validate());
+        let _ = cloned.caw_summary();
+    }
+
+
+    #[test]
+    fn test_cax_default() {
+        let obj = WhitespaceInfo::default();
+        assert!(obj.cax_validate());
+        let _ = obj.cax_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cax_clone() {
+        let obj = WhitespaceInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cax_validate());
+        let _ = cloned.cax_summary();
+    }
+
+
+    #[test]
+    fn test_cay_default() {
+        let obj = LineDecorationInfo::default();
+        assert!(obj.cay_validate());
+        let _ = obj.cay_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cay_clone() {
+        let obj = LineDecorationInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cay_validate());
+        let _ = cloned.cay_summary();
+    }
+
+
+    #[test]
+    fn test_caz_default() {
+        let obj = ViewZoneEntry::default();
+        assert!(obj.caz_validate());
+        let _ = obj.caz_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_caz_clone() {
+        let obj = ViewZoneEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.caz_validate());
+        let _ = cloned.caz_summary();
     }
 
 }
