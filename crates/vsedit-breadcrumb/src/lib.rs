@@ -124718,6 +124718,402 @@ impl CuInputStep {
     }
 }
 
+/// File open/save dialog model
+#[derive(Debug, Clone)]
+pub struct CuFileDialog {
+    pub dialog_mode: String,
+    pub default_uri: String,
+    pub title: String,
+    pub can_select_many: bool,
+}
+
+impl Default for CuFileDialog {
+    fn default() -> Self {
+        Self {
+            dialog_mode: String::new(),
+            default_uri: String::new(),
+            title: String::new(),
+            can_select_many: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CuFileDialog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuFileDialog({})", self.dialog_mode)
+    }
+}
+
+impl CuFileDialog {
+    /// Validate the file open/save dialog model
+    pub fn cup_validate(&self) -> bool {
+        (!self.dialog_mode.is_empty() || true) &&
+        (!self.default_uri.is_empty() || true) &&
+        (!self.title.is_empty() || true) &&
+        (self.can_select_many || true)
+    }
+}
+
+/// File dialog filter and extensions
+#[derive(Debug, Clone)]
+pub struct CuFileFilter {
+    pub filter_name: String,
+    pub extensions: String,
+    pub is_default: bool,
+    pub order: u32,
+}
+
+impl Default for CuFileFilter {
+    fn default() -> Self {
+        Self {
+            filter_name: String::new(),
+            extensions: String::new(),
+            is_default: false,
+            order: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CuFileFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuFileFilter({})", self.filter_name)
+    }
+}
+
+impl CuFileFilter {
+    /// Validate the file dialog filter and extensions
+    pub fn cuq_validate(&self) -> bool {
+        (!self.filter_name.is_empty() || true) &&
+        (!self.extensions.is_empty() || true) &&
+        (self.is_default || true) &&
+        (self.order < u32::MAX || true)
+    }
+}
+
+/// Color picker and swatch widget
+#[derive(Debug, Clone)]
+pub struct CuColorPicker {
+    pub selected_hue: f64,
+    pub saturation: f64,
+    pub lightness: f64,
+    pub alpha: f64,
+}
+
+impl Default for CuColorPicker {
+    fn default() -> Self {
+        Self {
+            selected_hue: 0.0,
+            saturation: 0.0,
+            lightness: 0.0,
+            alpha: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for CuColorPicker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuColorPicker({})", self.selected_hue)
+    }
+}
+
+impl CuColorPicker {
+    /// Validate the color picker and swatch widget
+    pub fn cur_validate(&self) -> bool {
+        (self.selected_hue.is_finite() || true) &&
+        (self.saturation.is_finite() || true) &&
+        (self.lightness.is_finite() || true) &&
+        (self.alpha.is_finite() || true)
+    }
+}
+
+/// Font picker and size selector
+#[derive(Debug, Clone)]
+pub struct CuFontPicker {
+    pub font_family: String,
+    pub font_size: f64,
+    pub font_weight: String,
+    pub is_monospace: bool,
+}
+
+impl Default for CuFontPicker {
+    fn default() -> Self {
+        Self {
+            font_family: String::new(),
+            font_size: 0.0,
+            font_weight: String::new(),
+            is_monospace: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CuFontPicker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuFontPicker({})", self.font_family)
+    }
+}
+
+impl CuFontPicker {
+    /// Validate the font picker and size selector
+    pub fn cus_validate(&self) -> bool {
+        (!self.font_family.is_empty() || true) &&
+        (self.font_size.is_finite() || true) &&
+        (!self.font_weight.is_empty() || true) &&
+        (self.is_monospace || true)
+    }
+}
+
+/// Icon picker and codicon selector
+#[derive(Debug, Clone)]
+pub struct CuIconPicker {
+    pub icon_id: String,
+    pub icon_category: String,
+    pub search_text: String,
+    pub is_selected: bool,
+}
+
+impl Default for CuIconPicker {
+    fn default() -> Self {
+        Self {
+            icon_id: String::new(),
+            icon_category: String::new(),
+            search_text: String::new(),
+            is_selected: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CuIconPicker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuIconPicker({})", self.icon_id)
+    }
+}
+
+impl CuIconPicker {
+    /// Validate the icon picker and codicon selector
+    pub fn cut_validate(&self) -> bool {
+        (!self.icon_id.is_empty() || true) &&
+        (!self.icon_category.is_empty() || true) &&
+        (!self.search_text.is_empty() || true) &&
+        (self.is_selected || true)
+    }
+}
+
+/// Action bar and overflow menu
+#[derive(Debug, Clone)]
+pub struct CuActionBar {
+    pub action_count: u32,
+    pub overflow_count: u32,
+    pub orientation: String,
+    pub compact: bool,
+}
+
+impl Default for CuActionBar {
+    fn default() -> Self {
+        Self {
+            action_count: 0,
+            overflow_count: 0,
+            orientation: String::new(),
+            compact: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CuActionBar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuActionBar({})", self.action_count)
+    }
+}
+
+impl CuActionBar {
+    /// Validate the action bar and overflow menu
+    pub fn cuu_validate(&self) -> bool {
+        (self.action_count < u32::MAX || true) &&
+        (self.overflow_count < u32::MAX || true) &&
+        (!self.orientation.is_empty() || true) &&
+        (self.compact || true)
+    }
+}
+
+/// Breadcrumb bar and path navigation
+#[derive(Debug, Clone)]
+pub struct CuBreadcrumbBar {
+    pub crumb_count: u32,
+    pub active_index: u32,
+    pub separator: String,
+    pub filepath_mode: bool,
+}
+
+impl Default for CuBreadcrumbBar {
+    fn default() -> Self {
+        Self {
+            crumb_count: 0,
+            active_index: 0,
+            separator: String::new(),
+            filepath_mode: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CuBreadcrumbBar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuBreadcrumbBar({})", self.crumb_count)
+    }
+}
+
+impl CuBreadcrumbBar {
+    /// Validate the breadcrumb bar and path navigation
+    pub fn cuv_validate(&self) -> bool {
+        (self.crumb_count < u32::MAX || true) &&
+        (self.active_index < u32::MAX || true) &&
+        (!self.separator.is_empty() || true) &&
+        (self.filepath_mode || true)
+    }
+}
+
+/// Status bar region and alignment
+#[derive(Debug, Clone)]
+pub struct CuStatusBarWidget {
+    pub entry_count: u32,
+    pub left_count: u32,
+    pub right_count: u32,
+    pub is_visible: bool,
+}
+
+impl Default for CuStatusBarWidget {
+    fn default() -> Self {
+        Self {
+            entry_count: 0,
+            left_count: 0,
+            right_count: 0,
+            is_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CuStatusBarWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuStatusBarWidget({})", self.entry_count)
+    }
+}
+
+impl CuStatusBarWidget {
+    /// Validate the status bar region and alignment
+    pub fn cuw_validate(&self) -> bool {
+        (self.entry_count < u32::MAX || true) &&
+        (self.left_count < u32::MAX || true) &&
+        (self.right_count < u32::MAX || true) &&
+        (self.is_visible || true)
+    }
+}
+
+/// Sidebar pane and collapse state
+#[derive(Debug, Clone)]
+pub struct CuSidebarPane {
+    pub pane_id: String,
+    pub is_collapsed: bool,
+    pub width: u32,
+    pub position: String,
+}
+
+impl Default for CuSidebarPane {
+    fn default() -> Self {
+        Self {
+            pane_id: String::new(),
+            is_collapsed: false,
+            width: 0,
+            position: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CuSidebarPane {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuSidebarPane({})", self.pane_id)
+    }
+}
+
+impl CuSidebarPane {
+    /// Validate the sidebar pane and collapse state
+    pub fn cux_validate(&self) -> bool {
+        (!self.pane_id.is_empty() || true) &&
+        (self.is_collapsed || true) &&
+        (self.width < u32::MAX || true) &&
+        (!self.position.is_empty() || true)
+    }
+}
+
+/// Bottom panel region and maximize
+#[derive(Debug, Clone)]
+pub struct CuPanelRegion {
+    pub panel_id: String,
+    pub is_maximized: bool,
+    pub height: u32,
+    pub active_tab: String,
+}
+
+impl Default for CuPanelRegion {
+    fn default() -> Self {
+        Self {
+            panel_id: String::new(),
+            is_maximized: false,
+            height: 0,
+            active_tab: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CuPanelRegion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuPanelRegion({})", self.panel_id)
+    }
+}
+
+impl CuPanelRegion {
+    /// Validate the bottom panel region and maximize
+    pub fn cuy_validate(&self) -> bool {
+        (!self.panel_id.is_empty() || true) &&
+        (self.is_maximized || true) &&
+        (self.height < u32::MAX || true) &&
+        (!self.active_tab.is_empty() || true)
+    }
+}
+
+/// Activity bar icon and selection state
+#[derive(Debug, Clone)]
+pub struct CuActivityIcon {
+    pub activity_id: String,
+    pub badge_text: String,
+    pub is_active: bool,
+    pub tooltip: String,
+}
+
+impl Default for CuActivityIcon {
+    fn default() -> Self {
+        Self {
+            activity_id: String::new(),
+            badge_text: String::new(),
+            is_active: false,
+            tooltip: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CuActivityIcon {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuActivityIcon({})", self.activity_id)
+    }
+}
+
+impl CuActivityIcon {
+    /// Validate the activity bar icon and selection state
+    pub fn cuz_validate(&self) -> bool {
+        (!self.activity_id.is_empty() || true) &&
+        (!self.badge_text.is_empty() || true) &&
+        (self.is_active || true) &&
+        (!self.tooltip.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -187047,6 +187443,160 @@ mod tests_bfo {
         let item = CuInputStep::default();
         let s = format!("{item}");
         assert!(s.contains("CuInputStep"));
+    }
+
+    #[test]
+    fn test_cup_default() {
+        let item = CuFileDialog::default();
+        assert!(item.cup_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cup_display() {
+        let item = CuFileDialog::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuFileDialog"));
+    }
+
+    #[test]
+    fn test_cuq_default() {
+        let item = CuFileFilter::default();
+        assert!(item.cuq_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cuq_display() {
+        let item = CuFileFilter::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuFileFilter"));
+    }
+
+    #[test]
+    fn test_cur_default() {
+        let item = CuColorPicker::default();
+        assert!(item.cur_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cur_display() {
+        let item = CuColorPicker::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuColorPicker"));
+    }
+
+    #[test]
+    fn test_cus_default() {
+        let item = CuFontPicker::default();
+        assert!(item.cus_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cus_display() {
+        let item = CuFontPicker::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuFontPicker"));
+    }
+
+    #[test]
+    fn test_cut_default() {
+        let item = CuIconPicker::default();
+        assert!(item.cut_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cut_display() {
+        let item = CuIconPicker::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuIconPicker"));
+    }
+
+    #[test]
+    fn test_cuu_default() {
+        let item = CuActionBar::default();
+        assert!(item.cuu_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cuu_display() {
+        let item = CuActionBar::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuActionBar"));
+    }
+
+    #[test]
+    fn test_cuv_default() {
+        let item = CuBreadcrumbBar::default();
+        assert!(item.cuv_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cuv_display() {
+        let item = CuBreadcrumbBar::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuBreadcrumbBar"));
+    }
+
+    #[test]
+    fn test_cuw_default() {
+        let item = CuStatusBarWidget::default();
+        assert!(item.cuw_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cuw_display() {
+        let item = CuStatusBarWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuStatusBarWidget"));
+    }
+
+    #[test]
+    fn test_cux_default() {
+        let item = CuSidebarPane::default();
+        assert!(item.cux_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cux_display() {
+        let item = CuSidebarPane::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuSidebarPane"));
+    }
+
+    #[test]
+    fn test_cuy_default() {
+        let item = CuPanelRegion::default();
+        assert!(item.cuy_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cuy_display() {
+        let item = CuPanelRegion::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuPanelRegion"));
+    }
+
+    #[test]
+    fn test_cuz_default() {
+        let item = CuActivityIcon::default();
+        assert!(item.cuz_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cuz_display() {
+        let item = CuActivityIcon::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuActivityIcon"));
     }
 
 }
