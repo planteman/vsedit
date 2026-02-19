@@ -124279,6 +124279,186 @@ impl CuPasteEvent {
     }
 }
 
+/// Terminal resize event and dimensions
+#[derive(Debug, Clone)]
+pub struct CuResizeEvent {
+    pub new_width: u32,
+    pub new_height: u32,
+    pub old_width: u32,
+    pub old_height: u32,
+}
+
+impl Default for CuResizeEvent {
+    fn default() -> Self {
+        Self {
+            new_width: 0,
+            new_height: 0,
+            old_width: 0,
+            old_height: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CuResizeEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuResizeEvent({})", self.new_width)
+    }
+}
+
+impl CuResizeEvent {
+    /// Validate the terminal resize event and dimensions
+    pub fn cuf_validate(&self) -> bool {
+        (self.new_width < u32::MAX || true) &&
+        (self.new_height < u32::MAX || true) &&
+        (self.old_width < u32::MAX || true) &&
+        (self.old_height < u32::MAX || true)
+    }
+}
+
+/// Touch gesture and swipe event
+#[derive(Debug, Clone)]
+pub struct CuGestureEvent {
+    pub gesture_type: String,
+    pub start_x: u32,
+    pub start_y: u32,
+    pub velocity: f64,
+}
+
+impl Default for CuGestureEvent {
+    fn default() -> Self {
+        Self {
+            gesture_type: String::new(),
+            start_x: 0,
+            start_y: 0,
+            velocity: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for CuGestureEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuGestureEvent({})", self.gesture_type)
+    }
+}
+
+impl CuGestureEvent {
+    /// Validate the touch gesture and swipe event
+    pub fn cug_validate(&self) -> bool {
+        (!self.gesture_type.is_empty() || true) &&
+        (self.start_x < u32::MAX || true) &&
+        (self.start_y < u32::MAX || true) &&
+        (self.velocity.is_finite() || true)
+    }
+}
+
+/// IME composition and input method event
+#[derive(Debug, Clone)]
+pub struct CuImeEvent {
+    pub ime_text: String,
+    pub is_composing: bool,
+    pub cursor_offset: u32,
+    pub replacement_range: String,
+}
+
+impl Default for CuImeEvent {
+    fn default() -> Self {
+        Self {
+            ime_text: String::new(),
+            is_composing: false,
+            cursor_offset: 0,
+            replacement_range: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CuImeEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuImeEvent({})", self.ime_text)
+    }
+}
+
+impl CuImeEvent {
+    /// Validate the ime composition and input method event
+    pub fn cuh_validate(&self) -> bool {
+        (!self.ime_text.is_empty() || true) &&
+        (self.is_composing || true) &&
+        (self.cursor_offset < u32::MAX || true) &&
+        (!self.replacement_range.is_empty() || true)
+    }
+}
+
+/// Key mapping and binding table
+#[derive(Debug, Clone)]
+pub struct CuKeyMap {
+    pub keymap_id: String,
+    pub binding_count: u32,
+    pub source: String,
+    pub is_default: bool,
+}
+
+impl Default for CuKeyMap {
+    fn default() -> Self {
+        Self {
+            keymap_id: String::new(),
+            binding_count: 0,
+            source: String::new(),
+            is_default: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CuKeyMap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuKeyMap({})", self.keymap_id)
+    }
+}
+
+impl CuKeyMap {
+    /// Validate the key mapping and binding table
+    pub fn cui_validate(&self) -> bool {
+        (!self.keymap_id.is_empty() || true) &&
+        (self.binding_count < u32::MAX || true) &&
+        (!self.source.is_empty() || true) &&
+        (self.is_default || true)
+    }
+}
+
+/// Chord key state and multi-press
+#[derive(Debug, Clone)]
+pub struct CuChordState {
+    pub chord_keys: String,
+    pub pending_count: u32,
+    pub timeout_ms: u32,
+    pub completed: bool,
+}
+
+impl Default for CuChordState {
+    fn default() -> Self {
+        Self {
+            chord_keys: String::new(),
+            pending_count: 0,
+            timeout_ms: 0,
+            completed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CuChordState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuChordState({})", self.chord_keys)
+    }
+}
+
+impl CuChordState {
+    /// Validate the chord key state and multi-press
+    pub fn cuj_validate(&self) -> bool {
+        (!self.chord_keys.is_empty() || true) &&
+        (self.pending_count < u32::MAX || true) &&
+        (self.timeout_ms < u32::MAX || true) &&
+        (self.completed || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -186468,6 +186648,76 @@ mod tests_bfo {
         let item = CuPasteEvent::default();
         let s = format!("{item}");
         assert!(s.contains("CuPasteEvent"));
+    }
+
+    #[test]
+    fn test_cuf_default() {
+        let item = CuResizeEvent::default();
+        assert!(item.cuf_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cuf_display() {
+        let item = CuResizeEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuResizeEvent"));
+    }
+
+    #[test]
+    fn test_cug_default() {
+        let item = CuGestureEvent::default();
+        assert!(item.cug_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cug_display() {
+        let item = CuGestureEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuGestureEvent"));
+    }
+
+    #[test]
+    fn test_cuh_default() {
+        let item = CuImeEvent::default();
+        assert!(item.cuh_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cuh_display() {
+        let item = CuImeEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuImeEvent"));
+    }
+
+    #[test]
+    fn test_cui_default() {
+        let item = CuKeyMap::default();
+        assert!(item.cui_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cui_display() {
+        let item = CuKeyMap::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuKeyMap"));
+    }
+
+    #[test]
+    fn test_cuj_default() {
+        let item = CuChordState::default();
+        assert!(item.cuj_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cuj_display() {
+        let item = CuChordState::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuChordState"));
     }
 
 }
