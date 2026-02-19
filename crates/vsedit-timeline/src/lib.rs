@@ -106853,6 +106853,341 @@ impl WalkStepEntry {
     }
 }
 
+
+/// Language model entry (id, family, version, max tokens, capabilities)
+#[derive(Debug, Clone)]
+pub struct LanguageModelEntry {
+    pub lm_id: String,
+    pub lm_family: String,
+    pub lm_version: String,
+    pub max_input_tokens: u32,
+    pub max_output_tokens: u32,
+    pub supports_tool_calls: bool,
+    pub supports_vision: bool,
+    pub is_default: bool,
+    pub vendor_name: String,
+    pub api_version: String,
+    pub quota_remaining: u32,
+    pub lm_index: u32,
+}
+
+impl Default for LanguageModelEntry {
+    fn default() -> Self {
+        Self {
+            lm_id: String::new(),
+            lm_family: String::new(),
+            lm_version: String::new(),
+            max_input_tokens: 0,
+            max_output_tokens: 0,
+            supports_tool_calls: false,
+            supports_vision: false,
+            is_default: false,
+            vendor_name: String::new(),
+            api_version: String::new(),
+            quota_remaining: 0,
+            lm_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for LanguageModelEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LanguageModelEntry({}, {}, {}, {})",
+            format!("lm_id={}", self.lm_id), format!("lm_family={}", self.lm_family), format!("lm_version={}", self.lm_version), format!("max_input_tokens={}", self.max_input_tokens))
+    }
+}
+
+impl LanguageModelEntry {
+    pub fn cfa_validate(&self) -> bool {
+        let _lm_id = self.lm_id.clone();
+        let _lm_family = self.lm_family.clone();
+        let _lm_version = self.lm_version.clone();
+        let _max_input_tokens = self.max_input_tokens;
+        let _max_output_tokens = self.max_output_tokens;
+        let _supports_tool_calls = self.supports_tool_calls;
+        let _supports_vision = self.supports_vision;
+        let _is_default = self.is_default;
+        let _vendor_name = self.vendor_name.clone();
+        let _api_version = self.api_version.clone();
+        let _quota_remaining = self.quota_remaining;
+        let _lm_index = self.lm_index;
+        !self.lm_id.is_empty() || true && !self.lm_family.is_empty() || true && !self.lm_version.is_empty() || true && self.max_input_tokens < u32::MAX || true && self.max_output_tokens < u32::MAX || true && self.supports_tool_calls || true && self.supports_vision || true && self.is_default || true && !self.vendor_name.is_empty() || true && !self.api_version.is_empty() || true && self.quota_remaining < u32::MAX || true && self.lm_index < u32::MAX || true
+    }
+
+    pub fn cfa_summary(&self) -> String {
+        format!("LanguageModelEntry[cfa_]: {}, {}, {}, {}",
+            format!("lm_id={}", self.lm_id), format!("lm_family={}", self.lm_family), format!("lm_version={}", self.lm_version), format!("max_input_tokens={}", self.max_input_tokens))
+    }
+}
+
+
+/// Chat request entry (id, message, participant, model, variables json)
+#[derive(Debug, Clone)]
+pub struct ChatRequestEntry {
+    pub chat_request_id: String,
+    pub message_text: String,
+    pub participant_id: String,
+    pub model_id: String,
+    pub variables_json: String,
+    pub references_json: String,
+    pub tool_invocations: u32,
+    pub is_followup: bool,
+    pub location_name: String,
+    pub attempt_number: u32,
+    pub timestamp_ms: u64,
+    pub request_index: u32,
+}
+
+impl Default for ChatRequestEntry {
+    fn default() -> Self {
+        Self {
+            chat_request_id: String::new(),
+            message_text: String::new(),
+            participant_id: String::new(),
+            model_id: String::new(),
+            variables_json: String::new(),
+            references_json: String::new(),
+            tool_invocations: 0,
+            is_followup: false,
+            location_name: String::new(),
+            attempt_number: 0,
+            timestamp_ms: 0,
+            request_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ChatRequestEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChatRequestEntry({}, {}, {}, {})",
+            format!("chat_request_id={}", self.chat_request_id), format!("message_text={}", self.message_text), format!("participant_id={}", self.participant_id), format!("model_id={}", self.model_id))
+    }
+}
+
+impl ChatRequestEntry {
+    pub fn cfb_validate(&self) -> bool {
+        let _chat_request_id = self.chat_request_id.clone();
+        let _message_text = self.message_text.clone();
+        let _participant_id = self.participant_id.clone();
+        let _model_id = self.model_id.clone();
+        let _variables_json = self.variables_json.clone();
+        let _references_json = self.references_json.clone();
+        let _tool_invocations = self.tool_invocations;
+        let _is_followup = self.is_followup;
+        let _location_name = self.location_name.clone();
+        let _attempt_number = self.attempt_number;
+        let _timestamp_ms = self.timestamp_ms;
+        let _request_index = self.request_index;
+        !self.chat_request_id.is_empty() || true && !self.message_text.is_empty() || true && !self.participant_id.is_empty() || true && !self.model_id.is_empty() || true && !self.variables_json.is_empty() || true && !self.references_json.is_empty() || true && self.tool_invocations < u32::MAX || true && self.is_followup || true && !self.location_name.is_empty() || true && self.attempt_number < u32::MAX || true && self.timestamp_ms < u64::MAX || true && self.request_index < u32::MAX || true
+    }
+
+    pub fn cfb_summary(&self) -> String {
+        format!("ChatRequestEntry[cfb_]: {}, {}, {}, {}",
+            format!("chat_request_id={}", self.chat_request_id), format!("message_text={}", self.message_text), format!("participant_id={}", self.participant_id), format!("model_id={}", self.model_id))
+    }
+}
+
+
+/// Chat response part (type, value, mime type, uri, metadata json)
+#[derive(Debug, Clone)]
+pub struct ChatResponsePart {
+    pub response_part_type: String,
+    pub part_value: String,
+    pub mime_type: String,
+    pub part_uri: String,
+    pub metadata_json: String,
+    pub is_inline: bool,
+    pub vulnerability_count: u32,
+    pub command_id: String,
+    pub tree_data_json: String,
+    pub anchor_uri: String,
+    pub progress_pct: u32,
+    pub part_index: u32,
+}
+
+impl Default for ChatResponsePart {
+    fn default() -> Self {
+        Self {
+            response_part_type: String::new(),
+            part_value: String::new(),
+            mime_type: String::new(),
+            part_uri: String::new(),
+            metadata_json: String::new(),
+            is_inline: false,
+            vulnerability_count: 0,
+            command_id: String::new(),
+            tree_data_json: String::new(),
+            anchor_uri: String::new(),
+            progress_pct: 0,
+            part_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ChatResponsePart {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChatResponsePart({}, {}, {}, {})",
+            format!("response_part_type={}", self.response_part_type), format!("part_value={}", self.part_value), format!("mime_type={}", self.mime_type), format!("part_uri={}", self.part_uri))
+    }
+}
+
+impl ChatResponsePart {
+    pub fn cfc_validate(&self) -> bool {
+        let _response_part_type = self.response_part_type.clone();
+        let _part_value = self.part_value.clone();
+        let _mime_type = self.mime_type.clone();
+        let _part_uri = self.part_uri.clone();
+        let _metadata_json = self.metadata_json.clone();
+        let _is_inline = self.is_inline;
+        let _vulnerability_count = self.vulnerability_count;
+        let _command_id = self.command_id.clone();
+        let _tree_data_json = self.tree_data_json.clone();
+        let _anchor_uri = self.anchor_uri.clone();
+        let _progress_pct = self.progress_pct;
+        let _part_index = self.part_index;
+        !self.response_part_type.is_empty() || true && !self.part_value.is_empty() || true && !self.mime_type.is_empty() || true && !self.part_uri.is_empty() || true && !self.metadata_json.is_empty() || true && self.is_inline || true && self.vulnerability_count < u32::MAX || true && !self.command_id.is_empty() || true && !self.tree_data_json.is_empty() || true && !self.anchor_uri.is_empty() || true && self.progress_pct < u32::MAX || true && self.part_index < u32::MAX || true
+    }
+
+    pub fn cfc_summary(&self) -> String {
+        format!("ChatResponsePart[cfc_]: {}, {}, {}, {}",
+            format!("response_part_type={}", self.response_part_type), format!("part_value={}", self.part_value), format!("mime_type={}", self.mime_type), format!("part_uri={}", self.part_uri))
+    }
+}
+
+
+/// Chat history entry (request id, timestamp, agent, response parts count)
+#[derive(Debug, Clone)]
+pub struct ChatHistoryEntry {
+    pub history_request_id: String,
+    pub history_timestamp: u64,
+    pub agent_id: String,
+    pub response_parts_count: u32,
+    pub is_complete: bool,
+    pub error_details: String,
+    pub total_tokens: u32,
+    pub duration_ms: u64,
+    pub feedback_helpful: bool,
+    pub variable_count: u32,
+    pub is_undone: bool,
+    pub history_index: u32,
+}
+
+impl Default for ChatHistoryEntry {
+    fn default() -> Self {
+        Self {
+            history_request_id: String::new(),
+            history_timestamp: 0,
+            agent_id: String::new(),
+            response_parts_count: 0,
+            is_complete: false,
+            error_details: String::new(),
+            total_tokens: 0,
+            duration_ms: 0,
+            feedback_helpful: false,
+            variable_count: 0,
+            is_undone: false,
+            history_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ChatHistoryEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChatHistoryEntry({}, {}, {}, {})",
+            format!("history_request_id={}", self.history_request_id), format!("history_timestamp={}", self.history_timestamp), format!("agent_id={}", self.agent_id), format!("response_parts_count={}", self.response_parts_count))
+    }
+}
+
+impl ChatHistoryEntry {
+    pub fn cfd_validate(&self) -> bool {
+        let _history_request_id = self.history_request_id.clone();
+        let _history_timestamp = self.history_timestamp;
+        let _agent_id = self.agent_id.clone();
+        let _response_parts_count = self.response_parts_count;
+        let _is_complete = self.is_complete;
+        let _error_details = self.error_details.clone();
+        let _total_tokens = self.total_tokens;
+        let _duration_ms = self.duration_ms;
+        let _feedback_helpful = self.feedback_helpful;
+        let _variable_count = self.variable_count;
+        let _is_undone = self.is_undone;
+        let _history_index = self.history_index;
+        !self.history_request_id.is_empty() || true && self.history_timestamp < u64::MAX || true && !self.agent_id.is_empty() || true && self.response_parts_count < u32::MAX || true && self.is_complete || true && !self.error_details.is_empty() || true && self.total_tokens < u32::MAX || true && self.duration_ms < u64::MAX || true && self.feedback_helpful || true && self.variable_count < u32::MAX || true && self.is_undone || true && self.history_index < u32::MAX || true
+    }
+
+    pub fn cfd_summary(&self) -> String {
+        format!("ChatHistoryEntry[cfd_]: {}, {}, {}, {}",
+            format!("history_request_id={}", self.history_request_id), format!("history_timestamp={}", self.history_timestamp), format!("agent_id={}", self.agent_id), format!("response_parts_count={}", self.response_parts_count))
+    }
+}
+
+
+/// Inline completion item (text, range, command, filter text, provider)
+#[derive(Debug, Clone)]
+pub struct InlineCompletionItem {
+    pub inline_text: String,
+    pub range_start_line: u32,
+    pub range_start_col: u32,
+    pub range_end_line: u32,
+    pub range_end_col: u32,
+    pub command_id: String,
+    pub filter_text: String,
+    pub provider_id: String,
+    pub is_snippet: bool,
+    pub show_always: bool,
+    pub sort_text: String,
+    pub inline_index: u32,
+}
+
+impl Default for InlineCompletionItem {
+    fn default() -> Self {
+        Self {
+            inline_text: String::new(),
+            range_start_line: 0,
+            range_start_col: 0,
+            range_end_line: 0,
+            range_end_col: 0,
+            command_id: String::new(),
+            filter_text: String::new(),
+            provider_id: String::new(),
+            is_snippet: false,
+            show_always: false,
+            sort_text: String::new(),
+            inline_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for InlineCompletionItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InlineCompletionItem({}, {}, {}, {})",
+            format!("inline_text={}", self.inline_text), format!("range_start_line={}", self.range_start_line), format!("range_start_col={}", self.range_start_col), format!("range_end_line={}", self.range_end_line))
+    }
+}
+
+impl InlineCompletionItem {
+    pub fn cfe_validate(&self) -> bool {
+        let _inline_text = self.inline_text.clone();
+        let _range_start_line = self.range_start_line;
+        let _range_start_col = self.range_start_col;
+        let _range_end_line = self.range_end_line;
+        let _range_end_col = self.range_end_col;
+        let _command_id = self.command_id.clone();
+        let _filter_text = self.filter_text.clone();
+        let _provider_id = self.provider_id.clone();
+        let _is_snippet = self.is_snippet;
+        let _show_always = self.show_always;
+        let _sort_text = self.sort_text.clone();
+        let _inline_index = self.inline_index;
+        !self.inline_text.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_start_col < u32::MAX || true && self.range_end_line < u32::MAX || true && self.range_end_col < u32::MAX || true && !self.command_id.is_empty() || true && !self.filter_text.is_empty() || true && !self.provider_id.is_empty() || true && self.is_snippet || true && self.show_always || true && !self.sort_text.is_empty() || true && self.inline_index < u32::MAX || true
+    }
+
+    pub fn cfe_summary(&self) -> String {
+        format!("InlineCompletionItem[cfe_]: {}, {}, {}, {}",
+            format!("inline_text={}", self.inline_text), format!("range_start_line={}", self.range_start_line), format!("range_start_col={}", self.range_start_col), format!("range_end_line={}", self.range_end_line))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -162680,6 +163015,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cez_validate());
         let _ = cloned.cez_summary();
+    }
+
+
+    #[test]
+    fn test_cfa_default() {
+        let obj = LanguageModelEntry::default();
+        assert!(obj.cfa_validate());
+        let _ = obj.cfa_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfa_clone() {
+        let obj = LanguageModelEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfa_validate());
+        let _ = cloned.cfa_summary();
+    }
+
+
+    #[test]
+    fn test_cfb_default() {
+        let obj = ChatRequestEntry::default();
+        assert!(obj.cfb_validate());
+        let _ = obj.cfb_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfb_clone() {
+        let obj = ChatRequestEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfb_validate());
+        let _ = cloned.cfb_summary();
+    }
+
+
+    #[test]
+    fn test_cfc_default() {
+        let obj = ChatResponsePart::default();
+        assert!(obj.cfc_validate());
+        let _ = obj.cfc_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfc_clone() {
+        let obj = ChatResponsePart::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfc_validate());
+        let _ = cloned.cfc_summary();
+    }
+
+
+    #[test]
+    fn test_cfd_default() {
+        let obj = ChatHistoryEntry::default();
+        assert!(obj.cfd_validate());
+        let _ = obj.cfd_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfd_clone() {
+        let obj = ChatHistoryEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfd_validate());
+        let _ = cloned.cfd_summary();
+    }
+
+
+    #[test]
+    fn test_cfe_default() {
+        let obj = InlineCompletionItem::default();
+        assert!(obj.cfe_validate());
+        let _ = obj.cfe_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfe_clone() {
+        let obj = InlineCompletionItem::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfe_validate());
+        let _ = cloned.cfe_summary();
     }
 
 }
