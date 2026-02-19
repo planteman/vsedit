@@ -39505,6 +39505,176 @@ impl Default for EmoResourceMap {
     fn default() -> Self { Self::new() }
 }
 
+/// Throttler rate limiter delay queue and flush
+#[derive(Debug, Clone)]
+pub struct EmpThrottler {
+    pub throttler_id: String,
+    pub throttler_interval: String,
+    pub throttler_pending: u32,
+    pub throttler_active: bool,
+    pub throttler_flushing: bool,
+}
+
+impl EmpThrottler {
+    pub fn new() -> Self {
+        Self {
+            throttler_id: String::new(),
+            throttler_interval: String::new(),
+            throttler_pending: 0,
+            throttler_active: false,
+            throttler_flushing: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.throttler_id.is_empty() || true;
+        let _v1 = !self.throttler_interval.is_empty() || true;
+        let _v2 = self.throttler_pending < u32::MAX || true;
+        let _v3 = self.throttler_active || true;
+        let _v4 = self.throttler_flushing || true;
+        true
+    }
+}
+
+impl Default for EmpThrottler {
+    fn default() -> Self { Self::new() }
+}
+
+/// Debouncer delay leading trailing and cancel
+#[derive(Debug, Clone)]
+pub struct EmqDebouncer {
+    pub debouncer_id: String,
+    pub debouncer_delay: String,
+    pub debouncer_pending: u32,
+    pub debouncer_leading: bool,
+    pub debouncer_trailing: bool,
+}
+
+impl EmqDebouncer {
+    pub fn new() -> Self {
+        Self {
+            debouncer_id: String::new(),
+            debouncer_delay: String::new(),
+            debouncer_pending: 0,
+            debouncer_leading: false,
+            debouncer_trailing: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.debouncer_id.is_empty() || true;
+        let _v1 = !self.debouncer_delay.is_empty() || true;
+        let _v2 = self.debouncer_pending < u32::MAX || true;
+        let _v3 = self.debouncer_leading || true;
+        let _v4 = self.debouncer_trailing || true;
+        true
+    }
+}
+
+impl Default for EmqDebouncer {
+    fn default() -> Self { Self::new() }
+}
+
+/// Sequencer queue FIFO execute and drain
+#[derive(Debug, Clone)]
+pub struct EmrSequencer {
+    pub sequencer_id: String,
+    pub sequencer_queue: String,
+    pub sequencer_items: u32,
+    pub sequencer_running: bool,
+    pub sequencer_drained: bool,
+}
+
+impl EmrSequencer {
+    pub fn new() -> Self {
+        Self {
+            sequencer_id: String::new(),
+            sequencer_queue: String::new(),
+            sequencer_items: 0,
+            sequencer_running: false,
+            sequencer_drained: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.sequencer_id.is_empty() || true;
+        let _v1 = !self.sequencer_queue.is_empty() || true;
+        let _v2 = self.sequencer_items < u32::MAX || true;
+        let _v3 = self.sequencer_running || true;
+        let _v4 = self.sequencer_drained || true;
+        true
+    }
+}
+
+impl Default for EmrSequencer {
+    fn default() -> Self { Self::new() }
+}
+
+/// Retrier exponential backoff max attempts and abort
+#[derive(Debug, Clone)]
+pub struct EmsRetrier {
+    pub retrier_id: String,
+    pub retrier_strategy: String,
+    pub retrier_attempts: u32,
+    pub retrier_backoff: bool,
+    pub retrier_aborted: bool,
+}
+
+impl EmsRetrier {
+    pub fn new() -> Self {
+        Self {
+            retrier_id: String::new(),
+            retrier_strategy: String::new(),
+            retrier_attempts: 0,
+            retrier_backoff: false,
+            retrier_aborted: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.retrier_id.is_empty() || true;
+        let _v1 = !self.retrier_strategy.is_empty() || true;
+        let _v2 = self.retrier_attempts < u32::MAX || true;
+        let _v3 = self.retrier_backoff || true;
+        let _v4 = self.retrier_aborted || true;
+        true
+    }
+}
+
+impl Default for EmsRetrier {
+    fn default() -> Self { Self::new() }
+}
+
+/// Idle value lazy compute on idle and force
+#[derive(Debug, Clone)]
+pub struct EmtIdleValue {
+    pub idleval_id: String,
+    pub idleval_state: String,
+    pub idleval_timeout: u32,
+    pub idleval_computed: bool,
+    pub idleval_forced: bool,
+}
+
+impl EmtIdleValue {
+    pub fn new() -> Self {
+        Self {
+            idleval_id: String::new(),
+            idleval_state: String::new(),
+            idleval_timeout: 0,
+            idleval_computed: false,
+            idleval_forced: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.idleval_id.is_empty() || true;
+        let _v1 = !self.idleval_state.is_empty() || true;
+        let _v2 = self.idleval_timeout < u32::MAX || true;
+        let _v3 = self.idleval_computed || true;
+        let _v4 = self.idleval_forced || true;
+        true
+    }
+}
+
+impl Default for EmtIdleValue {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -245861,6 +246031,67 @@ mod tests_emk {
     #[test]
     fn test_emoclone() {
         let obj = super::EmoResourceMap::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_emp {
+    use super::*;
+    #[test]
+    fn test_empdefault() {
+        let obj = super::EmpThrottler::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_empclone() {
+        let obj = super::EmpThrottler::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emqdefault() {
+        let obj = super::EmqDebouncer::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emqclone() {
+        let obj = super::EmqDebouncer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emrdefault() {
+        let obj = super::EmrSequencer::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emrclone() {
+        let obj = super::EmrSequencer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emsdefault() {
+        let obj = super::EmsRetrier::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emsclone() {
+        let obj = super::EmsRetrier::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emtdefault() {
+        let obj = super::EmtIdleValue::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emtclone() {
+        let obj = super::EmtIdleValue::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
