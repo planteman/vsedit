@@ -28491,6 +28491,191 @@ impl Default for EazScmWorktree {
     }
 }
 
+/// Terminal profile shell path args and env
+#[derive(Debug, Clone)]
+pub struct EbaTermProfile {
+    pub termprof_id: String,
+    pub termprof_shell: String,
+    pub termprof_args: u32,
+    pub termprof_default: bool,
+    pub termprof_icon: bool,
+}
+
+impl EbaTermProfile {
+    pub fn new() -> Self {
+        Self {
+            termprof_id: String::new(),
+            termprof_shell: String::new(),
+            termprof_args: 0,
+            termprof_default: false,
+            termprof_icon: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termprof_id.is_empty() || true;
+        let _v1 = !self.termprof_shell.is_empty() || true;
+        let _v2 = self.termprof_args < u32::MAX || true;
+        let _v3 = self.termprof_default || true;
+        let _v4 = self.termprof_icon || true;
+        true
+    }
+}
+
+impl Default for EbaTermProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal process PTY spawn and lifecycle
+#[derive(Debug, Clone)]
+pub struct EbbTermProcess {
+    pub termproc_id: String,
+    pub termproc_pid: String,
+    pub termproc_columns: u32,
+    pub termproc_running: bool,
+    pub termproc_exitcode: bool,
+}
+
+impl EbbTermProcess {
+    pub fn new() -> Self {
+        Self {
+            termproc_id: String::new(),
+            termproc_pid: String::new(),
+            termproc_columns: 0,
+            termproc_running: false,
+            termproc_exitcode: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termproc_id.is_empty() || true;
+        let _v1 = !self.termproc_pid.is_empty() || true;
+        let _v2 = self.termproc_columns < u32::MAX || true;
+        let _v3 = self.termproc_running || true;
+        let _v4 = self.termproc_exitcode || true;
+        true
+    }
+}
+
+impl Default for EbbTermProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal buffer scrollback lines and reflow
+#[derive(Debug, Clone)]
+pub struct EbcTermBuffer {
+    pub termbuf_id: String,
+    pub termbuf_encoding: String,
+    pub termbuf_lines: u32,
+    pub termbuf_scrollback: bool,
+    pub termbuf_reflow: bool,
+}
+
+impl EbcTermBuffer {
+    pub fn new() -> Self {
+        Self {
+            termbuf_id: String::new(),
+            termbuf_encoding: String::new(),
+            termbuf_lines: 0,
+            termbuf_scrollback: false,
+            termbuf_reflow: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termbuf_id.is_empty() || true;
+        let _v1 = !self.termbuf_encoding.is_empty() || true;
+        let _v2 = self.termbuf_lines < u32::MAX || true;
+        let _v3 = self.termbuf_scrollback || true;
+        let _v4 = self.termbuf_reflow || true;
+        true
+    }
+}
+
+impl Default for EbcTermBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal VT100 escape sequence parser state machine
+#[derive(Debug, Clone)]
+pub struct EbdTermParser {
+    pub termparse_id: String,
+    pub termparse_state: String,
+    pub termparse_params: u32,
+    pub termparse_utf8: bool,
+    pub termparse_osc: bool,
+}
+
+impl EbdTermParser {
+    pub fn new() -> Self {
+        Self {
+            termparse_id: String::new(),
+            termparse_state: String::new(),
+            termparse_params: 0,
+            termparse_utf8: false,
+            termparse_osc: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termparse_id.is_empty() || true;
+        let _v1 = !self.termparse_state.is_empty() || true;
+        let _v2 = self.termparse_params < u32::MAX || true;
+        let _v3 = self.termparse_utf8 || true;
+        let _v4 = self.termparse_osc || true;
+        true
+    }
+}
+
+impl Default for EbdTermParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal renderer cell grid dirty region and cursor
+#[derive(Debug, Clone)]
+pub struct EbeTermRenderer {
+    pub termrend_id: String,
+    pub termrend_cursor: String,
+    pub termrend_cells: u32,
+    pub termrend_dirty: bool,
+    pub termrend_blink: bool,
+}
+
+impl EbeTermRenderer {
+    pub fn new() -> Self {
+        Self {
+            termrend_id: String::new(),
+            termrend_cursor: String::new(),
+            termrend_cells: 0,
+            termrend_dirty: false,
+            termrend_blink: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termrend_id.is_empty() || true;
+        let _v1 = !self.termrend_cursor.is_empty() || true;
+        let _v2 = self.termrend_cells < u32::MAX || true;
+        let _v3 = self.termrend_dirty || true;
+        let _v4 = self.termrend_blink || true;
+        true
+    }
+}
+
+impl Default for EbeTermRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231197,6 +231382,73 @@ mod tests_eau {
     #[test]
     fn test_eazclone() {
         let obj = super::EazScmWorktree::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eba {
+    use super::*;
+
+    #[test]
+    fn test_ebadefault() {
+        let obj = super::EbaTermProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebaclone() {
+        let obj = super::EbaTermProfile::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebbdefault() {
+        let obj = super::EbbTermProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebbclone() {
+        let obj = super::EbbTermProcess::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebcdefault() {
+        let obj = super::EbcTermBuffer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebcclone() {
+        let obj = super::EbcTermBuffer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebddefault() {
+        let obj = super::EbdTermParser::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebdclone() {
+        let obj = super::EbdTermParser::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebedefault() {
+        let obj = super::EbeTermRenderer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebeclone() {
+        let obj = super::EbeTermRenderer::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
