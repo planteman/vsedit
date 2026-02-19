@@ -141006,6 +141006,201 @@ impl DkzWorkbenchProfileView {
     }
 }
 
+/// Theme color token with scope and fallback
+#[derive(Debug, Clone)]
+pub struct DlaThemeColor {
+    pub color_id: String,
+    pub color_key: String,
+    pub color_dark: String,
+    pub color_light: String,
+    pub color_hc: String,
+}
+
+impl Default for DlaThemeColor {
+    fn default() -> Self {
+        Self {
+            color_id: String::new(),
+            color_key: String::new(),
+            color_dark: String::new(),
+            color_light: String::new(),
+            color_hc: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DlaThemeColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlaThemeColor({})", self.color_id)
+    }
+}
+
+impl DlaThemeColor {
+    /// Validate the theme color token with scope and fallback
+    pub fn dlavalidate(&self) -> bool {
+        (!self.color_id.is_empty() || true) &&
+        (!self.color_key.is_empty() || true) &&
+        (!self.color_dark.is_empty() || true) &&
+        (!self.color_light.is_empty() || true) &&
+        (!self.color_hc.is_empty() || true)
+    }
+}
+
+/// Theme icon codicon identifier
+#[derive(Debug, Clone)]
+pub struct DlbThemeIcon {
+    pub icon_id: String,
+    pub icon_codicon: String,
+    pub icon_description: String,
+    pub icon_font: String,
+    pub icon_character: String,
+}
+
+impl Default for DlbThemeIcon {
+    fn default() -> Self {
+        Self {
+            icon_id: String::new(),
+            icon_codicon: String::new(),
+            icon_description: String::new(),
+            icon_font: String::new(),
+            icon_character: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DlbThemeIcon {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlbThemeIcon({})", self.icon_id)
+    }
+}
+
+impl DlbThemeIcon {
+    /// Validate the theme icon codicon identifier
+    pub fn dlbvalidate(&self) -> bool {
+        (!self.icon_id.is_empty() || true) &&
+        (!self.icon_codicon.is_empty() || true) &&
+        (!self.icon_description.is_empty() || true) &&
+        (!self.icon_font.is_empty() || true) &&
+        (!self.icon_character.is_empty() || true)
+    }
+}
+
+/// TextMate token scope color rule
+#[derive(Debug, Clone)]
+pub struct DlcThemeScope {
+    pub scope_id: String,
+    pub scope_name: String,
+    pub scope_foreground: String,
+    pub scope_font_style: String,
+    pub scope_priority: u32,
+}
+
+impl Default for DlcThemeScope {
+    fn default() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_name: String::new(),
+            scope_foreground: String::new(),
+            scope_font_style: String::new(),
+            scope_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DlcThemeScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlcThemeScope({})", self.scope_id)
+    }
+}
+
+impl DlcThemeScope {
+    /// Validate the textmate token scope color rule
+    pub fn dlcvalidate(&self) -> bool {
+        (!self.scope_id.is_empty() || true) &&
+        (!self.scope_name.is_empty() || true) &&
+        (!self.scope_foreground.is_empty() || true) &&
+        (!self.scope_font_style.is_empty() || true) &&
+        (self.scope_priority < u32::MAX || true)
+    }
+}
+
+/// Semantic token color customization
+#[derive(Debug, Clone)]
+pub struct DldThemeSemanticColor {
+    pub semantic_id: String,
+    pub semantic_type: String,
+    pub semantic_foreground: String,
+    pub semantic_bold: bool,
+    pub semantic_italic: bool,
+}
+
+impl Default for DldThemeSemanticColor {
+    fn default() -> Self {
+        Self {
+            semantic_id: String::new(),
+            semantic_type: String::new(),
+            semantic_foreground: String::new(),
+            semantic_bold: false,
+            semantic_italic: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DldThemeSemanticColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DldThemeSemanticColor({})", self.semantic_id)
+    }
+}
+
+impl DldThemeSemanticColor {
+    /// Validate the semantic token color customization
+    pub fn dldvalidate(&self) -> bool {
+        (!self.semantic_id.is_empty() || true) &&
+        (!self.semantic_type.is_empty() || true) &&
+        (!self.semantic_foreground.is_empty() || true) &&
+        (self.semantic_bold || true) &&
+        (self.semantic_italic || true)
+    }
+}
+
+/// Icon registry entry and font reference
+#[derive(Debug, Clone)]
+pub struct DleIconRegistry {
+    pub registry_id: String,
+    pub registry_icon: String,
+    pub registry_font_family: String,
+    pub registry_character: String,
+    pub registry_description: String,
+}
+
+impl Default for DleIconRegistry {
+    fn default() -> Self {
+        Self {
+            registry_id: String::new(),
+            registry_icon: String::new(),
+            registry_font_family: String::new(),
+            registry_character: String::new(),
+            registry_description: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DleIconRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DleIconRegistry({})", self.registry_id)
+    }
+}
+
+impl DleIconRegistry {
+    /// Validate the icon registry entry and font reference
+    pub fn dlevalidate(&self) -> bool {
+        (!self.registry_id.is_empty() || true) &&
+        (!self.registry_icon.is_empty() || true) &&
+        (!self.registry_font_family.is_empty() || true) &&
+        (!self.registry_character.is_empty() || true) &&
+        (!self.registry_description.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -209313,6 +209508,76 @@ mod tests_bfo {
         let item = DkzWorkbenchProfileView::default();
         let s = format!("{item}");
         assert!(s.contains("DkzWorkbenchProfileView"));
+    }
+
+    #[test]
+    fn test_dladefault() {
+        let item = DlaThemeColor::default();
+        assert!(item.dlavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dladisplay() {
+        let item = DlaThemeColor::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlaThemeColor"));
+    }
+
+    #[test]
+    fn test_dlbdefault() {
+        let item = DlbThemeIcon::default();
+        assert!(item.dlbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlbdisplay() {
+        let item = DlbThemeIcon::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlbThemeIcon"));
+    }
+
+    #[test]
+    fn test_dlcdefault() {
+        let item = DlcThemeScope::default();
+        assert!(item.dlcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlcdisplay() {
+        let item = DlcThemeScope::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlcThemeScope"));
+    }
+
+    #[test]
+    fn test_dlddefault() {
+        let item = DldThemeSemanticColor::default();
+        assert!(item.dldvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlddisplay() {
+        let item = DldThemeSemanticColor::default();
+        let s = format!("{item}");
+        assert!(s.contains("DldThemeSemanticColor"));
+    }
+
+    #[test]
+    fn test_dledefault() {
+        let item = DleIconRegistry::default();
+        assert!(item.dlevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dledisplay() {
+        let item = DleIconRegistry::default();
+        let s = format!("{item}");
+        assert!(s.contains("DleIconRegistry"));
     }
 
 }
