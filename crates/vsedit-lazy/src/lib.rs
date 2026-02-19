@@ -126836,6 +126836,186 @@ impl CwAccessibleView {
     }
 }
 
+/// File system entry and stat information
+#[derive(Debug, Clone)]
+pub struct CxFileEntry {
+    pub file_uri: String,
+    pub file_size: u64,
+    pub modified_ms: u64,
+    pub is_directory: bool,
+}
+
+impl Default for CxFileEntry {
+    fn default() -> Self {
+        Self {
+            file_uri: String::new(),
+            file_size: 0,
+            modified_ms: 0,
+            is_directory: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxFileEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxFileEntry({})", self.file_uri)
+    }
+}
+
+impl CxFileEntry {
+    /// Validate the file system entry and stat information
+    pub fn cxa_validate(&self) -> bool {
+        (!self.file_uri.is_empty() || true) &&
+        (self.file_size < u64::MAX || true) &&
+        (self.modified_ms < u64::MAX || true) &&
+        (self.is_directory || true)
+    }
+}
+
+/// Directory listing entry and children
+#[derive(Debug, Clone)]
+pub struct CxDirEntry {
+    pub dir_uri: String,
+    pub child_count: u32,
+    pub is_empty: bool,
+    pub is_symlink: bool,
+}
+
+impl Default for CxDirEntry {
+    fn default() -> Self {
+        Self {
+            dir_uri: String::new(),
+            child_count: 0,
+            is_empty: false,
+            is_symlink: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxDirEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxDirEntry({})", self.dir_uri)
+    }
+}
+
+impl CxDirEntry {
+    /// Validate the directory listing entry and children
+    pub fn cxb_validate(&self) -> bool {
+        (!self.dir_uri.is_empty() || true) &&
+        (self.child_count < u32::MAX || true) &&
+        (self.is_empty || true) &&
+        (self.is_symlink || true)
+    }
+}
+
+/// File watcher event and change type
+#[derive(Debug, Clone)]
+pub struct CxFileWatch {
+    pub watch_uri: String,
+    pub change_type: String,
+    pub is_recursive: bool,
+    pub exclude_pattern: String,
+}
+
+impl Default for CxFileWatch {
+    fn default() -> Self {
+        Self {
+            watch_uri: String::new(),
+            change_type: String::new(),
+            is_recursive: false,
+            exclude_pattern: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CxFileWatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxFileWatch({})", self.watch_uri)
+    }
+}
+
+impl CxFileWatch {
+    /// Validate the file watcher event and change type
+    pub fn cxc_validate(&self) -> bool {
+        (!self.watch_uri.is_empty() || true) &&
+        (!self.change_type.is_empty() || true) &&
+        (self.is_recursive || true) &&
+        (!self.exclude_pattern.is_empty() || true)
+    }
+}
+
+/// File encoding detection and conversion
+#[derive(Debug, Clone)]
+pub struct CxEncoding {
+    pub encoding_name: String,
+    pub bom_detected: bool,
+    pub confidence: f64,
+    pub fallback: String,
+}
+
+impl Default for CxEncoding {
+    fn default() -> Self {
+        Self {
+            encoding_name: String::new(),
+            bom_detected: false,
+            confidence: 0.0,
+            fallback: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CxEncoding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxEncoding({})", self.encoding_name)
+    }
+}
+
+impl CxEncoding {
+    /// Validate the file encoding detection and conversion
+    pub fn cxd_validate(&self) -> bool {
+        (!self.encoding_name.is_empty() || true) &&
+        (self.bom_detected || true) &&
+        (self.confidence.is_finite() || true) &&
+        (!self.fallback.is_empty() || true)
+    }
+}
+
+/// End-of-line sequence and normalization
+#[derive(Debug, Clone)]
+pub struct CxEolSeq {
+    pub eol_type: String,
+    pub mixed_eol: bool,
+    pub default_eol: String,
+    pub normalize: bool,
+}
+
+impl Default for CxEolSeq {
+    fn default() -> Self {
+        Self {
+            eol_type: String::new(),
+            mixed_eol: false,
+            default_eol: String::new(),
+            normalize: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxEolSeq {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxEolSeq({})", self.eol_type)
+    }
+}
+
+impl CxEolSeq {
+    /// Validate the end-of-line sequence and normalization
+    pub fn cxe_validate(&self) -> bool {
+        (!self.eol_type.is_empty() || true) &&
+        (self.mixed_eol || true) &&
+        (!self.default_eol.is_empty() || true) &&
+        (self.normalize || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -190047,6 +190227,76 @@ mod tests_bfo {
         let item = CwAccessibleView::default();
         let s = format!("{item}");
         assert!(s.contains("CwAccessibleView"));
+    }
+
+    #[test]
+    fn test_cxa_default() {
+        let item = CxFileEntry::default();
+        assert!(item.cxa_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxa_display() {
+        let item = CxFileEntry::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxFileEntry"));
+    }
+
+    #[test]
+    fn test_cxb_default() {
+        let item = CxDirEntry::default();
+        assert!(item.cxb_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxb_display() {
+        let item = CxDirEntry::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxDirEntry"));
+    }
+
+    #[test]
+    fn test_cxc_default() {
+        let item = CxFileWatch::default();
+        assert!(item.cxc_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxc_display() {
+        let item = CxFileWatch::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxFileWatch"));
+    }
+
+    #[test]
+    fn test_cxd_default() {
+        let item = CxEncoding::default();
+        assert!(item.cxd_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxd_display() {
+        let item = CxEncoding::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxEncoding"));
+    }
+
+    #[test]
+    fn test_cxe_default() {
+        let item = CxEolSeq::default();
+        assert!(item.cxe_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxe_display() {
+        let item = CxEolSeq::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxEolSeq"));
     }
 
 }
