@@ -67235,3 +67235,192 @@ mod bdc_tests {
         assert_eq!(l.line, 3);
     }
 }
+
+
+// --- bdd_: Editor inline chat / AI assistant model ---
+
+/// Chat message role.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BddChatRole { User, Assistant, System }
+
+/// A chat message.
+#[derive(Debug, Clone)]
+pub struct BddChatMessage {
+    pub role: BddChatRole,
+    pub content: String,
+    pub timestamp: u64,
+}
+
+impl BddChatMessage {
+    pub fn user(content: &str) -> Self { Self { role: BddChatRole::User, content: content.to_string(), timestamp: 0 } }
+    pub fn assistant(content: &str) -> Self { Self { role: BddChatRole::Assistant, content: content.to_string(), timestamp: 0 } }
+    pub fn system(content: &str) -> Self { Self { role: BddChatRole::System, content: content.to_string(), timestamp: 0 } }
+
+    pub fn is_user(&self) -> bool { self.role == BddChatRole::User }
+    pub fn is_assistant(&self) -> bool { self.role == BddChatRole::Assistant }
+
+    pub fn render_prefix(&self) -> &str {
+        match self.role { BddChatRole::User => "You: ", BddChatRole::Assistant => "AI: ", BddChatRole::System => "Sys: " }
+    }
+}
+
+/// An inline chat session state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BddInlineState { Idle, Waiting, Streaming, Done, Error }
+
+/// Inline chat widget model.
+#[derive(Debug)]
+pub struct BddInlineChat {
+    pub file: String,
+    pub line: u32,
+    pub prompt: String,
+    pub response: String,
+    pub state: BddInlineState,
+    pub accepted: bool,
+}
+
+impl BddInlineChat {
+    pub fn new(file: &str, line: u32) -> Self {
+        Self { file: file.to_string(), line, prompt: String::new(), response: String::new(), state: BddInlineState::Idle, accepted: false }
+    }
+
+    pub fn set_prompt(&mut self, p: &str) { self.prompt = p.to_string(); }
+    pub fn submit(&mut self) { self.state = BddInlineState::Waiting; }
+    pub fn stream_chunk(&mut self, chunk: &str) { self.response.push_str(chunk); self.state = BddInlineState::Streaming; }
+    pub fn finish(&mut self) { self.state = BddInlineState::Done; }
+    pub fn set_error(&mut self) { self.state = BddInlineState::Error; }
+    pub fn accept(&mut self) { self.accepted = true; }
+    pub fn discard(&mut self) { self.response.clear(); self.state = BddInlineState::Idle; }
+}
+
+/// The chat panel model.
+#[derive(Debug)]
+pub struct BddChatPanel {
+    messages: Vec<BddChatMessage>,
+    input: String,
+    streaming: bool,
+    title: String,
+    participants: Vec<String>,
+}
+
+impl BddChatPanel {
+    pub fn new() -> Self {
+        Self { messages: Vec::new(), input: String::new(), streaming: false, title: "Chat".to_string(), participants: vec!["copilot".to_string()] }
+    }
+
+    pub fn add_message(&mut self, msg: BddChatMessage) { self.messages.push(msg); }
+
+    pub fn submit_input(&mut self) -> Option<String> {
+        if self.input.is_empty() { return None; }
+        let text = self.input.clone();
+        self.add_message(BddChatMessage::user(&text));
+        self.input.clear();
+        self.streaming = true;
+        Some(text)
+    }
+
+    pub fn stream_response(&mut self, chunk: &str) {
+        if let Some(last) = self.messages.last_mut() {
+            if last.is_assistant() { last.content.push_str(chunk); return; }
+        }
+        self.messages.push(BddChatMessage::assistant(chunk));
+    }
+
+    pub fn finish_stream(&mut self) { self.streaming = false; }
+    pub fn is_streaming(&self) -> bool { self.streaming }
+
+    pub fn set_input(&mut self, text: &str) { self.input = text.to_string(); }
+    pub fn input(&self) -> &str { &self.input }
+    pub fn messages(&self) -> &[BddChatMessage] { &self.messages }
+    pub fn message_count(&self) -> usize { self.messages.len() }
+    pub fn clear(&mut self) { self.messages.clear(); }
+
+    pub fn add_participant(&mut self, name: &str) { self.participants.push(name.to_string()); }
+    pub fn participants(&self) -> &[String] { &self.participants }
+}
+
+#[cfg(test)]
+mod bdd_tests {
+    use super::*;
+
+    #[test]
+    fn test_bdd_message() {
+        let m = BddChatMessage::user("Hello");
+        assert!(m.is_user());
+        assert_eq!(m.render_prefix(), "You: ");
+    }
+
+    #[test]
+    fn test_bdd_assistant() {
+        let m = BddChatMessage::assistant("Here's the fix");
+        assert!(m.is_assistant());
+    }
+
+    #[test]
+    fn test_bdd_inline_chat() {
+        let mut ic = BddInlineChat::new("main.rs", 10);
+        ic.set_prompt("Fix this function");
+        ic.submit();
+        assert_eq!(ic.state, BddInlineState::Waiting);
+    }
+
+    #[test]
+    fn test_bdd_inline_stream() {
+        let mut ic = BddInlineChat::new("lib.rs", 5);
+        ic.stream_chunk("fn ");
+        ic.stream_chunk("fixed()");
+        assert_eq!(ic.response, "fn fixed()");
+        assert_eq!(ic.state, BddInlineState::Streaming);
+    }
+
+    #[test]
+    fn test_bdd_inline_accept() {
+        let mut ic = BddInlineChat::new("a.rs", 1);
+        ic.stream_chunk("code");
+        ic.finish();
+        ic.accept();
+        assert!(ic.accepted);
+    }
+
+    #[test]
+    fn test_bdd_inline_discard() {
+        let mut ic = BddInlineChat::new("a.rs", 1);
+        ic.stream_chunk("code");
+        ic.discard();
+        assert!(ic.response.is_empty());
+    }
+
+    #[test]
+    fn test_bdd_panel() {
+        let mut p = BddChatPanel::new();
+        p.set_input("How do I fix this?");
+        let q = p.submit_input().unwrap();
+        assert_eq!(q, "How do I fix this?");
+        assert!(p.is_streaming());
+    }
+
+    #[test]
+    fn test_bdd_panel_stream() {
+        let mut p = BddChatPanel::new();
+        p.add_message(BddChatMessage::user("q"));
+        p.stream_response("part1 ");
+        p.stream_response("part2");
+        p.finish_stream();
+        assert_eq!(p.messages().last().unwrap().content, "part1 part2");
+    }
+
+    #[test]
+    fn test_bdd_panel_clear() {
+        let mut p = BddChatPanel::new();
+        p.add_message(BddChatMessage::user("x"));
+        p.clear();
+        assert_eq!(p.message_count(), 0);
+    }
+
+    #[test]
+    fn test_bdd_participants() {
+        let mut p = BddChatPanel::new();
+        p.add_participant("workspace");
+        assert_eq!(p.participants().len(), 2);
+    }
+}
