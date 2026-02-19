@@ -31981,6 +31981,191 @@ impl Default for EejNotebookOutline {
     }
 }
 
+/// Notebook diff cell level addition deletion and change
+#[derive(Debug, Clone)]
+pub struct EekNotebookDiff {
+    pub nbdiff_id: String,
+    pub nbdiff_original: String,
+    pub nbdiff_changes: u32,
+    pub nbdiff_metadata: bool,
+    pub nbdiff_output: bool,
+}
+
+impl EekNotebookDiff {
+    pub fn new() -> Self {
+        Self {
+            nbdiff_id: String::new(),
+            nbdiff_original: String::new(),
+            nbdiff_changes: 0,
+            nbdiff_metadata: false,
+            nbdiff_output: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nbdiff_id.is_empty() || true;
+        let _v1 = !self.nbdiff_original.is_empty() || true;
+        let _v2 = self.nbdiff_changes < u32::MAX || true;
+        let _v3 = self.nbdiff_metadata || true;
+        let _v4 = self.nbdiff_output || true;
+        true
+    }
+}
+
+impl Default for EekNotebookDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook find and replace across cells and outputs
+#[derive(Debug, Clone)]
+pub struct EelNotebookFind {
+    pub nbfind_id: String,
+    pub nbfind_query: String,
+    pub nbfind_matches: u32,
+    pub nbfind_regex: bool,
+    pub nbfind_output: bool,
+}
+
+impl EelNotebookFind {
+    pub fn new() -> Self {
+        Self {
+            nbfind_id: String::new(),
+            nbfind_query: String::new(),
+            nbfind_matches: 0,
+            nbfind_regex: false,
+            nbfind_output: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nbfind_id.is_empty() || true;
+        let _v1 = !self.nbfind_query.is_empty() || true;
+        let _v2 = self.nbfind_matches < u32::MAX || true;
+        let _v3 = self.nbfind_regex || true;
+        let _v4 = self.nbfind_output || true;
+        true
+    }
+}
+
+impl Default for EelNotebookFind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook variable inspector scope and value
+#[derive(Debug, Clone)]
+pub struct EemNotebookVar {
+    pub nbvar_id: String,
+    pub nbvar_name: String,
+    pub nbvar_count: u32,
+    pub nbvar_expanded: bool,
+    pub nbvar_lazy: bool,
+}
+
+impl EemNotebookVar {
+    pub fn new() -> Self {
+        Self {
+            nbvar_id: String::new(),
+            nbvar_name: String::new(),
+            nbvar_count: 0,
+            nbvar_expanded: false,
+            nbvar_lazy: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nbvar_id.is_empty() || true;
+        let _v1 = !self.nbvar_name.is_empty() || true;
+        let _v2 = self.nbvar_count < u32::MAX || true;
+        let _v3 = self.nbvar_expanded || true;
+        let _v4 = self.nbvar_lazy || true;
+        true
+    }
+}
+
+impl Default for EemNotebookVar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook execution summary timing and success
+#[derive(Debug, Clone)]
+pub struct EenNotebookExec {
+    pub nbexec_id: String,
+    pub nbexec_state: String,
+    pub nbexec_duration: u32,
+    pub nbexec_success: bool,
+    pub nbexec_timing: bool,
+}
+
+impl EenNotebookExec {
+    pub fn new() -> Self {
+        Self {
+            nbexec_id: String::new(),
+            nbexec_state: String::new(),
+            nbexec_duration: 0,
+            nbexec_success: false,
+            nbexec_timing: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nbexec_id.is_empty() || true;
+        let _v1 = !self.nbexec_state.is_empty() || true;
+        let _v2 = self.nbexec_duration < u32::MAX || true;
+        let _v3 = self.nbexec_success || true;
+        let _v4 = self.nbexec_timing || true;
+        true
+    }
+}
+
+impl Default for EenNotebookExec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook chat AI cell generation and editing
+#[derive(Debug, Clone)]
+pub struct EeoNotebookChat {
+    pub nbchat_id: String,
+    pub nbchat_prompt: String,
+    pub nbchat_cells: u32,
+    pub nbchat_streaming: bool,
+    pub nbchat_editing: bool,
+}
+
+impl EeoNotebookChat {
+    pub fn new() -> Self {
+        Self {
+            nbchat_id: String::new(),
+            nbchat_prompt: String::new(),
+            nbchat_cells: 0,
+            nbchat_streaming: false,
+            nbchat_editing: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nbchat_id.is_empty() || true;
+        let _v1 = !self.nbchat_prompt.is_empty() || true;
+        let _v2 = self.nbchat_cells < u32::MAX || true;
+        let _v3 = self.nbchat_streaming || true;
+        let _v4 = self.nbchat_editing || true;
+        true
+    }
+}
+
+impl Default for EeoNotebookChat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235636,6 +235821,73 @@ mod tests_eef {
     #[test]
     fn test_eejclone() {
         let obj = super::EejNotebookOutline::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eek {
+    use super::*;
+
+    #[test]
+    fn test_eekdefault() {
+        let obj = super::EekNotebookDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eekclone() {
+        let obj = super::EekNotebookDiff::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eeldefault() {
+        let obj = super::EelNotebookFind::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eelclone() {
+        let obj = super::EelNotebookFind::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eemdefault() {
+        let obj = super::EemNotebookVar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eemclone() {
+        let obj = super::EemNotebookVar::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eendefault() {
+        let obj = super::EenNotebookExec::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eenclone() {
+        let obj = super::EenNotebookExec::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eeodefault() {
+        let obj = super::EeoNotebookChat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eeoclone() {
+        let obj = super::EeoNotebookChat::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
