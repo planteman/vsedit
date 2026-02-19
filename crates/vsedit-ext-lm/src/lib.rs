@@ -86378,6 +86378,67 @@ pub struct BleStatusBarClick { pub item_id: String, pub button: u8 }
 #[derive(Debug, Clone)]
 pub struct BleStatusBarState { pub left_items: Vec<BleStatusBarEntry>, pub right_items: Vec<BleStatusBarEntry> }
 
+
+// Title bar model — window title template, menu visibility, title bar style, traffic lights
+#[derive(Debug, Clone)]
+pub struct BlfTitleBarConfig { pub style: u8, pub show_menu: bool, pub show_command_center: bool }
+#[derive(Debug, Clone)]
+pub struct BlfWindowTitle { pub template: String, pub variables: Vec<String>, pub rendered: String }
+#[derive(Debug, Clone)]
+pub struct BlfTitleBarState { pub title: BlfWindowTitle, pub focused: bool, pub maximized: bool }
+#[derive(Debug, Clone)]
+pub struct BlfTrafficLight { pub close_enabled: bool, pub minimize_enabled: bool, pub maximize_enabled: bool }
+#[derive(Debug, Clone)]
+pub struct BlfTitleBarAction { pub action: u8, pub source: u8 }
+
+// Menu bar model — menu items, submenus, separators, accelerators, when clauses
+#[derive(Debug, Clone)]
+pub struct BlgMenuItem { pub id: String, pub label: String, pub keybinding: Option<String>, pub command: Option<String>, pub enabled: bool }
+#[derive(Debug, Clone)]
+pub struct BlgMenuSeparator { pub group: String }
+#[derive(Debug, Clone)]
+pub struct BlgSubmenu { pub id: String, pub label: String, pub items: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BlgMenuBarState { pub menus: Vec<BlgSubmenu>, pub active_menu: Option<String>, pub visible: bool }
+#[derive(Debug, Clone)]
+pub struct BlgMenuAction { pub menu_id: String, pub item_id: String }
+
+// Context menu model — context menu items, dynamic items, context menu position, when clause filtering
+#[derive(Debug, Clone)]
+pub struct BlhContextMenuItem { pub id: String, pub label: String, pub command: String, pub group: String, pub order: i32, pub when_clause: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BlhContextMenuPosition { pub x: usize, pub y: usize, pub anchor_line: Option<usize>, pub anchor_col: Option<usize> }
+#[derive(Debug, Clone)]
+pub struct BlhContextMenuState { pub items: Vec<BlhContextMenuItem>, pub position: BlhContextMenuPosition, pub visible: bool }
+#[derive(Debug, Clone)]
+pub struct BlhContextMenuGroup { pub id: String, pub items: Vec<BlhContextMenuItem> }
+#[derive(Debug, Clone)]
+pub struct BlhContextMenuEvent { pub item_id: String, pub dismissed: bool }
+
+// Notification system — notification items, severity, progress, actions, auto-dismiss
+#[derive(Debug, Clone)]
+pub struct BliNotification { pub id: String, pub message: String, pub severity: u8, pub source: Option<String>, pub sticky: bool }
+#[derive(Debug, Clone)]
+pub struct BliNotificationAction { pub label: String, pub command: String, pub is_primary: bool }
+#[derive(Debug, Clone)]
+pub struct BliNotificationProgress { pub infinite: bool, pub total: Option<u64>, pub worked: u64 }
+#[derive(Debug, Clone)]
+pub struct BliNotificationState { pub notifications: Vec<BliNotification>, pub max_visible: usize }
+#[derive(Debug, Clone)]
+pub struct BliNotificationDismiss { pub notification_id: String, pub by_user: bool }
+
+// Quick pick model — quick pick items, filter matching, multi-select, step navigation
+#[derive(Debug, Clone)]
+pub struct BljQuickPickItem { pub label: String, pub description: Option<String>, pub detail: Option<String>, pub picked: bool, pub always_show: bool }
+#[derive(Debug, Clone)]
+pub struct BljQuickPickFilter { pub value: String, pub match_on_label: bool, pub match_on_description: bool, pub match_on_detail: bool }
+#[derive(Debug, Clone)]
+pub struct BljQuickPickState { pub items: Vec<BljQuickPickItem>, pub placeholder: String, pub active_index: usize, pub multi_select: bool }
+#[derive(Debug, Clone)]
+pub struct BljQuickPickStep { pub title: String, pub step: usize, pub total_steps: usize }
+#[derive(Debug, Clone)]
+pub struct BljQuickPickResult { pub selected_indices: Vec<usize>, pub cancelled: bool }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -95498,4 +95559,104 @@ mod tests_bfo {
     fn test_ble_state_empty() { let s = BleStatusBarState { left_items: vec![], right_items: vec![] }; assert!(s.left_items.is_empty()); }
     #[test]
     fn test_ble_state_balanced() { let mk = |id: &str, align: u8| { let i = BleStatusBarItem { id: id.into(), text: id.into(), tooltip: None, command: None, alignment: align, priority: 0 }; let c = BleStatusBarColor { foreground: None, background: None }; BleStatusBarEntry { item: i, color: c, visible: true } }; let s = BleStatusBarState { left_items: vec![mk("a", 0)], right_items: vec![mk("b", 1)] }; assert_eq!(s.left_items.len(), 1); }
+    #[test]
+    fn test_blf_config_custom() { let c = BlfTitleBarConfig { style: 1, show_menu: true, show_command_center: true }; assert_eq!(c.style, 1); }
+    #[test]
+    fn test_blf_config_native() { let c = BlfTitleBarConfig { style: 0, show_menu: false, show_command_center: false }; assert_eq!(c.style, 0); }
+    #[test]
+    fn test_blf_title_basic() { let t = BlfWindowTitle { template: "${dirty}${activeEditorShort}".into(), variables: vec!["dirty".into(), "activeEditorShort".into()], rendered: "main.rs".into() }; assert_eq!(t.variables.len(), 2); }
+    #[test]
+    fn test_blf_title_state_focused() { let t = BlfWindowTitle { template: String::new(), variables: vec![], rendered: String::new() }; let s = BlfTitleBarState { title: t, focused: true, maximized: false }; assert!(s.focused); }
+    #[test]
+    fn test_blf_title_state_maximized() { let t = BlfWindowTitle { template: String::new(), variables: vec![], rendered: String::new() }; let s = BlfTitleBarState { title: t, focused: false, maximized: true }; assert!(s.maximized); }
+    #[test]
+    fn test_blf_traffic_all_enabled() { let tl = BlfTrafficLight { close_enabled: true, minimize_enabled: true, maximize_enabled: true }; assert!(tl.close_enabled); }
+    #[test]
+    fn test_blf_traffic_close_only() { let tl = BlfTrafficLight { close_enabled: true, minimize_enabled: false, maximize_enabled: false }; assert!(!tl.minimize_enabled); }
+    #[test]
+    fn test_blf_action_close() { let a = BlfTitleBarAction { action: 0, source: 0 }; assert_eq!(a.action, 0); }
+    #[test]
+    fn test_blf_action_maximize() { let a = BlfTitleBarAction { action: 2, source: 1 }; assert_eq!(a.action, 2); }
+    #[test]
+    fn test_blf_empty_title() { let t = BlfWindowTitle { template: String::new(), variables: vec![], rendered: String::new() }; assert!(t.rendered.is_empty()); }
+    #[test]
+    fn test_blg_menu_item() { let i = BlgMenuItem { id: "file.save".into(), label: "Save".into(), keybinding: Some("Ctrl+S".into()), command: Some("workbench.action.files.save".into()), enabled: true }; assert!(i.enabled); }
+    #[test]
+    fn test_blg_disabled_item() { let i = BlgMenuItem { id: "edit.undo".into(), label: "Undo".into(), keybinding: Some("Ctrl+Z".into()), command: None, enabled: false }; assert!(!i.enabled); }
+    #[test]
+    fn test_blg_separator() { let s = BlgMenuSeparator { group: "1_file".into() }; assert_eq!(s.group, "1_file"); }
+    #[test]
+    fn test_blg_submenu() { let s = BlgSubmenu { id: "file".into(), label: "File".into(), items: vec!["new".into(), "open".into()] }; assert_eq!(s.items.len(), 2); }
+    #[test]
+    fn test_blg_menu_state_active() { let m = BlgSubmenu { id: "edit".into(), label: "Edit".into(), items: vec![] }; let s = BlgMenuBarState { menus: vec![m], active_menu: Some("edit".into()), visible: true }; assert!(s.active_menu.is_some()); }
+    #[test]
+    fn test_blg_menu_state_closed() { let s = BlgMenuBarState { menus: vec![], active_menu: None, visible: true }; assert!(s.active_menu.is_none()); }
+    #[test]
+    fn test_blg_menu_hidden() { let s = BlgMenuBarState { menus: vec![], active_menu: None, visible: false }; assert!(!s.visible); }
+    #[test]
+    fn test_blg_menu_action() { let a = BlgMenuAction { menu_id: "file".into(), item_id: "save".into() }; assert_eq!(a.item_id, "save"); }
+    #[test]
+    fn test_blg_empty_submenu() { let s = BlgSubmenu { id: "x".into(), label: "X".into(), items: vec![] }; assert!(s.items.is_empty()); }
+    #[test]
+    fn test_blg_no_keybinding() { let i = BlgMenuItem { id: "custom".into(), label: "Custom".into(), keybinding: None, command: None, enabled: true }; assert!(i.keybinding.is_none()); }
+    #[test]
+    fn test_blh_item_basic() { let i = BlhContextMenuItem { id: "cut".into(), label: "Cut".into(), command: "editor.action.clipboardCutAction".into(), group: "9_cutcopypaste".into(), order: 1, when_clause: None }; assert_eq!(i.group, "9_cutcopypaste"); }
+    #[test]
+    fn test_blh_item_with_when() { let i = BlhContextMenuItem { id: "rename".into(), label: "Rename Symbol".into(), command: "editor.action.rename".into(), group: "1_modification".into(), order: 0, when_clause: Some("editorHasRenameProvider".into()) }; assert!(i.when_clause.is_some()); }
+    #[test]
+    fn test_blh_position_editor() { let p = BlhContextMenuPosition { x: 100, y: 200, anchor_line: Some(10), anchor_col: Some(5) }; assert!(p.anchor_line.is_some()); }
+    #[test]
+    fn test_blh_position_no_anchor() { let p = BlhContextMenuPosition { x: 50, y: 80, anchor_line: None, anchor_col: None }; assert!(p.anchor_line.is_none()); }
+    #[test]
+    fn test_blh_state_visible() { let p = BlhContextMenuPosition { x: 0, y: 0, anchor_line: None, anchor_col: None }; let s = BlhContextMenuState { items: vec![], position: p, visible: true }; assert!(s.visible); }
+    #[test]
+    fn test_blh_state_hidden() { let p = BlhContextMenuPosition { x: 0, y: 0, anchor_line: None, anchor_col: None }; let s = BlhContextMenuState { items: vec![], position: p, visible: false }; assert!(!s.visible); }
+    #[test]
+    fn test_blh_group() { let i = BlhContextMenuItem { id: "x".into(), label: "X".into(), command: "x".into(), group: "g".into(), order: 0, when_clause: None }; let g = BlhContextMenuGroup { id: "g".into(), items: vec![i] }; assert_eq!(g.items.len(), 1); }
+    #[test]
+    fn test_blh_event_selected() { let e = BlhContextMenuEvent { item_id: "copy".into(), dismissed: false }; assert!(!e.dismissed); }
+    #[test]
+    fn test_blh_event_dismissed() { let e = BlhContextMenuEvent { item_id: String::new(), dismissed: true }; assert!(e.dismissed); }
+    #[test]
+    fn test_blh_ordered_items() { let items: Vec<BlhContextMenuItem> = (0..3).map(|i| BlhContextMenuItem { id: format!("i{i}"), label: format!("I{i}"), command: "c".into(), group: "g".into(), order: i as i32, when_clause: None }).collect(); assert_eq!(items.len(), 3); }
+    #[test]
+    fn test_bli_info_notification() { let n = BliNotification { id: "n1".into(), message: "Saved".into(), severity: 0, source: None, sticky: false }; assert_eq!(n.severity, 0); }
+    #[test]
+    fn test_bli_warning_notification() { let n = BliNotification { id: "n2".into(), message: "Deprecated".into(), severity: 1, source: Some("lint".into()), sticky: false }; assert_eq!(n.severity, 1); }
+    #[test]
+    fn test_bli_error_sticky() { let n = BliNotification { id: "n3".into(), message: "Failed".into(), severity: 2, source: None, sticky: true }; assert!(n.sticky); }
+    #[test]
+    fn test_bli_action_primary() { let a = BliNotificationAction { label: "Retry".into(), command: "retry".into(), is_primary: true }; assert!(a.is_primary); }
+    #[test]
+    fn test_bli_action_secondary() { let a = BliNotificationAction { label: "Cancel".into(), command: "cancel".into(), is_primary: false }; assert!(!a.is_primary); }
+    #[test]
+    fn test_bli_progress_infinite() { let p = BliNotificationProgress { infinite: true, total: None, worked: 0 }; assert!(p.infinite); }
+    #[test]
+    fn test_bli_progress_finite() { let p = BliNotificationProgress { infinite: false, total: Some(100), worked: 50 }; assert_eq!(p.worked, 50); }
+    #[test]
+    fn test_bli_state_empty() { let s = BliNotificationState { notifications: vec![], max_visible: 3 }; assert!(s.notifications.is_empty()); }
+    #[test]
+    fn test_bli_dismiss_by_user() { let d = BliNotificationDismiss { notification_id: "n1".into(), by_user: true }; assert!(d.by_user); }
+    #[test]
+    fn test_bli_dismiss_auto() { let d = BliNotificationDismiss { notification_id: "n2".into(), by_user: false }; assert!(!d.by_user); }
+    #[test]
+    fn test_blj_item_basic() { let i = BljQuickPickItem { label: "Open File".into(), description: Some("Open a file".into()), detail: None, picked: false, always_show: false }; assert!(!i.picked); }
+    #[test]
+    fn test_blj_item_picked() { let i = BljQuickPickItem { label: "X".into(), description: None, detail: None, picked: true, always_show: false }; assert!(i.picked); }
+    #[test]
+    fn test_blj_item_always_show() { let i = BljQuickPickItem { label: "Recent".into(), description: None, detail: Some("recently used".into()), picked: false, always_show: true }; assert!(i.always_show); }
+    #[test]
+    fn test_blj_filter_label_only() { let f = BljQuickPickFilter { value: "open".into(), match_on_label: true, match_on_description: false, match_on_detail: false }; assert!(f.match_on_label); }
+    #[test]
+    fn test_blj_filter_all() { let f = BljQuickPickFilter { value: "search".into(), match_on_label: true, match_on_description: true, match_on_detail: true }; assert!(f.match_on_detail); }
+    #[test]
+    fn test_blj_state_single() { let i = BljQuickPickItem { label: "A".into(), description: None, detail: None, picked: false, always_show: false }; let s = BljQuickPickState { items: vec![i], placeholder: "Type to filter".into(), active_index: 0, multi_select: false }; assert!(!s.multi_select); }
+    #[test]
+    fn test_blj_state_multi() { let s = BljQuickPickState { items: vec![], placeholder: "Select items".into(), active_index: 0, multi_select: true }; assert!(s.multi_select); }
+    #[test]
+    fn test_blj_step_first() { let s = BljQuickPickStep { title: "Choose language".into(), step: 1, total_steps: 3 }; assert_eq!(s.step, 1); }
+    #[test]
+    fn test_blj_result_selected() { let r = BljQuickPickResult { selected_indices: vec![0, 2], cancelled: false }; assert_eq!(r.selected_indices.len(), 2); }
+    #[test]
+    fn test_blj_result_cancelled() { let r = BljQuickPickResult { selected_indices: vec![], cancelled: true }; assert!(r.cancelled); }
 }
