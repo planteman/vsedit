@@ -66433,3 +66433,157 @@ mod bcx_tests {
         assert_eq!(ctrl.total_threads(), 0);
     }
 }
+
+
+// --- bcy_: Editor workspace trust UI ---
+
+/// Trust level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcyTrustLevel { Trusted, Restricted, Untrusted }
+
+/// A trusted folder entry.
+#[derive(Debug, Clone)]
+pub struct BcyTrustedFolder {
+    pub path: String,
+    pub parent_trusted: bool,
+}
+
+/// Workspace trust state.
+#[derive(Debug)]
+pub struct BcyWorkspaceTrust {
+    level: BcyTrustLevel,
+    trusted_folders: Vec<BcyTrustedFolder>,
+    banner_dismissed: bool,
+    startup_prompt: bool,
+    restricted_features: Vec<String>,
+}
+
+impl BcyWorkspaceTrust {
+    pub fn new() -> Self {
+        Self { level: BcyTrustLevel::Untrusted, trusted_folders: Vec::new(), banner_dismissed: false, startup_prompt: true, restricted_features: Vec::new() }
+    }
+
+    pub fn trust_level(&self) -> BcyTrustLevel { self.level }
+    pub fn is_trusted(&self) -> bool { self.level == BcyTrustLevel::Trusted }
+
+    pub fn grant_trust(&mut self) { self.level = BcyTrustLevel::Trusted; }
+    pub fn restrict(&mut self) { self.level = BcyTrustLevel::Restricted; }
+
+    pub fn add_trusted_folder(&mut self, path: &str) {
+        self.trusted_folders.push(BcyTrustedFolder { path: path.to_string(), parent_trusted: false });
+    }
+
+    pub fn remove_trusted_folder(&mut self, path: &str) {
+        self.trusted_folders.retain(|f| f.path != path);
+    }
+
+    pub fn is_folder_trusted(&self, path: &str) -> bool {
+        self.trusted_folders.iter().any(|f| path.starts_with(&f.path))
+    }
+
+    pub fn trusted_folders(&self) -> &[BcyTrustedFolder] { &self.trusted_folders }
+    pub fn dismiss_banner(&mut self) { self.banner_dismissed = true; }
+    pub fn show_banner(&self) -> bool { !self.banner_dismissed && !self.is_trusted() }
+
+    pub fn add_restricted_feature(&mut self, feature: &str) {
+        self.restricted_features.push(feature.to_string());
+    }
+
+    pub fn restricted_features(&self) -> &[String] { &self.restricted_features }
+
+    pub fn render_trust_editor(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+        lines.push(format!("Workspace Trust: {:?}", self.level));
+        lines.push(String::new());
+        lines.push("Trusted Folders:".to_string());
+        for f in &self.trusted_folders { lines.push(format!("  ✓ {}", f.path)); }
+        if !self.restricted_features.is_empty() {
+            lines.push(String::new());
+            lines.push("Restricted Features:".to_string());
+            for feat in &self.restricted_features { lines.push(format!("  ⚠ {}", feat)); }
+        }
+        lines
+    }
+}
+
+#[cfg(test)]
+mod bcy_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcy_new() {
+        let t = BcyWorkspaceTrust::new();
+        assert_eq!(t.trust_level(), BcyTrustLevel::Untrusted);
+        assert!(!t.is_trusted());
+    }
+
+    #[test]
+    fn test_bcy_grant() {
+        let mut t = BcyWorkspaceTrust::new();
+        t.grant_trust();
+        assert!(t.is_trusted());
+    }
+
+    #[test]
+    fn test_bcy_restrict() {
+        let mut t = BcyWorkspaceTrust::new();
+        t.grant_trust();
+        t.restrict();
+        assert_eq!(t.trust_level(), BcyTrustLevel::Restricted);
+    }
+
+    #[test]
+    fn test_bcy_folders() {
+        let mut t = BcyWorkspaceTrust::new();
+        t.add_trusted_folder("/home/user/safe");
+        assert!(t.is_folder_trusted("/home/user/safe/sub"));
+        assert!(!t.is_folder_trusted("/tmp"));
+    }
+
+    #[test]
+    fn test_bcy_remove_folder() {
+        let mut t = BcyWorkspaceTrust::new();
+        t.add_trusted_folder("/safe");
+        t.remove_trusted_folder("/safe");
+        assert!(t.trusted_folders().is_empty());
+    }
+
+    #[test]
+    fn test_bcy_banner() {
+        let mut t = BcyWorkspaceTrust::new();
+        assert!(t.show_banner());
+        t.dismiss_banner();
+        assert!(!t.show_banner());
+    }
+
+    #[test]
+    fn test_bcy_banner_trusted() {
+        let mut t = BcyWorkspaceTrust::new();
+        t.grant_trust();
+        assert!(!t.show_banner());
+    }
+
+    #[test]
+    fn test_bcy_restricted_features() {
+        let mut t = BcyWorkspaceTrust::new();
+        t.add_restricted_feature("Tasks");
+        t.add_restricted_feature("Debug");
+        assert_eq!(t.restricted_features().len(), 2);
+    }
+
+    #[test]
+    fn test_bcy_render() {
+        let mut t = BcyWorkspaceTrust::new();
+        t.add_trusted_folder("/home");
+        let lines = t.render_trust_editor();
+        assert!(lines.iter().any(|l| l.contains("/home")));
+    }
+
+    #[test]
+    fn test_bcy_render_restricted() {
+        let mut t = BcyWorkspaceTrust::new();
+        t.add_restricted_feature("Extensions");
+        let lines = t.render_trust_editor();
+        assert!(lines.iter().any(|l| l.contains("Extensions")));
+    }
+}
