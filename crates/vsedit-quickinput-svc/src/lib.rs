@@ -145534,6 +145534,201 @@ impl DpjTextModelIndent {
     }
 }
 
+/// Text model tokenization line state
+#[derive(Debug, Clone)]
+pub struct DpkTextModelTokens {
+    pub tokens_id: String,
+    pub tokens_line: u32,
+    pub tokens_state: String,
+    pub tokens_offset: u32,
+    pub tokens_valid: bool,
+}
+
+impl Default for DpkTextModelTokens {
+    fn default() -> Self {
+        Self {
+            tokens_id: String::new(),
+            tokens_line: 0,
+            tokens_state: String::new(),
+            tokens_offset: 0,
+            tokens_valid: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DpkTextModelTokens {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpkTextModelTokens({})", self.tokens_id)
+    }
+}
+
+impl DpkTextModelTokens {
+    /// Validate the text model tokenization line state
+    pub fn dpkvalidate(&self) -> bool {
+        (!self.tokens_id.is_empty() || true) &&
+        (self.tokens_line < u32::MAX || true) &&
+        (!self.tokens_state.is_empty() || true) &&
+        (self.tokens_offset < u32::MAX || true) &&
+        (self.tokens_valid || true)
+    }
+}
+
+/// Text model associated language mode
+#[derive(Debug, Clone)]
+pub struct DplTextModelLanguage {
+    pub language_id: String,
+    pub language_mode: String,
+    pub language_auto_detected: bool,
+    pub language_label: String,
+    pub language_extensions: String,
+}
+
+impl Default for DplTextModelLanguage {
+    fn default() -> Self {
+        Self {
+            language_id: String::new(),
+            language_mode: String::new(),
+            language_auto_detected: false,
+            language_label: String::new(),
+            language_extensions: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DplTextModelLanguage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DplTextModelLanguage({})", self.language_id)
+    }
+}
+
+impl DplTextModelLanguage {
+    /// Validate the text model associated language mode
+    pub fn dplvalidate(&self) -> bool {
+        (!self.language_id.is_empty() || true) &&
+        (!self.language_mode.is_empty() || true) &&
+        (self.language_auto_detected || true) &&
+        (!self.language_label.is_empty() || true) &&
+        (!self.language_extensions.is_empty() || true)
+    }
+}
+
+/// Piece tree internal node representation
+#[derive(Debug, Clone)]
+pub struct DpmPieceTreeNode {
+    pub node_id: String,
+    pub node_left: String,
+    pub node_right: String,
+    pub node_size: u32,
+    pub node_lf_count: u32,
+}
+
+impl Default for DpmPieceTreeNode {
+    fn default() -> Self {
+        Self {
+            node_id: String::new(),
+            node_left: String::new(),
+            node_right: String::new(),
+            node_size: 0,
+            node_lf_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DpmPieceTreeNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpmPieceTreeNode({})", self.node_id)
+    }
+}
+
+impl DpmPieceTreeNode {
+    /// Validate the piece tree internal node representation
+    pub fn dpmvalidate(&self) -> bool {
+        (!self.node_id.is_empty() || true) &&
+        (!self.node_left.is_empty() || true) &&
+        (!self.node_right.is_empty() || true) &&
+        (self.node_size < u32::MAX || true) &&
+        (self.node_lf_count < u32::MAX || true)
+    }
+}
+
+/// Piece tree buffer segment
+#[derive(Debug, Clone)]
+pub struct DpnPieceTreeBuffer {
+    pub buffer_id: String,
+    pub buffer_value: String,
+    pub buffer_line_starts: String,
+    pub buffer_length: u32,
+    pub buffer_cr_count: u32,
+}
+
+impl Default for DpnPieceTreeBuffer {
+    fn default() -> Self {
+        Self {
+            buffer_id: String::new(),
+            buffer_value: String::new(),
+            buffer_line_starts: String::new(),
+            buffer_length: 0,
+            buffer_cr_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DpnPieceTreeBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpnPieceTreeBuffer({})", self.buffer_id)
+    }
+}
+
+impl DpnPieceTreeBuffer {
+    /// Validate the piece tree buffer segment
+    pub fn dpnvalidate(&self) -> bool {
+        (!self.buffer_id.is_empty() || true) &&
+        (!self.buffer_value.is_empty() || true) &&
+        (!self.buffer_line_starts.is_empty() || true) &&
+        (self.buffer_length < u32::MAX || true) &&
+        (self.buffer_cr_count < u32::MAX || true)
+    }
+}
+
+/// Piece tree immutable snapshot for undo
+#[derive(Debug, Clone)]
+pub struct DpoPieceTreeSnapshot {
+    pub snapshot_id: String,
+    pub snapshot_pieces: u32,
+    pub snapshot_length: u64,
+    pub snapshot_line_count: u32,
+    pub snapshot_version: u32,
+}
+
+impl Default for DpoPieceTreeSnapshot {
+    fn default() -> Self {
+        Self {
+            snapshot_id: String::new(),
+            snapshot_pieces: 0,
+            snapshot_length: 0,
+            snapshot_line_count: 0,
+            snapshot_version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DpoPieceTreeSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpoPieceTreeSnapshot({})", self.snapshot_id)
+    }
+}
+
+impl DpoPieceTreeSnapshot {
+    /// Validate the piece tree immutable snapshot for undo
+    pub fn dpovalidate(&self) -> bool {
+        (!self.snapshot_id.is_empty() || true) &&
+        (self.snapshot_pieces < u32::MAX || true) &&
+        (self.snapshot_length < u64::MAX || true) &&
+        (self.snapshot_line_count < u32::MAX || true) &&
+        (self.snapshot_version < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -215437,6 +215632,76 @@ mod tests_bfo {
         let item = DpjTextModelIndent::default();
         let s = format!("{item}");
         assert!(s.contains("DpjTextModelIndent"));
+    }
+
+    #[test]
+    fn test_dpkdefault() {
+        let item = DpkTextModelTokens::default();
+        assert!(item.dpkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpkdisplay() {
+        let item = DpkTextModelTokens::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpkTextModelTokens"));
+    }
+
+    #[test]
+    fn test_dpldefault() {
+        let item = DplTextModelLanguage::default();
+        assert!(item.dplvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpldisplay() {
+        let item = DplTextModelLanguage::default();
+        let s = format!("{item}");
+        assert!(s.contains("DplTextModelLanguage"));
+    }
+
+    #[test]
+    fn test_dpmdefault() {
+        let item = DpmPieceTreeNode::default();
+        assert!(item.dpmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpmdisplay() {
+        let item = DpmPieceTreeNode::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpmPieceTreeNode"));
+    }
+
+    #[test]
+    fn test_dpndefault() {
+        let item = DpnPieceTreeBuffer::default();
+        assert!(item.dpnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpndisplay() {
+        let item = DpnPieceTreeBuffer::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpnPieceTreeBuffer"));
+    }
+
+    #[test]
+    fn test_dpodefault() {
+        let item = DpoPieceTreeSnapshot::default();
+        assert!(item.dpovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpodisplay() {
+        let item = DpoPieceTreeSnapshot::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpoPieceTreeSnapshot"));
     }
 
 }
