@@ -82563,6 +82563,300 @@ impl BgzAccessibilityModel {
 }
 
 
+
+// bha_ Editor Outline View Model
+
+/// Symbol kind in the outline view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BhaOutlineSymbolKind {
+    File, Module, Namespace, Package, Class, Method, Property, Field,
+    Constructor, Enum, Interface, Function, Variable, Constant, String,
+    Number, Boolean, Array, Object, Key, Null, EnumMember, Struct, Event,
+    Operator, TypeParameter,
+}
+
+/// An outline symbol node.
+#[derive(Debug, Clone)]
+pub struct BhaOutlineNode {
+    pub name: String,
+    pub kind: BhaOutlineSymbolKind,
+    pub detail: Option<String>,
+    pub line: usize,
+    pub end_line: usize,
+    pub children: Vec<BhaOutlineNode>,
+    pub is_expanded: bool,
+}
+
+/// Outline view model.
+#[derive(Debug, Clone)]
+pub struct BhaOutlineModel {
+    pub root_nodes: Vec<BhaOutlineNode>,
+    pub is_visible: bool,
+    pub sort_by_position: bool,
+    pub filter_text: String,
+    pub selected_path: Vec<usize>,
+}
+
+impl BhaOutlineModel {
+    pub fn new() -> Self {
+        Self { root_nodes: Vec::new(), is_visible: true, sort_by_position: true, filter_text: String::new(), selected_path: Vec::new() }
+    }
+
+    pub fn set_symbols(&mut self, nodes: Vec<BhaOutlineNode>) { self.root_nodes = nodes; }
+
+    pub fn toggle_sort(&mut self) { self.sort_by_position = !self.sort_by_position; }
+
+    pub fn set_filter(&mut self, text: &str) { self.filter_text = text.to_string(); }
+
+    pub fn total_symbols(&self) -> usize {
+        fn count(nodes: &[BhaOutlineNode]) -> usize {
+            nodes.iter().map(|n| 1 + count(&n.children)).sum()
+        }
+        count(&self.root_nodes)
+    }
+
+    pub fn depth(&self) -> usize {
+        fn measure(nodes: &[BhaOutlineNode]) -> usize {
+            nodes.iter().map(|n| if n.children.is_empty() { 1 } else { 1 + measure(&n.children) }).max().unwrap_or(0)
+        }
+        measure(&self.root_nodes)
+    }
+
+    pub fn symbol_at_line(&self, line: usize) -> Option<&BhaOutlineNode> {
+        fn find<'a>(nodes: &'a [BhaOutlineNode], line: usize) -> Option<&'a BhaOutlineNode> {
+            for n in nodes {
+                if line >= n.line && line <= n.end_line {
+                    if let Some(child) = find(&n.children, line) { return Some(child); }
+                    return Some(n);
+                }
+            }
+            None
+        }
+        find(&self.root_nodes, line)
+    }
+
+    pub fn toggle_visibility(&mut self) { self.is_visible = !self.is_visible; }
+}
+
+
+// bhb_ Editor Notification Model
+
+/// Notification severity level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BhbNotificationSeverity { Info, Warning, Error }
+
+/// Notification action button.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BhbNotificationAction { pub label: String, pub command_id: String }
+
+/// A notification message.
+#[derive(Debug, Clone)]
+pub struct BhbNotification {
+    pub id: u64,
+    pub severity: BhbNotificationSeverity,
+    pub message: String,
+    pub source: Option<String>,
+    pub actions: Vec<BhbNotificationAction>,
+    pub is_read: bool,
+    pub is_dismissed: bool,
+}
+
+/// Notification center model.
+#[derive(Debug, Clone)]
+pub struct BhbNotificationCenter {
+    notifications: Vec<BhbNotification>,
+    next_id: u64,
+    do_not_disturb: bool,
+}
+
+impl BhbNotificationCenter {
+    pub fn new() -> Self { Self { notifications: Vec::new(), next_id: 1, do_not_disturb: false } }
+
+    pub fn notify(&mut self, severity: BhbNotificationSeverity, message: &str) -> u64 {
+        let id = self.next_id; self.next_id += 1;
+        self.notifications.push(BhbNotification { id, severity, message: message.to_string(), source: None, actions: Vec::new(), is_read: false, is_dismissed: false });
+        id
+    }
+
+    pub fn dismiss(&mut self, id: u64) { if let Some(n) = self.notifications.iter_mut().find(|n| n.id == id) { n.is_dismissed = true; } }
+    pub fn mark_read(&mut self, id: u64) { if let Some(n) = self.notifications.iter_mut().find(|n| n.id == id) { n.is_read = true; } }
+    pub fn dismiss_all(&mut self) { for n in &mut self.notifications { n.is_dismissed = true; } }
+
+    pub fn unread_count(&self) -> usize { self.notifications.iter().filter(|n| !n.is_read && !n.is_dismissed).count() }
+    pub fn active_notifications(&self) -> Vec<&BhbNotification> { self.notifications.iter().filter(|n| !n.is_dismissed).collect() }
+    pub fn total(&self) -> usize { self.notifications.len() }
+
+    pub fn toggle_dnd(&mut self) { self.do_not_disturb = !self.do_not_disturb; }
+    pub fn is_dnd(&self) -> bool { self.do_not_disturb }
+
+    pub fn clear_all(&mut self) { self.notifications.clear(); }
+}
+
+
+// bhc_ Editor Status Bar Model
+
+/// Status bar alignment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BhcStatusBarAlignment { Left, Right }
+
+/// A status bar item.
+#[derive(Debug, Clone)]
+pub struct BhcStatusBarItem {
+    pub id: String,
+    pub text: String,
+    pub tooltip: Option<String>,
+    pub command: Option<String>,
+    pub alignment: BhcStatusBarAlignment,
+    pub priority: i32,
+    pub is_visible: bool,
+    pub color: Option<String>,
+    pub background_color: Option<String>,
+}
+
+/// Status bar model.
+#[derive(Debug, Clone)]
+pub struct BhcStatusBarModel {
+    items: Vec<BhcStatusBarItem>,
+    is_visible: bool,
+}
+
+impl BhcStatusBarModel {
+    pub fn new() -> Self { Self { items: Vec::new(), is_visible: true } }
+
+    pub fn add_item(&mut self, item: BhcStatusBarItem) { self.items.push(item); }
+
+    pub fn remove_item(&mut self, id: &str) { self.items.retain(|i| i.id != id); }
+
+    pub fn update_text(&mut self, id: &str, text: &str) {
+        if let Some(i) = self.items.iter_mut().find(|i| i.id == id) { i.text = text.to_string(); }
+    }
+
+    pub fn left_items(&self) -> Vec<&BhcStatusBarItem> {
+        let mut items: Vec<_> = self.items.iter().filter(|i| i.alignment == BhcStatusBarAlignment::Left && i.is_visible).collect();
+        items.sort_by(|a, b| b.priority.cmp(&a.priority));
+        items
+    }
+
+    pub fn right_items(&self) -> Vec<&BhcStatusBarItem> {
+        let mut items: Vec<_> = self.items.iter().filter(|i| i.alignment == BhcStatusBarAlignment::Right && i.is_visible).collect();
+        items.sort_by(|a, b| b.priority.cmp(&a.priority));
+        items
+    }
+
+    pub fn toggle_visibility(&mut self) { self.is_visible = !self.is_visible; }
+    pub fn is_visible(&self) -> bool { self.is_visible }
+    pub fn total_items(&self) -> usize { self.items.len() }
+
+    pub fn show_item(&mut self, id: &str) { if let Some(i) = self.items.iter_mut().find(|i| i.id == id) { i.is_visible = true; } }
+    pub fn hide_item(&mut self, id: &str) { if let Some(i) = self.items.iter_mut().find(|i| i.id == id) { i.is_visible = false; } }
+}
+
+
+// bhd_ Editor Activity Bar Model
+
+/// An activity bar item (sidebar icon).
+#[derive(Debug, Clone)]
+pub struct BhdActivityBarItem {
+    pub id: String,
+    pub label: String,
+    pub icon: String,
+    pub badge_count: Option<u32>,
+    pub is_visible: bool,
+}
+
+/// Activity bar model.
+#[derive(Debug, Clone)]
+pub struct BhdActivityBarModel {
+    items: Vec<BhdActivityBarItem>,
+    active_id: Option<String>,
+    is_visible: bool,
+    position: BhdActivityBarPosition,
+}
+
+/// Activity bar position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BhdActivityBarPosition { SideLeft, SideRight, Top, Hidden }
+
+impl BhdActivityBarModel {
+    pub fn new() -> Self {
+        Self { items: Vec::new(), active_id: None, is_visible: true, position: BhdActivityBarPosition::SideLeft }
+    }
+
+    pub fn add_item(&mut self, item: BhdActivityBarItem) { self.items.push(item); }
+
+    pub fn set_active(&mut self, id: &str) { self.active_id = Some(id.to_string()); }
+
+    pub fn toggle_item(&mut self, id: &str) {
+        if self.active_id.as_deref() == Some(id) { self.active_id = None; }
+        else { self.active_id = Some(id.to_string()); }
+    }
+
+    pub fn active_id(&self) -> Option<&str> { self.active_id.as_deref() }
+    pub fn set_position(&mut self, pos: BhdActivityBarPosition) { self.position = pos; }
+    pub fn position(&self) -> BhdActivityBarPosition { self.position }
+
+    pub fn set_badge(&mut self, id: &str, count: Option<u32>) {
+        if let Some(item) = self.items.iter_mut().find(|i| i.id == id) { item.badge_count = count; }
+    }
+
+    pub fn visible_items(&self) -> Vec<&BhdActivityBarItem> { self.items.iter().filter(|i| i.is_visible).collect() }
+    pub fn total_items(&self) -> usize { self.items.len() }
+    pub fn toggle_visibility(&mut self) { self.is_visible = !self.is_visible; }
+    pub fn is_visible(&self) -> bool { self.is_visible }
+}
+
+
+// bhe_ Editor Panel Model
+
+/// Panel position in the layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BhePanelPosition { Bottom, Left, Right }
+
+/// A panel tab.
+#[derive(Debug, Clone)]
+pub struct BhePanelTab { pub id: String, pub label: String, pub icon: Option<String>, pub badge_count: Option<u32>, pub is_visible: bool }
+
+/// Panel model (bottom panel with terminal, problems, output, etc.).
+#[derive(Debug, Clone)]
+pub struct BhePanelModel {
+    tabs: Vec<BhePanelTab>,
+    active_tab_id: Option<String>,
+    is_visible: bool,
+    position: BhePanelPosition,
+    height: u16,
+    is_maximized: bool,
+}
+
+impl BhePanelModel {
+    pub fn new() -> Self {
+        Self { tabs: Vec::new(), active_tab_id: None, is_visible: true, position: BhePanelPosition::Bottom, height: 300, is_maximized: false }
+    }
+
+    pub fn add_tab(&mut self, tab: BhePanelTab) { self.tabs.push(tab); }
+    pub fn set_active(&mut self, id: &str) { self.active_tab_id = Some(id.to_string()); self.is_visible = true; }
+
+    pub fn toggle_panel(&mut self) { self.is_visible = !self.is_visible; }
+    pub fn toggle_maximize(&mut self) { self.is_maximized = !self.is_maximized; }
+
+    pub fn set_position(&mut self, pos: BhePanelPosition) { self.position = pos; }
+    pub fn set_height(&mut self, h: u16) { self.height = h.max(100).min(2000); }
+
+    pub fn active_tab(&self) -> Option<&BhePanelTab> {
+        self.active_tab_id.as_ref().and_then(|id| self.tabs.iter().find(|t| &t.id == id))
+    }
+
+    pub fn visible_tabs(&self) -> Vec<&BhePanelTab> { self.tabs.iter().filter(|t| t.is_visible).collect() }
+    pub fn is_visible(&self) -> bool { self.is_visible }
+    pub fn is_maximized(&self) -> bool { self.is_maximized }
+    pub fn position(&self) -> BhePanelPosition { self.position }
+    pub fn tab_count(&self) -> usize { self.tabs.len() }
+
+    pub fn set_badge(&mut self, id: &str, count: Option<u32>) {
+        if let Some(t) = self.tabs.iter_mut().find(|t| t.id == id) { t.badge_count = count; }
+    }
+}
+
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -86150,6 +86444,427 @@ mod tests_bfo {
     fn test_bgz_support_variants() {
         let supports = [BgzAccessibilitySupport::Unknown, BgzAccessibilitySupport::Enabled, BgzAccessibilitySupport::Disabled];
         assert_eq!(supports.len(), 3);
+    }
+
+
+
+    // bha_ tests
+
+    #[test]
+    fn test_bha_outline_creation() {
+        let m = BhaOutlineModel::new();
+        assert!(m.is_visible);
+        assert_eq!(m.total_symbols(), 0);
+    }
+
+    #[test]
+    fn test_bha_set_symbols() {
+        let mut m = BhaOutlineModel::new();
+        m.set_symbols(vec![
+            BhaOutlineNode { name: "main".into(), kind: BhaOutlineSymbolKind::Function, detail: None, line: 1, end_line: 10, children: vec![], is_expanded: true },
+            BhaOutlineNode { name: "MyStruct".into(), kind: BhaOutlineSymbolKind::Struct, detail: None, line: 12, end_line: 30, children: vec![
+                BhaOutlineNode { name: "new".into(), kind: BhaOutlineSymbolKind::Method, detail: None, line: 13, end_line: 20, children: vec![], is_expanded: true },
+            ], is_expanded: true },
+        ]);
+        assert_eq!(m.total_symbols(), 3);
+        assert_eq!(m.depth(), 2);
+    }
+
+    #[test]
+    fn test_bha_symbol_at_line() {
+        let mut m = BhaOutlineModel::new();
+        m.set_symbols(vec![
+            BhaOutlineNode { name: "outer".into(), kind: BhaOutlineSymbolKind::Function, detail: None, line: 1, end_line: 20, children: vec![
+                BhaOutlineNode { name: "inner".into(), kind: BhaOutlineSymbolKind::Variable, detail: None, line: 5, end_line: 8, children: vec![], is_expanded: true },
+            ], is_expanded: true },
+        ]);
+        assert_eq!(m.symbol_at_line(6).unwrap().name, "inner");
+        assert_eq!(m.symbol_at_line(15).unwrap().name, "outer");
+        assert!(m.symbol_at_line(25).is_none());
+    }
+
+    #[test]
+    fn test_bha_toggle_sort() {
+        let mut m = BhaOutlineModel::new();
+        assert!(m.sort_by_position);
+        m.toggle_sort();
+        assert!(!m.sort_by_position);
+    }
+
+    #[test]
+    fn test_bha_filter() {
+        let mut m = BhaOutlineModel::new();
+        m.set_filter("main");
+        assert_eq!(m.filter_text, "main");
+    }
+
+    #[test]
+    fn test_bha_toggle_visibility() {
+        let mut m = BhaOutlineModel::new();
+        m.toggle_visibility();
+        assert!(!m.is_visible);
+    }
+
+    #[test]
+    fn test_bha_empty_depth() {
+        let m = BhaOutlineModel::new();
+        assert_eq!(m.depth(), 0);
+    }
+
+    #[test]
+    fn test_bha_symbol_kinds() {
+        let kinds = [BhaOutlineSymbolKind::File, BhaOutlineSymbolKind::Class, BhaOutlineSymbolKind::Function, BhaOutlineSymbolKind::Variable];
+        assert_eq!(kinds.len(), 4);
+    }
+
+    #[test]
+    fn test_bha_deep_nesting() {
+        let mut m = BhaOutlineModel::new();
+        m.set_symbols(vec![BhaOutlineNode {
+            name: "a".into(), kind: BhaOutlineSymbolKind::Module, detail: None, line: 1, end_line: 100, is_expanded: true,
+            children: vec![BhaOutlineNode {
+                name: "b".into(), kind: BhaOutlineSymbolKind::Class, detail: None, line: 2, end_line: 50, is_expanded: true,
+                children: vec![BhaOutlineNode {
+                    name: "c".into(), kind: BhaOutlineSymbolKind::Method, detail: None, line: 3, end_line: 10, is_expanded: true, children: vec![],
+                }],
+            }],
+        }]);
+        assert_eq!(m.depth(), 3);
+        assert_eq!(m.total_symbols(), 3);
+    }
+
+    #[test]
+    fn test_bha_detail_field() {
+        let node = BhaOutlineNode { name: "x".into(), kind: BhaOutlineSymbolKind::Constant, detail: Some("i32".into()), line: 1, end_line: 1, children: vec![], is_expanded: false };
+        assert_eq!(node.detail.as_deref(), Some("i32"));
+    }
+
+
+    // bhb_ tests
+
+    #[test]
+    fn test_bhb_notification_creation() {
+        let nc = BhbNotificationCenter::new();
+        assert_eq!(nc.total(), 0);
+        assert_eq!(nc.unread_count(), 0);
+    }
+
+    #[test]
+    fn test_bhb_notify() {
+        let mut nc = BhbNotificationCenter::new();
+        let id = nc.notify(BhbNotificationSeverity::Info, "Hello");
+        assert_eq!(nc.total(), 1);
+        assert_eq!(nc.unread_count(), 1);
+        assert_eq!(id, 1);
+    }
+
+    #[test]
+    fn test_bhb_dismiss() {
+        let mut nc = BhbNotificationCenter::new();
+        let id = nc.notify(BhbNotificationSeverity::Warning, "warn");
+        nc.dismiss(id);
+        assert_eq!(nc.active_notifications().len(), 0);
+        assert_eq!(nc.unread_count(), 0);
+    }
+
+    #[test]
+    fn test_bhb_mark_read() {
+        let mut nc = BhbNotificationCenter::new();
+        let id = nc.notify(BhbNotificationSeverity::Error, "err");
+        nc.mark_read(id);
+        assert_eq!(nc.unread_count(), 0);
+        assert_eq!(nc.active_notifications().len(), 1);
+    }
+
+    #[test]
+    fn test_bhb_dismiss_all() {
+        let mut nc = BhbNotificationCenter::new();
+        nc.notify(BhbNotificationSeverity::Info, "a");
+        nc.notify(BhbNotificationSeverity::Info, "b");
+        nc.dismiss_all();
+        assert!(nc.active_notifications().is_empty());
+    }
+
+    #[test]
+    fn test_bhb_dnd() {
+        let mut nc = BhbNotificationCenter::new();
+        assert!(!nc.is_dnd());
+        nc.toggle_dnd();
+        assert!(nc.is_dnd());
+    }
+
+    #[test]
+    fn test_bhb_clear_all() {
+        let mut nc = BhbNotificationCenter::new();
+        nc.notify(BhbNotificationSeverity::Info, "x");
+        nc.clear_all();
+        assert_eq!(nc.total(), 0);
+    }
+
+    #[test]
+    fn test_bhb_severity_variants() {
+        let sevs = [BhbNotificationSeverity::Info, BhbNotificationSeverity::Warning, BhbNotificationSeverity::Error];
+        assert_eq!(sevs.len(), 3);
+    }
+
+    #[test]
+    fn test_bhb_multiple_notifications() {
+        let mut nc = BhbNotificationCenter::new();
+        for i in 0..5 { nc.notify(BhbNotificationSeverity::Info, &format!("msg {}", i)); }
+        assert_eq!(nc.total(), 5);
+        assert_eq!(nc.unread_count(), 5);
+    }
+
+    #[test]
+    fn test_bhb_actions() {
+        let mut nc = BhbNotificationCenter::new();
+        let id = nc.notify(BhbNotificationSeverity::Info, "update");
+        if let Some(n) = nc.notifications.iter_mut().find(|n| n.id == id) {
+            n.actions.push(BhbNotificationAction { label: "Update".into(), command_id: "ext.update".into() });
+        }
+        assert_eq!(nc.active_notifications()[0].actions.len(), 1);
+    }
+
+
+    // bhc_ tests
+
+    #[test]
+    fn test_bhc_status_bar_creation() {
+        let sb = BhcStatusBarModel::new();
+        assert!(sb.is_visible());
+        assert_eq!(sb.total_items(), 0);
+    }
+
+    #[test]
+    fn test_bhc_add_items() {
+        let mut sb = BhcStatusBarModel::new();
+        sb.add_item(BhcStatusBarItem { id: "line".into(), text: "Ln 1, Col 1".into(), tooltip: None, command: None, alignment: BhcStatusBarAlignment::Right, priority: 100, is_visible: true, color: None, background_color: None });
+        sb.add_item(BhcStatusBarItem { id: "branch".into(), text: "main".into(), tooltip: None, command: None, alignment: BhcStatusBarAlignment::Left, priority: 50, is_visible: true, color: None, background_color: None });
+        assert_eq!(sb.total_items(), 2);
+        assert_eq!(sb.left_items().len(), 1);
+        assert_eq!(sb.right_items().len(), 1);
+    }
+
+    #[test]
+    fn test_bhc_update_text() {
+        let mut sb = BhcStatusBarModel::new();
+        sb.add_item(BhcStatusBarItem { id: "pos".into(), text: "1:1".into(), tooltip: None, command: None, alignment: BhcStatusBarAlignment::Right, priority: 0, is_visible: true, color: None, background_color: None });
+        sb.update_text("pos", "5:10");
+        assert_eq!(sb.right_items()[0].text, "5:10");
+    }
+
+    #[test]
+    fn test_bhc_remove_item() {
+        let mut sb = BhcStatusBarModel::new();
+        sb.add_item(BhcStatusBarItem { id: "x".into(), text: "x".into(), tooltip: None, command: None, alignment: BhcStatusBarAlignment::Left, priority: 0, is_visible: true, color: None, background_color: None });
+        sb.remove_item("x");
+        assert_eq!(sb.total_items(), 0);
+    }
+
+    #[test]
+    fn test_bhc_priority_sort() {
+        let mut sb = BhcStatusBarModel::new();
+        sb.add_item(BhcStatusBarItem { id: "low".into(), text: "low".into(), tooltip: None, command: None, alignment: BhcStatusBarAlignment::Left, priority: 1, is_visible: true, color: None, background_color: None });
+        sb.add_item(BhcStatusBarItem { id: "high".into(), text: "high".into(), tooltip: None, command: None, alignment: BhcStatusBarAlignment::Left, priority: 100, is_visible: true, color: None, background_color: None });
+        assert_eq!(sb.left_items()[0].id, "high");
+    }
+
+    #[test]
+    fn test_bhc_hide_show() {
+        let mut sb = BhcStatusBarModel::new();
+        sb.add_item(BhcStatusBarItem { id: "a".into(), text: "a".into(), tooltip: None, command: None, alignment: BhcStatusBarAlignment::Left, priority: 0, is_visible: true, color: None, background_color: None });
+        sb.hide_item("a");
+        assert!(sb.left_items().is_empty());
+        sb.show_item("a");
+        assert_eq!(sb.left_items().len(), 1);
+    }
+
+    #[test]
+    fn test_bhc_toggle_visibility() {
+        let mut sb = BhcStatusBarModel::new();
+        sb.toggle_visibility();
+        assert!(!sb.is_visible());
+    }
+
+    #[test]
+    fn test_bhc_alignment_variants() {
+        let aligns = [BhcStatusBarAlignment::Left, BhcStatusBarAlignment::Right];
+        assert_eq!(aligns.len(), 2);
+    }
+
+    #[test]
+    fn test_bhc_item_color() {
+        let item = BhcStatusBarItem { id: "err".into(), text: "2 errors".into(), tooltip: None, command: None, alignment: BhcStatusBarAlignment::Left, priority: 0, is_visible: true, color: Some("#ff0000".into()), background_color: None };
+        assert_eq!(item.color.as_deref(), Some("#ff0000"));
+    }
+
+    #[test]
+    fn test_bhc_item_command() {
+        let item = BhcStatusBarItem { id: "lang".into(), text: "Rust".into(), tooltip: Some("Change Language".into()), command: Some("workbench.action.editor.changeLanguageMode".into()), alignment: BhcStatusBarAlignment::Right, priority: 0, is_visible: true, color: None, background_color: None };
+        assert!(item.command.is_some());
+    }
+
+
+    // bhd_ tests
+
+    #[test]
+    fn test_bhd_activity_bar_creation() {
+        let ab = BhdActivityBarModel::new();
+        assert!(ab.is_visible());
+        assert_eq!(ab.total_items(), 0);
+        assert!(ab.active_id().is_none());
+    }
+
+    #[test]
+    fn test_bhd_add_items() {
+        let mut ab = BhdActivityBarModel::new();
+        ab.add_item(BhdActivityBarItem { id: "explorer".into(), label: "Explorer".into(), icon: "files".into(), badge_count: None, is_visible: true });
+        ab.add_item(BhdActivityBarItem { id: "search".into(), label: "Search".into(), icon: "search".into(), badge_count: None, is_visible: true });
+        assert_eq!(ab.total_items(), 2);
+    }
+
+    #[test]
+    fn test_bhd_set_active() {
+        let mut ab = BhdActivityBarModel::new();
+        ab.add_item(BhdActivityBarItem { id: "explorer".into(), label: "Explorer".into(), icon: "files".into(), badge_count: None, is_visible: true });
+        ab.set_active("explorer");
+        assert_eq!(ab.active_id(), Some("explorer"));
+    }
+
+    #[test]
+    fn test_bhd_toggle_item() {
+        let mut ab = BhdActivityBarModel::new();
+        ab.add_item(BhdActivityBarItem { id: "search".into(), label: "Search".into(), icon: "search".into(), badge_count: None, is_visible: true });
+        ab.toggle_item("search");
+        assert_eq!(ab.active_id(), Some("search"));
+        ab.toggle_item("search");
+        assert!(ab.active_id().is_none());
+    }
+
+    #[test]
+    fn test_bhd_badge() {
+        let mut ab = BhdActivityBarModel::new();
+        ab.add_item(BhdActivityBarItem { id: "scm".into(), label: "SCM".into(), icon: "git".into(), badge_count: None, is_visible: true });
+        ab.set_badge("scm", Some(5));
+        assert_eq!(ab.visible_items()[0].badge_count, Some(5));
+    }
+
+    #[test]
+    fn test_bhd_position() {
+        let mut ab = BhdActivityBarModel::new();
+        assert_eq!(ab.position(), BhdActivityBarPosition::SideLeft);
+        ab.set_position(BhdActivityBarPosition::Top);
+        assert_eq!(ab.position(), BhdActivityBarPosition::Top);
+    }
+
+    #[test]
+    fn test_bhd_position_variants() {
+        let positions = [BhdActivityBarPosition::SideLeft, BhdActivityBarPosition::SideRight, BhdActivityBarPosition::Top, BhdActivityBarPosition::Hidden];
+        assert_eq!(positions.len(), 4);
+    }
+
+    #[test]
+    fn test_bhd_visible_items() {
+        let mut ab = BhdActivityBarModel::new();
+        ab.add_item(BhdActivityBarItem { id: "a".into(), label: "A".into(), icon: "a".into(), badge_count: None, is_visible: true });
+        ab.add_item(BhdActivityBarItem { id: "b".into(), label: "B".into(), icon: "b".into(), badge_count: None, is_visible: false });
+        assert_eq!(ab.visible_items().len(), 1);
+    }
+
+    #[test]
+    fn test_bhd_toggle_visibility() {
+        let mut ab = BhdActivityBarModel::new();
+        ab.toggle_visibility();
+        assert!(!ab.is_visible());
+    }
+
+    #[test]
+    fn test_bhd_clear_badge() {
+        let mut ab = BhdActivityBarModel::new();
+        ab.add_item(BhdActivityBarItem { id: "x".into(), label: "X".into(), icon: "x".into(), badge_count: Some(3), is_visible: true });
+        ab.set_badge("x", None);
+        assert!(ab.visible_items()[0].badge_count.is_none());
+    }
+
+
+    // bhe_ tests
+
+    #[test]
+    fn test_bhe_panel_creation() {
+        let p = BhePanelModel::new();
+        assert!(p.is_visible());
+        assert!(!p.is_maximized());
+        assert_eq!(p.position(), BhePanelPosition::Bottom);
+    }
+
+    #[test]
+    fn test_bhe_add_tabs() {
+        let mut p = BhePanelModel::new();
+        p.add_tab(BhePanelTab { id: "terminal".into(), label: "Terminal".into(), icon: None, badge_count: None, is_visible: true });
+        p.add_tab(BhePanelTab { id: "problems".into(), label: "Problems".into(), icon: None, badge_count: Some(3), is_visible: true });
+        assert_eq!(p.tab_count(), 2);
+    }
+
+    #[test]
+    fn test_bhe_set_active() {
+        let mut p = BhePanelModel::new();
+        p.add_tab(BhePanelTab { id: "output".into(), label: "Output".into(), icon: None, badge_count: None, is_visible: true });
+        p.set_active("output");
+        assert_eq!(p.active_tab().unwrap().id, "output");
+    }
+
+    #[test]
+    fn test_bhe_toggle_panel() {
+        let mut p = BhePanelModel::new();
+        p.toggle_panel();
+        assert!(!p.is_visible());
+        p.toggle_panel();
+        assert!(p.is_visible());
+    }
+
+    #[test]
+    fn test_bhe_toggle_maximize() {
+        let mut p = BhePanelModel::new();
+        p.toggle_maximize();
+        assert!(p.is_maximized());
+    }
+
+    #[test]
+    fn test_bhe_set_position() {
+        let mut p = BhePanelModel::new();
+        p.set_position(BhePanelPosition::Right);
+        assert_eq!(p.position(), BhePanelPosition::Right);
+    }
+
+    #[test]
+    fn test_bhe_height_clamp() {
+        let mut p = BhePanelModel::new();
+        p.set_height(50);
+        assert_eq!(p.height, 100);
+        p.set_height(5000);
+        assert_eq!(p.height, 2000);
+    }
+
+    #[test]
+    fn test_bhe_badge() {
+        let mut p = BhePanelModel::new();
+        p.add_tab(BhePanelTab { id: "problems".into(), label: "Problems".into(), icon: None, badge_count: None, is_visible: true });
+        p.set_badge("problems", Some(10));
+        assert_eq!(p.visible_tabs()[0].badge_count, Some(10));
+    }
+
+    #[test]
+    fn test_bhe_position_variants() {
+        let positions = [BhePanelPosition::Bottom, BhePanelPosition::Left, BhePanelPosition::Right];
+        assert_eq!(positions.len(), 3);
+    }
+
+    #[test]
+    fn test_bhe_visible_tabs_filter() {
+        let mut p = BhePanelModel::new();
+        p.add_tab(BhePanelTab { id: "a".into(), label: "A".into(), icon: None, badge_count: None, is_visible: true });
+        p.add_tab(BhePanelTab { id: "b".into(), label: "B".into(), icon: None, badge_count: None, is_visible: false });
+        assert_eq!(p.visible_tabs().len(), 1);
     }
 
 
