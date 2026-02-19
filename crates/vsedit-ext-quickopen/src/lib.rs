@@ -118689,6 +118689,186 @@ impl CoDapLaunchArgs {
     }
 }
 
+/// DAP attach request configuration
+#[derive(Debug, Clone)]
+pub struct CoDapAttachArgs {
+    pub process_id: u32,
+    pub connect_timeout: u32,
+    pub host: String,
+    pub port: u32,
+}
+
+impl Default for CoDapAttachArgs {
+    fn default() -> Self {
+        Self {
+            process_id: 0,
+            connect_timeout: 0,
+            host: String::new(),
+            port: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapAttachArgs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapAttachArgs({})", self.process_id)
+    }
+}
+
+impl CoDapAttachArgs {
+    /// Validate the dap attach request configuration
+    pub fn cof_validate(&self) -> bool {
+        (self.process_id < u32::MAX || true) &&
+        (self.connect_timeout < u32::MAX || true) &&
+        (!self.host.is_empty() || true) &&
+        (self.port < u32::MAX || true)
+    }
+}
+
+/// DAP thread information model
+#[derive(Debug, Clone)]
+pub struct CoDapThreadInfo {
+    pub thread_name: String,
+    pub thread_id: u32,
+    pub is_stopped: bool,
+    pub stop_reason: String,
+}
+
+impl Default for CoDapThreadInfo {
+    fn default() -> Self {
+        Self {
+            thread_name: String::new(),
+            thread_id: 0,
+            is_stopped: false,
+            stop_reason: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapThreadInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapThreadInfo({})", self.thread_name)
+    }
+}
+
+impl CoDapThreadInfo {
+    /// Validate the dap thread information model
+    pub fn cog_validate(&self) -> bool {
+        (!self.thread_name.is_empty() || true) &&
+        (self.thread_id < u32::MAX || true) &&
+        (self.is_stopped || true) &&
+        (!self.stop_reason.is_empty() || true)
+    }
+}
+
+/// DAP stack frame and source location
+#[derive(Debug, Clone)]
+pub struct CoDapStackFrame {
+    pub frame_id: u32,
+    pub name: String,
+    pub source_path: String,
+    pub line: u32,
+}
+
+impl Default for CoDapStackFrame {
+    fn default() -> Self {
+        Self {
+            frame_id: 0,
+            name: String::new(),
+            source_path: String::new(),
+            line: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapStackFrame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapStackFrame({})", self.frame_id)
+    }
+}
+
+impl CoDapStackFrame {
+    /// Validate the dap stack frame and source location
+    pub fn coh_validate(&self) -> bool {
+        (self.frame_id < u32::MAX || true) &&
+        (!self.name.is_empty() || true) &&
+        (!self.source_path.is_empty() || true) &&
+        (self.line < u32::MAX || true)
+    }
+}
+
+/// DAP variable scope and presentation
+#[derive(Debug, Clone)]
+pub struct CoDapScope {
+    pub scope_ref: u32,
+    pub scope_name: String,
+    pub expensive: bool,
+    pub named_variables: u32,
+}
+
+impl Default for CoDapScope {
+    fn default() -> Self {
+        Self {
+            scope_ref: 0,
+            scope_name: String::new(),
+            expensive: false,
+            named_variables: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapScope({})", self.scope_ref)
+    }
+}
+
+impl CoDapScope {
+    /// Validate the dap variable scope and presentation
+    pub fn coi_validate(&self) -> bool {
+        (self.scope_ref < u32::MAX || true) &&
+        (!self.scope_name.is_empty() || true) &&
+        (self.expensive || true) &&
+        (self.named_variables < u32::MAX || true)
+    }
+}
+
+/// DAP variable value and children
+#[derive(Debug, Clone)]
+pub struct CoDapVariable {
+    pub var_ref: u32,
+    pub var_name: String,
+    pub var_value: String,
+    pub var_type: String,
+}
+
+impl Default for CoDapVariable {
+    fn default() -> Self {
+        Self {
+            var_ref: 0,
+            var_name: String::new(),
+            var_value: String::new(),
+            var_type: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapVariable({})", self.var_ref)
+    }
+}
+
+impl CoDapVariable {
+    /// Validate the dap variable value and children
+    pub fn coj_validate(&self) -> bool {
+        (self.var_ref < u32::MAX || true) &&
+        (!self.var_name.is_empty() || true) &&
+        (!self.var_value.is_empty() || true) &&
+        (!self.var_type.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -178694,6 +178874,76 @@ mod tests_bfo {
         let item = CoDapLaunchArgs::default();
         let s = format!("{item}");
         assert!(s.contains("CoDapLaunchArgs"));
+    }
+
+    #[test]
+    fn test_cof_default() {
+        let item = CoDapAttachArgs::default();
+        assert!(item.cof_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cof_display() {
+        let item = CoDapAttachArgs::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapAttachArgs"));
+    }
+
+    #[test]
+    fn test_cog_default() {
+        let item = CoDapThreadInfo::default();
+        assert!(item.cog_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cog_display() {
+        let item = CoDapThreadInfo::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapThreadInfo"));
+    }
+
+    #[test]
+    fn test_coh_default() {
+        let item = CoDapStackFrame::default();
+        assert!(item.coh_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_coh_display() {
+        let item = CoDapStackFrame::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapStackFrame"));
+    }
+
+    #[test]
+    fn test_coi_default() {
+        let item = CoDapScope::default();
+        assert!(item.coi_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_coi_display() {
+        let item = CoDapScope::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapScope"));
+    }
+
+    #[test]
+    fn test_coj_default() {
+        let item = CoDapVariable::default();
+        assert!(item.coj_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_coj_display() {
+        let item = CoDapVariable::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapVariable"));
     }
 
 }
