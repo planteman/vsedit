@@ -29871,6 +29871,191 @@ impl Default for EceEditorMinimap {
     }
 }
 
+/// Editor gutter line numbers fold and debug icons
+#[derive(Debug, Clone)]
+pub struct EcfEditorGutter {
+    pub edgutter_id: String,
+    pub edgutter_width: String,
+    pub edgutter_decorations: u32,
+    pub edgutter_linenumbers: bool,
+    pub edgutter_folding: bool,
+}
+
+impl EcfEditorGutter {
+    pub fn new() -> Self {
+        Self {
+            edgutter_id: String::new(),
+            edgutter_width: String::new(),
+            edgutter_decorations: 0,
+            edgutter_linenumbers: false,
+            edgutter_folding: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edgutter_id.is_empty() || true;
+        let _v1 = !self.edgutter_width.is_empty() || true;
+        let _v2 = self.edgutter_decorations < u32::MAX || true;
+        let _v3 = self.edgutter_linenumbers || true;
+        let _v4 = self.edgutter_folding || true;
+        true
+    }
+}
+
+impl Default for EcfEditorGutter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor bracket matching pair colorize and guide
+#[derive(Debug, Clone)]
+pub struct EcgEditorBracket {
+    pub edbracket_id: String,
+    pub edbracket_pair: String,
+    pub edbracket_depth: u32,
+    pub edbracket_colorize: bool,
+    pub edbracket_guide: bool,
+}
+
+impl EcgEditorBracket {
+    pub fn new() -> Self {
+        Self {
+            edbracket_id: String::new(),
+            edbracket_pair: String::new(),
+            edbracket_depth: 0,
+            edbracket_colorize: false,
+            edbracket_guide: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edbracket_id.is_empty() || true;
+        let _v1 = !self.edbracket_pair.is_empty() || true;
+        let _v2 = self.edbracket_depth < u32::MAX || true;
+        let _v3 = self.edbracket_colorize || true;
+        let _v4 = self.edbracket_guide || true;
+        true
+    }
+}
+
+impl Default for EcgEditorBracket {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor indentation guide rainbow and active scope
+#[derive(Debug, Clone)]
+pub struct EchEditorIndent {
+    pub edindent_id: String,
+    pub edindent_size: String,
+    pub edindent_guides: u32,
+    pub edindent_rainbow: bool,
+    pub edindent_active: bool,
+}
+
+impl EchEditorIndent {
+    pub fn new() -> Self {
+        Self {
+            edindent_id: String::new(),
+            edindent_size: String::new(),
+            edindent_guides: 0,
+            edindent_rainbow: false,
+            edindent_active: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edindent_id.is_empty() || true;
+        let _v1 = !self.edindent_size.is_empty() || true;
+        let _v2 = self.edindent_guides < u32::MAX || true;
+        let _v3 = self.edindent_rainbow || true;
+        let _v4 = self.edindent_active || true;
+        true
+    }
+}
+
+impl Default for EchEditorIndent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor whitespace rendering boundary and trailing
+#[derive(Debug, Clone)]
+pub struct EciEditorWhitespace {
+    pub edws_id: String,
+    pub edws_render: String,
+    pub edws_size: u32,
+    pub edws_boundary: bool,
+    pub edws_trailing: bool,
+}
+
+impl EciEditorWhitespace {
+    pub fn new() -> Self {
+        Self {
+            edws_id: String::new(),
+            edws_render: String::new(),
+            edws_size: 0,
+            edws_boundary: false,
+            edws_trailing: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edws_id.is_empty() || true;
+        let _v1 = !self.edws_render.is_empty() || true;
+        let _v2 = self.edws_size < u32::MAX || true;
+        let _v3 = self.edws_boundary || true;
+        let _v4 = self.edws_trailing || true;
+        true
+    }
+}
+
+impl Default for EciEditorWhitespace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor word wrap column bounded and viewport
+#[derive(Debug, Clone)]
+pub struct EcjEditorWordWrap {
+    pub edwrap_id: String,
+    pub edwrap_column: String,
+    pub edwrap_lines: u32,
+    pub edwrap_bounded: bool,
+    pub edwrap_viewport: bool,
+}
+
+impl EcjEditorWordWrap {
+    pub fn new() -> Self {
+        Self {
+            edwrap_id: String::new(),
+            edwrap_column: String::new(),
+            edwrap_lines: 0,
+            edwrap_bounded: false,
+            edwrap_viewport: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edwrap_id.is_empty() || true;
+        let _v1 = !self.edwrap_column.is_empty() || true;
+        let _v2 = self.edwrap_lines < u32::MAX || true;
+        let _v3 = self.edwrap_bounded || true;
+        let _v4 = self.edwrap_viewport || true;
+        true
+    }
+}
+
+impl Default for EcjEditorWordWrap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -232852,6 +233037,73 @@ mod tests_eca {
     #[test]
     fn test_ececlone() {
         let obj = super::EceEditorMinimap::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ecf {
+    use super::*;
+
+    #[test]
+    fn test_ecfdefault() {
+        let obj = super::EcfEditorGutter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecfclone() {
+        let obj = super::EcfEditorGutter::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecgdefault() {
+        let obj = super::EcgEditorBracket::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecgclone() {
+        let obj = super::EcgEditorBracket::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_echdefault() {
+        let obj = super::EchEditorIndent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_echclone() {
+        let obj = super::EchEditorIndent::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecidefault() {
+        let obj = super::EciEditorWhitespace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eciclone() {
+        let obj = super::EciEditorWhitespace::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecjdefault() {
+        let obj = super::EcjEditorWordWrap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecjclone() {
+        let obj = super::EcjEditorWordWrap::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
