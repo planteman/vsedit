@@ -86244,6 +86244,79 @@ pub struct BktExternalDrop { pub files: Vec<String>, pub text: Option<String> }
 #[derive(Debug, Clone)]
 pub struct BktDragState { pub active: bool, pub source: Option<BktDragSource>, pub preview_line: Option<usize> }
 
+
+// Editor accessibility — ARIA labels, screen reader announcements, accessible navigation
+#[derive(Debug, Clone)]
+pub struct BkuAriaLabel { pub role: String, pub label: String, pub live: u8 }
+#[derive(Debug, Clone)]
+pub struct BkuScreenReaderAnnouncement { pub text: String, pub priority: u8, pub clear_previous: bool }
+#[derive(Debug, Clone)]
+pub struct BkuAccessibleNavigation { pub current_line: usize, pub total_lines: usize, pub current_col: usize, pub line_text: String }
+#[derive(Debug, Clone)]
+pub struct BkuAccessibleAction { pub id: String, pub label: String, pub keybinding: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BkuAccessibilityConfig { pub screen_reader_optimized: bool, pub announce_cursor: bool, pub announce_typing: bool }
+
+// Editor command execution — command dispatch, keybinding resolution, command arguments
+#[derive(Debug, Clone)]
+pub struct BkvCommandDescriptor { pub id: String, pub title: String, pub category: Option<String>, pub keybinding: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BkvCommandArgs { pub args: Vec<String>, pub context: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BkvCommandResult { pub success: bool, pub message: Option<String>, pub output: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BkvKeybindingMatch { pub command_id: String, pub when_clause: Option<String>, pub priority: i32 }
+#[derive(Debug, Clone)]
+pub struct BkvCommandHistory { pub entries: Vec<String>, pub max_size: usize }
+
+// Editor diff computation — line diff, inline diff, change annotations, diff decorations
+#[derive(Debug, Clone)]
+pub struct BkwLineDiff { pub original_start: usize, pub original_count: usize, pub modified_start: usize, pub modified_count: usize }
+#[derive(Debug, Clone)]
+pub struct BkwInlineDiff { pub line: usize, pub original_text: String, pub modified_text: String, pub char_changes: Vec<BkwCharChange> }
+#[derive(Debug, Clone)]
+pub struct BkwCharChange { pub original_start: usize, pub original_end: usize, pub modified_start: usize, pub modified_end: usize }
+#[derive(Debug, Clone)]
+pub struct BkwDiffDecoration { pub start_line: usize, pub end_line: usize, pub kind: u8, pub color: u32 }
+#[derive(Debug, Clone)]
+pub struct BkwDiffResult { pub line_diffs: Vec<BkwLineDiff>, pub identical: bool, pub change_count: usize }
+
+// Editor testing support — test items, test results, test coverage, test explorer state
+#[derive(Debug, Clone)]
+pub struct BkxTestItem { pub id: String, pub label: String, pub uri: Option<String>, pub line: Option<usize>, pub can_resolve: bool }
+#[derive(Debug, Clone)]
+pub struct BkxTestResult { pub test_id: String, pub state: u8, pub duration_ms: u64, pub message: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BkxTestCoverage { pub file: String, pub covered_lines: Vec<usize>, pub uncovered_lines: Vec<usize>, pub branch_coverage: f64 }
+#[derive(Debug, Clone)]
+pub struct BkxTestRunProfile { pub id: String, pub label: String, pub kind: u8, pub is_default: bool }
+#[derive(Debug, Clone)]
+pub struct BkxTestExplorerState { pub items: Vec<BkxTestItem>, pub running: bool, pub completed: usize, pub failed: usize }
+
+// Editor performance monitoring — frame timing, render stats, memory usage, latency tracking
+#[derive(Debug, Clone)]
+pub struct BkyFrameTiming { pub frame_number: u64, pub render_ms: f64, pub layout_ms: f64, pub paint_ms: f64 }
+#[derive(Debug, Clone)]
+pub struct BkyRenderStats { pub total_frames: u64, pub dropped_frames: u64, pub avg_fps: f64, pub peak_render_ms: f64 }
+#[derive(Debug, Clone)]
+pub struct BkyMemoryUsage { pub heap_bytes: u64, pub buffer_bytes: u64, pub cache_bytes: u64 }
+#[derive(Debug, Clone)]
+pub struct BkyLatencyEntry { pub operation: String, pub latency_us: u64, pub timestamp: u64 }
+#[derive(Debug, Clone)]
+pub struct BkyPerfReport { pub timing: BkyFrameTiming, pub stats: BkyRenderStats, pub memory: BkyMemoryUsage }
+
+// Editor plugin system — plugin descriptors, activation events, extension points, contrib registration
+#[derive(Debug, Clone)]
+pub struct BkzPluginDescriptor { pub id: String, pub name: String, pub version: String, pub publisher: String, pub activation_events: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BkzActivationEvent { pub event: String, pub pattern: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BkzExtensionPoint { pub id: String, pub json_schema: Option<String>, pub default_content: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BkzContribRegistration { pub extension_id: String, pub point_id: String, pub data: String }
+#[derive(Debug, Clone)]
+pub struct BkzPluginState { pub id: String, pub active: bool, pub load_time_ms: u64, pub error: Option<String> }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -95144,4 +95217,124 @@ mod tests_bfo {
     fn test_bkt_drag_inactive() { let s = BktDragState { active: false, source: None, preview_line: None }; assert!(!s.active); }
     #[test]
     fn test_bkt_drag_with_source() { let src = BktDragSource { editor_id: "e1".into(), line: 0, col: 0, text: "x".into() }; let s = BktDragState { active: true, source: Some(src), preview_line: Some(5) }; assert!(s.source.is_some()); }
+    #[test]
+    fn test_bku_aria_label() { let l = BkuAriaLabel { role: "textbox".into(), label: "Editor".into(), live: 0 }; assert_eq!(l.role, "textbox"); }
+    #[test]
+    fn test_bku_aria_live_polite() { let l = BkuAriaLabel { role: "status".into(), label: "Line 5".into(), live: 1 }; assert_eq!(l.live, 1); }
+    #[test]
+    fn test_bku_announcement() { let a = BkuScreenReaderAnnouncement { text: "Cursor at line 5".into(), priority: 1, clear_previous: false }; assert!(!a.clear_previous); }
+    #[test]
+    fn test_bku_announcement_high_priority() { let a = BkuScreenReaderAnnouncement { text: "Error found".into(), priority: 2, clear_previous: true }; assert!(a.clear_previous); }
+    #[test]
+    fn test_bku_nav_state() { let n = BkuAccessibleNavigation { current_line: 10, total_lines: 100, current_col: 5, line_text: "let x = 5;".into() }; assert_eq!(n.current_line, 10); }
+    #[test]
+    fn test_bku_action_with_key() { let a = BkuAccessibleAction { id: "undo".into(), label: "Undo".into(), keybinding: Some("Ctrl+Z".into()) }; assert!(a.keybinding.is_some()); }
+    #[test]
+    fn test_bku_action_no_key() { let a = BkuAccessibleAction { id: "custom".into(), label: "Custom".into(), keybinding: None }; assert!(a.keybinding.is_none()); }
+    #[test]
+    fn test_bku_config_optimized() { let c = BkuAccessibilityConfig { screen_reader_optimized: true, announce_cursor: true, announce_typing: true }; assert!(c.screen_reader_optimized); }
+    #[test]
+    fn test_bku_config_default() { let c = BkuAccessibilityConfig { screen_reader_optimized: false, announce_cursor: false, announce_typing: false }; assert!(!c.screen_reader_optimized); }
+    #[test]
+    fn test_bku_nav_first_line() { let n = BkuAccessibleNavigation { current_line: 0, total_lines: 50, current_col: 0, line_text: String::new() }; assert_eq!(n.current_line, 0); }
+    #[test]
+    fn test_bkv_command_basic() { let c = BkvCommandDescriptor { id: "editor.action.formatDocument".into(), title: "Format Document".into(), category: Some("Editor".into()), keybinding: Some("Shift+Alt+F".into()) }; assert!(c.category.is_some()); }
+    #[test]
+    fn test_bkv_command_no_keybinding() { let c = BkvCommandDescriptor { id: "custom.cmd".into(), title: "Custom".into(), category: None, keybinding: None }; assert!(c.keybinding.is_none()); }
+    #[test]
+    fn test_bkv_args_empty() { let a = BkvCommandArgs { args: vec![], context: None }; assert!(a.args.is_empty()); }
+    #[test]
+    fn test_bkv_args_with_context() { let a = BkvCommandArgs { args: vec!["file.rs".into()], context: Some("editor".into()) }; assert_eq!(a.args.len(), 1); }
+    #[test]
+    fn test_bkv_result_success() { let r = BkvCommandResult { success: true, message: None, output: Some("formatted".into()) }; assert!(r.success); }
+    #[test]
+    fn test_bkv_result_failure() { let r = BkvCommandResult { success: false, message: Some("No formatter".into()), output: None }; assert!(!r.success); }
+    #[test]
+    fn test_bkv_keybinding_match() { let m = BkvKeybindingMatch { command_id: "editor.action.commentLine".into(), when_clause: Some("editorTextFocus".into()), priority: 100 }; assert_eq!(m.priority, 100); }
+    #[test]
+    fn test_bkv_keybinding_no_when() { let m = BkvKeybindingMatch { command_id: "workbench.action.quit".into(), when_clause: None, priority: 0 }; assert!(m.when_clause.is_none()); }
+    #[test]
+    fn test_bkv_empty_history() { let h = BkvCommandHistory { entries: vec![], max_size: 50 }; assert!(h.entries.is_empty()); }
+    #[test]
+    fn test_bkv_history_with_entries() { let h = BkvCommandHistory { entries: vec!["cmd1".into(), "cmd2".into()], max_size: 50 }; assert_eq!(h.entries.len(), 2); }
+    #[test]
+    fn test_bkw_line_addition() { let d = BkwLineDiff { original_start: 5, original_count: 0, modified_start: 5, modified_count: 3 }; assert_eq!(d.original_count, 0); }
+    #[test]
+    fn test_bkw_line_deletion() { let d = BkwLineDiff { original_start: 10, original_count: 2, modified_start: 10, modified_count: 0 }; assert_eq!(d.modified_count, 0); }
+    #[test]
+    fn test_bkw_line_modification() { let d = BkwLineDiff { original_start: 3, original_count: 1, modified_start: 3, modified_count: 1 }; assert_eq!(d.original_count, d.modified_count); }
+    #[test]
+    fn test_bkw_char_change() { let c = BkwCharChange { original_start: 5, original_end: 10, modified_start: 5, modified_end: 12 }; assert_eq!(c.modified_end - c.modified_start, 7); }
+    #[test]
+    fn test_bkw_inline_diff() { let c = BkwCharChange { original_start: 0, original_end: 3, modified_start: 0, modified_end: 5 }; let d = BkwInlineDiff { line: 5, original_text: "abc".into(), modified_text: "abcde".into(), char_changes: vec![c] }; assert_eq!(d.char_changes.len(), 1); }
+    #[test]
+    fn test_bkw_decoration_added() { let d = BkwDiffDecoration { start_line: 10, end_line: 12, kind: 1, color: 0x00FF00 }; assert_eq!(d.kind, 1); }
+    #[test]
+    fn test_bkw_decoration_removed() { let d = BkwDiffDecoration { start_line: 5, end_line: 7, kind: 2, color: 0xFF0000 }; assert_eq!(d.kind, 2); }
+    #[test]
+    fn test_bkw_identical_result() { let r = BkwDiffResult { line_diffs: vec![], identical: true, change_count: 0 }; assert!(r.identical); }
+    #[test]
+    fn test_bkw_changed_result() { let d = BkwLineDiff { original_start: 0, original_count: 1, modified_start: 0, modified_count: 2 }; let r = BkwDiffResult { line_diffs: vec![d], identical: false, change_count: 1 }; assert!(!r.identical); }
+    #[test]
+    fn test_bkw_multi_change() { let diffs: Vec<BkwLineDiff> = (0..5).map(|i| BkwLineDiff { original_start: i * 10, original_count: 1, modified_start: i * 10, modified_count: 1 }).collect(); let r = BkwDiffResult { line_diffs: diffs, identical: false, change_count: 5 }; assert_eq!(r.change_count, 5); }
+    #[test]
+    fn test_bkx_test_item() { let t = BkxTestItem { id: "test1".into(), label: "it works".into(), uri: Some("file:///a.rs".into()), line: Some(10), can_resolve: true }; assert!(t.can_resolve); }
+    #[test]
+    fn test_bkx_test_item_no_uri() { let t = BkxTestItem { id: "t2".into(), label: "test".into(), uri: None, line: None, can_resolve: false }; assert!(t.uri.is_none()); }
+    #[test]
+    fn test_bkx_result_passed() { let r = BkxTestResult { test_id: "t1".into(), state: 1, duration_ms: 50, message: None }; assert_eq!(r.state, 1); }
+    #[test]
+    fn test_bkx_result_failed() { let r = BkxTestResult { test_id: "t2".into(), state: 2, duration_ms: 100, message: Some("assertion failed".into()) }; assert_eq!(r.state, 2); }
+    #[test]
+    fn test_bkx_coverage() { let c = BkxTestCoverage { file: "lib.rs".into(), covered_lines: vec![1, 2, 3], uncovered_lines: vec![5], branch_coverage: 0.75 }; assert_eq!(c.branch_coverage, 0.75); }
+    #[test]
+    fn test_bkx_full_coverage() { let c = BkxTestCoverage { file: "a.rs".into(), covered_lines: vec![1, 2, 3, 4, 5], uncovered_lines: vec![], branch_coverage: 1.0 }; assert!(c.uncovered_lines.is_empty()); }
+    #[test]
+    fn test_bkx_run_profile() { let p = BkxTestRunProfile { id: "p1".into(), label: "Run Tests".into(), kind: 1, is_default: true }; assert!(p.is_default); }
+    #[test]
+    fn test_bkx_debug_profile() { let p = BkxTestRunProfile { id: "p2".into(), label: "Debug Tests".into(), kind: 2, is_default: false }; assert_eq!(p.kind, 2); }
+    #[test]
+    fn test_bkx_explorer_idle() { let s = BkxTestExplorerState { items: vec![], running: false, completed: 0, failed: 0 }; assert!(!s.running); }
+    #[test]
+    fn test_bkx_explorer_running() { let t = BkxTestItem { id: "t1".into(), label: "test".into(), uri: None, line: None, can_resolve: false }; let s = BkxTestExplorerState { items: vec![t], running: true, completed: 0, failed: 0 }; assert!(s.running); }
+    #[test]
+    fn test_bky_frame_timing() { let f = BkyFrameTiming { frame_number: 100, render_ms: 8.5, layout_ms: 2.0, paint_ms: 4.0 }; assert!(f.render_ms < 16.0); }
+    #[test]
+    fn test_bky_slow_frame() { let f = BkyFrameTiming { frame_number: 200, render_ms: 25.0, layout_ms: 10.0, paint_ms: 12.0 }; assert!(f.render_ms > 16.0); }
+    #[test]
+    fn test_bky_render_stats() { let s = BkyRenderStats { total_frames: 10000, dropped_frames: 5, avg_fps: 59.95, peak_render_ms: 32.0 }; assert!(s.avg_fps > 59.0); }
+    #[test]
+    fn test_bky_no_dropped() { let s = BkyRenderStats { total_frames: 1000, dropped_frames: 0, avg_fps: 60.0, peak_render_ms: 15.0 }; assert_eq!(s.dropped_frames, 0); }
+    #[test]
+    fn test_bky_memory_usage() { let m = BkyMemoryUsage { heap_bytes: 50_000_000, buffer_bytes: 10_000_000, cache_bytes: 5_000_000 }; assert_eq!(m.heap_bytes, 50_000_000); }
+    #[test]
+    fn test_bky_low_memory() { let m = BkyMemoryUsage { heap_bytes: 1_000_000, buffer_bytes: 500_000, cache_bytes: 100_000 }; assert!(m.heap_bytes < 10_000_000); }
+    #[test]
+    fn test_bky_latency_entry() { let l = BkyLatencyEntry { operation: "keystroke".into(), latency_us: 3500, timestamp: 1000000 }; assert!(l.latency_us < 16000); }
+    #[test]
+    fn test_bky_high_latency() { let l = BkyLatencyEntry { operation: "format".into(), latency_us: 250000, timestamp: 2000000 }; assert!(l.latency_us > 100000); }
+    #[test]
+    fn test_bky_perf_report() { let t = BkyFrameTiming { frame_number: 1, render_ms: 5.0, layout_ms: 1.0, paint_ms: 2.0 }; let s = BkyRenderStats { total_frames: 1, dropped_frames: 0, avg_fps: 60.0, peak_render_ms: 5.0 }; let m = BkyMemoryUsage { heap_bytes: 100, buffer_bytes: 50, cache_bytes: 25 }; let r = BkyPerfReport { timing: t, stats: s, memory: m }; assert_eq!(r.timing.frame_number, 1); }
+    #[test]
+    fn test_bky_zero_paint() { let f = BkyFrameTiming { frame_number: 0, render_ms: 0.0, layout_ms: 0.0, paint_ms: 0.0 }; assert_eq!(f.paint_ms, 0.0); }
+    #[test]
+    fn test_bkz_plugin_descriptor() { let p = BkzPluginDescriptor { id: "ext.rust".into(), name: "Rust".into(), version: "1.0.0".into(), publisher: "rust-lang".into(), activation_events: vec!["onLanguage:rust".into()] }; assert_eq!(p.activation_events.len(), 1); }
+    #[test]
+    fn test_bkz_star_activation() { let p = BkzPluginDescriptor { id: "ext.all".into(), name: "Always".into(), version: "0.1.0".into(), publisher: "test".into(), activation_events: vec!["*".into()] }; assert_eq!(p.activation_events[0], "*"); }
+    #[test]
+    fn test_bkz_activation_event() { let e = BkzActivationEvent { event: "onLanguage".into(), pattern: Some("rust".into()) }; assert!(e.pattern.is_some()); }
+    #[test]
+    fn test_bkz_activation_no_pattern() { let e = BkzActivationEvent { event: "onStartupFinished".into(), pattern: None }; assert!(e.pattern.is_none()); }
+    #[test]
+    fn test_bkz_extension_point() { let p = BkzExtensionPoint { id: "grammars".into(), json_schema: Some("{}".into()), default_content: None }; assert!(p.json_schema.is_some()); }
+    #[test]
+    fn test_bkz_extension_point_empty() { let p = BkzExtensionPoint { id: "custom".into(), json_schema: None, default_content: None }; assert!(p.json_schema.is_none()); }
+    #[test]
+    fn test_bkz_contrib_registration() { let r = BkzContribRegistration { extension_id: "ext.rust".into(), point_id: "grammars".into(), data: "{}".into() }; assert_eq!(r.point_id, "grammars"); }
+    #[test]
+    fn test_bkz_plugin_active() { let s = BkzPluginState { id: "ext.rust".into(), active: true, load_time_ms: 50, error: None }; assert!(s.active); }
+    #[test]
+    fn test_bkz_plugin_error() { let s = BkzPluginState { id: "ext.broken".into(), active: false, load_time_ms: 0, error: Some("load failed".into()) }; assert!(s.error.is_some()); }
+    #[test]
+    fn test_bkz_fast_load() { let s = BkzPluginState { id: "ext.fast".into(), active: true, load_time_ms: 5, error: None }; assert!(s.load_time_ms < 100); }
 }
