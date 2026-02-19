@@ -90058,6 +90058,132 @@ impl SyncConflict {
     }
 }
 
+/// Runtime wiring: bsu_ ExtensionGallery
+#[derive(Debug, Clone)]
+pub struct ExtensionGallery {
+    pub bsu_gallery_id: String,
+    pub bsu_publisher: String,
+    pub bsu_extension_name: String,
+    pub bsu_display_name: String,
+    pub bsu_version: String,
+    pub bsu_install_count: u64,
+    pub bsu_rating: f64,
+    pub bsu_rating_count: u32,
+    pub bsu_categories: Vec<String>,
+    pub bsu_tags: Vec<String>,
+}
+
+impl ExtensionGallery {
+    pub fn bsu_summary(&self) -> String {
+        format!("ExtensionGallery({})", self.bsu_gallery_id)
+    }
+}
+
+/// Runtime wiring: bsv_ ExtensionUpdate
+#[derive(Debug, Clone)]
+pub struct ExtensionUpdate {
+    pub bsv_extension_id: String,
+    pub bsv_current_version: String,
+    pub bsv_target_version: String,
+    pub bsv_changelog: String,
+    pub bsv_is_pre_release: bool,
+    pub bsv_is_auto_update: bool,
+    pub bsv_download_url: String,
+    pub bsv_file_size: u64,
+    pub bsv_update_date: u64,
+    pub bsv_requires_restart: bool,
+}
+
+impl ExtensionUpdate {
+    pub fn bsv_summary(&self) -> String {
+        format!("ExtensionUpdate({})", self.bsv_extension_id)
+    }
+}
+
+/// Runtime wiring: bsw_ ExtensionBisect
+#[derive(Debug, Clone)]
+pub struct ExtensionBisect {
+    pub bsw_is_active: bool,
+    pub bsw_total_extensions: u32,
+    pub bsw_enabled_count: u32,
+    pub bsw_disabled_count: u32,
+    pub bsw_step_number: u32,
+    pub bsw_total_steps: u32,
+    pub bsw_low_index: u32,
+    pub bsw_high_index: u32,
+    pub bsw_result_extension_id: String,
+    pub bsw_is_good: bool,
+}
+
+impl ExtensionBisect {
+    pub fn bsw_summary(&self) -> String {
+        format!("ExtensionBisect({})", self.bsw_is_active)
+    }
+}
+
+/// Runtime wiring: bsx_ LocalizationBundle
+#[derive(Debug, Clone)]
+pub struct LocalizationBundle {
+    pub bsx_locale: String,
+    pub bsx_language_name: String,
+    pub bsx_translation_count: u32,
+    pub bsx_missing_count: u32,
+    pub bsx_bundle_path: String,
+    pub bsx_is_default: bool,
+    pub bsx_extension_id: String,
+    pub bsx_version: String,
+    pub bsx_is_builtin: bool,
+    pub bsx_coverage_percentage: u32,
+}
+
+impl LocalizationBundle {
+    pub fn bsx_summary(&self) -> String {
+        format!("LocalizationBundle({})", self.bsx_locale)
+    }
+}
+
+/// Runtime wiring: bsy_ ProductConfig
+#[derive(Debug, Clone)]
+pub struct ProductConfig {
+    pub bsy_product_name: String,
+    pub bsy_name_short: String,
+    pub bsy_name_long: String,
+    pub bsy_application_name: String,
+    pub bsy_data_folder_name: String,
+    pub bsy_quality: String,
+    pub bsy_commit_hash: String,
+    pub bsy_version_string: String,
+    pub bsy_enable_telemetry: bool,
+    pub bsy_update_url: String,
+}
+
+impl ProductConfig {
+    pub fn bsy_summary(&self) -> String {
+        format!("ProductConfig({})", self.bsy_product_name)
+    }
+}
+
+/// Runtime wiring: bsz_ EnvironmentService
+#[derive(Debug, Clone)]
+pub struct EnvironmentService {
+    pub bsz_user_home: String,
+    pub bsz_app_root: String,
+    pub bsz_user_data_path: String,
+    pub bsz_extensions_path: String,
+    pub bsz_logs_path: String,
+    pub bsz_is_portable: bool,
+    pub bsz_is_built_from_source: bool,
+    pub bsz_verbose_logging: bool,
+    pub bsz_log_level: String,
+    pub bsz_disable_extensions: bool,
+}
+
+impl EnvironmentService {
+    pub fn bsz_summary(&self) -> String {
+        format!("EnvironmentService({})", self.bsz_user_home)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -126433,6 +126559,1091 @@ mod tests_bfo {
         };
         let _ = obj.bst_summary();
         assert_eq!(obj.bst_sync_version, 0);
+    }
+
+    #[test]
+    fn test_bsu_gallery_id() {
+        let obj = ExtensionGallery {
+            bsu_gallery_id: String::from("test"),
+            bsu_publisher: String::from("test"),
+            bsu_extension_name: String::from("test"),
+            bsu_display_name: String::from("test"),
+            bsu_version: String::from("test"),
+            bsu_install_count: 0,
+            bsu_rating: 0.0,
+            bsu_rating_count: 0,
+            bsu_categories: Vec::new(),
+            bsu_tags: Vec::new(),
+        };
+        let _ = obj.bsu_summary();
+        assert_eq!(obj.bsu_gallery_id, "test");
+    }
+
+    #[test]
+    fn test_bsu_publisher() {
+        let obj = ExtensionGallery {
+            bsu_gallery_id: String::from("test"),
+            bsu_publisher: String::from("test"),
+            bsu_extension_name: String::from("test"),
+            bsu_display_name: String::from("test"),
+            bsu_version: String::from("test"),
+            bsu_install_count: 0,
+            bsu_rating: 0.0,
+            bsu_rating_count: 0,
+            bsu_categories: Vec::new(),
+            bsu_tags: Vec::new(),
+        };
+        let _ = obj.bsu_summary();
+        assert_eq!(obj.bsu_publisher, "test");
+    }
+
+    #[test]
+    fn test_bsu_extension_name() {
+        let obj = ExtensionGallery {
+            bsu_gallery_id: String::from("test"),
+            bsu_publisher: String::from("test"),
+            bsu_extension_name: String::from("test"),
+            bsu_display_name: String::from("test"),
+            bsu_version: String::from("test"),
+            bsu_install_count: 0,
+            bsu_rating: 0.0,
+            bsu_rating_count: 0,
+            bsu_categories: Vec::new(),
+            bsu_tags: Vec::new(),
+        };
+        let _ = obj.bsu_summary();
+        assert_eq!(obj.bsu_extension_name, "test");
+    }
+
+    #[test]
+    fn test_bsu_display_name() {
+        let obj = ExtensionGallery {
+            bsu_gallery_id: String::from("test"),
+            bsu_publisher: String::from("test"),
+            bsu_extension_name: String::from("test"),
+            bsu_display_name: String::from("test"),
+            bsu_version: String::from("test"),
+            bsu_install_count: 0,
+            bsu_rating: 0.0,
+            bsu_rating_count: 0,
+            bsu_categories: Vec::new(),
+            bsu_tags: Vec::new(),
+        };
+        let _ = obj.bsu_summary();
+        assert_eq!(obj.bsu_display_name, "test");
+    }
+
+    #[test]
+    fn test_bsu_version() {
+        let obj = ExtensionGallery {
+            bsu_gallery_id: String::from("test"),
+            bsu_publisher: String::from("test"),
+            bsu_extension_name: String::from("test"),
+            bsu_display_name: String::from("test"),
+            bsu_version: String::from("test"),
+            bsu_install_count: 0,
+            bsu_rating: 0.0,
+            bsu_rating_count: 0,
+            bsu_categories: Vec::new(),
+            bsu_tags: Vec::new(),
+        };
+        let _ = obj.bsu_summary();
+        assert_eq!(obj.bsu_version, "test");
+    }
+
+    #[test]
+    fn test_bsu_install_count() {
+        let obj = ExtensionGallery {
+            bsu_gallery_id: String::from("test"),
+            bsu_publisher: String::from("test"),
+            bsu_extension_name: String::from("test"),
+            bsu_display_name: String::from("test"),
+            bsu_version: String::from("test"),
+            bsu_install_count: 0,
+            bsu_rating: 0.0,
+            bsu_rating_count: 0,
+            bsu_categories: Vec::new(),
+            bsu_tags: Vec::new(),
+        };
+        let _ = obj.bsu_summary();
+        assert_eq!(obj.bsu_install_count, 0);
+    }
+
+    #[test]
+    fn test_bsu_rating() {
+        let obj = ExtensionGallery {
+            bsu_gallery_id: String::from("test"),
+            bsu_publisher: String::from("test"),
+            bsu_extension_name: String::from("test"),
+            bsu_display_name: String::from("test"),
+            bsu_version: String::from("test"),
+            bsu_install_count: 0,
+            bsu_rating: 0.0,
+            bsu_rating_count: 0,
+            bsu_categories: Vec::new(),
+            bsu_tags: Vec::new(),
+        };
+        let _ = obj.bsu_summary();
+        assert!((obj.bsu_rating - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_bsu_rating_count() {
+        let obj = ExtensionGallery {
+            bsu_gallery_id: String::from("test"),
+            bsu_publisher: String::from("test"),
+            bsu_extension_name: String::from("test"),
+            bsu_display_name: String::from("test"),
+            bsu_version: String::from("test"),
+            bsu_install_count: 0,
+            bsu_rating: 0.0,
+            bsu_rating_count: 0,
+            bsu_categories: Vec::new(),
+            bsu_tags: Vec::new(),
+        };
+        let _ = obj.bsu_summary();
+        assert_eq!(obj.bsu_rating_count, 0);
+    }
+
+    #[test]
+    fn test_bsu_categories() {
+        let obj = ExtensionGallery {
+            bsu_gallery_id: String::from("test"),
+            bsu_publisher: String::from("test"),
+            bsu_extension_name: String::from("test"),
+            bsu_display_name: String::from("test"),
+            bsu_version: String::from("test"),
+            bsu_install_count: 0,
+            bsu_rating: 0.0,
+            bsu_rating_count: 0,
+            bsu_categories: Vec::new(),
+            bsu_tags: Vec::new(),
+        };
+        let _ = obj.bsu_summary();
+        assert!(obj.bsu_categories.is_empty());
+    }
+
+    #[test]
+    fn test_bsu_tags() {
+        let obj = ExtensionGallery {
+            bsu_gallery_id: String::from("test"),
+            bsu_publisher: String::from("test"),
+            bsu_extension_name: String::from("test"),
+            bsu_display_name: String::from("test"),
+            bsu_version: String::from("test"),
+            bsu_install_count: 0,
+            bsu_rating: 0.0,
+            bsu_rating_count: 0,
+            bsu_categories: Vec::new(),
+            bsu_tags: Vec::new(),
+        };
+        let _ = obj.bsu_summary();
+        assert!(obj.bsu_tags.is_empty());
+    }
+
+
+    #[test]
+    fn test_bsv_extension_id() {
+        let obj = ExtensionUpdate {
+            bsv_extension_id: String::from("test"),
+            bsv_current_version: String::from("test"),
+            bsv_target_version: String::from("test"),
+            bsv_changelog: String::from("test"),
+            bsv_is_pre_release: false,
+            bsv_is_auto_update: false,
+            bsv_download_url: String::from("test"),
+            bsv_file_size: 0,
+            bsv_update_date: 0,
+            bsv_requires_restart: false,
+        };
+        let _ = obj.bsv_summary();
+        assert_eq!(obj.bsv_extension_id, "test");
+    }
+
+    #[test]
+    fn test_bsv_current_version() {
+        let obj = ExtensionUpdate {
+            bsv_extension_id: String::from("test"),
+            bsv_current_version: String::from("test"),
+            bsv_target_version: String::from("test"),
+            bsv_changelog: String::from("test"),
+            bsv_is_pre_release: false,
+            bsv_is_auto_update: false,
+            bsv_download_url: String::from("test"),
+            bsv_file_size: 0,
+            bsv_update_date: 0,
+            bsv_requires_restart: false,
+        };
+        let _ = obj.bsv_summary();
+        assert_eq!(obj.bsv_current_version, "test");
+    }
+
+    #[test]
+    fn test_bsv_target_version() {
+        let obj = ExtensionUpdate {
+            bsv_extension_id: String::from("test"),
+            bsv_current_version: String::from("test"),
+            bsv_target_version: String::from("test"),
+            bsv_changelog: String::from("test"),
+            bsv_is_pre_release: false,
+            bsv_is_auto_update: false,
+            bsv_download_url: String::from("test"),
+            bsv_file_size: 0,
+            bsv_update_date: 0,
+            bsv_requires_restart: false,
+        };
+        let _ = obj.bsv_summary();
+        assert_eq!(obj.bsv_target_version, "test");
+    }
+
+    #[test]
+    fn test_bsv_changelog() {
+        let obj = ExtensionUpdate {
+            bsv_extension_id: String::from("test"),
+            bsv_current_version: String::from("test"),
+            bsv_target_version: String::from("test"),
+            bsv_changelog: String::from("test"),
+            bsv_is_pre_release: false,
+            bsv_is_auto_update: false,
+            bsv_download_url: String::from("test"),
+            bsv_file_size: 0,
+            bsv_update_date: 0,
+            bsv_requires_restart: false,
+        };
+        let _ = obj.bsv_summary();
+        assert_eq!(obj.bsv_changelog, "test");
+    }
+
+    #[test]
+    fn test_bsv_is_pre_release() {
+        let obj = ExtensionUpdate {
+            bsv_extension_id: String::from("test"),
+            bsv_current_version: String::from("test"),
+            bsv_target_version: String::from("test"),
+            bsv_changelog: String::from("test"),
+            bsv_is_pre_release: false,
+            bsv_is_auto_update: false,
+            bsv_download_url: String::from("test"),
+            bsv_file_size: 0,
+            bsv_update_date: 0,
+            bsv_requires_restart: false,
+        };
+        let _ = obj.bsv_summary();
+        assert!(!obj.bsv_is_pre_release);
+    }
+
+    #[test]
+    fn test_bsv_is_auto_update() {
+        let obj = ExtensionUpdate {
+            bsv_extension_id: String::from("test"),
+            bsv_current_version: String::from("test"),
+            bsv_target_version: String::from("test"),
+            bsv_changelog: String::from("test"),
+            bsv_is_pre_release: false,
+            bsv_is_auto_update: false,
+            bsv_download_url: String::from("test"),
+            bsv_file_size: 0,
+            bsv_update_date: 0,
+            bsv_requires_restart: false,
+        };
+        let _ = obj.bsv_summary();
+        assert!(!obj.bsv_is_auto_update);
+    }
+
+    #[test]
+    fn test_bsv_download_url() {
+        let obj = ExtensionUpdate {
+            bsv_extension_id: String::from("test"),
+            bsv_current_version: String::from("test"),
+            bsv_target_version: String::from("test"),
+            bsv_changelog: String::from("test"),
+            bsv_is_pre_release: false,
+            bsv_is_auto_update: false,
+            bsv_download_url: String::from("test"),
+            bsv_file_size: 0,
+            bsv_update_date: 0,
+            bsv_requires_restart: false,
+        };
+        let _ = obj.bsv_summary();
+        assert_eq!(obj.bsv_download_url, "test");
+    }
+
+    #[test]
+    fn test_bsv_file_size() {
+        let obj = ExtensionUpdate {
+            bsv_extension_id: String::from("test"),
+            bsv_current_version: String::from("test"),
+            bsv_target_version: String::from("test"),
+            bsv_changelog: String::from("test"),
+            bsv_is_pre_release: false,
+            bsv_is_auto_update: false,
+            bsv_download_url: String::from("test"),
+            bsv_file_size: 0,
+            bsv_update_date: 0,
+            bsv_requires_restart: false,
+        };
+        let _ = obj.bsv_summary();
+        assert_eq!(obj.bsv_file_size, 0);
+    }
+
+    #[test]
+    fn test_bsv_update_date() {
+        let obj = ExtensionUpdate {
+            bsv_extension_id: String::from("test"),
+            bsv_current_version: String::from("test"),
+            bsv_target_version: String::from("test"),
+            bsv_changelog: String::from("test"),
+            bsv_is_pre_release: false,
+            bsv_is_auto_update: false,
+            bsv_download_url: String::from("test"),
+            bsv_file_size: 0,
+            bsv_update_date: 0,
+            bsv_requires_restart: false,
+        };
+        let _ = obj.bsv_summary();
+        assert_eq!(obj.bsv_update_date, 0);
+    }
+
+    #[test]
+    fn test_bsv_requires_restart() {
+        let obj = ExtensionUpdate {
+            bsv_extension_id: String::from("test"),
+            bsv_current_version: String::from("test"),
+            bsv_target_version: String::from("test"),
+            bsv_changelog: String::from("test"),
+            bsv_is_pre_release: false,
+            bsv_is_auto_update: false,
+            bsv_download_url: String::from("test"),
+            bsv_file_size: 0,
+            bsv_update_date: 0,
+            bsv_requires_restart: false,
+        };
+        let _ = obj.bsv_summary();
+        assert!(!obj.bsv_requires_restart);
+    }
+
+
+    #[test]
+    fn test_bsw_is_active() {
+        let obj = ExtensionBisect {
+            bsw_is_active: false,
+            bsw_total_extensions: 0,
+            bsw_enabled_count: 0,
+            bsw_disabled_count: 0,
+            bsw_step_number: 0,
+            bsw_total_steps: 0,
+            bsw_low_index: 0,
+            bsw_high_index: 0,
+            bsw_result_extension_id: String::from("test"),
+            bsw_is_good: false,
+        };
+        let _ = obj.bsw_summary();
+        assert!(!obj.bsw_is_active);
+    }
+
+    #[test]
+    fn test_bsw_total_extensions() {
+        let obj = ExtensionBisect {
+            bsw_is_active: false,
+            bsw_total_extensions: 0,
+            bsw_enabled_count: 0,
+            bsw_disabled_count: 0,
+            bsw_step_number: 0,
+            bsw_total_steps: 0,
+            bsw_low_index: 0,
+            bsw_high_index: 0,
+            bsw_result_extension_id: String::from("test"),
+            bsw_is_good: false,
+        };
+        let _ = obj.bsw_summary();
+        assert_eq!(obj.bsw_total_extensions, 0);
+    }
+
+    #[test]
+    fn test_bsw_enabled_count() {
+        let obj = ExtensionBisect {
+            bsw_is_active: false,
+            bsw_total_extensions: 0,
+            bsw_enabled_count: 0,
+            bsw_disabled_count: 0,
+            bsw_step_number: 0,
+            bsw_total_steps: 0,
+            bsw_low_index: 0,
+            bsw_high_index: 0,
+            bsw_result_extension_id: String::from("test"),
+            bsw_is_good: false,
+        };
+        let _ = obj.bsw_summary();
+        assert_eq!(obj.bsw_enabled_count, 0);
+    }
+
+    #[test]
+    fn test_bsw_disabled_count() {
+        let obj = ExtensionBisect {
+            bsw_is_active: false,
+            bsw_total_extensions: 0,
+            bsw_enabled_count: 0,
+            bsw_disabled_count: 0,
+            bsw_step_number: 0,
+            bsw_total_steps: 0,
+            bsw_low_index: 0,
+            bsw_high_index: 0,
+            bsw_result_extension_id: String::from("test"),
+            bsw_is_good: false,
+        };
+        let _ = obj.bsw_summary();
+        assert_eq!(obj.bsw_disabled_count, 0);
+    }
+
+    #[test]
+    fn test_bsw_step_number() {
+        let obj = ExtensionBisect {
+            bsw_is_active: false,
+            bsw_total_extensions: 0,
+            bsw_enabled_count: 0,
+            bsw_disabled_count: 0,
+            bsw_step_number: 0,
+            bsw_total_steps: 0,
+            bsw_low_index: 0,
+            bsw_high_index: 0,
+            bsw_result_extension_id: String::from("test"),
+            bsw_is_good: false,
+        };
+        let _ = obj.bsw_summary();
+        assert_eq!(obj.bsw_step_number, 0);
+    }
+
+    #[test]
+    fn test_bsw_total_steps() {
+        let obj = ExtensionBisect {
+            bsw_is_active: false,
+            bsw_total_extensions: 0,
+            bsw_enabled_count: 0,
+            bsw_disabled_count: 0,
+            bsw_step_number: 0,
+            bsw_total_steps: 0,
+            bsw_low_index: 0,
+            bsw_high_index: 0,
+            bsw_result_extension_id: String::from("test"),
+            bsw_is_good: false,
+        };
+        let _ = obj.bsw_summary();
+        assert_eq!(obj.bsw_total_steps, 0);
+    }
+
+    #[test]
+    fn test_bsw_low_index() {
+        let obj = ExtensionBisect {
+            bsw_is_active: false,
+            bsw_total_extensions: 0,
+            bsw_enabled_count: 0,
+            bsw_disabled_count: 0,
+            bsw_step_number: 0,
+            bsw_total_steps: 0,
+            bsw_low_index: 0,
+            bsw_high_index: 0,
+            bsw_result_extension_id: String::from("test"),
+            bsw_is_good: false,
+        };
+        let _ = obj.bsw_summary();
+        assert_eq!(obj.bsw_low_index, 0);
+    }
+
+    #[test]
+    fn test_bsw_high_index() {
+        let obj = ExtensionBisect {
+            bsw_is_active: false,
+            bsw_total_extensions: 0,
+            bsw_enabled_count: 0,
+            bsw_disabled_count: 0,
+            bsw_step_number: 0,
+            bsw_total_steps: 0,
+            bsw_low_index: 0,
+            bsw_high_index: 0,
+            bsw_result_extension_id: String::from("test"),
+            bsw_is_good: false,
+        };
+        let _ = obj.bsw_summary();
+        assert_eq!(obj.bsw_high_index, 0);
+    }
+
+    #[test]
+    fn test_bsw_result_extension_id() {
+        let obj = ExtensionBisect {
+            bsw_is_active: false,
+            bsw_total_extensions: 0,
+            bsw_enabled_count: 0,
+            bsw_disabled_count: 0,
+            bsw_step_number: 0,
+            bsw_total_steps: 0,
+            bsw_low_index: 0,
+            bsw_high_index: 0,
+            bsw_result_extension_id: String::from("test"),
+            bsw_is_good: false,
+        };
+        let _ = obj.bsw_summary();
+        assert_eq!(obj.bsw_result_extension_id, "test");
+    }
+
+    #[test]
+    fn test_bsw_is_good() {
+        let obj = ExtensionBisect {
+            bsw_is_active: false,
+            bsw_total_extensions: 0,
+            bsw_enabled_count: 0,
+            bsw_disabled_count: 0,
+            bsw_step_number: 0,
+            bsw_total_steps: 0,
+            bsw_low_index: 0,
+            bsw_high_index: 0,
+            bsw_result_extension_id: String::from("test"),
+            bsw_is_good: false,
+        };
+        let _ = obj.bsw_summary();
+        assert!(!obj.bsw_is_good);
+    }
+
+
+    #[test]
+    fn test_bsx_locale() {
+        let obj = LocalizationBundle {
+            bsx_locale: String::from("test"),
+            bsx_language_name: String::from("test"),
+            bsx_translation_count: 0,
+            bsx_missing_count: 0,
+            bsx_bundle_path: String::from("test"),
+            bsx_is_default: false,
+            bsx_extension_id: String::from("test"),
+            bsx_version: String::from("test"),
+            bsx_is_builtin: false,
+            bsx_coverage_percentage: 0,
+        };
+        let _ = obj.bsx_summary();
+        assert_eq!(obj.bsx_locale, "test");
+    }
+
+    #[test]
+    fn test_bsx_language_name() {
+        let obj = LocalizationBundle {
+            bsx_locale: String::from("test"),
+            bsx_language_name: String::from("test"),
+            bsx_translation_count: 0,
+            bsx_missing_count: 0,
+            bsx_bundle_path: String::from("test"),
+            bsx_is_default: false,
+            bsx_extension_id: String::from("test"),
+            bsx_version: String::from("test"),
+            bsx_is_builtin: false,
+            bsx_coverage_percentage: 0,
+        };
+        let _ = obj.bsx_summary();
+        assert_eq!(obj.bsx_language_name, "test");
+    }
+
+    #[test]
+    fn test_bsx_translation_count() {
+        let obj = LocalizationBundle {
+            bsx_locale: String::from("test"),
+            bsx_language_name: String::from("test"),
+            bsx_translation_count: 0,
+            bsx_missing_count: 0,
+            bsx_bundle_path: String::from("test"),
+            bsx_is_default: false,
+            bsx_extension_id: String::from("test"),
+            bsx_version: String::from("test"),
+            bsx_is_builtin: false,
+            bsx_coverage_percentage: 0,
+        };
+        let _ = obj.bsx_summary();
+        assert_eq!(obj.bsx_translation_count, 0);
+    }
+
+    #[test]
+    fn test_bsx_missing_count() {
+        let obj = LocalizationBundle {
+            bsx_locale: String::from("test"),
+            bsx_language_name: String::from("test"),
+            bsx_translation_count: 0,
+            bsx_missing_count: 0,
+            bsx_bundle_path: String::from("test"),
+            bsx_is_default: false,
+            bsx_extension_id: String::from("test"),
+            bsx_version: String::from("test"),
+            bsx_is_builtin: false,
+            bsx_coverage_percentage: 0,
+        };
+        let _ = obj.bsx_summary();
+        assert_eq!(obj.bsx_missing_count, 0);
+    }
+
+    #[test]
+    fn test_bsx_bundle_path() {
+        let obj = LocalizationBundle {
+            bsx_locale: String::from("test"),
+            bsx_language_name: String::from("test"),
+            bsx_translation_count: 0,
+            bsx_missing_count: 0,
+            bsx_bundle_path: String::from("test"),
+            bsx_is_default: false,
+            bsx_extension_id: String::from("test"),
+            bsx_version: String::from("test"),
+            bsx_is_builtin: false,
+            bsx_coverage_percentage: 0,
+        };
+        let _ = obj.bsx_summary();
+        assert_eq!(obj.bsx_bundle_path, "test");
+    }
+
+    #[test]
+    fn test_bsx_is_default() {
+        let obj = LocalizationBundle {
+            bsx_locale: String::from("test"),
+            bsx_language_name: String::from("test"),
+            bsx_translation_count: 0,
+            bsx_missing_count: 0,
+            bsx_bundle_path: String::from("test"),
+            bsx_is_default: false,
+            bsx_extension_id: String::from("test"),
+            bsx_version: String::from("test"),
+            bsx_is_builtin: false,
+            bsx_coverage_percentage: 0,
+        };
+        let _ = obj.bsx_summary();
+        assert!(!obj.bsx_is_default);
+    }
+
+    #[test]
+    fn test_bsx_extension_id() {
+        let obj = LocalizationBundle {
+            bsx_locale: String::from("test"),
+            bsx_language_name: String::from("test"),
+            bsx_translation_count: 0,
+            bsx_missing_count: 0,
+            bsx_bundle_path: String::from("test"),
+            bsx_is_default: false,
+            bsx_extension_id: String::from("test"),
+            bsx_version: String::from("test"),
+            bsx_is_builtin: false,
+            bsx_coverage_percentage: 0,
+        };
+        let _ = obj.bsx_summary();
+        assert_eq!(obj.bsx_extension_id, "test");
+    }
+
+    #[test]
+    fn test_bsx_version() {
+        let obj = LocalizationBundle {
+            bsx_locale: String::from("test"),
+            bsx_language_name: String::from("test"),
+            bsx_translation_count: 0,
+            bsx_missing_count: 0,
+            bsx_bundle_path: String::from("test"),
+            bsx_is_default: false,
+            bsx_extension_id: String::from("test"),
+            bsx_version: String::from("test"),
+            bsx_is_builtin: false,
+            bsx_coverage_percentage: 0,
+        };
+        let _ = obj.bsx_summary();
+        assert_eq!(obj.bsx_version, "test");
+    }
+
+    #[test]
+    fn test_bsx_is_builtin() {
+        let obj = LocalizationBundle {
+            bsx_locale: String::from("test"),
+            bsx_language_name: String::from("test"),
+            bsx_translation_count: 0,
+            bsx_missing_count: 0,
+            bsx_bundle_path: String::from("test"),
+            bsx_is_default: false,
+            bsx_extension_id: String::from("test"),
+            bsx_version: String::from("test"),
+            bsx_is_builtin: false,
+            bsx_coverage_percentage: 0,
+        };
+        let _ = obj.bsx_summary();
+        assert!(!obj.bsx_is_builtin);
+    }
+
+    #[test]
+    fn test_bsx_coverage_percentage() {
+        let obj = LocalizationBundle {
+            bsx_locale: String::from("test"),
+            bsx_language_name: String::from("test"),
+            bsx_translation_count: 0,
+            bsx_missing_count: 0,
+            bsx_bundle_path: String::from("test"),
+            bsx_is_default: false,
+            bsx_extension_id: String::from("test"),
+            bsx_version: String::from("test"),
+            bsx_is_builtin: false,
+            bsx_coverage_percentage: 0,
+        };
+        let _ = obj.bsx_summary();
+        assert_eq!(obj.bsx_coverage_percentage, 0);
+    }
+
+
+    #[test]
+    fn test_bsy_product_name() {
+        let obj = ProductConfig {
+            bsy_product_name: String::from("test"),
+            bsy_name_short: String::from("test"),
+            bsy_name_long: String::from("test"),
+            bsy_application_name: String::from("test"),
+            bsy_data_folder_name: String::from("test"),
+            bsy_quality: String::from("test"),
+            bsy_commit_hash: String::from("test"),
+            bsy_version_string: String::from("test"),
+            bsy_enable_telemetry: false,
+            bsy_update_url: String::from("test"),
+        };
+        let _ = obj.bsy_summary();
+        assert_eq!(obj.bsy_product_name, "test");
+    }
+
+    #[test]
+    fn test_bsy_name_short() {
+        let obj = ProductConfig {
+            bsy_product_name: String::from("test"),
+            bsy_name_short: String::from("test"),
+            bsy_name_long: String::from("test"),
+            bsy_application_name: String::from("test"),
+            bsy_data_folder_name: String::from("test"),
+            bsy_quality: String::from("test"),
+            bsy_commit_hash: String::from("test"),
+            bsy_version_string: String::from("test"),
+            bsy_enable_telemetry: false,
+            bsy_update_url: String::from("test"),
+        };
+        let _ = obj.bsy_summary();
+        assert_eq!(obj.bsy_name_short, "test");
+    }
+
+    #[test]
+    fn test_bsy_name_long() {
+        let obj = ProductConfig {
+            bsy_product_name: String::from("test"),
+            bsy_name_short: String::from("test"),
+            bsy_name_long: String::from("test"),
+            bsy_application_name: String::from("test"),
+            bsy_data_folder_name: String::from("test"),
+            bsy_quality: String::from("test"),
+            bsy_commit_hash: String::from("test"),
+            bsy_version_string: String::from("test"),
+            bsy_enable_telemetry: false,
+            bsy_update_url: String::from("test"),
+        };
+        let _ = obj.bsy_summary();
+        assert_eq!(obj.bsy_name_long, "test");
+    }
+
+    #[test]
+    fn test_bsy_application_name() {
+        let obj = ProductConfig {
+            bsy_product_name: String::from("test"),
+            bsy_name_short: String::from("test"),
+            bsy_name_long: String::from("test"),
+            bsy_application_name: String::from("test"),
+            bsy_data_folder_name: String::from("test"),
+            bsy_quality: String::from("test"),
+            bsy_commit_hash: String::from("test"),
+            bsy_version_string: String::from("test"),
+            bsy_enable_telemetry: false,
+            bsy_update_url: String::from("test"),
+        };
+        let _ = obj.bsy_summary();
+        assert_eq!(obj.bsy_application_name, "test");
+    }
+
+    #[test]
+    fn test_bsy_data_folder_name() {
+        let obj = ProductConfig {
+            bsy_product_name: String::from("test"),
+            bsy_name_short: String::from("test"),
+            bsy_name_long: String::from("test"),
+            bsy_application_name: String::from("test"),
+            bsy_data_folder_name: String::from("test"),
+            bsy_quality: String::from("test"),
+            bsy_commit_hash: String::from("test"),
+            bsy_version_string: String::from("test"),
+            bsy_enable_telemetry: false,
+            bsy_update_url: String::from("test"),
+        };
+        let _ = obj.bsy_summary();
+        assert_eq!(obj.bsy_data_folder_name, "test");
+    }
+
+    #[test]
+    fn test_bsy_quality() {
+        let obj = ProductConfig {
+            bsy_product_name: String::from("test"),
+            bsy_name_short: String::from("test"),
+            bsy_name_long: String::from("test"),
+            bsy_application_name: String::from("test"),
+            bsy_data_folder_name: String::from("test"),
+            bsy_quality: String::from("test"),
+            bsy_commit_hash: String::from("test"),
+            bsy_version_string: String::from("test"),
+            bsy_enable_telemetry: false,
+            bsy_update_url: String::from("test"),
+        };
+        let _ = obj.bsy_summary();
+        assert_eq!(obj.bsy_quality, "test");
+    }
+
+    #[test]
+    fn test_bsy_commit_hash() {
+        let obj = ProductConfig {
+            bsy_product_name: String::from("test"),
+            bsy_name_short: String::from("test"),
+            bsy_name_long: String::from("test"),
+            bsy_application_name: String::from("test"),
+            bsy_data_folder_name: String::from("test"),
+            bsy_quality: String::from("test"),
+            bsy_commit_hash: String::from("test"),
+            bsy_version_string: String::from("test"),
+            bsy_enable_telemetry: false,
+            bsy_update_url: String::from("test"),
+        };
+        let _ = obj.bsy_summary();
+        assert_eq!(obj.bsy_commit_hash, "test");
+    }
+
+    #[test]
+    fn test_bsy_version_string() {
+        let obj = ProductConfig {
+            bsy_product_name: String::from("test"),
+            bsy_name_short: String::from("test"),
+            bsy_name_long: String::from("test"),
+            bsy_application_name: String::from("test"),
+            bsy_data_folder_name: String::from("test"),
+            bsy_quality: String::from("test"),
+            bsy_commit_hash: String::from("test"),
+            bsy_version_string: String::from("test"),
+            bsy_enable_telemetry: false,
+            bsy_update_url: String::from("test"),
+        };
+        let _ = obj.bsy_summary();
+        assert_eq!(obj.bsy_version_string, "test");
+    }
+
+    #[test]
+    fn test_bsy_enable_telemetry() {
+        let obj = ProductConfig {
+            bsy_product_name: String::from("test"),
+            bsy_name_short: String::from("test"),
+            bsy_name_long: String::from("test"),
+            bsy_application_name: String::from("test"),
+            bsy_data_folder_name: String::from("test"),
+            bsy_quality: String::from("test"),
+            bsy_commit_hash: String::from("test"),
+            bsy_version_string: String::from("test"),
+            bsy_enable_telemetry: false,
+            bsy_update_url: String::from("test"),
+        };
+        let _ = obj.bsy_summary();
+        assert!(!obj.bsy_enable_telemetry);
+    }
+
+    #[test]
+    fn test_bsy_update_url() {
+        let obj = ProductConfig {
+            bsy_product_name: String::from("test"),
+            bsy_name_short: String::from("test"),
+            bsy_name_long: String::from("test"),
+            bsy_application_name: String::from("test"),
+            bsy_data_folder_name: String::from("test"),
+            bsy_quality: String::from("test"),
+            bsy_commit_hash: String::from("test"),
+            bsy_version_string: String::from("test"),
+            bsy_enable_telemetry: false,
+            bsy_update_url: String::from("test"),
+        };
+        let _ = obj.bsy_summary();
+        assert_eq!(obj.bsy_update_url, "test");
+    }
+
+
+    #[test]
+    fn test_bsz_user_home() {
+        let obj = EnvironmentService {
+            bsz_user_home: String::from("test"),
+            bsz_app_root: String::from("test"),
+            bsz_user_data_path: String::from("test"),
+            bsz_extensions_path: String::from("test"),
+            bsz_logs_path: String::from("test"),
+            bsz_is_portable: false,
+            bsz_is_built_from_source: false,
+            bsz_verbose_logging: false,
+            bsz_log_level: String::from("test"),
+            bsz_disable_extensions: false,
+        };
+        let _ = obj.bsz_summary();
+        assert_eq!(obj.bsz_user_home, "test");
+    }
+
+    #[test]
+    fn test_bsz_app_root() {
+        let obj = EnvironmentService {
+            bsz_user_home: String::from("test"),
+            bsz_app_root: String::from("test"),
+            bsz_user_data_path: String::from("test"),
+            bsz_extensions_path: String::from("test"),
+            bsz_logs_path: String::from("test"),
+            bsz_is_portable: false,
+            bsz_is_built_from_source: false,
+            bsz_verbose_logging: false,
+            bsz_log_level: String::from("test"),
+            bsz_disable_extensions: false,
+        };
+        let _ = obj.bsz_summary();
+        assert_eq!(obj.bsz_app_root, "test");
+    }
+
+    #[test]
+    fn test_bsz_user_data_path() {
+        let obj = EnvironmentService {
+            bsz_user_home: String::from("test"),
+            bsz_app_root: String::from("test"),
+            bsz_user_data_path: String::from("test"),
+            bsz_extensions_path: String::from("test"),
+            bsz_logs_path: String::from("test"),
+            bsz_is_portable: false,
+            bsz_is_built_from_source: false,
+            bsz_verbose_logging: false,
+            bsz_log_level: String::from("test"),
+            bsz_disable_extensions: false,
+        };
+        let _ = obj.bsz_summary();
+        assert_eq!(obj.bsz_user_data_path, "test");
+    }
+
+    #[test]
+    fn test_bsz_extensions_path() {
+        let obj = EnvironmentService {
+            bsz_user_home: String::from("test"),
+            bsz_app_root: String::from("test"),
+            bsz_user_data_path: String::from("test"),
+            bsz_extensions_path: String::from("test"),
+            bsz_logs_path: String::from("test"),
+            bsz_is_portable: false,
+            bsz_is_built_from_source: false,
+            bsz_verbose_logging: false,
+            bsz_log_level: String::from("test"),
+            bsz_disable_extensions: false,
+        };
+        let _ = obj.bsz_summary();
+        assert_eq!(obj.bsz_extensions_path, "test");
+    }
+
+    #[test]
+    fn test_bsz_logs_path() {
+        let obj = EnvironmentService {
+            bsz_user_home: String::from("test"),
+            bsz_app_root: String::from("test"),
+            bsz_user_data_path: String::from("test"),
+            bsz_extensions_path: String::from("test"),
+            bsz_logs_path: String::from("test"),
+            bsz_is_portable: false,
+            bsz_is_built_from_source: false,
+            bsz_verbose_logging: false,
+            bsz_log_level: String::from("test"),
+            bsz_disable_extensions: false,
+        };
+        let _ = obj.bsz_summary();
+        assert_eq!(obj.bsz_logs_path, "test");
+    }
+
+    #[test]
+    fn test_bsz_is_portable() {
+        let obj = EnvironmentService {
+            bsz_user_home: String::from("test"),
+            bsz_app_root: String::from("test"),
+            bsz_user_data_path: String::from("test"),
+            bsz_extensions_path: String::from("test"),
+            bsz_logs_path: String::from("test"),
+            bsz_is_portable: false,
+            bsz_is_built_from_source: false,
+            bsz_verbose_logging: false,
+            bsz_log_level: String::from("test"),
+            bsz_disable_extensions: false,
+        };
+        let _ = obj.bsz_summary();
+        assert!(!obj.bsz_is_portable);
+    }
+
+    #[test]
+    fn test_bsz_is_built_from_source() {
+        let obj = EnvironmentService {
+            bsz_user_home: String::from("test"),
+            bsz_app_root: String::from("test"),
+            bsz_user_data_path: String::from("test"),
+            bsz_extensions_path: String::from("test"),
+            bsz_logs_path: String::from("test"),
+            bsz_is_portable: false,
+            bsz_is_built_from_source: false,
+            bsz_verbose_logging: false,
+            bsz_log_level: String::from("test"),
+            bsz_disable_extensions: false,
+        };
+        let _ = obj.bsz_summary();
+        assert!(!obj.bsz_is_built_from_source);
+    }
+
+    #[test]
+    fn test_bsz_verbose_logging() {
+        let obj = EnvironmentService {
+            bsz_user_home: String::from("test"),
+            bsz_app_root: String::from("test"),
+            bsz_user_data_path: String::from("test"),
+            bsz_extensions_path: String::from("test"),
+            bsz_logs_path: String::from("test"),
+            bsz_is_portable: false,
+            bsz_is_built_from_source: false,
+            bsz_verbose_logging: false,
+            bsz_log_level: String::from("test"),
+            bsz_disable_extensions: false,
+        };
+        let _ = obj.bsz_summary();
+        assert!(!obj.bsz_verbose_logging);
+    }
+
+    #[test]
+    fn test_bsz_log_level() {
+        let obj = EnvironmentService {
+            bsz_user_home: String::from("test"),
+            bsz_app_root: String::from("test"),
+            bsz_user_data_path: String::from("test"),
+            bsz_extensions_path: String::from("test"),
+            bsz_logs_path: String::from("test"),
+            bsz_is_portable: false,
+            bsz_is_built_from_source: false,
+            bsz_verbose_logging: false,
+            bsz_log_level: String::from("test"),
+            bsz_disable_extensions: false,
+        };
+        let _ = obj.bsz_summary();
+        assert_eq!(obj.bsz_log_level, "test");
+    }
+
+    #[test]
+    fn test_bsz_disable_extensions() {
+        let obj = EnvironmentService {
+            bsz_user_home: String::from("test"),
+            bsz_app_root: String::from("test"),
+            bsz_user_data_path: String::from("test"),
+            bsz_extensions_path: String::from("test"),
+            bsz_logs_path: String::from("test"),
+            bsz_is_portable: false,
+            bsz_is_built_from_source: false,
+            bsz_verbose_logging: false,
+            bsz_log_level: String::from("test"),
+            bsz_disable_extensions: false,
+        };
+        let _ = obj.bsz_summary();
+        assert!(!obj.bsz_disable_extensions);
     }
 
 }
