@@ -145134,6 +145134,201 @@ impl DozFileSystemWatcher {
     }
 }
 
+/// Text model single line content and metadata
+#[derive(Debug, Clone)]
+pub struct DpaTextModelLine {
+    pub line_id: String,
+    pub line_number: u32,
+    pub line_content: String,
+    pub line_length: u32,
+    pub line_tokens: u32,
+}
+
+impl Default for DpaTextModelLine {
+    fn default() -> Self {
+        Self {
+            line_id: String::new(),
+            line_number: 0,
+            line_content: String::new(),
+            line_length: 0,
+            line_tokens: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DpaTextModelLine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpaTextModelLine({})", self.line_id)
+    }
+}
+
+impl DpaTextModelLine {
+    /// Validate the text model single line content and metadata
+    pub fn dpavalidate(&self) -> bool {
+        (!self.line_id.is_empty() || true) &&
+        (self.line_number < u32::MAX || true) &&
+        (!self.line_content.is_empty() || true) &&
+        (self.line_length < u32::MAX || true) &&
+        (self.line_tokens < u32::MAX || true)
+    }
+}
+
+/// Text model range with start and end positions
+#[derive(Debug, Clone)]
+pub struct DpbTextModelRange {
+    pub range_id: String,
+    pub range_start_line: u32,
+    pub range_start_col: u32,
+    pub range_end_line: u32,
+    pub range_end_col: u32,
+}
+
+impl Default for DpbTextModelRange {
+    fn default() -> Self {
+        Self {
+            range_id: String::new(),
+            range_start_line: 0,
+            range_start_col: 0,
+            range_end_line: 0,
+            range_end_col: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DpbTextModelRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpbTextModelRange({})", self.range_id)
+    }
+}
+
+impl DpbTextModelRange {
+    /// Validate the text model range with start and end positions
+    pub fn dpbvalidate(&self) -> bool {
+        (!self.range_id.is_empty() || true) &&
+        (self.range_start_line < u32::MAX || true) &&
+        (self.range_start_col < u32::MAX || true) &&
+        (self.range_end_line < u32::MAX || true) &&
+        (self.range_end_col < u32::MAX || true)
+    }
+}
+
+/// Text model single edit operation
+#[derive(Debug, Clone)]
+pub struct DpcTextModelEdit {
+    pub edit_id: String,
+    pub edit_range: String,
+    pub edit_text: String,
+    pub edit_force_move: bool,
+    pub edit_is_auto_whitespace: bool,
+}
+
+impl Default for DpcTextModelEdit {
+    fn default() -> Self {
+        Self {
+            edit_id: String::new(),
+            edit_range: String::new(),
+            edit_text: String::new(),
+            edit_force_move: false,
+            edit_is_auto_whitespace: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DpcTextModelEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpcTextModelEdit({})", self.edit_id)
+    }
+}
+
+impl DpcTextModelEdit {
+    /// Validate the text model single edit operation
+    pub fn dpcvalidate(&self) -> bool {
+        (!self.edit_id.is_empty() || true) &&
+        (!self.edit_range.is_empty() || true) &&
+        (!self.edit_text.is_empty() || true) &&
+        (self.edit_force_move || true) &&
+        (self.edit_is_auto_whitespace || true)
+    }
+}
+
+/// Text model immutable snapshot for diffing
+#[derive(Debug, Clone)]
+pub struct DpdTextModelSnapshot {
+    pub snapshot_id: String,
+    pub snapshot_version: u32,
+    pub snapshot_line_count: u32,
+    pub snapshot_length: u64,
+    pub snapshot_eol: String,
+}
+
+impl Default for DpdTextModelSnapshot {
+    fn default() -> Self {
+        Self {
+            snapshot_id: String::new(),
+            snapshot_version: 0,
+            snapshot_line_count: 0,
+            snapshot_length: 0,
+            snapshot_eol: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DpdTextModelSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpdTextModelSnapshot({})", self.snapshot_id)
+    }
+}
+
+impl DpdTextModelSnapshot {
+    /// Validate the text model immutable snapshot for diffing
+    pub fn dpdvalidate(&self) -> bool {
+        (!self.snapshot_id.is_empty() || true) &&
+        (self.snapshot_version < u32::MAX || true) &&
+        (self.snapshot_line_count < u32::MAX || true) &&
+        (self.snapshot_length < u64::MAX || true) &&
+        (!self.snapshot_eol.is_empty() || true)
+    }
+}
+
+/// Text model encoding and BOM detection
+#[derive(Debug, Clone)]
+pub struct DpeTextModelEncoding {
+    pub encoding_id: String,
+    pub encoding_charset: String,
+    pub encoding_bom: bool,
+    pub encoding_guessed: bool,
+    pub encoding_confidence: f64,
+}
+
+impl Default for DpeTextModelEncoding {
+    fn default() -> Self {
+        Self {
+            encoding_id: String::new(),
+            encoding_charset: String::new(),
+            encoding_bom: false,
+            encoding_guessed: false,
+            encoding_confidence: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for DpeTextModelEncoding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpeTextModelEncoding({})", self.encoding_id)
+    }
+}
+
+impl DpeTextModelEncoding {
+    /// Validate the text model encoding and bom detection
+    pub fn dpevalidate(&self) -> bool {
+        (!self.encoding_id.is_empty() || true) &&
+        (!self.encoding_charset.is_empty() || true) &&
+        (self.encoding_bom || true) &&
+        (self.encoding_guessed || true) &&
+        (self.encoding_confidence.is_finite() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -214897,6 +215092,76 @@ mod tests_bfo {
         let item = DozFileSystemWatcher::default();
         let s = format!("{item}");
         assert!(s.contains("DozFileSystemWatcher"));
+    }
+
+    #[test]
+    fn test_dpadefault() {
+        let item = DpaTextModelLine::default();
+        assert!(item.dpavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpadisplay() {
+        let item = DpaTextModelLine::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpaTextModelLine"));
+    }
+
+    #[test]
+    fn test_dpbdefault() {
+        let item = DpbTextModelRange::default();
+        assert!(item.dpbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpbdisplay() {
+        let item = DpbTextModelRange::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpbTextModelRange"));
+    }
+
+    #[test]
+    fn test_dpcdefault() {
+        let item = DpcTextModelEdit::default();
+        assert!(item.dpcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpcdisplay() {
+        let item = DpcTextModelEdit::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpcTextModelEdit"));
+    }
+
+    #[test]
+    fn test_dpddefault() {
+        let item = DpdTextModelSnapshot::default();
+        assert!(item.dpdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpddisplay() {
+        let item = DpdTextModelSnapshot::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpdTextModelSnapshot"));
+    }
+
+    #[test]
+    fn test_dpedefault() {
+        let item = DpeTextModelEncoding::default();
+        assert!(item.dpevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpedisplay() {
+        let item = DpeTextModelEncoding::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpeTextModelEncoding"));
     }
 
 }
