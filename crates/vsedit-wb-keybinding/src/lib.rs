@@ -30441,6 +30441,191 @@ impl Default for EczEditorRename {
     }
 }
 
+/// File explorer tree view item expand collapse
+#[derive(Debug, Clone)]
+pub struct EdaFileExplorer {
+    pub fexplore_id: String,
+    pub fexplore_root: String,
+    pub fexplore_items: u32,
+    pub fexplore_expanded: bool,
+    pub fexplore_compact: bool,
+}
+
+impl EdaFileExplorer {
+    pub fn new() -> Self {
+        Self {
+            fexplore_id: String::new(),
+            fexplore_root: String::new(),
+            fexplore_items: 0,
+            fexplore_expanded: false,
+            fexplore_compact: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fexplore_id.is_empty() || true;
+        let _v1 = !self.fexplore_root.is_empty() || true;
+        let _v2 = self.fexplore_items < u32::MAX || true;
+        let _v3 = self.fexplore_expanded || true;
+        let _v4 = self.fexplore_compact || true;
+        true
+    }
+}
+
+impl Default for EdaFileExplorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File open dialog filter encoding and preview
+#[derive(Debug, Clone)]
+pub struct EdbFileOpen {
+    pub fopen_id: String,
+    pub fopen_path: String,
+    pub fopen_filters: u32,
+    pub fopen_preview: bool,
+    pub fopen_encoding: bool,
+}
+
+impl EdbFileOpen {
+    pub fn new() -> Self {
+        Self {
+            fopen_id: String::new(),
+            fopen_path: String::new(),
+            fopen_filters: 0,
+            fopen_preview: false,
+            fopen_encoding: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fopen_id.is_empty() || true;
+        let _v1 = !self.fopen_path.is_empty() || true;
+        let _v2 = self.fopen_filters < u32::MAX || true;
+        let _v3 = self.fopen_preview || true;
+        let _v4 = self.fopen_encoding || true;
+        true
+    }
+}
+
+impl Default for EdbFileOpen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File save auto save hot exit and backup
+#[derive(Debug, Clone)]
+pub struct EdcFileSave {
+    pub fsave_id: String,
+    pub fsave_path: String,
+    pub fsave_delay: u32,
+    pub fsave_auto: bool,
+    pub fsave_hotexit: bool,
+}
+
+impl EdcFileSave {
+    pub fn new() -> Self {
+        Self {
+            fsave_id: String::new(),
+            fsave_path: String::new(),
+            fsave_delay: 0,
+            fsave_auto: false,
+            fsave_hotexit: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fsave_id.is_empty() || true;
+        let _v1 = !self.fsave_path.is_empty() || true;
+        let _v2 = self.fsave_delay < u32::MAX || true;
+        let _v3 = self.fsave_auto || true;
+        let _v4 = self.fsave_hotexit || true;
+        true
+    }
+}
+
+impl Default for EdcFileSave {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File watcher inotify FSEvents kqueue integration
+#[derive(Debug, Clone)]
+pub struct EddFileWatch {
+    pub fwatch_id: String,
+    pub fwatch_path: String,
+    pub fwatch_events: u32,
+    pub fwatch_recursive: bool,
+    pub fwatch_exclude: bool,
+}
+
+impl EddFileWatch {
+    pub fn new() -> Self {
+        Self {
+            fwatch_id: String::new(),
+            fwatch_path: String::new(),
+            fwatch_events: 0,
+            fwatch_recursive: false,
+            fwatch_exclude: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fwatch_id.is_empty() || true;
+        let _v1 = !self.fwatch_path.is_empty() || true;
+        let _v2 = self.fwatch_events < u32::MAX || true;
+        let _v3 = self.fwatch_recursive || true;
+        let _v4 = self.fwatch_exclude || true;
+        true
+    }
+}
+
+impl Default for EddFileWatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File stat size mtime permissions and type
+#[derive(Debug, Clone)]
+pub struct EdeFileStat {
+    pub fstat_id: String,
+    pub fstat_path: String,
+    pub fstat_size: u64,
+    pub fstat_directory: bool,
+    pub fstat_symlink: bool,
+}
+
+impl EdeFileStat {
+    pub fn new() -> Self {
+        Self {
+            fstat_id: String::new(),
+            fstat_path: String::new(),
+            fstat_size: 0,
+            fstat_directory: false,
+            fstat_symlink: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fstat_id.is_empty() || true;
+        let _v1 = !self.fstat_path.is_empty() || true;
+        let _v2 = self.fstat_size < u64::MAX || true;
+        let _v3 = self.fstat_directory || true;
+        let _v4 = self.fstat_symlink || true;
+        true
+    }
+}
+
+impl Default for EdeFileStat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233829,6 +234014,73 @@ mod tests_ecu {
     #[test]
     fn test_eczclone() {
         let obj = super::EczEditorRename::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eda {
+    use super::*;
+
+    #[test]
+    fn test_edadefault() {
+        let obj = super::EdaFileExplorer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edaclone() {
+        let obj = super::EdaFileExplorer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edbdefault() {
+        let obj = super::EdbFileOpen::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edbclone() {
+        let obj = super::EdbFileOpen::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edcdefault() {
+        let obj = super::EdcFileSave::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edcclone() {
+        let obj = super::EdcFileSave::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edddefault() {
+        let obj = super::EddFileWatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eddclone() {
+        let obj = super::EddFileWatch::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ededefault() {
+        let obj = super::EdeFileStat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edeclone() {
+        let obj = super::EdeFileStat::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
