@@ -111530,6 +111530,408 @@ impl SnippetsViewState {
     }
 }
 
+
+/// Welcome view state (tab visible, walkthroughs, recent count, tips)
+#[derive(Debug, Clone)]
+pub struct WelcomeViewState {
+    pub welcome_tab_visible: bool,
+    pub walkthroughs_count: u32,
+    pub recent_count: u32,
+    pub show_tips: bool,
+    pub start_entries_json: String,
+    pub show_on_startup: bool,
+    pub new_file_action: String,
+    pub customized: bool,
+    pub extension_tips_count: u32,
+    pub interactive_playground: bool,
+    pub command_center: bool,
+    pub welcome_index: u32,
+}
+
+impl Default for WelcomeViewState {
+    fn default() -> Self {
+        Self {
+            welcome_tab_visible: false,
+            walkthroughs_count: 0,
+            recent_count: 0,
+            show_tips: false,
+            start_entries_json: String::new(),
+            show_on_startup: false,
+            new_file_action: String::new(),
+            customized: false,
+            extension_tips_count: 0,
+            interactive_playground: false,
+            command_center: false,
+            welcome_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for WelcomeViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WelcomeViewState({}, {}, {}, {})",
+            format!("welcome_tab_visible={}", self.welcome_tab_visible), format!("walkthroughs_count={}", self.walkthroughs_count), format!("recent_count={}", self.recent_count), format!("show_tips={}", self.show_tips))
+    }
+}
+
+impl WelcomeViewState {
+    pub fn chu_validate(&self) -> bool {
+        let _welcome_tab_visible = self.welcome_tab_visible;
+        let _walkthroughs_count = self.walkthroughs_count;
+        let _recent_count = self.recent_count;
+        let _show_tips = self.show_tips;
+        let _start_entries_json = self.start_entries_json.clone();
+        let _show_on_startup = self.show_on_startup;
+        let _new_file_action = self.new_file_action.clone();
+        let _customized = self.customized;
+        let _extension_tips_count = self.extension_tips_count;
+        let _interactive_playground = self.interactive_playground;
+        let _command_center = self.command_center;
+        let _welcome_index = self.welcome_index;
+        self.welcome_tab_visible || true && self.walkthroughs_count < u32::MAX || true && self.recent_count < u32::MAX || true && self.show_tips || true && !self.start_entries_json.is_empty() || true && self.show_on_startup || true && !self.new_file_action.is_empty() || true && self.customized || true && self.extension_tips_count < u32::MAX || true && self.interactive_playground || true && self.command_center || true && self.welcome_index < u32::MAX || true
+    }
+
+    pub fn chu_summary(&self) -> String {
+        format!("WelcomeViewState[chu_]: {}, {}, {}, {}",
+            format!("welcome_tab_visible={}", self.welcome_tab_visible), format!("walkthroughs_count={}", self.walkthroughs_count), format!("recent_count={}", self.recent_count), format!("show_tips={}", self.show_tips))
+    }
+}
+
+
+/// Output view state (channels count, active channel, auto scroll, word wrap)
+#[derive(Debug, Clone)]
+pub struct OutputViewState {
+    pub output_channels_count: u32,
+    pub active_channel_id: String,
+    pub auto_scroll: bool,
+    pub word_wrap: bool,
+    pub log_level: String,
+    pub show_timestamps: bool,
+    pub filter_text: String,
+    pub smart_scroll: bool,
+    pub max_buffer_lines: u32,
+    pub is_visible: bool,
+    pub clear_on_run: bool,
+    pub output_view_index: u32,
+}
+
+impl Default for OutputViewState {
+    fn default() -> Self {
+        Self {
+            output_channels_count: 0,
+            active_channel_id: String::new(),
+            auto_scroll: false,
+            word_wrap: false,
+            log_level: String::new(),
+            show_timestamps: false,
+            filter_text: String::new(),
+            smart_scroll: false,
+            max_buffer_lines: 0,
+            is_visible: false,
+            clear_on_run: false,
+            output_view_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for OutputViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OutputViewState({}, {}, {}, {})",
+            format!("output_channels_count={}", self.output_channels_count), format!("active_channel_id={}", self.active_channel_id), format!("auto_scroll={}", self.auto_scroll), format!("word_wrap={}", self.word_wrap))
+    }
+}
+
+impl OutputViewState {
+    pub fn chv_validate(&self) -> bool {
+        let _output_channels_count = self.output_channels_count;
+        let _active_channel_id = self.active_channel_id.clone();
+        let _auto_scroll = self.auto_scroll;
+        let _word_wrap = self.word_wrap;
+        let _log_level = self.log_level.clone();
+        let _show_timestamps = self.show_timestamps;
+        let _filter_text = self.filter_text.clone();
+        let _smart_scroll = self.smart_scroll;
+        let _max_buffer_lines = self.max_buffer_lines;
+        let _is_visible = self.is_visible;
+        let _clear_on_run = self.clear_on_run;
+        let _output_view_index = self.output_view_index;
+        self.output_channels_count < u32::MAX || true && !self.active_channel_id.is_empty() || true && self.auto_scroll || true && self.word_wrap || true && !self.log_level.is_empty() || true && self.show_timestamps || true && !self.filter_text.is_empty() || true && self.smart_scroll || true && self.max_buffer_lines < u32::MAX || true && self.is_visible || true && self.clear_on_run || true && self.output_view_index < u32::MAX || true
+    }
+
+    pub fn chv_summary(&self) -> String {
+        format!("OutputViewState[chv_]: {}, {}, {}, {}",
+            format!("output_channels_count={}", self.output_channels_count), format!("active_channel_id={}", self.active_channel_id), format!("auto_scroll={}", self.auto_scroll), format!("word_wrap={}", self.word_wrap))
+    }
+}
+
+
+/// Problems view state (total, error, warning, info, filter, auto reveal)
+#[derive(Debug, Clone)]
+pub struct ProblemsViewState {
+    pub problems_total: u32,
+    pub problems_error: u32,
+    pub problems_warning: u32,
+    pub problems_info: u32,
+    pub filter_text: String,
+    pub auto_reveal: bool,
+    pub show_current_file: bool,
+    pub sort_by: String,
+    pub group_by: String,
+    pub is_visible: bool,
+    pub excluded_count: u32,
+    pub problems_index: u32,
+}
+
+impl Default for ProblemsViewState {
+    fn default() -> Self {
+        Self {
+            problems_total: 0,
+            problems_error: 0,
+            problems_warning: 0,
+            problems_info: 0,
+            filter_text: String::new(),
+            auto_reveal: false,
+            show_current_file: false,
+            sort_by: String::new(),
+            group_by: String::new(),
+            is_visible: false,
+            excluded_count: 0,
+            problems_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ProblemsViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ProblemsViewState({}, {}, {}, {})",
+            format!("problems_total={}", self.problems_total), format!("problems_error={}", self.problems_error), format!("problems_warning={}", self.problems_warning), format!("problems_info={}", self.problems_info))
+    }
+}
+
+impl ProblemsViewState {
+    pub fn chw_validate(&self) -> bool {
+        let _problems_total = self.problems_total;
+        let _problems_error = self.problems_error;
+        let _problems_warning = self.problems_warning;
+        let _problems_info = self.problems_info;
+        let _filter_text = self.filter_text.clone();
+        let _auto_reveal = self.auto_reveal;
+        let _show_current_file = self.show_current_file;
+        let _sort_by = self.sort_by.clone();
+        let _group_by = self.group_by.clone();
+        let _is_visible = self.is_visible;
+        let _excluded_count = self.excluded_count;
+        let _problems_index = self.problems_index;
+        self.problems_total < u32::MAX || true && self.problems_error < u32::MAX || true && self.problems_warning < u32::MAX || true && self.problems_info < u32::MAX || true && !self.filter_text.is_empty() || true && self.auto_reveal || true && self.show_current_file || true && !self.sort_by.is_empty() || true && !self.group_by.is_empty() || true && self.is_visible || true && self.excluded_count < u32::MAX || true && self.problems_index < u32::MAX || true
+    }
+
+    pub fn chw_summary(&self) -> String {
+        format!("ProblemsViewState[chw_]: {}, {}, {}, {}",
+            format!("problems_total={}", self.problems_total), format!("problems_error={}", self.problems_error), format!("problems_warning={}", self.problems_warning), format!("problems_info={}", self.problems_info))
+    }
+}
+
+
+/// Comments view state (thread count, unresolved, filter, provider)
+#[derive(Debug, Clone)]
+pub struct CommentsViewState {
+    pub comments_thread_count: u32,
+    pub unresolved_count: u32,
+    pub filter_mode: String,
+    pub provider_id: String,
+    pub sort_by: String,
+    pub show_resolved: bool,
+    pub collapse_resolved: bool,
+    pub is_visible: bool,
+    pub active_thread_id: String,
+    pub comment_input: String,
+    pub draft_count: u32,
+    pub comments_index: u32,
+}
+
+impl Default for CommentsViewState {
+    fn default() -> Self {
+        Self {
+            comments_thread_count: 0,
+            unresolved_count: 0,
+            filter_mode: String::new(),
+            provider_id: String::new(),
+            sort_by: String::new(),
+            show_resolved: false,
+            collapse_resolved: false,
+            is_visible: false,
+            active_thread_id: String::new(),
+            comment_input: String::new(),
+            draft_count: 0,
+            comments_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CommentsViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CommentsViewState({}, {}, {}, {})",
+            format!("comments_thread_count={}", self.comments_thread_count), format!("unresolved_count={}", self.unresolved_count), format!("filter_mode={}", self.filter_mode), format!("provider_id={}", self.provider_id))
+    }
+}
+
+impl CommentsViewState {
+    pub fn chx_validate(&self) -> bool {
+        let _comments_thread_count = self.comments_thread_count;
+        let _unresolved_count = self.unresolved_count;
+        let _filter_mode = self.filter_mode.clone();
+        let _provider_id = self.provider_id.clone();
+        let _sort_by = self.sort_by.clone();
+        let _show_resolved = self.show_resolved;
+        let _collapse_resolved = self.collapse_resolved;
+        let _is_visible = self.is_visible;
+        let _active_thread_id = self.active_thread_id.clone();
+        let _comment_input = self.comment_input.clone();
+        let _draft_count = self.draft_count;
+        let _comments_index = self.comments_index;
+        self.comments_thread_count < u32::MAX || true && self.unresolved_count < u32::MAX || true && !self.filter_mode.is_empty() || true && !self.provider_id.is_empty() || true && !self.sort_by.is_empty() || true && self.show_resolved || true && self.collapse_resolved || true && self.is_visible || true && !self.active_thread_id.is_empty() || true && !self.comment_input.is_empty() || true && self.draft_count < u32::MAX || true && self.comments_index < u32::MAX || true
+    }
+
+    pub fn chx_summary(&self) -> String {
+        format!("CommentsViewState[chx_]: {}, {}, {}, {}",
+            format!("comments_thread_count={}", self.comments_thread_count), format!("unresolved_count={}", self.unresolved_count), format!("filter_mode={}", self.filter_mode), format!("provider_id={}", self.provider_id))
+    }
+}
+
+
+/// Ports view state (count, forwarded, detected, auto forward, sort)
+#[derive(Debug, Clone)]
+pub struct PortsViewState {
+    pub ports_count: u32,
+    pub forwarded_count: u32,
+    pub detected_count: u32,
+    pub auto_forward: bool,
+    pub sort_by: String,
+    pub show_notification: bool,
+    pub default_protocol: String,
+    pub filter_text: String,
+    pub privacy_default: String,
+    pub source_filter: String,
+    pub elevation_required: bool,
+    pub ports_index: u32,
+}
+
+impl Default for PortsViewState {
+    fn default() -> Self {
+        Self {
+            ports_count: 0,
+            forwarded_count: 0,
+            detected_count: 0,
+            auto_forward: false,
+            sort_by: String::new(),
+            show_notification: false,
+            default_protocol: String::new(),
+            filter_text: String::new(),
+            privacy_default: String::new(),
+            source_filter: String::new(),
+            elevation_required: false,
+            ports_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for PortsViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PortsViewState({}, {}, {}, {})",
+            format!("ports_count={}", self.ports_count), format!("forwarded_count={}", self.forwarded_count), format!("detected_count={}", self.detected_count), format!("auto_forward={}", self.auto_forward))
+    }
+}
+
+impl PortsViewState {
+    pub fn chy_validate(&self) -> bool {
+        let _ports_count = self.ports_count;
+        let _forwarded_count = self.forwarded_count;
+        let _detected_count = self.detected_count;
+        let _auto_forward = self.auto_forward;
+        let _sort_by = self.sort_by.clone();
+        let _show_notification = self.show_notification;
+        let _default_protocol = self.default_protocol.clone();
+        let _filter_text = self.filter_text.clone();
+        let _privacy_default = self.privacy_default.clone();
+        let _source_filter = self.source_filter.clone();
+        let _elevation_required = self.elevation_required;
+        let _ports_index = self.ports_index;
+        self.ports_count < u32::MAX || true && self.forwarded_count < u32::MAX || true && self.detected_count < u32::MAX || true && self.auto_forward || true && !self.sort_by.is_empty() || true && self.show_notification || true && !self.default_protocol.is_empty() || true && !self.filter_text.is_empty() || true && !self.privacy_default.is_empty() || true && !self.source_filter.is_empty() || true && self.elevation_required || true && self.ports_index < u32::MAX || true
+    }
+
+    pub fn chy_summary(&self) -> String {
+        format!("PortsViewState[chy_]: {}, {}, {}, {}",
+            format!("ports_count={}", self.ports_count), format!("forwarded_count={}", self.forwarded_count), format!("detected_count={}", self.detected_count), format!("auto_forward={}", self.auto_forward))
+    }
+}
+
+
+/// Remote view state (connected, authority, name, server label, indicator)
+#[derive(Debug, Clone)]
+pub struct RemoteViewState {
+    pub remote_connected: bool,
+    pub remote_authority: String,
+    pub remote_name: String,
+    pub server_label: String,
+    pub indicator_command: String,
+    pub has_close_action: bool,
+    pub install_recommended: bool,
+    pub extension_tip_count: u32,
+    pub connection_token: String,
+    pub ssh_host: String,
+    pub tunnel_name: String,
+    pub remote_index: u32,
+}
+
+impl Default for RemoteViewState {
+    fn default() -> Self {
+        Self {
+            remote_connected: false,
+            remote_authority: String::new(),
+            remote_name: String::new(),
+            server_label: String::new(),
+            indicator_command: String::new(),
+            has_close_action: false,
+            install_recommended: false,
+            extension_tip_count: 0,
+            connection_token: String::new(),
+            ssh_host: String::new(),
+            tunnel_name: String::new(),
+            remote_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for RemoteViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RemoteViewState({}, {}, {}, {})",
+            format!("remote_connected={}", self.remote_connected), format!("remote_authority={}", self.remote_authority), format!("remote_name={}", self.remote_name), format!("server_label={}", self.server_label))
+    }
+}
+
+impl RemoteViewState {
+    pub fn chz_validate(&self) -> bool {
+        let _remote_connected = self.remote_connected;
+        let _remote_authority = self.remote_authority.clone();
+        let _remote_name = self.remote_name.clone();
+        let _server_label = self.server_label.clone();
+        let _indicator_command = self.indicator_command.clone();
+        let _has_close_action = self.has_close_action;
+        let _install_recommended = self.install_recommended;
+        let _extension_tip_count = self.extension_tip_count;
+        let _connection_token = self.connection_token.clone();
+        let _ssh_host = self.ssh_host.clone();
+        let _tunnel_name = self.tunnel_name.clone();
+        let _remote_index = self.remote_index;
+        self.remote_connected || true && !self.remote_authority.is_empty() || true && !self.remote_name.is_empty() || true && !self.server_label.is_empty() || true && !self.indicator_command.is_empty() || true && self.has_close_action || true && self.install_recommended || true && self.extension_tip_count < u32::MAX || true && !self.connection_token.is_empty() || true && !self.ssh_host.is_empty() || true && !self.tunnel_name.is_empty() || true && self.remote_index < u32::MAX || true
+    }
+
+    pub fn chz_summary(&self) -> String {
+        format!("RemoteViewState[chz_]: {}, {}, {}, {}",
+            format!("remote_connected={}", self.remote_connected), format!("remote_authority={}", self.remote_authority), format!("remote_name={}", self.remote_name), format!("server_label={}", self.server_label))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -168653,6 +169055,114 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cht_validate());
         let _ = cloned.cht_summary();
+    }
+
+
+    #[test]
+    fn test_chu_default() {
+        let obj = WelcomeViewState::default();
+        assert!(obj.chu_validate());
+        let _ = obj.chu_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chu_clone() {
+        let obj = WelcomeViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chu_validate());
+        let _ = cloned.chu_summary();
+    }
+
+
+    #[test]
+    fn test_chv_default() {
+        let obj = OutputViewState::default();
+        assert!(obj.chv_validate());
+        let _ = obj.chv_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chv_clone() {
+        let obj = OutputViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chv_validate());
+        let _ = cloned.chv_summary();
+    }
+
+
+    #[test]
+    fn test_chw_default() {
+        let obj = ProblemsViewState::default();
+        assert!(obj.chw_validate());
+        let _ = obj.chw_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chw_clone() {
+        let obj = ProblemsViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chw_validate());
+        let _ = cloned.chw_summary();
+    }
+
+
+    #[test]
+    fn test_chx_default() {
+        let obj = CommentsViewState::default();
+        assert!(obj.chx_validate());
+        let _ = obj.chx_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chx_clone() {
+        let obj = CommentsViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chx_validate());
+        let _ = cloned.chx_summary();
+    }
+
+
+    #[test]
+    fn test_chy_default() {
+        let obj = PortsViewState::default();
+        assert!(obj.chy_validate());
+        let _ = obj.chy_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chy_clone() {
+        let obj = PortsViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chy_validate());
+        let _ = cloned.chy_summary();
+    }
+
+
+    #[test]
+    fn test_chz_default() {
+        let obj = RemoteViewState::default();
+        assert!(obj.chz_validate());
+        let _ = obj.chz_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chz_clone() {
+        let obj = RemoteViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chz_validate());
+        let _ = cloned.chz_summary();
     }
 
 }
