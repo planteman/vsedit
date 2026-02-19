@@ -84357,6 +84357,248 @@ impl BieRecentlyOpened {
     pub fn len(&self) -> usize { self.items.len() }
 }
 
+
+/// Quick pick item (bif_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BifQuickPickItem {
+    pub label: String,
+    pub description: Option<String>,
+    pub detail: Option<String>,
+    pub is_picked: bool,
+    pub always_show: bool,
+}
+
+/// Quick input kind (bif_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BifQuickInputKind {
+    Pick,
+    InputBox,
+}
+
+/// Quick input model (bif_)
+#[derive(Debug, Clone)]
+pub struct BifQuickInput {
+    pub kind: BifQuickInputKind,
+    pub title: Option<String>,
+    pub placeholder: Option<String>,
+    pub items: Vec<BifQuickPickItem>,
+    pub filter_text: String,
+    pub multi_select: bool,
+    pub value: String,
+    pub step: Option<(usize, usize)>,
+    pub is_busy: bool,
+    pub validation_message: Option<String>,
+}
+
+impl BifQuickInput {
+    pub fn pick(items: Vec<BifQuickPickItem>) -> Self {
+        Self { kind: BifQuickInputKind::Pick, title: None, placeholder: None, items, filter_text: String::new(), multi_select: false, value: String::new(), step: None, is_busy: false, validation_message: None }
+    }
+    pub fn input_box() -> Self {
+        Self { kind: BifQuickInputKind::InputBox, title: None, placeholder: None, items: Vec::new(), filter_text: String::new(), multi_select: false, value: String::new(), step: None, is_busy: false, validation_message: None }
+    }
+    pub fn set_title(&mut self, t: String) { self.title = Some(t); }
+    pub fn set_placeholder(&mut self, p: String) { self.placeholder = Some(p); }
+    pub fn set_filter(&mut self, f: String) { self.filter_text = f; }
+    pub fn filtered_items(&self) -> Vec<&BifQuickPickItem> {
+        if self.filter_text.is_empty() { return self.items.iter().collect(); }
+        let f = self.filter_text.to_lowercase();
+        self.items.iter().filter(|i| i.always_show || i.label.to_lowercase().contains(&f)).collect()
+    }
+    pub fn toggle_pick(&mut self, idx: usize) {
+        if let Some(item) = self.items.get_mut(idx) { item.is_picked = !item.is_picked; }
+    }
+    pub fn selected_items(&self) -> Vec<&BifQuickPickItem> { self.items.iter().filter(|i| i.is_picked).collect() }
+    pub fn set_step(&mut self, current: usize, total: usize) { self.step = Some((current, total)); }
+    pub fn set_busy(&mut self, busy: bool) { self.is_busy = busy; }
+    pub fn set_value(&mut self, v: String) { self.value = v; }
+    pub fn validate(&mut self, msg: Option<String>) { self.validation_message = msg; }
+}
+
+
+/// Progress location (big_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BigProgressLocation {
+    Notification,
+    Window,
+    SourceControl,
+}
+
+/// Progress indicator (big_)
+#[derive(Debug, Clone)]
+pub struct BigProgressIndicator {
+    pub id: String,
+    pub title: String,
+    pub message: Option<String>,
+    pub location: BigProgressLocation,
+    pub percentage: Option<f64>,
+    pub is_cancellable: bool,
+    pub is_cancelled: bool,
+    pub is_complete: bool,
+}
+
+impl BigProgressIndicator {
+    pub fn new(id: String, title: String, location: BigProgressLocation) -> Self {
+        Self { id, title, message: None, location, percentage: None, is_cancellable: false, is_cancelled: false, is_complete: false }
+    }
+    pub fn set_message(&mut self, msg: String) { self.message = Some(msg); }
+    pub fn set_percentage(&mut self, pct: f64) { self.percentage = Some(pct.clamp(0.0, 100.0)); }
+    pub fn increment(&mut self, delta: f64) {
+        let current = self.percentage.unwrap_or(0.0);
+        self.set_percentage(current + delta);
+    }
+    pub fn set_cancellable(&mut self, c: bool) { self.is_cancellable = c; }
+    pub fn cancel(&mut self) { if self.is_cancellable { self.is_cancelled = true; } }
+    pub fn complete(&mut self) { self.is_complete = true; self.percentage = Some(100.0); }
+    pub fn is_indeterminate(&self) -> bool { self.percentage.is_none() }
+}
+
+
+/// Dialog severity (bih_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BihDialogSeverity {
+    Info,
+    Warning,
+    Error,
+}
+
+/// Dialog button (bih_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BihDialogButton {
+    pub label: String,
+    pub is_primary: bool,
+}
+
+/// Dialog kind (bih_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BihDialogKind {
+    Message,
+    Confirm,
+    Input,
+    OpenFile,
+    SaveFile,
+    OpenFolder,
+}
+
+/// Dialog model (bih_)
+#[derive(Debug, Clone)]
+pub struct BihDialog {
+    pub kind: BihDialogKind,
+    pub title: String,
+    pub message: Option<String>,
+    pub severity: BihDialogSeverity,
+    pub buttons: Vec<BihDialogButton>,
+    pub input_value: Option<String>,
+    pub default_path: Option<String>,
+    pub filters: Vec<(String, Vec<String>)>,
+}
+
+impl BihDialog {
+    pub fn message(title: String, msg: String, severity: BihDialogSeverity) -> Self {
+        Self { kind: BihDialogKind::Message, title, message: Some(msg), severity, buttons: vec![BihDialogButton { label: "OK".into(), is_primary: true }], input_value: None, default_path: None, filters: Vec::new() }
+    }
+    pub fn confirm(title: String, msg: String) -> Self {
+        Self { kind: BihDialogKind::Confirm, title, message: Some(msg), severity: BihDialogSeverity::Warning, buttons: vec![BihDialogButton { label: "Yes".into(), is_primary: true }, BihDialogButton { label: "No".into(), is_primary: false }], input_value: None, default_path: None, filters: Vec::new() }
+    }
+    pub fn input(title: String, placeholder: Option<String>) -> Self {
+        Self { kind: BihDialogKind::Input, title, message: placeholder, severity: BihDialogSeverity::Info, buttons: vec![BihDialogButton { label: "OK".into(), is_primary: true }, BihDialogButton { label: "Cancel".into(), is_primary: false }], input_value: Some(String::new()), default_path: None, filters: Vec::new() }
+    }
+    pub fn open_file(title: String) -> Self {
+        Self { kind: BihDialogKind::OpenFile, title, message: None, severity: BihDialogSeverity::Info, buttons: vec![], input_value: None, default_path: None, filters: Vec::new() }
+    }
+    pub fn save_file(title: String) -> Self {
+        Self { kind: BihDialogKind::SaveFile, title, message: None, severity: BihDialogSeverity::Info, buttons: vec![], input_value: None, default_path: None, filters: Vec::new() }
+    }
+    pub fn add_filter(&mut self, name: String, exts: Vec<String>) { self.filters.push((name, exts)); }
+    pub fn set_default_path(&mut self, p: String) { self.default_path = Some(p); }
+    pub fn add_button(&mut self, b: BihDialogButton) { self.buttons.push(b); }
+    pub fn button_count(&self) -> usize { self.buttons.len() }
+}
+
+
+/// Context key value (bii_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BiiContextValue {
+    Bool(bool),
+    String(String),
+}
+
+/// Context key service (bii_)
+#[derive(Debug, Clone)]
+pub struct BiiContextKeyService {
+    pub keys: std::collections::HashMap<String, BiiContextValue>,
+}
+
+impl BiiContextKeyService {
+    pub fn new() -> Self { Self { keys: std::collections::HashMap::new() } }
+    pub fn set_bool(&mut self, key: String, val: bool) { self.keys.insert(key, BiiContextValue::Bool(val)); }
+    pub fn set_string(&mut self, key: String, val: String) { self.keys.insert(key, BiiContextValue::String(val)); }
+    pub fn unset(&mut self, key: &str) { self.keys.remove(key); }
+    pub fn get(&self, key: &str) -> Option<&BiiContextValue> { self.keys.get(key) }
+    pub fn get_bool(&self, key: &str) -> Option<bool> {
+        match self.keys.get(key) { Some(BiiContextValue::Bool(b)) => Some(*b), _ => None }
+    }
+    pub fn get_string(&self, key: &str) -> Option<&str> {
+        match self.keys.get(key) { Some(BiiContextValue::String(s)) => Some(s.as_str()), _ => None }
+    }
+    pub fn eval_simple(&self, expr: &str) -> bool {
+        if let Some(stripped) = expr.strip_prefix('!') {
+            !self.get_bool(stripped).unwrap_or(false)
+        } else if let Some((key, val)) = expr.split_once(" == ") {
+            self.get_string(key).map_or(false, |v| v == val.trim_matches('\''))
+        } else {
+            self.get_bool(expr).unwrap_or(false)
+        }
+    }
+    pub fn key_count(&self) -> usize { self.keys.len() }
+}
+
+
+/// Menu item kind (bij_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BijMenuItemKind {
+    Command { command_id: String, title: String },
+    Submenu { submenu_id: String, title: String },
+    Separator,
+}
+
+/// Menu item (bij_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BijMenuItem {
+    pub kind: BijMenuItemKind,
+    pub when: Option<String>,
+    pub group: Option<String>,
+    pub order: i32,
+}
+
+/// Menu registry (bij_)
+#[derive(Debug, Clone)]
+pub struct BijMenuRegistry {
+    pub menus: std::collections::HashMap<String, Vec<BijMenuItem>>,
+}
+
+impl BijMenuRegistry {
+    pub fn new() -> Self { Self { menus: std::collections::HashMap::new() } }
+    pub fn register(&mut self, menu_id: String, item: BijMenuItem) {
+        self.menus.entry(menu_id).or_default().push(item);
+    }
+    pub fn get_items(&self, menu_id: &str) -> Vec<&BijMenuItem> {
+        let mut items: Vec<_> = self.menus.get(menu_id).map_or(vec![], |v| v.iter().collect());
+        items.sort_by_key(|i| i.order);
+        items
+    }
+    pub fn remove_command(&mut self, menu_id: &str, command_id: &str) {
+        if let Some(items) = self.menus.get_mut(menu_id) {
+            items.retain(|i| !matches!(&i.kind, BijMenuItemKind::Command { command_id: cid, .. } if cid == command_id));
+        }
+    }
+    pub fn menu_ids(&self) -> Vec<&str> { self.menus.keys().map(|k| k.as_str()).collect() }
+    pub fn menu_count(&self) -> usize { self.menus.len() }
+    pub fn item_count(&self, menu_id: &str) -> usize {
+        self.menus.get(menu_id).map_or(0, |v| v.len())
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -90330,6 +90572,330 @@ mod tests_bfo {
         r.add(BieRecentItem { path: "/old".into(), kind: BieRecentKind::File, timestamp: 100, is_pinned: false });
         r.add(BieRecentItem { path: "/new".into(), kind: BieRecentKind::File, timestamp: 200, is_pinned: false });
         assert_eq!(r.items[0].path, "/new");
+    }
+
+
+    #[test]
+    fn test_bif_quick_pick() {
+        let items = vec![BifQuickPickItem { label: "Item 1".into(), description: None, detail: None, is_picked: false, always_show: false }];
+        let q = BifQuickInput::pick(items);
+        assert_eq!(q.kind, BifQuickInputKind::Pick);
+        assert_eq!(q.items.len(), 1);
+    }
+    #[test]
+    fn test_bif_input_box() {
+        let q = BifQuickInput::input_box();
+        assert_eq!(q.kind, BifQuickInputKind::InputBox);
+    }
+    #[test]
+    fn test_bif_filter() {
+        let items = vec![
+            BifQuickPickItem { label: "Apple".into(), description: None, detail: None, is_picked: false, always_show: false },
+            BifQuickPickItem { label: "Banana".into(), description: None, detail: None, is_picked: false, always_show: false },
+        ];
+        let mut q = BifQuickInput::pick(items);
+        q.set_filter("app".into());
+        assert_eq!(q.filtered_items().len(), 1);
+    }
+    #[test]
+    fn test_bif_always_show() {
+        let items = vec![BifQuickPickItem { label: "X".into(), description: None, detail: None, is_picked: false, always_show: true }];
+        let mut q = BifQuickInput::pick(items);
+        q.set_filter("zzz".into());
+        assert_eq!(q.filtered_items().len(), 1);
+    }
+    #[test]
+    fn test_bif_toggle_pick() {
+        let items = vec![BifQuickPickItem { label: "A".into(), description: None, detail: None, is_picked: false, always_show: false }];
+        let mut q = BifQuickInput::pick(items);
+        q.toggle_pick(0);
+        assert!(q.items[0].is_picked);
+    }
+    #[test]
+    fn test_bif_selected_items() {
+        let items = vec![
+            BifQuickPickItem { label: "A".into(), description: None, detail: None, is_picked: true, always_show: false },
+            BifQuickPickItem { label: "B".into(), description: None, detail: None, is_picked: false, always_show: false },
+        ];
+        let q = BifQuickInput::pick(items);
+        assert_eq!(q.selected_items().len(), 1);
+    }
+    #[test]
+    fn test_bif_step() {
+        let mut q = BifQuickInput::input_box();
+        q.set_step(1, 3);
+        assert_eq!(q.step, Some((1, 3)));
+    }
+    #[test]
+    fn test_bif_busy() {
+        let mut q = BifQuickInput::input_box();
+        q.set_busy(true);
+        assert!(q.is_busy);
+    }
+    #[test]
+    fn test_bif_validation() {
+        let mut q = BifQuickInput::input_box();
+        q.set_value("".into());
+        q.validate(Some("Required".into()));
+        assert_eq!(q.validation_message.as_deref(), Some("Required"));
+    }
+    #[test]
+    fn test_bif_title_placeholder() {
+        let mut q = BifQuickInput::pick(vec![]);
+        q.set_title("Select".into());
+        q.set_placeholder("Type to filter".into());
+        assert_eq!(q.title.as_deref(), Some("Select"));
+    }
+
+
+    #[test]
+    fn test_big_progress_new() {
+        let p = BigProgressIndicator::new("p1".into(), "Loading".into(), BigProgressLocation::Notification);
+        assert!(!p.is_complete);
+        assert!(p.is_indeterminate());
+    }
+    #[test]
+    fn test_big_set_percentage() {
+        let mut p = BigProgressIndicator::new("p1".into(), "T".into(), BigProgressLocation::Window);
+        p.set_percentage(50.0);
+        assert_eq!(p.percentage, Some(50.0));
+        assert!(!p.is_indeterminate());
+    }
+    #[test]
+    fn test_big_increment() {
+        let mut p = BigProgressIndicator::new("p1".into(), "T".into(), BigProgressLocation::Window);
+        p.set_percentage(0.0);
+        p.increment(30.0);
+        p.increment(40.0);
+        assert_eq!(p.percentage, Some(70.0));
+    }
+    #[test]
+    fn test_big_clamp() {
+        let mut p = BigProgressIndicator::new("p1".into(), "T".into(), BigProgressLocation::Window);
+        p.set_percentage(150.0);
+        assert_eq!(p.percentage, Some(100.0));
+    }
+    #[test]
+    fn test_big_cancel() {
+        let mut p = BigProgressIndicator::new("p1".into(), "T".into(), BigProgressLocation::Notification);
+        p.set_cancellable(true);
+        p.cancel();
+        assert!(p.is_cancelled);
+    }
+    #[test]
+    fn test_big_cannot_cancel() {
+        let mut p = BigProgressIndicator::new("p1".into(), "T".into(), BigProgressLocation::Notification);
+        p.cancel();
+        assert!(!p.is_cancelled);
+    }
+    #[test]
+    fn test_big_complete() {
+        let mut p = BigProgressIndicator::new("p1".into(), "T".into(), BigProgressLocation::Window);
+        p.complete();
+        assert!(p.is_complete);
+        assert_eq!(p.percentage, Some(100.0));
+    }
+    #[test]
+    fn test_big_message() {
+        let mut p = BigProgressIndicator::new("p1".into(), "T".into(), BigProgressLocation::Notification);
+        p.set_message("Step 2 of 5".into());
+        assert_eq!(p.message.as_deref(), Some("Step 2 of 5"));
+    }
+    #[test]
+    fn test_big_source_control() {
+        let p = BigProgressIndicator::new("p1".into(), "Sync".into(), BigProgressLocation::SourceControl);
+        assert_eq!(p.location, BigProgressLocation::SourceControl);
+    }
+    #[test]
+    fn test_big_title() {
+        let p = BigProgressIndicator::new("p1".into(), "Indexing".into(), BigProgressLocation::Window);
+        assert_eq!(p.title, "Indexing");
+    }
+
+
+    #[test]
+    fn test_bih_message_dialog() {
+        let d = BihDialog::message("Error".into(), "Something failed".into(), BihDialogSeverity::Error);
+        assert_eq!(d.kind, BihDialogKind::Message);
+        assert_eq!(d.button_count(), 1);
+    }
+    #[test]
+    fn test_bih_confirm_dialog() {
+        let d = BihDialog::confirm("Delete?".into(), "Sure?".into());
+        assert_eq!(d.kind, BihDialogKind::Confirm);
+        assert_eq!(d.button_count(), 2);
+    }
+    #[test]
+    fn test_bih_input_dialog() {
+        let d = BihDialog::input("Name".into(), Some("Enter name".into()));
+        assert_eq!(d.kind, BihDialogKind::Input);
+        assert!(d.input_value.is_some());
+    }
+    #[test]
+    fn test_bih_open_file() {
+        let mut d = BihDialog::open_file("Open".into());
+        d.add_filter("Rust".into(), vec!["rs".into()]);
+        assert_eq!(d.filters.len(), 1);
+    }
+    #[test]
+    fn test_bih_save_file() {
+        let mut d = BihDialog::save_file("Save As".into());
+        d.set_default_path("/home/user/file.rs".into());
+        assert_eq!(d.default_path.as_deref(), Some("/home/user/file.rs"));
+    }
+    #[test]
+    fn test_bih_add_button() {
+        let mut d = BihDialog::message("T".into(), "M".into(), BihDialogSeverity::Info);
+        d.add_button(BihDialogButton { label: "Details".into(), is_primary: false });
+        assert_eq!(d.button_count(), 2);
+    }
+    #[test]
+    fn test_bih_severity() {
+        let d = BihDialog::message("T".into(), "M".into(), BihDialogSeverity::Warning);
+        assert_eq!(d.severity, BihDialogSeverity::Warning);
+    }
+    #[test]
+    fn test_bih_open_folder() {
+        let d = BihDialog { kind: BihDialogKind::OpenFolder, title: "Open Folder".into(), message: None, severity: BihDialogSeverity::Info, buttons: vec![], input_value: None, default_path: None, filters: vec![] };
+        assert_eq!(d.kind, BihDialogKind::OpenFolder);
+    }
+    #[test]
+    fn test_bih_button_primary() {
+        let b = BihDialogButton { label: "OK".into(), is_primary: true };
+        assert!(b.is_primary);
+    }
+    #[test]
+    fn test_bih_multiple_filters() {
+        let mut d = BihDialog::open_file("Open".into());
+        d.add_filter("Images".into(), vec!["png".into(), "jpg".into()]);
+        d.add_filter("All".into(), vec!["*".into()]);
+        assert_eq!(d.filters.len(), 2);
+    }
+
+
+    #[test]
+    fn test_bii_context_new() {
+        let c = BiiContextKeyService::new();
+        assert_eq!(c.key_count(), 0);
+    }
+    #[test]
+    fn test_bii_set_get_bool() {
+        let mut c = BiiContextKeyService::new();
+        c.set_bool("editorFocus".into(), true);
+        assert_eq!(c.get_bool("editorFocus"), Some(true));
+    }
+    #[test]
+    fn test_bii_set_get_string() {
+        let mut c = BiiContextKeyService::new();
+        c.set_string("editorLangId".into(), "rust".into());
+        assert_eq!(c.get_string("editorLangId"), Some("rust"));
+    }
+    #[test]
+    fn test_bii_unset() {
+        let mut c = BiiContextKeyService::new();
+        c.set_bool("k".into(), true);
+        c.unset("k");
+        assert!(c.get("k").is_none());
+    }
+    #[test]
+    fn test_bii_eval_bool() {
+        let mut c = BiiContextKeyService::new();
+        c.set_bool("editorFocus".into(), true);
+        assert!(c.eval_simple("editorFocus"));
+    }
+    #[test]
+    fn test_bii_eval_negation() {
+        let mut c = BiiContextKeyService::new();
+        c.set_bool("editorReadonly".into(), false);
+        assert!(c.eval_simple("!editorReadonly"));
+    }
+    #[test]
+    fn test_bii_eval_equals() {
+        let mut c = BiiContextKeyService::new();
+        c.set_string("editorLangId".into(), "rust".into());
+        assert!(c.eval_simple("editorLangId == 'rust'"));
+    }
+    #[test]
+    fn test_bii_eval_false() {
+        let c = BiiContextKeyService::new();
+        assert!(!c.eval_simple("nonexistent"));
+    }
+    #[test]
+    fn test_bii_key_count() {
+        let mut c = BiiContextKeyService::new();
+        c.set_bool("a".into(), true);
+        c.set_string("b".into(), "x".into());
+        assert_eq!(c.key_count(), 2);
+    }
+    #[test]
+    fn test_bii_overwrite() {
+        let mut c = BiiContextKeyService::new();
+        c.set_bool("k".into(), true);
+        c.set_bool("k".into(), false);
+        assert_eq!(c.get_bool("k"), Some(false));
+    }
+
+
+    #[test]
+    fn test_bij_registry_new() {
+        let r = BijMenuRegistry::new();
+        assert_eq!(r.menu_count(), 0);
+    }
+    #[test]
+    fn test_bij_register_item() {
+        let mut r = BijMenuRegistry::new();
+        r.register("editor/context".into(), BijMenuItem { kind: BijMenuItemKind::Command { command_id: "copy".into(), title: "Copy".into() }, when: None, group: Some("clipboard".into()), order: 1 });
+        assert_eq!(r.item_count("editor/context"), 1);
+    }
+    #[test]
+    fn test_bij_get_items_sorted() {
+        let mut r = BijMenuRegistry::new();
+        r.register("m".into(), BijMenuItem { kind: BijMenuItemKind::Command { command_id: "b".into(), title: "B".into() }, when: None, group: None, order: 2 });
+        r.register("m".into(), BijMenuItem { kind: BijMenuItemKind::Command { command_id: "a".into(), title: "A".into() }, when: None, group: None, order: 1 });
+        let items = r.get_items("m");
+        assert_eq!(items[0].order, 1);
+    }
+    #[test]
+    fn test_bij_separator() {
+        let mut r = BijMenuRegistry::new();
+        r.register("m".into(), BijMenuItem { kind: BijMenuItemKind::Separator, when: None, group: None, order: 5 });
+        assert_eq!(r.item_count("m"), 1);
+    }
+    #[test]
+    fn test_bij_submenu() {
+        let mut r = BijMenuRegistry::new();
+        r.register("m".into(), BijMenuItem { kind: BijMenuItemKind::Submenu { submenu_id: "sub1".into(), title: "More".into() }, when: None, group: None, order: 10 });
+        let items = r.get_items("m");
+        assert!(matches!(&items[0].kind, BijMenuItemKind::Submenu { .. }));
+    }
+    #[test]
+    fn test_bij_remove_command() {
+        let mut r = BijMenuRegistry::new();
+        r.register("m".into(), BijMenuItem { kind: BijMenuItemKind::Command { command_id: "cmd1".into(), title: "C".into() }, when: None, group: None, order: 1 });
+        r.remove_command("m", "cmd1");
+        assert_eq!(r.item_count("m"), 0);
+    }
+    #[test]
+    fn test_bij_when_clause() {
+        let item = BijMenuItem { kind: BijMenuItemKind::Command { command_id: "c".into(), title: "C".into() }, when: Some("editorFocus".into()), group: None, order: 1 };
+        assert_eq!(item.when.as_deref(), Some("editorFocus"));
+    }
+    #[test]
+    fn test_bij_menu_ids() {
+        let mut r = BijMenuRegistry::new();
+        r.register("editor/context".into(), BijMenuItem { kind: BijMenuItemKind::Separator, when: None, group: None, order: 1 });
+        r.register("editor/title".into(), BijMenuItem { kind: BijMenuItemKind::Separator, when: None, group: None, order: 1 });
+        assert_eq!(r.menu_count(), 2);
+    }
+    #[test]
+    fn test_bij_empty_menu() {
+        let r = BijMenuRegistry::new();
+        assert_eq!(r.get_items("nonexistent").len(), 0);
+    }
+    #[test]
+    fn test_bij_group() {
+        let item = BijMenuItem { kind: BijMenuItemKind::Command { command_id: "paste".into(), title: "Paste".into() }, when: None, group: Some("9_cutcopypaste".into()), order: 3 };
+        assert_eq!(item.group.as_deref(), Some("9_cutcopypaste"));
     }
 
 }
