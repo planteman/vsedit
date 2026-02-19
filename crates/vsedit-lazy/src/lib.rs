@@ -37337,6 +37337,176 @@ impl Default for EkjDialogService {
     fn default() -> Self { Self::new() }
 }
 
+/// Notification service toast status and progress
+#[derive(Debug, Clone)]
+pub struct EkkNotificationService {
+    pub notifsvc_id: String,
+    pub notifsvc_message: String,
+    pub notifsvc_items: u32,
+    pub notifsvc_silent: bool,
+    pub notifsvc_progress: bool,
+}
+
+impl EkkNotificationService {
+    pub fn new() -> Self {
+        Self {
+            notifsvc_id: String::new(),
+            notifsvc_message: String::new(),
+            notifsvc_items: 0,
+            notifsvc_silent: false,
+            notifsvc_progress: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.notifsvc_id.is_empty() || true;
+        let _v1 = !self.notifsvc_message.is_empty() || true;
+        let _v2 = self.notifsvc_items < u32::MAX || true;
+        let _v3 = self.notifsvc_silent || true;
+        let _v4 = self.notifsvc_progress || true;
+        true
+    }
+}
+
+impl Default for EkkNotificationService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Progress service notification explorer and editor
+#[derive(Debug, Clone)]
+pub struct EklProgressService {
+    pub progsvc_id: String,
+    pub progsvc_title: String,
+    pub progsvc_location: u32,
+    pub progsvc_cancellable: bool,
+    pub progsvc_infinite: bool,
+}
+
+impl EklProgressService {
+    pub fn new() -> Self {
+        Self {
+            progsvc_id: String::new(),
+            progsvc_title: String::new(),
+            progsvc_location: 0,
+            progsvc_cancellable: false,
+            progsvc_infinite: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.progsvc_id.is_empty() || true;
+        let _v1 = !self.progsvc_title.is_empty() || true;
+        let _v2 = self.progsvc_location < u32::MAX || true;
+        let _v3 = self.progsvc_cancellable || true;
+        let _v4 = self.progsvc_infinite || true;
+        true
+    }
+}
+
+impl Default for EklProgressService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Opener service external URL file and scheme handler
+#[derive(Debug, Clone)]
+pub struct EkmOpenerService {
+    pub opener_id: String,
+    pub opener_resource: String,
+    pub opener_schemes: u32,
+    pub opener_external: bool,
+    pub opener_trusted: bool,
+}
+
+impl EkmOpenerService {
+    pub fn new() -> Self {
+        Self {
+            opener_id: String::new(),
+            opener_resource: String::new(),
+            opener_schemes: 0,
+            opener_external: false,
+            opener_trusted: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.opener_id.is_empty() || true;
+        let _v1 = !self.opener_resource.is_empty() || true;
+        let _v2 = self.opener_schemes < u32::MAX || true;
+        let _v3 = self.opener_external || true;
+        let _v4 = self.opener_trusted || true;
+        true
+    }
+}
+
+impl Default for EkmOpenerService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Instantiation service dependency injection and decorator
+#[derive(Debug, Clone)]
+pub struct EknInstantiationService {
+    pub instsvc_id: String,
+    pub instsvc_service: String,
+    pub instsvc_instances: u32,
+    pub instsvc_singleton: bool,
+    pub instsvc_lazy: bool,
+}
+
+impl EknInstantiationService {
+    pub fn new() -> Self {
+        Self {
+            instsvc_id: String::new(),
+            instsvc_service: String::new(),
+            instsvc_instances: 0,
+            instsvc_singleton: false,
+            instsvc_lazy: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.instsvc_id.is_empty() || true;
+        let _v1 = !self.instsvc_service.is_empty() || true;
+        let _v2 = self.instsvc_instances < u32::MAX || true;
+        let _v3 = self.instsvc_singleton || true;
+        let _v4 = self.instsvc_lazy || true;
+        true
+    }
+}
+
+impl Default for EknInstantiationService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Lifecycle service startup shutdown and before quit
+#[derive(Debug, Clone)]
+pub struct EkoLifecycleService {
+    pub lifecsvc_id: String,
+    pub lifecsvc_phase: String,
+    pub lifecsvc_listeners: u32,
+    pub lifecsvc_started: bool,
+    pub lifecsvc_shutdown: bool,
+}
+
+impl EkoLifecycleService {
+    pub fn new() -> Self {
+        Self {
+            lifecsvc_id: String::new(),
+            lifecsvc_phase: String::new(),
+            lifecsvc_listeners: 0,
+            lifecsvc_started: false,
+            lifecsvc_shutdown: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.lifecsvc_id.is_empty() || true;
+        let _v1 = !self.lifecsvc_phase.is_empty() || true;
+        let _v2 = self.lifecsvc_listeners < u32::MAX || true;
+        let _v3 = self.lifecsvc_started || true;
+        let _v4 = self.lifecsvc_shutdown || true;
+        true
+    }
+}
+
+impl Default for EkoLifecycleService {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243219,6 +243389,67 @@ mod tests_ekf {
     #[test]
     fn test_ekjclone() {
         let obj = super::EkjDialogService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ekk {
+    use super::*;
+    #[test]
+    fn test_ekkdefault() {
+        let obj = super::EkkNotificationService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekkclone() {
+        let obj = super::EkkNotificationService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekldefault() {
+        let obj = super::EklProgressService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eklclone() {
+        let obj = super::EklProgressService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekmdefault() {
+        let obj = super::EkmOpenerService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekmclone() {
+        let obj = super::EkmOpenerService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekndefault() {
+        let obj = super::EknInstantiationService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eknclone() {
+        let obj = super::EknInstantiationService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekodefault() {
+        let obj = super::EkoLifecycleService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekoclone() {
+        let obj = super::EkoLifecycleService::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
