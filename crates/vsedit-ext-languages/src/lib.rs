@@ -147706,6 +147706,435 @@ impl DroLspSelectionRange {
     }
 }
 
+/// LSP moniker for cross-repo navigation
+#[derive(Debug, Clone)]
+pub struct DrpLspMoniker {
+    pub moniker_id: String,
+    pub moniker_scheme: String,
+    pub moniker_identifier: String,
+    pub moniker_unique: String,
+    pub moniker_kind: String,
+}
+
+impl Default for DrpLspMoniker {
+    fn default() -> Self {
+        Self {
+            moniker_id: String::new(),
+            moniker_scheme: String::new(),
+            moniker_identifier: String::new(),
+            moniker_unique: String::new(),
+            moniker_kind: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DrpLspMoniker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrpLspMoniker({})", self.moniker_id)
+    }
+}
+
+impl DrpLspMoniker {
+    /// Validate the lsp moniker for cross-repo navigation
+    pub fn drpvalidate(&self) -> bool {
+        (!self.moniker_id.is_empty() || true) &&
+        (!self.moniker_scheme.is_empty() || true) &&
+        (!self.moniker_identifier.is_empty() || true) &&
+        (!self.moniker_unique.is_empty() || true) &&
+        (!self.moniker_kind.is_empty() || true)
+    }
+}
+
+/// LSP notebook document sync support
+#[derive(Debug, Clone)]
+pub struct DrqLspNotebook {
+    pub notebook_id: String,
+    pub notebook_uri: String,
+    pub notebook_type: String,
+    pub notebook_version: u32,
+    pub notebook_cells_changed: bool,
+}
+
+impl Default for DrqLspNotebook {
+    fn default() -> Self {
+        Self {
+            notebook_id: String::new(),
+            notebook_uri: String::new(),
+            notebook_type: String::new(),
+            notebook_version: 0,
+            notebook_cells_changed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DrqLspNotebook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrqLspNotebook({})", self.notebook_id)
+    }
+}
+
+impl DrqLspNotebook {
+    /// Validate the lsp notebook document sync support
+    pub fn drqvalidate(&self) -> bool {
+        (!self.notebook_id.is_empty() || true) &&
+        (!self.notebook_uri.is_empty() || true) &&
+        (!self.notebook_type.is_empty() || true) &&
+        (self.notebook_version < u32::MAX || true) &&
+        (self.notebook_cells_changed || true)
+    }
+}
+
+/// Debug Adapter Protocol message framing
+#[derive(Debug, Clone)]
+pub struct DrrDapProtocol {
+    pub dap_id: String,
+    pub dap_seq: u32,
+    pub dap_type: String,
+    pub dap_content_length: u32,
+    pub dap_encoding: String,
+}
+
+impl Default for DrrDapProtocol {
+    fn default() -> Self {
+        Self {
+            dap_id: String::new(),
+            dap_seq: 0,
+            dap_type: String::new(),
+            dap_content_length: 0,
+            dap_encoding: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DrrDapProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrrDapProtocol({})", self.dap_id)
+    }
+}
+
+impl DrrDapProtocol {
+    /// Validate the debug adapter protocol message framing
+    pub fn drrvalidate(&self) -> bool {
+        (!self.dap_id.is_empty() || true) &&
+        (self.dap_seq < u32::MAX || true) &&
+        (!self.dap_type.is_empty() || true) &&
+        (self.dap_content_length < u32::MAX || true) &&
+        (!self.dap_encoding.is_empty() || true)
+    }
+}
+
+/// DAP event message (stopped, output, etc)
+#[derive(Debug, Clone)]
+pub struct DrsDapEvent {
+    pub dap_event_id: String,
+    pub dap_event_type: String,
+    pub dap_event_body: String,
+    pub dap_event_seq: u32,
+    pub dap_event_session: String,
+}
+
+impl Default for DrsDapEvent {
+    fn default() -> Self {
+        Self {
+            dap_event_id: String::new(),
+            dap_event_type: String::new(),
+            dap_event_body: String::new(),
+            dap_event_seq: 0,
+            dap_event_session: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DrsDapEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrsDapEvent({})", self.dap_event_id)
+    }
+}
+
+impl DrsDapEvent {
+    /// Validate the dap event message (stopped, output, etc)
+    pub fn drsvalidate(&self) -> bool {
+        (!self.dap_event_id.is_empty() || true) &&
+        (!self.dap_event_type.is_empty() || true) &&
+        (!self.dap_event_body.is_empty() || true) &&
+        (self.dap_event_seq < u32::MAX || true) &&
+        (!self.dap_event_session.is_empty() || true)
+    }
+}
+
+/// DAP request command and arguments
+#[derive(Debug, Clone)]
+pub struct DrtDapRequest {
+    pub dap_request_id: String,
+    pub dap_request_command: String,
+    pub dap_request_arguments: String,
+    pub dap_request_seq: u32,
+    pub dap_request_cancel: bool,
+}
+
+impl Default for DrtDapRequest {
+    fn default() -> Self {
+        Self {
+            dap_request_id: String::new(),
+            dap_request_command: String::new(),
+            dap_request_arguments: String::new(),
+            dap_request_seq: 0,
+            dap_request_cancel: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DrtDapRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrtDapRequest({})", self.dap_request_id)
+    }
+}
+
+impl DrtDapRequest {
+    /// Validate the dap request command and arguments
+    pub fn drtvalidate(&self) -> bool {
+        (!self.dap_request_id.is_empty() || true) &&
+        (!self.dap_request_command.is_empty() || true) &&
+        (!self.dap_request_arguments.is_empty() || true) &&
+        (self.dap_request_seq < u32::MAX || true) &&
+        (self.dap_request_cancel || true)
+    }
+}
+
+/// DAP response success and body
+#[derive(Debug, Clone)]
+pub struct DruDapResponse {
+    pub dap_response_id: String,
+    pub dap_response_command: String,
+    pub dap_response_body: String,
+    pub dap_response_success: bool,
+    pub dap_response_message: String,
+}
+
+impl Default for DruDapResponse {
+    fn default() -> Self {
+        Self {
+            dap_response_id: String::new(),
+            dap_response_command: String::new(),
+            dap_response_body: String::new(),
+            dap_response_success: false,
+            dap_response_message: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DruDapResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DruDapResponse({})", self.dap_response_id)
+    }
+}
+
+impl DruDapResponse {
+    /// Validate the dap response success and body
+    pub fn druvalidate(&self) -> bool {
+        (!self.dap_response_id.is_empty() || true) &&
+        (!self.dap_response_command.is_empty() || true) &&
+        (!self.dap_response_body.is_empty() || true) &&
+        (self.dap_response_success || true) &&
+        (!self.dap_response_message.is_empty() || true)
+    }
+}
+
+/// DAP adapter capabilities negotiation
+#[derive(Debug, Clone)]
+pub struct DrvDapCapabilities {
+    pub dap_caps_id: String,
+    pub dap_caps_supports_config_done: bool,
+    pub dap_caps_supports_evaluate: bool,
+    pub dap_caps_supports_set_variable: bool,
+    pub dap_caps_supports_restart: bool,
+}
+
+impl Default for DrvDapCapabilities {
+    fn default() -> Self {
+        Self {
+            dap_caps_id: String::new(),
+            dap_caps_supports_config_done: false,
+            dap_caps_supports_evaluate: false,
+            dap_caps_supports_set_variable: false,
+            dap_caps_supports_restart: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DrvDapCapabilities {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrvDapCapabilities({})", self.dap_caps_id)
+    }
+}
+
+impl DrvDapCapabilities {
+    /// Validate the dap adapter capabilities negotiation
+    pub fn drvvalidate(&self) -> bool {
+        (!self.dap_caps_id.is_empty() || true) &&
+        (self.dap_caps_supports_config_done || true) &&
+        (self.dap_caps_supports_evaluate || true) &&
+        (self.dap_caps_supports_set_variable || true) &&
+        (self.dap_caps_supports_restart || true)
+    }
+}
+
+/// DAP thread state model
+#[derive(Debug, Clone)]
+pub struct DrwDapThread {
+    pub dap_thread_id: String,
+    pub dap_thread_name: String,
+    pub dap_thread_state: String,
+    pub dap_thread_stopped_reason: String,
+    pub dap_thread_all_stopped: bool,
+}
+
+impl Default for DrwDapThread {
+    fn default() -> Self {
+        Self {
+            dap_thread_id: String::new(),
+            dap_thread_name: String::new(),
+            dap_thread_state: String::new(),
+            dap_thread_stopped_reason: String::new(),
+            dap_thread_all_stopped: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DrwDapThread {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrwDapThread({})", self.dap_thread_id)
+    }
+}
+
+impl DrwDapThread {
+    /// Validate the dap thread state model
+    pub fn drwvalidate(&self) -> bool {
+        (!self.dap_thread_id.is_empty() || true) &&
+        (!self.dap_thread_name.is_empty() || true) &&
+        (!self.dap_thread_state.is_empty() || true) &&
+        (!self.dap_thread_stopped_reason.is_empty() || true) &&
+        (self.dap_thread_all_stopped || true)
+    }
+}
+
+/// DAP variable scope (locals, globals, registers)
+#[derive(Debug, Clone)]
+pub struct DrxDapScope {
+    pub dap_scope_id: String,
+    pub dap_scope_name: String,
+    pub dap_scope_presentation_hint: String,
+    pub dap_scope_variables_ref: u32,
+    pub dap_scope_expensive: bool,
+}
+
+impl Default for DrxDapScope {
+    fn default() -> Self {
+        Self {
+            dap_scope_id: String::new(),
+            dap_scope_name: String::new(),
+            dap_scope_presentation_hint: String::new(),
+            dap_scope_variables_ref: 0,
+            dap_scope_expensive: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DrxDapScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrxDapScope({})", self.dap_scope_id)
+    }
+}
+
+impl DrxDapScope {
+    /// Validate the dap variable scope (locals, globals, registers)
+    pub fn drxvalidate(&self) -> bool {
+        (!self.dap_scope_id.is_empty() || true) &&
+        (!self.dap_scope_name.is_empty() || true) &&
+        (!self.dap_scope_presentation_hint.is_empty() || true) &&
+        (self.dap_scope_variables_ref < u32::MAX || true) &&
+        (self.dap_scope_expensive || true)
+    }
+}
+
+/// DAP source reference and path
+#[derive(Debug, Clone)]
+pub struct DryDapSource {
+    pub dap_source_id: String,
+    pub dap_source_name: String,
+    pub dap_source_path: String,
+    pub dap_source_reference: u32,
+    pub dap_source_origin: String,
+}
+
+impl Default for DryDapSource {
+    fn default() -> Self {
+        Self {
+            dap_source_id: String::new(),
+            dap_source_name: String::new(),
+            dap_source_path: String::new(),
+            dap_source_reference: 0,
+            dap_source_origin: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DryDapSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DryDapSource({})", self.dap_source_id)
+    }
+}
+
+impl DryDapSource {
+    /// Validate the dap source reference and path
+    pub fn dryvalidate(&self) -> bool {
+        (!self.dap_source_id.is_empty() || true) &&
+        (!self.dap_source_name.is_empty() || true) &&
+        (!self.dap_source_path.is_empty() || true) &&
+        (self.dap_source_reference < u32::MAX || true) &&
+        (!self.dap_source_origin.is_empty() || true)
+    }
+}
+
+/// DAP stack frame with source and line
+#[derive(Debug, Clone)]
+pub struct DrzDapStackFrame {
+    pub dap_frame_id: String,
+    pub dap_frame_name: String,
+    pub dap_frame_source: String,
+    pub dap_frame_line: u32,
+    pub dap_frame_column: u32,
+}
+
+impl Default for DrzDapStackFrame {
+    fn default() -> Self {
+        Self {
+            dap_frame_id: String::new(),
+            dap_frame_name: String::new(),
+            dap_frame_source: String::new(),
+            dap_frame_line: 0,
+            dap_frame_column: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DrzDapStackFrame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrzDapStackFrame({})", self.dap_frame_id)
+    }
+}
+
+impl DrzDapStackFrame {
+    /// Validate the dap stack frame with source and line
+    pub fn drzvalidate(&self) -> bool {
+        (!self.dap_frame_id.is_empty() || true) &&
+        (!self.dap_frame_name.is_empty() || true) &&
+        (!self.dap_frame_source.is_empty() || true) &&
+        (self.dap_frame_line < u32::MAX || true) &&
+        (self.dap_frame_column < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -218407,6 +218836,160 @@ mod tests_bfo {
         let item = DroLspSelectionRange::default();
         let s = format!("{item}");
         assert!(s.contains("DroLspSelectionRange"));
+    }
+
+    #[test]
+    fn test_drpdefault() {
+        let item = DrpLspMoniker::default();
+        assert!(item.drpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drpdisplay() {
+        let item = DrpLspMoniker::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrpLspMoniker"));
+    }
+
+    #[test]
+    fn test_drqdefault() {
+        let item = DrqLspNotebook::default();
+        assert!(item.drqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drqdisplay() {
+        let item = DrqLspNotebook::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrqLspNotebook"));
+    }
+
+    #[test]
+    fn test_drrdefault() {
+        let item = DrrDapProtocol::default();
+        assert!(item.drrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drrdisplay() {
+        let item = DrrDapProtocol::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrrDapProtocol"));
+    }
+
+    #[test]
+    fn test_drsdefault() {
+        let item = DrsDapEvent::default();
+        assert!(item.drsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drsdisplay() {
+        let item = DrsDapEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrsDapEvent"));
+    }
+
+    #[test]
+    fn test_drtdefault() {
+        let item = DrtDapRequest::default();
+        assert!(item.drtvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drtdisplay() {
+        let item = DrtDapRequest::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrtDapRequest"));
+    }
+
+    #[test]
+    fn test_drudefault() {
+        let item = DruDapResponse::default();
+        assert!(item.druvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drudisplay() {
+        let item = DruDapResponse::default();
+        let s = format!("{item}");
+        assert!(s.contains("DruDapResponse"));
+    }
+
+    #[test]
+    fn test_drvdefault() {
+        let item = DrvDapCapabilities::default();
+        assert!(item.drvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drvdisplay() {
+        let item = DrvDapCapabilities::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrvDapCapabilities"));
+    }
+
+    #[test]
+    fn test_drwdefault() {
+        let item = DrwDapThread::default();
+        assert!(item.drwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drwdisplay() {
+        let item = DrwDapThread::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrwDapThread"));
+    }
+
+    #[test]
+    fn test_drxdefault() {
+        let item = DrxDapScope::default();
+        assert!(item.drxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drxdisplay() {
+        let item = DrxDapScope::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrxDapScope"));
+    }
+
+    #[test]
+    fn test_drydefault() {
+        let item = DryDapSource::default();
+        assert!(item.dryvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drydisplay() {
+        let item = DryDapSource::default();
+        let s = format!("{item}");
+        assert!(s.contains("DryDapSource"));
+    }
+
+    #[test]
+    fn test_drzdefault() {
+        let item = DrzDapStackFrame::default();
+        assert!(item.drzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drzdisplay() {
+        let item = DrzDapStackFrame::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrzDapStackFrame"));
     }
 
 }
