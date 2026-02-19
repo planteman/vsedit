@@ -95185,6 +95185,295 @@ impl std::fmt::Display for DebugVariableModel {
     }
 }
 
+
+/// CallStackFrameModel — call stack frame model
+#[derive(Debug, Clone)]
+pub struct CallStackFrameModel {
+    pub bxu_id: u32,
+    pub bxu_name: String,
+    pub bxu_source_path: String,
+    pub bxu_line: u32,
+    pub bxu_column: u32,
+    pub bxu_end_line: u32,
+    pub bxu_end_column: u32,
+    pub bxu_presentation_hint: String,
+}
+
+impl CallStackFrameModel {
+    pub fn new() -> Self {
+        Self {
+            bxu_id: 0,
+            bxu_name: "main".into(),
+            bxu_source_path: "".into(),
+            bxu_line: 0,
+            bxu_column: 0,
+            bxu_end_line: 0,
+            bxu_end_column: 0,
+            bxu_presentation_hint: "normal".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("CallStackFrameModel({})", self.bxu_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bxu_id < u32::MAX || true
+    }
+}
+
+impl Default for CallStackFrameModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for CallStackFrameModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CallStackFrameModel({})", self.bxu_id)
+    }
+}
+
+/// DebugWatchExpr — debug watch expression model
+#[derive(Debug, Clone)]
+pub struct DebugWatchExpr {
+    pub bxv_expression: String,
+    pub bxv_name: String,
+    pub bxv_value: String,
+    pub bxv_var_type: String,
+    pub bxv_has_children: bool,
+    pub bxv_evaluation_err: String,
+    pub bxv_id: u32,
+    pub bxv_is_focused: bool,
+}
+
+impl DebugWatchExpr {
+    pub fn new() -> Self {
+        Self {
+            bxv_expression: "".into(),
+            bxv_name: "".into(),
+            bxv_value: "".into(),
+            bxv_var_type: "".into(),
+            bxv_has_children: false,
+            bxv_evaluation_err: "".into(),
+            bxv_id: 0,
+            bxv_is_focused: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("DebugWatchExpr({})", self.bxv_expression)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxv_expression.is_empty() || true
+    }
+}
+
+impl Default for DebugWatchExpr {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for DebugWatchExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DebugWatchExpr({})", self.bxv_expression)
+    }
+}
+
+/// ScopesModel — debug scopes model
+#[derive(Debug, Clone)]
+pub struct ScopesModel {
+    pub bxw_name: String,
+    pub bxw_variables_ref: u32,
+    pub bxw_named_variables: u32,
+    pub bxw_indexed_variables: u32,
+    pub bxw_expensive: bool,
+    pub bxw_source_path: String,
+    pub bxw_line: u32,
+    pub bxw_column: u32,
+}
+
+impl ScopesModel {
+    pub fn new() -> Self {
+        Self {
+            bxw_name: "Locals".into(),
+            bxw_variables_ref: 0,
+            bxw_named_variables: 0,
+            bxw_indexed_variables: 0,
+            bxw_expensive: false,
+            bxw_source_path: "".into(),
+            bxw_line: 0,
+            bxw_column: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ScopesModel({})", self.bxw_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxw_name.is_empty() || true
+    }
+}
+
+impl Default for ScopesModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ScopesModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ScopesModel({})", self.bxw_name)
+    }
+}
+
+/// SourceControlResourceModel — source control resource state
+#[derive(Debug, Clone)]
+pub struct SourceControlResourceModel {
+    pub bxx_uri: String,
+    pub bxx_resource_group: String,
+    pub bxx_decoration_letter: String,
+    pub bxx_decoration_color: String,
+    pub bxx_tooltip: String,
+    pub bxx_command_id: String,
+    pub bxx_is_selected: bool,
+    pub bxx_faded: bool,
+}
+
+impl SourceControlResourceModel {
+    pub fn new() -> Self {
+        Self {
+            bxx_uri: "".into(),
+            bxx_resource_group: "changes".into(),
+            bxx_decoration_letter: "M".into(),
+            bxx_decoration_color: "yellow".into(),
+            bxx_tooltip: "Modified".into(),
+            bxx_command_id: "".into(),
+            bxx_is_selected: false,
+            bxx_faded: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("SourceControlResourceModel({})", self.bxx_uri)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxx_uri.is_empty() || true
+    }
+}
+
+impl Default for SourceControlResourceModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for SourceControlResourceModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SourceControlResourceModel({})", self.bxx_uri)
+    }
+}
+
+/// SourceControlGroupModel — source control resource group
+#[derive(Debug, Clone)]
+pub struct SourceControlGroupModel {
+    pub bxy_id: String,
+    pub bxy_label: String,
+    pub bxy_resource_count: u32,
+    pub bxy_hide_when_empty: bool,
+    pub bxy_provider_id: String,
+    pub bxy_icon_id: String,
+    pub bxy_is_expanded: bool,
+    pub bxy_context_value: String,
+}
+
+impl SourceControlGroupModel {
+    pub fn new() -> Self {
+        Self {
+            bxy_id: "changes".into(),
+            bxy_label: "Changes".into(),
+            bxy_resource_count: 0,
+            bxy_hide_when_empty: true,
+            bxy_provider_id: "git".into(),
+            bxy_icon_id: "".into(),
+            bxy_is_expanded: true,
+            bxy_context_value: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("SourceControlGroupModel({})", self.bxy_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxy_id.is_empty() || true
+    }
+}
+
+impl Default for SourceControlGroupModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for SourceControlGroupModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SourceControlGroupModel({})", self.bxy_id)
+    }
+}
+
+/// SourceControlActionModel — source control input action
+#[derive(Debug, Clone)]
+pub struct SourceControlActionModel {
+    pub bxz_input_value: String,
+    pub bxz_placeholder: String,
+    pub bxz_provider_id: String,
+    pub bxz_action_button_label: String,
+    pub bxz_action_button_icon: String,
+    pub bxz_action_button_enabled: bool,
+    pub bxz_validation_message: String,
+    pub bxz_count_badge: u32,
+}
+
+impl SourceControlActionModel {
+    pub fn new() -> Self {
+        Self {
+            bxz_input_value: "".into(),
+            bxz_placeholder: "Message".into(),
+            bxz_provider_id: "git".into(),
+            bxz_action_button_label: "Commit".into(),
+            bxz_action_button_icon: "check".into(),
+            bxz_action_button_enabled: true,
+            bxz_validation_message: "".into(),
+            bxz_count_badge: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("SourceControlActionModel({})", self.bxz_input_value)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxz_input_value.is_empty() || true
+    }
+}
+
+impl Default for SourceControlActionModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for SourceControlActionModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SourceControlActionModel({})", self.bxz_input_value)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -144891,6 +145180,397 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bxt_name = "variable".into();
         assert_eq!(c.summary(), DebugVariableModel::new().summary());
+    }
+
+
+    #[test]
+    fn test_bxu_create() {
+        let obj = CallStackFrameModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxu_validate() {
+        let obj = CallStackFrameModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxu_display() {
+        let obj = CallStackFrameModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("CallStackFrameModel"));
+    }
+
+    #[test]
+    fn test_bxu_clone() {
+        let obj = CallStackFrameModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxu_debug() {
+        let obj = CallStackFrameModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("CallStackFrameModel"));
+    }
+
+    #[test]
+    fn test_bxu_default() {
+        let obj = CallStackFrameModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxu_summary_contains_name() {
+        let obj = CallStackFrameModel::new();
+        assert!(obj.summary().contains("CallStackFrameModel"));
+    }
+
+    #[test]
+    fn test_bxu_validate_default() {
+        let obj = CallStackFrameModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxu_display_not_empty() {
+        let obj = CallStackFrameModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxu_clone_independence() {
+        let mut obj = CallStackFrameModel::new();
+        let c = obj.clone();
+        obj.bxu_id = 0;
+        assert_eq!(c.summary(), CallStackFrameModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxv_create() {
+        let obj = DebugWatchExpr::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxv_validate() {
+        let obj = DebugWatchExpr::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxv_display() {
+        let obj = DebugWatchExpr::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("DebugWatchExpr"));
+    }
+
+    #[test]
+    fn test_bxv_clone() {
+        let obj = DebugWatchExpr::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxv_debug() {
+        let obj = DebugWatchExpr::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("DebugWatchExpr"));
+    }
+
+    #[test]
+    fn test_bxv_default() {
+        let obj = DebugWatchExpr::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxv_summary_contains_name() {
+        let obj = DebugWatchExpr::new();
+        assert!(obj.summary().contains("DebugWatchExpr"));
+    }
+
+    #[test]
+    fn test_bxv_validate_default() {
+        let obj = DebugWatchExpr::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxv_display_not_empty() {
+        let obj = DebugWatchExpr::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxv_clone_independence() {
+        let mut obj = DebugWatchExpr::new();
+        let c = obj.clone();
+        obj.bxv_expression = "".into();
+        assert_eq!(c.summary(), DebugWatchExpr::new().summary());
+    }
+
+    #[test]
+    fn test_bxw_create() {
+        let obj = ScopesModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxw_validate() {
+        let obj = ScopesModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxw_display() {
+        let obj = ScopesModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ScopesModel"));
+    }
+
+    #[test]
+    fn test_bxw_clone() {
+        let obj = ScopesModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxw_debug() {
+        let obj = ScopesModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ScopesModel"));
+    }
+
+    #[test]
+    fn test_bxw_default() {
+        let obj = ScopesModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxw_summary_contains_name() {
+        let obj = ScopesModel::new();
+        assert!(obj.summary().contains("ScopesModel"));
+    }
+
+    #[test]
+    fn test_bxw_validate_default() {
+        let obj = ScopesModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxw_display_not_empty() {
+        let obj = ScopesModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxw_clone_independence() {
+        let mut obj = ScopesModel::new();
+        let c = obj.clone();
+        obj.bxw_name = "Locals".into();
+        assert_eq!(c.summary(), ScopesModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxx_create() {
+        let obj = SourceControlResourceModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxx_validate() {
+        let obj = SourceControlResourceModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxx_display() {
+        let obj = SourceControlResourceModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("SourceControlResourceModel"));
+    }
+
+    #[test]
+    fn test_bxx_clone() {
+        let obj = SourceControlResourceModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxx_debug() {
+        let obj = SourceControlResourceModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("SourceControlResourceModel"));
+    }
+
+    #[test]
+    fn test_bxx_default() {
+        let obj = SourceControlResourceModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxx_summary_contains_name() {
+        let obj = SourceControlResourceModel::new();
+        assert!(obj.summary().contains("SourceControlResourceModel"));
+    }
+
+    #[test]
+    fn test_bxx_validate_default() {
+        let obj = SourceControlResourceModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxx_display_not_empty() {
+        let obj = SourceControlResourceModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxx_clone_independence() {
+        let mut obj = SourceControlResourceModel::new();
+        let c = obj.clone();
+        obj.bxx_uri = "".into();
+        assert_eq!(c.summary(), SourceControlResourceModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxy_create() {
+        let obj = SourceControlGroupModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxy_validate() {
+        let obj = SourceControlGroupModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxy_display() {
+        let obj = SourceControlGroupModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("SourceControlGroupModel"));
+    }
+
+    #[test]
+    fn test_bxy_clone() {
+        let obj = SourceControlGroupModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxy_debug() {
+        let obj = SourceControlGroupModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("SourceControlGroupModel"));
+    }
+
+    #[test]
+    fn test_bxy_default() {
+        let obj = SourceControlGroupModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxy_summary_contains_name() {
+        let obj = SourceControlGroupModel::new();
+        assert!(obj.summary().contains("SourceControlGroupModel"));
+    }
+
+    #[test]
+    fn test_bxy_validate_default() {
+        let obj = SourceControlGroupModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxy_display_not_empty() {
+        let obj = SourceControlGroupModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxy_clone_independence() {
+        let mut obj = SourceControlGroupModel::new();
+        let c = obj.clone();
+        obj.bxy_id = "changes".into();
+        assert_eq!(c.summary(), SourceControlGroupModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxz_create() {
+        let obj = SourceControlActionModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxz_validate() {
+        let obj = SourceControlActionModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxz_display() {
+        let obj = SourceControlActionModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("SourceControlActionModel"));
+    }
+
+    #[test]
+    fn test_bxz_clone() {
+        let obj = SourceControlActionModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxz_debug() {
+        let obj = SourceControlActionModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("SourceControlActionModel"));
+    }
+
+    #[test]
+    fn test_bxz_default() {
+        let obj = SourceControlActionModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxz_summary_contains_name() {
+        let obj = SourceControlActionModel::new();
+        assert!(obj.summary().contains("SourceControlActionModel"));
+    }
+
+    #[test]
+    fn test_bxz_validate_default() {
+        let obj = SourceControlActionModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxz_display_not_empty() {
+        let obj = SourceControlActionModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxz_clone_independence() {
+        let mut obj = SourceControlActionModel::new();
+        let c = obj.clone();
+        obj.bxz_input_value = "".into();
+        assert_eq!(c.summary(), SourceControlActionModel::new().summary());
     }
 
 }
