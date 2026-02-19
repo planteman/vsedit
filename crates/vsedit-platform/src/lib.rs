@@ -86005,6 +86005,67 @@ pub struct BjzDiagnosticCollection { pub name: String, pub entries: Vec<BjzDiagn
 #[derive(Debug, Clone)]
 pub struct BjzDiagnosticChangeEvent { pub uris: Vec<String> }
 
+
+// Editor scroll synchronization — sync scroll positions across split editors, lock scroll
+#[derive(Debug, Clone)]
+pub struct BkaScrollPosition { pub top_line: usize, pub left_col: usize, pub viewport_height: usize, pub viewport_width: usize }
+#[derive(Debug, Clone)]
+pub struct BkaScrollSyncGroup { pub editors: Vec<String>, pub enabled: bool, pub lock_vertical: bool, pub lock_horizontal: bool }
+#[derive(Debug, Clone)]
+pub struct BkaScrollDelta { pub delta_lines: i64, pub delta_cols: i64, pub smooth: bool }
+#[derive(Debug, Clone)]
+pub struct BkaScrollEvent { pub editor_id: String, pub position: BkaScrollPosition, pub source: u8 }
+#[derive(Debug, Clone)]
+pub struct BkaScrollReveal { pub line: usize, pub col: usize, pub at_top: bool, pub at_center: bool }
+
+// Editor viewport model — visible ranges, line mapping, soft wrap viewport calculations
+#[derive(Debug, Clone)]
+pub struct BkbVisibleRange { pub start_line: usize, pub end_line: usize, pub start_col: usize, pub end_col: usize }
+#[derive(Debug, Clone)]
+pub struct BkbLineMapping { pub model_line: usize, pub view_lines: Vec<usize>, pub is_wrapped: bool }
+#[derive(Debug, Clone)]
+pub struct BkbViewportInfo { pub first_visible_line: usize, pub last_visible_line: usize, pub total_view_lines: usize, pub scroll_fraction: f64 }
+#[derive(Debug, Clone)]
+pub struct BkbSoftWrapConfig { pub enabled: bool, pub word_wrap_column: usize, pub wrap_indent: u8, pub min_content_width: usize }
+#[derive(Debug, Clone)]
+pub struct BkbViewportChange { pub old_first: usize, pub old_last: usize, pub new_first: usize, pub new_last: usize }
+
+// Cursor blinking model — blink phases, rates, focus-based blink, style transitions
+#[derive(Debug, Clone)]
+pub struct BkcCursorStyle { pub shape: u8, pub blinking: u8, pub blink_rate_ms: u32 }
+#[derive(Debug, Clone)]
+pub struct BkcBlinkPhase { pub visible: bool, pub elapsed_ms: u64, pub cycle_count: u32 }
+#[derive(Debug, Clone)]
+pub struct BkcCursorState { pub line: usize, pub col: usize, pub style: BkcCursorStyle, pub phase: BkcBlinkPhase, pub focused: bool }
+#[derive(Debug, Clone)]
+pub struct BkcBlinkConfig { pub on_ms: u32, pub off_ms: u32, pub smooth_caret: bool, pub cursor_width: u8 }
+#[derive(Debug, Clone)]
+pub struct BkcCursorAnimation { pub from_line: usize, pub from_col: usize, pub to_line: usize, pub to_col: usize, pub progress: f64 }
+
+// Selection decoration model — selection colors, highlight ranges, multi-cursor selection rendering
+#[derive(Debug, Clone)]
+pub struct BkdSelectionRange { pub start_line: usize, pub start_col: usize, pub end_line: usize, pub end_col: usize, pub is_reversed: bool }
+#[derive(Debug, Clone)]
+pub struct BkdSelectionStyle { pub background_color: u32, pub border_color: Option<u32>, pub rounded_corners: bool }
+#[derive(Debug, Clone)]
+pub struct BkdSelectionDecoration { pub range: BkdSelectionRange, pub style: BkdSelectionStyle, pub is_primary: bool }
+#[derive(Debug, Clone)]
+pub struct BkdHighlightRange { pub line: usize, pub start_col: usize, pub end_col: usize, pub kind: u8 }
+#[derive(Debug, Clone)]
+pub struct BkdSelectionSet { pub selections: Vec<BkdSelectionDecoration>, pub highlight_ranges: Vec<BkdHighlightRange> }
+
+// Word boundary detection — word segmentation, camelCase/snake_case boundaries, Unicode categories
+#[derive(Debug, Clone)]
+pub struct BkeWordBoundary { pub offset: usize, pub is_start: bool, pub kind: u8 }
+#[derive(Debug, Clone)]
+pub struct BkeWordRange { pub start: usize, pub end: usize, pub text: String, pub category: u8 }
+#[derive(Debug, Clone)]
+pub struct BkeWordConfig { pub separators: String, pub camel_case: bool, pub snake_case: bool }
+#[derive(Debug, Clone)]
+pub struct BkeWordAtPosition { pub word: String, pub start_col: usize, pub end_col: usize, pub line: usize }
+#[derive(Debug, Clone)]
+pub struct BkeWordSegmentation { pub ranges: Vec<BkeWordRange>, pub boundary_count: usize }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -94505,4 +94566,104 @@ mod tests_bfo {
     fn test_bjz_change_event() { let e = BjzDiagnosticChangeEvent { uris: vec!["file:///a.rs".into()] }; assert_eq!(e.uris.len(), 1); }
     #[test]
     fn test_bjz_multi_file_collection() { let entries: Vec<BjzDiagnosticEntry> = (0..3).map(|i| BjzDiagnosticEntry { uri: format!("f{i}.rs"), diagnostics: vec![] }).collect(); let c = BjzDiagnosticCollection { name: "test".into(), entries }; assert_eq!(c.entries.len(), 3); }
+    #[test]
+    fn test_bka_position_basic() { let p = BkaScrollPosition { top_line: 0, left_col: 0, viewport_height: 40, viewport_width: 80 }; assert_eq!(p.viewport_height, 40); }
+    #[test]
+    fn test_bka_sync_group() { let g = BkaScrollSyncGroup { editors: vec!["a".into(), "b".into()], enabled: true, lock_vertical: true, lock_horizontal: false }; assert_eq!(g.editors.len(), 2); }
+    #[test]
+    fn test_bka_delta_down() { let d = BkaScrollDelta { delta_lines: 10, delta_cols: 0, smooth: true }; assert_eq!(d.delta_lines, 10); }
+    #[test]
+    fn test_bka_delta_up() { let d = BkaScrollDelta { delta_lines: -5, delta_cols: 0, smooth: false }; assert_eq!(d.delta_lines, -5); }
+    #[test]
+    fn test_bka_scroll_event() { let p = BkaScrollPosition { top_line: 100, left_col: 0, viewport_height: 30, viewport_width: 120 }; let e = BkaScrollEvent { editor_id: "e1".into(), position: p, source: 1 }; assert_eq!(e.position.top_line, 100); }
+    #[test]
+    fn test_bka_reveal_at_top() { let r = BkaScrollReveal { line: 50, col: 0, at_top: true, at_center: false }; assert!(r.at_top); }
+    #[test]
+    fn test_bka_reveal_at_center() { let r = BkaScrollReveal { line: 25, col: 10, at_top: false, at_center: true }; assert!(r.at_center); }
+    #[test]
+    fn test_bka_sync_disabled() { let g = BkaScrollSyncGroup { editors: vec![], enabled: false, lock_vertical: false, lock_horizontal: false }; assert!(!g.enabled); }
+    #[test]
+    fn test_bka_horizontal_scroll() { let d = BkaScrollDelta { delta_lines: 0, delta_cols: 20, smooth: true }; assert_eq!(d.delta_cols, 20); }
+    #[test]
+    fn test_bka_event_source_keyboard() { let p = BkaScrollPosition { top_line: 0, left_col: 0, viewport_height: 24, viewport_width: 80 }; let e = BkaScrollEvent { editor_id: "e2".into(), position: p, source: 2 }; assert_eq!(e.source, 2); }
+    #[test]
+    fn test_bkb_visible_range() { let r = BkbVisibleRange { start_line: 10, end_line: 50, start_col: 0, end_col: 80 }; assert_eq!(r.end_line - r.start_line, 40); }
+    #[test]
+    fn test_bkb_line_not_wrapped() { let m = BkbLineMapping { model_line: 5, view_lines: vec![5], is_wrapped: false }; assert!(!m.is_wrapped); }
+    #[test]
+    fn test_bkb_line_wrapped() { let m = BkbLineMapping { model_line: 10, view_lines: vec![12, 13], is_wrapped: true }; assert_eq!(m.view_lines.len(), 2); }
+    #[test]
+    fn test_bkb_viewport_at_top() { let v = BkbViewportInfo { first_visible_line: 0, last_visible_line: 39, total_view_lines: 1000, scroll_fraction: 0.0 }; assert_eq!(v.scroll_fraction, 0.0); }
+    #[test]
+    fn test_bkb_viewport_at_bottom() { let v = BkbViewportInfo { first_visible_line: 960, last_visible_line: 999, total_view_lines: 1000, scroll_fraction: 1.0 }; assert_eq!(v.scroll_fraction, 1.0); }
+    #[test]
+    fn test_bkb_wrap_config_enabled() { let c = BkbSoftWrapConfig { enabled: true, word_wrap_column: 80, wrap_indent: 2, min_content_width: 20 }; assert!(c.enabled); }
+    #[test]
+    fn test_bkb_wrap_config_disabled() { let c = BkbSoftWrapConfig { enabled: false, word_wrap_column: 0, wrap_indent: 0, min_content_width: 0 }; assert!(!c.enabled); }
+    #[test]
+    fn test_bkb_viewport_change() { let ch = BkbViewportChange { old_first: 0, old_last: 39, new_first: 10, new_last: 49 }; assert_eq!(ch.new_first - ch.old_first, 10); }
+    #[test]
+    fn test_bkb_scroll_fraction_mid() { let v = BkbViewportInfo { first_visible_line: 500, last_visible_line: 539, total_view_lines: 1080, scroll_fraction: 0.48 }; assert!(v.scroll_fraction > 0.4); }
+    #[test]
+    fn test_bkb_triple_wrap() { let m = BkbLineMapping { model_line: 1, view_lines: vec![1, 2, 3], is_wrapped: true }; assert_eq!(m.view_lines.len(), 3); }
+    #[test]
+    fn test_bkc_line_cursor() { let s = BkcCursorStyle { shape: 1, blinking: 1, blink_rate_ms: 530 }; assert_eq!(s.shape, 1); }
+    #[test]
+    fn test_bkc_block_cursor() { let s = BkcCursorStyle { shape: 2, blinking: 0, blink_rate_ms: 0 }; assert_eq!(s.blinking, 0); }
+    #[test]
+    fn test_bkc_blink_visible() { let p = BkcBlinkPhase { visible: true, elapsed_ms: 100, cycle_count: 0 }; assert!(p.visible); }
+    #[test]
+    fn test_bkc_blink_hidden() { let p = BkcBlinkPhase { visible: false, elapsed_ms: 630, cycle_count: 1 }; assert!(!p.visible); }
+    #[test]
+    fn test_bkc_cursor_focused() { let s = BkcCursorStyle { shape: 1, blinking: 1, blink_rate_ms: 530 }; let p = BkcBlinkPhase { visible: true, elapsed_ms: 0, cycle_count: 0 }; let c = BkcCursorState { line: 5, col: 10, style: s, phase: p, focused: true }; assert!(c.focused); }
+    #[test]
+    fn test_bkc_cursor_unfocused() { let s = BkcCursorStyle { shape: 1, blinking: 0, blink_rate_ms: 0 }; let p = BkcBlinkPhase { visible: true, elapsed_ms: 0, cycle_count: 0 }; let c = BkcCursorState { line: 0, col: 0, style: s, phase: p, focused: false }; assert!(!c.focused); }
+    #[test]
+    fn test_bkc_blink_config() { let cfg = BkcBlinkConfig { on_ms: 530, off_ms: 530, smooth_caret: true, cursor_width: 2 }; assert_eq!(cfg.on_ms, 530); }
+    #[test]
+    fn test_bkc_smooth_caret() { let cfg = BkcBlinkConfig { on_ms: 500, off_ms: 500, smooth_caret: true, cursor_width: 1 }; assert!(cfg.smooth_caret); }
+    #[test]
+    fn test_bkc_animation_progress() { let a = BkcCursorAnimation { from_line: 0, from_col: 0, to_line: 5, to_col: 10, progress: 0.5 }; assert_eq!(a.progress, 0.5); }
+    #[test]
+    fn test_bkc_animation_complete() { let a = BkcCursorAnimation { from_line: 10, from_col: 5, to_line: 10, to_col: 20, progress: 1.0 }; assert_eq!(a.progress, 1.0); }
+    #[test]
+    fn test_bkd_forward_selection() { let r = BkdSelectionRange { start_line: 1, start_col: 0, end_line: 3, end_col: 5, is_reversed: false }; assert!(!r.is_reversed); }
+    #[test]
+    fn test_bkd_reversed_selection() { let r = BkdSelectionRange { start_line: 5, start_col: 10, end_line: 1, end_col: 0, is_reversed: true }; assert!(r.is_reversed); }
+    #[test]
+    fn test_bkd_selection_style() { let s = BkdSelectionStyle { background_color: 0x264F78, border_color: None, rounded_corners: false }; assert_eq!(s.background_color, 0x264F78); }
+    #[test]
+    fn test_bkd_primary_decoration() { let r = BkdSelectionRange { start_line: 0, start_col: 0, end_line: 0, end_col: 5, is_reversed: false }; let s = BkdSelectionStyle { background_color: 0xFF, border_color: None, rounded_corners: false }; let d = BkdSelectionDecoration { range: r, style: s, is_primary: true }; assert!(d.is_primary); }
+    #[test]
+    fn test_bkd_secondary_decoration() { let r = BkdSelectionRange { start_line: 2, start_col: 0, end_line: 2, end_col: 3, is_reversed: false }; let s = BkdSelectionStyle { background_color: 0xAA, border_color: Some(0xBB), rounded_corners: true }; let d = BkdSelectionDecoration { range: r, style: s, is_primary: false }; assert!(!d.is_primary); }
+    #[test]
+    fn test_bkd_highlight_kind_word() { let h = BkdHighlightRange { line: 5, start_col: 3, end_col: 8, kind: 1 }; assert_eq!(h.kind, 1); }
+    #[test]
+    fn test_bkd_highlight_kind_bracket() { let h = BkdHighlightRange { line: 10, start_col: 15, end_col: 16, kind: 2 }; assert_eq!(h.kind, 2); }
+    #[test]
+    fn test_bkd_empty_selection_set() { let s = BkdSelectionSet { selections: vec![], highlight_ranges: vec![] }; assert!(s.selections.is_empty()); }
+    #[test]
+    fn test_bkd_multi_cursor_set() { let mk = |l, c1, c2| { let r = BkdSelectionRange { start_line: l, start_col: c1, end_line: l, end_col: c2, is_reversed: false }; let s = BkdSelectionStyle { background_color: 0xFF, border_color: None, rounded_corners: false }; BkdSelectionDecoration { range: r, style: s, is_primary: false } }; let set = BkdSelectionSet { selections: vec![mk(1, 0, 5), mk(2, 0, 5), mk(3, 0, 5)], highlight_ranges: vec![] }; assert_eq!(set.selections.len(), 3); }
+    #[test]
+    fn test_bkd_with_highlights() { let h = BkdHighlightRange { line: 0, start_col: 0, end_col: 10, kind: 0 }; let s = BkdSelectionSet { selections: vec![], highlight_ranges: vec![h] }; assert_eq!(s.highlight_ranges.len(), 1); }
+    #[test]
+    fn test_bke_boundary_start() { let b = BkeWordBoundary { offset: 0, is_start: true, kind: 1 }; assert!(b.is_start); }
+    #[test]
+    fn test_bke_boundary_end() { let b = BkeWordBoundary { offset: 5, is_start: false, kind: 1 }; assert!(!b.is_start); }
+    #[test]
+    fn test_bke_word_range() { let r = BkeWordRange { start: 0, end: 5, text: "hello".into(), category: 1 }; assert_eq!(r.text, "hello"); }
+    #[test]
+    fn test_bke_word_config_default() { let c = BkeWordConfig { separators: "`~!@#$%^&*()-=+[{]}|;:',.<>/?".into(), camel_case: true, snake_case: true }; assert!(c.camel_case); }
+    #[test]
+    fn test_bke_word_at_position() { let w = BkeWordAtPosition { word: "println".into(), start_col: 4, end_col: 11, line: 5 }; assert_eq!(w.word, "println"); }
+    #[test]
+    fn test_bke_empty_segmentation() { let s = BkeWordSegmentation { ranges: vec![], boundary_count: 0 }; assert_eq!(s.boundary_count, 0); }
+    #[test]
+    fn test_bke_multi_word_segmentation() { let ranges: Vec<BkeWordRange> = vec![BkeWordRange { start: 0, end: 5, text: "hello".into(), category: 1 }, BkeWordRange { start: 6, end: 11, text: "world".into(), category: 1 }]; let s = BkeWordSegmentation { ranges, boundary_count: 3 }; assert_eq!(s.boundary_count, 3); }
+    #[test]
+    fn test_bke_whitespace_category() { let r = BkeWordRange { start: 5, end: 6, text: " ".into(), category: 0 }; assert_eq!(r.category, 0); }
+    #[test]
+    fn test_bke_separator_category() { let r = BkeWordRange { start: 10, end: 11, text: ";".into(), category: 2 }; assert_eq!(r.category, 2); }
+    #[test]
+    fn test_bke_word_config_no_camel() { let c = BkeWordConfig { separators: String::new(), camel_case: false, snake_case: false }; assert!(!c.camel_case); }
 }
