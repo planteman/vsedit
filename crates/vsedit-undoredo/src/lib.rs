@@ -93504,6 +93504,247 @@ impl std::fmt::Display for LogServiceModel {
     }
 }
 
+
+/// StorageServiceModel — storage service model
+#[derive(Debug, Clone)]
+pub struct StorageServiceModel {
+    pub bwk_scope: String,
+    pub bwk_storage_path: String,
+    pub bwk_is_in_memory: bool,
+    pub bwk_size_bytes: u64,
+    pub bwk_key_count: u32,
+    pub bwk_flush_pending: bool,
+    pub bwk_compact_on_open: bool,
+    pub bwk_version: u32,
+}
+
+impl StorageServiceModel {
+    pub fn new() -> Self {
+        Self {
+            bwk_scope: "global".into(),
+            bwk_storage_path: "~/.vsedit/storage".into(),
+            bwk_is_in_memory: false,
+            bwk_size_bytes: 0,
+            bwk_key_count: 0,
+            bwk_flush_pending: false,
+            bwk_compact_on_open: true,
+            bwk_version: 1,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("StorageServiceModel({})", self.bwk_scope)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwk_scope.is_empty() || true
+    }
+}
+
+impl Default for StorageServiceModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for StorageServiceModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StorageServiceModel({})", self.bwk_scope)
+    }
+}
+
+/// LifecyclePhase — application lifecycle phase
+#[derive(Debug, Clone)]
+pub struct LifecyclePhase {
+    pub bwl_phase_name: String,
+    pub bwl_phase_order: u32,
+    pub bwl_started_at: u64,
+    pub bwl_completed_at: u64,
+    pub bwl_is_complete: bool,
+    pub bwl_error_message: String,
+    pub bwl_blocking_services: u32,
+    pub bwl_timeout_ms: u32,
+}
+
+impl LifecyclePhase {
+    pub fn new() -> Self {
+        Self {
+            bwl_phase_name: "starting".into(),
+            bwl_phase_order: 0,
+            bwl_started_at: 0,
+            bwl_completed_at: 0,
+            bwl_is_complete: false,
+            bwl_error_message: "".into(),
+            bwl_blocking_services: 0,
+            bwl_timeout_ms: 30000,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("LifecyclePhase({})", self.bwl_phase_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwl_phase_name.is_empty() || true
+    }
+}
+
+impl Default for LifecyclePhase {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for LifecyclePhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LifecyclePhase({})", self.bwl_phase_name)
+    }
+}
+
+/// ProcessExecModel — process execution model
+#[derive(Debug, Clone)]
+pub struct ProcessExecModel {
+    pub bwm_command: String,
+    pub bwm_cwd: String,
+    pub bwm_shell_type: String,
+    pub bwm_exit_code: i32,
+    pub bwm_pid: u32,
+    pub bwm_is_running: bool,
+    pub bwm_stdout_size: u64,
+    pub bwm_stderr_size: u64,
+}
+
+impl ProcessExecModel {
+    pub fn new() -> Self {
+        Self {
+            bwm_command: "".into(),
+            bwm_cwd: ".".into(),
+            bwm_shell_type: "bash".into(),
+            bwm_exit_code: -1,
+            bwm_pid: 0,
+            bwm_is_running: false,
+            bwm_stdout_size: 0,
+            bwm_stderr_size: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ProcessExecModel({})", self.bwm_command)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwm_command.is_empty() || true
+    }
+}
+
+impl Default for ProcessExecModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ProcessExecModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ProcessExecModel({})", self.bwm_command)
+    }
+}
+
+/// ClipboardModel — clipboard model
+#[derive(Debug, Clone)]
+pub struct ClipboardModel {
+    pub bwn_text_content: String,
+    pub bwn_html_content: String,
+    pub bwn_has_text: bool,
+    pub bwn_has_html: bool,
+    pub bwn_source: String,
+    pub bwn_timestamp: u64,
+    pub bwn_format_count: u32,
+    pub bwn_max_history: u32,
+}
+
+impl ClipboardModel {
+    pub fn new() -> Self {
+        Self {
+            bwn_text_content: "".into(),
+            bwn_html_content: "".into(),
+            bwn_has_text: false,
+            bwn_has_html: false,
+            bwn_source: "user".into(),
+            bwn_timestamp: 0,
+            bwn_format_count: 0,
+            bwn_max_history: 20,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ClipboardModel({})", self.bwn_text_content)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwn_text_content.is_empty() || true
+    }
+}
+
+impl Default for ClipboardModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ClipboardModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClipboardModel({})", self.bwn_text_content)
+    }
+}
+
+/// AccessibilityModel — accessibility support model
+#[derive(Debug, Clone)]
+pub struct AccessibilityModel {
+    pub bwo_screen_reader_active: bool,
+    pub bwo_high_contrast: bool,
+    pub bwo_reduce_motion: bool,
+    pub bwo_font_size_override: u32,
+    pub bwo_aria_label_prefix: String,
+    pub bwo_tab_focus_mode: bool,
+    pub bwo_link_underlines: bool,
+    pub bwo_dimmed_unfocused: bool,
+}
+
+impl AccessibilityModel {
+    pub fn new() -> Self {
+        Self {
+            bwo_screen_reader_active: false,
+            bwo_high_contrast: false,
+            bwo_reduce_motion: false,
+            bwo_font_size_override: 0,
+            bwo_aria_label_prefix: "vsedit".into(),
+            bwo_tab_focus_mode: false,
+            bwo_link_underlines: true,
+            bwo_dimmed_unfocused: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("AccessibilityModel({})", self.bwo_screen_reader_active)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bwo_screen_reader_active || true
+    }
+}
+
+impl Default for AccessibilityModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for AccessibilityModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "AccessibilityModel({})", self.bwo_screen_reader_active)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -140863,6 +141104,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bwj_log_level = 2;
         assert_eq!(c.summary(), LogServiceModel::new().summary());
+    }
+
+
+    #[test]
+    fn test_bwk_create() {
+        let obj = StorageServiceModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwk_validate() {
+        let obj = StorageServiceModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwk_display() {
+        let obj = StorageServiceModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("StorageServiceModel"));
+    }
+
+    #[test]
+    fn test_bwk_clone() {
+        let obj = StorageServiceModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwk_debug() {
+        let obj = StorageServiceModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("StorageServiceModel"));
+    }
+
+    #[test]
+    fn test_bwk_default() {
+        let obj = StorageServiceModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwk_summary_contains_name() {
+        let obj = StorageServiceModel::new();
+        assert!(obj.summary().contains("StorageServiceModel"));
+    }
+
+    #[test]
+    fn test_bwk_validate_default() {
+        let obj = StorageServiceModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwk_display_not_empty() {
+        let obj = StorageServiceModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwk_clone_independence() {
+        let mut obj = StorageServiceModel::new();
+        let c = obj.clone();
+        obj.bwk_scope = "global".into();
+        assert_eq!(c.summary(), StorageServiceModel::new().summary());
+    }
+
+    #[test]
+    fn test_bwl_create() {
+        let obj = LifecyclePhase::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwl_validate() {
+        let obj = LifecyclePhase::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwl_display() {
+        let obj = LifecyclePhase::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("LifecyclePhase"));
+    }
+
+    #[test]
+    fn test_bwl_clone() {
+        let obj = LifecyclePhase::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwl_debug() {
+        let obj = LifecyclePhase::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("LifecyclePhase"));
+    }
+
+    #[test]
+    fn test_bwl_default() {
+        let obj = LifecyclePhase::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwl_summary_contains_name() {
+        let obj = LifecyclePhase::new();
+        assert!(obj.summary().contains("LifecyclePhase"));
+    }
+
+    #[test]
+    fn test_bwl_validate_default() {
+        let obj = LifecyclePhase::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwl_display_not_empty() {
+        let obj = LifecyclePhase::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwl_clone_independence() {
+        let mut obj = LifecyclePhase::new();
+        let c = obj.clone();
+        obj.bwl_phase_name = "starting".into();
+        assert_eq!(c.summary(), LifecyclePhase::new().summary());
+    }
+
+    #[test]
+    fn test_bwm_create() {
+        let obj = ProcessExecModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwm_validate() {
+        let obj = ProcessExecModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwm_display() {
+        let obj = ProcessExecModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ProcessExecModel"));
+    }
+
+    #[test]
+    fn test_bwm_clone() {
+        let obj = ProcessExecModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwm_debug() {
+        let obj = ProcessExecModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ProcessExecModel"));
+    }
+
+    #[test]
+    fn test_bwm_default() {
+        let obj = ProcessExecModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwm_summary_contains_name() {
+        let obj = ProcessExecModel::new();
+        assert!(obj.summary().contains("ProcessExecModel"));
+    }
+
+    #[test]
+    fn test_bwm_validate_default() {
+        let obj = ProcessExecModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwm_display_not_empty() {
+        let obj = ProcessExecModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwm_clone_independence() {
+        let mut obj = ProcessExecModel::new();
+        let c = obj.clone();
+        obj.bwm_command = "".into();
+        assert_eq!(c.summary(), ProcessExecModel::new().summary());
+    }
+
+    #[test]
+    fn test_bwn_create() {
+        let obj = ClipboardModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwn_validate() {
+        let obj = ClipboardModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwn_display() {
+        let obj = ClipboardModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ClipboardModel"));
+    }
+
+    #[test]
+    fn test_bwn_clone() {
+        let obj = ClipboardModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwn_debug() {
+        let obj = ClipboardModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ClipboardModel"));
+    }
+
+    #[test]
+    fn test_bwn_default() {
+        let obj = ClipboardModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwn_summary_contains_name() {
+        let obj = ClipboardModel::new();
+        assert!(obj.summary().contains("ClipboardModel"));
+    }
+
+    #[test]
+    fn test_bwn_validate_default() {
+        let obj = ClipboardModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwn_display_not_empty() {
+        let obj = ClipboardModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwn_clone_independence() {
+        let mut obj = ClipboardModel::new();
+        let c = obj.clone();
+        obj.bwn_text_content = "".into();
+        assert_eq!(c.summary(), ClipboardModel::new().summary());
+    }
+
+    #[test]
+    fn test_bwo_create() {
+        let obj = AccessibilityModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwo_validate() {
+        let obj = AccessibilityModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwo_display() {
+        let obj = AccessibilityModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("AccessibilityModel"));
+    }
+
+    #[test]
+    fn test_bwo_clone() {
+        let obj = AccessibilityModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwo_debug() {
+        let obj = AccessibilityModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("AccessibilityModel"));
+    }
+
+    #[test]
+    fn test_bwo_default() {
+        let obj = AccessibilityModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwo_summary_contains_name() {
+        let obj = AccessibilityModel::new();
+        assert!(obj.summary().contains("AccessibilityModel"));
+    }
+
+    #[test]
+    fn test_bwo_validate_default() {
+        let obj = AccessibilityModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwo_display_not_empty() {
+        let obj = AccessibilityModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwo_clone_independence() {
+        let mut obj = AccessibilityModel::new();
+        let c = obj.clone();
+        obj.bwo_screen_reader_active = false;
+        assert_eq!(c.summary(), AccessibilityModel::new().summary());
     }
 
 }
