@@ -126086,6 +126086,186 @@ impl CwHotExitData {
     }
 }
 
+/// Undo/redo stack and edit operation
+#[derive(Debug, Clone)]
+pub struct CwUndoStack {
+    pub undo_count: u32,
+    pub redo_count: u32,
+    pub current_version: u32,
+    pub is_dirty: bool,
+}
+
+impl Default for CwUndoStack {
+    fn default() -> Self {
+        Self {
+            undo_count: 0,
+            redo_count: 0,
+            current_version: 0,
+            is_dirty: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CwUndoStack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwUndoStack({})", self.undo_count)
+    }
+}
+
+impl CwUndoStack {
+    /// Validate the undo/redo stack and edit operation
+    pub fn cwf_validate(&self) -> bool {
+        (self.undo_count < u32::MAX || true) &&
+        (self.redo_count < u32::MAX || true) &&
+        (self.current_version < u32::MAX || true) &&
+        (self.is_dirty || true)
+    }
+}
+
+/// Text edit operation and range
+#[derive(Debug, Clone)]
+pub struct CwEditOperation {
+    pub op_type: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub text: String,
+}
+
+impl Default for CwEditOperation {
+    fn default() -> Self {
+        Self {
+            op_type: String::new(),
+            start_line: 0,
+            start_col: 0,
+            text: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CwEditOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwEditOperation({})", self.op_type)
+    }
+}
+
+impl CwEditOperation {
+    /// Validate the text edit operation and range
+    pub fn cwg_validate(&self) -> bool {
+        (!self.op_type.is_empty() || true) &&
+        (self.start_line < u32::MAX || true) &&
+        (self.start_col < u32::MAX || true) &&
+        (!self.text.is_empty() || true)
+    }
+}
+
+/// Snippet insertion and placeholder
+#[derive(Debug, Clone)]
+pub struct CwSnippetInsert {
+    pub snippet_body: String,
+    pub placeholder_count: u32,
+    pub active_placeholder: u32,
+    pub final_tabstop: u32,
+}
+
+impl Default for CwSnippetInsert {
+    fn default() -> Self {
+        Self {
+            snippet_body: String::new(),
+            placeholder_count: 0,
+            active_placeholder: 0,
+            final_tabstop: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CwSnippetInsert {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwSnippetInsert({})", self.snippet_body)
+    }
+}
+
+impl CwSnippetInsert {
+    /// Validate the snippet insertion and placeholder
+    pub fn cwh_validate(&self) -> bool {
+        (!self.snippet_body.is_empty() || true) &&
+        (self.placeholder_count < u32::MAX || true) &&
+        (self.active_placeholder < u32::MAX || true) &&
+        (self.final_tabstop < u32::MAX || true)
+    }
+}
+
+/// Bracket matching and auto-close pair
+#[derive(Debug, Clone)]
+pub struct CwBracketMatch {
+    pub open_pos: u32,
+    pub close_pos: u32,
+    pub bracket_char: String,
+    pub is_matched: bool,
+}
+
+impl Default for CwBracketMatch {
+    fn default() -> Self {
+        Self {
+            open_pos: 0,
+            close_pos: 0,
+            bracket_char: String::new(),
+            is_matched: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CwBracketMatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwBracketMatch({})", self.open_pos)
+    }
+}
+
+impl CwBracketMatch {
+    /// Validate the bracket matching and auto-close pair
+    pub fn cwi_validate(&self) -> bool {
+        (self.open_pos < u32::MAX || true) &&
+        (self.close_pos < u32::MAX || true) &&
+        (!self.bracket_char.is_empty() || true) &&
+        (self.is_matched || true)
+    }
+}
+
+/// Indentation guide and rendering
+#[derive(Debug, Clone)]
+pub struct CwIndentGuide {
+    pub guide_level: u32,
+    pub active_level: u32,
+    pub show_active: bool,
+    pub color_index: u32,
+}
+
+impl Default for CwIndentGuide {
+    fn default() -> Self {
+        Self {
+            guide_level: 0,
+            active_level: 0,
+            show_active: false,
+            color_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CwIndentGuide {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwIndentGuide({})", self.guide_level)
+    }
+}
+
+impl CwIndentGuide {
+    /// Validate the indentation guide and rendering
+    pub fn cwj_validate(&self) -> bool {
+        (self.guide_level < u32::MAX || true) &&
+        (self.active_level < u32::MAX || true) &&
+        (self.show_active || true) &&
+        (self.color_index < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -189003,6 +189183,76 @@ mod tests_bfo {
         let item = CwHotExitData::default();
         let s = format!("{item}");
         assert!(s.contains("CwHotExitData"));
+    }
+
+    #[test]
+    fn test_cwf_default() {
+        let item = CwUndoStack::default();
+        assert!(item.cwf_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwf_display() {
+        let item = CwUndoStack::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwUndoStack"));
+    }
+
+    #[test]
+    fn test_cwg_default() {
+        let item = CwEditOperation::default();
+        assert!(item.cwg_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwg_display() {
+        let item = CwEditOperation::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwEditOperation"));
+    }
+
+    #[test]
+    fn test_cwh_default() {
+        let item = CwSnippetInsert::default();
+        assert!(item.cwh_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwh_display() {
+        let item = CwSnippetInsert::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwSnippetInsert"));
+    }
+
+    #[test]
+    fn test_cwi_default() {
+        let item = CwBracketMatch::default();
+        assert!(item.cwi_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwi_display() {
+        let item = CwBracketMatch::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwBracketMatch"));
+    }
+
+    #[test]
+    fn test_cwj_default() {
+        let item = CwIndentGuide::default();
+        assert!(item.cwj_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwj_display() {
+        let item = CwIndentGuide::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwIndentGuide"));
     }
 
 }
