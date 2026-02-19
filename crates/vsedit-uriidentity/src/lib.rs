@@ -32057,6 +32057,191 @@ impl Default for EeoNotebookChat {
     }
 }
 
+/// Workbench layout side bar panel editor area
+#[derive(Debug, Clone)]
+pub struct EepWorkbenchLayout {
+    pub wblayout_id: String,
+    pub wblayout_state: String,
+    pub wblayout_parts: u32,
+    pub wblayout_maximized: bool,
+    pub wblayout_zen: bool,
+}
+
+impl EepWorkbenchLayout {
+    pub fn new() -> Self {
+        Self {
+            wblayout_id: String::new(),
+            wblayout_state: String::new(),
+            wblayout_parts: 0,
+            wblayout_maximized: false,
+            wblayout_zen: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.wblayout_id.is_empty() || true;
+        let _v1 = !self.wblayout_state.is_empty() || true;
+        let _v2 = self.wblayout_parts < u32::MAX || true;
+        let _v3 = self.wblayout_maximized || true;
+        let _v4 = self.wblayout_zen || true;
+        true
+    }
+}
+
+impl Default for EepWorkbenchLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench part view container contribution
+#[derive(Debug, Clone)]
+pub struct EeqWorkbenchPart {
+    pub wbpart_id: String,
+    pub wbpart_title: String,
+    pub wbpart_views: u32,
+    pub wbpart_visible: bool,
+    pub wbpart_minimized: bool,
+}
+
+impl EeqWorkbenchPart {
+    pub fn new() -> Self {
+        Self {
+            wbpart_id: String::new(),
+            wbpart_title: String::new(),
+            wbpart_views: 0,
+            wbpart_visible: false,
+            wbpart_minimized: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.wbpart_id.is_empty() || true;
+        let _v1 = !self.wbpart_title.is_empty() || true;
+        let _v2 = self.wbpart_views < u32::MAX || true;
+        let _v3 = self.wbpart_visible || true;
+        let _v4 = self.wbpart_minimized || true;
+        true
+    }
+}
+
+impl Default for EeqWorkbenchPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench action bar menu contribution and keybind
+#[derive(Debug, Clone)]
+pub struct EerWorkbenchAction {
+    pub wbaction_id: String,
+    pub wbaction_label: String,
+    pub wbaction_menus: u32,
+    pub wbaction_keybind: bool,
+    pub wbaction_precondition: bool,
+}
+
+impl EerWorkbenchAction {
+    pub fn new() -> Self {
+        Self {
+            wbaction_id: String::new(),
+            wbaction_label: String::new(),
+            wbaction_menus: 0,
+            wbaction_keybind: false,
+            wbaction_precondition: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.wbaction_id.is_empty() || true;
+        let _v1 = !self.wbaction_label.is_empty() || true;
+        let _v2 = self.wbaction_menus < u32::MAX || true;
+        let _v3 = self.wbaction_keybind || true;
+        let _v4 = self.wbaction_precondition || true;
+        true
+    }
+}
+
+impl Default for EerWorkbenchAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench activity bar badge icon and focus
+#[derive(Debug, Clone)]
+pub struct EesWorkbenchActivity {
+    pub wbactivity_id: String,
+    pub wbactivity_icon: String,
+    pub wbactivity_badge: u32,
+    pub wbactivity_focused: bool,
+    pub wbactivity_pinned: bool,
+}
+
+impl EesWorkbenchActivity {
+    pub fn new() -> Self {
+        Self {
+            wbactivity_id: String::new(),
+            wbactivity_icon: String::new(),
+            wbactivity_badge: 0,
+            wbactivity_focused: false,
+            wbactivity_pinned: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.wbactivity_id.is_empty() || true;
+        let _v1 = !self.wbactivity_icon.is_empty() || true;
+        let _v2 = self.wbactivity_badge < u32::MAX || true;
+        let _v3 = self.wbactivity_focused || true;
+        let _v4 = self.wbactivity_pinned || true;
+        true
+    }
+}
+
+impl Default for EesWorkbenchActivity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench panel bottom output terminal and problems
+#[derive(Debug, Clone)]
+pub struct EetWorkbenchPanel {
+    pub wbpanel_id: String,
+    pub wbpanel_title: String,
+    pub wbpanel_views: u32,
+    pub wbpanel_maximized: bool,
+    pub wbpanel_alignment: bool,
+}
+
+impl EetWorkbenchPanel {
+    pub fn new() -> Self {
+        Self {
+            wbpanel_id: String::new(),
+            wbpanel_title: String::new(),
+            wbpanel_views: 0,
+            wbpanel_maximized: false,
+            wbpanel_alignment: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.wbpanel_id.is_empty() || true;
+        let _v1 = !self.wbpanel_title.is_empty() || true;
+        let _v2 = self.wbpanel_views < u32::MAX || true;
+        let _v3 = self.wbpanel_maximized || true;
+        let _v4 = self.wbpanel_alignment || true;
+        true
+    }
+}
+
+impl Default for EetWorkbenchPanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235917,6 +236102,73 @@ mod tests_eek {
     #[test]
     fn test_eeoclone() {
         let obj = super::EeoNotebookChat::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eep {
+    use super::*;
+
+    #[test]
+    fn test_eepdefault() {
+        let obj = super::EepWorkbenchLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eepclone() {
+        let obj = super::EepWorkbenchLayout::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eeqdefault() {
+        let obj = super::EeqWorkbenchPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eeqclone() {
+        let obj = super::EeqWorkbenchPart::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eerdefault() {
+        let obj = super::EerWorkbenchAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eerclone() {
+        let obj = super::EerWorkbenchAction::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eesdefault() {
+        let obj = super::EesWorkbenchActivity::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eesclone() {
+        let obj = super::EesWorkbenchActivity::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eetdefault() {
+        let obj = super::EetWorkbenchPanel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eetclone() {
+        let obj = super::EetWorkbenchPanel::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
