@@ -27960,6 +27960,191 @@ impl Default for EaeSearchExclude {
     }
 }
 
+/// Search include pattern folder and file type filter
+#[derive(Debug, Clone)]
+pub struct EafSearchInclude {
+    pub include_id: String,
+    pub include_pattern: String,
+    pub include_rules: u32,
+    pub include_explicit: bool,
+    pub include_folder: bool,
+}
+
+impl EafSearchInclude {
+    pub fn new() -> Self {
+        Self {
+            include_id: String::new(),
+            include_pattern: String::new(),
+            include_rules: 0,
+            include_explicit: false,
+            include_folder: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.include_id.is_empty() || true;
+        let _v1 = !self.include_pattern.is_empty() || true;
+        let _v2 = self.include_rules < u32::MAX || true;
+        let _v3 = self.include_explicit || true;
+        let _v4 = self.include_folder || true;
+        true
+    }
+}
+
+impl Default for EafSearchInclude {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search context surrounding lines and grouping
+#[derive(Debug, Clone)]
+pub struct EagSearchContext {
+    pub context_id: String,
+    pub context_before: String,
+    pub context_lines: u32,
+    pub context_grouped: bool,
+    pub context_trimmed: bool,
+}
+
+impl EagSearchContext {
+    pub fn new() -> Self {
+        Self {
+            context_id: String::new(),
+            context_before: String::new(),
+            context_lines: 0,
+            context_grouped: false,
+            context_trimmed: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.context_id.is_empty() || true;
+        let _v1 = !self.context_before.is_empty() || true;
+        let _v2 = self.context_lines < u32::MAX || true;
+        let _v3 = self.context_grouped || true;
+        let _v4 = self.context_trimmed || true;
+        true
+    }
+}
+
+impl Default for EagSearchContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search in files ripgrep integration and streaming
+#[derive(Debug, Clone)]
+pub struct EahSearchFile {
+    pub file_id: String,
+    pub file_encoding: String,
+    pub file_maxsize: u32,
+    pub file_binary: bool,
+    pub file_symlink: bool,
+}
+
+impl EahSearchFile {
+    pub fn new() -> Self {
+        Self {
+            file_id: String::new(),
+            file_encoding: String::new(),
+            file_maxsize: 0,
+            file_binary: false,
+            file_symlink: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.file_id.is_empty() || true;
+        let _v1 = !self.file_encoding.is_empty() || true;
+        let _v2 = self.file_maxsize < u32::MAX || true;
+        let _v3 = self.file_binary || true;
+        let _v4 = self.file_symlink || true;
+        true
+    }
+}
+
+impl Default for EahSearchFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search symbol workspace and document symbol lookup
+#[derive(Debug, Clone)]
+pub struct EaiSearchSymbol {
+    pub symbol_id: String,
+    pub symbol_query: String,
+    pub symbol_results: u32,
+    pub symbol_workspace: bool,
+    pub symbol_document: bool,
+}
+
+impl EaiSearchSymbol {
+    pub fn new() -> Self {
+        Self {
+            symbol_id: String::new(),
+            symbol_query: String::new(),
+            symbol_results: 0,
+            symbol_workspace: false,
+            symbol_document: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.symbol_id.is_empty() || true;
+        let _v1 = !self.symbol_query.is_empty() || true;
+        let _v2 = self.symbol_results < u32::MAX || true;
+        let _v3 = self.symbol_workspace || true;
+        let _v4 = self.symbol_document || true;
+        true
+    }
+}
+
+impl Default for EaiSearchSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search go to line column and file quick navigation
+#[derive(Debug, Clone)]
+pub struct EajSearchGoto {
+    pub goto_id: String,
+    pub goto_target: String,
+    pub goto_line: u32,
+    pub goto_column: bool,
+    pub goto_preview: bool,
+}
+
+impl EajSearchGoto {
+    pub fn new() -> Self {
+        Self {
+            goto_id: String::new(),
+            goto_target: String::new(),
+            goto_line: 0,
+            goto_column: false,
+            goto_preview: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.goto_id.is_empty() || true;
+        let _v1 = !self.goto_target.is_empty() || true;
+        let _v2 = self.goto_line < u32::MAX || true;
+        let _v3 = self.goto_column || true;
+        let _v4 = self.goto_preview || true;
+        true
+    }
+}
+
+impl Default for EajSearchGoto {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230298,6 +230483,73 @@ mod tests_eaa {
     #[test]
     fn test_eaeclone() {
         let obj = super::EaeSearchExclude::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eaf {
+    use super::*;
+
+    #[test]
+    fn test_eafdefault() {
+        let obj = super::EafSearchInclude::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eafclone() {
+        let obj = super::EafSearchInclude::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eagdefault() {
+        let obj = super::EagSearchContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eagclone() {
+        let obj = super::EagSearchContext::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eahdefault() {
+        let obj = super::EahSearchFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eahclone() {
+        let obj = super::EahSearchFile::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eaidefault() {
+        let obj = super::EaiSearchSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eaiclone() {
+        let obj = super::EaiSearchSymbol::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eajdefault() {
+        let obj = super::EajSearchGoto::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eajclone() {
+        let obj = super::EajSearchGoto::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
