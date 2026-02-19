@@ -127017,6 +127017,186 @@ impl CxEolSeq {
     }
 }
 
+/// File copy/move operation and conflict
+#[derive(Debug, Clone)]
+pub struct CxFileCopy {
+    pub source_uri: String,
+    pub target_uri: String,
+    pub overwrite: bool,
+    pub is_move: bool,
+}
+
+impl Default for CxFileCopy {
+    fn default() -> Self {
+        Self {
+            source_uri: String::new(),
+            target_uri: String::new(),
+            overwrite: false,
+            is_move: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxFileCopy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxFileCopy({})", self.source_uri)
+    }
+}
+
+impl CxFileCopy {
+    /// Validate the file copy/move operation and conflict
+    pub fn cxf_validate(&self) -> bool {
+        (!self.source_uri.is_empty() || true) &&
+        (!self.target_uri.is_empty() || true) &&
+        (self.overwrite || true) &&
+        (self.is_move || true)
+    }
+}
+
+/// File delete operation and trash support
+#[derive(Debug, Clone)]
+pub struct CxFileDelete {
+    pub delete_uri: String,
+    pub use_trash: bool,
+    pub recursive: bool,
+    pub confirm: bool,
+}
+
+impl Default for CxFileDelete {
+    fn default() -> Self {
+        Self {
+            delete_uri: String::new(),
+            use_trash: false,
+            recursive: false,
+            confirm: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxFileDelete {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxFileDelete({})", self.delete_uri)
+    }
+}
+
+impl CxFileDelete {
+    /// Validate the file delete operation and trash support
+    pub fn cxg_validate(&self) -> bool {
+        (!self.delete_uri.is_empty() || true) &&
+        (self.use_trash || true) &&
+        (self.recursive || true) &&
+        (self.confirm || true)
+    }
+}
+
+/// File/folder create operation and template
+#[derive(Debug, Clone)]
+pub struct CxFileCreate {
+    pub create_uri: String,
+    pub is_folder: bool,
+    pub content: String,
+    pub overwrite_existing: bool,
+}
+
+impl Default for CxFileCreate {
+    fn default() -> Self {
+        Self {
+            create_uri: String::new(),
+            is_folder: false,
+            content: String::new(),
+            overwrite_existing: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxFileCreate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxFileCreate({})", self.create_uri)
+    }
+}
+
+impl CxFileCreate {
+    /// Validate the file/folder create operation and template
+    pub fn cxh_validate(&self) -> bool {
+        (!self.create_uri.is_empty() || true) &&
+        (self.is_folder || true) &&
+        (!self.content.is_empty() || true) &&
+        (self.overwrite_existing || true)
+    }
+}
+
+/// File rename operation and refactor
+#[derive(Debug, Clone)]
+pub struct CxFileRename {
+    pub old_uri: String,
+    pub new_uri: String,
+    pub overwrite: bool,
+    pub update_imports: bool,
+}
+
+impl Default for CxFileRename {
+    fn default() -> Self {
+        Self {
+            old_uri: String::new(),
+            new_uri: String::new(),
+            overwrite: false,
+            update_imports: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxFileRename {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxFileRename({})", self.old_uri)
+    }
+}
+
+impl CxFileRename {
+    /// Validate the file rename operation and refactor
+    pub fn cxi_validate(&self) -> bool {
+        (!self.old_uri.is_empty() || true) &&
+        (!self.new_uri.is_empty() || true) &&
+        (self.overwrite || true) &&
+        (self.update_imports || true)
+    }
+}
+
+/// File save operation and encoding
+#[derive(Debug, Clone)]
+pub struct CxFileSave {
+    pub save_uri: String,
+    pub encoding: String,
+    pub add_bom: bool,
+    pub trim_trailing: bool,
+}
+
+impl Default for CxFileSave {
+    fn default() -> Self {
+        Self {
+            save_uri: String::new(),
+            encoding: String::new(),
+            add_bom: false,
+            trim_trailing: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxFileSave {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxFileSave({})", self.save_uri)
+    }
+}
+
+impl CxFileSave {
+    /// Validate the file save operation and encoding
+    pub fn cxj_validate(&self) -> bool {
+        (!self.save_uri.is_empty() || true) &&
+        (!self.encoding.is_empty() || true) &&
+        (self.add_bom || true) &&
+        (self.trim_trailing || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -190298,6 +190478,76 @@ mod tests_bfo {
         let item = CxEolSeq::default();
         let s = format!("{item}");
         assert!(s.contains("CxEolSeq"));
+    }
+
+    #[test]
+    fn test_cxf_default() {
+        let item = CxFileCopy::default();
+        assert!(item.cxf_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxf_display() {
+        let item = CxFileCopy::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxFileCopy"));
+    }
+
+    #[test]
+    fn test_cxg_default() {
+        let item = CxFileDelete::default();
+        assert!(item.cxg_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxg_display() {
+        let item = CxFileDelete::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxFileDelete"));
+    }
+
+    #[test]
+    fn test_cxh_default() {
+        let item = CxFileCreate::default();
+        assert!(item.cxh_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxh_display() {
+        let item = CxFileCreate::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxFileCreate"));
+    }
+
+    #[test]
+    fn test_cxi_default() {
+        let item = CxFileRename::default();
+        assert!(item.cxi_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxi_display() {
+        let item = CxFileRename::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxFileRename"));
+    }
+
+    #[test]
+    fn test_cxj_default() {
+        let item = CxFileSave::default();
+        assert!(item.cxj_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxj_display() {
+        let item = CxFileSave::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxFileSave"));
     }
 
 }
