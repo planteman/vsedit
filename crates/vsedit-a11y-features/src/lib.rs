@@ -60539,3 +60539,233 @@ mod bbt_tests {
         assert!(m.root().is_none());
     }
 }
+
+
+// --- bbu_: Editor type hierarchy model ---
+
+/// Type hierarchy direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BbuTypeDirection { Supertypes, Subtypes }
+
+impl BbuTypeDirection {
+    pub fn label(&self) -> &'static str {
+        match self { Self::Supertypes => "Supertypes", Self::Subtypes => "Subtypes" }
+    }
+    pub fn opposite(&self) -> Self {
+        match self { Self::Supertypes => Self::Subtypes, Self::Subtypes => Self::Supertypes }
+    }
+}
+
+/// A type hierarchy item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BbuTypeItem {
+    pub name: String,
+    pub kind: u32,
+    pub detail: Option<String>,
+    pub file_path: String,
+    pub line: u32,
+    pub col: u32,
+    pub tags: Vec<String>,
+}
+
+impl BbuTypeItem {
+    pub fn new(name: &str, kind: u32, path: &str, line: u32, col: u32) -> Self {
+        Self { name: name.to_string(), kind, detail: None, file_path: path.to_string(), line, col, tags: Vec::new() }
+    }
+
+    pub fn with_detail(mut self, d: &str) -> Self { self.detail = Some(d.to_string()); self }
+    pub fn with_tag(mut self, t: &str) -> Self { self.tags.push(t.to_string()); self }
+
+    pub fn display_text(&self) -> String {
+        match &self.detail {
+            Some(d) => format!("{} — {}", self.name, d),
+            None => self.name.clone(),
+        }
+    }
+
+    pub fn location_text(&self) -> String {
+        format!("{}:{}:{}", self.file_path, self.line, self.col)
+    }
+
+    pub fn is_deprecated(&self) -> bool { self.tags.iter().any(|t| t == "deprecated") }
+}
+
+/// A type hierarchy node (item + children loaded on demand).
+#[derive(Debug, Clone)]
+pub struct BbuTypeNode {
+    pub item: BbuTypeItem,
+    pub children: Vec<BbuTypeNode>,
+    pub expanded: bool,
+    pub children_loaded: bool,
+}
+
+impl BbuTypeNode {
+    pub fn new(item: BbuTypeItem) -> Self {
+        Self { item, children: Vec::new(), expanded: false, children_loaded: false }
+    }
+
+    pub fn set_children(&mut self, children: Vec<BbuTypeItem>) {
+        self.children = children.into_iter().map(BbuTypeNode::new).collect();
+        self.children_loaded = true;
+    }
+
+    pub fn child_count(&self) -> usize { self.children.len() }
+    pub fn toggle_expand(&mut self) { self.expanded = !self.expanded; }
+
+    pub fn flatten(&self) -> Vec<(&BbuTypeItem, u32)> {
+        let mut result = vec![(&self.item, 0)];
+        if self.expanded {
+            for child in &self.children {
+                for (item, depth) in child.flatten() {
+                    result.push((item, depth + 1));
+                }
+            }
+        }
+        result
+    }
+}
+
+/// The type hierarchy model.
+#[derive(Debug)]
+pub struct BbuTypeModel {
+    root: Option<BbuTypeNode>,
+    direction: BbuTypeDirection,
+    selected_depth: Vec<usize>,
+}
+
+impl BbuTypeModel {
+    pub fn new() -> Self {
+        Self { root: None, direction: BbuTypeDirection::Subtypes, selected_depth: Vec::new() }
+    }
+
+    pub fn set_root(&mut self, item: BbuTypeItem) {
+        self.root = Some(BbuTypeNode::new(item));
+        self.selected_depth.clear();
+    }
+
+    pub fn root(&self) -> Option<&BbuTypeNode> { self.root.as_ref() }
+
+    pub fn set_direction(&mut self, d: BbuTypeDirection) { self.direction = d; }
+    pub fn direction(&self) -> BbuTypeDirection { self.direction }
+    pub fn toggle_direction(&mut self) { self.direction = self.direction.opposite(); }
+
+    pub fn expand_root(&mut self, children: Vec<BbuTypeItem>) {
+        if let Some(r) = &mut self.root {
+            r.set_children(children);
+            r.expanded = true;
+        }
+    }
+
+    pub fn flattened(&self) -> Vec<(&BbuTypeItem, u32)> {
+        match &self.root {
+            Some(r) => r.flatten(),
+            None => Vec::new(),
+        }
+    }
+
+    pub fn item_count(&self) -> usize { self.flattened().len() }
+
+    pub fn clear(&mut self) {
+        self.root = None;
+        self.selected_depth.clear();
+    }
+
+    pub fn has_root(&self) -> bool { self.root.is_some() }
+
+    pub fn status_text(&self) -> String {
+        match &self.root {
+            Some(r) => format!("{}: {} {}", r.item.name, r.child_count(), self.direction.label()),
+            None => String::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod bbu_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbu_direction() {
+        assert_eq!(BbuTypeDirection::Subtypes.label(), "Subtypes");
+        assert_eq!(BbuTypeDirection::Subtypes.opposite(), BbuTypeDirection::Supertypes);
+    }
+
+    #[test]
+    fn test_bbu_item() {
+        let i = BbuTypeItem::new("MyClass", 5, "src/lib.rs", 10, 0)
+            .with_detail("class MyClass")
+            .with_tag("deprecated");
+        assert!(i.is_deprecated());
+        assert_eq!(i.display_text(), "MyClass — class MyClass");
+    }
+
+    #[test]
+    fn test_bbu_item_location() {
+        let i = BbuTypeItem::new("Foo", 5, "x.rs", 3, 4);
+        assert_eq!(i.location_text(), "x.rs:3:4");
+    }
+
+    #[test]
+    fn test_bbu_node_children() {
+        let mut n = BbuTypeNode::new(BbuTypeItem::new("Base", 5, "", 0, 0));
+        assert!(!n.children_loaded);
+        n.set_children(vec![
+            BbuTypeItem::new("Child1", 5, "", 1, 0),
+            BbuTypeItem::new("Child2", 5, "", 2, 0),
+        ]);
+        assert!(n.children_loaded);
+        assert_eq!(n.child_count(), 2);
+    }
+
+    #[test]
+    fn test_bbu_node_flatten() {
+        let mut n = BbuTypeNode::new(BbuTypeItem::new("Root", 5, "", 0, 0));
+        n.set_children(vec![BbuTypeItem::new("A", 5, "", 1, 0)]);
+        // Not expanded yet
+        assert_eq!(n.flatten().len(), 1);
+        n.toggle_expand();
+        assert_eq!(n.flatten().len(), 2);
+    }
+
+    #[test]
+    fn test_bbu_model_basic() {
+        let mut m = BbuTypeModel::new();
+        m.set_root(BbuTypeItem::new("Animal", 5, "", 0, 0));
+        assert!(m.has_root());
+        m.expand_root(vec![
+            BbuTypeItem::new("Dog", 5, "", 1, 0),
+            BbuTypeItem::new("Cat", 5, "", 2, 0),
+        ]);
+        assert_eq!(m.item_count(), 3); // root + 2 children (root is expanded)
+    }
+
+    #[test]
+    fn test_bbu_model_toggle_dir() {
+        let mut m = BbuTypeModel::new();
+        assert_eq!(m.direction(), BbuTypeDirection::Subtypes);
+        m.toggle_direction();
+        assert_eq!(m.direction(), BbuTypeDirection::Supertypes);
+    }
+
+    #[test]
+    fn test_bbu_model_status() {
+        let mut m = BbuTypeModel::new();
+        m.set_root(BbuTypeItem::new("Foo", 5, "", 0, 0));
+        m.expand_root(vec![BbuTypeItem::new("Bar", 5, "", 1, 0)]);
+        assert_eq!(m.status_text(), "Foo: 1 Subtypes");
+    }
+
+    #[test]
+    fn test_bbu_model_clear() {
+        let mut m = BbuTypeModel::new();
+        m.set_root(BbuTypeItem::new("X", 5, "", 0, 0));
+        m.clear();
+        assert!(!m.has_root());
+    }
+
+    #[test]
+    fn test_bbu_not_deprecated() {
+        let i = BbuTypeItem::new("Fresh", 5, "", 0, 0);
+        assert!(!i.is_deprecated());
+    }
+}
