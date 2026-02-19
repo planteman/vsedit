@@ -28954,3 +28954,228 @@ mod bbn_tests {
         assert_eq!(r.status_text(), "Plain Text");
     }
 }
+
+
+// --- bbo_: Editor semantic tokens model ---
+
+/// Semantic token type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BboTokenType {
+    Namespace, Type, Class, Enum, Interface, Struct, TypeParameter,
+    Parameter, Variable, Property, EnumMember, Event, Function, Method,
+    Macro, Keyword, Modifier, Comment, String, Number, Regexp, Operator,
+    Decorator, Label,
+}
+
+impl BboTokenType {
+    pub fn legend_index(&self) -> u32 {
+        match self {
+            Self::Namespace => 0, Self::Type => 1, Self::Class => 2, Self::Enum => 3,
+            Self::Interface => 4, Self::Struct => 5, Self::TypeParameter => 6,
+            Self::Parameter => 7, Self::Variable => 8, Self::Property => 9,
+            Self::EnumMember => 10, Self::Event => 11, Self::Function => 12,
+            Self::Method => 13, Self::Macro => 14, Self::Keyword => 15,
+            Self::Modifier => 16, Self::Comment => 17, Self::String => 18,
+            Self::Number => 19, Self::Regexp => 20, Self::Operator => 21,
+            Self::Decorator => 22, Self::Label => 23,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Namespace => "namespace", Self::Type => "type", Self::Class => "class",
+            Self::Enum => "enum", Self::Interface => "interface", Self::Struct => "struct",
+            Self::TypeParameter => "typeParameter", Self::Parameter => "parameter",
+            Self::Variable => "variable", Self::Property => "property",
+            Self::EnumMember => "enumMember", Self::Event => "event",
+            Self::Function => "function", Self::Method => "method",
+            Self::Macro => "macro", Self::Keyword => "keyword",
+            Self::Modifier => "modifier", Self::Comment => "comment",
+            Self::String => "string", Self::Number => "number",
+            Self::Regexp => "regexp", Self::Operator => "operator",
+            Self::Decorator => "decorator", Self::Label => "label",
+        }
+    }
+}
+
+/// Semantic token modifier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BboTokenModifier {
+    Declaration, Definition, Readonly, Static, Deprecated, Abstract,
+    Async, Modification, Documentation, DefaultLibrary,
+}
+
+impl BboTokenModifier {
+    pub fn bit_flag(&self) -> u32 {
+        1 << match self {
+            Self::Declaration => 0, Self::Definition => 1, Self::Readonly => 2,
+            Self::Static => 3, Self::Deprecated => 4, Self::Abstract => 5,
+            Self::Async => 6, Self::Modification => 7, Self::Documentation => 8,
+            Self::DefaultLibrary => 9,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Declaration => "declaration", Self::Definition => "definition",
+            Self::Readonly => "readonly", Self::Static => "static",
+            Self::Deprecated => "deprecated", Self::Abstract => "abstract",
+            Self::Async => "async", Self::Modification => "modification",
+            Self::Documentation => "documentation", Self::DefaultLibrary => "defaultLibrary",
+        }
+    }
+}
+
+/// A semantic token (encoded as delta from previous).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BboSemanticToken {
+    pub delta_line: u32,
+    pub delta_start: u32,
+    pub length: u32,
+    pub token_type: u32,
+    pub modifiers: u32,
+}
+
+impl BboSemanticToken {
+    pub fn new(dl: u32, ds: u32, len: u32, tt: u32, mods: u32) -> Self {
+        Self { delta_line: dl, delta_start: ds, length: len, token_type: tt, modifiers: mods }
+    }
+
+    pub fn has_modifier(&self, m: BboTokenModifier) -> bool {
+        self.modifiers & m.bit_flag() != 0
+    }
+}
+
+/// Semantic tokens result (entire document or range).
+#[derive(Debug, Clone)]
+pub struct BboSemanticTokensResult {
+    pub result_id: Option<String>,
+    pub tokens: Vec<BboSemanticToken>,
+}
+
+impl BboSemanticTokensResult {
+    pub fn new(tokens: Vec<BboSemanticToken>) -> Self {
+        Self { result_id: None, tokens }
+    }
+
+    pub fn with_id(mut self, id: &str) -> Self {
+        self.result_id = Some(id.to_string()); self
+    }
+
+    pub fn token_count(&self) -> usize { self.tokens.len() }
+    pub fn is_empty(&self) -> bool { self.tokens.is_empty() }
+
+    pub fn encode(&self) -> Vec<u32> {
+        let mut data = Vec::with_capacity(self.tokens.len() * 5);
+        for t in &self.tokens {
+            data.push(t.delta_line);
+            data.push(t.delta_start);
+            data.push(t.length);
+            data.push(t.token_type);
+            data.push(t.modifiers);
+        }
+        data
+    }
+}
+
+/// The semantic tokens model.
+#[derive(Debug)]
+pub struct BboSemanticModel {
+    current: Option<BboSemanticTokensResult>,
+    enabled: bool,
+}
+
+impl BboSemanticModel {
+    pub fn new() -> Self { Self { current: None, enabled: true } }
+
+    pub fn set_result(&mut self, result: BboSemanticTokensResult) { self.current = Some(result); }
+    pub fn clear(&mut self) { self.current = None; }
+
+    pub fn current(&self) -> Option<&BboSemanticTokensResult> { self.current.as_ref() }
+    pub fn token_count(&self) -> usize { self.current.as_ref().map_or(0, |r| r.token_count()) }
+
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn set_enabled(&mut self, v: bool) { self.enabled = v; }
+}
+
+#[cfg(test)]
+mod bbo_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbo_token_type() {
+        assert_eq!(BboTokenType::Function.legend_index(), 12);
+        assert_eq!(BboTokenType::Keyword.name(), "keyword");
+    }
+
+    #[test]
+    fn test_bbo_modifier_bits() {
+        assert_eq!(BboTokenModifier::Declaration.bit_flag(), 1);
+        assert_eq!(BboTokenModifier::Static.bit_flag(), 8);
+    }
+
+    #[test]
+    fn test_bbo_token_modifier_check() {
+        let t = BboSemanticToken::new(0, 0, 5, 12, 0b1010); // static + definition
+        assert!(t.has_modifier(BboTokenModifier::Definition));
+        assert!(t.has_modifier(BboTokenModifier::Static));
+        assert!(!t.has_modifier(BboTokenModifier::Readonly));
+    }
+
+    #[test]
+    fn test_bbo_result_encode() {
+        let r = BboSemanticTokensResult::new(vec![
+            BboSemanticToken::new(0, 5, 3, 15, 0),
+            BboSemanticToken::new(1, 0, 4, 8, 1),
+        ]);
+        let encoded = r.encode();
+        assert_eq!(encoded.len(), 10);
+        assert_eq!(encoded[0], 0); // first delta_line
+    }
+
+    #[test]
+    fn test_bbo_result_id() {
+        let r = BboSemanticTokensResult::new(vec![]).with_id("abc123");
+        assert_eq!(r.result_id.as_deref(), Some("abc123"));
+    }
+
+    #[test]
+    fn test_bbo_model() {
+        let mut m = BboSemanticModel::new();
+        assert_eq!(m.token_count(), 0);
+        m.set_result(BboSemanticTokensResult::new(vec![
+            BboSemanticToken::new(0, 0, 5, 0, 0),
+        ]));
+        assert_eq!(m.token_count(), 1);
+        m.clear();
+        assert_eq!(m.token_count(), 0);
+    }
+
+    #[test]
+    fn test_bbo_token_type_all() {
+        // Verify all types have unique indices
+        let types = [
+            BboTokenType::Namespace, BboTokenType::Type, BboTokenType::Class,
+            BboTokenType::Function, BboTokenType::Method, BboTokenType::Keyword,
+        ];
+        let indices: Vec<u32> = types.iter().map(|t| t.legend_index()).collect();
+        for (i, idx) in indices.iter().enumerate() {
+            for (j, jdx) in indices.iter().enumerate() {
+                if i != j { assert_ne!(idx, jdx); }
+            }
+        }
+    }
+
+    #[test]
+    fn test_bbo_modifier_names() {
+        assert_eq!(BboTokenModifier::Async.name(), "async");
+        assert_eq!(BboTokenModifier::Deprecated.name(), "deprecated");
+    }
+
+    #[test]
+    fn test_bbo_empty_result() {
+        let r = BboSemanticTokensResult::new(vec![]);
+        assert!(r.is_empty());
+        assert_eq!(r.encode().len(), 0);
+    }
+}
