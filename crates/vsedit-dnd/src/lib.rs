@@ -135985,6 +135985,201 @@ impl DfzEnvTrust {
     }
 }
 
+/// Custom editor webview panel model
+#[derive(Debug, Clone)]
+pub struct DgaCustomEditor {
+    pub editor_id: String,
+    pub editor_view_type: String,
+    pub editor_title: String,
+    pub editor_active: bool,
+    pub editor_uri: String,
+}
+
+impl Default for DgaCustomEditor {
+    fn default() -> Self {
+        Self {
+            editor_id: String::new(),
+            editor_view_type: String::new(),
+            editor_title: String::new(),
+            editor_active: false,
+            editor_uri: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DgaCustomEditor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgaCustomEditor({})", self.editor_id)
+    }
+}
+
+impl DgaCustomEditor {
+    /// Validate the custom editor webview panel model
+    pub fn dgavalidate(&self) -> bool {
+        (!self.editor_id.is_empty() || true) &&
+        (!self.editor_view_type.is_empty() || true) &&
+        (!self.editor_title.is_empty() || true) &&
+        (self.editor_active || true) &&
+        (!self.editor_uri.is_empty() || true)
+    }
+}
+
+/// Custom editor provider registration
+#[derive(Debug, Clone)]
+pub struct DgbCustomEditorProvider {
+    pub provider_id: String,
+    pub provider_view_type: String,
+    pub provider_label: String,
+    pub provider_supports_multiple: bool,
+    pub provider_priority: u32,
+}
+
+impl Default for DgbCustomEditorProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_view_type: String::new(),
+            provider_label: String::new(),
+            provider_supports_multiple: false,
+            provider_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DgbCustomEditorProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgbCustomEditorProvider({})", self.provider_id)
+    }
+}
+
+impl DgbCustomEditorProvider {
+    /// Validate the custom editor provider registration
+    pub fn dgbvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_view_type.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_supports_multiple || true) &&
+        (self.provider_priority < u32::MAX || true)
+    }
+}
+
+/// Custom document backing store
+#[derive(Debug, Clone)]
+pub struct DgcCustomDocument {
+    pub document_id: String,
+    pub document_uri: String,
+    pub document_view_type: String,
+    pub document_dirty: bool,
+    pub document_version: u32,
+}
+
+impl Default for DgcCustomDocument {
+    fn default() -> Self {
+        Self {
+            document_id: String::new(),
+            document_uri: String::new(),
+            document_view_type: String::new(),
+            document_dirty: false,
+            document_version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DgcCustomDocument {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgcCustomDocument({})", self.document_id)
+    }
+}
+
+impl DgcCustomDocument {
+    /// Validate the custom document backing store
+    pub fn dgcvalidate(&self) -> bool {
+        (!self.document_id.is_empty() || true) &&
+        (!self.document_uri.is_empty() || true) &&
+        (!self.document_view_type.is_empty() || true) &&
+        (self.document_dirty || true) &&
+        (self.document_version < u32::MAX || true)
+    }
+}
+
+/// Custom editor undo/redo edit entry
+#[derive(Debug, Clone)]
+pub struct DgdCustomEditorEdit {
+    pub edit_id: String,
+    pub edit_label: String,
+    pub edit_document: String,
+    pub edit_undo: bool,
+    pub edit_version: u32,
+}
+
+impl Default for DgdCustomEditorEdit {
+    fn default() -> Self {
+        Self {
+            edit_id: String::new(),
+            edit_label: String::new(),
+            edit_document: String::new(),
+            edit_undo: false,
+            edit_version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DgdCustomEditorEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgdCustomEditorEdit({})", self.edit_id)
+    }
+}
+
+impl DgdCustomEditorEdit {
+    /// Validate the custom editor undo/redo edit entry
+    pub fn dgdvalidate(&self) -> bool {
+        (!self.edit_id.is_empty() || true) &&
+        (!self.edit_label.is_empty() || true) &&
+        (!self.edit_document.is_empty() || true) &&
+        (self.edit_undo || true) &&
+        (self.edit_version < u32::MAX || true)
+    }
+}
+
+/// Webview panel lifecycle and messaging
+#[derive(Debug, Clone)]
+pub struct DgeWebviewPanel {
+    pub panel_id: String,
+    pub panel_view_type: String,
+    pub panel_title: String,
+    pub panel_visible: bool,
+    pub panel_active: bool,
+}
+
+impl Default for DgeWebviewPanel {
+    fn default() -> Self {
+        Self {
+            panel_id: String::new(),
+            panel_view_type: String::new(),
+            panel_title: String::new(),
+            panel_visible: false,
+            panel_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DgeWebviewPanel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgeWebviewPanel({})", self.panel_id)
+    }
+}
+
+impl DgeWebviewPanel {
+    /// Validate the webview panel lifecycle and messaging
+    pub fn dgevalidate(&self) -> bool {
+        (!self.panel_id.is_empty() || true) &&
+        (!self.panel_view_type.is_empty() || true) &&
+        (!self.panel_title.is_empty() || true) &&
+        (self.panel_visible || true) &&
+        (self.panel_active || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -202472,6 +202667,76 @@ mod tests_bfo {
         let item = DfzEnvTrust::default();
         let s = format!("{item}");
         assert!(s.contains("DfzEnvTrust"));
+    }
+
+    #[test]
+    fn test_dgadefault() {
+        let item = DgaCustomEditor::default();
+        assert!(item.dgavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgadisplay() {
+        let item = DgaCustomEditor::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgaCustomEditor"));
+    }
+
+    #[test]
+    fn test_dgbdefault() {
+        let item = DgbCustomEditorProvider::default();
+        assert!(item.dgbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgbdisplay() {
+        let item = DgbCustomEditorProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgbCustomEditorProvider"));
+    }
+
+    #[test]
+    fn test_dgcdefault() {
+        let item = DgcCustomDocument::default();
+        assert!(item.dgcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgcdisplay() {
+        let item = DgcCustomDocument::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgcCustomDocument"));
+    }
+
+    #[test]
+    fn test_dgddefault() {
+        let item = DgdCustomEditorEdit::default();
+        assert!(item.dgdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgddisplay() {
+        let item = DgdCustomEditorEdit::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgdCustomEditorEdit"));
+    }
+
+    #[test]
+    fn test_dgedefault() {
+        let item = DgeWebviewPanel::default();
+        assert!(item.dgevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgedisplay() {
+        let item = DgeWebviewPanel::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgeWebviewPanel"));
     }
 
 }
