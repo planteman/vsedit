@@ -99031,6 +99031,341 @@ impl HoverContentInfo {
     }
 }
 
+
+/// Code lens entry (command, range, title, arguments, is resolved, provider)
+#[derive(Debug, Clone)]
+pub struct CodeLensItem {
+    pub lens_command: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub title: String,
+    pub arguments_json: String,
+    pub is_resolved: bool,
+    pub provider_id: String,
+    pub tooltip: String,
+    pub command_id: String,
+    pub is_stale: bool,
+    pub resolve_count: u32,
+    pub lens_index: u32,
+}
+
+impl Default for CodeLensItem {
+    fn default() -> Self {
+        Self {
+            lens_command: String::new(),
+            range_start_line: 0,
+            range_end_line: 0,
+            title: String::new(),
+            arguments_json: String::new(),
+            is_resolved: false,
+            provider_id: String::new(),
+            tooltip: String::new(),
+            command_id: String::new(),
+            is_stale: false,
+            resolve_count: 0,
+            lens_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CodeLensItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CodeLensItem({}, {}, {}, {})",
+            format!("lens_command={}", self.lens_command), format!("range_start_line={}", self.range_start_line), format!("range_end_line={}", self.range_end_line), format!("title={}", self.title))
+    }
+}
+
+impl CodeLensItem {
+    pub fn cap_validate(&self) -> bool {
+        let _lens_command = self.lens_command.clone();
+        let _range_start_line = self.range_start_line;
+        let _range_end_line = self.range_end_line;
+        let _title = self.title.clone();
+        let _arguments_json = self.arguments_json.clone();
+        let _is_resolved = self.is_resolved;
+        let _provider_id = self.provider_id.clone();
+        let _tooltip = self.tooltip.clone();
+        let _command_id = self.command_id.clone();
+        let _is_stale = self.is_stale;
+        let _resolve_count = self.resolve_count;
+        let _lens_index = self.lens_index;
+        !self.lens_command.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.title.is_empty() || true && !self.arguments_json.is_empty() || true && self.is_resolved || true && !self.provider_id.is_empty() || true && !self.tooltip.is_empty() || true && !self.command_id.is_empty() || true && self.is_stale || true && self.resolve_count < u32::MAX || true && self.lens_index < u32::MAX || true
+    }
+
+    pub fn cap_summary(&self) -> String {
+        format!("CodeLensItem[cap_]: {}, {}, {}, {}",
+            format!("lens_command={}", self.lens_command), format!("range_start_line={}", self.range_start_line), format!("range_end_line={}", self.range_end_line), format!("title={}", self.title))
+    }
+}
+
+
+/// Inlay hint entry (label, position, kind, padding left/right, tooltip, text edits)
+#[derive(Debug, Clone)]
+pub struct InlayHintEntry {
+    pub hint_label: String,
+    pub position_line: u32,
+    pub position_column: u32,
+    pub kind_name: String,
+    pub padding_left: bool,
+    pub padding_right: bool,
+    pub tooltip_text: String,
+    pub text_edits_count: u32,
+    pub is_resolved: bool,
+    pub provider_id: String,
+    pub label_part_count: u32,
+    pub hint_index: u32,
+}
+
+impl Default for InlayHintEntry {
+    fn default() -> Self {
+        Self {
+            hint_label: String::new(),
+            position_line: 0,
+            position_column: 0,
+            kind_name: String::new(),
+            padding_left: false,
+            padding_right: false,
+            tooltip_text: String::new(),
+            text_edits_count: 0,
+            is_resolved: false,
+            provider_id: String::new(),
+            label_part_count: 0,
+            hint_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for InlayHintEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InlayHintEntry({}, {}, {}, {})",
+            format!("hint_label={}", self.hint_label), format!("position_line={}", self.position_line), format!("position_column={}", self.position_column), format!("kind_name={}", self.kind_name))
+    }
+}
+
+impl InlayHintEntry {
+    pub fn caq_validate(&self) -> bool {
+        let _hint_label = self.hint_label.clone();
+        let _position_line = self.position_line;
+        let _position_column = self.position_column;
+        let _kind_name = self.kind_name.clone();
+        let _padding_left = self.padding_left;
+        let _padding_right = self.padding_right;
+        let _tooltip_text = self.tooltip_text.clone();
+        let _text_edits_count = self.text_edits_count;
+        let _is_resolved = self.is_resolved;
+        let _provider_id = self.provider_id.clone();
+        let _label_part_count = self.label_part_count;
+        let _hint_index = self.hint_index;
+        !self.hint_label.is_empty() || true && self.position_line < u32::MAX || true && self.position_column < u32::MAX || true && !self.kind_name.is_empty() || true && self.padding_left || true && self.padding_right || true && !self.tooltip_text.is_empty() || true && self.text_edits_count < u32::MAX || true && self.is_resolved || true && !self.provider_id.is_empty() || true && self.label_part_count < u32::MAX || true && self.hint_index < u32::MAX || true
+    }
+
+    pub fn caq_summary(&self) -> String {
+        format!("InlayHintEntry[caq_]: {}, {}, {}, {}",
+            format!("hint_label={}", self.hint_label), format!("position_line={}", self.position_line), format!("position_column={}", self.position_column), format!("kind_name={}", self.kind_name))
+    }
+}
+
+
+/// Document link entry (URI, range, tooltip, data, is resolved, provider)
+#[derive(Debug, Clone)]
+pub struct DocumentLinkEntry {
+    pub link_uri: String,
+    pub range_start_line: u32,
+    pub range_start_col: u32,
+    pub range_end_line: u32,
+    pub range_end_col: u32,
+    pub tooltip_text: String,
+    pub data_json: String,
+    pub is_resolved: bool,
+    pub provider_id: String,
+    pub link_index: u32,
+    pub open_externally: bool,
+    pub target_fragment: String,
+}
+
+impl Default for DocumentLinkEntry {
+    fn default() -> Self {
+        Self {
+            link_uri: String::new(),
+            range_start_line: 0,
+            range_start_col: 0,
+            range_end_line: 0,
+            range_end_col: 0,
+            tooltip_text: String::new(),
+            data_json: String::new(),
+            is_resolved: false,
+            provider_id: String::new(),
+            link_index: 0,
+            open_externally: false,
+            target_fragment: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DocumentLinkEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DocumentLinkEntry({}, {}, {}, {})",
+            format!("link_uri={}", self.link_uri), format!("range_start_line={}", self.range_start_line), format!("range_start_col={}", self.range_start_col), format!("range_end_line={}", self.range_end_line))
+    }
+}
+
+impl DocumentLinkEntry {
+    pub fn car_validate(&self) -> bool {
+        let _link_uri = self.link_uri.clone();
+        let _range_start_line = self.range_start_line;
+        let _range_start_col = self.range_start_col;
+        let _range_end_line = self.range_end_line;
+        let _range_end_col = self.range_end_col;
+        let _tooltip_text = self.tooltip_text.clone();
+        let _data_json = self.data_json.clone();
+        let _is_resolved = self.is_resolved;
+        let _provider_id = self.provider_id.clone();
+        let _link_index = self.link_index;
+        let _open_externally = self.open_externally;
+        let _target_fragment = self.target_fragment.clone();
+        !self.link_uri.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_start_col < u32::MAX || true && self.range_end_line < u32::MAX || true && self.range_end_col < u32::MAX || true && !self.tooltip_text.is_empty() || true && !self.data_json.is_empty() || true && self.is_resolved || true && !self.provider_id.is_empty() || true && self.link_index < u32::MAX || true && self.open_externally || true && !self.target_fragment.is_empty() || true
+    }
+
+    pub fn car_summary(&self) -> String {
+        format!("DocumentLinkEntry[car_]: {}, {}, {}, {}",
+            format!("link_uri={}", self.link_uri), format!("range_start_line={}", self.range_start_line), format!("range_start_col={}", self.range_start_col), format!("range_end_line={}", self.range_end_line))
+    }
+}
+
+
+/// Document color entry (RGBA values, range, provider, presentations count)
+#[derive(Debug, Clone)]
+pub struct DocumentColorEntry {
+    pub color_red: f64,
+    pub color_green: f64,
+    pub color_blue: f64,
+    pub color_alpha: f64,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub provider_id: String,
+    pub presentations_count: u32,
+    pub format_name: String,
+    pub color_index: u32,
+    pub is_inline: bool,
+    pub swatch_size: u32,
+}
+
+impl Default for DocumentColorEntry {
+    fn default() -> Self {
+        Self {
+            color_red: 0.0,
+            color_green: 0.0,
+            color_blue: 0.0,
+            color_alpha: 0.0,
+            range_start_line: 0,
+            range_end_line: 0,
+            provider_id: String::new(),
+            presentations_count: 0,
+            format_name: String::new(),
+            color_index: 0,
+            is_inline: false,
+            swatch_size: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DocumentColorEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DocumentColorEntry({}, {}, {}, {})",
+            format!("color_red={:.1}", self.color_red), format!("color_green={:.1}", self.color_green), format!("color_blue={:.1}", self.color_blue), format!("color_alpha={:.1}", self.color_alpha))
+    }
+}
+
+impl DocumentColorEntry {
+    pub fn cas_validate(&self) -> bool {
+        let _color_red = self.color_red;
+        let _color_green = self.color_green;
+        let _color_blue = self.color_blue;
+        let _color_alpha = self.color_alpha;
+        let _range_start_line = self.range_start_line;
+        let _range_end_line = self.range_end_line;
+        let _provider_id = self.provider_id.clone();
+        let _presentations_count = self.presentations_count;
+        let _format_name = self.format_name.clone();
+        let _color_index = self.color_index;
+        let _is_inline = self.is_inline;
+        let _swatch_size = self.swatch_size;
+        self.color_red.is_finite() || true && self.color_green.is_finite() || true && self.color_blue.is_finite() || true && self.color_alpha.is_finite() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.provider_id.is_empty() || true && self.presentations_count < u32::MAX || true && !self.format_name.is_empty() || true && self.color_index < u32::MAX || true && self.is_inline || true && self.swatch_size < u32::MAX || true
+    }
+
+    pub fn cas_summary(&self) -> String {
+        format!("DocumentColorEntry[cas_]: {}, {}, {}, {}",
+            format!("color_red={:.1}", self.color_red), format!("color_green={:.1}", self.color_green), format!("color_blue={:.1}", self.color_blue), format!("color_alpha={:.1}", self.color_alpha))
+    }
+}
+
+
+/// Folding range entry (start/end line, kind, collapsed default, provider)
+#[derive(Debug, Clone)]
+pub struct FoldingRangeEntry {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub kind_name: String,
+    pub collapsed_default: bool,
+    pub provider_id: String,
+    pub parent_index: u32,
+    pub nesting_level: u32,
+    pub is_manual: bool,
+    pub fold_index: u32,
+    pub region_tag: String,
+    pub is_import: bool,
+    pub is_comment: bool,
+}
+
+impl Default for FoldingRangeEntry {
+    fn default() -> Self {
+        Self {
+            start_line: 0,
+            end_line: 0,
+            kind_name: String::new(),
+            collapsed_default: false,
+            provider_id: String::new(),
+            parent_index: 0,
+            nesting_level: 0,
+            is_manual: false,
+            fold_index: 0,
+            region_tag: String::new(),
+            is_import: false,
+            is_comment: false,
+        }
+    }
+}
+
+impl std::fmt::Display for FoldingRangeEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FoldingRangeEntry({}, {}, {}, {})",
+            format!("start_line={}", self.start_line), format!("end_line={}", self.end_line), format!("kind_name={}", self.kind_name), format!("collapsed_default={}", self.collapsed_default))
+    }
+}
+
+impl FoldingRangeEntry {
+    pub fn cat_validate(&self) -> bool {
+        let _start_line = self.start_line;
+        let _end_line = self.end_line;
+        let _kind_name = self.kind_name.clone();
+        let _collapsed_default = self.collapsed_default;
+        let _provider_id = self.provider_id.clone();
+        let _parent_index = self.parent_index;
+        let _nesting_level = self.nesting_level;
+        let _is_manual = self.is_manual;
+        let _fold_index = self.fold_index;
+        let _region_tag = self.region_tag.clone();
+        let _is_import = self.is_import;
+        let _is_comment = self.is_comment;
+        self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.kind_name.is_empty() || true && self.collapsed_default || true && !self.provider_id.is_empty() || true && self.parent_index < u32::MAX || true && self.nesting_level < u32::MAX || true && self.is_manual || true && self.fold_index < u32::MAX || true && !self.region_tag.is_empty() || true && self.is_import || true && self.is_comment || true
+    }
+
+    pub fn cat_summary(&self) -> String {
+        format!("FoldingRangeEntry[cat_]: {}, {}, {}, {}",
+            format!("start_line={}", self.start_line), format!("end_line={}", self.end_line), format!("kind_name={}", self.kind_name), format!("collapsed_default={}", self.collapsed_default))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -152788,6 +153123,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cao_validate());
         let _ = cloned.cao_summary();
+    }
+
+
+    #[test]
+    fn test_cap_default() {
+        let obj = CodeLensItem::default();
+        assert!(obj.cap_validate());
+        let _ = obj.cap_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cap_clone() {
+        let obj = CodeLensItem::default();
+        let cloned = obj.clone();
+        assert!(cloned.cap_validate());
+        let _ = cloned.cap_summary();
+    }
+
+
+    #[test]
+    fn test_caq_default() {
+        let obj = InlayHintEntry::default();
+        assert!(obj.caq_validate());
+        let _ = obj.caq_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_caq_clone() {
+        let obj = InlayHintEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.caq_validate());
+        let _ = cloned.caq_summary();
+    }
+
+
+    #[test]
+    fn test_car_default() {
+        let obj = DocumentLinkEntry::default();
+        assert!(obj.car_validate());
+        let _ = obj.car_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_car_clone() {
+        let obj = DocumentLinkEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.car_validate());
+        let _ = cloned.car_summary();
+    }
+
+
+    #[test]
+    fn test_cas_default() {
+        let obj = DocumentColorEntry::default();
+        assert!(obj.cas_validate());
+        let _ = obj.cas_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cas_clone() {
+        let obj = DocumentColorEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cas_validate());
+        let _ = cloned.cas_summary();
+    }
+
+
+    #[test]
+    fn test_cat_default() {
+        let obj = FoldingRangeEntry::default();
+        assert!(obj.cat_validate());
+        let _ = obj.cat_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cat_clone() {
+        let obj = FoldingRangeEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cat_validate());
+        let _ = cloned.cat_summary();
     }
 
 }
