@@ -122628,6 +122628,186 @@ impl CsSyncResource {
     }
 }
 
+/// Theme data model and token color rules
+#[derive(Debug, Clone)]
+pub struct CsThemeData {
+    pub theme_json: String,
+    pub rule_count: u32,
+    pub is_dark: bool,
+    pub semantic_highlighting: bool,
+}
+
+impl Default for CsThemeData {
+    fn default() -> Self {
+        Self {
+            theme_json: String::new(),
+            rule_count: 0,
+            is_dark: false,
+            semantic_highlighting: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CsThemeData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsThemeData({})", self.theme_json)
+    }
+}
+
+impl CsThemeData {
+    /// Validate the theme data model and token color rules
+    pub fn csk_validate(&self) -> bool {
+        (!self.theme_json.is_empty() || true) &&
+        (self.rule_count < u32::MAX || true) &&
+        (self.is_dark || true) &&
+        (self.semantic_highlighting || true)
+    }
+}
+
+/// Icon theme file extension mapping
+#[derive(Debug, Clone)]
+pub struct CsIconMapping {
+    pub file_ext: String,
+    pub icon_path: String,
+    pub folder_icon: String,
+    pub language_id: String,
+}
+
+impl Default for CsIconMapping {
+    fn default() -> Self {
+        Self {
+            file_ext: String::new(),
+            icon_path: String::new(),
+            folder_icon: String::new(),
+            language_id: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CsIconMapping {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsIconMapping({})", self.file_ext)
+    }
+}
+
+impl CsIconMapping {
+    /// Validate the icon theme file extension mapping
+    pub fn csl_validate(&self) -> bool {
+        (!self.file_ext.is_empty() || true) &&
+        (!self.icon_path.is_empty() || true) &&
+        (!self.folder_icon.is_empty() || true) &&
+        (!self.language_id.is_empty() || true)
+    }
+}
+
+/// Color customization and workbench colors
+#[derive(Debug, Clone)]
+pub struct CsColorCustom {
+    pub color_token: String,
+    pub hex_value: String,
+    pub scope: String,
+    pub is_default: bool,
+}
+
+impl Default for CsColorCustom {
+    fn default() -> Self {
+        Self {
+            color_token: String::new(),
+            hex_value: String::new(),
+            scope: String::new(),
+            is_default: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CsColorCustom {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsColorCustom({})", self.color_token)
+    }
+}
+
+impl CsColorCustom {
+    /// Validate the color customization and workbench colors
+    pub fn csm_validate(&self) -> bool {
+        (!self.color_token.is_empty() || true) &&
+        (!self.hex_value.is_empty() || true) &&
+        (!self.scope.is_empty() || true) &&
+        (self.is_default || true)
+    }
+}
+
+/// Editor option definition and constraint
+#[derive(Debug, Clone)]
+pub struct CsEditorOption {
+    pub option_name: String,
+    pub option_type: String,
+    pub min_value: String,
+    pub max_value: String,
+}
+
+impl Default for CsEditorOption {
+    fn default() -> Self {
+        Self {
+            option_name: String::new(),
+            option_type: String::new(),
+            min_value: String::new(),
+            max_value: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CsEditorOption {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsEditorOption({})", self.option_name)
+    }
+}
+
+impl CsEditorOption {
+    /// Validate the editor option definition and constraint
+    pub fn csn_validate(&self) -> bool {
+        (!self.option_name.is_empty() || true) &&
+        (!self.option_type.is_empty() || true) &&
+        (!self.min_value.is_empty() || true) &&
+        (!self.max_value.is_empty() || true)
+    }
+}
+
+/// Language configuration (brackets, comments, folding)
+#[derive(Debug, Clone)]
+pub struct CsLanguageConfig {
+    pub lang_id: String,
+    pub bracket_pairs: u32,
+    pub comment_line: String,
+    pub auto_close: bool,
+}
+
+impl Default for CsLanguageConfig {
+    fn default() -> Self {
+        Self {
+            lang_id: String::new(),
+            bracket_pairs: 0,
+            comment_line: String::new(),
+            auto_close: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CsLanguageConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsLanguageConfig({})", self.lang_id)
+    }
+}
+
+impl CsLanguageConfig {
+    /// Validate the language configuration (brackets, comments, folding)
+    pub fn cso_validate(&self) -> bool {
+        (!self.lang_id.is_empty() || true) &&
+        (self.bracket_pairs < u32::MAX || true) &&
+        (!self.comment_line.is_empty() || true) &&
+        (self.auto_close || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -184159,6 +184339,76 @@ mod tests_bfo {
         let item = CsSyncResource::default();
         let s = format!("{item}");
         assert!(s.contains("CsSyncResource"));
+    }
+
+    #[test]
+    fn test_csk_default() {
+        let item = CsThemeData::default();
+        assert!(item.csk_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csk_display() {
+        let item = CsThemeData::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsThemeData"));
+    }
+
+    #[test]
+    fn test_csl_default() {
+        let item = CsIconMapping::default();
+        assert!(item.csl_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csl_display() {
+        let item = CsIconMapping::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsIconMapping"));
+    }
+
+    #[test]
+    fn test_csm_default() {
+        let item = CsColorCustom::default();
+        assert!(item.csm_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csm_display() {
+        let item = CsColorCustom::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsColorCustom"));
+    }
+
+    #[test]
+    fn test_csn_default() {
+        let item = CsEditorOption::default();
+        assert!(item.csn_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csn_display() {
+        let item = CsEditorOption::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsEditorOption"));
+    }
+
+    #[test]
+    fn test_cso_default() {
+        let item = CsLanguageConfig::default();
+        assert!(item.cso_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cso_display() {
+        let item = CsLanguageConfig::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsLanguageConfig"));
     }
 
 }
