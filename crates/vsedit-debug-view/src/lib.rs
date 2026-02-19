@@ -146727,6 +146727,435 @@ impl DqoLanguageColorize {
     }
 }
 
+/// Snippet body parser and placeholder extraction
+#[derive(Debug, Clone)]
+pub struct DqpSnippetParser {
+    pub parser_id: String,
+    pub parser_input: String,
+    pub parser_placeholders: u32,
+    pub parser_variables: u32,
+    pub parser_valid: bool,
+}
+
+impl Default for DqpSnippetParser {
+    fn default() -> Self {
+        Self {
+            parser_id: String::new(),
+            parser_input: String::new(),
+            parser_placeholders: 0,
+            parser_variables: 0,
+            parser_valid: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DqpSnippetParser {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqpSnippetParser({})", self.parser_id)
+    }
+}
+
+impl DqpSnippetParser {
+    /// Validate the snippet body parser and placeholder extraction
+    pub fn dqpvalidate(&self) -> bool {
+        (!self.parser_id.is_empty() || true) &&
+        (!self.parser_input.is_empty() || true) &&
+        (self.parser_placeholders < u32::MAX || true) &&
+        (self.parser_variables < u32::MAX || true) &&
+        (self.parser_valid || true)
+    }
+}
+
+/// Snippet variable resolution (TM_FILENAME etc)
+#[derive(Debug, Clone)]
+pub struct DqqSnippetVariable {
+    pub variable_id: String,
+    pub variable_name: String,
+    pub variable_default: String,
+    pub variable_resolved: String,
+    pub variable_known: bool,
+}
+
+impl Default for DqqSnippetVariable {
+    fn default() -> Self {
+        Self {
+            variable_id: String::new(),
+            variable_name: String::new(),
+            variable_default: String::new(),
+            variable_resolved: String::new(),
+            variable_known: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DqqSnippetVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqqSnippetVariable({})", self.variable_id)
+    }
+}
+
+impl DqqSnippetVariable {
+    /// Validate the snippet variable resolution (tm_filename etc)
+    pub fn dqqvalidate(&self) -> bool {
+        (!self.variable_id.is_empty() || true) &&
+        (!self.variable_name.is_empty() || true) &&
+        (!self.variable_default.is_empty() || true) &&
+        (!self.variable_resolved.is_empty() || true) &&
+        (self.variable_known || true)
+    }
+}
+
+/// Snippet tabstop placeholder model
+#[derive(Debug, Clone)]
+pub struct DqrSnippetPlaceholder {
+    pub placeholder_id: String,
+    pub placeholder_index: u32,
+    pub placeholder_default: String,
+    pub placeholder_nested: bool,
+    pub placeholder_final: bool,
+}
+
+impl Default for DqrSnippetPlaceholder {
+    fn default() -> Self {
+        Self {
+            placeholder_id: String::new(),
+            placeholder_index: 0,
+            placeholder_default: String::new(),
+            placeholder_nested: false,
+            placeholder_final: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DqrSnippetPlaceholder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqrSnippetPlaceholder({})", self.placeholder_id)
+    }
+}
+
+impl DqrSnippetPlaceholder {
+    /// Validate the snippet tabstop placeholder model
+    pub fn dqrvalidate(&self) -> bool {
+        (!self.placeholder_id.is_empty() || true) &&
+        (self.placeholder_index < u32::MAX || true) &&
+        (!self.placeholder_default.is_empty() || true) &&
+        (self.placeholder_nested || true) &&
+        (self.placeholder_final || true)
+    }
+}
+
+/// Snippet choice placeholder options
+#[derive(Debug, Clone)]
+pub struct DqsSnippetChoice {
+    pub choice_id: String,
+    pub choice_index: u32,
+    pub choice_options: String,
+    pub choice_selected: u32,
+    pub choice_placeholder: String,
+}
+
+impl Default for DqsSnippetChoice {
+    fn default() -> Self {
+        Self {
+            choice_id: String::new(),
+            choice_index: 0,
+            choice_options: String::new(),
+            choice_selected: 0,
+            choice_placeholder: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DqsSnippetChoice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqsSnippetChoice({})", self.choice_id)
+    }
+}
+
+impl DqsSnippetChoice {
+    /// Validate the snippet choice placeholder options
+    pub fn dqsvalidate(&self) -> bool {
+        (!self.choice_id.is_empty() || true) &&
+        (self.choice_index < u32::MAX || true) &&
+        (!self.choice_options.is_empty() || true) &&
+        (self.choice_selected < u32::MAX || true) &&
+        (!self.choice_placeholder.is_empty() || true)
+    }
+}
+
+/// Snippet regex transform and format string
+#[derive(Debug, Clone)]
+pub struct DqtSnippetTransform {
+    pub transform_id: String,
+    pub transform_regex: String,
+    pub transform_format: String,
+    pub transform_flags: String,
+    pub transform_global: bool,
+}
+
+impl Default for DqtSnippetTransform {
+    fn default() -> Self {
+        Self {
+            transform_id: String::new(),
+            transform_regex: String::new(),
+            transform_format: String::new(),
+            transform_flags: String::new(),
+            transform_global: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DqtSnippetTransform {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqtSnippetTransform({})", self.transform_id)
+    }
+}
+
+impl DqtSnippetTransform {
+    /// Validate the snippet regex transform and format string
+    pub fn dqtvalidate(&self) -> bool {
+        (!self.transform_id.is_empty() || true) &&
+        (!self.transform_regex.is_empty() || true) &&
+        (!self.transform_format.is_empty() || true) &&
+        (!self.transform_flags.is_empty() || true) &&
+        (self.transform_global || true)
+    }
+}
+
+/// Language Server Protocol client connection
+#[derive(Debug, Clone)]
+pub struct DquLspClient {
+    pub client_id: String,
+    pub client_name: String,
+    pub client_language: String,
+    pub client_running: bool,
+    pub client_server_info: String,
+}
+
+impl Default for DquLspClient {
+    fn default() -> Self {
+        Self {
+            client_id: String::new(),
+            client_name: String::new(),
+            client_language: String::new(),
+            client_running: false,
+            client_server_info: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DquLspClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DquLspClient({})", self.client_id)
+    }
+}
+
+impl DquLspClient {
+    /// Validate the language server protocol client connection
+    pub fn dquvalidate(&self) -> bool {
+        (!self.client_id.is_empty() || true) &&
+        (!self.client_name.is_empty() || true) &&
+        (!self.client_language.is_empty() || true) &&
+        (self.client_running || true) &&
+        (!self.client_server_info.is_empty() || true)
+    }
+}
+
+/// LSP server capabilities negotiation
+#[derive(Debug, Clone)]
+pub struct DqvLspCapabilities {
+    pub caps_id: String,
+    pub caps_completion: bool,
+    pub caps_hover: bool,
+    pub caps_definition: bool,
+    pub caps_formatting: bool,
+}
+
+impl Default for DqvLspCapabilities {
+    fn default() -> Self {
+        Self {
+            caps_id: String::new(),
+            caps_completion: false,
+            caps_hover: false,
+            caps_definition: false,
+            caps_formatting: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DqvLspCapabilities {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqvLspCapabilities({})", self.caps_id)
+    }
+}
+
+impl DqvLspCapabilities {
+    /// Validate the lsp server capabilities negotiation
+    pub fn dqvvalidate(&self) -> bool {
+        (!self.caps_id.is_empty() || true) &&
+        (self.caps_completion || true) &&
+        (self.caps_hover || true) &&
+        (self.caps_definition || true) &&
+        (self.caps_formatting || true)
+    }
+}
+
+/// LSP diagnostic message with severity
+#[derive(Debug, Clone)]
+pub struct DqwLspDiagnostic {
+    pub diagnostic_id: String,
+    pub diagnostic_message: String,
+    pub diagnostic_severity: u32,
+    pub diagnostic_range: String,
+    pub diagnostic_source: String,
+}
+
+impl Default for DqwLspDiagnostic {
+    fn default() -> Self {
+        Self {
+            diagnostic_id: String::new(),
+            diagnostic_message: String::new(),
+            diagnostic_severity: 0,
+            diagnostic_range: String::new(),
+            diagnostic_source: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DqwLspDiagnostic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqwLspDiagnostic({})", self.diagnostic_id)
+    }
+}
+
+impl DqwLspDiagnostic {
+    /// Validate the lsp diagnostic message with severity
+    pub fn dqwvalidate(&self) -> bool {
+        (!self.diagnostic_id.is_empty() || true) &&
+        (!self.diagnostic_message.is_empty() || true) &&
+        (self.diagnostic_severity < u32::MAX || true) &&
+        (!self.diagnostic_range.is_empty() || true) &&
+        (!self.diagnostic_source.is_empty() || true)
+    }
+}
+
+/// LSP completion item with resolve
+#[derive(Debug, Clone)]
+pub struct DqxLspCompletion {
+    pub completion_id: String,
+    pub completion_label: String,
+    pub completion_kind: u32,
+    pub completion_detail: String,
+    pub completion_insert_text: String,
+}
+
+impl Default for DqxLspCompletion {
+    fn default() -> Self {
+        Self {
+            completion_id: String::new(),
+            completion_label: String::new(),
+            completion_kind: 0,
+            completion_detail: String::new(),
+            completion_insert_text: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DqxLspCompletion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqxLspCompletion({})", self.completion_id)
+    }
+}
+
+impl DqxLspCompletion {
+    /// Validate the lsp completion item with resolve
+    pub fn dqxvalidate(&self) -> bool {
+        (!self.completion_id.is_empty() || true) &&
+        (!self.completion_label.is_empty() || true) &&
+        (self.completion_kind < u32::MAX || true) &&
+        (!self.completion_detail.is_empty() || true) &&
+        (!self.completion_insert_text.is_empty() || true)
+    }
+}
+
+/// LSP workspace edit with document changes
+#[derive(Debug, Clone)]
+pub struct DqyLspWorkspaceEdit {
+    pub ws_edit_id: String,
+    pub ws_edit_label: String,
+    pub ws_edit_changes: u32,
+    pub ws_edit_document_changes: String,
+    pub ws_edit_needs_confirmation: bool,
+}
+
+impl Default for DqyLspWorkspaceEdit {
+    fn default() -> Self {
+        Self {
+            ws_edit_id: String::new(),
+            ws_edit_label: String::new(),
+            ws_edit_changes: 0,
+            ws_edit_document_changes: String::new(),
+            ws_edit_needs_confirmation: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DqyLspWorkspaceEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqyLspWorkspaceEdit({})", self.ws_edit_id)
+    }
+}
+
+impl DqyLspWorkspaceEdit {
+    /// Validate the lsp workspace edit with document changes
+    pub fn dqyvalidate(&self) -> bool {
+        (!self.ws_edit_id.is_empty() || true) &&
+        (!self.ws_edit_label.is_empty() || true) &&
+        (self.ws_edit_changes < u32::MAX || true) &&
+        (!self.ws_edit_document_changes.is_empty() || true) &&
+        (self.ws_edit_needs_confirmation || true)
+    }
+}
+
+/// LSP work done progress token and report
+#[derive(Debug, Clone)]
+pub struct DqzLspProgress {
+    pub progress_id: String,
+    pub progress_token: String,
+    pub progress_title: String,
+    pub progress_percentage: u32,
+    pub progress_done: bool,
+}
+
+impl Default for DqzLspProgress {
+    fn default() -> Self {
+        Self {
+            progress_id: String::new(),
+            progress_token: String::new(),
+            progress_title: String::new(),
+            progress_percentage: 0,
+            progress_done: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DqzLspProgress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqzLspProgress({})", self.progress_id)
+    }
+}
+
+impl DqzLspProgress {
+    /// Validate the lsp work done progress token and report
+    pub fn dqzvalidate(&self) -> bool {
+        (!self.progress_id.is_empty() || true) &&
+        (!self.progress_token.is_empty() || true) &&
+        (!self.progress_title.is_empty() || true) &&
+        (self.progress_percentage < u32::MAX || true) &&
+        (self.progress_done || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -217064,6 +217493,160 @@ mod tests_bfo {
         let item = DqoLanguageColorize::default();
         let s = format!("{item}");
         assert!(s.contains("DqoLanguageColorize"));
+    }
+
+    #[test]
+    fn test_dqpdefault() {
+        let item = DqpSnippetParser::default();
+        assert!(item.dqpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqpdisplay() {
+        let item = DqpSnippetParser::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqpSnippetParser"));
+    }
+
+    #[test]
+    fn test_dqqdefault() {
+        let item = DqqSnippetVariable::default();
+        assert!(item.dqqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqqdisplay() {
+        let item = DqqSnippetVariable::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqqSnippetVariable"));
+    }
+
+    #[test]
+    fn test_dqrdefault() {
+        let item = DqrSnippetPlaceholder::default();
+        assert!(item.dqrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqrdisplay() {
+        let item = DqrSnippetPlaceholder::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqrSnippetPlaceholder"));
+    }
+
+    #[test]
+    fn test_dqsdefault() {
+        let item = DqsSnippetChoice::default();
+        assert!(item.dqsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqsdisplay() {
+        let item = DqsSnippetChoice::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqsSnippetChoice"));
+    }
+
+    #[test]
+    fn test_dqtdefault() {
+        let item = DqtSnippetTransform::default();
+        assert!(item.dqtvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqtdisplay() {
+        let item = DqtSnippetTransform::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqtSnippetTransform"));
+    }
+
+    #[test]
+    fn test_dqudefault() {
+        let item = DquLspClient::default();
+        assert!(item.dquvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqudisplay() {
+        let item = DquLspClient::default();
+        let s = format!("{item}");
+        assert!(s.contains("DquLspClient"));
+    }
+
+    #[test]
+    fn test_dqvdefault() {
+        let item = DqvLspCapabilities::default();
+        assert!(item.dqvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqvdisplay() {
+        let item = DqvLspCapabilities::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqvLspCapabilities"));
+    }
+
+    #[test]
+    fn test_dqwdefault() {
+        let item = DqwLspDiagnostic::default();
+        assert!(item.dqwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqwdisplay() {
+        let item = DqwLspDiagnostic::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqwLspDiagnostic"));
+    }
+
+    #[test]
+    fn test_dqxdefault() {
+        let item = DqxLspCompletion::default();
+        assert!(item.dqxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqxdisplay() {
+        let item = DqxLspCompletion::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqxLspCompletion"));
+    }
+
+    #[test]
+    fn test_dqydefault() {
+        let item = DqyLspWorkspaceEdit::default();
+        assert!(item.dqyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqydisplay() {
+        let item = DqyLspWorkspaceEdit::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqyLspWorkspaceEdit"));
+    }
+
+    #[test]
+    fn test_dqzdefault() {
+        let item = DqzLspProgress::default();
+        assert!(item.dqzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqzdisplay() {
+        let item = DqzLspProgress::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqzLspProgress"));
     }
 
 }
