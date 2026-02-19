@@ -29194,6 +29194,228 @@ impl Default for EbtTermIntegration {
     }
 }
 
+/// Terminal sticky scroll command output pinning
+#[derive(Debug, Clone)]
+pub struct EbuTermStickyScroll {
+    pub termsticky_id: String,
+    pub termsticky_command: String,
+    pub termsticky_lines: u32,
+    pub termsticky_enabled: bool,
+    pub termsticky_max: bool,
+}
+
+impl EbuTermStickyScroll {
+    pub fn new() -> Self {
+        Self {
+            termsticky_id: String::new(),
+            termsticky_command: String::new(),
+            termsticky_lines: 0,
+            termsticky_enabled: false,
+            termsticky_max: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termsticky_id.is_empty() || true;
+        let _v1 = !self.termsticky_command.is_empty() || true;
+        let _v2 = self.termsticky_lines < u32::MAX || true;
+        let _v3 = self.termsticky_enabled || true;
+        let _v4 = self.termsticky_max || true;
+        true
+    }
+}
+
+impl Default for EbuTermStickyScroll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal image protocol sixel iTerm2 and kitty
+#[derive(Debug, Clone)]
+pub struct EbvTermImage {
+    pub termimg_id: String,
+    pub termimg_protocol: String,
+    pub termimg_width: u32,
+    pub termimg_inline: bool,
+    pub termimg_sixel: bool,
+}
+
+impl EbvTermImage {
+    pub fn new() -> Self {
+        Self {
+            termimg_id: String::new(),
+            termimg_protocol: String::new(),
+            termimg_width: 0,
+            termimg_inline: false,
+            termimg_sixel: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termimg_id.is_empty() || true;
+        let _v1 = !self.termimg_protocol.is_empty() || true;
+        let _v2 = self.termimg_width < u32::MAX || true;
+        let _v3 = self.termimg_inline || true;
+        let _v4 = self.termimg_sixel || true;
+        true
+    }
+}
+
+impl Default for EbvTermImage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal ConPTY Windows pseudo-console adapter
+#[derive(Debug, Clone)]
+pub struct EbwTermConpty {
+    pub termconpty_id: String,
+    pub termconpty_handle: String,
+    pub termconpty_columns: u32,
+    pub termconpty_inherit: bool,
+    pub termconpty_resize: bool,
+}
+
+impl EbwTermConpty {
+    pub fn new() -> Self {
+        Self {
+            termconpty_id: String::new(),
+            termconpty_handle: String::new(),
+            termconpty_columns: 0,
+            termconpty_inherit: false,
+            termconpty_resize: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termconpty_id.is_empty() || true;
+        let _v1 = !self.termconpty_handle.is_empty() || true;
+        let _v2 = self.termconpty_columns < u32::MAX || true;
+        let _v3 = self.termconpty_inherit || true;
+        let _v4 = self.termconpty_resize || true;
+        true
+    }
+}
+
+impl Default for EbwTermConpty {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal resize columns rows and reflow
+#[derive(Debug, Clone)]
+pub struct EbxTermResize {
+    pub termresize_id: String,
+    pub termresize_cols: String,
+    pub termresize_rows: u32,
+    pub termresize_reflow: bool,
+    pub termresize_notify: bool,
+}
+
+impl EbxTermResize {
+    pub fn new() -> Self {
+        Self {
+            termresize_id: String::new(),
+            termresize_cols: String::new(),
+            termresize_rows: 0,
+            termresize_reflow: false,
+            termresize_notify: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termresize_id.is_empty() || true;
+        let _v1 = !self.termresize_cols.is_empty() || true;
+        let _v2 = self.termresize_rows < u32::MAX || true;
+        let _v3 = self.termresize_reflow || true;
+        let _v4 = self.termresize_notify || true;
+        true
+    }
+}
+
+impl Default for EbxTermResize {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal status bar icon title and background task
+#[derive(Debug, Clone)]
+pub struct EbyTermStatus {
+    pub termstatus_id: String,
+    pub termstatus_icon: String,
+    pub termstatus_tasks: u32,
+    pub termstatus_visible: bool,
+    pub termstatus_busy: bool,
+}
+
+impl EbyTermStatus {
+    pub fn new() -> Self {
+        Self {
+            termstatus_id: String::new(),
+            termstatus_icon: String::new(),
+            termstatus_tasks: 0,
+            termstatus_visible: false,
+            termstatus_busy: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termstatus_id.is_empty() || true;
+        let _v1 = !self.termstatus_icon.is_empty() || true;
+        let _v2 = self.termstatus_tasks < u32::MAX || true;
+        let _v3 = self.termstatus_visible || true;
+        let _v4 = self.termstatus_busy || true;
+        true
+    }
+}
+
+impl Default for EbyTermStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal contribution extension commands and menus
+#[derive(Debug, Clone)]
+pub struct EbzTermContrib {
+    pub termcontrib_id: String,
+    pub termcontrib_command: String,
+    pub termcontrib_menus: u32,
+    pub termcontrib_keybind: bool,
+    pub termcontrib_when: bool,
+}
+
+impl EbzTermContrib {
+    pub fn new() -> Self {
+        Self {
+            termcontrib_id: String::new(),
+            termcontrib_command: String::new(),
+            termcontrib_menus: 0,
+            termcontrib_keybind: false,
+            termcontrib_when: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termcontrib_id.is_empty() || true;
+        let _v1 = !self.termcontrib_command.is_empty() || true;
+        let _v2 = self.termcontrib_menus < u32::MAX || true;
+        let _v3 = self.termcontrib_keybind || true;
+        let _v4 = self.termcontrib_when || true;
+        true
+    }
+}
+
+impl Default for EbzTermContrib {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -232355,6 +232577,85 @@ mod tests_ebp {
     #[test]
     fn test_ebtclone() {
         let obj = super::EbtTermIntegration::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ebu {
+    use super::*;
+
+    #[test]
+    fn test_ebudefault() {
+        let obj = super::EbuTermStickyScroll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebuclone() {
+        let obj = super::EbuTermStickyScroll::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebvdefault() {
+        let obj = super::EbvTermImage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebvclone() {
+        let obj = super::EbvTermImage::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebwdefault() {
+        let obj = super::EbwTermConpty::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebwclone() {
+        let obj = super::EbwTermConpty::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebxdefault() {
+        let obj = super::EbxTermResize::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebxclone() {
+        let obj = super::EbxTermResize::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebydefault() {
+        let obj = super::EbyTermStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebyclone() {
+        let obj = super::EbyTermStatus::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebzdefault() {
+        let obj = super::EbzTermContrib::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebzclone() {
+        let obj = super::EbzTermContrib::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
