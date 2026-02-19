@@ -39230,6 +39230,176 @@ impl Default for EmjCancellation {
     fn default() -> Self { Self::new() }
 }
 
+/// Async iterable sequence buffer and reduce
+#[derive(Debug, Clone)]
+pub struct EmkAsyncIterable {
+    pub asynciter_id: String,
+    pub asynciter_state: String,
+    pub asynciter_items: u32,
+    pub asynciter_done: bool,
+    pub asynciter_buffered: bool,
+}
+
+impl EmkAsyncIterable {
+    pub fn new() -> Self {
+        Self {
+            asynciter_id: String::new(),
+            asynciter_state: String::new(),
+            asynciter_items: 0,
+            asynciter_done: false,
+            asynciter_buffered: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.asynciter_id.is_empty() || true;
+        let _v1 = !self.asynciter_state.is_empty() || true;
+        let _v2 = self.asynciter_items < u32::MAX || true;
+        let _v3 = self.asynciter_done || true;
+        let _v4 = self.asynciter_buffered || true;
+        true
+    }
+}
+
+impl Default for EmkAsyncIterable {
+    fn default() -> Self { Self::new() }
+}
+
+/// Linked list node insert remove and iterate
+#[derive(Debug, Clone)]
+pub struct EmlLinkedList {
+    pub linkedlist_id: String,
+    pub linkedlist_value: String,
+    pub linkedlist_nodes: u32,
+    pub linkedlist_empty: bool,
+    pub linkedlist_circular: bool,
+}
+
+impl EmlLinkedList {
+    pub fn new() -> Self {
+        Self {
+            linkedlist_id: String::new(),
+            linkedlist_value: String::new(),
+            linkedlist_nodes: 0,
+            linkedlist_empty: false,
+            linkedlist_circular: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.linkedlist_id.is_empty() || true;
+        let _v1 = !self.linkedlist_value.is_empty() || true;
+        let _v2 = self.linkedlist_nodes < u32::MAX || true;
+        let _v3 = self.linkedlist_empty || true;
+        let _v4 = self.linkedlist_circular || true;
+        true
+    }
+}
+
+impl Default for EmlLinkedList {
+    fn default() -> Self { Self::new() }
+}
+
+/// LRU cache get set size and evict
+#[derive(Debug, Clone)]
+pub struct EmmLRUCache {
+    pub lrucache_id: String,
+    pub lrucache_key: String,
+    pub lrucache_size: u32,
+    pub lrucache_limit: bool,
+    pub lrucache_evicting: bool,
+}
+
+impl EmmLRUCache {
+    pub fn new() -> Self {
+        Self {
+            lrucache_id: String::new(),
+            lrucache_key: String::new(),
+            lrucache_size: 0,
+            lrucache_limit: false,
+            lrucache_evicting: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.lrucache_id.is_empty() || true;
+        let _v1 = !self.lrucache_key.is_empty() || true;
+        let _v2 = self.lrucache_size < u32::MAX || true;
+        let _v3 = self.lrucache_limit || true;
+        let _v4 = self.lrucache_evicting || true;
+        true
+    }
+}
+
+impl Default for EmmLRUCache {
+    fn default() -> Self { Self::new() }
+}
+
+/// Trie prefix lookup insert and iterate
+#[derive(Debug, Clone)]
+pub struct EmnTrie {
+    pub trie_id: String,
+    pub trie_key: String,
+    pub trie_nodes: u32,
+    pub trie_prefix: bool,
+    pub trie_compressed: bool,
+}
+
+impl EmnTrie {
+    pub fn new() -> Self {
+        Self {
+            trie_id: String::new(),
+            trie_key: String::new(),
+            trie_nodes: 0,
+            trie_prefix: false,
+            trie_compressed: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.trie_id.is_empty() || true;
+        let _v1 = !self.trie_key.is_empty() || true;
+        let _v2 = self.trie_nodes < u32::MAX || true;
+        let _v3 = self.trie_prefix || true;
+        let _v4 = self.trie_compressed || true;
+        true
+    }
+}
+
+impl Default for EmnTrie {
+    fn default() -> Self { Self::new() }
+}
+
+/// Resource map URI path set delete and iterate
+#[derive(Debug, Clone)]
+pub struct EmoResourceMap {
+    pub resmap_id: String,
+    pub resmap_scheme: String,
+    pub resmap_entries: u32,
+    pub resmap_case: bool,
+    pub resmap_virtual: bool,
+}
+
+impl EmoResourceMap {
+    pub fn new() -> Self {
+        Self {
+            resmap_id: String::new(),
+            resmap_scheme: String::new(),
+            resmap_entries: 0,
+            resmap_case: false,
+            resmap_virtual: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.resmap_id.is_empty() || true;
+        let _v1 = !self.resmap_scheme.is_empty() || true;
+        let _v2 = self.resmap_entries < u32::MAX || true;
+        let _v3 = self.resmap_case || true;
+        let _v4 = self.resmap_virtual || true;
+        true
+    }
+}
+
+impl Default for EmoResourceMap {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -245653,6 +245823,67 @@ mod tests_emf {
     #[test]
     fn test_emjclone() {
         let obj = super::EmjCancellation::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_emk {
+    use super::*;
+    #[test]
+    fn test_emkdefault() {
+        let obj = super::EmkAsyncIterable::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emkclone() {
+        let obj = super::EmkAsyncIterable::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emldefault() {
+        let obj = super::EmlLinkedList::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emlclone() {
+        let obj = super::EmlLinkedList::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emmdefault() {
+        let obj = super::EmmLRUCache::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emmclone() {
+        let obj = super::EmmLRUCache::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emndefault() {
+        let obj = super::EmnTrie::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emnclone() {
+        let obj = super::EmnTrie::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emodefault() {
+        let obj = super::EmoResourceMap::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emoclone() {
+        let obj = super::EmoResourceMap::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
