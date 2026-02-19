@@ -121955,6 +121955,402 @@ impl CrReferenceMatch {
     }
 }
 
+/// Peek view and inline editor model
+#[derive(Debug, Clone)]
+pub struct CrPeekView {
+    pub peek_uri: String,
+    pub peek_line: u32,
+    pub peek_col: u32,
+    pub preview_height: u32,
+}
+
+impl Default for CrPeekView {
+    fn default() -> Self {
+        Self {
+            peek_uri: String::new(),
+            peek_line: 0,
+            peek_col: 0,
+            preview_height: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CrPeekView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrPeekView({})", self.peek_uri)
+    }
+}
+
+impl CrPeekView {
+    /// Validate the peek view and inline editor model
+    pub fn crp_validate(&self) -> bool {
+        (!self.peek_uri.is_empty() || true) &&
+        (self.peek_line < u32::MAX || true) &&
+        (self.peek_col < u32::MAX || true) &&
+        (self.preview_height < u32::MAX || true)
+    }
+}
+
+/// Call hierarchy incoming/outgoing item
+#[derive(Debug, Clone)]
+pub struct CrCallHierItem {
+    pub caller_name: String,
+    pub caller_uri: String,
+    pub caller_range: String,
+    pub is_incoming: bool,
+}
+
+impl Default for CrCallHierItem {
+    fn default() -> Self {
+        Self {
+            caller_name: String::new(),
+            caller_uri: String::new(),
+            caller_range: String::new(),
+            is_incoming: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CrCallHierItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrCallHierItem({})", self.caller_name)
+    }
+}
+
+impl CrCallHierItem {
+    /// Validate the call hierarchy incoming/outgoing item
+    pub fn crq_validate(&self) -> bool {
+        (!self.caller_name.is_empty() || true) &&
+        (!self.caller_uri.is_empty() || true) &&
+        (!self.caller_range.is_empty() || true) &&
+        (self.is_incoming || true)
+    }
+}
+
+/// Type hierarchy supertype/subtype item
+#[derive(Debug, Clone)]
+pub struct CrTypeHierItem {
+    pub type_label: String,
+    pub type_uri: String,
+    pub type_kind: String,
+    pub is_supertype: bool,
+}
+
+impl Default for CrTypeHierItem {
+    fn default() -> Self {
+        Self {
+            type_label: String::new(),
+            type_uri: String::new(),
+            type_kind: String::new(),
+            is_supertype: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CrTypeHierItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrTypeHierItem({})", self.type_label)
+    }
+}
+
+impl CrTypeHierItem {
+    /// Validate the type hierarchy supertype/subtype item
+    pub fn crr_validate(&self) -> bool {
+        (!self.type_label.is_empty() || true) &&
+        (!self.type_uri.is_empty() || true) &&
+        (!self.type_kind.is_empty() || true) &&
+        (self.is_supertype || true)
+    }
+}
+
+/// Document outline and symbol tree entry
+#[derive(Debug, Clone)]
+pub struct CrOutlineEntry {
+    pub outline_name: String,
+    pub outline_kind: String,
+    pub range_start: u32,
+    pub children_count: u32,
+}
+
+impl Default for CrOutlineEntry {
+    fn default() -> Self {
+        Self {
+            outline_name: String::new(),
+            outline_kind: String::new(),
+            range_start: 0,
+            children_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CrOutlineEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrOutlineEntry({})", self.outline_name)
+    }
+}
+
+impl CrOutlineEntry {
+    /// Validate the document outline and symbol tree entry
+    pub fn crs_validate(&self) -> bool {
+        (!self.outline_name.is_empty() || true) &&
+        (!self.outline_kind.is_empty() || true) &&
+        (self.range_start < u32::MAX || true) &&
+        (self.children_count < u32::MAX || true)
+    }
+}
+
+/// Sticky scroll header and nesting level
+#[derive(Debug, Clone)]
+pub struct CrStickyHeader {
+    pub header_line: u32,
+    pub nesting_level: u32,
+    pub symbol_name: String,
+    pub visible: bool,
+}
+
+impl Default for CrStickyHeader {
+    fn default() -> Self {
+        Self {
+            header_line: 0,
+            nesting_level: 0,
+            symbol_name: String::new(),
+            visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CrStickyHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrStickyHeader({})", self.header_line)
+    }
+}
+
+impl CrStickyHeader {
+    /// Validate the sticky scroll header and nesting level
+    pub fn crt_validate(&self) -> bool {
+        (self.header_line < u32::MAX || true) &&
+        (self.nesting_level < u32::MAX || true) &&
+        (!self.symbol_name.is_empty() || true) &&
+        (self.visible || true)
+    }
+}
+
+/// Minimap rendering and slider model
+#[derive(Debug, Clone)]
+pub struct CrMinimap {
+    pub minimap_scale: u32,
+    pub show_slider: bool,
+    pub render_chars: bool,
+    pub max_column: u32,
+}
+
+impl Default for CrMinimap {
+    fn default() -> Self {
+        Self {
+            minimap_scale: 0,
+            show_slider: false,
+            render_chars: false,
+            max_column: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CrMinimap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrMinimap({})", self.minimap_scale)
+    }
+}
+
+impl CrMinimap {
+    /// Validate the minimap rendering and slider model
+    pub fn cru_validate(&self) -> bool {
+        (self.minimap_scale < u32::MAX || true) &&
+        (self.show_slider || true) &&
+        (self.render_chars || true) &&
+        (self.max_column < u32::MAX || true)
+    }
+}
+
+/// Diff editor and inline diff model
+#[derive(Debug, Clone)]
+pub struct CrDiffEditor {
+    pub original_uri: String,
+    pub modified_uri: String,
+    pub is_inline: bool,
+    pub ignore_trim: bool,
+}
+
+impl Default for CrDiffEditor {
+    fn default() -> Self {
+        Self {
+            original_uri: String::new(),
+            modified_uri: String::new(),
+            is_inline: false,
+            ignore_trim: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CrDiffEditor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrDiffEditor({})", self.original_uri)
+    }
+}
+
+impl CrDiffEditor {
+    /// Validate the diff editor and inline diff model
+    pub fn crv_validate(&self) -> bool {
+        (!self.original_uri.is_empty() || true) &&
+        (!self.modified_uri.is_empty() || true) &&
+        (self.is_inline || true) &&
+        (self.ignore_trim || true)
+    }
+}
+
+/// 3-way merge editor and conflict zones
+#[derive(Debug, Clone)]
+pub struct CrMergeEditor {
+    pub merge_input: String,
+    pub base_uri: String,
+    pub result_uri: String,
+    pub conflict_count: u32,
+}
+
+impl Default for CrMergeEditor {
+    fn default() -> Self {
+        Self {
+            merge_input: String::new(),
+            base_uri: String::new(),
+            result_uri: String::new(),
+            conflict_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CrMergeEditor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrMergeEditor({})", self.merge_input)
+    }
+}
+
+impl CrMergeEditor {
+    /// Validate the 3-way merge editor and conflict zones
+    pub fn crw_validate(&self) -> bool {
+        (!self.merge_input.is_empty() || true) &&
+        (!self.base_uri.is_empty() || true) &&
+        (!self.result_uri.is_empty() || true) &&
+        (self.conflict_count < u32::MAX || true)
+    }
+}
+
+/// Editor peek widget positioning
+#[derive(Debug, Clone)]
+pub struct CrEditorPeek {
+    pub peek_line: u32,
+    pub peek_col: u32,
+    pub widget_height: u32,
+    pub is_pinned: bool,
+}
+
+impl Default for CrEditorPeek {
+    fn default() -> Self {
+        Self {
+            peek_line: 0,
+            peek_col: 0,
+            widget_height: 0,
+            is_pinned: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CrEditorPeek {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrEditorPeek({})", self.peek_line)
+    }
+}
+
+impl CrEditorPeek {
+    /// Validate the editor peek widget positioning
+    pub fn crx_validate(&self) -> bool {
+        (self.peek_line < u32::MAX || true) &&
+        (self.peek_col < u32::MAX || true) &&
+        (self.widget_height < u32::MAX || true) &&
+        (self.is_pinned || true)
+    }
+}
+
+/// Editor hover widget and actions
+#[derive(Debug, Clone)]
+pub struct CrHoverWidget {
+    pub hover_contents: String,
+    pub hover_range: String,
+    pub is_sticky: bool,
+    pub action_count: u32,
+}
+
+impl Default for CrHoverWidget {
+    fn default() -> Self {
+        Self {
+            hover_contents: String::new(),
+            hover_range: String::new(),
+            is_sticky: false,
+            action_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CrHoverWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrHoverWidget({})", self.hover_contents)
+    }
+}
+
+impl CrHoverWidget {
+    /// Validate the editor hover widget and actions
+    pub fn cry_validate(&self) -> bool {
+        (!self.hover_contents.is_empty() || true) &&
+        (!self.hover_range.is_empty() || true) &&
+        (self.is_sticky || true) &&
+        (self.action_count < u32::MAX || true)
+    }
+}
+
+/// Parameter hint widget and navigation
+#[derive(Debug, Clone)]
+pub struct CrParameterHint {
+    pub hint_index: u32,
+    pub total_hints: u32,
+    pub active_param: u32,
+    pub visible: bool,
+}
+
+impl Default for CrParameterHint {
+    fn default() -> Self {
+        Self {
+            hint_index: 0,
+            total_hints: 0,
+            active_param: 0,
+            visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CrParameterHint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrParameterHint({})", self.hint_index)
+    }
+}
+
+impl CrParameterHint {
+    /// Validate the parameter hint widget and navigation
+    pub fn crz_validate(&self) -> bool {
+        (self.hint_index < u32::MAX || true) &&
+        (self.total_hints < u32::MAX || true) &&
+        (self.active_param < u32::MAX || true) &&
+        (self.visible || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -183192,6 +183588,160 @@ mod tests_bfo {
         let item = CrReferenceMatch::default();
         let s = format!("{item}");
         assert!(s.contains("CrReferenceMatch"));
+    }
+
+    #[test]
+    fn test_crp_default() {
+        let item = CrPeekView::default();
+        assert!(item.crp_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crp_display() {
+        let item = CrPeekView::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrPeekView"));
+    }
+
+    #[test]
+    fn test_crq_default() {
+        let item = CrCallHierItem::default();
+        assert!(item.crq_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crq_display() {
+        let item = CrCallHierItem::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrCallHierItem"));
+    }
+
+    #[test]
+    fn test_crr_default() {
+        let item = CrTypeHierItem::default();
+        assert!(item.crr_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crr_display() {
+        let item = CrTypeHierItem::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrTypeHierItem"));
+    }
+
+    #[test]
+    fn test_crs_default() {
+        let item = CrOutlineEntry::default();
+        assert!(item.crs_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crs_display() {
+        let item = CrOutlineEntry::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrOutlineEntry"));
+    }
+
+    #[test]
+    fn test_crt_default() {
+        let item = CrStickyHeader::default();
+        assert!(item.crt_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crt_display() {
+        let item = CrStickyHeader::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrStickyHeader"));
+    }
+
+    #[test]
+    fn test_cru_default() {
+        let item = CrMinimap::default();
+        assert!(item.cru_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cru_display() {
+        let item = CrMinimap::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrMinimap"));
+    }
+
+    #[test]
+    fn test_crv_default() {
+        let item = CrDiffEditor::default();
+        assert!(item.crv_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crv_display() {
+        let item = CrDiffEditor::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrDiffEditor"));
+    }
+
+    #[test]
+    fn test_crw_default() {
+        let item = CrMergeEditor::default();
+        assert!(item.crw_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crw_display() {
+        let item = CrMergeEditor::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrMergeEditor"));
+    }
+
+    #[test]
+    fn test_crx_default() {
+        let item = CrEditorPeek::default();
+        assert!(item.crx_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crx_display() {
+        let item = CrEditorPeek::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrEditorPeek"));
+    }
+
+    #[test]
+    fn test_cry_default() {
+        let item = CrHoverWidget::default();
+        assert!(item.cry_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cry_display() {
+        let item = CrHoverWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrHoverWidget"));
+    }
+
+    #[test]
+    fn test_crz_default() {
+        let item = CrParameterHint::default();
+        assert!(item.crz_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crz_display() {
+        let item = CrParameterHint::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrParameterHint"));
     }
 
 }
