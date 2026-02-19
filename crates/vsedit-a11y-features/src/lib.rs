@@ -49537,3 +49537,503 @@ mod bah_tests {
         assert_eq!(m.source.as_deref(), Some("rustc"));
     }
 }
+
+
+// --- bai_: Editor suggestion/completion widget model ---
+
+/// Completion item kind matching VS Code's CompletionItemKind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BaiCompletionKind {
+    Text,
+    Method,
+    Function,
+    Constructor,
+    Field,
+    Variable,
+    Class,
+    Interface,
+    Module,
+    Property,
+    Unit,
+    Value,
+    Enum,
+    Keyword,
+    Snippet,
+    Color,
+    File,
+    Reference,
+    Folder,
+    EnumMember,
+    Constant,
+    Struct,
+    Event,
+    Operator,
+    TypeParameter,
+}
+
+impl BaiCompletionKind {
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Self::Method | Self::Function => "f",
+            Self::Constructor => "C",
+            Self::Field | Self::Property => "p",
+            Self::Variable => "v",
+            Self::Class | Self::Struct => "c",
+            Self::Interface => "i",
+            Self::Module => "m",
+            Self::Enum | Self::EnumMember => "e",
+            Self::Keyword => "k",
+            Self::Snippet => "s",
+            Self::Constant => "K",
+            Self::TypeParameter => "T",
+            _ => " ",
+        }
+    }
+
+    pub fn sort_group(&self) -> u8 {
+        match self {
+            Self::Variable | Self::Field | Self::Property => 0,
+            Self::Method | Self::Function => 1,
+            Self::Class | Self::Struct | Self::Interface | Self::Enum => 2,
+            Self::Keyword => 3,
+            Self::Snippet => 4,
+            _ => 5,
+        }
+    }
+}
+
+/// A single completion suggestion item.
+#[derive(Debug, Clone)]
+pub struct BaiSuggestionItem {
+    pub label: String,
+    pub kind: BaiCompletionKind,
+    pub detail: Option<String>,
+    pub documentation: Option<String>,
+    pub insert_text: Option<String>,
+    pub filter_text: Option<String>,
+    pub sort_text: Option<String>,
+    pub is_snippet: bool,
+    pub preselect: bool,
+    pub deprecated: bool,
+    score: f64,
+}
+
+impl BaiSuggestionItem {
+    pub fn new(label: &str, kind: BaiCompletionKind) -> Self {
+        Self {
+            label: label.to_string(),
+            kind,
+            detail: None,
+            documentation: None,
+            insert_text: None,
+            filter_text: None,
+            sort_text: None,
+            is_snippet: false,
+            preselect: false,
+            deprecated: false,
+            score: 0.0,
+        }
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_documentation(mut self, doc: &str) -> Self {
+        self.documentation = Some(doc.to_string());
+        self
+    }
+
+    pub fn with_insert_text(mut self, text: &str) -> Self {
+        self.insert_text = Some(text.to_string());
+        self
+    }
+
+    pub fn as_snippet(mut self) -> Self {
+        self.is_snippet = true;
+        self
+    }
+
+    pub fn text_to_insert(&self) -> &str {
+        self.insert_text.as_deref().unwrap_or(&self.label)
+    }
+
+    pub fn filter_label(&self) -> &str {
+        self.filter_text.as_deref().unwrap_or(&self.label)
+    }
+
+    pub fn sort_key(&self) -> String {
+        self.sort_text.as_deref().unwrap_or(&self.label).to_string()
+    }
+
+    pub fn set_score(&mut self, score: f64) {
+        self.score = score;
+    }
+
+    pub fn score(&self) -> f64 {
+        self.score
+    }
+}
+
+/// State of the suggestion widget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BaiWidgetState {
+    Hidden,
+    Loading,
+    Visible,
+    Details,
+}
+
+/// The suggestion/completion widget model.
+#[derive(Debug, Clone)]
+pub struct BaiSuggestionWidget {
+    items: Vec<BaiSuggestionItem>,
+    filtered_indices: Vec<usize>,
+    selected_index: Option<usize>,
+    state: BaiWidgetState,
+    prefix: String,
+    line: u32,
+    column: u32,
+    max_visible: usize,
+    scroll_offset: usize,
+}
+
+impl BaiSuggestionWidget {
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            filtered_indices: Vec::new(),
+            selected_index: None,
+            state: BaiWidgetState::Hidden,
+            prefix: String::new(),
+            line: 0,
+            column: 0,
+            max_visible: 12,
+            scroll_offset: 0,
+        }
+    }
+
+    pub fn show(&mut self, items: Vec<BaiSuggestionItem>, line: u32, column: u32, prefix: &str) {
+        self.items = items;
+        self.line = line;
+        self.column = column;
+        self.prefix = prefix.to_string();
+        self.filter_items();
+        self.state = if self.filtered_indices.is_empty() {
+            BaiWidgetState::Hidden
+        } else {
+            BaiWidgetState::Visible
+        };
+        self.scroll_offset = 0;
+    }
+
+    pub fn hide(&mut self) {
+        self.state = BaiWidgetState::Hidden;
+        self.items.clear();
+        self.filtered_indices.clear();
+        self.selected_index = None;
+    }
+
+    pub fn is_visible(&self) -> bool {
+        matches!(self.state, BaiWidgetState::Visible | BaiWidgetState::Details)
+    }
+
+    pub fn state(&self) -> BaiWidgetState {
+        self.state
+    }
+
+    pub fn update_prefix(&mut self, prefix: &str) {
+        self.prefix = prefix.to_string();
+        self.filter_items();
+        if self.filtered_indices.is_empty() {
+            self.state = BaiWidgetState::Hidden;
+        }
+    }
+
+    fn filter_items(&mut self) {
+        let prefix_lower = self.prefix.to_lowercase();
+        self.filtered_indices.clear();
+
+        for (i, item) in self.items.iter_mut().enumerate() {
+            let label = item.filter_label().to_lowercase();
+            if prefix_lower.is_empty() || label.contains(&prefix_lower) {
+                let score = if item.preselect {
+                    1000.0
+                } else if label.starts_with(&prefix_lower) {
+                    100.0 + (1.0 / (label.len() as f64 + 1.0))
+                } else {
+                    50.0 + (1.0 / (label.len() as f64 + 1.0))
+                };
+                item.set_score(score);
+                self.filtered_indices.push(i);
+            }
+        }
+
+        // Sort by score descending, then by sort_key
+        let items_ref = &self.items;
+        self.filtered_indices.sort_by(|a, b| {
+            let sa = &items_ref[*a];
+            let sb = &items_ref[*b];
+            sb.score().partial_cmp(&sa.score())
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| sa.sort_key().cmp(&sb.sort_key()))
+        });
+
+        self.selected_index = if self.filtered_indices.is_empty() {
+            None
+        } else {
+            Some(0)
+        };
+    }
+
+    pub fn filtered_count(&self) -> usize {
+        self.filtered_indices.len()
+    }
+
+    pub fn selected_item(&self) -> Option<&BaiSuggestionItem> {
+        self.selected_index
+            .and_then(|si| self.filtered_indices.get(si))
+            .map(|idx| &self.items[*idx])
+    }
+
+    pub fn visible_items(&self) -> Vec<&BaiSuggestionItem> {
+        let start = self.scroll_offset;
+        let end = (start + self.max_visible).min(self.filtered_indices.len());
+        self.filtered_indices[start..end]
+            .iter()
+            .map(|idx| &self.items[*idx])
+            .collect()
+    }
+
+    pub fn select_next(&mut self) {
+        if let Some(idx) = self.selected_index {
+            if idx + 1 < self.filtered_indices.len() {
+                self.selected_index = Some(idx + 1);
+                if idx + 1 >= self.scroll_offset + self.max_visible {
+                    self.scroll_offset += 1;
+                }
+            }
+        }
+    }
+
+    pub fn select_prev(&mut self) {
+        if let Some(idx) = self.selected_index {
+            if idx > 0 {
+                self.selected_index = Some(idx - 1);
+                if idx - 1 < self.scroll_offset {
+                    self.scroll_offset = idx - 1;
+                }
+            }
+        }
+    }
+
+    pub fn select_index(&mut self, index: usize) {
+        if index < self.filtered_indices.len() {
+            self.selected_index = Some(index);
+        }
+    }
+
+    pub fn accept_selected(&self) -> Option<&BaiSuggestionItem> {
+        self.selected_item()
+    }
+
+    pub fn show_details(&mut self) {
+        if self.state == BaiWidgetState::Visible {
+            self.state = BaiWidgetState::Details;
+        }
+    }
+
+    pub fn hide_details(&mut self) {
+        if self.state == BaiWidgetState::Details {
+            self.state = BaiWidgetState::Visible;
+        }
+    }
+
+    pub fn position(&self) -> (u32, u32) {
+        (self.line, self.column)
+    }
+}
+
+#[cfg(test)]
+mod bai_tests {
+    use super::*;
+
+    #[test]
+    fn test_bai_completion_kind_icon() {
+        assert_eq!(BaiCompletionKind::Function.icon(), "f");
+        assert_eq!(BaiCompletionKind::Variable.icon(), "v");
+        assert_eq!(BaiCompletionKind::Class.icon(), "c");
+        assert_eq!(BaiCompletionKind::Keyword.icon(), "k");
+    }
+
+    #[test]
+    fn test_bai_suggestion_item() {
+        let item = BaiSuggestionItem::new("println", BaiCompletionKind::Function)
+            .with_detail("macro")
+            .with_documentation("Print to stdout");
+        assert_eq!(item.label, "println");
+        assert_eq!(item.detail.as_deref(), Some("macro"));
+        assert_eq!(item.text_to_insert(), "println");
+    }
+
+    #[test]
+    fn test_bai_item_insert_text() {
+        let item = BaiSuggestionItem::new("for", BaiCompletionKind::Snippet)
+            .with_insert_text("for ${1:item} in ${2:iter} {\n\t$0\n}")
+            .as_snippet();
+        assert!(item.is_snippet);
+        assert_ne!(item.text_to_insert(), "for");
+    }
+
+    #[test]
+    fn test_bai_widget_show_hide() {
+        let mut widget = BaiSuggestionWidget::new();
+        assert!(!widget.is_visible());
+
+        let items = vec![
+            BaiSuggestionItem::new("foo", BaiCompletionKind::Variable),
+            BaiSuggestionItem::new("bar", BaiCompletionKind::Function),
+        ];
+        widget.show(items, 10, 5, "");
+        assert!(widget.is_visible());
+        assert_eq!(widget.filtered_count(), 2);
+        assert_eq!(widget.position(), (10, 5));
+
+        widget.hide();
+        assert!(!widget.is_visible());
+    }
+
+    #[test]
+    fn test_bai_widget_filtering() {
+        let mut widget = BaiSuggestionWidget::new();
+        let items = vec![
+            BaiSuggestionItem::new("foo_bar", BaiCompletionKind::Variable),
+            BaiSuggestionItem::new("foo_baz", BaiCompletionKind::Variable),
+            BaiSuggestionItem::new("qux", BaiCompletionKind::Variable),
+        ];
+        widget.show(items, 1, 1, "foo");
+        assert_eq!(widget.filtered_count(), 2);
+    }
+
+    #[test]
+    fn test_bai_widget_navigation() {
+        let mut widget = BaiSuggestionWidget::new();
+        let items = vec![
+            BaiSuggestionItem::new("a", BaiCompletionKind::Variable),
+            BaiSuggestionItem::new("b", BaiCompletionKind::Variable),
+            BaiSuggestionItem::new("c", BaiCompletionKind::Variable),
+        ];
+        widget.show(items, 1, 1, "");
+        assert_eq!(widget.selected_index, Some(0));
+
+        widget.select_next();
+        assert_eq!(widget.selected_index, Some(1));
+
+        widget.select_next();
+        assert_eq!(widget.selected_index, Some(2));
+
+        widget.select_prev();
+        assert_eq!(widget.selected_index, Some(1));
+    }
+
+    #[test]
+    fn test_bai_widget_preselect() {
+        let mut widget = BaiSuggestionWidget::new();
+        let mut preselected = BaiSuggestionItem::new("preferred", BaiCompletionKind::Variable);
+        preselected.preselect = true;
+        let items = vec![
+            BaiSuggestionItem::new("alpha", BaiCompletionKind::Variable),
+            preselected,
+        ];
+        widget.show(items, 1, 1, "");
+        // Preselected item should be first (highest score)
+        assert_eq!(widget.selected_item().unwrap().label, "preferred");
+    }
+
+    #[test]
+    fn test_bai_widget_details() {
+        let mut widget = BaiSuggestionWidget::new();
+        let items = vec![
+            BaiSuggestionItem::new("test", BaiCompletionKind::Function),
+        ];
+        widget.show(items, 1, 1, "");
+        widget.show_details();
+        assert_eq!(widget.state(), BaiWidgetState::Details);
+        widget.hide_details();
+        assert_eq!(widget.state(), BaiWidgetState::Visible);
+    }
+
+    #[test]
+    fn test_bai_widget_update_prefix() {
+        let mut widget = BaiSuggestionWidget::new();
+        let items = vec![
+            BaiSuggestionItem::new("hello", BaiCompletionKind::Variable),
+            BaiSuggestionItem::new("help", BaiCompletionKind::Function),
+            BaiSuggestionItem::new("world", BaiCompletionKind::Variable),
+        ];
+        widget.show(items, 1, 1, "");
+        assert_eq!(widget.filtered_count(), 3);
+
+        widget.update_prefix("hel");
+        assert_eq!(widget.filtered_count(), 2);
+
+        widget.update_prefix("xyz");
+        assert!(!widget.is_visible()); // No matches
+    }
+
+    #[test]
+    fn test_bai_widget_accept() {
+        let mut widget = BaiSuggestionWidget::new();
+        let items = vec![
+            BaiSuggestionItem::new("accept_me", BaiCompletionKind::Function),
+        ];
+        widget.show(items, 1, 1, "");
+        let accepted = widget.accept_selected();
+        assert_eq!(accepted.unwrap().label, "accept_me");
+    }
+
+    #[test]
+    fn test_bai_widget_empty() {
+        let mut widget = BaiSuggestionWidget::new();
+        widget.show(vec![], 1, 1, "");
+        assert!(!widget.is_visible());
+        assert!(widget.selected_item().is_none());
+    }
+
+    #[test]
+    fn test_bai_widget_visible_items() {
+        let mut widget = BaiSuggestionWidget::new();
+        widget.max_visible = 3;
+        let items = (0..10)
+            .map(|i| BaiSuggestionItem::new(&format!("item_{}", i), BaiCompletionKind::Variable))
+            .collect();
+        widget.show(items, 1, 1, "");
+        assert_eq!(widget.visible_items().len(), 3);
+    }
+
+    #[test]
+    fn test_bai_sort_group() {
+        assert!(BaiCompletionKind::Variable.sort_group() < BaiCompletionKind::Keyword.sort_group());
+        assert!(BaiCompletionKind::Function.sort_group() < BaiCompletionKind::Snippet.sort_group());
+    }
+
+    #[test]
+    fn test_bai_deprecated_item() {
+        let mut item = BaiSuggestionItem::new("old_fn", BaiCompletionKind::Function);
+        item.deprecated = true;
+        assert!(item.deprecated);
+    }
+
+    #[test]
+    fn test_bai_select_index() {
+        let mut widget = BaiSuggestionWidget::new();
+        let items = vec![
+            BaiSuggestionItem::new("a", BaiCompletionKind::Variable),
+            BaiSuggestionItem::new("b", BaiCompletionKind::Variable),
+        ];
+        widget.show(items, 1, 1, "");
+        widget.select_index(1);
+        assert_eq!(widget.selected_index, Some(1));
+    }
+}
