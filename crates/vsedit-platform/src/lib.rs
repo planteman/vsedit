@@ -68359,3 +68359,185 @@ mod bdj_tests {
         assert_eq!(m.lens_count(), 0);
     }
 }
+
+
+// --- bdk_: Editor parameter hints model ---
+
+/// A function parameter.
+#[derive(Debug, Clone)]
+pub struct BdkParameter {
+    pub label: String,
+    pub documentation: Option<String>,
+}
+
+impl BdkParameter {
+    pub fn new(label: &str) -> Self { Self { label: label.to_string(), documentation: None } }
+    pub fn with_doc(mut self, d: &str) -> Self { self.documentation = Some(d.to_string()); self }
+}
+
+/// A function signature with parameters.
+#[derive(Debug, Clone)]
+pub struct BdkSignature {
+    pub label: String,
+    pub documentation: Option<String>,
+    pub parameters: Vec<BdkParameter>,
+    pub active_parameter: usize,
+}
+
+impl BdkSignature {
+    pub fn new(label: &str) -> Self {
+        Self { label: label.to_string(), documentation: None, parameters: Vec::new(), active_parameter: 0 }
+    }
+
+    pub fn with_doc(mut self, d: &str) -> Self { self.documentation = Some(d.to_string()); self }
+    pub fn with_param(mut self, p: BdkParameter) -> Self { self.parameters.push(p); self }
+
+    pub fn current_param(&self) -> Option<&BdkParameter> { self.parameters.get(self.active_parameter) }
+    pub fn param_count(&self) -> usize { self.parameters.len() }
+
+    pub fn render(&self) -> Vec<String> {
+        let mut lines = vec![self.label.clone()];
+        if let Some(doc) = &self.documentation { lines.push(doc.clone()); }
+        if let Some(p) = self.current_param() {
+            lines.push(format!("  → {} {}", p.label, p.documentation.as_deref().unwrap_or("")));
+        }
+        lines
+    }
+}
+
+/// Parameter hints widget state.
+#[derive(Debug)]
+pub struct BdkParameterHints {
+    signatures: Vec<BdkSignature>,
+    active_signature: usize,
+    visible: bool,
+    trigger_char: Option<char>,
+}
+
+impl BdkParameterHints {
+    pub fn new() -> Self { Self { signatures: Vec::new(), active_signature: 0, visible: false, trigger_char: None } }
+
+    pub fn show(&mut self, signatures: Vec<BdkSignature>, trigger: Option<char>) {
+        self.signatures = signatures;
+        self.active_signature = 0;
+        self.visible = !self.signatures.is_empty();
+        self.trigger_char = trigger;
+    }
+
+    pub fn hide(&mut self) { self.visible = false; }
+    pub fn is_visible(&self) -> bool { self.visible }
+
+    pub fn active_signature(&self) -> Option<&BdkSignature> { self.signatures.get(self.active_signature) }
+    pub fn signature_count(&self) -> usize { self.signatures.len() }
+
+    pub fn next_signature(&mut self) {
+        if self.signatures.len() > 1 { self.active_signature = (self.active_signature + 1) % self.signatures.len(); }
+    }
+
+    pub fn prev_signature(&mut self) {
+        if self.signatures.len() > 1 { self.active_signature = self.active_signature.checked_sub(1).unwrap_or(self.signatures.len() - 1); }
+    }
+
+    pub fn advance_parameter(&mut self) {
+        if let Some(sig) = self.signatures.get_mut(self.active_signature) {
+            if sig.active_parameter + 1 < sig.param_count() { sig.active_parameter += 1; }
+        }
+    }
+
+    pub fn retreat_parameter(&mut self) {
+        if let Some(sig) = self.signatures.get_mut(self.active_signature) {
+            if sig.active_parameter > 0 { sig.active_parameter -= 1; }
+        }
+    }
+
+    pub fn render(&self) -> Vec<String> {
+        if !self.visible { return Vec::new(); }
+        let mut lines = Vec::new();
+        if self.signatures.len() > 1 { lines.push(format!("Signature {}/{}", self.active_signature + 1, self.signatures.len())); }
+        if let Some(sig) = self.active_signature() { lines.extend(sig.render()); }
+        lines
+    }
+}
+
+#[cfg(test)]
+mod bdk_tests {
+    use super::*;
+
+    #[test]
+    fn test_bdk_param() {
+        let p = BdkParameter::new("x: i32").with_doc("The x coordinate");
+        assert_eq!(p.label, "x: i32");
+    }
+
+    #[test]
+    fn test_bdk_signature() {
+        let s = BdkSignature::new("fn foo(x: i32, y: i32)")
+            .with_param(BdkParameter::new("x: i32"))
+            .with_param(BdkParameter::new("y: i32"));
+        assert_eq!(s.param_count(), 2);
+        assert_eq!(s.current_param().unwrap().label, "x: i32");
+    }
+
+    #[test]
+    fn test_bdk_hints_show() {
+        let mut h = BdkParameterHints::new();
+        h.show(vec![BdkSignature::new("fn a()")], Some('('));
+        assert!(h.is_visible());
+        assert_eq!(h.signature_count(), 1);
+    }
+
+    #[test]
+    fn test_bdk_hints_hide() {
+        let mut h = BdkParameterHints::new();
+        h.show(vec![BdkSignature::new("fn a()")], None);
+        h.hide();
+        assert!(!h.is_visible());
+    }
+
+    #[test]
+    fn test_bdk_next_sig() {
+        let mut h = BdkParameterHints::new();
+        h.show(vec![BdkSignature::new("fn a()"), BdkSignature::new("fn b()")], None);
+        h.next_signature();
+        assert_eq!(h.active_signature().unwrap().label, "fn b()");
+    }
+
+    #[test]
+    fn test_bdk_advance_param() {
+        let mut h = BdkParameterHints::new();
+        h.show(vec![BdkSignature::new("fn f(a, b)").with_param(BdkParameter::new("a")).with_param(BdkParameter::new("b"))], None);
+        h.advance_parameter();
+        assert_eq!(h.active_signature().unwrap().current_param().unwrap().label, "b");
+    }
+
+    #[test]
+    fn test_bdk_retreat_param() {
+        let mut h = BdkParameterHints::new();
+        h.show(vec![BdkSignature::new("fn f(a, b)").with_param(BdkParameter::new("a")).with_param(BdkParameter::new("b"))], None);
+        h.advance_parameter();
+        h.retreat_parameter();
+        assert_eq!(h.active_signature().unwrap().current_param().unwrap().label, "a");
+    }
+
+    #[test]
+    fn test_bdk_render() {
+        let mut h = BdkParameterHints::new();
+        h.show(vec![BdkSignature::new("fn foo(x: i32)").with_param(BdkParameter::new("x: i32"))], None);
+        let lines = h.render();
+        assert!(!lines.is_empty());
+    }
+
+    #[test]
+    fn test_bdk_empty_render() {
+        let h = BdkParameterHints::new();
+        assert!(h.render().is_empty());
+    }
+
+    #[test]
+    fn test_bdk_no_overflows() {
+        let mut h = BdkParameterHints::new();
+        h.show(vec![BdkSignature::new("fn f(a)").with_param(BdkParameter::new("a"))], None);
+        h.advance_parameter(); // already at last
+        assert_eq!(h.active_signature().unwrap().active_parameter, 0); // stays at 0 (only 1 param)
+    }
+}
