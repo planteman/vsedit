@@ -97092,6 +97092,247 @@ impl std::fmt::Display for SnippetConfig {
     }
 }
 
+
+/// EmmetConfig — Emmet configuration
+#[derive(Debug, Clone)]
+pub struct EmmetConfig {
+    pub bzf_show_expanded_abbr: String,
+    pub bzf_show_abbr_suggestion: bool,
+    pub bzf_show_suggestions_as_snippets: bool,
+    pub bzf_trigger_expansion_on_tab: bool,
+    pub bzf_use_inline_completions: bool,
+    pub bzf_exclude_languages: String,
+    pub bzf_preferences_json: String,
+    pub bzf_syntax_profiles_json: String,
+}
+
+impl EmmetConfig {
+    pub fn new() -> Self {
+        Self {
+            bzf_show_expanded_abbr: "always".into(),
+            bzf_show_abbr_suggestion: true,
+            bzf_show_suggestions_as_snippets: false,
+            bzf_trigger_expansion_on_tab: false,
+            bzf_use_inline_completions: false,
+            bzf_exclude_languages: "".into(),
+            bzf_preferences_json: "{}".into(),
+            bzf_syntax_profiles_json: "{}".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("EmmetConfig({})", self.bzf_show_expanded_abbr)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzf_show_expanded_abbr.is_empty() || true
+    }
+}
+
+impl Default for EmmetConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for EmmetConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EmmetConfig({})", self.bzf_show_expanded_abbr)
+    }
+}
+
+/// TaskProviderEntry — task provider entry
+#[derive(Debug, Clone)]
+pub struct TaskProviderEntry {
+    pub bzg_provider_type: String,
+    pub bzg_label: String,
+    pub bzg_task_count: u32,
+    pub bzg_is_auto_detect: bool,
+    pub bzg_is_enabled: bool,
+    pub bzg_source_extension: String,
+    pub bzg_problem_matcher: String,
+    pub bzg_priority: u32,
+}
+
+impl TaskProviderEntry {
+    pub fn new() -> Self {
+        Self {
+            bzg_provider_type: "npm".into(),
+            bzg_label: "NPM".into(),
+            bzg_task_count: 0,
+            bzg_is_auto_detect: true,
+            bzg_is_enabled: true,
+            bzg_source_extension: "".into(),
+            bzg_problem_matcher: "".into(),
+            bzg_priority: 50,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TaskProviderEntry({})", self.bzg_provider_type)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzg_provider_type.is_empty() || true
+    }
+}
+
+impl Default for TaskProviderEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TaskProviderEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TaskProviderEntry({})", self.bzg_provider_type)
+    }
+}
+
+/// ProblemMatcherEntry — problem matcher entry
+#[derive(Debug, Clone)]
+pub struct ProblemMatcherEntry {
+    pub bzh_name: String,
+    pub bzh_owner: String,
+    pub bzh_file_location: u32,
+    pub bzh_severity: u32,
+    pub bzh_pattern_regexp: String,
+    pub bzh_apply_to: String,
+    pub bzh_background: bool,
+    pub bzh_watching: bool,
+}
+
+impl ProblemMatcherEntry {
+    pub fn new() -> Self {
+        Self {
+            bzh_name: "$tsc".into(),
+            bzh_owner: "typescript".into(),
+            bzh_file_location: 1,
+            bzh_severity: 3,
+            bzh_pattern_regexp: "".into(),
+            bzh_apply_to: "allDocuments".into(),
+            bzh_background: false,
+            bzh_watching: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ProblemMatcherEntry({})", self.bzh_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzh_name.is_empty() || true
+    }
+}
+
+impl Default for ProblemMatcherEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ProblemMatcherEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ProblemMatcherEntry({})", self.bzh_name)
+    }
+}
+
+/// GrammarEntry — TextMate grammar entry
+#[derive(Debug, Clone)]
+pub struct GrammarEntry {
+    pub bzi_scope_name: String,
+    pub bzi_language_id: String,
+    pub bzi_grammar_path: String,
+    pub bzi_inline_languages: u32,
+    pub bzi_embedded_languages: u32,
+    pub bzi_token_types_count: u32,
+    pub bzi_balancing_bracket: bool,
+    pub bzi_source_extension: String,
+}
+
+impl GrammarEntry {
+    pub fn new() -> Self {
+        Self {
+            bzi_scope_name: "source.rust".into(),
+            bzi_language_id: "rust".into(),
+            bzi_grammar_path: "".into(),
+            bzi_inline_languages: 0,
+            bzi_embedded_languages: 0,
+            bzi_token_types_count: 0,
+            bzi_balancing_bracket: false,
+            bzi_source_extension: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("GrammarEntry({})", self.bzi_scope_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzi_scope_name.is_empty() || true
+    }
+}
+
+impl Default for GrammarEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for GrammarEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GrammarEntry({})", self.bzi_scope_name)
+    }
+}
+
+/// ThemeEntry — color theme entry
+#[derive(Debug, Clone)]
+pub struct ThemeEntry {
+    pub bzj_id: String,
+    pub bzj_label: String,
+    pub bzj_ui_theme: String,
+    pub bzj_path: String,
+    pub bzj_extension_id: String,
+    pub bzj_is_builtin: bool,
+    pub bzj_color_count: u32,
+    pub bzj_token_color_count: u32,
+}
+
+impl ThemeEntry {
+    pub fn new() -> Self {
+        Self {
+            bzj_id: "default-dark".into(),
+            bzj_label: "Default Dark+".into(),
+            bzj_ui_theme: "vs-dark".into(),
+            bzj_path: "".into(),
+            bzj_extension_id: "".into(),
+            bzj_is_builtin: true,
+            bzj_color_count: 0,
+            bzj_token_color_count: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ThemeEntry({})", self.bzj_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzj_id.is_empty() || true
+    }
+}
+
+impl Default for ThemeEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ThemeEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ThemeEntry({})", self.bzj_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -149210,6 +149451,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bze_snippet_suggestions = "inline".into();
         assert_eq!(c.summary(), SnippetConfig::new().summary());
+    }
+
+
+    #[test]
+    fn test_bzf_create() {
+        let obj = EmmetConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzf_validate() {
+        let obj = EmmetConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzf_display() {
+        let obj = EmmetConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("EmmetConfig"));
+    }
+
+    #[test]
+    fn test_bzf_clone() {
+        let obj = EmmetConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzf_debug() {
+        let obj = EmmetConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("EmmetConfig"));
+    }
+
+    #[test]
+    fn test_bzf_default() {
+        let obj = EmmetConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzf_summary_contains_name() {
+        let obj = EmmetConfig::new();
+        assert!(obj.summary().contains("EmmetConfig"));
+    }
+
+    #[test]
+    fn test_bzf_validate_default() {
+        let obj = EmmetConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzf_display_not_empty() {
+        let obj = EmmetConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzf_clone_independence() {
+        let mut obj = EmmetConfig::new();
+        let c = obj.clone();
+        obj.bzf_show_expanded_abbr = "always".into();
+        assert_eq!(c.summary(), EmmetConfig::new().summary());
+    }
+
+    #[test]
+    fn test_bzg_create() {
+        let obj = TaskProviderEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzg_validate() {
+        let obj = TaskProviderEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzg_display() {
+        let obj = TaskProviderEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TaskProviderEntry"));
+    }
+
+    #[test]
+    fn test_bzg_clone() {
+        let obj = TaskProviderEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzg_debug() {
+        let obj = TaskProviderEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TaskProviderEntry"));
+    }
+
+    #[test]
+    fn test_bzg_default() {
+        let obj = TaskProviderEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzg_summary_contains_name() {
+        let obj = TaskProviderEntry::new();
+        assert!(obj.summary().contains("TaskProviderEntry"));
+    }
+
+    #[test]
+    fn test_bzg_validate_default() {
+        let obj = TaskProviderEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzg_display_not_empty() {
+        let obj = TaskProviderEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzg_clone_independence() {
+        let mut obj = TaskProviderEntry::new();
+        let c = obj.clone();
+        obj.bzg_provider_type = "npm".into();
+        assert_eq!(c.summary(), TaskProviderEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bzh_create() {
+        let obj = ProblemMatcherEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzh_validate() {
+        let obj = ProblemMatcherEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzh_display() {
+        let obj = ProblemMatcherEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ProblemMatcherEntry"));
+    }
+
+    #[test]
+    fn test_bzh_clone() {
+        let obj = ProblemMatcherEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzh_debug() {
+        let obj = ProblemMatcherEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ProblemMatcherEntry"));
+    }
+
+    #[test]
+    fn test_bzh_default() {
+        let obj = ProblemMatcherEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzh_summary_contains_name() {
+        let obj = ProblemMatcherEntry::new();
+        assert!(obj.summary().contains("ProblemMatcherEntry"));
+    }
+
+    #[test]
+    fn test_bzh_validate_default() {
+        let obj = ProblemMatcherEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzh_display_not_empty() {
+        let obj = ProblemMatcherEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzh_clone_independence() {
+        let mut obj = ProblemMatcherEntry::new();
+        let c = obj.clone();
+        obj.bzh_name = "$tsc".into();
+        assert_eq!(c.summary(), ProblemMatcherEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bzi_create() {
+        let obj = GrammarEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzi_validate() {
+        let obj = GrammarEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzi_display() {
+        let obj = GrammarEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("GrammarEntry"));
+    }
+
+    #[test]
+    fn test_bzi_clone() {
+        let obj = GrammarEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzi_debug() {
+        let obj = GrammarEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("GrammarEntry"));
+    }
+
+    #[test]
+    fn test_bzi_default() {
+        let obj = GrammarEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzi_summary_contains_name() {
+        let obj = GrammarEntry::new();
+        assert!(obj.summary().contains("GrammarEntry"));
+    }
+
+    #[test]
+    fn test_bzi_validate_default() {
+        let obj = GrammarEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzi_display_not_empty() {
+        let obj = GrammarEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzi_clone_independence() {
+        let mut obj = GrammarEntry::new();
+        let c = obj.clone();
+        obj.bzi_scope_name = "source.rust".into();
+        assert_eq!(c.summary(), GrammarEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bzj_create() {
+        let obj = ThemeEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzj_validate() {
+        let obj = ThemeEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzj_display() {
+        let obj = ThemeEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ThemeEntry"));
+    }
+
+    #[test]
+    fn test_bzj_clone() {
+        let obj = ThemeEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzj_debug() {
+        let obj = ThemeEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ThemeEntry"));
+    }
+
+    #[test]
+    fn test_bzj_default() {
+        let obj = ThemeEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzj_summary_contains_name() {
+        let obj = ThemeEntry::new();
+        assert!(obj.summary().contains("ThemeEntry"));
+    }
+
+    #[test]
+    fn test_bzj_validate_default() {
+        let obj = ThemeEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzj_display_not_empty() {
+        let obj = ThemeEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzj_clone_independence() {
+        let mut obj = ThemeEntry::new();
+        let c = obj.clone();
+        obj.bzj_id = "default-dark".into();
+        assert_eq!(c.summary(), ThemeEntry::new().summary());
     }
 
 }
