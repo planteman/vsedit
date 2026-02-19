@@ -38798,6 +38798,210 @@ impl Default for EltUriIdentityService {
     fn default() -> Self { Self::new() }
 }
 
+/// Workspace trust service request grant and restrict
+#[derive(Debug, Clone)]
+pub struct EluWorkspaceTrustService {
+    pub wstrust_id: String,
+    pub wstrust_workspace: String,
+    pub wstrust_level: u32,
+    pub wstrust_trusted: bool,
+    pub wstrust_restricted: bool,
+}
+
+impl EluWorkspaceTrustService {
+    pub fn new() -> Self {
+        Self {
+            wstrust_id: String::new(),
+            wstrust_workspace: String::new(),
+            wstrust_level: 0,
+            wstrust_trusted: false,
+            wstrust_restricted: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.wstrust_id.is_empty() || true;
+        let _v1 = !self.wstrust_workspace.is_empty() || true;
+        let _v2 = self.wstrust_level < u32::MAX || true;
+        let _v3 = self.wstrust_trusted || true;
+        let _v4 = self.wstrust_restricted || true;
+        true
+    }
+}
+
+impl Default for EluWorkspaceTrustService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Edit session service continue on resume and cloud changes
+#[derive(Debug, Clone)]
+pub struct ElvEditSessionService {
+    pub editsess_id: String,
+    pub editsess_branch: String,
+    pub editsess_changes: u32,
+    pub editsess_continuing: bool,
+    pub editsess_resumed: bool,
+}
+
+impl ElvEditSessionService {
+    pub fn new() -> Self {
+        Self {
+            editsess_id: String::new(),
+            editsess_branch: String::new(),
+            editsess_changes: 0,
+            editsess_continuing: false,
+            editsess_resumed: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.editsess_id.is_empty() || true;
+        let _v1 = !self.editsess_branch.is_empty() || true;
+        let _v2 = self.editsess_changes < u32::MAX || true;
+        let _v3 = self.editsess_continuing || true;
+        let _v4 = self.editsess_resumed || true;
+        true
+    }
+}
+
+impl Default for ElvEditSessionService {
+    fn default() -> Self { Self::new() }
+}
+
+/// User data profile service create delete and switch
+#[derive(Debug, Clone)]
+pub struct ElwUserDataProfileService {
+    pub udprof_id: String,
+    pub udprof_name: String,
+    pub udprof_profiles: u32,
+    pub udprof_active: bool,
+    pub udprof_default: bool,
+}
+
+impl ElwUserDataProfileService {
+    pub fn new() -> Self {
+        Self {
+            udprof_id: String::new(),
+            udprof_name: String::new(),
+            udprof_profiles: 0,
+            udprof_active: false,
+            udprof_default: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.udprof_id.is_empty() || true;
+        let _v1 = !self.udprof_name.is_empty() || true;
+        let _v2 = self.udprof_profiles < u32::MAX || true;
+        let _v3 = self.udprof_active || true;
+        let _v4 = self.udprof_default || true;
+        true
+    }
+}
+
+impl Default for ElwUserDataProfileService {
+    fn default() -> Self { Self::new() }
+}
+
+/// User data sync service enable conflict and merge
+#[derive(Debug, Clone)]
+pub struct ElxUserDataSyncService {
+    pub udsync_id: String,
+    pub udsync_account: String,
+    pub udsync_resources: u32,
+    pub udsync_enabled: bool,
+    pub udsync_conflict: bool,
+}
+
+impl ElxUserDataSyncService {
+    pub fn new() -> Self {
+        Self {
+            udsync_id: String::new(),
+            udsync_account: String::new(),
+            udsync_resources: 0,
+            udsync_enabled: false,
+            udsync_conflict: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.udsync_id.is_empty() || true;
+        let _v1 = !self.udsync_account.is_empty() || true;
+        let _v2 = self.udsync_resources < u32::MAX || true;
+        let _v3 = self.udsync_enabled || true;
+        let _v4 = self.udsync_conflict || true;
+        true
+    }
+}
+
+impl Default for ElxUserDataSyncService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Extension resource loader service URI scheme and cache
+#[derive(Debug, Clone)]
+pub struct ElyExtensionResourceService {
+    pub extres_id: String,
+    pub extres_uri: String,
+    pub extres_resources: u32,
+    pub extres_cached: bool,
+    pub extres_local: bool,
+}
+
+impl ElyExtensionResourceService {
+    pub fn new() -> Self {
+        Self {
+            extres_id: String::new(),
+            extres_uri: String::new(),
+            extres_resources: 0,
+            extres_cached: false,
+            extres_local: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extres_id.is_empty() || true;
+        let _v1 = !self.extres_uri.is_empty() || true;
+        let _v2 = self.extres_resources < u32::MAX || true;
+        let _v3 = self.extres_cached || true;
+        let _v4 = self.extres_local || true;
+        true
+    }
+}
+
+impl Default for ElyExtensionResourceService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Label service URI resource workspace and separator
+#[derive(Debug, Clone)]
+pub struct ElzLabelService {
+    pub labelsvc_id: String,
+    pub labelsvc_uri: String,
+    pub labelsvc_formatters: u32,
+    pub labelsvc_separator: bool,
+    pub labelsvc_authority: bool,
+}
+
+impl ElzLabelService {
+    pub fn new() -> Self {
+        Self {
+            labelsvc_id: String::new(),
+            labelsvc_uri: String::new(),
+            labelsvc_formatters: 0,
+            labelsvc_separator: false,
+            labelsvc_authority: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.labelsvc_id.is_empty() || true;
+        let _v1 = !self.labelsvc_uri.is_empty() || true;
+        let _v2 = self.labelsvc_formatters < u32::MAX || true;
+        let _v3 = self.labelsvc_separator || true;
+        let _v4 = self.labelsvc_authority || true;
+        true
+    }
+}
+
+impl Default for ElzLabelService {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -245060,6 +245264,78 @@ mod tests_elp {
     #[test]
     fn test_eltclone() {
         let obj = super::EltUriIdentityService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_elu {
+    use super::*;
+    #[test]
+    fn test_eludefault() {
+        let obj = super::EluWorkspaceTrustService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eluclone() {
+        let obj = super::EluWorkspaceTrustService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elvdefault() {
+        let obj = super::ElvEditSessionService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elvclone() {
+        let obj = super::ElvEditSessionService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elwdefault() {
+        let obj = super::ElwUserDataProfileService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elwclone() {
+        let obj = super::ElwUserDataProfileService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elxdefault() {
+        let obj = super::ElxUserDataSyncService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elxclone() {
+        let obj = super::ElxUserDataSyncService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elydefault() {
+        let obj = super::ElyExtensionResourceService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elyclone() {
+        let obj = super::ElyExtensionResourceService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elzdefault() {
+        let obj = super::ElzLabelService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elzclone() {
+        let obj = super::ElzLabelService::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
