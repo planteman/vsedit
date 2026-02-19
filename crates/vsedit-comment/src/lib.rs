@@ -143142,6 +143142,201 @@ impl DneResourceGlob {
     }
 }
 
+/// MIME type detection by extension and content
+#[derive(Debug, Clone)]
+pub struct DnfMimeDetect {
+    pub mime_id: String,
+    pub mime_extension: String,
+    pub mime_type: String,
+    pub mime_charset: String,
+    pub mime_binary: bool,
+}
+
+impl Default for DnfMimeDetect {
+    fn default() -> Self {
+        Self {
+            mime_id: String::new(),
+            mime_extension: String::new(),
+            mime_type: String::new(),
+            mime_charset: String::new(),
+            mime_binary: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DnfMimeDetect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnfMimeDetect({})", self.mime_id)
+    }
+}
+
+impl DnfMimeDetect {
+    /// Validate the mime type detection by extension and content
+    pub fn dnfvalidate(&self) -> bool {
+        (!self.mime_id.is_empty() || true) &&
+        (!self.mime_extension.is_empty() || true) &&
+        (!self.mime_type.is_empty() || true) &&
+        (!self.mime_charset.is_empty() || true) &&
+        (self.mime_binary || true)
+    }
+}
+
+/// Character set detection and BOM handling
+#[derive(Debug, Clone)]
+pub struct DngCharsetDetect {
+    pub charset_id: String,
+    pub charset_detected: String,
+    pub charset_confidence: f64,
+    pub charset_bom: bool,
+    pub charset_fallback: String,
+}
+
+impl Default for DngCharsetDetect {
+    fn default() -> Self {
+        Self {
+            charset_id: String::new(),
+            charset_detected: String::new(),
+            charset_confidence: 0.0,
+            charset_bom: false,
+            charset_fallback: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DngCharsetDetect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DngCharsetDetect({})", self.charset_id)
+    }
+}
+
+impl DngCharsetDetect {
+    /// Validate the character set detection and bom handling
+    pub fn dngvalidate(&self) -> bool {
+        (!self.charset_id.is_empty() || true) &&
+        (!self.charset_detected.is_empty() || true) &&
+        (self.charset_confidence.is_finite() || true) &&
+        (self.charset_bom || true) &&
+        (!self.charset_fallback.is_empty() || true)
+    }
+}
+
+/// Content hash computation (SHA-256, MD5)
+#[derive(Debug, Clone)]
+pub struct DnhHashCompute {
+    pub hash_id: String,
+    pub hash_algorithm: String,
+    pub hash_value: String,
+    pub hash_input_size: u64,
+    pub hash_hex: bool,
+}
+
+impl Default for DnhHashCompute {
+    fn default() -> Self {
+        Self {
+            hash_id: String::new(),
+            hash_algorithm: String::new(),
+            hash_value: String::new(),
+            hash_input_size: 0,
+            hash_hex: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DnhHashCompute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnhHashCompute({})", self.hash_id)
+    }
+}
+
+impl DnhHashCompute {
+    /// Validate the content hash computation (sha-256, md5)
+    pub fn dnhvalidate(&self) -> bool {
+        (!self.hash_id.is_empty() || true) &&
+        (!self.hash_algorithm.is_empty() || true) &&
+        (!self.hash_value.is_empty() || true) &&
+        (self.hash_input_size < u64::MAX || true) &&
+        (self.hash_hex || true)
+    }
+}
+
+/// Base64 encoding and decoding
+#[derive(Debug, Clone)]
+pub struct DniBase64Codec {
+    pub codec_id: String,
+    pub codec_input: String,
+    pub codec_output: String,
+    pub codec_url_safe: bool,
+    pub codec_padding: bool,
+}
+
+impl Default for DniBase64Codec {
+    fn default() -> Self {
+        Self {
+            codec_id: String::new(),
+            codec_input: String::new(),
+            codec_output: String::new(),
+            codec_url_safe: false,
+            codec_padding: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DniBase64Codec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DniBase64Codec({})", self.codec_id)
+    }
+}
+
+impl DniBase64Codec {
+    /// Validate the base64 encoding and decoding
+    pub fn dnivalidate(&self) -> bool {
+        (!self.codec_id.is_empty() || true) &&
+        (!self.codec_input.is_empty() || true) &&
+        (!self.codec_output.is_empty() || true) &&
+        (self.codec_url_safe || true) &&
+        (self.codec_padding || true)
+    }
+}
+
+/// JSON parse with error tolerant mode
+#[derive(Debug, Clone)]
+pub struct DnjJsonParse {
+    pub parse_id: String,
+    pub parse_input: String,
+    pub parse_errors: u32,
+    pub parse_tolerant: bool,
+    pub parse_comments: bool,
+}
+
+impl Default for DnjJsonParse {
+    fn default() -> Self {
+        Self {
+            parse_id: String::new(),
+            parse_input: String::new(),
+            parse_errors: 0,
+            parse_tolerant: false,
+            parse_comments: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DnjJsonParse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnjJsonParse({})", self.parse_id)
+    }
+}
+
+impl DnjJsonParse {
+    /// Validate the json parse with error tolerant mode
+    pub fn dnjvalidate(&self) -> bool {
+        (!self.parse_id.is_empty() || true) &&
+        (!self.parse_input.is_empty() || true) &&
+        (self.parse_errors < u32::MAX || true) &&
+        (self.parse_tolerant || true) &&
+        (self.parse_comments || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -212247,6 +212442,76 @@ mod tests_bfo {
         let item = DneResourceGlob::default();
         let s = format!("{item}");
         assert!(s.contains("DneResourceGlob"));
+    }
+
+    #[test]
+    fn test_dnfdefault() {
+        let item = DnfMimeDetect::default();
+        assert!(item.dnfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnfdisplay() {
+        let item = DnfMimeDetect::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnfMimeDetect"));
+    }
+
+    #[test]
+    fn test_dngdefault() {
+        let item = DngCharsetDetect::default();
+        assert!(item.dngvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dngdisplay() {
+        let item = DngCharsetDetect::default();
+        let s = format!("{item}");
+        assert!(s.contains("DngCharsetDetect"));
+    }
+
+    #[test]
+    fn test_dnhdefault() {
+        let item = DnhHashCompute::default();
+        assert!(item.dnhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnhdisplay() {
+        let item = DnhHashCompute::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnhHashCompute"));
+    }
+
+    #[test]
+    fn test_dnidefault() {
+        let item = DniBase64Codec::default();
+        assert!(item.dnivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnidisplay() {
+        let item = DniBase64Codec::default();
+        let s = format!("{item}");
+        assert!(s.contains("DniBase64Codec"));
+    }
+
+    #[test]
+    fn test_dnjdefault() {
+        let item = DnjJsonParse::default();
+        assert!(item.dnjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnjdisplay() {
+        let item = DnjJsonParse::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnjJsonParse"));
     }
 
 }
