@@ -86245,6 +86245,67 @@ pub struct BkoZoneAction { pub zone_id: String, pub action: u8, pub data: Option
 #[derive(Debug, Clone)]
 pub struct BkoZoneRegistry { pub zones: Vec<BkoEditorZone>, pub decorations: Vec<BkoZoneDecoration> }
 
+
+// Editor tokenization — token states, grammar scopes, token color resolution, token caching
+#[derive(Debug, Clone)]
+pub struct BkpTokenState { pub rule_stack_id: u32, pub end_state_hash: u64 }
+#[derive(Debug, Clone)]
+pub struct BkpToken { pub start_index: usize, pub end_index: usize, pub scopes: Vec<String>, pub color: u32 }
+#[derive(Debug, Clone)]
+pub struct BkpTokenizedLine { pub line_number: usize, pub tokens: Vec<BkpToken>, pub state_before: BkpTokenState }
+#[derive(Debug, Clone)]
+pub struct BkpTokenColorMap { pub entries: Vec<u32>, pub default_foreground: u32, pub default_background: u32 }
+#[derive(Debug, Clone)]
+pub struct BkpTokenCache { pub cached_lines: usize, pub dirty_from: Option<usize>, pub total_tokens: usize }
+
+// Text model events — content change events, version tracking, line count changes
+#[derive(Debug, Clone)]
+pub struct BkqContentChange { pub start_line: usize, pub start_col: usize, pub end_line: usize, pub end_col: usize, pub text: String, pub range_length: usize }
+#[derive(Debug, Clone)]
+pub struct BkqModelVersion { pub version_id: u64, pub alternative_version_id: u64 }
+#[derive(Debug, Clone)]
+pub struct BkqModelContentEvent { pub changes: Vec<BkqContentChange>, pub version: BkqModelVersion, pub is_undo: bool, pub is_redo: bool }
+#[derive(Debug, Clone)]
+pub struct BkqLineCountChange { pub old_count: usize, pub new_count: usize, pub changed_from_line: usize }
+#[derive(Debug, Clone)]
+pub struct BkqModelOptions { pub tab_size: usize, pub insert_spaces: bool, pub default_eol: u8, pub trim_auto_whitespace: bool }
+
+// Undo/redo stack — edit element grouping, undo stop boundaries, stack size limits
+#[derive(Debug, Clone)]
+pub struct BkrUndoElement { pub changes: Vec<String>, pub before_cursor_line: usize, pub before_cursor_col: usize, pub after_cursor_line: usize, pub after_cursor_col: usize }
+#[derive(Debug, Clone)]
+pub struct BkrUndoStack { pub elements: Vec<BkrUndoElement>, pub current_index: usize, pub size_limit: usize }
+#[derive(Debug, Clone)]
+pub struct BkrUndoStop { pub reason: u8, pub forced: bool }
+#[derive(Debug, Clone)]
+pub struct BkrUndoGroup { pub elements: Vec<BkrUndoElement>, pub label: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BkrUndoResult { pub success: bool, pub cursor_line: usize, pub cursor_col: usize }
+
+// Clipboard integration — system clipboard, internal clipboard ring, paste formatting
+#[derive(Debug, Clone)]
+pub struct BksClipboardContent { pub text: String, pub mode: u8, pub source_language: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BksClipboardRing { pub entries: Vec<BksClipboardContent>, pub max_size: usize, pub current_index: usize }
+#[derive(Debug, Clone)]
+pub struct BksPasteOptions { pub format_on_paste: bool, pub trim_trailing: bool, pub adjust_indent: bool }
+#[derive(Debug, Clone)]
+pub struct BksClipboardEvent { pub kind: u8, pub content: BksClipboardContent }
+#[derive(Debug, Clone)]
+pub struct BksMultiCursorClipboard { pub per_cursor_texts: Vec<String>, pub full_text: String }
+
+// Drag and drop — editor drag source/target, drop effects, external file drops
+#[derive(Debug, Clone)]
+pub struct BktDragSource { pub editor_id: String, pub line: usize, pub col: usize, pub text: String }
+#[derive(Debug, Clone)]
+pub struct BktDropTarget { pub editor_id: String, pub line: usize, pub col: usize }
+#[derive(Debug, Clone)]
+pub struct BktDropEffect { pub effect: u8, pub move_source: bool }
+#[derive(Debug, Clone)]
+pub struct BktExternalDrop { pub files: Vec<String>, pub text: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BktDragState { pub active: bool, pub source: Option<BktDragSource>, pub preview_line: Option<usize> }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -95045,4 +95106,104 @@ mod tests_bfo {
     fn test_bko_high_priority_contrib() { let c = BkoContribPoint { id: "cp1".into(), zone_type: 0, priority: 999 }; assert_eq!(c.priority, 999); }
     #[test]
     fn test_bko_negative_priority() { let c = BkoContribPoint { id: "cp2".into(), zone_type: 2, priority: -10 }; assert!(c.priority < 0); }
+    #[test]
+    fn test_bkp_token_state() { let s = BkpTokenState { rule_stack_id: 1, end_state_hash: 12345 }; assert_eq!(s.rule_stack_id, 1); }
+    #[test]
+    fn test_bkp_basic_token() { let t = BkpToken { start_index: 0, end_index: 5, scopes: vec!["keyword.control".into()], color: 0xCC7832 }; assert_eq!(t.scopes.len(), 1); }
+    #[test]
+    fn test_bkp_tokenized_line() { let s = BkpTokenState { rule_stack_id: 0, end_state_hash: 0 }; let t = BkpToken { start_index: 0, end_index: 3, scopes: vec![], color: 0 }; let l = BkpTokenizedLine { line_number: 0, tokens: vec![t], state_before: s }; assert_eq!(l.tokens.len(), 1); }
+    #[test]
+    fn test_bkp_color_map() { let m = BkpTokenColorMap { entries: vec![0xFF0000, 0x00FF00, 0x0000FF], default_foreground: 0xD4D4D4, default_background: 0x1E1E1E }; assert_eq!(m.entries.len(), 3); }
+    #[test]
+    fn test_bkp_cache_clean() { let c = BkpTokenCache { cached_lines: 100, dirty_from: None, total_tokens: 5000 }; assert!(c.dirty_from.is_none()); }
+    #[test]
+    fn test_bkp_cache_dirty() { let c = BkpTokenCache { cached_lines: 100, dirty_from: Some(50), total_tokens: 3000 }; assert_eq!(c.dirty_from, Some(50)); }
+    #[test]
+    fn test_bkp_multi_scope_token() { let t = BkpToken { start_index: 5, end_index: 10, scopes: vec!["source.rust".into(), "entity.name.function".into()], color: 0xDCDCAA }; assert_eq!(t.scopes.len(), 2); }
+    #[test]
+    fn test_bkp_default_colors() { let m = BkpTokenColorMap { entries: vec![], default_foreground: 0xFFFFFF, default_background: 0x000000 }; assert!(m.entries.is_empty()); }
+    #[test]
+    fn test_bkp_empty_line() { let s = BkpTokenState { rule_stack_id: 0, end_state_hash: 0 }; let l = BkpTokenizedLine { line_number: 5, tokens: vec![], state_before: s }; assert!(l.tokens.is_empty()); }
+    #[test]
+    fn test_bkp_large_cache() { let c = BkpTokenCache { cached_lines: 10000, dirty_from: None, total_tokens: 500000 }; assert_eq!(c.total_tokens, 500000); }
+    #[test]
+    fn test_bkq_insert_change() { let c = BkqContentChange { start_line: 5, start_col: 0, end_line: 5, end_col: 0, text: "hello\n".into(), range_length: 0 }; assert_eq!(c.range_length, 0); }
+    #[test]
+    fn test_bkq_delete_change() { let c = BkqContentChange { start_line: 3, start_col: 0, end_line: 4, end_col: 0, text: String::new(), range_length: 20 }; assert!(c.text.is_empty()); }
+    #[test]
+    fn test_bkq_version_basic() { let v = BkqModelVersion { version_id: 1, alternative_version_id: 1 }; assert_eq!(v.version_id, 1); }
+    #[test]
+    fn test_bkq_version_diverged() { let v = BkqModelVersion { version_id: 10, alternative_version_id: 8 }; assert!(v.version_id > v.alternative_version_id); }
+    #[test]
+    fn test_bkq_content_event() { let c = BkqContentChange { start_line: 0, start_col: 0, end_line: 0, end_col: 0, text: "x".into(), range_length: 0 }; let v = BkqModelVersion { version_id: 2, alternative_version_id: 2 }; let e = BkqModelContentEvent { changes: vec![c], version: v, is_undo: false, is_redo: false }; assert_eq!(e.changes.len(), 1); }
+    #[test]
+    fn test_bkq_undo_event() { let v = BkqModelVersion { version_id: 3, alternative_version_id: 2 }; let e = BkqModelContentEvent { changes: vec![], version: v, is_undo: true, is_redo: false }; assert!(e.is_undo); }
+    #[test]
+    fn test_bkq_line_count_increase() { let l = BkqLineCountChange { old_count: 100, new_count: 105, changed_from_line: 50 }; assert!(l.new_count > l.old_count); }
+    #[test]
+    fn test_bkq_line_count_decrease() { let l = BkqLineCountChange { old_count: 200, new_count: 195, changed_from_line: 10 }; assert!(l.new_count < l.old_count); }
+    #[test]
+    fn test_bkq_model_options() { let o = BkqModelOptions { tab_size: 4, insert_spaces: true, default_eol: 1, trim_auto_whitespace: true }; assert_eq!(o.tab_size, 4); }
+    #[test]
+    fn test_bkq_model_options_tabs() { let o = BkqModelOptions { tab_size: 8, insert_spaces: false, default_eol: 2, trim_auto_whitespace: false }; assert!(!o.insert_spaces); }
+    #[test]
+    fn test_bkr_basic_element() { let e = BkrUndoElement { changes: vec!["insert x".into()], before_cursor_line: 0, before_cursor_col: 0, after_cursor_line: 0, after_cursor_col: 1 }; assert_eq!(e.changes.len(), 1); }
+    #[test]
+    fn test_bkr_empty_stack() { let s = BkrUndoStack { elements: vec![], current_index: 0, size_limit: 1000 }; assert!(s.elements.is_empty()); }
+    #[test]
+    fn test_bkr_stack_with_history() { let e = BkrUndoElement { changes: vec!["a".into()], before_cursor_line: 0, before_cursor_col: 0, after_cursor_line: 0, after_cursor_col: 1 }; let s = BkrUndoStack { elements: vec![e], current_index: 1, size_limit: 1000 }; assert_eq!(s.current_index, 1); }
+    #[test]
+    fn test_bkr_undo_stop_auto() { let s = BkrUndoStop { reason: 0, forced: false }; assert!(!s.forced); }
+    #[test]
+    fn test_bkr_undo_stop_forced() { let s = BkrUndoStop { reason: 1, forced: true }; assert!(s.forced); }
+    #[test]
+    fn test_bkr_undo_group() { let e1 = BkrUndoElement { changes: vec!["a".into()], before_cursor_line: 0, before_cursor_col: 0, after_cursor_line: 0, after_cursor_col: 1 }; let e2 = BkrUndoElement { changes: vec!["b".into()], before_cursor_line: 0, before_cursor_col: 1, after_cursor_line: 0, after_cursor_col: 2 }; let g = BkrUndoGroup { elements: vec![e1, e2], label: Some("typing".into()) }; assert_eq!(g.elements.len(), 2); }
+    #[test]
+    fn test_bkr_group_no_label() { let g = BkrUndoGroup { elements: vec![], label: None }; assert!(g.label.is_none()); }
+    #[test]
+    fn test_bkr_undo_success() { let r = BkrUndoResult { success: true, cursor_line: 5, cursor_col: 10 }; assert!(r.success); }
+    #[test]
+    fn test_bkr_undo_failure() { let r = BkrUndoResult { success: false, cursor_line: 0, cursor_col: 0 }; assert!(!r.success); }
+    #[test]
+    fn test_bkr_stack_at_limit() { let s = BkrUndoStack { elements: vec![], current_index: 0, size_limit: 50 }; assert_eq!(s.size_limit, 50); }
+    #[test]
+    fn test_bks_text_content() { let c = BksClipboardContent { text: "hello".into(), mode: 0, source_language: None }; assert_eq!(c.text, "hello"); }
+    #[test]
+    fn test_bks_line_mode() { let c = BksClipboardContent { text: "line\n".into(), mode: 1, source_language: Some("rust".into()) }; assert_eq!(c.mode, 1); }
+    #[test]
+    fn test_bks_empty_ring() { let r = BksClipboardRing { entries: vec![], max_size: 10, current_index: 0 }; assert!(r.entries.is_empty()); }
+    #[test]
+    fn test_bks_ring_with_entries() { let c = BksClipboardContent { text: "a".into(), mode: 0, source_language: None }; let r = BksClipboardRing { entries: vec![c], max_size: 10, current_index: 0 }; assert_eq!(r.entries.len(), 1); }
+    #[test]
+    fn test_bks_paste_options_default() { let o = BksPasteOptions { format_on_paste: true, trim_trailing: true, adjust_indent: true }; assert!(o.format_on_paste); }
+    #[test]
+    fn test_bks_paste_options_minimal() { let o = BksPasteOptions { format_on_paste: false, trim_trailing: false, adjust_indent: false }; assert!(!o.format_on_paste); }
+    #[test]
+    fn test_bks_copy_event() { let c = BksClipboardContent { text: "data".into(), mode: 0, source_language: None }; let e = BksClipboardEvent { kind: 0, content: c }; assert_eq!(e.kind, 0); }
+    #[test]
+    fn test_bks_cut_event() { let c = BksClipboardContent { text: "cut".into(), mode: 0, source_language: None }; let e = BksClipboardEvent { kind: 1, content: c }; assert_eq!(e.kind, 1); }
+    #[test]
+    fn test_bks_multi_cursor_clip() { let m = BksMultiCursorClipboard { per_cursor_texts: vec!["a".into(), "b".into()], full_text: "a\nb".into() }; assert_eq!(m.per_cursor_texts.len(), 2); }
+    #[test]
+    fn test_bks_single_cursor_clip() { let m = BksMultiCursorClipboard { per_cursor_texts: vec!["text".into()], full_text: "text".into() }; assert_eq!(m.per_cursor_texts.len(), 1); }
+    #[test]
+    fn test_bkt_drag_source() { let s = BktDragSource { editor_id: "e1".into(), line: 5, col: 3, text: "dragged".into() }; assert_eq!(s.text, "dragged"); }
+    #[test]
+    fn test_bkt_drop_target() { let t = BktDropTarget { editor_id: "e2".into(), line: 10, col: 0 }; assert_eq!(t.line, 10); }
+    #[test]
+    fn test_bkt_effect_copy() { let e = BktDropEffect { effect: 0, move_source: false }; assert!(!e.move_source); }
+    #[test]
+    fn test_bkt_effect_move() { let e = BktDropEffect { effect: 1, move_source: true }; assert!(e.move_source); }
+    #[test]
+    fn test_bkt_file_drop() { let d = BktExternalDrop { files: vec!["file.txt".into()], text: None }; assert_eq!(d.files.len(), 1); }
+    #[test]
+    fn test_bkt_text_drop() { let d = BktExternalDrop { files: vec![], text: Some("dropped text".into()) }; assert!(d.text.is_some()); }
+    #[test]
+    fn test_bkt_multi_file_drop() { let d = BktExternalDrop { files: vec!["a.rs".into(), "b.rs".into(), "c.rs".into()], text: None }; assert_eq!(d.files.len(), 3); }
+    #[test]
+    fn test_bkt_drag_active() { let s = BktDragState { active: true, source: None, preview_line: Some(15) }; assert!(s.active); }
+    #[test]
+    fn test_bkt_drag_inactive() { let s = BktDragState { active: false, source: None, preview_line: None }; assert!(!s.active); }
+    #[test]
+    fn test_bkt_drag_with_source() { let src = BktDragSource { editor_id: "e1".into(), line: 0, col: 0, text: "x".into() }; let s = BktDragState { active: true, source: Some(src), preview_line: Some(5) }; assert!(s.source.is_some()); }
 }
