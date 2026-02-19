@@ -86997,6 +86997,79 @@ pub struct BmtUsageData { pub session_id: String, pub session_duration_ms: u64, 
 #[derive(Debug, Clone)]
 pub struct BmtTelemetryState { pub opted_in: bool, pub level: u8, pub last_report: Option<u64> }
 
+
+// Remote connection model - remote authority, connection state, reconnection, remote agent
+#[derive(Debug, Clone)]
+pub struct BmuRemoteAuthority { pub scheme: String, pub host: String, pub port: Option<u16> }
+#[derive(Debug, Clone)]
+pub struct BmuConnectionState { pub connected: bool, pub latency_ms: Option<u64>, pub error: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmuReconnectConfig { pub max_retries: u32, pub backoff_ms: u64, pub auto_reconnect: bool }
+#[derive(Debug, Clone)]
+pub struct BmuRemoteAgent { pub id: String, pub platform: String, pub version: String }
+#[derive(Debug, Clone)]
+pub struct BmuRemoteSession { pub authority: BmuRemoteAuthority, pub state: BmuConnectionState }
+
+// Tunnel service - port forwarding, tunnel state, tunnel protocol, access control
+#[derive(Debug, Clone)]
+pub struct BmvPortForward { pub local_port: u16, pub remote_port: u16, pub label: Option<String>, pub protocol: u8 }
+#[derive(Debug, Clone)]
+pub struct BmvTunnelState { pub forwarded_ports: Vec<BmvPortForward>, pub active: bool }
+#[derive(Debug, Clone)]
+pub struct BmvTunnelConfig { pub auto_forward: bool, pub source_whitelist: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BmvAccessControl { pub port: u16, pub visibility: u8, pub requires_auth: bool }
+#[derive(Debug, Clone)]
+pub struct BmvTunnelInfo { pub id: String, pub uri: String, pub expires_at: Option<u64> }
+
+// Process spawning - child process, environment, shell detection, process tree management
+#[derive(Debug, Clone)]
+pub struct BmwProcessConfig { pub command: String, pub args: Vec<String>, pub cwd: Option<String>, pub env: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BmwProcessHandle { pub pid: u32, pub running: bool, pub exit_code: Option<i32> }
+#[derive(Debug, Clone)]
+pub struct BmwShellDetection { pub shell_path: String, pub shell_type: u8, pub login_shell: bool }
+#[derive(Debug, Clone)]
+pub struct BmwProcessTree { pub root_pid: u32, pub children: Vec<u32> }
+#[derive(Debug, Clone)]
+pub struct BmwSpawnResult { pub pid: Option<u32>, pub success: bool, pub error: Option<String> }
+
+// IPC protocol - message framing, request/response, notification, cancellation tokens
+#[derive(Debug, Clone)]
+pub struct BmxIpcMessage { pub id: u64, pub method: String, pub params: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmxIpcResponse { pub id: u64, pub result: Option<String>, pub error: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmxIpcNotification { pub method: String, pub params: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmxCancellationToken { pub id: u64, pub cancelled: bool }
+#[derive(Debug, Clone)]
+pub struct BmxIpcChannel { pub name: String, pub connected: bool, pub message_count: u64 }
+
+// Log service - log levels, log channels, log rotation, structured logging
+#[derive(Debug, Clone)]
+pub struct BmyLogEntry { pub timestamp: u64, pub level: u8, pub message: String, pub source: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmyLogChannel { pub id: String, pub name: String, pub level: u8, pub visible: bool }
+#[derive(Debug, Clone)]
+pub struct BmyLogConfig { pub global_level: u8, pub rotation_size_mb: u32, pub max_files: u32 }
+#[derive(Debug, Clone)]
+pub struct BmyLogFilter { pub source: Option<String>, pub min_level: u8 }
+#[derive(Debug, Clone)]
+pub struct BmyLogState { pub channels: Vec<BmyLogChannel>, pub entry_count: u64 }
+
+// Update service - version check, update download, update install, release notes
+#[derive(Debug, Clone)]
+pub struct BmzVersionInfo { pub version: String, pub product_version: String, pub commit: String, pub date: String }
+#[derive(Debug, Clone)]
+pub struct BmzUpdateAvailable { pub current: String, pub latest: String, pub is_major: bool, pub download_url: String }
+#[derive(Debug, Clone)]
+pub struct BmzUpdateProgress { pub downloaded_bytes: u64, pub total_bytes: u64, pub percent: f64 }
+#[derive(Debug, Clone)]
+pub struct BmzReleaseNote { pub version: String, pub notes: String, pub date: String }
+#[derive(Debug, Clone)]
+pub struct BmzUpdateConfig { pub auto_check: bool, pub auto_download: bool, pub channel: u8 }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -96937,4 +97010,124 @@ mod tests_bfo {
     fn test_bmt_opted_in() { let s = BmtTelemetryState { opted_in: true, level: 3, last_report: Some(1000) }; assert!(s.opted_in); }
     #[test]
     fn test_bmt_opted_out() { let s = BmtTelemetryState { opted_in: false, level: 0, last_report: None }; assert!(!s.opted_in); }
+    #[test]
+    fn test_bmu_authority_ssh() { let a = BmuRemoteAuthority { scheme: "ssh".into(), host: "server".into(), port: Some(22) }; assert_eq!(a.port, Some(22)); }
+    #[test]
+    fn test_bmu_authority_no_port() { let a = BmuRemoteAuthority { scheme: "wsl".into(), host: "Ubuntu".into(), port: None }; assert!(a.port.is_none()); }
+    #[test]
+    fn test_bmu_connected() { let s = BmuConnectionState { connected: true, latency_ms: Some(50), error: None }; assert!(s.connected); }
+    #[test]
+    fn test_bmu_disconnected() { let s = BmuConnectionState { connected: false, latency_ms: None, error: Some("timeout".into()) }; assert!(!s.connected); }
+    #[test]
+    fn test_bmu_reconnect_config() { let c = BmuReconnectConfig { max_retries: 5, backoff_ms: 1000, auto_reconnect: true }; assert!(c.auto_reconnect); }
+    #[test]
+    fn test_bmu_no_reconnect() { let c = BmuReconnectConfig { max_retries: 0, backoff_ms: 0, auto_reconnect: false }; assert!(!c.auto_reconnect); }
+    #[test]
+    fn test_bmu_remote_agent() { let a = BmuRemoteAgent { id: "agent1".into(), platform: "linux-x64".into(), version: "1.80.0".into() }; assert_eq!(a.platform, "linux-x64"); }
+    #[test]
+    fn test_bmu_session_connected() { let auth = BmuRemoteAuthority { scheme: "ssh".into(), host: "h".into(), port: None }; let state = BmuConnectionState { connected: true, latency_ms: Some(10), error: None }; let s = BmuRemoteSession { authority: auth, state }; assert!(s.state.connected); }
+    #[test]
+    fn test_bmu_session_disconnected() { let auth = BmuRemoteAuthority { scheme: "wsl".into(), host: "w".into(), port: None }; let state = BmuConnectionState { connected: false, latency_ms: None, error: None }; let s = BmuRemoteSession { authority: auth, state }; assert!(!s.state.connected); }
+    #[test]
+    fn test_bmu_low_latency() { let s = BmuConnectionState { connected: true, latency_ms: Some(5), error: None }; assert!(s.latency_ms.unwrap() < 10); }
+    #[test]
+    fn test_bmv_port_forward() { let p = BmvPortForward { local_port: 3000, remote_port: 3000, label: Some("Web Server".into()), protocol: 0 }; assert_eq!(p.local_port, 3000); }
+    #[test]
+    fn test_bmv_port_no_label() { let p = BmvPortForward { local_port: 8080, remote_port: 80, label: None, protocol: 1 }; assert!(p.label.is_none()); }
+    #[test]
+    fn test_bmv_state_active() { let s = BmvTunnelState { forwarded_ports: vec![], active: true }; assert!(s.active); }
+    #[test]
+    fn test_bmv_state_inactive() { let s = BmvTunnelState { forwarded_ports: vec![], active: false }; assert!(!s.active); }
+    #[test]
+    fn test_bmv_config_auto() { let c = BmvTunnelConfig { auto_forward: true, source_whitelist: vec!["output".into()] }; assert!(c.auto_forward); }
+    #[test]
+    fn test_bmv_config_manual() { let c = BmvTunnelConfig { auto_forward: false, source_whitelist: vec![] }; assert!(!c.auto_forward); }
+    #[test]
+    fn test_bmv_access_public() { let a = BmvAccessControl { port: 3000, visibility: 0, requires_auth: false }; assert!(!a.requires_auth); }
+    #[test]
+    fn test_bmv_access_private() { let a = BmvAccessControl { port: 5432, visibility: 1, requires_auth: true }; assert!(a.requires_auth); }
+    #[test]
+    fn test_bmv_tunnel_info() { let t = BmvTunnelInfo { id: "t1".into(), uri: "https://tunnel.dev/t1".into(), expires_at: Some(99999) }; assert!(t.expires_at.is_some()); }
+    #[test]
+    fn test_bmv_tunnel_no_expiry() { let t = BmvTunnelInfo { id: "t2".into(), uri: "https://tunnel.dev/t2".into(), expires_at: None }; assert!(t.expires_at.is_none()); }
+    #[test]
+    fn test_bmw_config_basic() { let c = BmwProcessConfig { command: "cargo".into(), args: vec!["build".into()], cwd: Some("/project".into()), env: vec![] }; assert_eq!(c.command, "cargo"); }
+    #[test]
+    fn test_bmw_config_no_cwd() { let c = BmwProcessConfig { command: "ls".into(), args: vec![], cwd: None, env: vec![] }; assert!(c.cwd.is_none()); }
+    #[test]
+    fn test_bmw_handle_running() { let h = BmwProcessHandle { pid: 1234, running: true, exit_code: None }; assert!(h.running); }
+    #[test]
+    fn test_bmw_handle_exited() { let h = BmwProcessHandle { pid: 5678, running: false, exit_code: Some(0) }; assert_eq!(h.exit_code, Some(0)); }
+    #[test]
+    fn test_bmw_shell_bash() { let s = BmwShellDetection { shell_path: "/bin/bash".into(), shell_type: 0, login_shell: false }; assert_eq!(s.shell_type, 0); }
+    #[test]
+    fn test_bmw_shell_zsh() { let s = BmwShellDetection { shell_path: "/bin/zsh".into(), shell_type: 1, login_shell: true }; assert!(s.login_shell); }
+    #[test]
+    fn test_bmw_process_tree() { let t = BmwProcessTree { root_pid: 100, children: vec![101, 102] }; assert_eq!(t.children.len(), 2); }
+    #[test]
+    fn test_bmw_empty_tree() { let t = BmwProcessTree { root_pid: 1, children: vec![] }; assert!(t.children.is_empty()); }
+    #[test]
+    fn test_bmw_spawn_success() { let r = BmwSpawnResult { pid: Some(999), success: true, error: None }; assert!(r.success); }
+    #[test]
+    fn test_bmw_spawn_failure() { let r = BmwSpawnResult { pid: None, success: false, error: Some("not found".into()) }; assert!(!r.success); }
+    #[test]
+    fn test_bmx_request() { let m = BmxIpcMessage { id: 1, method: "initialize".into(), params: Some("{}".into()) }; assert_eq!(m.id, 1); }
+    #[test]
+    fn test_bmx_request_no_params() { let m = BmxIpcMessage { id: 2, method: "shutdown".into(), params: None }; assert!(m.params.is_none()); }
+    #[test]
+    fn test_bmx_response_ok() { let r = BmxIpcResponse { id: 1, result: Some("{}".into()), error: None }; assert!(r.result.is_some()); }
+    #[test]
+    fn test_bmx_response_error() { let r = BmxIpcResponse { id: 2, result: None, error: Some("not supported".into()) }; assert!(r.error.is_some()); }
+    #[test]
+    fn test_bmx_notification() { let n = BmxIpcNotification { method: "textDocument/didChange".into(), params: Some("{}".into()) }; assert_eq!(n.method, "textDocument/didChange"); }
+    #[test]
+    fn test_bmx_notification_no_params() { let n = BmxIpcNotification { method: "exit".into(), params: None }; assert!(n.params.is_none()); }
+    #[test]
+    fn test_bmx_token_active() { let t = BmxCancellationToken { id: 1, cancelled: false }; assert!(!t.cancelled); }
+    #[test]
+    fn test_bmx_token_cancelled() { let t = BmxCancellationToken { id: 2, cancelled: true }; assert!(t.cancelled); }
+    #[test]
+    fn test_bmx_channel_connected() { let c = BmxIpcChannel { name: "ext-host".into(), connected: true, message_count: 100 }; assert!(c.connected); }
+    #[test]
+    fn test_bmx_channel_disconnected() { let c = BmxIpcChannel { name: "debug".into(), connected: false, message_count: 0 }; assert!(!c.connected); }
+    #[test]
+    fn test_bmy_info_entry() { let e = BmyLogEntry { timestamp: 1000, level: 2, message: "started".into(), source: Some("main".into()) }; assert_eq!(e.level, 2); }
+    #[test]
+    fn test_bmy_error_entry() { let e = BmyLogEntry { timestamp: 2000, level: 0, message: "crash".into(), source: None }; assert_eq!(e.level, 0); }
+    #[test]
+    fn test_bmy_channel() { let c = BmyLogChannel { id: "ext".into(), name: "Extension Host".into(), level: 2, visible: true }; assert!(c.visible); }
+    #[test]
+    fn test_bmy_channel_hidden() { let c = BmyLogChannel { id: "telemetry".into(), name: "Telemetry".into(), level: 3, visible: false }; assert!(!c.visible); }
+    #[test]
+    fn test_bmy_config() { let c = BmyLogConfig { global_level: 2, rotation_size_mb: 50, max_files: 5 }; assert_eq!(c.rotation_size_mb, 50); }
+    #[test]
+    fn test_bmy_strict_config() { let c = BmyLogConfig { global_level: 0, rotation_size_mb: 10, max_files: 3 }; assert_eq!(c.global_level, 0); }
+    #[test]
+    fn test_bmy_filter_by_source() { let f = BmyLogFilter { source: Some("ext".into()), min_level: 1 }; assert!(f.source.is_some()); }
+    #[test]
+    fn test_bmy_filter_all() { let f = BmyLogFilter { source: None, min_level: 0 }; assert!(f.source.is_none()); }
+    #[test]
+    fn test_bmy_empty_state() { let s = BmyLogState { channels: vec![], entry_count: 0 }; assert_eq!(s.entry_count, 0); }
+    #[test]
+    fn test_bmy_state_with_entries() { let c = BmyLogChannel { id: "x".into(), name: "X".into(), level: 2, visible: true }; let s = BmyLogState { channels: vec![c], entry_count: 1000 }; assert_eq!(s.entry_count, 1000); }
+    #[test]
+    fn test_bmz_version_info() { let v = BmzVersionInfo { version: "1.80.0".into(), product_version: "1.80.0".into(), commit: "abc123".into(), date: "2025-01-01".into() }; assert_eq!(v.version, "1.80.0"); }
+    #[test]
+    fn test_bmz_update_available() { let u = BmzUpdateAvailable { current: "1.79.0".into(), latest: "1.80.0".into(), is_major: false, download_url: "https://update.example.com".into() }; assert!(!u.is_major); }
+    #[test]
+    fn test_bmz_major_update() { let u = BmzUpdateAvailable { current: "1.0.0".into(), latest: "2.0.0".into(), is_major: true, download_url: "url".into() }; assert!(u.is_major); }
+    #[test]
+    fn test_bmz_progress_start() { let p = BmzUpdateProgress { downloaded_bytes: 0, total_bytes: 100000, percent: 0.0 }; assert_eq!(p.percent, 0.0); }
+    #[test]
+    fn test_bmz_progress_half() { let p = BmzUpdateProgress { downloaded_bytes: 50000, total_bytes: 100000, percent: 50.0 }; assert_eq!(p.percent, 50.0); }
+    #[test]
+    fn test_bmz_progress_complete() { let p = BmzUpdateProgress { downloaded_bytes: 100000, total_bytes: 100000, percent: 100.0 }; assert_eq!(p.percent, 100.0); }
+    #[test]
+    fn test_bmz_release_note() { let r = BmzReleaseNote { version: "1.80.0".into(), notes: "Bug fixes".into(), date: "2025-01-01".into() }; assert!(r.notes.contains("Bug")); }
+    #[test]
+    fn test_bmz_config_auto_all() { let c = BmzUpdateConfig { auto_check: true, auto_download: true, channel: 0 }; assert!(c.auto_download); }
+    #[test]
+    fn test_bmz_config_manual() { let c = BmzUpdateConfig { auto_check: false, auto_download: false, channel: 1 }; assert!(!c.auto_check); }
+    #[test]
+    fn test_bmz_insider_channel() { let c = BmzUpdateConfig { auto_check: true, auto_download: false, channel: 1 }; assert_eq!(c.channel, 1); }
 }
