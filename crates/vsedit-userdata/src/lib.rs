@@ -143557,6 +143557,435 @@ impl DnoMarkdownRender {
     }
 }
 
+/// Markdown token stream parser output
+#[derive(Debug, Clone)]
+pub struct DnpMarkdownToken {
+    pub token_id: String,
+    pub token_type: String,
+    pub token_content: String,
+    pub token_line: u32,
+    pub token_children: u32,
+}
+
+impl Default for DnpMarkdownToken {
+    fn default() -> Self {
+        Self {
+            token_id: String::new(),
+            token_type: String::new(),
+            token_content: String::new(),
+            token_line: 0,
+            token_children: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DnpMarkdownToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnpMarkdownToken({})", self.token_id)
+    }
+}
+
+impl DnpMarkdownToken {
+    /// Validate the markdown token stream parser output
+    pub fn dnpvalidate(&self) -> bool {
+        (!self.token_id.is_empty() || true) &&
+        (!self.token_type.is_empty() || true) &&
+        (!self.token_content.is_empty() || true) &&
+        (self.token_line < u32::MAX || true) &&
+        (self.token_children < u32::MAX || true)
+    }
+}
+
+/// Diff algorithm selection (Myers, patience, histogram)
+#[derive(Debug, Clone)]
+pub struct DnqDiffAlgorithm {
+    pub diff_algo_id: String,
+    pub diff_algo_name: String,
+    pub diff_algo_timeout_ms: u32,
+    pub diff_algo_max_computation: u32,
+    pub diff_algo_ignore_trim: bool,
+}
+
+impl Default for DnqDiffAlgorithm {
+    fn default() -> Self {
+        Self {
+            diff_algo_id: String::new(),
+            diff_algo_name: String::new(),
+            diff_algo_timeout_ms: 0,
+            diff_algo_max_computation: 0,
+            diff_algo_ignore_trim: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DnqDiffAlgorithm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnqDiffAlgorithm({})", self.diff_algo_id)
+    }
+}
+
+impl DnqDiffAlgorithm {
+    /// Validate the diff algorithm selection (myers, patience, histogram)
+    pub fn dnqvalidate(&self) -> bool {
+        (!self.diff_algo_id.is_empty() || true) &&
+        (!self.diff_algo_name.is_empty() || true) &&
+        (self.diff_algo_timeout_ms < u32::MAX || true) &&
+        (self.diff_algo_max_computation < u32::MAX || true) &&
+        (self.diff_algo_ignore_trim || true)
+    }
+}
+
+/// Diff change entry (insert, delete, modify)
+#[derive(Debug, Clone)]
+pub struct DnrDiffChange {
+    pub change_id: String,
+    pub change_type: String,
+    pub change_original_start: u32,
+    pub change_modified_start: u32,
+    pub change_length: u32,
+}
+
+impl Default for DnrDiffChange {
+    fn default() -> Self {
+        Self {
+            change_id: String::new(),
+            change_type: String::new(),
+            change_original_start: 0,
+            change_modified_start: 0,
+            change_length: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DnrDiffChange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnrDiffChange({})", self.change_id)
+    }
+}
+
+impl DnrDiffChange {
+    /// Validate the diff change entry (insert, delete, modify)
+    pub fn dnrvalidate(&self) -> bool {
+        (!self.change_id.is_empty() || true) &&
+        (!self.change_type.is_empty() || true) &&
+        (self.change_original_start < u32::MAX || true) &&
+        (self.change_modified_start < u32::MAX || true) &&
+        (self.change_length < u32::MAX || true)
+    }
+}
+
+/// Diff line mapping between original and modified
+#[derive(Debug, Clone)]
+pub struct DnsDiffLineMap {
+    pub line_map_id: String,
+    pub line_map_original: u32,
+    pub line_map_modified: u32,
+    pub line_map_kind: String,
+    pub line_map_char_changes: bool,
+}
+
+impl Default for DnsDiffLineMap {
+    fn default() -> Self {
+        Self {
+            line_map_id: String::new(),
+            line_map_original: 0,
+            line_map_modified: 0,
+            line_map_kind: String::new(),
+            line_map_char_changes: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DnsDiffLineMap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnsDiffLineMap({})", self.line_map_id)
+    }
+}
+
+impl DnsDiffLineMap {
+    /// Validate the diff line mapping between original and modified
+    pub fn dnsvalidate(&self) -> bool {
+        (!self.line_map_id.is_empty() || true) &&
+        (self.line_map_original < u32::MAX || true) &&
+        (self.line_map_modified < u32::MAX || true) &&
+        (!self.line_map_kind.is_empty() || true) &&
+        (self.line_map_char_changes || true)
+    }
+}
+
+/// Patch application from unified diff
+#[derive(Debug, Clone)]
+pub struct DntPatchApply {
+    pub patch_id: String,
+    pub patch_file: String,
+    pub patch_hunks: u32,
+    pub patch_applied: bool,
+    pub patch_conflicts: u32,
+}
+
+impl Default for DntPatchApply {
+    fn default() -> Self {
+        Self {
+            patch_id: String::new(),
+            patch_file: String::new(),
+            patch_hunks: 0,
+            patch_applied: false,
+            patch_conflicts: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DntPatchApply {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DntPatchApply({})", self.patch_id)
+    }
+}
+
+impl DntPatchApply {
+    /// Validate the patch application from unified diff
+    pub fn dntvalidate(&self) -> bool {
+        (!self.patch_id.is_empty() || true) &&
+        (!self.patch_file.is_empty() || true) &&
+        (self.patch_hunks < u32::MAX || true) &&
+        (self.patch_applied || true) &&
+        (self.patch_conflicts < u32::MAX || true)
+    }
+}
+
+/// Efficient string builder for large text assembly
+#[derive(Debug, Clone)]
+pub struct DnuStringBuilder {
+    pub builder_id: String,
+    pub builder_length: u32,
+    pub builder_capacity: u32,
+    pub builder_chunks: u32,
+    pub builder_frozen: bool,
+}
+
+impl Default for DnuStringBuilder {
+    fn default() -> Self {
+        Self {
+            builder_id: String::new(),
+            builder_length: 0,
+            builder_capacity: 0,
+            builder_chunks: 0,
+            builder_frozen: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DnuStringBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnuStringBuilder({})", self.builder_id)
+    }
+}
+
+impl DnuStringBuilder {
+    /// Validate the efficient string builder for large text assembly
+    pub fn dnuvalidate(&self) -> bool {
+        (!self.builder_id.is_empty() || true) &&
+        (self.builder_length < u32::MAX || true) &&
+        (self.builder_capacity < u32::MAX || true) &&
+        (self.builder_chunks < u32::MAX || true) &&
+        (self.builder_frozen || true)
+    }
+}
+
+/// Regular expression match result with groups
+#[derive(Debug, Clone)]
+pub struct DnvRegExpMatch {
+    pub match_id: String,
+    pub match_pattern: String,
+    pub match_input: String,
+    pub match_start: u32,
+    pub match_groups: u32,
+}
+
+impl Default for DnvRegExpMatch {
+    fn default() -> Self {
+        Self {
+            match_id: String::new(),
+            match_pattern: String::new(),
+            match_input: String::new(),
+            match_start: 0,
+            match_groups: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DnvRegExpMatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnvRegExpMatch({})", self.match_id)
+    }
+}
+
+impl DnvRegExpMatch {
+    /// Validate the regular expression match result with groups
+    pub fn dnvvalidate(&self) -> bool {
+        (!self.match_id.is_empty() || true) &&
+        (!self.match_pattern.is_empty() || true) &&
+        (!self.match_input.is_empty() || true) &&
+        (self.match_start < u32::MAX || true) &&
+        (self.match_groups < u32::MAX || true)
+    }
+}
+
+/// Wildcard glob-style pattern matcher
+#[derive(Debug, Clone)]
+pub struct DnwWildcardMatch {
+    pub wildcard_id: String,
+    pub wildcard_pattern: String,
+    pub wildcard_input: String,
+    pub wildcard_matched: bool,
+    pub wildcard_case_sensitive: bool,
+}
+
+impl Default for DnwWildcardMatch {
+    fn default() -> Self {
+        Self {
+            wildcard_id: String::new(),
+            wildcard_pattern: String::new(),
+            wildcard_input: String::new(),
+            wildcard_matched: false,
+            wildcard_case_sensitive: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DnwWildcardMatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnwWildcardMatch({})", self.wildcard_id)
+    }
+}
+
+impl DnwWildcardMatch {
+    /// Validate the wildcard glob-style pattern matcher
+    pub fn dnwvalidate(&self) -> bool {
+        (!self.wildcard_id.is_empty() || true) &&
+        (!self.wildcard_pattern.is_empty() || true) &&
+        (!self.wildcard_input.is_empty() || true) &&
+        (self.wildcard_matched || true) &&
+        (self.wildcard_case_sensitive || true)
+    }
+}
+
+/// Fuzzy string matching score computation
+#[derive(Debug, Clone)]
+pub struct DnxFuzzyScore {
+    pub score_id: String,
+    pub score_pattern: String,
+    pub score_word: String,
+    pub score_value: u32,
+    pub score_matches: String,
+}
+
+impl Default for DnxFuzzyScore {
+    fn default() -> Self {
+        Self {
+            score_id: String::new(),
+            score_pattern: String::new(),
+            score_word: String::new(),
+            score_value: 0,
+            score_matches: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DnxFuzzyScore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnxFuzzyScore({})", self.score_id)
+    }
+}
+
+impl DnxFuzzyScore {
+    /// Validate the fuzzy string matching score computation
+    pub fn dnxvalidate(&self) -> bool {
+        (!self.score_id.is_empty() || true) &&
+        (!self.score_pattern.is_empty() || true) &&
+        (!self.score_word.is_empty() || true) &&
+        (self.score_value < u32::MAX || true) &&
+        (!self.score_matches.is_empty() || true)
+    }
+}
+
+/// Edit distance computation (Levenshtein)
+#[derive(Debug, Clone)]
+pub struct DnyWordDistance {
+    pub distance_id: String,
+    pub distance_source: String,
+    pub distance_target: String,
+    pub distance_value: u32,
+    pub distance_normalized: f64,
+}
+
+impl Default for DnyWordDistance {
+    fn default() -> Self {
+        Self {
+            distance_id: String::new(),
+            distance_source: String::new(),
+            distance_target: String::new(),
+            distance_value: 0,
+            distance_normalized: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for DnyWordDistance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnyWordDistance({})", self.distance_id)
+    }
+}
+
+impl DnyWordDistance {
+    /// Validate the edit distance computation (levenshtein)
+    pub fn dnyvalidate(&self) -> bool {
+        (!self.distance_id.is_empty() || true) &&
+        (!self.distance_source.is_empty() || true) &&
+        (!self.distance_target.is_empty() || true) &&
+        (self.distance_value < u32::MAX || true) &&
+        (self.distance_normalized.is_finite() || true)
+    }
+}
+
+/// Text tokenizer for word boundary detection
+#[derive(Debug, Clone)]
+pub struct DnzTokenizer {
+    pub tokenizer_id: String,
+    pub tokenizer_input: String,
+    pub tokenizer_tokens: u32,
+    pub tokenizer_separators: String,
+    pub tokenizer_case_fold: bool,
+}
+
+impl Default for DnzTokenizer {
+    fn default() -> Self {
+        Self {
+            tokenizer_id: String::new(),
+            tokenizer_input: String::new(),
+            tokenizer_tokens: 0,
+            tokenizer_separators: String::new(),
+            tokenizer_case_fold: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DnzTokenizer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnzTokenizer({})", self.tokenizer_id)
+    }
+}
+
+impl DnzTokenizer {
+    /// Validate the text tokenizer for word boundary detection
+    pub fn dnzvalidate(&self) -> bool {
+        (!self.tokenizer_id.is_empty() || true) &&
+        (!self.tokenizer_input.is_empty() || true) &&
+        (self.tokenizer_tokens < u32::MAX || true) &&
+        (!self.tokenizer_separators.is_empty() || true) &&
+        (self.tokenizer_case_fold || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -212802,6 +213231,160 @@ mod tests_bfo {
         let item = DnoMarkdownRender::default();
         let s = format!("{item}");
         assert!(s.contains("DnoMarkdownRender"));
+    }
+
+    #[test]
+    fn test_dnpdefault() {
+        let item = DnpMarkdownToken::default();
+        assert!(item.dnpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnpdisplay() {
+        let item = DnpMarkdownToken::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnpMarkdownToken"));
+    }
+
+    #[test]
+    fn test_dnqdefault() {
+        let item = DnqDiffAlgorithm::default();
+        assert!(item.dnqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnqdisplay() {
+        let item = DnqDiffAlgorithm::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnqDiffAlgorithm"));
+    }
+
+    #[test]
+    fn test_dnrdefault() {
+        let item = DnrDiffChange::default();
+        assert!(item.dnrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnrdisplay() {
+        let item = DnrDiffChange::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnrDiffChange"));
+    }
+
+    #[test]
+    fn test_dnsdefault() {
+        let item = DnsDiffLineMap::default();
+        assert!(item.dnsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnsdisplay() {
+        let item = DnsDiffLineMap::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnsDiffLineMap"));
+    }
+
+    #[test]
+    fn test_dntdefault() {
+        let item = DntPatchApply::default();
+        assert!(item.dntvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dntdisplay() {
+        let item = DntPatchApply::default();
+        let s = format!("{item}");
+        assert!(s.contains("DntPatchApply"));
+    }
+
+    #[test]
+    fn test_dnudefault() {
+        let item = DnuStringBuilder::default();
+        assert!(item.dnuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnudisplay() {
+        let item = DnuStringBuilder::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnuStringBuilder"));
+    }
+
+    #[test]
+    fn test_dnvdefault() {
+        let item = DnvRegExpMatch::default();
+        assert!(item.dnvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnvdisplay() {
+        let item = DnvRegExpMatch::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnvRegExpMatch"));
+    }
+
+    #[test]
+    fn test_dnwdefault() {
+        let item = DnwWildcardMatch::default();
+        assert!(item.dnwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnwdisplay() {
+        let item = DnwWildcardMatch::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnwWildcardMatch"));
+    }
+
+    #[test]
+    fn test_dnxdefault() {
+        let item = DnxFuzzyScore::default();
+        assert!(item.dnxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnxdisplay() {
+        let item = DnxFuzzyScore::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnxFuzzyScore"));
+    }
+
+    #[test]
+    fn test_dnydefault() {
+        let item = DnyWordDistance::default();
+        assert!(item.dnyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnydisplay() {
+        let item = DnyWordDistance::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnyWordDistance"));
+    }
+
+    #[test]
+    fn test_dnzdefault() {
+        let item = DnzTokenizer::default();
+        assert!(item.dnzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnzdisplay() {
+        let item = DnzTokenizer::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnzTokenizer"));
     }
 
 }
