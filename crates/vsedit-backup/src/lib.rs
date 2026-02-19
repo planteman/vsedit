@@ -83095,6 +83095,325 @@ impl BhjDebugConsole {
 }
 
 
+
+/// Search match within a file (bhk_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhkSearchMatch {
+    pub line: usize,
+    pub col_start: usize,
+    pub col_end: usize,
+    pub preview: String,
+}
+
+/// File with search matches (bhk_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhkFileMatches {
+    pub path: String,
+    pub matches: Vec<BhkSearchMatch>,
+}
+
+/// Search query configuration (bhk_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhkSearchQuery {
+    pub pattern: String,
+    pub is_regex: bool,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub include_glob: Option<String>,
+    pub exclude_glob: Option<String>,
+}
+
+/// Search view model (bhk_)
+#[derive(Debug, Clone)]
+pub struct BhkSearchView {
+    pub query: Option<BhkSearchQuery>,
+    pub results: Vec<BhkFileMatches>,
+    pub replace_pattern: Option<String>,
+    pub is_searching: bool,
+    pub total_matches: usize,
+}
+
+impl BhkSearchView {
+    pub fn new() -> Self {
+        Self { query: None, results: Vec::new(), replace_pattern: None, is_searching: false, total_matches: 0 }
+    }
+    pub fn start_search(&mut self, query: BhkSearchQuery) {
+        self.query = Some(query);
+        self.results.clear();
+        self.total_matches = 0;
+        self.is_searching = true;
+    }
+    pub fn add_file_matches(&mut self, fm: BhkFileMatches) {
+        self.total_matches += fm.matches.len();
+        self.results.push(fm);
+    }
+    pub fn finish_search(&mut self) { self.is_searching = false; }
+    pub fn file_count(&self) -> usize { self.results.len() }
+    pub fn set_replace(&mut self, pat: String) { self.replace_pattern = Some(pat); }
+    pub fn clear(&mut self) {
+        self.query = None;
+        self.results.clear();
+        self.replace_pattern = None;
+        self.total_matches = 0;
+        self.is_searching = false;
+    }
+}
+
+
+/// Timeline entry source (bhl_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BhlTimelineSource {
+    Git,
+    LocalHistory,
+    Extension(String),
+}
+
+/// Timeline entry (bhl_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhlTimelineEntry {
+    pub id: String,
+    pub label: String,
+    pub description: Option<String>,
+    pub timestamp: u64,
+    pub source: BhlTimelineSource,
+}
+
+/// Timeline view model (bhl_)
+#[derive(Debug, Clone)]
+pub struct BhlTimelineView {
+    pub file_path: Option<String>,
+    pub entries: Vec<BhlTimelineEntry>,
+    pub sources_enabled: Vec<BhlTimelineSource>,
+}
+
+impl BhlTimelineView {
+    pub fn new() -> Self {
+        Self { file_path: None, entries: Vec::new(), sources_enabled: vec![BhlTimelineSource::Git, BhlTimelineSource::LocalHistory] }
+    }
+    pub fn set_file(&mut self, path: String) {
+        self.file_path = Some(path);
+        self.entries.clear();
+    }
+    pub fn add_entry(&mut self, entry: BhlTimelineEntry) {
+        let pos = self.entries.partition_point(|e| e.timestamp >= entry.timestamp);
+        self.entries.insert(pos, entry);
+    }
+    pub fn entries_by_source(&self, src: &BhlTimelineSource) -> Vec<&BhlTimelineEntry> {
+        self.entries.iter().filter(|e| &e.source == src).collect()
+    }
+    pub fn toggle_source(&mut self, src: BhlTimelineSource) {
+        if let Some(idx) = self.sources_enabled.iter().position(|s| s == &src) {
+            self.sources_enabled.remove(idx);
+        } else {
+            self.sources_enabled.push(src);
+        }
+    }
+    pub fn is_source_enabled(&self, src: &BhlTimelineSource) -> bool {
+        self.sources_enabled.contains(src)
+    }
+    pub fn latest_entry(&self) -> Option<&BhlTimelineEntry> {
+        self.entries.first()
+    }
+    pub fn entry_count(&self) -> usize { self.entries.len() }
+}
+
+
+/// Extension state (bhm_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BhmExtensionState {
+    Installed,
+    Disabled,
+    Uninstalled,
+}
+
+/// Extension info (bhm_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhmExtensionInfo {
+    pub id: String,
+    pub name: String,
+    pub publisher: String,
+    pub version: String,
+    pub description: String,
+    pub state: BhmExtensionState,
+    pub rating: Option<f64>,
+    pub install_count: u64,
+}
+
+/// Extensions view model (bhm_)
+#[derive(Debug, Clone)]
+pub struct BhmExtensionsView {
+    pub extensions: Vec<BhmExtensionInfo>,
+    pub search_query: Option<String>,
+    pub filter: Option<BhmExtensionState>,
+}
+
+impl BhmExtensionsView {
+    pub fn new() -> Self {
+        Self { extensions: Vec::new(), search_query: None, filter: None }
+    }
+    pub fn add_extension(&mut self, ext: BhmExtensionInfo) {
+        self.extensions.push(ext);
+    }
+    pub fn install(&mut self, id: &str) {
+        if let Some(ext) = self.extensions.iter_mut().find(|e| e.id == id) {
+            ext.state = BhmExtensionState::Installed;
+        }
+    }
+    pub fn disable(&mut self, id: &str) {
+        if let Some(ext) = self.extensions.iter_mut().find(|e| e.id == id) {
+            ext.state = BhmExtensionState::Disabled;
+        }
+    }
+    pub fn uninstall(&mut self, id: &str) {
+        if let Some(ext) = self.extensions.iter_mut().find(|e| e.id == id) {
+            ext.state = BhmExtensionState::Uninstalled;
+        }
+    }
+    pub fn set_search(&mut self, q: String) { self.search_query = Some(q); }
+    pub fn set_filter(&mut self, f: BhmExtensionState) { self.filter = Some(f); }
+    pub fn clear_filter(&mut self) { self.filter = None; }
+    pub fn filtered(&self) -> Vec<&BhmExtensionInfo> {
+        self.extensions.iter().filter(|e| {
+            if let Some(ref f) = self.filter { &e.state == f } else { true }
+        }).filter(|e| {
+            if let Some(ref q) = self.search_query { e.name.contains(q) || e.description.contains(q) } else { true }
+        }).collect()
+    }
+    pub fn installed_count(&self) -> usize {
+        self.extensions.iter().filter(|e| e.state == BhmExtensionState::Installed).count()
+    }
+    pub fn by_rating(&self) -> Vec<&BhmExtensionInfo> {
+        let mut v: Vec<_> = self.extensions.iter().filter(|e| e.rating.is_some()).collect();
+        v.sort_by(|a, b| b.rating.unwrap().partial_cmp(&a.rating.unwrap()).unwrap_or(std::cmp::Ordering::Equal));
+        v
+    }
+}
+
+
+/// Setting value type (bhn_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BhnSettingValue {
+    Bool(bool),
+    String(String),
+    Number(f64),
+    Enum { value: String, options: Vec<String> },
+    Array(Vec<String>),
+}
+
+/// A single setting entry (bhn_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhnSettingEntry {
+    pub key: String,
+    pub label: String,
+    pub description: String,
+    pub category: String,
+    pub value: BhnSettingValue,
+    pub default_value: BhnSettingValue,
+    pub is_modified: bool,
+}
+
+/// Settings editor model (bhn_)
+#[derive(Debug, Clone)]
+pub struct BhnSettingsEditor {
+    pub settings: Vec<BhnSettingEntry>,
+    pub search_query: Option<String>,
+    pub active_category: Option<String>,
+}
+
+impl BhnSettingsEditor {
+    pub fn new() -> Self {
+        Self { settings: Vec::new(), search_query: None, active_category: None }
+    }
+    pub fn add_setting(&mut self, s: BhnSettingEntry) { self.settings.push(s); }
+    pub fn update_setting(&mut self, key: &str, value: BhnSettingValue) {
+        if let Some(s) = self.settings.iter_mut().find(|s| s.key == key) {
+            s.is_modified = value != s.default_value;
+            s.value = value;
+        }
+    }
+    pub fn reset_setting(&mut self, key: &str) {
+        if let Some(s) = self.settings.iter_mut().find(|s| s.key == key) {
+            s.value = s.default_value.clone();
+            s.is_modified = false;
+        }
+    }
+    pub fn set_search(&mut self, q: String) { self.search_query = Some(q); }
+    pub fn set_category(&mut self, c: String) { self.active_category = Some(c); }
+    pub fn categories(&self) -> Vec<String> {
+        let mut cats: Vec<String> = self.settings.iter().map(|s| s.category.clone()).collect();
+        cats.sort();
+        cats.dedup();
+        cats
+    }
+    pub fn filtered(&self) -> Vec<&BhnSettingEntry> {
+        self.settings.iter().filter(|s| {
+            if let Some(ref c) = self.active_category { &s.category == c } else { true }
+        }).filter(|s| {
+            if let Some(ref q) = self.search_query { s.key.contains(q) || s.label.contains(q) || s.description.contains(q) } else { true }
+        }).collect()
+    }
+    pub fn modified_count(&self) -> usize {
+        self.settings.iter().filter(|s| s.is_modified).count()
+    }
+}
+
+
+/// Keybinding source (bho_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BhoKeybindingSource {
+    Default,
+    User,
+    Extension(String),
+}
+
+/// Keybinding entry (bho_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhoKeybindingEntry {
+    pub key: String,
+    pub command: String,
+    pub when: Option<String>,
+    pub source: BhoKeybindingSource,
+}
+
+/// Keyboard shortcuts editor model (bho_)
+#[derive(Debug, Clone)]
+pub struct BhoKeybindingsEditor {
+    pub bindings: Vec<BhoKeybindingEntry>,
+    pub search_query: Option<String>,
+}
+
+impl BhoKeybindingsEditor {
+    pub fn new() -> Self {
+        Self { bindings: Vec::new(), search_query: None }
+    }
+    pub fn add_binding(&mut self, b: BhoKeybindingEntry) { self.bindings.push(b); }
+    pub fn remove_binding(&mut self, key: &str, command: &str) {
+        self.bindings.retain(|b| !(b.key == key && b.command == command));
+    }
+    pub fn set_search(&mut self, q: String) { self.search_query = Some(q); }
+    pub fn filtered(&self) -> Vec<&BhoKeybindingEntry> {
+        self.bindings.iter().filter(|b| {
+            if let Some(ref q) = self.search_query {
+                b.key.contains(q) || b.command.contains(q) || b.when.as_deref().unwrap_or("").contains(q)
+            } else { true }
+        }).collect()
+    }
+    pub fn conflicts(&self) -> Vec<Vec<&BhoKeybindingEntry>> {
+        let mut groups: std::collections::HashMap<&str, Vec<&BhoKeybindingEntry>> = std::collections::HashMap::new();
+        for b in &self.bindings {
+            groups.entry(&b.key).or_default().push(b);
+        }
+        groups.into_values().filter(|v| v.len() > 1).collect()
+    }
+    pub fn by_source(&self, src: &BhoKeybindingSource) -> Vec<&BhoKeybindingEntry> {
+        self.bindings.iter().filter(|b| &b.source == src).collect()
+    }
+    pub fn reset_key(&mut self, key: &str) {
+        self.bindings.retain(|b| !(b.key == key && b.source == BhoKeybindingSource::User));
+    }
+    pub fn binding_count(&self) -> usize { self.bindings.len() }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -87543,5 +87862,388 @@ mod tests_bfo {
         assert_eq!(result, Some("only"));
     }
 
+
+
+    #[test]
+    fn test_bhk_search_view_new() {
+        let v = BhkSearchView::new();
+        assert!(v.query.is_none());
+        assert_eq!(v.total_matches, 0);
+        assert!(!v.is_searching);
+    }
+    #[test]
+    fn test_bhk_start_search() {
+        let mut v = BhkSearchView::new();
+        let q = BhkSearchQuery { pattern: "foo".into(), is_regex: false, case_sensitive: true, whole_word: false, include_glob: None, exclude_glob: None };
+        v.start_search(q);
+        assert!(v.is_searching);
+        assert_eq!(v.query.as_ref().unwrap().pattern, "foo");
+    }
+    #[test]
+    fn test_bhk_add_file_matches() {
+        let mut v = BhkSearchView::new();
+        let q = BhkSearchQuery { pattern: "x".into(), is_regex: false, case_sensitive: false, whole_word: false, include_glob: None, exclude_glob: None };
+        v.start_search(q);
+        let fm = BhkFileMatches { path: "a.rs".into(), matches: vec![BhkSearchMatch { line: 1, col_start: 0, col_end: 1, preview: "x".into() }] };
+        v.add_file_matches(fm);
+        assert_eq!(v.total_matches, 1);
+        assert_eq!(v.file_count(), 1);
+    }
+    #[test]
+    fn test_bhk_finish_search() {
+        let mut v = BhkSearchView::new();
+        let q = BhkSearchQuery { pattern: "y".into(), is_regex: true, case_sensitive: false, whole_word: false, include_glob: None, exclude_glob: None };
+        v.start_search(q);
+        v.finish_search();
+        assert!(!v.is_searching);
+    }
+    #[test]
+    fn test_bhk_set_replace() {
+        let mut v = BhkSearchView::new();
+        v.set_replace("bar".into());
+        assert_eq!(v.replace_pattern.as_deref(), Some("bar"));
+    }
+    #[test]
+    fn test_bhk_clear() {
+        let mut v = BhkSearchView::new();
+        let q = BhkSearchQuery { pattern: "z".into(), is_regex: false, case_sensitive: false, whole_word: true, include_glob: Some("*.rs".into()), exclude_glob: None };
+        v.start_search(q);
+        v.clear();
+        assert!(v.query.is_none());
+        assert_eq!(v.total_matches, 0);
+    }
+    #[test]
+    fn test_bhk_regex_query() {
+        let q = BhkSearchQuery { pattern: r"\bfoo\b".into(), is_regex: true, case_sensitive: true, whole_word: false, include_glob: None, exclude_glob: Some("target/".into()) };
+        assert!(q.is_regex);
+        assert_eq!(q.exclude_glob.as_deref(), Some("target/"));
+    }
+    #[test]
+    fn test_bhk_multiple_files() {
+        let mut v = BhkSearchView::new();
+        let q = BhkSearchQuery { pattern: "fn".into(), is_regex: false, case_sensitive: false, whole_word: false, include_glob: None, exclude_glob: None };
+        v.start_search(q);
+        for i in 0..5 {
+            let fm = BhkFileMatches { path: format!("f{i}.rs"), matches: vec![BhkSearchMatch { line: i, col_start: 0, col_end: 2, preview: "fn".into() }, BhkSearchMatch { line: i+10, col_start: 0, col_end: 2, preview: "fn".into() }] };
+            v.add_file_matches(fm);
+        }
+        assert_eq!(v.file_count(), 5);
+        assert_eq!(v.total_matches, 10);
+    }
+    #[test]
+    fn test_bhk_whole_word() {
+        let q = BhkSearchQuery { pattern: "test".into(), is_regex: false, case_sensitive: false, whole_word: true, include_glob: None, exclude_glob: None };
+        assert!(q.whole_word);
+    }
+    #[test]
+    fn test_bhk_search_match_fields() {
+        let m = BhkSearchMatch { line: 42, col_start: 5, col_end: 10, preview: "hello".into() };
+        assert_eq!(m.line, 42);
+        assert_eq!(m.col_end - m.col_start, 5);
+    }
+
+
+    #[test]
+    fn test_bhl_timeline_new() {
+        let v = BhlTimelineView::new();
+        assert!(v.file_path.is_none());
+        assert_eq!(v.entry_count(), 0);
+        assert!(v.is_source_enabled(&BhlTimelineSource::Git));
+    }
+    #[test]
+    fn test_bhl_set_file() {
+        let mut v = BhlTimelineView::new();
+        v.set_file("src/main.rs".into());
+        assert_eq!(v.file_path.as_deref(), Some("src/main.rs"));
+    }
+    #[test]
+    fn test_bhl_add_entry_sorted() {
+        let mut v = BhlTimelineView::new();
+        v.add_entry(BhlTimelineEntry { id: "1".into(), label: "old".into(), description: None, timestamp: 100, source: BhlTimelineSource::Git });
+        v.add_entry(BhlTimelineEntry { id: "2".into(), label: "new".into(), description: None, timestamp: 200, source: BhlTimelineSource::Git });
+        assert_eq!(v.entries[0].timestamp, 200);
+        assert_eq!(v.entries[1].timestamp, 100);
+    }
+    #[test]
+    fn test_bhl_entries_by_source() {
+        let mut v = BhlTimelineView::new();
+        v.add_entry(BhlTimelineEntry { id: "1".into(), label: "a".into(), description: None, timestamp: 100, source: BhlTimelineSource::Git });
+        v.add_entry(BhlTimelineEntry { id: "2".into(), label: "b".into(), description: None, timestamp: 200, source: BhlTimelineSource::LocalHistory });
+        assert_eq!(v.entries_by_source(&BhlTimelineSource::Git).len(), 1);
+    }
+    #[test]
+    fn test_bhl_toggle_source() {
+        let mut v = BhlTimelineView::new();
+        assert!(v.is_source_enabled(&BhlTimelineSource::Git));
+        v.toggle_source(BhlTimelineSource::Git);
+        assert!(!v.is_source_enabled(&BhlTimelineSource::Git));
+        v.toggle_source(BhlTimelineSource::Git);
+        assert!(v.is_source_enabled(&BhlTimelineSource::Git));
+    }
+    #[test]
+    fn test_bhl_latest_entry() {
+        let mut v = BhlTimelineView::new();
+        assert!(v.latest_entry().is_none());
+        v.add_entry(BhlTimelineEntry { id: "1".into(), label: "x".into(), description: Some("desc".into()), timestamp: 50, source: BhlTimelineSource::LocalHistory });
+        assert_eq!(v.latest_entry().unwrap().id, "1");
+    }
+    #[test]
+    fn test_bhl_extension_source() {
+        let src = BhlTimelineSource::Extension("my-ext".into());
+        let mut v = BhlTimelineView::new();
+        v.toggle_source(src.clone());
+        assert!(v.is_source_enabled(&src));
+    }
+    #[test]
+    fn test_bhl_multiple_entries() {
+        let mut v = BhlTimelineView::new();
+        for i in 0..10 {
+            v.add_entry(BhlTimelineEntry { id: format!("{i}"), label: format!("e{i}"), description: None, timestamp: i * 100, source: BhlTimelineSource::Git });
+        }
+        assert_eq!(v.entry_count(), 10);
+        assert_eq!(v.entries[0].timestamp, 900);
+    }
+    #[test]
+    fn test_bhl_entry_fields() {
+        let e = BhlTimelineEntry { id: "abc".into(), label: "commit msg".into(), description: Some("sha: abc123".into()), timestamp: 1700000000, source: BhlTimelineSource::Git };
+        assert_eq!(e.label, "commit msg");
+        assert!(e.description.is_some());
+    }
+    #[test]
+    fn test_bhl_clear_on_file_change() {
+        let mut v = BhlTimelineView::new();
+        v.add_entry(BhlTimelineEntry { id: "1".into(), label: "a".into(), description: None, timestamp: 100, source: BhlTimelineSource::Git });
+        v.set_file("other.rs".into());
+        assert_eq!(v.entry_count(), 0);
+    }
+
+
+    #[test]
+    fn test_bhm_extensions_view_new() {
+        let v = BhmExtensionsView::new();
+        assert!(v.extensions.is_empty());
+        assert!(v.search_query.is_none());
+    }
+    #[test]
+    fn test_bhm_add_extension() {
+        let mut v = BhmExtensionsView::new();
+        v.add_extension(BhmExtensionInfo { id: "ext1".into(), name: "Rust".into(), publisher: "rust-lang".into(), version: "1.0.0".into(), description: "Rust support".into(), state: BhmExtensionState::Installed, rating: Some(4.8), install_count: 1000000 });
+        assert_eq!(v.extensions.len(), 1);
+    }
+    #[test]
+    fn test_bhm_install_disable_uninstall() {
+        let mut v = BhmExtensionsView::new();
+        v.add_extension(BhmExtensionInfo { id: "e1".into(), name: "T".into(), publisher: "p".into(), version: "1.0".into(), description: "d".into(), state: BhmExtensionState::Uninstalled, rating: None, install_count: 0 });
+        v.install("e1");
+        assert_eq!(v.extensions[0].state, BhmExtensionState::Installed);
+        v.disable("e1");
+        assert_eq!(v.extensions[0].state, BhmExtensionState::Disabled);
+        v.uninstall("e1");
+        assert_eq!(v.extensions[0].state, BhmExtensionState::Uninstalled);
+    }
+    #[test]
+    fn test_bhm_search_filter() {
+        let mut v = BhmExtensionsView::new();
+        v.add_extension(BhmExtensionInfo { id: "e1".into(), name: "Rust".into(), publisher: "p".into(), version: "1.0".into(), description: "lang".into(), state: BhmExtensionState::Installed, rating: None, install_count: 0 });
+        v.add_extension(BhmExtensionInfo { id: "e2".into(), name: "Python".into(), publisher: "p".into(), version: "1.0".into(), description: "lang".into(), state: BhmExtensionState::Disabled, rating: None, install_count: 0 });
+        v.set_search("Rust".into());
+        assert_eq!(v.filtered().len(), 1);
+    }
+    #[test]
+    fn test_bhm_state_filter() {
+        let mut v = BhmExtensionsView::new();
+        v.add_extension(BhmExtensionInfo { id: "e1".into(), name: "A".into(), publisher: "p".into(), version: "1.0".into(), description: "d".into(), state: BhmExtensionState::Installed, rating: None, install_count: 0 });
+        v.add_extension(BhmExtensionInfo { id: "e2".into(), name: "B".into(), publisher: "p".into(), version: "1.0".into(), description: "d".into(), state: BhmExtensionState::Disabled, rating: None, install_count: 0 });
+        v.set_filter(BhmExtensionState::Installed);
+        assert_eq!(v.filtered().len(), 1);
+    }
+    #[test]
+    fn test_bhm_installed_count() {
+        let mut v = BhmExtensionsView::new();
+        v.add_extension(BhmExtensionInfo { id: "e1".into(), name: "A".into(), publisher: "p".into(), version: "1.0".into(), description: "d".into(), state: BhmExtensionState::Installed, rating: None, install_count: 0 });
+        v.add_extension(BhmExtensionInfo { id: "e2".into(), name: "B".into(), publisher: "p".into(), version: "1.0".into(), description: "d".into(), state: BhmExtensionState::Disabled, rating: None, install_count: 0 });
+        assert_eq!(v.installed_count(), 1);
+    }
+    #[test]
+    fn test_bhm_by_rating() {
+        let mut v = BhmExtensionsView::new();
+        v.add_extension(BhmExtensionInfo { id: "e1".into(), name: "A".into(), publisher: "p".into(), version: "1.0".into(), description: "d".into(), state: BhmExtensionState::Installed, rating: Some(3.5), install_count: 100 });
+        v.add_extension(BhmExtensionInfo { id: "e2".into(), name: "B".into(), publisher: "p".into(), version: "1.0".into(), description: "d".into(), state: BhmExtensionState::Installed, rating: Some(4.9), install_count: 500 });
+        let sorted = v.by_rating();
+        assert_eq!(sorted[0].id, "e2");
+    }
+    #[test]
+    fn test_bhm_clear_filter() {
+        let mut v = BhmExtensionsView::new();
+        v.add_extension(BhmExtensionInfo { id: "e1".into(), name: "A".into(), publisher: "p".into(), version: "1.0".into(), description: "d".into(), state: BhmExtensionState::Installed, rating: None, install_count: 0 });
+        v.set_filter(BhmExtensionState::Disabled);
+        assert_eq!(v.filtered().len(), 0);
+        v.clear_filter();
+        assert_eq!(v.filtered().len(), 1);
+    }
+    #[test]
+    fn test_bhm_extension_fields() {
+        let e = BhmExtensionInfo { id: "ms-python.python".into(), name: "Python".into(), publisher: "Microsoft".into(), version: "2024.1.0".into(), description: "Python language support".into(), state: BhmExtensionState::Installed, rating: Some(4.7), install_count: 50000000 };
+        assert_eq!(e.publisher, "Microsoft");
+        assert_eq!(e.install_count, 50000000);
+    }
+    #[test]
+    fn test_bhm_description_search() {
+        let mut v = BhmExtensionsView::new();
+        v.add_extension(BhmExtensionInfo { id: "e1".into(), name: "Ext".into(), publisher: "p".into(), version: "1.0".into(), description: "awesome tool".into(), state: BhmExtensionState::Installed, rating: None, install_count: 0 });
+        v.set_search("awesome".into());
+        assert_eq!(v.filtered().len(), 1);
+    }
+
+
+    #[test]
+    fn test_bhn_settings_editor_new() {
+        let e = BhnSettingsEditor::new();
+        assert!(e.settings.is_empty());
+        assert!(e.search_query.is_none());
+    }
+    #[test]
+    fn test_bhn_add_setting() {
+        let mut e = BhnSettingsEditor::new();
+        e.add_setting(BhnSettingEntry { key: "editor.fontSize".into(), label: "Font Size".into(), description: "Controls font size".into(), category: "Editor".into(), value: BhnSettingValue::Number(14.0), default_value: BhnSettingValue::Number(14.0), is_modified: false });
+        assert_eq!(e.settings.len(), 1);
+    }
+    #[test]
+    fn test_bhn_update_setting() {
+        let mut e = BhnSettingsEditor::new();
+        e.add_setting(BhnSettingEntry { key: "editor.tabSize".into(), label: "Tab Size".into(), description: "Tab width".into(), category: "Editor".into(), value: BhnSettingValue::Number(4.0), default_value: BhnSettingValue::Number(4.0), is_modified: false });
+        e.update_setting("editor.tabSize", BhnSettingValue::Number(2.0));
+        assert!(e.settings[0].is_modified);
+        assert_eq!(e.settings[0].value, BhnSettingValue::Number(2.0));
+    }
+    #[test]
+    fn test_bhn_reset_setting() {
+        let mut e = BhnSettingsEditor::new();
+        e.add_setting(BhnSettingEntry { key: "k".into(), label: "l".into(), description: "d".into(), category: "C".into(), value: BhnSettingValue::Bool(true), default_value: BhnSettingValue::Bool(true), is_modified: false });
+        e.update_setting("k", BhnSettingValue::Bool(false));
+        assert!(e.settings[0].is_modified);
+        e.reset_setting("k");
+        assert!(!e.settings[0].is_modified);
+        assert_eq!(e.settings[0].value, BhnSettingValue::Bool(true));
+    }
+    #[test]
+    fn test_bhn_categories() {
+        let mut e = BhnSettingsEditor::new();
+        e.add_setting(BhnSettingEntry { key: "a".into(), label: "".into(), description: "".into(), category: "Editor".into(), value: BhnSettingValue::Bool(true), default_value: BhnSettingValue::Bool(true), is_modified: false });
+        e.add_setting(BhnSettingEntry { key: "b".into(), label: "".into(), description: "".into(), category: "Terminal".into(), value: BhnSettingValue::Bool(true), default_value: BhnSettingValue::Bool(true), is_modified: false });
+        let cats = e.categories();
+        assert_eq!(cats.len(), 2);
+        assert!(cats.contains(&"Editor".to_string()));
+    }
+    #[test]
+    fn test_bhn_search_filter() {
+        let mut e = BhnSettingsEditor::new();
+        e.add_setting(BhnSettingEntry { key: "editor.fontSize".into(), label: "Font Size".into(), description: "px".into(), category: "Editor".into(), value: BhnSettingValue::Number(14.0), default_value: BhnSettingValue::Number(14.0), is_modified: false });
+        e.add_setting(BhnSettingEntry { key: "terminal.shell".into(), label: "Shell".into(), description: "path".into(), category: "Terminal".into(), value: BhnSettingValue::String("/bin/bash".into()), default_value: BhnSettingValue::String("/bin/bash".into()), is_modified: false });
+        e.set_search("font".into());
+        // "font" appears in label "Font Size"
+        assert_eq!(e.filtered().len(), 1);
+    }
+    #[test]
+    fn test_bhn_category_filter() {
+        let mut e = BhnSettingsEditor::new();
+        e.add_setting(BhnSettingEntry { key: "a".into(), label: "A".into(), description: "".into(), category: "Editor".into(), value: BhnSettingValue::Bool(true), default_value: BhnSettingValue::Bool(true), is_modified: false });
+        e.add_setting(BhnSettingEntry { key: "b".into(), label: "B".into(), description: "".into(), category: "Terminal".into(), value: BhnSettingValue::Bool(false), default_value: BhnSettingValue::Bool(false), is_modified: false });
+        e.set_category("Terminal".into());
+        assert_eq!(e.filtered().len(), 1);
+    }
+    #[test]
+    fn test_bhn_modified_count() {
+        let mut e = BhnSettingsEditor::new();
+        e.add_setting(BhnSettingEntry { key: "a".into(), label: "".into(), description: "".into(), category: "C".into(), value: BhnSettingValue::Number(1.0), default_value: BhnSettingValue::Number(1.0), is_modified: false });
+        e.add_setting(BhnSettingEntry { key: "b".into(), label: "".into(), description: "".into(), category: "C".into(), value: BhnSettingValue::Number(2.0), default_value: BhnSettingValue::Number(2.0), is_modified: false });
+        e.update_setting("a", BhnSettingValue::Number(99.0));
+        assert_eq!(e.modified_count(), 1);
+    }
+    #[test]
+    fn test_bhn_enum_setting() {
+        let v = BhnSettingValue::Enum { value: "dark".into(), options: vec!["light".into(), "dark".into(), "auto".into()] };
+        if let BhnSettingValue::Enum { value, options } = &v {
+            assert_eq!(value, "dark");
+            assert_eq!(options.len(), 3);
+        }
+    }
+    #[test]
+    fn test_bhn_array_setting() {
+        let v = BhnSettingValue::Array(vec!["*.pyc".into(), "__pycache__".into()]);
+        if let BhnSettingValue::Array(arr) = &v {
+            assert_eq!(arr.len(), 2);
+        }
+    }
+
+
+    #[test]
+    fn test_bho_keybindings_new() {
+        let e = BhoKeybindingsEditor::new();
+        assert_eq!(e.binding_count(), 0);
+    }
+    #[test]
+    fn test_bho_add_binding() {
+        let mut e = BhoKeybindingsEditor::new();
+        e.add_binding(BhoKeybindingEntry { key: "ctrl+s".into(), command: "workbench.action.files.save".into(), when: None, source: BhoKeybindingSource::Default });
+        assert_eq!(e.binding_count(), 1);
+    }
+    #[test]
+    fn test_bho_remove_binding() {
+        let mut e = BhoKeybindingsEditor::new();
+        e.add_binding(BhoKeybindingEntry { key: "ctrl+s".into(), command: "save".into(), when: None, source: BhoKeybindingSource::Default });
+        e.remove_binding("ctrl+s", "save");
+        assert_eq!(e.binding_count(), 0);
+    }
+    #[test]
+    fn test_bho_search_by_key() {
+        let mut e = BhoKeybindingsEditor::new();
+        e.add_binding(BhoKeybindingEntry { key: "ctrl+s".into(), command: "save".into(), when: None, source: BhoKeybindingSource::Default });
+        e.add_binding(BhoKeybindingEntry { key: "ctrl+p".into(), command: "quickOpen".into(), when: None, source: BhoKeybindingSource::Default });
+        e.set_search("ctrl+s".into());
+        assert_eq!(e.filtered().len(), 1);
+    }
+    #[test]
+    fn test_bho_search_by_command() {
+        let mut e = BhoKeybindingsEditor::new();
+        e.add_binding(BhoKeybindingEntry { key: "ctrl+shift+p".into(), command: "commandPalette".into(), when: None, source: BhoKeybindingSource::Default });
+        e.set_search("Palette".into());
+        assert_eq!(e.filtered().len(), 1);
+    }
+    #[test]
+    fn test_bho_conflicts() {
+        let mut e = BhoKeybindingsEditor::new();
+        e.add_binding(BhoKeybindingEntry { key: "ctrl+k".into(), command: "cmd1".into(), when: None, source: BhoKeybindingSource::Default });
+        e.add_binding(BhoKeybindingEntry { key: "ctrl+k".into(), command: "cmd2".into(), when: None, source: BhoKeybindingSource::User });
+        let c = e.conflicts();
+        assert_eq!(c.len(), 1);
+        assert_eq!(c[0].len(), 2);
+    }
+    #[test]
+    fn test_bho_by_source() {
+        let mut e = BhoKeybindingsEditor::new();
+        e.add_binding(BhoKeybindingEntry { key: "a".into(), command: "c1".into(), when: None, source: BhoKeybindingSource::Default });
+        e.add_binding(BhoKeybindingEntry { key: "b".into(), command: "c2".into(), when: None, source: BhoKeybindingSource::User });
+        assert_eq!(e.by_source(&BhoKeybindingSource::User).len(), 1);
+    }
+    #[test]
+    fn test_bho_reset_key() {
+        let mut e = BhoKeybindingsEditor::new();
+        e.add_binding(BhoKeybindingEntry { key: "ctrl+s".into(), command: "save".into(), when: None, source: BhoKeybindingSource::Default });
+        e.add_binding(BhoKeybindingEntry { key: "ctrl+s".into(), command: "custom".into(), when: None, source: BhoKeybindingSource::User });
+        e.reset_key("ctrl+s");
+        assert_eq!(e.binding_count(), 1);
+        assert_eq!(e.bindings[0].source, BhoKeybindingSource::Default);
+    }
+    #[test]
+    fn test_bho_when_clause() {
+        let b = BhoKeybindingEntry { key: "ctrl+`".into(), command: "toggleTerminal".into(), when: Some("terminalFocus".into()), source: BhoKeybindingSource::Default };
+        assert_eq!(b.when.as_deref(), Some("terminalFocus"));
+    }
+    #[test]
+    fn test_bho_extension_source() {
+        let b = BhoKeybindingEntry { key: "ctrl+shift+t".into(), command: "ext.cmd".into(), when: None, source: BhoKeybindingSource::Extension("my-ext".into()) };
+        assert!(matches!(b.source, BhoKeybindingSource::Extension(_)));
+    }
 
 }
