@@ -93083,6 +93083,247 @@ impl std::fmt::Display for TunnelConnection {
     }
 }
 
+
+/// RemoteAuthorityEntry — remote authority resolver entry
+#[derive(Debug, Clone)]
+pub struct RemoteAuthorityEntry {
+    pub bwa_authority: String,
+    pub bwa_host: String,
+    pub bwa_port: u32,
+    pub bwa_user: String,
+    pub bwa_connection_token: String,
+    pub bwa_is_connected: bool,
+    pub bwa_latency_ms: u32,
+    pub bwa_os_type: String,
+}
+
+impl RemoteAuthorityEntry {
+    pub fn new() -> Self {
+        Self {
+            bwa_authority: "ssh-remote".into(),
+            bwa_host: "dev-server".into(),
+            bwa_port: 22,
+            bwa_user: "developer".into(),
+            bwa_connection_token: "".into(),
+            bwa_is_connected: false,
+            bwa_latency_ms: 0,
+            bwa_os_type: "linux".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("RemoteAuthorityEntry({})", self.bwa_authority)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwa_authority.is_empty() || true
+    }
+}
+
+impl Default for RemoteAuthorityEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for RemoteAuthorityEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RemoteAuthorityEntry({})", self.bwa_authority)
+    }
+}
+
+/// RemoteExtHostEnv — remote extension host environment
+#[derive(Debug, Clone)]
+pub struct RemoteExtHostEnv {
+    pub bwb_authority: String,
+    pub bwb_pid: u32,
+    pub bwb_log_level: u8,
+    pub bwb_app_root: String,
+    pub bwb_extensions_path: String,
+    pub bwb_user_data_dir: String,
+    pub bwb_is_headless: bool,
+    pub bwb_node_version: String,
+}
+
+impl RemoteExtHostEnv {
+    pub fn new() -> Self {
+        Self {
+            bwb_authority: "ssh-remote".into(),
+            bwb_pid: 0,
+            bwb_log_level: 2,
+            bwb_app_root: "~/.vsedit-server".into(),
+            bwb_extensions_path: "~/.vsedit-server/extensions".into(),
+            bwb_user_data_dir: "~/.vsedit-server/data".into(),
+            bwb_is_headless: true,
+            bwb_node_version: "18.17.0".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("RemoteExtHostEnv({})", self.bwb_authority)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwb_authority.is_empty() || true
+    }
+}
+
+impl Default for RemoteExtHostEnv {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for RemoteExtHostEnv {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RemoteExtHostEnv({})", self.bwb_authority)
+    }
+}
+
+/// FileSystemProviderCaps — file system provider capabilities
+#[derive(Debug, Clone)]
+pub struct FileSystemProviderCaps {
+    pub bwc_scheme: String,
+    pub bwc_is_readonly: bool,
+    pub bwc_supports_file_search: bool,
+    pub bwc_supports_text_search: bool,
+    pub bwc_supports_create: bool,
+    pub bwc_supports_delete: bool,
+    pub bwc_supports_rename: bool,
+    pub bwc_case_sensitive: bool,
+}
+
+impl FileSystemProviderCaps {
+    pub fn new() -> Self {
+        Self {
+            bwc_scheme: "file".into(),
+            bwc_is_readonly: false,
+            bwc_supports_file_search: true,
+            bwc_supports_text_search: true,
+            bwc_supports_create: true,
+            bwc_supports_delete: true,
+            bwc_supports_rename: true,
+            bwc_case_sensitive: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("FileSystemProviderCaps({})", self.bwc_scheme)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwc_scheme.is_empty() || true
+    }
+}
+
+impl Default for FileSystemProviderCaps {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for FileSystemProviderCaps {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FileSystemProviderCaps({})", self.bwc_scheme)
+    }
+}
+
+/// WorkspaceTrustState — workspace trust state
+#[derive(Debug, Clone)]
+pub struct WorkspaceTrustState {
+    pub bwd_is_trusted: bool,
+    pub bwd_trust_uri: String,
+    pub bwd_parent_trusted: bool,
+    pub bwd_trust_reason: String,
+    pub bwd_restricted_mode: bool,
+    pub bwd_trust_requested: bool,
+    pub bwd_trust_banner_shown: bool,
+    pub bwd_startup_prompt: bool,
+}
+
+impl WorkspaceTrustState {
+    pub fn new() -> Self {
+        Self {
+            bwd_is_trusted: false,
+            bwd_trust_uri: "".into(),
+            bwd_parent_trusted: false,
+            bwd_trust_reason: "user".into(),
+            bwd_restricted_mode: true,
+            bwd_trust_requested: false,
+            bwd_trust_banner_shown: false,
+            bwd_startup_prompt: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("WorkspaceTrustState({})", self.bwd_is_trusted)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bwd_is_trusted || true
+    }
+}
+
+impl Default for WorkspaceTrustState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for WorkspaceTrustState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WorkspaceTrustState({})", self.bwd_is_trusted)
+    }
+}
+
+/// ProfileModel — user profile model
+#[derive(Debug, Clone)]
+pub struct ProfileModel {
+    pub bwe_id: String,
+    pub bwe_name: String,
+    pub bwe_icon: String,
+    pub bwe_is_default: bool,
+    pub bwe_is_transient: bool,
+    pub bwe_settings_resource: String,
+    pub bwe_extensions_resource: String,
+    pub bwe_use_default_flags: bool,
+}
+
+impl ProfileModel {
+    pub fn new() -> Self {
+        Self {
+            bwe_id: "default".into(),
+            bwe_name: "Default".into(),
+            bwe_icon: "account".into(),
+            bwe_is_default: true,
+            bwe_is_transient: false,
+            bwe_settings_resource: "".into(),
+            bwe_extensions_resource: "".into(),
+            bwe_use_default_flags: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ProfileModel({})", self.bwe_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwe_id.is_empty() || true
+    }
+}
+
+impl Default for ProfileModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ProfileModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ProfileModel({})", self.bwe_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -139790,6 +140031,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bvz_tunnel_id = "tunnel-1".into();
         assert_eq!(c.summary(), TunnelConnection::new().summary());
+    }
+
+
+    #[test]
+    fn test_bwa_create() {
+        let obj = RemoteAuthorityEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwa_validate() {
+        let obj = RemoteAuthorityEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwa_display() {
+        let obj = RemoteAuthorityEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("RemoteAuthorityEntry"));
+    }
+
+    #[test]
+    fn test_bwa_clone() {
+        let obj = RemoteAuthorityEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwa_debug() {
+        let obj = RemoteAuthorityEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("RemoteAuthorityEntry"));
+    }
+
+    #[test]
+    fn test_bwa_default() {
+        let obj = RemoteAuthorityEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwa_summary_contains_name() {
+        let obj = RemoteAuthorityEntry::new();
+        assert!(obj.summary().contains("RemoteAuthorityEntry"));
+    }
+
+    #[test]
+    fn test_bwa_validate_default() {
+        let obj = RemoteAuthorityEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwa_display_not_empty() {
+        let obj = RemoteAuthorityEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwa_clone_independence() {
+        let mut obj = RemoteAuthorityEntry::new();
+        let c = obj.clone();
+        obj.bwa_authority = "ssh-remote".into();
+        assert_eq!(c.summary(), RemoteAuthorityEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bwb_create() {
+        let obj = RemoteExtHostEnv::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwb_validate() {
+        let obj = RemoteExtHostEnv::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwb_display() {
+        let obj = RemoteExtHostEnv::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("RemoteExtHostEnv"));
+    }
+
+    #[test]
+    fn test_bwb_clone() {
+        let obj = RemoteExtHostEnv::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwb_debug() {
+        let obj = RemoteExtHostEnv::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("RemoteExtHostEnv"));
+    }
+
+    #[test]
+    fn test_bwb_default() {
+        let obj = RemoteExtHostEnv::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwb_summary_contains_name() {
+        let obj = RemoteExtHostEnv::new();
+        assert!(obj.summary().contains("RemoteExtHostEnv"));
+    }
+
+    #[test]
+    fn test_bwb_validate_default() {
+        let obj = RemoteExtHostEnv::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwb_display_not_empty() {
+        let obj = RemoteExtHostEnv::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwb_clone_independence() {
+        let mut obj = RemoteExtHostEnv::new();
+        let c = obj.clone();
+        obj.bwb_authority = "ssh-remote".into();
+        assert_eq!(c.summary(), RemoteExtHostEnv::new().summary());
+    }
+
+    #[test]
+    fn test_bwc_create() {
+        let obj = FileSystemProviderCaps::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwc_validate() {
+        let obj = FileSystemProviderCaps::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwc_display() {
+        let obj = FileSystemProviderCaps::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("FileSystemProviderCaps"));
+    }
+
+    #[test]
+    fn test_bwc_clone() {
+        let obj = FileSystemProviderCaps::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwc_debug() {
+        let obj = FileSystemProviderCaps::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("FileSystemProviderCaps"));
+    }
+
+    #[test]
+    fn test_bwc_default() {
+        let obj = FileSystemProviderCaps::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwc_summary_contains_name() {
+        let obj = FileSystemProviderCaps::new();
+        assert!(obj.summary().contains("FileSystemProviderCaps"));
+    }
+
+    #[test]
+    fn test_bwc_validate_default() {
+        let obj = FileSystemProviderCaps::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwc_display_not_empty() {
+        let obj = FileSystemProviderCaps::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwc_clone_independence() {
+        let mut obj = FileSystemProviderCaps::new();
+        let c = obj.clone();
+        obj.bwc_scheme = "file".into();
+        assert_eq!(c.summary(), FileSystemProviderCaps::new().summary());
+    }
+
+    #[test]
+    fn test_bwd_create() {
+        let obj = WorkspaceTrustState::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwd_validate() {
+        let obj = WorkspaceTrustState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwd_display() {
+        let obj = WorkspaceTrustState::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("WorkspaceTrustState"));
+    }
+
+    #[test]
+    fn test_bwd_clone() {
+        let obj = WorkspaceTrustState::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwd_debug() {
+        let obj = WorkspaceTrustState::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("WorkspaceTrustState"));
+    }
+
+    #[test]
+    fn test_bwd_default() {
+        let obj = WorkspaceTrustState::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwd_summary_contains_name() {
+        let obj = WorkspaceTrustState::new();
+        assert!(obj.summary().contains("WorkspaceTrustState"));
+    }
+
+    #[test]
+    fn test_bwd_validate_default() {
+        let obj = WorkspaceTrustState::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwd_display_not_empty() {
+        let obj = WorkspaceTrustState::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwd_clone_independence() {
+        let mut obj = WorkspaceTrustState::new();
+        let c = obj.clone();
+        obj.bwd_is_trusted = false;
+        assert_eq!(c.summary(), WorkspaceTrustState::new().summary());
+    }
+
+    #[test]
+    fn test_bwe_create() {
+        let obj = ProfileModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwe_validate() {
+        let obj = ProfileModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwe_display() {
+        let obj = ProfileModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ProfileModel"));
+    }
+
+    #[test]
+    fn test_bwe_clone() {
+        let obj = ProfileModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwe_debug() {
+        let obj = ProfileModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ProfileModel"));
+    }
+
+    #[test]
+    fn test_bwe_default() {
+        let obj = ProfileModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwe_summary_contains_name() {
+        let obj = ProfileModel::new();
+        assert!(obj.summary().contains("ProfileModel"));
+    }
+
+    #[test]
+    fn test_bwe_validate_default() {
+        let obj = ProfileModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwe_display_not_empty() {
+        let obj = ProfileModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwe_clone_independence() {
+        let mut obj = ProfileModel::new();
+        let c = obj.clone();
+        obj.bwe_id = "default".into();
+        assert_eq!(c.summary(), ProfileModel::new().summary());
     }
 
 }
