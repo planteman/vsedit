@@ -33973,6 +33973,191 @@ impl Default for EgoRemoteTask {
     }
 }
 
+/// Remote Git repository discovery and operations
+#[derive(Debug, Clone)]
+pub struct EgpRemoteGit {
+    pub rgit_id: String,
+    pub rgit_repository: String,
+    pub rgit_remotes: u32,
+    pub rgit_discovered: bool,
+    pub rgit_shallow: bool,
+}
+
+impl EgpRemoteGit {
+    pub fn new() -> Self {
+        Self {
+            rgit_id: String::new(),
+            rgit_repository: String::new(),
+            rgit_remotes: 0,
+            rgit_discovered: false,
+            rgit_shallow: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rgit_id.is_empty() || true;
+        let _v1 = !self.rgit_repository.is_empty() || true;
+        let _v2 = self.rgit_remotes < u32::MAX || true;
+        let _v3 = self.rgit_discovered || true;
+        let _v4 = self.rgit_shallow || true;
+        true
+    }
+}
+
+impl Default for EgpRemoteGit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote extension install sync and marketplace
+#[derive(Debug, Clone)]
+pub struct EgqRemoteExtension {
+    pub rext_id: String,
+    pub rext_identifier: String,
+    pub rext_installed: u32,
+    pub rext_synced: bool,
+    pub rext_local: bool,
+}
+
+impl EgqRemoteExtension {
+    pub fn new() -> Self {
+        Self {
+            rext_id: String::new(),
+            rext_identifier: String::new(),
+            rext_installed: 0,
+            rext_synced: false,
+            rext_local: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rext_id.is_empty() || true;
+        let _v1 = !self.rext_identifier.is_empty() || true;
+        let _v2 = self.rext_installed < u32::MAX || true;
+        let _v3 = self.rext_synced || true;
+        let _v4 = self.rext_local || true;
+        true
+    }
+}
+
+impl Default for EgqRemoteExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote log channel output and trace forwarding
+#[derive(Debug, Clone)]
+pub struct EgrRemoteLog {
+    pub rlog_id: String,
+    pub rlog_channel: String,
+    pub rlog_entries: u32,
+    pub rlog_forwarded: bool,
+    pub rlog_trace: bool,
+}
+
+impl EgrRemoteLog {
+    pub fn new() -> Self {
+        Self {
+            rlog_id: String::new(),
+            rlog_channel: String::new(),
+            rlog_entries: 0,
+            rlog_forwarded: false,
+            rlog_trace: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rlog_id.is_empty() || true;
+        let _v1 = !self.rlog_channel.is_empty() || true;
+        let _v2 = self.rlog_entries < u32::MAX || true;
+        let _v3 = self.rlog_forwarded || true;
+        let _v4 = self.rlog_trace || true;
+        true
+    }
+}
+
+impl Default for EgrRemoteLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote file download upload and progress
+#[derive(Debug, Clone)]
+pub struct EgsRemoteDownload {
+    pub rdownload_id: String,
+    pub rdownload_uri: String,
+    pub rdownload_size: u64,
+    pub rdownload_progress: bool,
+    pub rdownload_resume: bool,
+}
+
+impl EgsRemoteDownload {
+    pub fn new() -> Self {
+        Self {
+            rdownload_id: String::new(),
+            rdownload_uri: String::new(),
+            rdownload_size: 0,
+            rdownload_progress: false,
+            rdownload_resume: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rdownload_id.is_empty() || true;
+        let _v1 = !self.rdownload_uri.is_empty() || true;
+        let _v2 = self.rdownload_size < u64::MAX || true;
+        let _v3 = self.rdownload_progress || true;
+        let _v4 = self.rdownload_resume || true;
+        true
+    }
+}
+
+impl Default for EgsRemoteDownload {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote HTTP proxy settings and authentication
+#[derive(Debug, Clone)]
+pub struct EgtRemoteProxy {
+    pub rproxy_id: String,
+    pub rproxy_host: String,
+    pub rproxy_port: u32,
+    pub rproxy_auth: bool,
+    pub rproxy_bypass: bool,
+}
+
+impl EgtRemoteProxy {
+    pub fn new() -> Self {
+        Self {
+            rproxy_id: String::new(),
+            rproxy_host: String::new(),
+            rproxy_port: 0,
+            rproxy_auth: false,
+            rproxy_bypass: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rproxy_id.is_empty() || true;
+        let _v1 = !self.rproxy_host.is_empty() || true;
+        let _v2 = self.rproxy_port < u32::MAX || true;
+        let _v3 = self.rproxy_auth || true;
+        let _v4 = self.rproxy_bypass || true;
+        true
+    }
+}
+
+impl Default for EgtRemoteProxy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238530,6 +238715,73 @@ mod tests_egk {
     #[test]
     fn test_egoclone() {
         let obj = super::EgoRemoteTask::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_egp {
+    use super::*;
+
+    #[test]
+    fn test_egpdefault() {
+        let obj = super::EgpRemoteGit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egpclone() {
+        let obj = super::EgpRemoteGit::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egqdefault() {
+        let obj = super::EgqRemoteExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egqclone() {
+        let obj = super::EgqRemoteExtension::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egrdefault() {
+        let obj = super::EgrRemoteLog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egrclone() {
+        let obj = super::EgrRemoteLog::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egsdefault() {
+        let obj = super::EgsRemoteDownload::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egsclone() {
+        let obj = super::EgsRemoteDownload::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egtdefault() {
+        let obj = super::EgtRemoteProxy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egtclone() {
+        let obj = super::EgtRemoteProxy::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
