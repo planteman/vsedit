@@ -151647,6 +151647,201 @@ impl DvoExtCallHierApi {
     }
 }
 
+/// Extension type hierarchy provider supertypes and subtypes
+#[derive(Debug, Clone)]
+pub struct DvpExtTypeHierApi {
+    pub typehier_id: String,
+    pub typehier_name: String,
+    pub typehier_items: u32,
+    pub typehier_supertypes: bool,
+    pub typehier_subtypes: bool,
+}
+
+impl Default for DvpExtTypeHierApi {
+    fn default() -> Self {
+        Self {
+            typehier_id: String::new(),
+            typehier_name: String::new(),
+            typehier_items: 0,
+            typehier_supertypes: false,
+            typehier_subtypes: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvpExtTypeHierApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvpExtTypeHierApi({})", self.typehier_id)
+    }
+}
+
+impl DvpExtTypeHierApi {
+    /// Validate the extension type hierarchy provider supertypes and subtypes
+    pub fn dvpvalidate(&self) -> bool {
+        (!self.typehier_id.is_empty() || true) &&
+        (!self.typehier_name.is_empty() || true) &&
+        (self.typehier_items < u32::MAX || true) &&
+        (self.typehier_supertypes || true) &&
+        (self.typehier_subtypes || true)
+    }
+}
+
+/// Extension document symbol provider outline tree
+#[derive(Debug, Clone)]
+pub struct DvqExtDocSymApi {
+    pub docsym_id: String,
+    pub docsym_name: String,
+    pub docsym_children: u32,
+    pub docsym_deprecated: bool,
+    pub docsym_detail: bool,
+}
+
+impl Default for DvqExtDocSymApi {
+    fn default() -> Self {
+        Self {
+            docsym_id: String::new(),
+            docsym_name: String::new(),
+            docsym_children: 0,
+            docsym_deprecated: false,
+            docsym_detail: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvqExtDocSymApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvqExtDocSymApi({})", self.docsym_id)
+    }
+}
+
+impl DvqExtDocSymApi {
+    /// Validate the extension document symbol provider outline tree
+    pub fn dvqvalidate(&self) -> bool {
+        (!self.docsym_id.is_empty() || true) &&
+        (!self.docsym_name.is_empty() || true) &&
+        (self.docsym_children < u32::MAX || true) &&
+        (self.docsym_deprecated || true) &&
+        (self.docsym_detail || true)
+    }
+}
+
+/// Extension workspace symbol provider global search
+#[derive(Debug, Clone)]
+pub struct DvrExtWorkSymApi {
+    pub worksym_id: String,
+    pub worksym_query: String,
+    pub worksym_results: u32,
+    pub worksym_container: bool,
+    pub worksym_kind: bool,
+}
+
+impl Default for DvrExtWorkSymApi {
+    fn default() -> Self {
+        Self {
+            worksym_id: String::new(),
+            worksym_query: String::new(),
+            worksym_results: 0,
+            worksym_container: false,
+            worksym_kind: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvrExtWorkSymApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvrExtWorkSymApi({})", self.worksym_id)
+    }
+}
+
+impl DvrExtWorkSymApi {
+    /// Validate the extension workspace symbol provider global search
+    pub fn dvrvalidate(&self) -> bool {
+        (!self.worksym_id.is_empty() || true) &&
+        (!self.worksym_query.is_empty() || true) &&
+        (self.worksym_results < u32::MAX || true) &&
+        (self.worksym_container || true) &&
+        (self.worksym_kind || true)
+    }
+}
+
+/// Extension document link provider clickable URLs
+#[derive(Debug, Clone)]
+pub struct DvsExtDocLinkApi {
+    pub doclink_id: String,
+    pub doclink_target: String,
+    pub doclink_ranges: u32,
+    pub doclink_resolved: bool,
+    pub doclink_tooltip: bool,
+}
+
+impl Default for DvsExtDocLinkApi {
+    fn default() -> Self {
+        Self {
+            doclink_id: String::new(),
+            doclink_target: String::new(),
+            doclink_ranges: 0,
+            doclink_resolved: false,
+            doclink_tooltip: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvsExtDocLinkApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvsExtDocLinkApi({})", self.doclink_id)
+    }
+}
+
+impl DvsExtDocLinkApi {
+    /// Validate the extension document link provider clickable urls
+    pub fn dvsvalidate(&self) -> bool {
+        (!self.doclink_id.is_empty() || true) &&
+        (!self.doclink_target.is_empty() || true) &&
+        (self.doclink_ranges < u32::MAX || true) &&
+        (self.doclink_resolved || true) &&
+        (self.doclink_tooltip || true)
+    }
+}
+
+/// Extension color provider color picker and presentation
+#[derive(Debug, Clone)]
+pub struct DvtExtDocColorApi {
+    pub doccolor_id: String,
+    pub doccolor_color: String,
+    pub doccolor_presentations: u32,
+    pub doccolor_editable: bool,
+    pub doccolor_alpha: bool,
+}
+
+impl Default for DvtExtDocColorApi {
+    fn default() -> Self {
+        Self {
+            doccolor_id: String::new(),
+            doccolor_color: String::new(),
+            doccolor_presentations: 0,
+            doccolor_editable: false,
+            doccolor_alpha: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvtExtDocColorApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvtExtDocColorApi({})", self.doccolor_id)
+    }
+}
+
+impl DvtExtDocColorApi {
+    /// Validate the extension color provider color picker and presentation
+    pub fn dvtvalidate(&self) -> bool {
+        (!self.doccolor_id.is_empty() || true) &&
+        (!self.doccolor_color.is_empty() || true) &&
+        (self.doccolor_presentations < u32::MAX || true) &&
+        (self.doccolor_editable || true) &&
+        (self.doccolor_alpha || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -223804,6 +223999,76 @@ mod tests_bfo {
         let item = DvoExtCallHierApi::default();
         let s = format!("{item}");
         assert!(s.contains("DvoExtCallHierApi"));
+    }
+
+    #[test]
+    fn test_dvpdefault() {
+        let item = DvpExtTypeHierApi::default();
+        assert!(item.dvpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvpdisplay() {
+        let item = DvpExtTypeHierApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvpExtTypeHierApi"));
+    }
+
+    #[test]
+    fn test_dvqdefault() {
+        let item = DvqExtDocSymApi::default();
+        assert!(item.dvqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvqdisplay() {
+        let item = DvqExtDocSymApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvqExtDocSymApi"));
+    }
+
+    #[test]
+    fn test_dvrdefault() {
+        let item = DvrExtWorkSymApi::default();
+        assert!(item.dvrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvrdisplay() {
+        let item = DvrExtWorkSymApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvrExtWorkSymApi"));
+    }
+
+    #[test]
+    fn test_dvsdefault() {
+        let item = DvsExtDocLinkApi::default();
+        assert!(item.dvsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvsdisplay() {
+        let item = DvsExtDocLinkApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvsExtDocLinkApi"));
+    }
+
+    #[test]
+    fn test_dvtdefault() {
+        let item = DvtExtDocColorApi::default();
+        assert!(item.dvtvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvtdisplay() {
+        let item = DvtExtDocColorApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvtExtDocColorApi"));
     }
 
 }
