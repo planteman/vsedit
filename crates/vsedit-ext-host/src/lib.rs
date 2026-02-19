@@ -64796,3 +64796,188 @@ mod bco_tests {
         assert_eq!(msgs[0].command, "click");
     }
 }
+
+
+// --- bcp_: Editor output channel model ---
+
+/// Log level for output channel messages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BcpLogLevel { Trace, Debug, Info, Warning, Error }
+
+/// A single output line.
+#[derive(Debug, Clone)]
+pub struct BcpOutputLine {
+    pub text: String,
+    pub level: BcpLogLevel,
+    pub timestamp: u64,
+}
+
+/// An output channel.
+#[derive(Debug)]
+pub struct BcpOutputChannel {
+    pub name: String,
+    pub language_id: Option<String>,
+    lines: Vec<BcpOutputLine>,
+    visible: bool,
+    min_level: BcpLogLevel,
+    preserved_focus: bool,
+}
+
+impl BcpOutputChannel {
+    pub fn new(name: &str) -> Self {
+        Self { name: name.to_string(), language_id: None, lines: Vec::new(), visible: false, min_level: BcpLogLevel::Info, preserved_focus: false }
+    }
+
+    pub fn log(name: &str, language_id: &str) -> Self {
+        Self { name: name.to_string(), language_id: Some(language_id.to_string()), lines: Vec::new(), visible: false, min_level: BcpLogLevel::Info, preserved_focus: false }
+    }
+
+    pub fn append(&mut self, text: &str, level: BcpLogLevel) {
+        self.lines.push(BcpOutputLine { text: text.to_string(), level, timestamp: 0 });
+    }
+
+    pub fn append_line(&mut self, text: &str) { self.append(text, BcpLogLevel::Info); }
+
+    pub fn info(&mut self, text: &str) { self.append(text, BcpLogLevel::Info); }
+    pub fn warn(&mut self, text: &str) { self.append(text, BcpLogLevel::Warning); }
+    pub fn error(&mut self, text: &str) { self.append(text, BcpLogLevel::Error); }
+    pub fn trace(&mut self, text: &str) { self.append(text, BcpLogLevel::Trace); }
+    pub fn debug(&mut self, text: &str) { self.append(text, BcpLogLevel::Debug); }
+
+    pub fn clear(&mut self) { self.lines.clear(); }
+    pub fn show(&mut self, preserve_focus: bool) { self.visible = true; self.preserved_focus = preserve_focus; }
+    pub fn hide(&mut self) { self.visible = false; }
+    pub fn is_visible(&self) -> bool { self.visible }
+
+    pub fn set_min_level(&mut self, level: BcpLogLevel) { self.min_level = level; }
+
+    pub fn filtered_lines(&self) -> Vec<&BcpOutputLine> {
+        self.lines.iter().filter(|l| l.level >= self.min_level).collect()
+    }
+
+    pub fn line_count(&self) -> usize { self.lines.len() }
+
+    pub fn render(&self, max_lines: usize) -> Vec<String> {
+        let filtered = self.filtered_lines();
+        let skip = filtered.len().saturating_sub(max_lines);
+        filtered.iter().skip(skip).map(|l| {
+            let prefix = match l.level {
+                BcpLogLevel::Error => "[ERR]",
+                BcpLogLevel::Warning => "[WRN]",
+                BcpLogLevel::Info => "[INF]",
+                BcpLogLevel::Debug => "[DBG]",
+                BcpLogLevel::Trace => "[TRC]",
+            };
+            format!("{} {}", prefix, l.text)
+        }).collect()
+    }
+}
+
+/// Manages multiple output channels.
+#[derive(Debug)]
+pub struct BcpOutputManager {
+    channels: Vec<BcpOutputChannel>,
+    active: Option<String>,
+}
+
+impl BcpOutputManager {
+    pub fn new() -> Self { Self { channels: Vec::new(), active: None } }
+
+    pub fn create_channel(&mut self, name: &str) -> &mut BcpOutputChannel {
+        self.channels.push(BcpOutputChannel::new(name));
+        self.channels.last_mut().unwrap()
+    }
+
+    pub fn get_channel(&self, name: &str) -> Option<&BcpOutputChannel> { self.channels.iter().find(|c| c.name == name) }
+    pub fn get_channel_mut(&mut self, name: &str) -> Option<&mut BcpOutputChannel> { self.channels.iter_mut().find(|c| c.name == name) }
+
+    pub fn channel_names(&self) -> Vec<&str> { self.channels.iter().map(|c| c.name.as_str()).collect() }
+    pub fn set_active(&mut self, name: &str) { self.active = Some(name.to_string()); }
+    pub fn active_channel(&self) -> Option<&BcpOutputChannel> { self.active.as_ref().and_then(|n| self.get_channel(n)) }
+}
+
+#[cfg(test)]
+mod bcp_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcp_channel() {
+        let mut ch = BcpOutputChannel::new("Git");
+        ch.info("Pulling...");
+        assert_eq!(ch.line_count(), 1);
+    }
+
+    #[test]
+    fn test_bcp_levels() {
+        let mut ch = BcpOutputChannel::new("Test");
+        ch.error("fail");
+        ch.warn("warn");
+        ch.trace("trace");
+        assert_eq!(ch.line_count(), 3);
+    }
+
+    #[test]
+    fn test_bcp_filter() {
+        let mut ch = BcpOutputChannel::new("Test");
+        ch.trace("t");
+        ch.info("i");
+        ch.error("e");
+        ch.set_min_level(BcpLogLevel::Warning);
+        assert_eq!(ch.filtered_lines().len(), 1); // only error
+    }
+
+    #[test]
+    fn test_bcp_clear() {
+        let mut ch = BcpOutputChannel::new("Test");
+        ch.info("x");
+        ch.clear();
+        assert_eq!(ch.line_count(), 0);
+    }
+
+    #[test]
+    fn test_bcp_visibility() {
+        let mut ch = BcpOutputChannel::new("Test");
+        assert!(!ch.is_visible());
+        ch.show(false);
+        assert!(ch.is_visible());
+        ch.hide();
+        assert!(!ch.is_visible());
+    }
+
+    #[test]
+    fn test_bcp_render() {
+        let mut ch = BcpOutputChannel::new("Test");
+        ch.error("bad");
+        let lines = ch.render(10);
+        assert!(lines[0].contains("[ERR]"));
+    }
+
+    #[test]
+    fn test_bcp_manager() {
+        let mut mgr = BcpOutputManager::new();
+        mgr.create_channel("Git");
+        mgr.create_channel("Tasks");
+        assert_eq!(mgr.channel_names().len(), 2);
+    }
+
+    #[test]
+    fn test_bcp_active() {
+        let mut mgr = BcpOutputManager::new();
+        mgr.create_channel("Git");
+        mgr.set_active("Git");
+        assert!(mgr.active_channel().is_some());
+    }
+
+    #[test]
+    fn test_bcp_log_channel() {
+        let ch = BcpOutputChannel::log("Extension", "json");
+        assert_eq!(ch.language_id.as_deref(), Some("json"));
+    }
+
+    #[test]
+    fn test_bcp_render_max() {
+        let mut ch = BcpOutputChannel::new("Test");
+        for i in 0..20 { ch.info(&format!("line {}", i)); }
+        assert_eq!(ch.render(5).len(), 5);
+    }
+}
