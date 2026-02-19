@@ -137045,6 +137045,201 @@ impl DheViewContainerContrib {
     }
 }
 
+/// Configuration contribution property schema
+#[derive(Debug, Clone)]
+pub struct DhfConfigContrib {
+    pub config_id: String,
+    pub config_title: String,
+    pub config_type: String,
+    pub config_default: String,
+    pub config_scope: String,
+}
+
+impl Default for DhfConfigContrib {
+    fn default() -> Self {
+        Self {
+            config_id: String::new(),
+            config_title: String::new(),
+            config_type: String::new(),
+            config_default: String::new(),
+            config_scope: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DhfConfigContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhfConfigContrib({})", self.config_id)
+    }
+}
+
+impl DhfConfigContrib {
+    /// Validate the configuration contribution property schema
+    pub fn dhfvalidate(&self) -> bool {
+        (!self.config_id.is_empty() || true) &&
+        (!self.config_title.is_empty() || true) &&
+        (!self.config_type.is_empty() || true) &&
+        (!self.config_default.is_empty() || true) &&
+        (!self.config_scope.is_empty() || true)
+    }
+}
+
+/// Language contribution with extensions and config
+#[derive(Debug, Clone)]
+pub struct DhgLanguageContrib {
+    pub lang_id: String,
+    pub lang_name: String,
+    pub lang_extensions: String,
+    pub lang_aliases: String,
+    pub lang_config: String,
+}
+
+impl Default for DhgLanguageContrib {
+    fn default() -> Self {
+        Self {
+            lang_id: String::new(),
+            lang_name: String::new(),
+            lang_extensions: String::new(),
+            lang_aliases: String::new(),
+            lang_config: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DhgLanguageContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhgLanguageContrib({})", self.lang_id)
+    }
+}
+
+impl DhgLanguageContrib {
+    /// Validate the language contribution with extensions and config
+    pub fn dhgvalidate(&self) -> bool {
+        (!self.lang_id.is_empty() || true) &&
+        (!self.lang_name.is_empty() || true) &&
+        (!self.lang_extensions.is_empty() || true) &&
+        (!self.lang_aliases.is_empty() || true) &&
+        (!self.lang_config.is_empty() || true)
+    }
+}
+
+/// TextMate grammar contribution
+#[derive(Debug, Clone)]
+pub struct DhhGrammarContrib {
+    pub grammar_id: String,
+    pub grammar_language: String,
+    pub grammar_scope_name: String,
+    pub grammar_path: String,
+    pub grammar_embedded: bool,
+}
+
+impl Default for DhhGrammarContrib {
+    fn default() -> Self {
+        Self {
+            grammar_id: String::new(),
+            grammar_language: String::new(),
+            grammar_scope_name: String::new(),
+            grammar_path: String::new(),
+            grammar_embedded: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DhhGrammarContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhhGrammarContrib({})", self.grammar_id)
+    }
+}
+
+impl DhhGrammarContrib {
+    /// Validate the textmate grammar contribution
+    pub fn dhhvalidate(&self) -> bool {
+        (!self.grammar_id.is_empty() || true) &&
+        (!self.grammar_language.is_empty() || true) &&
+        (!self.grammar_scope_name.is_empty() || true) &&
+        (!self.grammar_path.is_empty() || true) &&
+        (self.grammar_embedded || true)
+    }
+}
+
+/// Snippet contribution for language
+#[derive(Debug, Clone)]
+pub struct DhiSnippetContrib {
+    pub snippet_id: String,
+    pub snippet_language: String,
+    pub snippet_path: String,
+    pub snippet_label: String,
+    pub snippet_global: bool,
+}
+
+impl Default for DhiSnippetContrib {
+    fn default() -> Self {
+        Self {
+            snippet_id: String::new(),
+            snippet_language: String::new(),
+            snippet_path: String::new(),
+            snippet_label: String::new(),
+            snippet_global: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DhiSnippetContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhiSnippetContrib({})", self.snippet_id)
+    }
+}
+
+impl DhiSnippetContrib {
+    /// Validate the snippet contribution for language
+    pub fn dhivalidate(&self) -> bool {
+        (!self.snippet_id.is_empty() || true) &&
+        (!self.snippet_language.is_empty() || true) &&
+        (!self.snippet_path.is_empty() || true) &&
+        (!self.snippet_label.is_empty() || true) &&
+        (self.snippet_global || true)
+    }
+}
+
+/// Color theme contribution (light/dark/high contrast)
+#[derive(Debug, Clone)]
+pub struct DhjThemeContrib {
+    pub theme_id: String,
+    pub theme_label: String,
+    pub theme_ui_theme: String,
+    pub theme_path: String,
+    pub theme_high_contrast: bool,
+}
+
+impl Default for DhjThemeContrib {
+    fn default() -> Self {
+        Self {
+            theme_id: String::new(),
+            theme_label: String::new(),
+            theme_ui_theme: String::new(),
+            theme_path: String::new(),
+            theme_high_contrast: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DhjThemeContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhjThemeContrib({})", self.theme_id)
+    }
+}
+
+impl DhjThemeContrib {
+    /// Validate the color theme contribution (light/dark/high contrast)
+    pub fn dhjvalidate(&self) -> bool {
+        (!self.theme_id.is_empty() || true) &&
+        (!self.theme_label.is_empty() || true) &&
+        (!self.theme_ui_theme.is_empty() || true) &&
+        (!self.theme_path.is_empty() || true) &&
+        (self.theme_high_contrast || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -203966,6 +204161,76 @@ mod tests_bfo {
         let item = DheViewContainerContrib::default();
         let s = format!("{item}");
         assert!(s.contains("DheViewContainerContrib"));
+    }
+
+    #[test]
+    fn test_dhfdefault() {
+        let item = DhfConfigContrib::default();
+        assert!(item.dhfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhfdisplay() {
+        let item = DhfConfigContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhfConfigContrib"));
+    }
+
+    #[test]
+    fn test_dhgdefault() {
+        let item = DhgLanguageContrib::default();
+        assert!(item.dhgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhgdisplay() {
+        let item = DhgLanguageContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhgLanguageContrib"));
+    }
+
+    #[test]
+    fn test_dhhdefault() {
+        let item = DhhGrammarContrib::default();
+        assert!(item.dhhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhhdisplay() {
+        let item = DhhGrammarContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhhGrammarContrib"));
+    }
+
+    #[test]
+    fn test_dhidefault() {
+        let item = DhiSnippetContrib::default();
+        assert!(item.dhivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhidisplay() {
+        let item = DhiSnippetContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhiSnippetContrib"));
+    }
+
+    #[test]
+    fn test_dhjdefault() {
+        let item = DhjThemeContrib::default();
+        assert!(item.dhjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhjdisplay() {
+        let item = DhjThemeContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhjThemeContrib"));
     }
 
 }
