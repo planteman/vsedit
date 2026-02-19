@@ -49933,3 +49933,387 @@ mod bai_tests {
         assert_eq!(widget.selected_index, Some(1));
     }
 }
+
+
+// --- baj_: Terminal link detection model ---
+
+/// Type of link detected in terminal output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BajTerminalLinkType {
+    Url,
+    FilePath,
+    FilePathWithLine,
+    FilePathWithLineCol,
+    Command,
+    Search,
+}
+
+impl BajTerminalLinkType {
+    pub fn is_file_link(&self) -> bool {
+        matches!(self, Self::FilePath | Self::FilePathWithLine | Self::FilePathWithLineCol)
+    }
+
+    pub fn is_url(&self) -> bool {
+        matches!(self, Self::Url)
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Url => "URL",
+            Self::FilePath => "File",
+            Self::FilePathWithLine => "File:Line",
+            Self::FilePathWithLineCol => "File:Line:Col",
+            Self::Command => "Command",
+            Self::Search => "Search",
+        }
+    }
+}
+
+/// A detected link in terminal output.
+#[derive(Debug, Clone)]
+pub struct BajTerminalLink {
+    pub link_type: BajTerminalLinkType,
+    pub text: String,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub line_in_terminal: u32,
+    pub target_path: Option<String>,
+    pub target_line: Option<u32>,
+    pub target_column: Option<u32>,
+    pub url: Option<String>,
+    pub tooltip: Option<String>,
+}
+
+impl BajTerminalLink {
+    pub fn url(text: &str, start: u32, end: u32, line: u32) -> Self {
+        Self {
+            link_type: BajTerminalLinkType::Url,
+            text: text.to_string(),
+            start_col: start,
+            end_col: end,
+            line_in_terminal: line,
+            target_path: None,
+            target_line: None,
+            target_column: None,
+            url: Some(text.to_string()),
+            tooltip: Some(format!("Open {}", text)),
+        }
+    }
+
+    pub fn file(text: &str, path: &str, start: u32, end: u32, line: u32) -> Self {
+        Self {
+            link_type: BajTerminalLinkType::FilePath,
+            text: text.to_string(),
+            start_col: start,
+            end_col: end,
+            line_in_terminal: line,
+            target_path: Some(path.to_string()),
+            target_line: None,
+            target_column: None,
+            url: None,
+            tooltip: Some(format!("Open {}", path)),
+        }
+    }
+
+    pub fn file_with_line(text: &str, path: &str, target_line: u32, start: u32, end: u32, term_line: u32) -> Self {
+        Self {
+            link_type: BajTerminalLinkType::FilePathWithLine,
+            text: text.to_string(),
+            start_col: start,
+            end_col: end,
+            line_in_terminal: term_line,
+            target_path: Some(path.to_string()),
+            target_line: Some(target_line),
+            target_column: None,
+            url: None,
+            tooltip: Some(format!("{}:{}", path, target_line)),
+        }
+    }
+
+    pub fn file_with_line_col(text: &str, path: &str, target_line: u32, target_col: u32, start: u32, end: u32, term_line: u32) -> Self {
+        Self {
+            link_type: BajTerminalLinkType::FilePathWithLineCol,
+            text: text.to_string(),
+            start_col: start,
+            end_col: end,
+            line_in_terminal: term_line,
+            target_path: Some(path.to_string()),
+            target_line: Some(target_line),
+            target_column: Some(target_col),
+            url: None,
+            tooltip: Some(format!("{}:{}:{}", path, target_line, target_col)),
+        }
+    }
+
+    pub fn length(&self) -> u32 {
+        self.end_col.saturating_sub(self.start_col)
+    }
+
+    pub fn contains_col(&self, col: u32) -> bool {
+        col >= self.start_col && col < self.end_col
+    }
+}
+
+/// Detector for links in terminal output lines.
+#[derive(Debug, Clone)]
+pub struct BajLinkDetector {
+    pub url_schemes: Vec<String>,
+    pub file_extensions: Vec<String>,
+    pub cwd: String,
+}
+
+impl BajLinkDetector {
+    pub fn new(cwd: &str) -> Self {
+        Self {
+            url_schemes: vec!["http".to_string(), "https".to_string(), "file".to_string()],
+            file_extensions: vec![
+                "rs".to_string(), "ts".to_string(), "js".to_string(),
+                "py".to_string(), "go".to_string(), "c".to_string(),
+                "cpp".to_string(), "h".to_string(), "java".to_string(),
+                "rb".to_string(), "sh".to_string(), "toml".to_string(),
+                "json".to_string(), "yaml".to_string(), "yml".to_string(),
+                "md".to_string(), "txt".to_string(),
+            ],
+            cwd: cwd.to_string(),
+        }
+    }
+
+    pub fn detect_urls(&self, text: &str, line: u32) -> Vec<BajTerminalLink> {
+        let mut links = Vec::new();
+        for scheme in &self.url_schemes {
+            let prefix = format!("{}://", scheme);
+            let mut start = 0;
+            while let Some(pos) = text[start..].find(&prefix) {
+                let abs_start = start + pos;
+                let url_end = text[abs_start..].find(|c: char| c.is_whitespace() || c == ')' || c == ']' || c == '>' || c == '"' || c == '\'')
+                    .map(|e| abs_start + e)
+                    .unwrap_or(text.len());
+                let url_text = &text[abs_start..url_end];
+                if url_text.len() > prefix.len() {
+                    links.push(BajTerminalLink::url(url_text, abs_start as u32, url_end as u32, line));
+                }
+                start = url_end;
+            }
+        }
+        links
+    }
+
+    pub fn detect_file_paths(&self, text: &str, line: u32) -> Vec<BajTerminalLink> {
+        let mut links = Vec::new();
+        // Simple pattern: look for path:line:col or path:line patterns
+        let words: Vec<&str> = text.split_whitespace().collect();
+        let mut col_offset: u32 = 0;
+        for word in &words {
+            let clean = word.trim_matches(|c: char| c == '(' || c == ')' || c == ',' || c == ';' || c == ':' && !word.contains('/'));
+            let parts: Vec<&str> = clean.splitn(3, ':').collect();
+            if let Some(path) = parts.first() {
+                let has_ext = self.file_extensions.iter().any(|ext| {
+                    path.ends_with(&format!(".{}", ext))
+                });
+                let looks_like_path = path.contains('/') || path.contains('\\') || has_ext;
+
+                if looks_like_path && !path.is_empty() {
+                    let start = text.find(clean).unwrap_or(col_offset as usize) as u32;
+                    let end = start + clean.len() as u32;
+
+                    match parts.len() {
+                        3 => {
+                            if let (Ok(l), Ok(c)) = (parts[1].parse::<u32>(), parts[2].parse::<u32>()) {
+                                links.push(BajTerminalLink::file_with_line_col(clean, path, l, c, start, end, line));
+                            }
+                        }
+                        2 => {
+                            if let Ok(l) = parts[1].parse::<u32>() {
+                                links.push(BajTerminalLink::file_with_line(clean, path, l, start, end, line));
+                            }
+                        }
+                        _ => {
+                            if has_ext {
+                                links.push(BajTerminalLink::file(clean, path, start, end, line));
+                            }
+                        }
+                    }
+                }
+            }
+            col_offset += word.len() as u32 + 1;
+        }
+        links
+    }
+
+    pub fn detect_all(&self, text: &str, line: u32) -> Vec<BajTerminalLink> {
+        let mut links = self.detect_urls(text, line);
+        links.extend(self.detect_file_paths(text, line));
+        links.sort_by_key(|l| l.start_col);
+        links
+    }
+}
+
+/// Manages detected links for a terminal session.
+#[derive(Debug, Clone)]
+pub struct BajTerminalLinkManager {
+    pub links: Vec<BajTerminalLink>,
+    pub detector: BajLinkDetector,
+    pub highlighted_link: Option<usize>,
+}
+
+impl BajTerminalLinkManager {
+    pub fn new(cwd: &str) -> Self {
+        Self {
+            links: Vec::new(),
+            detector: BajLinkDetector::new(cwd),
+            highlighted_link: None,
+        }
+    }
+
+    pub fn process_line(&mut self, text: &str, line: u32) {
+        let detected = self.detector.detect_all(text, line);
+        self.links.extend(detected);
+    }
+
+    pub fn link_at(&self, line: u32, col: u32) -> Option<&BajTerminalLink> {
+        self.links.iter().find(|l| l.line_in_terminal == line && l.contains_col(col))
+    }
+
+    pub fn links_on_line(&self, line: u32) -> Vec<&BajTerminalLink> {
+        self.links.iter().filter(|l| l.line_in_terminal == line).collect()
+    }
+
+    pub fn highlight_at(&mut self, line: u32, col: u32) -> bool {
+        self.highlighted_link = self.links.iter().position(|l| l.line_in_terminal == line && l.contains_col(col));
+        self.highlighted_link.is_some()
+    }
+
+    pub fn clear_highlight(&mut self) {
+        self.highlighted_link = None;
+    }
+
+    pub fn total_links(&self) -> usize {
+        self.links.len()
+    }
+
+    pub fn url_count(&self) -> usize {
+        self.links.iter().filter(|l| l.link_type.is_url()).count()
+    }
+
+    pub fn file_link_count(&self) -> usize {
+        self.links.iter().filter(|l| l.link_type.is_file_link()).count()
+    }
+
+    pub fn clear(&mut self) {
+        self.links.clear();
+        self.highlighted_link = None;
+    }
+}
+
+#[cfg(test)]
+mod baj_tests {
+    use super::*;
+
+    #[test]
+    fn test_baj_link_type() {
+        assert!(BajTerminalLinkType::FilePath.is_file_link());
+        assert!(BajTerminalLinkType::FilePathWithLine.is_file_link());
+        assert!(!BajTerminalLinkType::Url.is_file_link());
+        assert!(BajTerminalLinkType::Url.is_url());
+    }
+
+    #[test]
+    fn test_baj_terminal_link_url() {
+        let link = BajTerminalLink::url("https://example.com", 5, 25, 0);
+        assert_eq!(link.link_type, BajTerminalLinkType::Url);
+        assert_eq!(link.length(), 20);
+        assert!(link.contains_col(10));
+        assert!(!link.contains_col(25));
+    }
+
+    #[test]
+    fn test_baj_terminal_link_file() {
+        let link = BajTerminalLink::file("src/main.rs", "src/main.rs", 0, 11, 3);
+        assert_eq!(link.target_path.as_deref(), Some("src/main.rs"));
+    }
+
+    #[test]
+    fn test_baj_file_with_line_col() {
+        let link = BajTerminalLink::file_with_line_col("src/lib.rs:42:10", "src/lib.rs", 42, 10, 0, 16, 5);
+        assert_eq!(link.target_line, Some(42));
+        assert_eq!(link.target_column, Some(10));
+        assert_eq!(link.tooltip.as_deref(), Some("src/lib.rs:42:10"));
+    }
+
+    #[test]
+    fn test_baj_detect_urls() {
+        let detector = BajLinkDetector::new("/home/user");
+        let links = detector.detect_urls("Visit https://example.com for more info", 0);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].text, "https://example.com");
+    }
+
+    #[test]
+    fn test_baj_detect_file_paths() {
+        let detector = BajLinkDetector::new("/workspace");
+        let links = detector.detect_file_paths("error at src/main.rs:42:10 failed", 0);
+        assert!(!links.is_empty());
+        let file_link = &links[0];
+        assert!(file_link.link_type.is_file_link());
+    }
+
+    #[test]
+    fn test_baj_detect_all() {
+        let detector = BajLinkDetector::new("/workspace");
+        let links = detector.detect_all("See https://docs.rs and src/lib.rs:10", 0);
+        assert!(links.len() >= 2);
+    }
+
+    #[test]
+    fn test_baj_link_manager() {
+        let mut mgr = BajTerminalLinkManager::new("/workspace");
+        mgr.process_line("Visit https://example.com now", 0);
+        mgr.process_line("Error at src/main.rs:10:5", 1);
+        assert!(mgr.total_links() >= 2);
+        assert!(mgr.url_count() >= 1);
+    }
+
+    #[test]
+    fn test_baj_link_at() {
+        let mut mgr = BajTerminalLinkManager::new("/ws");
+        mgr.process_line("See https://example.com here", 0);
+        let link = mgr.link_at(0, 6);
+        assert!(link.is_some());
+        assert!(mgr.link_at(0, 0).is_none()); // Before the URL
+    }
+
+    #[test]
+    fn test_baj_highlight() {
+        let mut mgr = BajTerminalLinkManager::new("/ws");
+        mgr.process_line("See https://example.com here", 0);
+        assert!(mgr.highlight_at(0, 6));
+        assert!(mgr.highlighted_link.is_some());
+        mgr.clear_highlight();
+        assert!(mgr.highlighted_link.is_none());
+    }
+
+    #[test]
+    fn test_baj_manager_clear() {
+        let mut mgr = BajTerminalLinkManager::new("/ws");
+        mgr.process_line("https://a.com", 0);
+        mgr.clear();
+        assert_eq!(mgr.total_links(), 0);
+    }
+
+    #[test]
+    fn test_baj_links_on_line() {
+        let mut mgr = BajTerminalLinkManager::new("/ws");
+        mgr.process_line("https://a.com https://b.com", 0);
+        mgr.process_line("Nothing here", 1);
+        assert!(mgr.links_on_line(0).len() >= 2);
+        assert_eq!(mgr.links_on_line(1).len(), 0);
+    }
+
+    #[test]
+    fn test_baj_file_extension_detection() {
+        let detector = BajLinkDetector::new("/ws");
+        let links = detector.detect_file_paths("Failed: test.py crashed", 0);
+        assert!(!links.is_empty());
+        assert_eq!(links[0].link_type, BajTerminalLinkType::FilePath);
+    }
+}
