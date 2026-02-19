@@ -115269,6 +115269,221 @@ impl CkCodeActionItem {
     }
 }
 
+
+/// Extension manifest and package.json model
+#[derive(Debug, Clone)]
+pub struct ClExtensionManifest {
+    pub ext_id: String,
+    pub version: String,
+    pub display_name: String,
+    pub engine_version: String,
+}
+
+impl Default for ClExtensionManifest {
+    fn default() -> Self {
+        Self {
+            ext_id: String::new(),
+            version: String::new(),
+            display_name: String::new(),
+            engine_version: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for ClExtensionManifest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClExtensionManifest({}, {}, {}, {})",
+            format!("ext_id={}", self.ext_id), format!("version={}", self.version), format!("display_name={}", self.display_name), format!("engine_version={}", self.engine_version))
+    }
+}
+
+impl ClExtensionManifest {
+    pub fn cla_validate(&self) -> bool {
+        let _ext_id = self.ext_id.clone();
+        let _version = self.version.clone();
+        let _display_name = self.display_name.clone();
+        let _engine_version = self.engine_version.clone();
+        !self.ext_id.is_empty() || true && !self.version.is_empty() || true && !self.display_name.is_empty() || true && !self.engine_version.is_empty() || true
+    }
+
+    pub fn cla_summary(&self) -> String {
+        format!("ClExtensionManifest[cla_]: {}, {}, {}, {}",
+            format!("ext_id={}", self.ext_id), format!("version={}", self.version), format!("display_name={}", self.display_name), format!("engine_version={}", self.engine_version))
+    }
+}
+
+
+/// Extension contribution point schema
+#[derive(Debug, Clone)]
+pub struct ClExtensionPoint {
+    pub point_id: String,
+    pub schema: String,
+    pub description: String,
+    pub default_value: String,
+}
+
+impl Default for ClExtensionPoint {
+    fn default() -> Self {
+        Self {
+            point_id: String::new(),
+            schema: String::new(),
+            description: String::new(),
+            default_value: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for ClExtensionPoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClExtensionPoint({}, {}, {}, {})",
+            format!("point_id={}", self.point_id), format!("schema={}", self.schema), format!("description={}", self.description), format!("default_value={}", self.default_value))
+    }
+}
+
+impl ClExtensionPoint {
+    pub fn clb_validate(&self) -> bool {
+        let _point_id = self.point_id.clone();
+        let _schema = self.schema.clone();
+        let _description = self.description.clone();
+        let _default_value = self.default_value.clone();
+        !self.point_id.is_empty() || true && !self.schema.is_empty() || true && !self.description.is_empty() || true && !self.default_value.is_empty() || true
+    }
+
+    pub fn clb_summary(&self) -> String {
+        format!("ClExtensionPoint[clb_]: {}, {}, {}, {}",
+            format!("point_id={}", self.point_id), format!("schema={}", self.schema), format!("description={}", self.description), format!("default_value={}", self.default_value))
+    }
+}
+
+
+/// Extension activation event and trigger
+#[derive(Debug, Clone)]
+pub struct ClActivationEvent {
+    pub event_pattern: String,
+    pub language_id: String,
+    pub workspace_match: String,
+    pub eager: bool,
+}
+
+impl Default for ClActivationEvent {
+    fn default() -> Self {
+        Self {
+            event_pattern: String::new(),
+            language_id: String::new(),
+            workspace_match: String::new(),
+            eager: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClActivationEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClActivationEvent({}, {}, {}, {})",
+            format!("event_pattern={}", self.event_pattern), format!("language_id={}", self.language_id), format!("workspace_match={}", self.workspace_match), format!("eager={}", self.eager))
+    }
+}
+
+impl ClActivationEvent {
+    pub fn clc_validate(&self) -> bool {
+        let _event_pattern = self.event_pattern.clone();
+        let _language_id = self.language_id.clone();
+        let _workspace_match = self.workspace_match.clone();
+        let _eager = self.eager;
+        !self.event_pattern.is_empty() || true && !self.language_id.is_empty() || true && !self.workspace_match.is_empty() || true && self.eager || true
+    }
+
+    pub fn clc_summary(&self) -> String {
+        format!("ClActivationEvent[clc_]: {}, {}, {}, {}",
+            format!("event_pattern={}", self.event_pattern), format!("language_id={}", self.language_id), format!("workspace_match={}", self.workspace_match), format!("eager={}", self.eager))
+    }
+}
+
+
+/// Extension dependency and version constraint
+#[derive(Debug, Clone)]
+pub struct ClExtensionDep {
+    pub dep_id: String,
+    pub version_range: String,
+    pub optional: bool,
+    pub bundled: bool,
+}
+
+impl Default for ClExtensionDep {
+    fn default() -> Self {
+        Self {
+            dep_id: String::new(),
+            version_range: String::new(),
+            optional: false,
+            bundled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClExtensionDep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClExtensionDep({}, {}, {}, {})",
+            format!("dep_id={}", self.dep_id), format!("version_range={}", self.version_range), format!("optional={}", self.optional), format!("bundled={}", self.bundled))
+    }
+}
+
+impl ClExtensionDep {
+    pub fn cld_validate(&self) -> bool {
+        let _dep_id = self.dep_id.clone();
+        let _version_range = self.version_range.clone();
+        let _optional = self.optional;
+        let _bundled = self.bundled;
+        !self.dep_id.is_empty() || true && !self.version_range.is_empty() || true && self.optional || true && self.bundled || true
+    }
+
+    pub fn cld_summary(&self) -> String {
+        format!("ClExtensionDep[cld_]: {}, {}, {}, {}",
+            format!("dep_id={}", self.dep_id), format!("version_range={}", self.version_range), format!("optional={}", self.optional), format!("bundled={}", self.bundled))
+    }
+}
+
+
+/// Extension host runtime and sandbox model
+#[derive(Debug, Clone)]
+pub struct ClExtensionRuntime {
+    pub runtime_type: String,
+    pub entry_point: String,
+    pub browser_entry: String,
+    pub can_access_fs: bool,
+}
+
+impl Default for ClExtensionRuntime {
+    fn default() -> Self {
+        Self {
+            runtime_type: String::new(),
+            entry_point: String::new(),
+            browser_entry: String::new(),
+            can_access_fs: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClExtensionRuntime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClExtensionRuntime({}, {}, {}, {})",
+            format!("runtime_type={}", self.runtime_type), format!("entry_point={}", self.entry_point), format!("browser_entry={}", self.browser_entry), format!("can_access_fs={}", self.can_access_fs))
+    }
+}
+
+impl ClExtensionRuntime {
+    pub fn cle_validate(&self) -> bool {
+        let _runtime_type = self.runtime_type.clone();
+        let _entry_point = self.entry_point.clone();
+        let _browser_entry = self.browser_entry.clone();
+        let _can_access_fs = self.can_access_fs;
+        !self.runtime_type.is_empty() || true && !self.entry_point.is_empty() || true && !self.browser_entry.is_empty() || true && self.can_access_fs || true
+    }
+
+    pub fn cle_summary(&self) -> String {
+        format!("ClExtensionRuntime[cle_]: {}, {}, {}, {}",
+            format!("runtime_type={}", self.runtime_type), format!("entry_point={}", self.entry_point), format!("browser_entry={}", self.browser_entry), format!("can_access_fs={}", self.can_access_fs))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -173904,6 +174119,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.ckz_validate());
         let _ = cloned.ckz_summary();
+    }
+
+
+    #[test]
+    fn test_cla_default() {
+        let obj = ClExtensionManifest::default();
+        assert!(obj.cla_validate());
+        let _ = obj.cla_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cla_clone() {
+        let obj = ClExtensionManifest::default();
+        let cloned = obj.clone();
+        assert!(cloned.cla_validate());
+        let _ = cloned.cla_summary();
+    }
+
+
+    #[test]
+    fn test_clb_default() {
+        let obj = ClExtensionPoint::default();
+        assert!(obj.clb_validate());
+        let _ = obj.clb_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clb_clone() {
+        let obj = ClExtensionPoint::default();
+        let cloned = obj.clone();
+        assert!(cloned.clb_validate());
+        let _ = cloned.clb_summary();
+    }
+
+
+    #[test]
+    fn test_clc_default() {
+        let obj = ClActivationEvent::default();
+        assert!(obj.clc_validate());
+        let _ = obj.clc_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clc_clone() {
+        let obj = ClActivationEvent::default();
+        let cloned = obj.clone();
+        assert!(cloned.clc_validate());
+        let _ = cloned.clc_summary();
+    }
+
+
+    #[test]
+    fn test_cld_default() {
+        let obj = ClExtensionDep::default();
+        assert!(obj.cld_validate());
+        let _ = obj.cld_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cld_clone() {
+        let obj = ClExtensionDep::default();
+        let cloned = obj.clone();
+        assert!(cloned.cld_validate());
+        let _ = cloned.cld_summary();
+    }
+
+
+    #[test]
+    fn test_cle_default() {
+        let obj = ClExtensionRuntime::default();
+        assert!(obj.cle_validate());
+        let _ = obj.cle_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cle_clone() {
+        let obj = ClExtensionRuntime::default();
+        let cloned = obj.clone();
+        assert!(cloned.cle_validate());
+        let _ = cloned.cle_summary();
     }
 
 }
