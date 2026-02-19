@@ -57271,3 +57271,219 @@ mod bbe_tests {
         assert!(!r.is_confident());
     }
 }
+
+
+// --- bbf_: Editor whitespace rendering model ---
+
+/// When to render whitespace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbfWhitespaceMode {
+    None,
+    Boundary,
+    Selection,
+    Trailing,
+    All,
+}
+
+impl BbfWhitespaceMode {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::None => "None", Self::Boundary => "Boundary",
+            Self::Selection => "Selection", Self::Trailing => "Trailing",
+            Self::All => "All",
+        }
+    }
+
+    pub fn shows_all(&self) -> bool { matches!(self, Self::All) }
+}
+
+/// A whitespace character to render.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BbfWhitespaceChar {
+    Space,
+    Tab,
+    Nbsp,
+    HalfWidthSpace,
+    IdeographicSpace,
+}
+
+impl BbfWhitespaceChar {
+    pub fn display_char(&self) -> char {
+        match self {
+            Self::Space => '·',
+            Self::Tab => '→',
+            Self::Nbsp => '°',
+            Self::HalfWidthSpace => '⸱',
+            Self::IdeographicSpace => '□',
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Space => "Space", Self::Tab => "Tab", Self::Nbsp => "Non-Breaking Space",
+            Self::HalfWidthSpace => "Half-Width Space", Self::IdeographicSpace => "Ideographic Space",
+        }
+    }
+
+    pub fn is_irregular(&self) -> bool {
+        !matches!(self, Self::Space | Self::Tab)
+    }
+}
+
+/// A whitespace occurrence on a line.
+#[derive(Debug, Clone)]
+pub struct BbfWhitespaceOccurrence {
+    pub col: u32,
+    pub kind: BbfWhitespaceChar,
+    pub is_trailing: bool,
+    pub is_boundary: bool,
+}
+
+impl BbfWhitespaceOccurrence {
+    pub fn new(col: u32, kind: BbfWhitespaceChar) -> Self {
+        Self { col, kind, is_trailing: false, is_boundary: false }
+    }
+
+    pub fn should_render(&self, mode: BbfWhitespaceMode) -> bool {
+        match mode {
+            BbfWhitespaceMode::None => false,
+            BbfWhitespaceMode::All => true,
+            BbfWhitespaceMode::Trailing => self.is_trailing,
+            BbfWhitespaceMode::Boundary => self.is_boundary || self.is_trailing,
+            BbfWhitespaceMode::Selection => false, // handled by selection check
+        }
+    }
+}
+
+/// The whitespace rendering model.
+#[derive(Debug)]
+pub struct BbfWhitespaceModel {
+    mode: BbfWhitespaceMode,
+    tab_size: u32,
+    render_control_chars: bool,
+}
+
+impl BbfWhitespaceModel {
+    pub fn new(mode: BbfWhitespaceMode) -> Self {
+        Self { mode, tab_size: 4, render_control_chars: true }
+    }
+
+    pub fn mode(&self) -> BbfWhitespaceMode { self.mode }
+    pub fn set_mode(&mut self, m: BbfWhitespaceMode) { self.mode = m; }
+
+    pub fn set_tab_size(&mut self, s: u32) { self.tab_size = s; }
+    pub fn tab_size(&self) -> u32 { self.tab_size }
+
+    pub fn set_render_control_chars(&mut self, v: bool) { self.render_control_chars = v; }
+
+    pub fn analyze_line(&self, line: &str) -> Vec<BbfWhitespaceOccurrence> {
+        let trimmed_end = line.trim_end().len();
+        let mut result = Vec::new();
+        let mut prev_was_text = false;
+
+        for (i, ch) in line.char_indices() {
+            let kind = match ch {
+                ' ' => Some(BbfWhitespaceChar::Space),
+                '\t' => Some(BbfWhitespaceChar::Tab),
+                '\u{00a0}' => Some(BbfWhitespaceChar::Nbsp),
+                _ => None,
+            };
+            if let Some(k) = kind {
+                let mut occ = BbfWhitespaceOccurrence::new(i as u32, k);
+                occ.is_trailing = i >= trimmed_end;
+                occ.is_boundary = prev_was_text;
+                result.push(occ);
+                prev_was_text = false;
+            } else {
+                prev_was_text = true;
+            }
+        }
+        result
+    }
+
+    pub fn visible_occurrences(&self, line: &str) -> Vec<BbfWhitespaceOccurrence> {
+        self.analyze_line(line).into_iter()
+            .filter(|o| o.should_render(self.mode))
+            .collect()
+    }
+
+    pub fn has_trailing_whitespace(line: &str) -> bool {
+        !line.is_empty() && line.ends_with(|c: char| c.is_whitespace())
+    }
+
+    pub fn trailing_whitespace_length(line: &str) -> usize {
+        line.len() - line.trim_end().len()
+    }
+
+    pub fn status_text(&self) -> String {
+        format!("Whitespace: {}", self.mode.label())
+    }
+}
+
+#[cfg(test)]
+mod bbf_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbf_mode() {
+        assert_eq!(BbfWhitespaceMode::All.label(), "All");
+        assert!(BbfWhitespaceMode::All.shows_all());
+        assert!(!BbfWhitespaceMode::None.shows_all());
+    }
+
+    #[test]
+    fn test_bbf_char_display() {
+        assert_eq!(BbfWhitespaceChar::Space.display_char(), '·');
+        assert_eq!(BbfWhitespaceChar::Tab.display_char(), '→');
+    }
+
+    #[test]
+    fn test_bbf_char_irregular() {
+        assert!(BbfWhitespaceChar::Nbsp.is_irregular());
+        assert!(!BbfWhitespaceChar::Space.is_irregular());
+    }
+
+    #[test]
+    fn test_bbf_should_render() {
+        let mut o = BbfWhitespaceOccurrence::new(5, BbfWhitespaceChar::Space);
+        o.is_trailing = true;
+        assert!(o.should_render(BbfWhitespaceMode::Trailing));
+        assert!(!o.should_render(BbfWhitespaceMode::None));
+        assert!(o.should_render(BbfWhitespaceMode::All));
+    }
+
+    #[test]
+    fn test_bbf_analyze_line() {
+        let m = BbfWhitespaceModel::new(BbfWhitespaceMode::All);
+        let occs = m.analyze_line("hello world  ");
+        assert!(occs.len() >= 3); // space between + 2 trailing
+    }
+
+    #[test]
+    fn test_bbf_trailing() {
+        let m = BbfWhitespaceModel::new(BbfWhitespaceMode::Trailing);
+        let vis = m.visible_occurrences("hello  ");
+        assert_eq!(vis.len(), 2); // 2 trailing spaces
+    }
+
+    #[test]
+    fn test_bbf_trailing_detect() {
+        assert!(BbfWhitespaceModel::has_trailing_whitespace("hello "));
+        assert!(!BbfWhitespaceModel::has_trailing_whitespace("hello"));
+        assert_eq!(BbfWhitespaceModel::trailing_whitespace_length("hello   "), 3);
+    }
+
+    #[test]
+    fn test_bbf_status() {
+        let m = BbfWhitespaceModel::new(BbfWhitespaceMode::Boundary);
+        assert_eq!(m.status_text(), "Whitespace: Boundary");
+    }
+
+    #[test]
+    fn test_bbf_tab_analysis() {
+        let m = BbfWhitespaceModel::new(BbfWhitespaceMode::All);
+        let occs = m.analyze_line("\thello");
+        assert_eq!(occs.len(), 1);
+        assert_eq!(occs[0].kind, BbfWhitespaceChar::Tab);
+    }
+}
