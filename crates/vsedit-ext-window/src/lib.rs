@@ -74905,3 +74905,934 @@ mod tests_beo {
         assert_ne!(BeoDragSource::File, BeoDragSource::Selection);
     }
 }
+
+// bep_: Editor clipboard model — clipboard history, paste as, clipboard
+// format, multi-cursor paste distribution, system clipboard sync
+
+/// Clipboard entry format
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BepClipboardFormat {
+    PlainText,
+    Html,
+    Rtf,
+    ColumnBlock,
+}
+
+/// A clipboard entry
+#[derive(Debug, Clone)]
+pub struct BepClipboardEntry {
+    pub text: String,
+    pub format: BepClipboardFormat,
+    pub source: Option<String>,
+    pub timestamp: u64,
+}
+
+impl BepClipboardEntry {
+    pub fn new(text: &str) -> Self {
+        Self { text: text.to_string(), format: BepClipboardFormat::PlainText, source: None, timestamp: 0 }
+    }
+
+    pub fn with_format(mut self, format: BepClipboardFormat) -> Self { self.format = format; self }
+    pub fn with_source(mut self, source: &str) -> Self { self.source = Some(source.to_string()); self }
+
+    pub fn is_multiline(&self) -> bool { self.text.contains('\n') }
+    pub fn line_count(&self) -> usize { self.text.lines().count().max(1) }
+    pub fn char_count(&self) -> usize { self.text.len() }
+
+    pub fn lines(&self) -> Vec<&str> { self.text.lines().collect() }
+}
+
+/// Clipboard history
+#[derive(Debug, Clone)]
+pub struct BepClipboardHistory {
+    pub entries: Vec<BepClipboardEntry>,
+    pub max_size: usize,
+}
+
+impl Default for BepClipboardHistory {
+    fn default() -> Self {
+        Self { entries: Vec::new(), max_size: 20 }
+    }
+}
+
+impl BepClipboardHistory {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn push(&mut self, entry: BepClipboardEntry) {
+        self.entries.insert(0, entry);
+        if self.entries.len() > self.max_size {
+            self.entries.truncate(self.max_size);
+        }
+    }
+
+    pub fn latest(&self) -> Option<&BepClipboardEntry> { self.entries.first() }
+
+    pub fn get(&self, index: usize) -> Option<&BepClipboardEntry> { self.entries.get(index) }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+
+    pub fn count(&self) -> usize { self.entries.len() }
+
+    pub fn search(&self, query: &str) -> Vec<&BepClipboardEntry> {
+        let q = query.to_lowercase();
+        self.entries.iter().filter(|e| e.text.to_lowercase().contains(&q)).collect()
+    }
+
+    pub fn remove(&mut self, index: usize) -> bool {
+        if index < self.entries.len() { self.entries.remove(index); true } else { false }
+    }
+}
+
+/// Multi-cursor paste distribution
+pub fn bep_distribute_paste(text: &str, cursor_count: usize) -> Vec<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.len() == cursor_count {
+        lines.iter().map(|l| l.to_string()).collect()
+    } else {
+        vec![text.to_string(); cursor_count]
+    }
+}
+
+#[cfg(test)]
+mod tests_bep {
+    use super::*;
+
+    #[test]
+    fn test_bep_entry_basic() {
+        let e = BepClipboardEntry::new("hello");
+        assert!(!e.is_multiline());
+        assert_eq!(e.line_count(), 1);
+        assert_eq!(e.char_count(), 5);
+    }
+
+    #[test]
+    fn test_bep_entry_multiline() {
+        let e = BepClipboardEntry::new("a\nb\nc");
+        assert!(e.is_multiline());
+        assert_eq!(e.line_count(), 3);
+        assert_eq!(e.lines().len(), 3);
+    }
+
+    #[test]
+    fn test_bep_entry_format() {
+        let e = BepClipboardEntry::new("block").with_format(BepClipboardFormat::ColumnBlock);
+        assert_eq!(e.format, BepClipboardFormat::ColumnBlock);
+    }
+
+    #[test]
+    fn test_bep_history_push() {
+        let mut h = BepClipboardHistory::new();
+        h.push(BepClipboardEntry::new("first"));
+        h.push(BepClipboardEntry::new("second"));
+        assert_eq!(h.count(), 2);
+        assert_eq!(h.latest().unwrap().text, "second");
+    }
+
+    #[test]
+    fn test_bep_history_max() {
+        let mut h = BepClipboardHistory::new();
+        h.max_size = 3;
+        for i in 0..5 { h.push(BepClipboardEntry::new(&format!("item{}", i))); }
+        assert_eq!(h.count(), 3);
+    }
+
+    #[test]
+    fn test_bep_history_search() {
+        let mut h = BepClipboardHistory::new();
+        h.push(BepClipboardEntry::new("hello world"));
+        h.push(BepClipboardEntry::new("goodbye"));
+        assert_eq!(h.search("hello").len(), 1);
+        assert_eq!(h.search("xyz").len(), 0);
+    }
+
+    #[test]
+    fn test_bep_history_remove() {
+        let mut h = BepClipboardHistory::new();
+        h.push(BepClipboardEntry::new("a"));
+        assert!(h.remove(0));
+        assert_eq!(h.count(), 0);
+        assert!(!h.remove(0));
+    }
+
+    #[test]
+    fn test_bep_distribute_matching() {
+        let result = bep_distribute_paste("a\nb\nc", 3);
+        assert_eq!(result, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn test_bep_distribute_non_matching() {
+        let result = bep_distribute_paste("hello", 3);
+        assert_eq!(result, vec!["hello", "hello", "hello"]);
+    }
+
+    #[test]
+    fn test_bep_history_clear() {
+        let mut h = BepClipboardHistory::new();
+        h.push(BepClipboardEntry::new("x"));
+        h.clear();
+        assert_eq!(h.count(), 0);
+    }
+}
+
+// beq_: Editor file dialog model — open/save dialogs, filters, default path,
+// multi-select, dialog result, recent files
+
+/// File dialog type
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BeqDialogType {
+    Open,
+    Save,
+    OpenFolder,
+    OpenMultiple,
+}
+
+/// File filter for dialogs
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BeqFileFilter {
+    pub label: String,
+    pub extensions: Vec<String>,
+}
+
+impl BeqFileFilter {
+    pub fn new(label: &str, exts: &[&str]) -> Self {
+        Self { label: label.to_string(), extensions: exts.iter().map(|e| e.to_string()).collect() }
+    }
+
+    pub fn matches(&self, filename: &str) -> bool {
+        self.extensions.iter().any(|ext| filename.ends_with(ext))
+    }
+
+    pub fn display(&self) -> String {
+        format!("{} ({})", self.label, self.extensions.join(", "))
+    }
+}
+
+/// File dialog options
+#[derive(Debug, Clone)]
+pub struct BeqDialogOptions {
+    pub dialog_type: BeqDialogType,
+    pub title: String,
+    pub default_path: Option<String>,
+    pub default_name: Option<String>,
+    pub filters: Vec<BeqFileFilter>,
+    pub can_select_many: bool,
+}
+
+impl BeqDialogOptions {
+    pub fn open() -> Self {
+        Self { dialog_type: BeqDialogType::Open, title: "Open File".to_string(),
+               default_path: None, default_name: None, filters: Vec::new(), can_select_many: false }
+    }
+
+    pub fn save() -> Self {
+        Self { dialog_type: BeqDialogType::Save, title: "Save File".to_string(),
+               default_path: None, default_name: None, filters: Vec::new(), can_select_many: false }
+    }
+
+    pub fn open_folder() -> Self {
+        Self { dialog_type: BeqDialogType::OpenFolder, title: "Open Folder".to_string(),
+               default_path: None, default_name: None, filters: Vec::new(), can_select_many: false }
+    }
+
+    pub fn with_title(mut self, title: &str) -> Self { self.title = title.to_string(); self }
+    pub fn with_default_path(mut self, path: &str) -> Self { self.default_path = Some(path.to_string()); self }
+    pub fn with_filter(mut self, filter: BeqFileFilter) -> Self { self.filters.push(filter); self }
+    pub fn multi_select(mut self) -> Self { self.can_select_many = true; self }
+}
+
+/// File dialog result
+#[derive(Debug, Clone)]
+pub enum BeqDialogResult {
+    Selected(Vec<String>),
+    Cancelled,
+}
+
+impl BeqDialogResult {
+    pub fn single(path: &str) -> Self { BeqDialogResult::Selected(vec![path.to_string()]) }
+
+    pub fn is_cancelled(&self) -> bool { matches!(self, BeqDialogResult::Cancelled) }
+
+    pub fn paths(&self) -> &[String] {
+        match self { BeqDialogResult::Selected(p) => p, BeqDialogResult::Cancelled => &[] }
+    }
+
+    pub fn first_path(&self) -> Option<&str> {
+        self.paths().first().map(|s| s.as_str())
+    }
+}
+
+/// Recent files list
+#[derive(Debug, Clone, Default)]
+pub struct BeqRecentFiles {
+    pub files: Vec<String>,
+    pub max_size: usize,
+}
+
+impl BeqRecentFiles {
+    pub fn new(max_size: usize) -> Self { Self { files: Vec::new(), max_size } }
+
+    pub fn add(&mut self, path: &str) {
+        self.files.retain(|f| f != path);
+        self.files.insert(0, path.to_string());
+        if self.files.len() > self.max_size { self.files.truncate(self.max_size); }
+    }
+
+    pub fn remove(&mut self, path: &str) { self.files.retain(|f| f != path); }
+    pub fn clear(&mut self) { self.files.clear(); }
+    pub fn count(&self) -> usize { self.files.len() }
+    pub fn is_empty(&self) -> bool { self.files.is_empty() }
+}
+
+#[cfg(test)]
+mod tests_beq {
+    use super::*;
+
+    #[test]
+    fn test_beq_file_filter() {
+        let f = BeqFileFilter::new("Rust", &[".rs"]);
+        assert!(f.matches("main.rs"));
+        assert!(!f.matches("main.py"));
+        assert!(f.display().contains("Rust"));
+    }
+
+    #[test]
+    fn test_beq_dialog_open() {
+        let opts = BeqDialogOptions::open()
+            .with_title("Pick a file")
+            .with_filter(BeqFileFilter::new("All", &[".*"]));
+        assert_eq!(opts.dialog_type, BeqDialogType::Open);
+        assert_eq!(opts.title, "Pick a file");
+    }
+
+    #[test]
+    fn test_beq_dialog_save() {
+        let opts = BeqDialogOptions::save().with_default_path("/home/user");
+        assert_eq!(opts.dialog_type, BeqDialogType::Save);
+        assert_eq!(opts.default_path.as_deref(), Some("/home/user"));
+    }
+
+    #[test]
+    fn test_beq_dialog_result_selected() {
+        let r = BeqDialogResult::single("/a/b.rs");
+        assert!(!r.is_cancelled());
+        assert_eq!(r.first_path(), Some("/a/b.rs"));
+        assert_eq!(r.paths().len(), 1);
+    }
+
+    #[test]
+    fn test_beq_dialog_result_cancelled() {
+        let r = BeqDialogResult::Cancelled;
+        assert!(r.is_cancelled());
+        assert!(r.paths().is_empty());
+        assert!(r.first_path().is_none());
+    }
+
+    #[test]
+    fn test_beq_recent_files() {
+        let mut recent = BeqRecentFiles::new(3);
+        recent.add("/a");
+        recent.add("/b");
+        recent.add("/c");
+        assert_eq!(recent.count(), 3);
+        recent.add("/d");
+        assert_eq!(recent.count(), 3);
+        assert_eq!(recent.files[0], "/d");
+    }
+
+    #[test]
+    fn test_beq_recent_files_dedup() {
+        let mut recent = BeqRecentFiles::new(5);
+        recent.add("/a");
+        recent.add("/b");
+        recent.add("/a"); // moves to front
+        assert_eq!(recent.count(), 2);
+        assert_eq!(recent.files[0], "/a");
+    }
+
+    #[test]
+    fn test_beq_recent_files_remove() {
+        let mut recent = BeqRecentFiles::new(5);
+        recent.add("/a");
+        recent.remove("/a");
+        assert!(recent.is_empty());
+    }
+
+    #[test]
+    fn test_beq_dialog_multi_select() {
+        let opts = BeqDialogOptions::open().multi_select();
+        assert!(opts.can_select_many);
+    }
+
+    #[test]
+    fn test_beq_dialog_folder() {
+        let opts = BeqDialogOptions::open_folder();
+        assert_eq!(opts.dialog_type, BeqDialogType::OpenFolder);
+    }
+}
+
+// ber_: Editor notification model — notification toast, notification center,
+// progress notifications, notification actions, severity
+
+/// Notification severity
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BerNotificationSeverity {
+    Info,
+    Warning,
+    Error,
+}
+
+/// Notification action button
+#[derive(Debug, Clone)]
+pub struct BerNotificationAction {
+    pub label: String,
+    pub id: String,
+    pub is_primary: bool,
+}
+
+impl BerNotificationAction {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), is_primary: false }
+    }
+
+    pub fn primary(mut self) -> Self { self.is_primary = true; self }
+}
+
+/// A notification
+#[derive(Debug, Clone)]
+pub struct BerNotification {
+    pub id: String,
+    pub message: String,
+    pub severity: BerNotificationSeverity,
+    pub source: Option<String>,
+    pub actions: Vec<BerNotificationAction>,
+    pub has_progress: bool,
+    pub progress_pct: Option<f64>,
+    pub is_silent: bool,
+    pub is_sticky: bool,
+    pub dismissed: bool,
+}
+
+impl BerNotification {
+    pub fn info(id: &str, msg: &str) -> Self {
+        Self { id: id.to_string(), message: msg.to_string(), severity: BerNotificationSeverity::Info,
+               source: None, actions: Vec::new(), has_progress: false, progress_pct: None,
+               is_silent: false, is_sticky: false, dismissed: false }
+    }
+
+    pub fn warning(id: &str, msg: &str) -> Self {
+        let mut n = Self::info(id, msg); n.severity = BerNotificationSeverity::Warning; n
+    }
+
+    pub fn error(id: &str, msg: &str) -> Self {
+        let mut n = Self::info(id, msg); n.severity = BerNotificationSeverity::Error; n.is_sticky = true; n
+    }
+
+    pub fn with_action(mut self, action: BerNotificationAction) -> Self {
+        self.actions.push(action); self
+    }
+
+    pub fn with_source(mut self, source: &str) -> Self { self.source = Some(source.to_string()); self }
+
+    pub fn with_progress(mut self) -> Self { self.has_progress = true; self }
+
+    pub fn set_progress(&mut self, pct: f64) { self.progress_pct = Some(pct.clamp(0.0, 100.0)); }
+
+    pub fn dismiss(&mut self) { self.dismissed = true; }
+    pub fn is_error(&self) -> bool { self.severity == BerNotificationSeverity::Error }
+}
+
+/// Notification center
+#[derive(Debug, Clone, Default)]
+pub struct BerNotificationCenter {
+    pub notifications: Vec<BerNotification>,
+    pub max_visible: usize,
+}
+
+impl BerNotificationCenter {
+    pub fn new() -> Self { Self { notifications: Vec::new(), max_visible: 5 } }
+
+    pub fn show(&mut self, notif: BerNotification) { self.notifications.push(notif); }
+
+    pub fn dismiss(&mut self, id: &str) {
+        if let Some(n) = self.notifications.iter_mut().find(|n| n.id == id) { n.dismiss(); }
+    }
+
+    pub fn dismiss_all(&mut self) { for n in &mut self.notifications { n.dismiss(); } }
+
+    pub fn visible(&self) -> Vec<&BerNotification> {
+        self.notifications.iter().filter(|n| !n.dismissed).take(self.max_visible).collect()
+    }
+
+    pub fn active_count(&self) -> usize { self.notifications.iter().filter(|n| !n.dismissed).count() }
+    pub fn total_count(&self) -> usize { self.notifications.len() }
+
+    pub fn has_errors(&self) -> bool { self.notifications.iter().any(|n| !n.dismissed && n.is_error()) }
+}
+
+#[cfg(test)]
+mod tests_ber {
+    use super::*;
+
+    #[test]
+    fn test_ber_notification_info() {
+        let n = BerNotification::info("n1", "Hello");
+        assert_eq!(n.severity, BerNotificationSeverity::Info);
+        assert!(!n.is_sticky);
+        assert!(!n.dismissed);
+    }
+
+    #[test]
+    fn test_ber_notification_error() {
+        let n = BerNotification::error("n2", "Failed");
+        assert!(n.is_error());
+        assert!(n.is_sticky);
+    }
+
+    #[test]
+    fn test_ber_notification_actions() {
+        let n = BerNotification::info("n3", "Update?")
+            .with_action(BerNotificationAction::new("yes", "Yes").primary())
+            .with_action(BerNotificationAction::new("no", "No"));
+        assert_eq!(n.actions.len(), 2);
+        assert!(n.actions[0].is_primary);
+    }
+
+    #[test]
+    fn test_ber_notification_progress() {
+        let mut n = BerNotification::info("n4", "Loading").with_progress();
+        assert!(n.has_progress);
+        n.set_progress(50.0);
+        assert_eq!(n.progress_pct, Some(50.0));
+        n.set_progress(150.0);
+        assert_eq!(n.progress_pct, Some(100.0));
+    }
+
+    #[test]
+    fn test_ber_center_show_dismiss() {
+        let mut center = BerNotificationCenter::new();
+        center.show(BerNotification::info("n1", "Hello"));
+        center.show(BerNotification::warning("n2", "Careful"));
+        assert_eq!(center.active_count(), 2);
+        center.dismiss("n1");
+        assert_eq!(center.active_count(), 1);
+    }
+
+    #[test]
+    fn test_ber_center_visible() {
+        let mut center = BerNotificationCenter::new();
+        center.max_visible = 2;
+        center.show(BerNotification::info("a", "A"));
+        center.show(BerNotification::info("b", "B"));
+        center.show(BerNotification::info("c", "C"));
+        assert_eq!(center.visible().len(), 2);
+    }
+
+    #[test]
+    fn test_ber_center_dismiss_all() {
+        let mut center = BerNotificationCenter::new();
+        center.show(BerNotification::info("a", "A"));
+        center.show(BerNotification::info("b", "B"));
+        center.dismiss_all();
+        assert_eq!(center.active_count(), 0);
+    }
+
+    #[test]
+    fn test_ber_center_has_errors() {
+        let mut center = BerNotificationCenter::new();
+        center.show(BerNotification::info("a", "A"));
+        assert!(!center.has_errors());
+        center.show(BerNotification::error("e", "Error"));
+        assert!(center.has_errors());
+    }
+
+    #[test]
+    fn test_ber_notification_source() {
+        let n = BerNotification::info("n", "msg").with_source("Extension");
+        assert_eq!(n.source.as_deref(), Some("Extension"));
+    }
+
+    #[test]
+    fn test_ber_center_total() {
+        let mut center = BerNotificationCenter::new();
+        center.show(BerNotification::info("a", "A"));
+        center.dismiss("a");
+        assert_eq!(center.total_count(), 1);
+        assert_eq!(center.active_count(), 0);
+    }
+}
+
+// bes_: Editor status bar model — status bar items, alignment, priority,
+// tooltip, click command, visibility, status bar sections
+
+/// Status bar alignment
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BesAlignment {
+    Left,
+    Right,
+}
+
+/// Status bar item
+#[derive(Debug, Clone)]
+pub struct BesStatusBarItem {
+    pub id: String,
+    pub text: String,
+    pub tooltip: Option<String>,
+    pub command: Option<String>,
+    pub alignment: BesAlignment,
+    pub priority: i32,
+    pub visible: bool,
+    pub icon: Option<String>,
+    pub color: Option<String>,
+    pub background_color: Option<String>,
+}
+
+impl BesStatusBarItem {
+    pub fn new(id: &str, text: &str, alignment: BesAlignment) -> Self {
+        Self {
+            id: id.to_string(), text: text.to_string(), tooltip: None, command: None,
+            alignment, priority: 0, visible: true, icon: None, color: None, background_color: None,
+        }
+    }
+
+    pub fn left(id: &str, text: &str) -> Self { Self::new(id, text, BesAlignment::Left) }
+    pub fn right(id: &str, text: &str) -> Self { Self::new(id, text, BesAlignment::Right) }
+
+    pub fn with_tooltip(mut self, tip: &str) -> Self { self.tooltip = Some(tip.to_string()); self }
+    pub fn with_command(mut self, cmd: &str) -> Self { self.command = Some(cmd.to_string()); self }
+    pub fn with_priority(mut self, p: i32) -> Self { self.priority = p; self }
+    pub fn with_icon(mut self, icon: &str) -> Self { self.icon = Some(icon.to_string()); self }
+    pub fn with_color(mut self, color: &str) -> Self { self.color = Some(color.to_string()); self }
+
+    pub fn set_text(&mut self, text: &str) { self.text = text.to_string(); }
+    pub fn show(&mut self) { self.visible = true; }
+    pub fn hide(&mut self) { self.visible = false; }
+
+    pub fn display_text(&self) -> String {
+        if let Some(icon) = &self.icon {
+            format!("{} {}", icon, self.text)
+        } else {
+            self.text.clone()
+        }
+    }
+}
+
+/// Status bar
+#[derive(Debug, Clone, Default)]
+pub struct BesStatusBar {
+    pub items: Vec<BesStatusBarItem>,
+}
+
+impl BesStatusBar {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn add(&mut self, item: BesStatusBarItem) { self.items.push(item); }
+
+    pub fn find(&self, id: &str) -> Option<&BesStatusBarItem> {
+        self.items.iter().find(|i| i.id == id)
+    }
+
+    pub fn find_mut(&mut self, id: &str) -> Option<&mut BesStatusBarItem> {
+        self.items.iter_mut().find(|i| i.id == id)
+    }
+
+    pub fn left_items(&self) -> Vec<&BesStatusBarItem> {
+        let mut items: Vec<&BesStatusBarItem> = self.items.iter()
+            .filter(|i| i.visible && i.alignment == BesAlignment::Left)
+            .collect();
+        items.sort_by(|a, b| b.priority.cmp(&a.priority));
+        items
+    }
+
+    pub fn right_items(&self) -> Vec<&BesStatusBarItem> {
+        let mut items: Vec<&BesStatusBarItem> = self.items.iter()
+            .filter(|i| i.visible && i.alignment == BesAlignment::Right)
+            .collect();
+        items.sort_by(|a, b| b.priority.cmp(&a.priority));
+        items
+    }
+
+    pub fn remove(&mut self, id: &str) -> bool {
+        let before = self.items.len();
+        self.items.retain(|i| i.id != id);
+        self.items.len() < before
+    }
+
+    pub fn count(&self) -> usize { self.items.len() }
+}
+
+#[cfg(test)]
+mod tests_bes {
+    use super::*;
+
+    #[test]
+    fn test_bes_item_basic() {
+        let item = BesStatusBarItem::left("git", "main").with_icon("⎇").with_tooltip("Branch: main");
+        assert_eq!(item.display_text(), "⎇ main");
+        assert_eq!(item.tooltip.as_deref(), Some("Branch: main"));
+        assert!(item.visible);
+    }
+
+    #[test]
+    fn test_bes_item_right() {
+        let item = BesStatusBarItem::right("line", "Ln 1, Col 1");
+        assert_eq!(item.alignment, BesAlignment::Right);
+    }
+
+    #[test]
+    fn test_bes_item_visibility() {
+        let mut item = BesStatusBarItem::left("test", "Test");
+        item.hide();
+        assert!(!item.visible);
+        item.show();
+        assert!(item.visible);
+    }
+
+    #[test]
+    fn test_bes_item_update() {
+        let mut item = BesStatusBarItem::left("line", "Ln 1");
+        item.set_text("Ln 42");
+        assert_eq!(item.text, "Ln 42");
+    }
+
+    #[test]
+    fn test_bes_bar_add_find() {
+        let mut bar = BesStatusBar::new();
+        bar.add(BesStatusBarItem::left("git", "main"));
+        bar.add(BesStatusBarItem::right("line", "Ln 1"));
+        assert_eq!(bar.count(), 2);
+        assert!(bar.find("git").is_some());
+    }
+
+    #[test]
+    fn test_bes_bar_left_right() {
+        let mut bar = BesStatusBar::new();
+        bar.add(BesStatusBarItem::left("a", "A").with_priority(10));
+        bar.add(BesStatusBarItem::left("b", "B").with_priority(20));
+        bar.add(BesStatusBarItem::right("c", "C"));
+        assert_eq!(bar.left_items().len(), 2);
+        assert_eq!(bar.left_items()[0].id, "b"); // higher priority first
+        assert_eq!(bar.right_items().len(), 1);
+    }
+
+    #[test]
+    fn test_bes_bar_remove() {
+        let mut bar = BesStatusBar::new();
+        bar.add(BesStatusBarItem::left("a", "A"));
+        assert!(bar.remove("a"));
+        assert_eq!(bar.count(), 0);
+    }
+
+    #[test]
+    fn test_bes_bar_find_mut() {
+        let mut bar = BesStatusBar::new();
+        bar.add(BesStatusBarItem::left("a", "A"));
+        bar.find_mut("a").unwrap().set_text("B");
+        assert_eq!(bar.find("a").unwrap().text, "B");
+    }
+
+    #[test]
+    fn test_bes_item_command() {
+        let item = BesStatusBarItem::left("a", "A").with_command("editor.action.format");
+        assert_eq!(item.command.as_deref(), Some("editor.action.format"));
+    }
+
+    #[test]
+    fn test_bes_item_color() {
+        let item = BesStatusBarItem::left("a", "A").with_color("#ff0000");
+        assert_eq!(item.color.as_deref(), Some("#ff0000"));
+    }
+}
+
+// bet_: Editor title bar model — window title, title bar style, menu bar,
+// breadcrumb, window controls, dirty indicator
+
+/// Title bar style
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BetTitleBarStyle {
+    Native,
+    Custom,
+}
+
+/// Window state
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BetWindowState {
+    Normal,
+    Maximized,
+    Minimized,
+    Fullscreen,
+}
+
+/// Title bar configuration
+#[derive(Debug, Clone)]
+pub struct BetTitleBar {
+    pub style: BetTitleBarStyle,
+    pub title: String,
+    pub subtitle: Option<String>,
+    pub is_dirty: bool,
+    pub file_path: Option<String>,
+    pub workspace_name: Option<String>,
+    pub window_state: BetWindowState,
+    pub show_menu: bool,
+}
+
+impl Default for BetTitleBar {
+    fn default() -> Self {
+        Self {
+            style: BetTitleBarStyle::Custom,
+            title: "vsedit".to_string(),
+            subtitle: None,
+            is_dirty: false,
+            file_path: None,
+            workspace_name: None,
+            window_state: BetWindowState::Normal,
+            show_menu: true,
+        }
+    }
+}
+
+impl BetTitleBar {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn set_file(&mut self, path: &str) {
+        let name = path.rsplit('/').next().unwrap_or(path);
+        self.file_path = Some(path.to_string());
+        self.title = name.to_string();
+    }
+
+    pub fn set_workspace(&mut self, name: &str) {
+        self.workspace_name = Some(name.to_string());
+    }
+
+    pub fn set_dirty(&mut self, dirty: bool) { self.is_dirty = dirty; }
+
+    pub fn display_title(&self) -> String {
+        let dirty_marker = if self.is_dirty { "● " } else { "" };
+        let base = format!("{}{}", dirty_marker, self.title);
+        if let Some(ws) = &self.workspace_name {
+            format!("{} — {}", base, ws)
+        } else {
+            base
+        }
+    }
+
+    pub fn set_fullscreen(&mut self) { self.window_state = BetWindowState::Fullscreen; }
+    pub fn set_maximized(&mut self) { self.window_state = BetWindowState::Maximized; }
+    pub fn set_normal(&mut self) { self.window_state = BetWindowState::Normal; }
+
+    pub fn is_fullscreen(&self) -> bool { self.window_state == BetWindowState::Fullscreen }
+    pub fn is_maximized(&self) -> bool { self.window_state == BetWindowState::Maximized }
+}
+
+/// Menu bar entry
+#[derive(Debug, Clone)]
+pub struct BetMenuEntry {
+    pub label: String,
+    pub command: Option<String>,
+    pub submenu: Vec<BetMenuEntry>,
+    pub enabled: bool,
+    pub separator: bool,
+}
+
+impl BetMenuEntry {
+    pub fn new(label: &str) -> Self {
+        Self { label: label.to_string(), command: None, submenu: Vec::new(), enabled: true, separator: false }
+    }
+
+    pub fn command(label: &str, cmd: &str) -> Self {
+        Self { label: label.to_string(), command: Some(cmd.to_string()), submenu: Vec::new(), enabled: true, separator: false }
+    }
+
+    pub fn separator() -> Self {
+        Self { label: String::new(), command: None, submenu: Vec::new(), enabled: true, separator: true }
+    }
+
+    pub fn with_submenu(mut self, entry: BetMenuEntry) -> Self {
+        self.submenu.push(entry); self
+    }
+
+    pub fn has_submenu(&self) -> bool { !self.submenu.is_empty() }
+}
+
+#[cfg(test)]
+mod tests_bet {
+    use super::*;
+
+    #[test]
+    fn test_bet_titlebar_default() {
+        let tb = BetTitleBar::new();
+        assert_eq!(tb.display_title(), "vsedit");
+        assert!(!tb.is_dirty);
+    }
+
+    #[test]
+    fn test_bet_titlebar_file() {
+        let mut tb = BetTitleBar::new();
+        tb.set_file("/home/user/project/main.rs");
+        assert_eq!(tb.title, "main.rs");
+        assert_eq!(tb.display_title(), "main.rs");
+    }
+
+    #[test]
+    fn test_bet_titlebar_dirty() {
+        let mut tb = BetTitleBar::new();
+        tb.set_file("/a/b.rs");
+        tb.set_dirty(true);
+        assert!(tb.display_title().starts_with("● "));
+    }
+
+    #[test]
+    fn test_bet_titlebar_workspace() {
+        let mut tb = BetTitleBar::new();
+        tb.set_file("/a/b.rs");
+        tb.set_workspace("My Project");
+        assert!(tb.display_title().contains("My Project"));
+    }
+
+    #[test]
+    fn test_bet_titlebar_window_state() {
+        let mut tb = BetTitleBar::new();
+        tb.set_fullscreen();
+        assert!(tb.is_fullscreen());
+        tb.set_maximized();
+        assert!(tb.is_maximized());
+        tb.set_normal();
+        assert!(!tb.is_fullscreen());
+    }
+
+    #[test]
+    fn test_bet_menu_entry() {
+        let entry = BetMenuEntry::command("Save", "editor.save");
+        assert_eq!(entry.command.as_deref(), Some("editor.save"));
+        assert!(!entry.has_submenu());
+    }
+
+    #[test]
+    fn test_bet_menu_submenu() {
+        let menu = BetMenuEntry::new("File")
+            .with_submenu(BetMenuEntry::command("New", "file.new"))
+            .with_submenu(BetMenuEntry::separator())
+            .with_submenu(BetMenuEntry::command("Quit", "app.quit"));
+        assert!(menu.has_submenu());
+        assert_eq!(menu.submenu.len(), 3);
+        assert!(menu.submenu[1].separator);
+    }
+
+    #[test]
+    fn test_bet_menu_separator() {
+        let sep = BetMenuEntry::separator();
+        assert!(sep.separator);
+        assert!(sep.label.is_empty());
+    }
+
+    #[test]
+    fn test_bet_window_states() {
+        assert_ne!(BetWindowState::Normal, BetWindowState::Maximized);
+        assert_ne!(BetWindowState::Fullscreen, BetWindowState::Minimized);
+    }
+
+    #[test]
+    fn test_bet_titlebar_styles() {
+        assert_ne!(BetTitleBarStyle::Native, BetTitleBarStyle::Custom);
+    }
+}
