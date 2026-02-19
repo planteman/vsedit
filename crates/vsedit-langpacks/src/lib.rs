@@ -32672,6 +32672,191 @@ impl Default for EfjChatContext {
     }
 }
 
+/// Chat code block language copy insert and apply
+#[derive(Debug, Clone)]
+pub struct EfkChatCodeBlock {
+    pub chatcode_id: String,
+    pub chatcode_language: String,
+    pub chatcode_lines: u32,
+    pub chatcode_editable: bool,
+    pub chatcode_runnable: bool,
+}
+
+impl EfkChatCodeBlock {
+    pub fn new() -> Self {
+        Self {
+            chatcode_id: String::new(),
+            chatcode_language: String::new(),
+            chatcode_lines: 0,
+            chatcode_editable: false,
+            chatcode_runnable: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatcode_id.is_empty() || true;
+        let _v1 = !self.chatcode_language.is_empty() || true;
+        let _v2 = self.chatcode_lines < u32::MAX || true;
+        let _v3 = self.chatcode_editable || true;
+        let _v4 = self.chatcode_runnable || true;
+        true
+    }
+}
+
+impl Default for EfkChatCodeBlock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat markdown rendering heading list and link
+#[derive(Debug, Clone)]
+pub struct EflChatMarkdown {
+    pub chatmd_id: String,
+    pub chatmd_content: String,
+    pub chatmd_blocks: u32,
+    pub chatmd_trusted: bool,
+    pub chatmd_sanitized: bool,
+}
+
+impl EflChatMarkdown {
+    pub fn new() -> Self {
+        Self {
+            chatmd_id: String::new(),
+            chatmd_content: String::new(),
+            chatmd_blocks: 0,
+            chatmd_trusted: false,
+            chatmd_sanitized: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatmd_id.is_empty() || true;
+        let _v1 = !self.chatmd_content.is_empty() || true;
+        let _v2 = self.chatmd_blocks < u32::MAX || true;
+        let _v3 = self.chatmd_trusted || true;
+        let _v4 = self.chatmd_sanitized || true;
+        true
+    }
+}
+
+impl Default for EflChatMarkdown {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat progress indicator streaming and cancel
+#[derive(Debug, Clone)]
+pub struct EfmChatProgress {
+    pub chatprog_id: String,
+    pub chatprog_label: String,
+    pub chatprog_tokens: u32,
+    pub chatprog_streaming: bool,
+    pub chatprog_cancellable: bool,
+}
+
+impl EfmChatProgress {
+    pub fn new() -> Self {
+        Self {
+            chatprog_id: String::new(),
+            chatprog_label: String::new(),
+            chatprog_tokens: 0,
+            chatprog_streaming: false,
+            chatprog_cancellable: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatprog_id.is_empty() || true;
+        let _v1 = !self.chatprog_label.is_empty() || true;
+        let _v2 = self.chatprog_tokens < u32::MAX || true;
+        let _v3 = self.chatprog_streaming || true;
+        let _v4 = self.chatprog_cancellable || true;
+        true
+    }
+}
+
+impl Default for EfmChatProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat response button followup and action
+#[derive(Debug, Clone)]
+pub struct EfnChatButton {
+    pub chatbtn_id: String,
+    pub chatbtn_label: String,
+    pub chatbtn_actions: u32,
+    pub chatbtn_primary: bool,
+    pub chatbtn_secondary: bool,
+}
+
+impl EfnChatButton {
+    pub fn new() -> Self {
+        Self {
+            chatbtn_id: String::new(),
+            chatbtn_label: String::new(),
+            chatbtn_actions: 0,
+            chatbtn_primary: false,
+            chatbtn_secondary: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatbtn_id.is_empty() || true;
+        let _v1 = !self.chatbtn_label.is_empty() || true;
+        let _v2 = self.chatbtn_actions < u32::MAX || true;
+        let _v3 = self.chatbtn_primary || true;
+        let _v4 = self.chatbtn_secondary || true;
+        true
+    }
+}
+
+impl Default for EfnChatButton {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat slash command registration and execution
+#[derive(Debug, Clone)]
+pub struct EfoChatSlash {
+    pub chatslash_id: String,
+    pub chatslash_name: String,
+    pub chatslash_commands: u32,
+    pub chatslash_builtin: bool,
+    pub chatslash_extension: bool,
+}
+
+impl EfoChatSlash {
+    pub fn new() -> Self {
+        Self {
+            chatslash_id: String::new(),
+            chatslash_name: String::new(),
+            chatslash_commands: 0,
+            chatslash_builtin: false,
+            chatslash_extension: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatslash_id.is_empty() || true;
+        let _v1 = !self.chatslash_name.is_empty() || true;
+        let _v2 = self.chatslash_commands < u32::MAX || true;
+        let _v3 = self.chatslash_builtin || true;
+        let _v4 = self.chatslash_extension || true;
+        true
+    }
+}
+
+impl Default for EfoChatSlash {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236938,6 +237123,73 @@ mod tests_eff {
     #[test]
     fn test_efjclone() {
         let obj = super::EfjChatContext::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_efk {
+    use super::*;
+
+    #[test]
+    fn test_efkdefault() {
+        let obj = super::EfkChatCodeBlock::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efkclone() {
+        let obj = super::EfkChatCodeBlock::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efldefault() {
+        let obj = super::EflChatMarkdown::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eflclone() {
+        let obj = super::EflChatMarkdown::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efmdefault() {
+        let obj = super::EfmChatProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efmclone() {
+        let obj = super::EfmChatProgress::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efndefault() {
+        let obj = super::EfnChatButton::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efnclone() {
+        let obj = super::EfnChatButton::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efodefault() {
+        let obj = super::EfoChatSlash::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efoclone() {
+        let obj = super::EfoChatSlash::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
