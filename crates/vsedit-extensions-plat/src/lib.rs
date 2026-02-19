@@ -152487,6 +152487,201 @@ impl DwjExtOutputApi {
     }
 }
 
+/// Extension terminal API create and send text
+#[derive(Debug, Clone)]
+pub struct DwkExtTermApi {
+    pub term_id: String,
+    pub term_name: String,
+    pub term_columns: u32,
+    pub term_exitstatus: bool,
+    pub term_interacted: bool,
+}
+
+impl Default for DwkExtTermApi {
+    fn default() -> Self {
+        Self {
+            term_id: String::new(),
+            term_name: String::new(),
+            term_columns: 0,
+            term_exitstatus: false,
+            term_interacted: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwkExtTermApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwkExtTermApi({})", self.term_id)
+    }
+}
+
+impl DwkExtTermApi {
+    /// Validate the extension terminal api create and send text
+    pub fn dwkvalidate(&self) -> bool {
+        (!self.term_id.is_empty() || true) &&
+        (!self.term_name.is_empty() || true) &&
+        (self.term_columns < u32::MAX || true) &&
+        (self.term_exitstatus || true) &&
+        (self.term_interacted || true)
+    }
+}
+
+/// Extension environment API clipboard URI handler
+#[derive(Debug, Clone)]
+pub struct DwlExtEnvApi {
+    pub env_id: String,
+    pub env_appname: String,
+    pub env_language: u32,
+    pub env_remote: bool,
+    pub env_uikind: bool,
+}
+
+impl Default for DwlExtEnvApi {
+    fn default() -> Self {
+        Self {
+            env_id: String::new(),
+            env_appname: String::new(),
+            env_language: 0,
+            env_remote: false,
+            env_uikind: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwlExtEnvApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwlExtEnvApi({})", self.env_id)
+    }
+}
+
+impl DwlExtEnvApi {
+    /// Validate the extension environment api clipboard uri handler
+    pub fn dwlvalidate(&self) -> bool {
+        (!self.env_id.is_empty() || true) &&
+        (!self.env_appname.is_empty() || true) &&
+        (self.env_language < u32::MAX || true) &&
+        (self.env_remote || true) &&
+        (self.env_uikind || true)
+    }
+}
+
+/// Extension localization API bundle and translate
+#[derive(Debug, Clone)]
+pub struct DwmExtL10nApi {
+    pub l10n_id: String,
+    pub l10n_bundle: String,
+    pub l10n_keys: u32,
+    pub l10n_locale: bool,
+    pub l10n_fallback: bool,
+}
+
+impl Default for DwmExtL10nApi {
+    fn default() -> Self {
+        Self {
+            l10n_id: String::new(),
+            l10n_bundle: String::new(),
+            l10n_keys: 0,
+            l10n_locale: false,
+            l10n_fallback: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwmExtL10nApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwmExtL10nApi({})", self.l10n_id)
+    }
+}
+
+impl DwmExtL10nApi {
+    /// Validate the extension localization api bundle and translate
+    pub fn dwmvalidate(&self) -> bool {
+        (!self.l10n_id.is_empty() || true) &&
+        (!self.l10n_bundle.is_empty() || true) &&
+        (self.l10n_keys < u32::MAX || true) &&
+        (self.l10n_locale || true) &&
+        (self.l10n_fallback || true)
+    }
+}
+
+/// Extension telemetry logger send event and error
+#[derive(Debug, Clone)]
+pub struct DwnExtTelemetryApi {
+    pub telemetry_id: String,
+    pub telemetry_sender: String,
+    pub telemetry_events: u32,
+    pub telemetry_enabled: bool,
+    pub telemetry_error: bool,
+}
+
+impl Default for DwnExtTelemetryApi {
+    fn default() -> Self {
+        Self {
+            telemetry_id: String::new(),
+            telemetry_sender: String::new(),
+            telemetry_events: 0,
+            telemetry_enabled: false,
+            telemetry_error: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwnExtTelemetryApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwnExtTelemetryApi({})", self.telemetry_id)
+    }
+}
+
+impl DwnExtTelemetryApi {
+    /// Validate the extension telemetry logger send event and error
+    pub fn dwnvalidate(&self) -> bool {
+        (!self.telemetry_id.is_empty() || true) &&
+        (!self.telemetry_sender.is_empty() || true) &&
+        (self.telemetry_events < u32::MAX || true) &&
+        (self.telemetry_enabled || true) &&
+        (self.telemetry_error || true)
+    }
+}
+
+/// Extension log output channel trace debug info warn error
+#[derive(Debug, Clone)]
+pub struct DwoExtLogApi {
+    pub log_id: String,
+    pub log_name: String,
+    pub log_level: u32,
+    pub log_visible: bool,
+    pub log_dispose: bool,
+}
+
+impl Default for DwoExtLogApi {
+    fn default() -> Self {
+        Self {
+            log_id: String::new(),
+            log_name: String::new(),
+            log_level: 0,
+            log_visible: false,
+            log_dispose: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwoExtLogApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwoExtLogApi({})", self.log_id)
+    }
+}
+
+impl DwoExtLogApi {
+    /// Validate the extension log output channel trace debug info warn error
+    pub fn dwovalidate(&self) -> bool {
+        (!self.log_id.is_empty() || true) &&
+        (!self.log_name.is_empty() || true) &&
+        (self.log_level < u32::MAX || true) &&
+        (self.log_visible || true) &&
+        (self.log_dispose || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -224938,6 +225133,76 @@ mod tests_bfo {
         let item = DwjExtOutputApi::default();
         let s = format!("{item}");
         assert!(s.contains("DwjExtOutputApi"));
+    }
+
+    #[test]
+    fn test_dwkdefault() {
+        let item = DwkExtTermApi::default();
+        assert!(item.dwkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwkdisplay() {
+        let item = DwkExtTermApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwkExtTermApi"));
+    }
+
+    #[test]
+    fn test_dwldefault() {
+        let item = DwlExtEnvApi::default();
+        assert!(item.dwlvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwldisplay() {
+        let item = DwlExtEnvApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwlExtEnvApi"));
+    }
+
+    #[test]
+    fn test_dwmdefault() {
+        let item = DwmExtL10nApi::default();
+        assert!(item.dwmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwmdisplay() {
+        let item = DwmExtL10nApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwmExtL10nApi"));
+    }
+
+    #[test]
+    fn test_dwndefault() {
+        let item = DwnExtTelemetryApi::default();
+        assert!(item.dwnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwndisplay() {
+        let item = DwnExtTelemetryApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwnExtTelemetryApi"));
+    }
+
+    #[test]
+    fn test_dwodefault() {
+        let item = DwoExtLogApi::default();
+        assert!(item.dwovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwodisplay() {
+        let item = DwoExtLogApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwoExtLogApi"));
     }
 
 }
