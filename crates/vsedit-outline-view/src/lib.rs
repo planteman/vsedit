@@ -90175,6 +90175,111 @@ impl EnvironmentService {
     }
 }
 
+/// Runtime wiring: bta_ TaskDefinition
+#[derive(Debug, Clone)]
+pub struct TaskDefinition {
+    pub bta_task_type: String,
+    pub bta_task_id: String,
+    pub bta_task_label: String,
+    pub bta_command: String,
+    pub bta_args: Vec<String>,
+    pub bta_is_background: bool,
+    pub bta_problem_matcher: String,
+    pub bta_group_id: String,
+    pub bta_presentation_reveal: String,
+    pub bta_run_options_rerun: bool,
+}
+
+impl TaskDefinition {
+    pub fn bta_summary(&self) -> String {
+        format!("TaskDefinition({})", self.bta_task_type)
+    }
+}
+
+/// Runtime wiring: btb_ TaskExecution
+#[derive(Debug, Clone)]
+pub struct TaskExecution {
+    pub btb_execution_id: u64,
+    pub btb_task_id: String,
+    pub btb_state: String,
+    pub btb_exit_code: Option<i32>,
+    pub btb_started_at: u64,
+    pub btb_ended_at: u64,
+    pub btb_is_active: bool,
+    pub btb_terminal_id: u32,
+    pub btb_process_id: u32,
+    pub btb_rerun_count: u32,
+}
+
+impl TaskExecution {
+    pub fn btb_summary(&self) -> String {
+        format!("TaskExecution({})", self.btb_execution_id)
+    }
+}
+
+/// Runtime wiring: btc_ TaskTerminal
+#[derive(Debug, Clone)]
+pub struct TaskTerminal {
+    pub btc_terminal_id: u32,
+    pub btc_task_name: String,
+    pub btc_is_shared: bool,
+    pub btc_clear_before_run: bool,
+    pub btc_echo_command: bool,
+    pub btc_show_reuse_message: bool,
+    pub btc_panel_kind: String,
+    pub btc_focus_terminal: bool,
+    pub btc_close_on_exit: String,
+    pub btc_icon_id: String,
+}
+
+impl TaskTerminal {
+    pub fn btc_summary(&self) -> String {
+        format!("TaskTerminal({})", self.btc_terminal_id)
+    }
+}
+
+/// Runtime wiring: btd_ TaskGroup
+#[derive(Debug, Clone)]
+pub struct TaskGroup {
+    pub btd_group_id: String,
+    pub btd_is_default: bool,
+    pub btd_is_build: bool,
+    pub btd_is_test: bool,
+    pub btd_task_count: u32,
+    pub btd_label: String,
+    pub btd_order: u32,
+    pub btd_icon_id: String,
+    pub btd_description: String,
+    pub btd_when_clause: String,
+}
+
+impl TaskGroup {
+    pub fn btd_summary(&self) -> String {
+        format!("TaskGroup({})", self.btd_group_id)
+    }
+}
+
+/// Runtime wiring: bte_ TaskDependency
+#[derive(Debug, Clone)]
+pub struct TaskDependency {
+    pub bte_task_id: String,
+    pub bte_depends_on_id: String,
+    pub bte_depends_order: String,
+    pub bte_is_resolved: bool,
+    pub bte_resolved_task_id: String,
+    pub bte_workspace_folder: String,
+    pub bte_task_type: String,
+    pub bte_problem_matcher: String,
+    pub bte_depth: u32,
+    pub bte_cycle_detected: bool,
+}
+
+impl TaskDependency {
+    pub fn bte_summary(&self) -> String {
+        format!("TaskDependency({})", self.bte_task_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -127635,6 +127740,910 @@ mod tests_bfo {
         };
         let _ = obj.bsz_summary();
         assert!(!obj.bsz_disable_extensions);
+    }
+
+    #[test]
+    fn test_bta_task_type() {
+        let obj = TaskDefinition {
+            bta_task_type: String::from("test"),
+            bta_task_id: String::from("test"),
+            bta_task_label: String::from("test"),
+            bta_command: String::from("test"),
+            bta_args: Vec::new(),
+            bta_is_background: false,
+            bta_problem_matcher: String::from("test"),
+            bta_group_id: String::from("test"),
+            bta_presentation_reveal: String::from("test"),
+            bta_run_options_rerun: false,
+        };
+        let _ = obj.bta_summary();
+        assert_eq!(obj.bta_task_type, "test");
+    }
+
+    #[test]
+    fn test_bta_task_id() {
+        let obj = TaskDefinition {
+            bta_task_type: String::from("test"),
+            bta_task_id: String::from("test"),
+            bta_task_label: String::from("test"),
+            bta_command: String::from("test"),
+            bta_args: Vec::new(),
+            bta_is_background: false,
+            bta_problem_matcher: String::from("test"),
+            bta_group_id: String::from("test"),
+            bta_presentation_reveal: String::from("test"),
+            bta_run_options_rerun: false,
+        };
+        let _ = obj.bta_summary();
+        assert_eq!(obj.bta_task_id, "test");
+    }
+
+    #[test]
+    fn test_bta_task_label() {
+        let obj = TaskDefinition {
+            bta_task_type: String::from("test"),
+            bta_task_id: String::from("test"),
+            bta_task_label: String::from("test"),
+            bta_command: String::from("test"),
+            bta_args: Vec::new(),
+            bta_is_background: false,
+            bta_problem_matcher: String::from("test"),
+            bta_group_id: String::from("test"),
+            bta_presentation_reveal: String::from("test"),
+            bta_run_options_rerun: false,
+        };
+        let _ = obj.bta_summary();
+        assert_eq!(obj.bta_task_label, "test");
+    }
+
+    #[test]
+    fn test_bta_command() {
+        let obj = TaskDefinition {
+            bta_task_type: String::from("test"),
+            bta_task_id: String::from("test"),
+            bta_task_label: String::from("test"),
+            bta_command: String::from("test"),
+            bta_args: Vec::new(),
+            bta_is_background: false,
+            bta_problem_matcher: String::from("test"),
+            bta_group_id: String::from("test"),
+            bta_presentation_reveal: String::from("test"),
+            bta_run_options_rerun: false,
+        };
+        let _ = obj.bta_summary();
+        assert_eq!(obj.bta_command, "test");
+    }
+
+    #[test]
+    fn test_bta_args() {
+        let obj = TaskDefinition {
+            bta_task_type: String::from("test"),
+            bta_task_id: String::from("test"),
+            bta_task_label: String::from("test"),
+            bta_command: String::from("test"),
+            bta_args: Vec::new(),
+            bta_is_background: false,
+            bta_problem_matcher: String::from("test"),
+            bta_group_id: String::from("test"),
+            bta_presentation_reveal: String::from("test"),
+            bta_run_options_rerun: false,
+        };
+        let _ = obj.bta_summary();
+        assert!(obj.bta_args.is_empty());
+    }
+
+    #[test]
+    fn test_bta_is_background() {
+        let obj = TaskDefinition {
+            bta_task_type: String::from("test"),
+            bta_task_id: String::from("test"),
+            bta_task_label: String::from("test"),
+            bta_command: String::from("test"),
+            bta_args: Vec::new(),
+            bta_is_background: false,
+            bta_problem_matcher: String::from("test"),
+            bta_group_id: String::from("test"),
+            bta_presentation_reveal: String::from("test"),
+            bta_run_options_rerun: false,
+        };
+        let _ = obj.bta_summary();
+        assert!(!obj.bta_is_background);
+    }
+
+    #[test]
+    fn test_bta_problem_matcher() {
+        let obj = TaskDefinition {
+            bta_task_type: String::from("test"),
+            bta_task_id: String::from("test"),
+            bta_task_label: String::from("test"),
+            bta_command: String::from("test"),
+            bta_args: Vec::new(),
+            bta_is_background: false,
+            bta_problem_matcher: String::from("test"),
+            bta_group_id: String::from("test"),
+            bta_presentation_reveal: String::from("test"),
+            bta_run_options_rerun: false,
+        };
+        let _ = obj.bta_summary();
+        assert_eq!(obj.bta_problem_matcher, "test");
+    }
+
+    #[test]
+    fn test_bta_group_id() {
+        let obj = TaskDefinition {
+            bta_task_type: String::from("test"),
+            bta_task_id: String::from("test"),
+            bta_task_label: String::from("test"),
+            bta_command: String::from("test"),
+            bta_args: Vec::new(),
+            bta_is_background: false,
+            bta_problem_matcher: String::from("test"),
+            bta_group_id: String::from("test"),
+            bta_presentation_reveal: String::from("test"),
+            bta_run_options_rerun: false,
+        };
+        let _ = obj.bta_summary();
+        assert_eq!(obj.bta_group_id, "test");
+    }
+
+    #[test]
+    fn test_bta_presentation_reveal() {
+        let obj = TaskDefinition {
+            bta_task_type: String::from("test"),
+            bta_task_id: String::from("test"),
+            bta_task_label: String::from("test"),
+            bta_command: String::from("test"),
+            bta_args: Vec::new(),
+            bta_is_background: false,
+            bta_problem_matcher: String::from("test"),
+            bta_group_id: String::from("test"),
+            bta_presentation_reveal: String::from("test"),
+            bta_run_options_rerun: false,
+        };
+        let _ = obj.bta_summary();
+        assert_eq!(obj.bta_presentation_reveal, "test");
+    }
+
+    #[test]
+    fn test_bta_run_options_rerun() {
+        let obj = TaskDefinition {
+            bta_task_type: String::from("test"),
+            bta_task_id: String::from("test"),
+            bta_task_label: String::from("test"),
+            bta_command: String::from("test"),
+            bta_args: Vec::new(),
+            bta_is_background: false,
+            bta_problem_matcher: String::from("test"),
+            bta_group_id: String::from("test"),
+            bta_presentation_reveal: String::from("test"),
+            bta_run_options_rerun: false,
+        };
+        let _ = obj.bta_summary();
+        assert!(!obj.bta_run_options_rerun);
+    }
+
+
+    #[test]
+    fn test_btb_execution_id() {
+        let obj = TaskExecution {
+            btb_execution_id: 0,
+            btb_task_id: String::from("test"),
+            btb_state: String::from("test"),
+            btb_exit_code: None,
+            btb_started_at: 0,
+            btb_ended_at: 0,
+            btb_is_active: false,
+            btb_terminal_id: 0,
+            btb_process_id: 0,
+            btb_rerun_count: 0,
+        };
+        let _ = obj.btb_summary();
+        assert_eq!(obj.btb_execution_id, 0);
+    }
+
+    #[test]
+    fn test_btb_task_id() {
+        let obj = TaskExecution {
+            btb_execution_id: 0,
+            btb_task_id: String::from("test"),
+            btb_state: String::from("test"),
+            btb_exit_code: None,
+            btb_started_at: 0,
+            btb_ended_at: 0,
+            btb_is_active: false,
+            btb_terminal_id: 0,
+            btb_process_id: 0,
+            btb_rerun_count: 0,
+        };
+        let _ = obj.btb_summary();
+        assert_eq!(obj.btb_task_id, "test");
+    }
+
+    #[test]
+    fn test_btb_state() {
+        let obj = TaskExecution {
+            btb_execution_id: 0,
+            btb_task_id: String::from("test"),
+            btb_state: String::from("test"),
+            btb_exit_code: None,
+            btb_started_at: 0,
+            btb_ended_at: 0,
+            btb_is_active: false,
+            btb_terminal_id: 0,
+            btb_process_id: 0,
+            btb_rerun_count: 0,
+        };
+        let _ = obj.btb_summary();
+        assert_eq!(obj.btb_state, "test");
+    }
+
+    #[test]
+    fn test_btb_exit_code() {
+        let obj = TaskExecution {
+            btb_execution_id: 0,
+            btb_task_id: String::from("test"),
+            btb_state: String::from("test"),
+            btb_exit_code: None,
+            btb_started_at: 0,
+            btb_ended_at: 0,
+            btb_is_active: false,
+            btb_terminal_id: 0,
+            btb_process_id: 0,
+            btb_rerun_count: 0,
+        };
+        let _ = obj.btb_summary();
+        assert!(obj.btb_exit_code.is_none());
+    }
+
+    #[test]
+    fn test_btb_started_at() {
+        let obj = TaskExecution {
+            btb_execution_id: 0,
+            btb_task_id: String::from("test"),
+            btb_state: String::from("test"),
+            btb_exit_code: None,
+            btb_started_at: 0,
+            btb_ended_at: 0,
+            btb_is_active: false,
+            btb_terminal_id: 0,
+            btb_process_id: 0,
+            btb_rerun_count: 0,
+        };
+        let _ = obj.btb_summary();
+        assert_eq!(obj.btb_started_at, 0);
+    }
+
+    #[test]
+    fn test_btb_ended_at() {
+        let obj = TaskExecution {
+            btb_execution_id: 0,
+            btb_task_id: String::from("test"),
+            btb_state: String::from("test"),
+            btb_exit_code: None,
+            btb_started_at: 0,
+            btb_ended_at: 0,
+            btb_is_active: false,
+            btb_terminal_id: 0,
+            btb_process_id: 0,
+            btb_rerun_count: 0,
+        };
+        let _ = obj.btb_summary();
+        assert_eq!(obj.btb_ended_at, 0);
+    }
+
+    #[test]
+    fn test_btb_is_active() {
+        let obj = TaskExecution {
+            btb_execution_id: 0,
+            btb_task_id: String::from("test"),
+            btb_state: String::from("test"),
+            btb_exit_code: None,
+            btb_started_at: 0,
+            btb_ended_at: 0,
+            btb_is_active: false,
+            btb_terminal_id: 0,
+            btb_process_id: 0,
+            btb_rerun_count: 0,
+        };
+        let _ = obj.btb_summary();
+        assert!(!obj.btb_is_active);
+    }
+
+    #[test]
+    fn test_btb_terminal_id() {
+        let obj = TaskExecution {
+            btb_execution_id: 0,
+            btb_task_id: String::from("test"),
+            btb_state: String::from("test"),
+            btb_exit_code: None,
+            btb_started_at: 0,
+            btb_ended_at: 0,
+            btb_is_active: false,
+            btb_terminal_id: 0,
+            btb_process_id: 0,
+            btb_rerun_count: 0,
+        };
+        let _ = obj.btb_summary();
+        assert_eq!(obj.btb_terminal_id, 0);
+    }
+
+    #[test]
+    fn test_btb_process_id() {
+        let obj = TaskExecution {
+            btb_execution_id: 0,
+            btb_task_id: String::from("test"),
+            btb_state: String::from("test"),
+            btb_exit_code: None,
+            btb_started_at: 0,
+            btb_ended_at: 0,
+            btb_is_active: false,
+            btb_terminal_id: 0,
+            btb_process_id: 0,
+            btb_rerun_count: 0,
+        };
+        let _ = obj.btb_summary();
+        assert_eq!(obj.btb_process_id, 0);
+    }
+
+    #[test]
+    fn test_btb_rerun_count() {
+        let obj = TaskExecution {
+            btb_execution_id: 0,
+            btb_task_id: String::from("test"),
+            btb_state: String::from("test"),
+            btb_exit_code: None,
+            btb_started_at: 0,
+            btb_ended_at: 0,
+            btb_is_active: false,
+            btb_terminal_id: 0,
+            btb_process_id: 0,
+            btb_rerun_count: 0,
+        };
+        let _ = obj.btb_summary();
+        assert_eq!(obj.btb_rerun_count, 0);
+    }
+
+
+    #[test]
+    fn test_btc_terminal_id() {
+        let obj = TaskTerminal {
+            btc_terminal_id: 0,
+            btc_task_name: String::from("test"),
+            btc_is_shared: false,
+            btc_clear_before_run: false,
+            btc_echo_command: false,
+            btc_show_reuse_message: false,
+            btc_panel_kind: String::from("test"),
+            btc_focus_terminal: false,
+            btc_close_on_exit: String::from("test"),
+            btc_icon_id: String::from("test"),
+        };
+        let _ = obj.btc_summary();
+        assert_eq!(obj.btc_terminal_id, 0);
+    }
+
+    #[test]
+    fn test_btc_task_name() {
+        let obj = TaskTerminal {
+            btc_terminal_id: 0,
+            btc_task_name: String::from("test"),
+            btc_is_shared: false,
+            btc_clear_before_run: false,
+            btc_echo_command: false,
+            btc_show_reuse_message: false,
+            btc_panel_kind: String::from("test"),
+            btc_focus_terminal: false,
+            btc_close_on_exit: String::from("test"),
+            btc_icon_id: String::from("test"),
+        };
+        let _ = obj.btc_summary();
+        assert_eq!(obj.btc_task_name, "test");
+    }
+
+    #[test]
+    fn test_btc_is_shared() {
+        let obj = TaskTerminal {
+            btc_terminal_id: 0,
+            btc_task_name: String::from("test"),
+            btc_is_shared: false,
+            btc_clear_before_run: false,
+            btc_echo_command: false,
+            btc_show_reuse_message: false,
+            btc_panel_kind: String::from("test"),
+            btc_focus_terminal: false,
+            btc_close_on_exit: String::from("test"),
+            btc_icon_id: String::from("test"),
+        };
+        let _ = obj.btc_summary();
+        assert!(!obj.btc_is_shared);
+    }
+
+    #[test]
+    fn test_btc_clear_before_run() {
+        let obj = TaskTerminal {
+            btc_terminal_id: 0,
+            btc_task_name: String::from("test"),
+            btc_is_shared: false,
+            btc_clear_before_run: false,
+            btc_echo_command: false,
+            btc_show_reuse_message: false,
+            btc_panel_kind: String::from("test"),
+            btc_focus_terminal: false,
+            btc_close_on_exit: String::from("test"),
+            btc_icon_id: String::from("test"),
+        };
+        let _ = obj.btc_summary();
+        assert!(!obj.btc_clear_before_run);
+    }
+
+    #[test]
+    fn test_btc_echo_command() {
+        let obj = TaskTerminal {
+            btc_terminal_id: 0,
+            btc_task_name: String::from("test"),
+            btc_is_shared: false,
+            btc_clear_before_run: false,
+            btc_echo_command: false,
+            btc_show_reuse_message: false,
+            btc_panel_kind: String::from("test"),
+            btc_focus_terminal: false,
+            btc_close_on_exit: String::from("test"),
+            btc_icon_id: String::from("test"),
+        };
+        let _ = obj.btc_summary();
+        assert!(!obj.btc_echo_command);
+    }
+
+    #[test]
+    fn test_btc_show_reuse_message() {
+        let obj = TaskTerminal {
+            btc_terminal_id: 0,
+            btc_task_name: String::from("test"),
+            btc_is_shared: false,
+            btc_clear_before_run: false,
+            btc_echo_command: false,
+            btc_show_reuse_message: false,
+            btc_panel_kind: String::from("test"),
+            btc_focus_terminal: false,
+            btc_close_on_exit: String::from("test"),
+            btc_icon_id: String::from("test"),
+        };
+        let _ = obj.btc_summary();
+        assert!(!obj.btc_show_reuse_message);
+    }
+
+    #[test]
+    fn test_btc_panel_kind() {
+        let obj = TaskTerminal {
+            btc_terminal_id: 0,
+            btc_task_name: String::from("test"),
+            btc_is_shared: false,
+            btc_clear_before_run: false,
+            btc_echo_command: false,
+            btc_show_reuse_message: false,
+            btc_panel_kind: String::from("test"),
+            btc_focus_terminal: false,
+            btc_close_on_exit: String::from("test"),
+            btc_icon_id: String::from("test"),
+        };
+        let _ = obj.btc_summary();
+        assert_eq!(obj.btc_panel_kind, "test");
+    }
+
+    #[test]
+    fn test_btc_focus_terminal() {
+        let obj = TaskTerminal {
+            btc_terminal_id: 0,
+            btc_task_name: String::from("test"),
+            btc_is_shared: false,
+            btc_clear_before_run: false,
+            btc_echo_command: false,
+            btc_show_reuse_message: false,
+            btc_panel_kind: String::from("test"),
+            btc_focus_terminal: false,
+            btc_close_on_exit: String::from("test"),
+            btc_icon_id: String::from("test"),
+        };
+        let _ = obj.btc_summary();
+        assert!(!obj.btc_focus_terminal);
+    }
+
+    #[test]
+    fn test_btc_close_on_exit() {
+        let obj = TaskTerminal {
+            btc_terminal_id: 0,
+            btc_task_name: String::from("test"),
+            btc_is_shared: false,
+            btc_clear_before_run: false,
+            btc_echo_command: false,
+            btc_show_reuse_message: false,
+            btc_panel_kind: String::from("test"),
+            btc_focus_terminal: false,
+            btc_close_on_exit: String::from("test"),
+            btc_icon_id: String::from("test"),
+        };
+        let _ = obj.btc_summary();
+        assert_eq!(obj.btc_close_on_exit, "test");
+    }
+
+    #[test]
+    fn test_btc_icon_id() {
+        let obj = TaskTerminal {
+            btc_terminal_id: 0,
+            btc_task_name: String::from("test"),
+            btc_is_shared: false,
+            btc_clear_before_run: false,
+            btc_echo_command: false,
+            btc_show_reuse_message: false,
+            btc_panel_kind: String::from("test"),
+            btc_focus_terminal: false,
+            btc_close_on_exit: String::from("test"),
+            btc_icon_id: String::from("test"),
+        };
+        let _ = obj.btc_summary();
+        assert_eq!(obj.btc_icon_id, "test");
+    }
+
+
+    #[test]
+    fn test_btd_group_id() {
+        let obj = TaskGroup {
+            btd_group_id: String::from("test"),
+            btd_is_default: false,
+            btd_is_build: false,
+            btd_is_test: false,
+            btd_task_count: 0,
+            btd_label: String::from("test"),
+            btd_order: 0,
+            btd_icon_id: String::from("test"),
+            btd_description: String::from("test"),
+            btd_when_clause: String::from("test"),
+        };
+        let _ = obj.btd_summary();
+        assert_eq!(obj.btd_group_id, "test");
+    }
+
+    #[test]
+    fn test_btd_is_default() {
+        let obj = TaskGroup {
+            btd_group_id: String::from("test"),
+            btd_is_default: false,
+            btd_is_build: false,
+            btd_is_test: false,
+            btd_task_count: 0,
+            btd_label: String::from("test"),
+            btd_order: 0,
+            btd_icon_id: String::from("test"),
+            btd_description: String::from("test"),
+            btd_when_clause: String::from("test"),
+        };
+        let _ = obj.btd_summary();
+        assert!(!obj.btd_is_default);
+    }
+
+    #[test]
+    fn test_btd_is_build() {
+        let obj = TaskGroup {
+            btd_group_id: String::from("test"),
+            btd_is_default: false,
+            btd_is_build: false,
+            btd_is_test: false,
+            btd_task_count: 0,
+            btd_label: String::from("test"),
+            btd_order: 0,
+            btd_icon_id: String::from("test"),
+            btd_description: String::from("test"),
+            btd_when_clause: String::from("test"),
+        };
+        let _ = obj.btd_summary();
+        assert!(!obj.btd_is_build);
+    }
+
+    #[test]
+    fn test_btd_is_test() {
+        let obj = TaskGroup {
+            btd_group_id: String::from("test"),
+            btd_is_default: false,
+            btd_is_build: false,
+            btd_is_test: false,
+            btd_task_count: 0,
+            btd_label: String::from("test"),
+            btd_order: 0,
+            btd_icon_id: String::from("test"),
+            btd_description: String::from("test"),
+            btd_when_clause: String::from("test"),
+        };
+        let _ = obj.btd_summary();
+        assert!(!obj.btd_is_test);
+    }
+
+    #[test]
+    fn test_btd_task_count() {
+        let obj = TaskGroup {
+            btd_group_id: String::from("test"),
+            btd_is_default: false,
+            btd_is_build: false,
+            btd_is_test: false,
+            btd_task_count: 0,
+            btd_label: String::from("test"),
+            btd_order: 0,
+            btd_icon_id: String::from("test"),
+            btd_description: String::from("test"),
+            btd_when_clause: String::from("test"),
+        };
+        let _ = obj.btd_summary();
+        assert_eq!(obj.btd_task_count, 0);
+    }
+
+    #[test]
+    fn test_btd_label() {
+        let obj = TaskGroup {
+            btd_group_id: String::from("test"),
+            btd_is_default: false,
+            btd_is_build: false,
+            btd_is_test: false,
+            btd_task_count: 0,
+            btd_label: String::from("test"),
+            btd_order: 0,
+            btd_icon_id: String::from("test"),
+            btd_description: String::from("test"),
+            btd_when_clause: String::from("test"),
+        };
+        let _ = obj.btd_summary();
+        assert_eq!(obj.btd_label, "test");
+    }
+
+    #[test]
+    fn test_btd_order() {
+        let obj = TaskGroup {
+            btd_group_id: String::from("test"),
+            btd_is_default: false,
+            btd_is_build: false,
+            btd_is_test: false,
+            btd_task_count: 0,
+            btd_label: String::from("test"),
+            btd_order: 0,
+            btd_icon_id: String::from("test"),
+            btd_description: String::from("test"),
+            btd_when_clause: String::from("test"),
+        };
+        let _ = obj.btd_summary();
+        assert_eq!(obj.btd_order, 0);
+    }
+
+    #[test]
+    fn test_btd_icon_id() {
+        let obj = TaskGroup {
+            btd_group_id: String::from("test"),
+            btd_is_default: false,
+            btd_is_build: false,
+            btd_is_test: false,
+            btd_task_count: 0,
+            btd_label: String::from("test"),
+            btd_order: 0,
+            btd_icon_id: String::from("test"),
+            btd_description: String::from("test"),
+            btd_when_clause: String::from("test"),
+        };
+        let _ = obj.btd_summary();
+        assert_eq!(obj.btd_icon_id, "test");
+    }
+
+    #[test]
+    fn test_btd_description() {
+        let obj = TaskGroup {
+            btd_group_id: String::from("test"),
+            btd_is_default: false,
+            btd_is_build: false,
+            btd_is_test: false,
+            btd_task_count: 0,
+            btd_label: String::from("test"),
+            btd_order: 0,
+            btd_icon_id: String::from("test"),
+            btd_description: String::from("test"),
+            btd_when_clause: String::from("test"),
+        };
+        let _ = obj.btd_summary();
+        assert_eq!(obj.btd_description, "test");
+    }
+
+    #[test]
+    fn test_btd_when_clause() {
+        let obj = TaskGroup {
+            btd_group_id: String::from("test"),
+            btd_is_default: false,
+            btd_is_build: false,
+            btd_is_test: false,
+            btd_task_count: 0,
+            btd_label: String::from("test"),
+            btd_order: 0,
+            btd_icon_id: String::from("test"),
+            btd_description: String::from("test"),
+            btd_when_clause: String::from("test"),
+        };
+        let _ = obj.btd_summary();
+        assert_eq!(obj.btd_when_clause, "test");
+    }
+
+
+    #[test]
+    fn test_bte_task_id() {
+        let obj = TaskDependency {
+            bte_task_id: String::from("test"),
+            bte_depends_on_id: String::from("test"),
+            bte_depends_order: String::from("test"),
+            bte_is_resolved: false,
+            bte_resolved_task_id: String::from("test"),
+            bte_workspace_folder: String::from("test"),
+            bte_task_type: String::from("test"),
+            bte_problem_matcher: String::from("test"),
+            bte_depth: 0,
+            bte_cycle_detected: false,
+        };
+        let _ = obj.bte_summary();
+        assert_eq!(obj.bte_task_id, "test");
+    }
+
+    #[test]
+    fn test_bte_depends_on_id() {
+        let obj = TaskDependency {
+            bte_task_id: String::from("test"),
+            bte_depends_on_id: String::from("test"),
+            bte_depends_order: String::from("test"),
+            bte_is_resolved: false,
+            bte_resolved_task_id: String::from("test"),
+            bte_workspace_folder: String::from("test"),
+            bte_task_type: String::from("test"),
+            bte_problem_matcher: String::from("test"),
+            bte_depth: 0,
+            bte_cycle_detected: false,
+        };
+        let _ = obj.bte_summary();
+        assert_eq!(obj.bte_depends_on_id, "test");
+    }
+
+    #[test]
+    fn test_bte_depends_order() {
+        let obj = TaskDependency {
+            bte_task_id: String::from("test"),
+            bte_depends_on_id: String::from("test"),
+            bte_depends_order: String::from("test"),
+            bte_is_resolved: false,
+            bte_resolved_task_id: String::from("test"),
+            bte_workspace_folder: String::from("test"),
+            bte_task_type: String::from("test"),
+            bte_problem_matcher: String::from("test"),
+            bte_depth: 0,
+            bte_cycle_detected: false,
+        };
+        let _ = obj.bte_summary();
+        assert_eq!(obj.bte_depends_order, "test");
+    }
+
+    #[test]
+    fn test_bte_is_resolved() {
+        let obj = TaskDependency {
+            bte_task_id: String::from("test"),
+            bte_depends_on_id: String::from("test"),
+            bte_depends_order: String::from("test"),
+            bte_is_resolved: false,
+            bte_resolved_task_id: String::from("test"),
+            bte_workspace_folder: String::from("test"),
+            bte_task_type: String::from("test"),
+            bte_problem_matcher: String::from("test"),
+            bte_depth: 0,
+            bte_cycle_detected: false,
+        };
+        let _ = obj.bte_summary();
+        assert!(!obj.bte_is_resolved);
+    }
+
+    #[test]
+    fn test_bte_resolved_task_id() {
+        let obj = TaskDependency {
+            bte_task_id: String::from("test"),
+            bte_depends_on_id: String::from("test"),
+            bte_depends_order: String::from("test"),
+            bte_is_resolved: false,
+            bte_resolved_task_id: String::from("test"),
+            bte_workspace_folder: String::from("test"),
+            bte_task_type: String::from("test"),
+            bte_problem_matcher: String::from("test"),
+            bte_depth: 0,
+            bte_cycle_detected: false,
+        };
+        let _ = obj.bte_summary();
+        assert_eq!(obj.bte_resolved_task_id, "test");
+    }
+
+    #[test]
+    fn test_bte_workspace_folder() {
+        let obj = TaskDependency {
+            bte_task_id: String::from("test"),
+            bte_depends_on_id: String::from("test"),
+            bte_depends_order: String::from("test"),
+            bte_is_resolved: false,
+            bte_resolved_task_id: String::from("test"),
+            bte_workspace_folder: String::from("test"),
+            bte_task_type: String::from("test"),
+            bte_problem_matcher: String::from("test"),
+            bte_depth: 0,
+            bte_cycle_detected: false,
+        };
+        let _ = obj.bte_summary();
+        assert_eq!(obj.bte_workspace_folder, "test");
+    }
+
+    #[test]
+    fn test_bte_task_type() {
+        let obj = TaskDependency {
+            bte_task_id: String::from("test"),
+            bte_depends_on_id: String::from("test"),
+            bte_depends_order: String::from("test"),
+            bte_is_resolved: false,
+            bte_resolved_task_id: String::from("test"),
+            bte_workspace_folder: String::from("test"),
+            bte_task_type: String::from("test"),
+            bte_problem_matcher: String::from("test"),
+            bte_depth: 0,
+            bte_cycle_detected: false,
+        };
+        let _ = obj.bte_summary();
+        assert_eq!(obj.bte_task_type, "test");
+    }
+
+    #[test]
+    fn test_bte_problem_matcher() {
+        let obj = TaskDependency {
+            bte_task_id: String::from("test"),
+            bte_depends_on_id: String::from("test"),
+            bte_depends_order: String::from("test"),
+            bte_is_resolved: false,
+            bte_resolved_task_id: String::from("test"),
+            bte_workspace_folder: String::from("test"),
+            bte_task_type: String::from("test"),
+            bte_problem_matcher: String::from("test"),
+            bte_depth: 0,
+            bte_cycle_detected: false,
+        };
+        let _ = obj.bte_summary();
+        assert_eq!(obj.bte_problem_matcher, "test");
+    }
+
+    #[test]
+    fn test_bte_depth() {
+        let obj = TaskDependency {
+            bte_task_id: String::from("test"),
+            bte_depends_on_id: String::from("test"),
+            bte_depends_order: String::from("test"),
+            bte_is_resolved: false,
+            bte_resolved_task_id: String::from("test"),
+            bte_workspace_folder: String::from("test"),
+            bte_task_type: String::from("test"),
+            bte_problem_matcher: String::from("test"),
+            bte_depth: 0,
+            bte_cycle_detected: false,
+        };
+        let _ = obj.bte_summary();
+        assert_eq!(obj.bte_depth, 0);
+    }
+
+    #[test]
+    fn test_bte_cycle_detected() {
+        let obj = TaskDependency {
+            bte_task_id: String::from("test"),
+            bte_depends_on_id: String::from("test"),
+            bte_depends_order: String::from("test"),
+            bte_is_resolved: false,
+            bte_resolved_task_id: String::from("test"),
+            bte_workspace_folder: String::from("test"),
+            bte_task_type: String::from("test"),
+            bte_problem_matcher: String::from("test"),
+            bte_depth: 0,
+            bte_cycle_detected: false,
+        };
+        let _ = obj.bte_summary();
+        assert!(!obj.bte_cycle_detected);
     }
 
 }
