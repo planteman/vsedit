@@ -58642,3 +58642,197 @@ mod bbk_tests {
         assert_eq!(s.left_col, 20);
     }
 }
+
+
+// --- bbl_: Editor command model ---
+
+/// Category for a command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BblCommandCategory {
+    Editor, File, View, Selection, Search, Terminal, Debug, Git, Extensions, Help,
+}
+
+impl BblCommandCategory {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Editor => "Editor", Self::File => "File", Self::View => "View",
+            Self::Selection => "Selection", Self::Search => "Search", Self::Terminal => "Terminal",
+            Self::Debug => "Debug", Self::Git => "Git", Self::Extensions => "Extensions",
+            Self::Help => "Help",
+        }
+    }
+}
+
+/// A command registration.
+#[derive(Debug, Clone)]
+pub struct BblCommand {
+    pub id: String,
+    pub title: String,
+    pub category: BblCommandCategory,
+    pub keybinding: Option<String>,
+    pub when_clause: Option<String>,
+    pub enabled: bool,
+}
+
+impl BblCommand {
+    pub fn new(id: &str, title: &str, cat: BblCommandCategory) -> Self {
+        Self {
+            id: id.to_string(), title: title.to_string(), category: cat,
+            keybinding: None, when_clause: None, enabled: true,
+        }
+    }
+
+    pub fn with_key(mut self, key: &str) -> Self { self.keybinding = Some(key.to_string()); self }
+    pub fn with_when(mut self, when: &str) -> Self { self.when_clause = Some(when.to_string()); self }
+
+    pub fn display_text(&self) -> String {
+        match &self.keybinding {
+            Some(k) => format!("{}: {} ({})", self.category.label(), self.title, k),
+            None => format!("{}: {}", self.category.label(), self.title),
+        }
+    }
+
+    pub fn matches_query(&self, query: &str) -> bool {
+        let ql = query.to_lowercase();
+        self.id.to_lowercase().contains(&ql) || self.title.to_lowercase().contains(&ql) ||
+        self.category.label().to_lowercase().contains(&ql)
+    }
+}
+
+/// The command registry.
+#[derive(Debug)]
+pub struct BblCommandRegistry {
+    commands: Vec<BblCommand>,
+    recent: Vec<String>,
+    max_recent: usize,
+}
+
+impl BblCommandRegistry {
+    pub fn new() -> Self {
+        Self { commands: Vec::new(), recent: Vec::new(), max_recent: 50 }
+    }
+
+    pub fn register(&mut self, cmd: BblCommand) { self.commands.push(cmd); }
+    pub fn command_count(&self) -> usize { self.commands.len() }
+
+    pub fn find(&self, id: &str) -> Option<&BblCommand> {
+        self.commands.iter().find(|c| c.id == id)
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&BblCommand> {
+        if query.is_empty() { return self.commands.iter().collect(); }
+        self.commands.iter().filter(|c| c.enabled && c.matches_query(query)).collect()
+    }
+
+    pub fn by_category(&self, cat: BblCommandCategory) -> Vec<&BblCommand> {
+        self.commands.iter().filter(|c| c.category == cat).collect()
+    }
+
+    pub fn record_use(&mut self, id: &str) {
+        self.recent.retain(|r| r != id);
+        self.recent.insert(0, id.to_string());
+        if self.recent.len() > self.max_recent { self.recent.truncate(self.max_recent); }
+    }
+
+    pub fn recent_commands(&self) -> Vec<&BblCommand> {
+        self.recent.iter().filter_map(|id| self.find(id)).collect()
+    }
+
+    pub fn set_enabled(&mut self, id: &str, enabled: bool) {
+        if let Some(cmd) = self.commands.iter_mut().find(|c| c.id == id) {
+            cmd.enabled = enabled;
+        }
+    }
+
+    pub fn enabled_count(&self) -> usize {
+        self.commands.iter().filter(|c| c.enabled).count()
+    }
+}
+
+#[cfg(test)]
+mod bbl_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbl_category() {
+        assert_eq!(BblCommandCategory::Editor.label(), "Editor");
+        assert_eq!(BblCommandCategory::Git.label(), "Git");
+    }
+
+    #[test]
+    fn test_bbl_command_display() {
+        let c = BblCommand::new("editor.copy", "Copy", BblCommandCategory::Editor)
+            .with_key("Ctrl+C");
+        assert!(c.display_text().contains("Ctrl+C"));
+    }
+
+    #[test]
+    fn test_bbl_command_matches() {
+        let c = BblCommand::new("editor.formatDocument", "Format Document", BblCommandCategory::Editor);
+        assert!(c.matches_query("format"));
+        assert!(c.matches_query("editor"));
+        assert!(!c.matches_query("terminal"));
+    }
+
+    #[test]
+    fn test_bbl_registry_register() {
+        let mut r = BblCommandRegistry::new();
+        r.register(BblCommand::new("a", "A", BblCommandCategory::Editor));
+        r.register(BblCommand::new("b", "B", BblCommandCategory::File));
+        assert_eq!(r.command_count(), 2);
+    }
+
+    #[test]
+    fn test_bbl_registry_find() {
+        let mut r = BblCommandRegistry::new();
+        r.register(BblCommand::new("editor.copy", "Copy", BblCommandCategory::Editor));
+        assert!(r.find("editor.copy").is_some());
+        assert!(r.find("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_bbl_registry_search() {
+        let mut r = BblCommandRegistry::new();
+        r.register(BblCommand::new("editor.copy", "Copy", BblCommandCategory::Editor));
+        r.register(BblCommand::new("editor.paste", "Paste", BblCommandCategory::Editor));
+        r.register(BblCommand::new("file.save", "Save", BblCommandCategory::File));
+        assert_eq!(r.search("copy").len(), 1);
+        assert_eq!(r.search("editor").len(), 2);
+    }
+
+    #[test]
+    fn test_bbl_registry_category() {
+        let mut r = BblCommandRegistry::new();
+        r.register(BblCommand::new("a", "A", BblCommandCategory::Editor));
+        r.register(BblCommand::new("b", "B", BblCommandCategory::File));
+        assert_eq!(r.by_category(BblCommandCategory::Editor).len(), 1);
+    }
+
+    #[test]
+    fn test_bbl_registry_recent() {
+        let mut r = BblCommandRegistry::new();
+        r.register(BblCommand::new("a", "A", BblCommandCategory::Editor));
+        r.register(BblCommand::new("b", "B", BblCommandCategory::Editor));
+        r.record_use("b");
+        r.record_use("a");
+        let recent = r.recent_commands();
+        assert_eq!(recent[0].id, "a");
+    }
+
+    #[test]
+    fn test_bbl_registry_enable() {
+        let mut r = BblCommandRegistry::new();
+        r.register(BblCommand::new("a", "A", BblCommandCategory::Editor));
+        r.set_enabled("a", false);
+        assert_eq!(r.search("A").len(), 0); // disabled
+    }
+
+    #[test]
+    fn test_bbl_enabled_count() {
+        let mut r = BblCommandRegistry::new();
+        r.register(BblCommand::new("a", "A", BblCommandCategory::Editor));
+        r.register(BblCommand::new("b", "B", BblCommandCategory::Editor));
+        r.set_enabled("b", false);
+        assert_eq!(r.enabled_count(), 1);
+    }
+}
