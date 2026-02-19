@@ -49048,6 +49048,620 @@ impl BfoTestRun {
     pub fn all_passed(&self) -> bool { self.items.iter().all(|i| i.state == BfoTestState::Passed) }
 }
 
+
+// bfp_ Editor Breadcrumb Model
+
+/// Breadcrumb element representing a segment in the file path or symbol hierarchy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BfpBreadcrumbElement {
+    pub label: String,
+    pub kind: BfpBreadcrumbKind,
+    pub icon: Option<String>,
+    pub uri: Option<String>,
+    pub is_active: bool,
+}
+
+/// Kind of breadcrumb element.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfpBreadcrumbKind {
+    File,
+    Folder,
+    Symbol,
+    Type,
+    Module,
+    Namespace,
+    Package,
+}
+
+/// Breadcrumb navigation bar state.
+#[derive(Debug, Clone)]
+pub struct BfpBreadcrumbBar {
+    pub elements: Vec<BfpBreadcrumbElement>,
+    pub focused_index: Option<usize>,
+    pub is_visible: bool,
+    pub file_path: String,
+}
+
+impl BfpBreadcrumbBar {
+    pub fn new(file_path: &str) -> Self {
+        let segments: Vec<&str> = file_path.split('/').filter(|s| !s.is_empty()).collect();
+        let mut elements = Vec::new();
+        for (i, seg) in segments.iter().enumerate() {
+            let kind = if i == segments.len() - 1 {
+                BfpBreadcrumbKind::File
+            } else {
+                BfpBreadcrumbKind::Folder
+            };
+            elements.push(BfpBreadcrumbElement {
+                label: seg.to_string(),
+                kind,
+                icon: None,
+                uri: None,
+                is_active: false,
+            });
+        }
+        Self {
+            elements,
+            focused_index: None,
+            is_visible: true,
+            file_path: file_path.to_string(),
+        }
+    }
+
+    pub fn focus_element(&mut self, index: usize) {
+        if index < self.elements.len() {
+            if let Some(old) = self.focused_index {
+                if old < self.elements.len() {
+                    self.elements[old].is_active = false;
+                }
+            }
+            self.elements[index].is_active = true;
+            self.focused_index = Some(index);
+        }
+    }
+
+    pub fn focus_next(&mut self) {
+        let next = match self.focused_index {
+            Some(i) if i + 1 < self.elements.len() => i + 1,
+            None if !self.elements.is_empty() => 0,
+            _ => return,
+        };
+        self.focus_element(next);
+    }
+
+    pub fn focus_prev(&mut self) {
+        let prev = match self.focused_index {
+            Some(i) if i > 0 => i - 1,
+            _ => return,
+        };
+        self.focus_element(prev);
+    }
+
+    pub fn add_symbol(&mut self, label: &str, kind: BfpBreadcrumbKind) {
+        self.elements.push(BfpBreadcrumbElement {
+            label: label.to_string(),
+            kind,
+            icon: None,
+            uri: None,
+            is_active: false,
+        });
+    }
+
+    pub fn depth(&self) -> usize {
+        self.elements.len()
+    }
+
+    pub fn active_label(&self) -> Option<&str> {
+        self.focused_index
+            .and_then(|i| self.elements.get(i))
+            .map(|e| e.label.as_str())
+    }
+}
+
+
+// bfq_ Source Control View Model
+
+/// Source control resource state in SCM view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfqScmResourceState {
+    Untracked,
+    Modified,
+    Added,
+    Deleted,
+    Renamed,
+    Copied,
+    Conflicting,
+    Ignored,
+}
+
+/// A single resource in the SCM view.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BfqScmResource {
+    pub path: String,
+    pub state: BfqScmResourceState,
+    pub original_path: Option<String>,
+}
+
+/// SCM resource group (staged, unstaged, untracked, merge changes).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BfqScmResourceGroup {
+    pub id: String,
+    pub label: String,
+    pub resources: Vec<BfqScmResource>,
+    pub hide_when_empty: bool,
+}
+
+/// Source control view model.
+#[derive(Debug, Clone)]
+pub struct BfqScmView {
+    pub provider_label: String,
+    pub root_uri: Option<String>,
+    pub groups: Vec<BfqScmResourceGroup>,
+    pub commit_message: String,
+    pub count: usize,
+    pub selected_index: Option<usize>,
+}
+
+impl BfqScmView {
+    pub fn new(provider: &str) -> Self {
+        Self {
+            provider_label: provider.to_string(),
+            root_uri: None,
+            groups: Vec::new(),
+            commit_message: String::new(),
+            count: 0,
+            selected_index: None,
+        }
+    }
+
+    pub fn add_group(&mut self, id: &str, label: &str, hide_when_empty: bool) {
+        self.groups.push(BfqScmResourceGroup {
+            id: id.to_string(),
+            label: label.to_string(),
+            resources: Vec::new(),
+            hide_when_empty,
+        });
+    }
+
+    pub fn add_resource(&mut self, group_id: &str, path: &str, state: BfqScmResourceState) {
+        if let Some(g) = self.groups.iter_mut().find(|g| g.id == group_id) {
+            g.resources.push(BfqScmResource {
+                path: path.to_string(),
+                state,
+                original_path: None,
+            });
+            self.count += 1;
+        }
+    }
+
+    pub fn stage_resource(&mut self, path: &str) -> bool {
+        let mut found = None;
+        for g in &mut self.groups {
+            if g.id != "staged" {
+                if let Some(pos) = g.resources.iter().position(|r| r.path == path) {
+                    found = Some(g.resources.remove(pos));
+                    break;
+                }
+            }
+        }
+        if let Some(res) = found {
+            if let Some(staged) = self.groups.iter_mut().find(|g| g.id == "staged") {
+                staged.resources.push(res);
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn unstage_resource(&mut self, path: &str) -> bool {
+        let mut found = None;
+        if let Some(staged) = self.groups.iter_mut().find(|g| g.id == "staged") {
+            if let Some(pos) = staged.resources.iter().position(|r| r.path == path) {
+                found = Some(staged.resources.remove(pos));
+            }
+        }
+        if let Some(res) = found {
+            if let Some(changes) = self.groups.iter_mut().find(|g| g.id == "changes") {
+                changes.resources.push(res);
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn visible_groups(&self) -> Vec<&BfqScmResourceGroup> {
+        self.groups.iter().filter(|g| !g.hide_when_empty || !g.resources.is_empty()).collect()
+    }
+
+    pub fn total_resources(&self) -> usize {
+        self.groups.iter().map(|g| g.resources.len()).sum()
+    }
+
+    pub fn set_commit_message(&mut self, msg: &str) {
+        self.commit_message = msg.to_string();
+    }
+
+    pub fn resources_by_state(&self, state: BfqScmResourceState) -> Vec<&BfqScmResource> {
+        self.groups.iter().flat_map(|g| g.resources.iter()).filter(|r| r.state == state).collect()
+    }
+}
+
+
+// bfr_ Debug Breakpoint Model
+
+/// Breakpoint kind in the debug model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfrBreakpointKind {
+    Line,
+    Conditional,
+    Logpoint,
+    Function,
+    Data,
+    Exception,
+    Inline,
+}
+
+/// A debug breakpoint.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BfrBreakpoint {
+    pub id: u64,
+    pub kind: BfrBreakpointKind,
+    pub file: String,
+    pub line: usize,
+    pub column: Option<usize>,
+    pub condition: Option<String>,
+    pub hit_condition: Option<String>,
+    pub log_message: Option<String>,
+    pub enabled: bool,
+    pub verified: bool,
+    pub hit_count: u64,
+}
+
+/// Breakpoint manager that tracks all breakpoints.
+#[derive(Debug, Clone)]
+pub struct BfrBreakpointManager {
+    breakpoints: Vec<BfrBreakpoint>,
+    next_id: u64,
+}
+
+impl BfrBreakpointManager {
+    pub fn new() -> Self {
+        Self { breakpoints: Vec::new(), next_id: 1 }
+    }
+
+    pub fn add_line_breakpoint(&mut self, file: &str, line: usize) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.breakpoints.push(BfrBreakpoint {
+            id, kind: BfrBreakpointKind::Line, file: file.to_string(),
+            line, column: None, condition: None, hit_condition: None,
+            log_message: None, enabled: true, verified: false, hit_count: 0,
+        });
+        id
+    }
+
+    pub fn add_conditional(&mut self, file: &str, line: usize, condition: &str) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.breakpoints.push(BfrBreakpoint {
+            id, kind: BfrBreakpointKind::Conditional, file: file.to_string(),
+            line, column: None, condition: Some(condition.to_string()),
+            hit_condition: None, log_message: None, enabled: true, verified: false, hit_count: 0,
+        });
+        id
+    }
+
+    pub fn add_logpoint(&mut self, file: &str, line: usize, message: &str) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.breakpoints.push(BfrBreakpoint {
+            id, kind: BfrBreakpointKind::Logpoint, file: file.to_string(),
+            line, column: None, condition: None, hit_condition: None,
+            log_message: Some(message.to_string()), enabled: true, verified: false, hit_count: 0,
+        });
+        id
+    }
+
+    pub fn remove(&mut self, id: u64) -> bool {
+        if let Some(pos) = self.breakpoints.iter().position(|b| b.id == id) {
+            self.breakpoints.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn toggle(&mut self, id: u64) -> bool {
+        if let Some(bp) = self.breakpoints.iter_mut().find(|b| b.id == id) {
+            bp.enabled = !bp.enabled;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn verify(&mut self, id: u64) {
+        if let Some(bp) = self.breakpoints.iter_mut().find(|b| b.id == id) {
+            bp.verified = true;
+        }
+    }
+
+    pub fn record_hit(&mut self, id: u64) {
+        if let Some(bp) = self.breakpoints.iter_mut().find(|b| b.id == id) {
+            bp.hit_count += 1;
+        }
+    }
+
+    pub fn breakpoints_for_file(&self, file: &str) -> Vec<&BfrBreakpoint> {
+        self.breakpoints.iter().filter(|b| b.file == file).collect()
+    }
+
+    pub fn enabled_breakpoints(&self) -> Vec<&BfrBreakpoint> {
+        self.breakpoints.iter().filter(|b| b.enabled).collect()
+    }
+
+    pub fn count(&self) -> usize {
+        self.breakpoints.len()
+    }
+
+    pub fn clear_all(&mut self) {
+        self.breakpoints.clear();
+    }
+
+    pub fn get(&self, id: u64) -> Option<&BfrBreakpoint> {
+        self.breakpoints.iter().find(|b| b.id == id)
+    }
+}
+
+
+// bfs_ Debug Call Stack Model
+
+/// A stack frame in the debug call stack.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BfsStackFrame {
+    pub id: u64,
+    pub name: String,
+    pub source_file: Option<String>,
+    pub line: usize,
+    pub column: usize,
+    pub module_name: Option<String>,
+    pub presentation_hint: BfsFrameHint,
+}
+
+/// How to present a stack frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfsFrameHint {
+    Normal,
+    Label,
+    Subtle,
+    Deemphasize,
+}
+
+/// Thread state in the debugger.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfsThreadState {
+    Running,
+    Stopped,
+    Terminated,
+}
+
+/// A thread in the debug session.
+#[derive(Debug, Clone)]
+pub struct BfsThread {
+    pub id: u64,
+    pub name: String,
+    pub state: BfsThreadState,
+    pub frames: Vec<BfsStackFrame>,
+}
+
+/// Debug call stack model managing all threads and their frames.
+#[derive(Debug, Clone)]
+pub struct BfsCallStack {
+    pub threads: Vec<BfsThread>,
+    pub focused_thread_id: Option<u64>,
+    pub focused_frame_id: Option<u64>,
+}
+
+impl BfsCallStack {
+    pub fn new() -> Self {
+        Self { threads: Vec::new(), focused_thread_id: None, focused_frame_id: None }
+    }
+
+    pub fn add_thread(&mut self, id: u64, name: &str) {
+        self.threads.push(BfsThread {
+            id, name: name.to_string(), state: BfsThreadState::Running,
+            frames: Vec::new(),
+        });
+    }
+
+    pub fn stop_thread(&mut self, thread_id: u64, frames: Vec<BfsStackFrame>) {
+        if let Some(t) = self.threads.iter_mut().find(|t| t.id == thread_id) {
+            t.state = BfsThreadState::Stopped;
+            t.frames = frames;
+        }
+    }
+
+    pub fn continue_thread(&mut self, thread_id: u64) {
+        if let Some(t) = self.threads.iter_mut().find(|t| t.id == thread_id) {
+            t.state = BfsThreadState::Running;
+            t.frames.clear();
+        }
+    }
+
+    pub fn terminate_thread(&mut self, thread_id: u64) {
+        if let Some(t) = self.threads.iter_mut().find(|t| t.id == thread_id) {
+            t.state = BfsThreadState::Terminated;
+            t.frames.clear();
+        }
+    }
+
+    pub fn focus_thread(&mut self, thread_id: u64) {
+        self.focused_thread_id = Some(thread_id);
+        if let Some(t) = self.threads.iter().find(|t| t.id == thread_id) {
+            self.focused_frame_id = t.frames.first().map(|f| f.id);
+        }
+    }
+
+    pub fn focus_frame(&mut self, frame_id: u64) {
+        self.focused_frame_id = Some(frame_id);
+    }
+
+    pub fn focused_thread(&self) -> Option<&BfsThread> {
+        self.focused_thread_id.and_then(|id| self.threads.iter().find(|t| t.id == id))
+    }
+
+    pub fn focused_frame(&self) -> Option<&BfsStackFrame> {
+        self.focused_thread()
+            .and_then(|t| {
+                self.focused_frame_id
+                    .and_then(|fid| t.frames.iter().find(|f| f.id == fid))
+            })
+    }
+
+    pub fn thread_count(&self) -> usize {
+        self.threads.len()
+    }
+
+    pub fn stopped_threads(&self) -> Vec<&BfsThread> {
+        self.threads.iter().filter(|t| t.state == BfsThreadState::Stopped).collect()
+    }
+}
+
+
+// bft_ Watch Expression Model
+
+/// Value type of a watch expression result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BftValueKind {
+    String,
+    Number,
+    Boolean,
+    Object,
+    Array,
+    Null,
+    Error,
+    Undefined,
+}
+
+/// A watch expression in the debug watch panel.
+#[derive(Debug, Clone)]
+pub struct BftWatchExpression {
+    pub id: u64,
+    pub expression: String,
+    pub value: Option<String>,
+    pub value_kind: BftValueKind,
+    pub has_children: bool,
+    pub children: Vec<BftWatchExpression>,
+    pub error_message: Option<String>,
+}
+
+/// Watch expression panel model.
+#[derive(Debug, Clone)]
+pub struct BftWatchPanel {
+    expressions: Vec<BftWatchExpression>,
+    next_id: u64,
+    selected_index: Option<usize>,
+}
+
+impl BftWatchPanel {
+    pub fn new() -> Self {
+        Self { expressions: Vec::new(), next_id: 1, selected_index: None }
+    }
+
+    pub fn add_expression(&mut self, expr: &str) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.expressions.push(BftWatchExpression {
+            id, expression: expr.to_string(), value: None,
+            value_kind: BftValueKind::Undefined, has_children: false,
+            children: Vec::new(), error_message: None,
+        });
+        id
+    }
+
+    pub fn remove_expression(&mut self, id: u64) -> bool {
+        if let Some(pos) = self.expressions.iter().position(|e| e.id == id) {
+            self.expressions.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn update_value(&mut self, id: u64, value: &str, kind: BftValueKind) {
+        if let Some(expr) = self.expressions.iter_mut().find(|e| e.id == id) {
+            expr.value = Some(value.to_string());
+            expr.value_kind = kind;
+            expr.error_message = None;
+        }
+    }
+
+    pub fn set_error(&mut self, id: u64, message: &str) {
+        if let Some(expr) = self.expressions.iter_mut().find(|e| e.id == id) {
+            expr.value = None;
+            expr.value_kind = BftValueKind::Error;
+            expr.error_message = Some(message.to_string());
+        }
+    }
+
+    pub fn set_children(&mut self, id: u64, children: Vec<BftWatchExpression>) {
+        if let Some(expr) = self.expressions.iter_mut().find(|e| e.id == id) {
+            expr.has_children = !children.is_empty();
+            expr.children = children;
+        }
+    }
+
+    pub fn edit_expression(&mut self, id: u64, new_expr: &str) -> bool {
+        if let Some(expr) = self.expressions.iter_mut().find(|e| e.id == id) {
+            expr.expression = new_expr.to_string();
+            expr.value = None;
+            expr.value_kind = BftValueKind::Undefined;
+            expr.error_message = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn select(&mut self, index: usize) {
+        if index < self.expressions.len() {
+            self.selected_index = Some(index);
+        }
+    }
+
+    pub fn selected(&self) -> Option<&BftWatchExpression> {
+        self.selected_index.and_then(|i| self.expressions.get(i))
+    }
+
+    pub fn count(&self) -> usize {
+        self.expressions.len()
+    }
+
+    pub fn expressions(&self) -> &[BftWatchExpression] {
+        &self.expressions
+    }
+
+    pub fn clear_all_values(&mut self) {
+        for expr in &mut self.expressions {
+            expr.value = None;
+            expr.value_kind = BftValueKind::Undefined;
+            expr.children.clear();
+            expr.has_children = false;
+        }
+    }
+
+    pub fn move_up(&mut self, id: u64) -> bool {
+        if let Some(pos) = self.expressions.iter().position(|e| e.id == id) {
+            if pos > 0 {
+                self.expressions.swap(pos, pos - 1);
+                return true;
+            }
+        }
+        false
+    }
+}
+
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -49129,4 +49743,503 @@ mod tests_bfo {
         item.line = Some(42);
         assert_eq!(item.line, Some(42));
     }
+
+    // bfp_ tests
+
+    #[test]
+    fn test_bfp_breadcrumb_from_path() {
+        let bar = BfpBreadcrumbBar::new("/src/editor/main.rs");
+        assert_eq!(bar.depth(), 3);
+        assert_eq!(bar.elements[0].label, "src");
+        assert_eq!(bar.elements[0].kind, BfpBreadcrumbKind::Folder);
+        assert_eq!(bar.elements[2].label, "main.rs");
+        assert_eq!(bar.elements[2].kind, BfpBreadcrumbKind::File);
+    }
+
+    #[test]
+    fn test_bfp_focus_navigation() {
+        let mut bar = BfpBreadcrumbBar::new("/a/b/c.rs");
+        bar.focus_element(0);
+        assert_eq!(bar.active_label(), Some("a"));
+        bar.focus_next();
+        assert_eq!(bar.active_label(), Some("b"));
+        bar.focus_next();
+        assert_eq!(bar.active_label(), Some("c.rs"));
+        bar.focus_next();
+        assert_eq!(bar.active_label(), Some("c.rs"));
+    }
+
+    #[test]
+    fn test_bfp_focus_prev() {
+        let mut bar = BfpBreadcrumbBar::new("/x/y/z.ts");
+        bar.focus_element(2);
+        assert_eq!(bar.active_label(), Some("z.ts"));
+        bar.focus_prev();
+        assert_eq!(bar.active_label(), Some("y"));
+        bar.focus_prev();
+        assert_eq!(bar.active_label(), Some("x"));
+        bar.focus_prev();
+        assert_eq!(bar.active_label(), Some("x"));
+    }
+
+    #[test]
+    fn test_bfp_add_symbol() {
+        let mut bar = BfpBreadcrumbBar::new("/lib.rs");
+        bar.add_symbol("MyStruct", BfpBreadcrumbKind::Type);
+        bar.add_symbol("my_func", BfpBreadcrumbKind::Symbol);
+        assert_eq!(bar.depth(), 3);
+        assert_eq!(bar.elements[1].kind, BfpBreadcrumbKind::Type);
+        assert_eq!(bar.elements[2].kind, BfpBreadcrumbKind::Symbol);
+    }
+
+    #[test]
+    fn test_bfp_visibility() {
+        let mut bar = BfpBreadcrumbBar::new("/test.py");
+        assert!(bar.is_visible);
+        bar.is_visible = false;
+        assert!(!bar.is_visible);
+    }
+
+    #[test]
+    fn test_bfp_empty_path() {
+        let bar = BfpBreadcrumbBar::new("");
+        assert_eq!(bar.depth(), 0);
+        assert_eq!(bar.active_label(), None);
+    }
+
+    #[test]
+    fn test_bfp_single_segment() {
+        let bar = BfpBreadcrumbBar::new("/README.md");
+        assert_eq!(bar.depth(), 1);
+        assert_eq!(bar.elements[0].kind, BfpBreadcrumbKind::File);
+    }
+
+    #[test]
+    fn test_bfp_focus_clears_previous() {
+        let mut bar = BfpBreadcrumbBar::new("/a/b/c");
+        bar.focus_element(0);
+        assert!(bar.elements[0].is_active);
+        bar.focus_element(2);
+        assert!(!bar.elements[0].is_active);
+        assert!(bar.elements[2].is_active);
+    }
+
+    #[test]
+    fn test_bfp_kind_variants() {
+        let kinds = [
+            BfpBreadcrumbKind::File, BfpBreadcrumbKind::Folder,
+            BfpBreadcrumbKind::Symbol, BfpBreadcrumbKind::Type,
+            BfpBreadcrumbKind::Module, BfpBreadcrumbKind::Namespace,
+            BfpBreadcrumbKind::Package,
+        ];
+        assert_eq!(kinds.len(), 7);
+    }
+
+    #[test]
+    fn test_bfp_deep_path() {
+        let bar = BfpBreadcrumbBar::new("/a/b/c/d/e/f/g.rs");
+        assert_eq!(bar.depth(), 7);
+        assert_eq!(bar.elements[5].kind, BfpBreadcrumbKind::Folder);
+        assert_eq!(bar.elements[6].kind, BfpBreadcrumbKind::File);
+    }
+
+
+    // bfq_ tests
+
+    #[test]
+    fn test_bfq_scm_view_creation() {
+        let view = BfqScmView::new("Git");
+        assert_eq!(view.provider_label, "Git");
+        assert_eq!(view.total_resources(), 0);
+    }
+
+    #[test]
+    fn test_bfq_add_groups_and_resources() {
+        let mut view = BfqScmView::new("Git");
+        view.add_group("staged", "Staged Changes", true);
+        view.add_group("changes", "Changes", false);
+        view.add_resource("changes", "src/main.rs", BfqScmResourceState::Modified);
+        view.add_resource("changes", "new.txt", BfqScmResourceState::Untracked);
+        assert_eq!(view.total_resources(), 2);
+    }
+
+    #[test]
+    fn test_bfq_stage_unstage() {
+        let mut view = BfqScmView::new("Git");
+        view.add_group("staged", "Staged", true);
+        view.add_group("changes", "Changes", false);
+        view.add_resource("changes", "file.rs", BfqScmResourceState::Modified);
+        assert!(view.stage_resource("file.rs"));
+        assert_eq!(view.groups[0].resources.len(), 1);
+        assert_eq!(view.groups[1].resources.len(), 0);
+        assert!(view.unstage_resource("file.rs"));
+        assert_eq!(view.groups[0].resources.len(), 0);
+        assert_eq!(view.groups[1].resources.len(), 1);
+    }
+
+    #[test]
+    fn test_bfq_visible_groups() {
+        let mut view = BfqScmView::new("Git");
+        view.add_group("staged", "Staged", true);
+        view.add_group("changes", "Changes", false);
+        assert_eq!(view.visible_groups().len(), 1);
+        view.add_resource("staged", "a.rs", BfqScmResourceState::Added);
+        assert_eq!(view.visible_groups().len(), 2);
+    }
+
+    #[test]
+    fn test_bfq_commit_message() {
+        let mut view = BfqScmView::new("Git");
+        view.set_commit_message("fix: resolve bug");
+        assert_eq!(view.commit_message, "fix: resolve bug");
+    }
+
+    #[test]
+    fn test_bfq_resources_by_state() {
+        let mut view = BfqScmView::new("Git");
+        view.add_group("changes", "Changes", false);
+        view.add_resource("changes", "a.rs", BfqScmResourceState::Modified);
+        view.add_resource("changes", "b.rs", BfqScmResourceState::Added);
+        view.add_resource("changes", "c.rs", BfqScmResourceState::Modified);
+        let mods = view.resources_by_state(BfqScmResourceState::Modified);
+        assert_eq!(mods.len(), 2);
+    }
+
+    #[test]
+    fn test_bfq_resource_state_variants() {
+        let states = [
+            BfqScmResourceState::Untracked, BfqScmResourceState::Modified,
+            BfqScmResourceState::Added, BfqScmResourceState::Deleted,
+            BfqScmResourceState::Renamed, BfqScmResourceState::Copied,
+            BfqScmResourceState::Conflicting, BfqScmResourceState::Ignored,
+        ];
+        assert_eq!(states.len(), 8);
+    }
+
+    #[test]
+    fn test_bfq_stage_nonexistent() {
+        let mut view = BfqScmView::new("Git");
+        view.add_group("staged", "Staged", true);
+        view.add_group("changes", "Changes", false);
+        assert!(!view.stage_resource("nonexistent.rs"));
+    }
+
+    #[test]
+    fn test_bfq_root_uri() {
+        let mut view = BfqScmView::new("Git");
+        view.root_uri = Some("/workspace".to_string());
+        assert_eq!(view.root_uri.as_deref(), Some("/workspace"));
+    }
+
+    #[test]
+    fn test_bfq_renamed_resource() {
+        let mut view = BfqScmView::new("Git");
+        view.add_group("changes", "Changes", false);
+        view.add_resource("changes", "new_name.rs", BfqScmResourceState::Renamed);
+        let r = &view.groups[0].resources[0];
+        assert_eq!(r.state, BfqScmResourceState::Renamed);
+    }
+
+
+    // bfr_ tests
+
+    #[test]
+    fn test_bfr_add_line_breakpoint() {
+        let mut mgr = BfrBreakpointManager::new();
+        let id = mgr.add_line_breakpoint("main.rs", 10);
+        assert_eq!(mgr.count(), 1);
+        let bp = mgr.get(id).unwrap();
+        assert_eq!(bp.kind, BfrBreakpointKind::Line);
+        assert_eq!(bp.line, 10);
+    }
+
+    #[test]
+    fn test_bfr_conditional_breakpoint() {
+        let mut mgr = BfrBreakpointManager::new();
+        let id = mgr.add_conditional("main.rs", 20, "x > 5");
+        let bp = mgr.get(id).unwrap();
+        assert_eq!(bp.kind, BfrBreakpointKind::Conditional);
+        assert_eq!(bp.condition.as_deref(), Some("x > 5"));
+    }
+
+    #[test]
+    fn test_bfr_logpoint() {
+        let mut mgr = BfrBreakpointManager::new();
+        let id = mgr.add_logpoint("main.rs", 30, "value is {x}");
+        let bp = mgr.get(id).unwrap();
+        assert_eq!(bp.kind, BfrBreakpointKind::Logpoint);
+    }
+
+    #[test]
+    fn test_bfr_toggle() {
+        let mut mgr = BfrBreakpointManager::new();
+        let id = mgr.add_line_breakpoint("a.rs", 1);
+        assert!(mgr.get(id).unwrap().enabled);
+        mgr.toggle(id);
+        assert!(!mgr.get(id).unwrap().enabled);
+        mgr.toggle(id);
+        assert!(mgr.get(id).unwrap().enabled);
+    }
+
+    #[test]
+    fn test_bfr_remove() {
+        let mut mgr = BfrBreakpointManager::new();
+        let id1 = mgr.add_line_breakpoint("a.rs", 1);
+        let _id2 = mgr.add_line_breakpoint("b.rs", 2);
+        assert_eq!(mgr.count(), 2);
+        assert!(mgr.remove(id1));
+        assert_eq!(mgr.count(), 1);
+        assert!(!mgr.remove(id1));
+    }
+
+    #[test]
+    fn test_bfr_verify_and_hit() {
+        let mut mgr = BfrBreakpointManager::new();
+        let id = mgr.add_line_breakpoint("main.rs", 5);
+        mgr.verify(id);
+        assert!(mgr.get(id).unwrap().verified);
+        mgr.record_hit(id);
+        mgr.record_hit(id);
+        assert_eq!(mgr.get(id).unwrap().hit_count, 2);
+    }
+
+    #[test]
+    fn test_bfr_breakpoints_for_file() {
+        let mut mgr = BfrBreakpointManager::new();
+        mgr.add_line_breakpoint("a.rs", 1);
+        mgr.add_line_breakpoint("b.rs", 2);
+        mgr.add_line_breakpoint("a.rs", 10);
+        assert_eq!(mgr.breakpoints_for_file("a.rs").len(), 2);
+    }
+
+    #[test]
+    fn test_bfr_enabled_breakpoints() {
+        let mut mgr = BfrBreakpointManager::new();
+        let id1 = mgr.add_line_breakpoint("a.rs", 1);
+        let _id2 = mgr.add_line_breakpoint("b.rs", 2);
+        mgr.toggle(id1);
+        assert_eq!(mgr.enabled_breakpoints().len(), 1);
+    }
+
+    #[test]
+    fn test_bfr_clear_all() {
+        let mut mgr = BfrBreakpointManager::new();
+        mgr.add_line_breakpoint("a.rs", 1);
+        mgr.add_line_breakpoint("b.rs", 2);
+        mgr.clear_all();
+        assert_eq!(mgr.count(), 0);
+    }
+
+    #[test]
+    fn test_bfr_kind_variants() {
+        let kinds = [
+            BfrBreakpointKind::Line, BfrBreakpointKind::Conditional,
+            BfrBreakpointKind::Logpoint, BfrBreakpointKind::Function,
+            BfrBreakpointKind::Data, BfrBreakpointKind::Exception,
+            BfrBreakpointKind::Inline,
+        ];
+        assert_eq!(kinds.len(), 7);
+    }
+
+
+    // bfs_ tests
+
+    #[test]
+    fn test_bfs_call_stack_creation() {
+        let cs = BfsCallStack::new();
+        assert_eq!(cs.thread_count(), 0);
+        assert!(cs.focused_thread().is_none());
+    }
+
+    #[test]
+    fn test_bfs_add_thread_and_stop() {
+        let mut cs = BfsCallStack::new();
+        cs.add_thread(1, "main");
+        assert_eq!(cs.threads[0].state, BfsThreadState::Running);
+        let frames = vec![BfsStackFrame {
+            id: 100, name: "foo".into(), source_file: Some("main.rs".into()),
+            line: 10, column: 1, module_name: None, presentation_hint: BfsFrameHint::Normal,
+        }];
+        cs.stop_thread(1, frames);
+        assert_eq!(cs.threads[0].state, BfsThreadState::Stopped);
+        assert_eq!(cs.threads[0].frames.len(), 1);
+    }
+
+    #[test]
+    fn test_bfs_continue_thread() {
+        let mut cs = BfsCallStack::new();
+        cs.add_thread(1, "main");
+        cs.stop_thread(1, vec![BfsStackFrame {
+            id: 1, name: "f".into(), source_file: None, line: 1, column: 0,
+            module_name: None, presentation_hint: BfsFrameHint::Normal,
+        }]);
+        cs.continue_thread(1);
+        assert_eq!(cs.threads[0].state, BfsThreadState::Running);
+        assert!(cs.threads[0].frames.is_empty());
+    }
+
+    #[test]
+    fn test_bfs_focus_thread_and_frame() {
+        let mut cs = BfsCallStack::new();
+        cs.add_thread(1, "main");
+        let frames = vec![
+            BfsStackFrame { id: 10, name: "a".into(), source_file: None, line: 1, column: 0, module_name: None, presentation_hint: BfsFrameHint::Normal },
+            BfsStackFrame { id: 11, name: "b".into(), source_file: None, line: 2, column: 0, module_name: None, presentation_hint: BfsFrameHint::Subtle },
+        ];
+        cs.stop_thread(1, frames);
+        cs.focus_thread(1);
+        assert_eq!(cs.focused_frame().unwrap().id, 10);
+        cs.focus_frame(11);
+        assert_eq!(cs.focused_frame().unwrap().name, "b");
+    }
+
+    #[test]
+    fn test_bfs_stopped_threads() {
+        let mut cs = BfsCallStack::new();
+        cs.add_thread(1, "t1");
+        cs.add_thread(2, "t2");
+        cs.stop_thread(1, vec![]);
+        assert_eq!(cs.stopped_threads().len(), 1);
+    }
+
+    #[test]
+    fn test_bfs_terminate_thread() {
+        let mut cs = BfsCallStack::new();
+        cs.add_thread(1, "main");
+        cs.terminate_thread(1);
+        assert_eq!(cs.threads[0].state, BfsThreadState::Terminated);
+    }
+
+    #[test]
+    fn test_bfs_frame_hint_variants() {
+        let hints = [BfsFrameHint::Normal, BfsFrameHint::Label, BfsFrameHint::Subtle, BfsFrameHint::Deemphasize];
+        assert_eq!(hints.len(), 4);
+    }
+
+    #[test]
+    fn test_bfs_thread_state_variants() {
+        let states = [BfsThreadState::Running, BfsThreadState::Stopped, BfsThreadState::Terminated];
+        assert_eq!(states.len(), 3);
+    }
+
+    #[test]
+    fn test_bfs_multiple_threads() {
+        let mut cs = BfsCallStack::new();
+        for i in 1..=5 {
+            cs.add_thread(i, &format!("thread-{}", i));
+        }
+        assert_eq!(cs.thread_count(), 5);
+    }
+
+    #[test]
+    fn test_bfs_focused_thread_none() {
+        let cs = BfsCallStack::new();
+        assert!(cs.focused_thread().is_none());
+        assert!(cs.focused_frame().is_none());
+    }
+
+
+    // bft_ tests
+
+    #[test]
+    fn test_bft_watch_panel_creation() {
+        let panel = BftWatchPanel::new();
+        assert_eq!(panel.count(), 0);
+        assert!(panel.selected().is_none());
+    }
+
+    #[test]
+    fn test_bft_add_and_remove() {
+        let mut panel = BftWatchPanel::new();
+        let id1 = panel.add_expression("x + 1");
+        let id2 = panel.add_expression("arr.length");
+        assert_eq!(panel.count(), 2);
+        assert!(panel.remove_expression(id1));
+        assert_eq!(panel.count(), 1);
+        assert_eq!(panel.expressions()[0].id, id2);
+    }
+
+    #[test]
+    fn test_bft_update_value() {
+        let mut panel = BftWatchPanel::new();
+        let id = panel.add_expression("counter");
+        panel.update_value(id, "42", BftValueKind::Number);
+        let expr = &panel.expressions()[0];
+        assert_eq!(expr.value.as_deref(), Some("42"));
+        assert_eq!(expr.value_kind, BftValueKind::Number);
+    }
+
+    #[test]
+    fn test_bft_set_error() {
+        let mut panel = BftWatchPanel::new();
+        let id = panel.add_expression("bad.expr");
+        panel.set_error(id, "ReferenceError");
+        let expr = &panel.expressions()[0];
+        assert_eq!(expr.value_kind, BftValueKind::Error);
+    }
+
+    #[test]
+    fn test_bft_edit_expression() {
+        let mut panel = BftWatchPanel::new();
+        let id = panel.add_expression("old");
+        panel.update_value(id, "1", BftValueKind::Number);
+        assert!(panel.edit_expression(id, "new_expr"));
+        assert_eq!(panel.expressions()[0].expression, "new_expr");
+        assert!(panel.expressions()[0].value.is_none());
+    }
+
+    #[test]
+    fn test_bft_children() {
+        let mut panel = BftWatchPanel::new();
+        let id = panel.add_expression("obj");
+        let children = vec![
+            BftWatchExpression {
+                id: 100, expression: "obj.a".into(), value: Some("1".into()),
+                value_kind: BftValueKind::Number, has_children: false,
+                children: vec![], error_message: None,
+            },
+        ];
+        panel.set_children(id, children);
+        assert!(panel.expressions()[0].has_children);
+        assert_eq!(panel.expressions()[0].children.len(), 1);
+    }
+
+    #[test]
+    fn test_bft_selection() {
+        let mut panel = BftWatchPanel::new();
+        panel.add_expression("a");
+        panel.add_expression("b");
+        panel.select(1);
+        assert_eq!(panel.selected().unwrap().expression, "b");
+    }
+
+    #[test]
+    fn test_bft_clear_all_values() {
+        let mut panel = BftWatchPanel::new();
+        let id = panel.add_expression("x");
+        panel.update_value(id, "10", BftValueKind::Number);
+        panel.clear_all_values();
+        assert!(panel.expressions()[0].value.is_none());
+    }
+
+    #[test]
+    fn test_bft_move_up() {
+        let mut panel = BftWatchPanel::new();
+        let _id1 = panel.add_expression("first");
+        let id2 = panel.add_expression("second");
+        assert!(panel.move_up(id2));
+        assert_eq!(panel.expressions()[0].expression, "second");
+    }
+
+    #[test]
+    fn test_bft_value_kind_variants() {
+        let kinds = [
+            BftValueKind::String, BftValueKind::Number, BftValueKind::Boolean,
+            BftValueKind::Object, BftValueKind::Array, BftValueKind::Null,
+            BftValueKind::Error, BftValueKind::Undefined,
+        ];
+        assert_eq!(kinds.len(), 8);
+    }
+
+
 }
