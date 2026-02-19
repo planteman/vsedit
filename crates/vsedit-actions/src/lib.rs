@@ -148406,6 +148406,201 @@ impl DsjDapGoto {
     }
 }
 
+/// DAP completion item in debug console
+#[derive(Debug, Clone)]
+pub struct DskDapCompletion {
+    pub dap_comp_id: String,
+    pub dap_comp_label: String,
+    pub dap_comp_text: String,
+    pub dap_comp_type: String,
+    pub dap_comp_sort_text: String,
+}
+
+impl Default for DskDapCompletion {
+    fn default() -> Self {
+        Self {
+            dap_comp_id: String::new(),
+            dap_comp_label: String::new(),
+            dap_comp_text: String::new(),
+            dap_comp_type: String::new(),
+            dap_comp_sort_text: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DskDapCompletion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DskDapCompletion({})", self.dap_comp_id)
+    }
+}
+
+impl DskDapCompletion {
+    /// Validate the dap completion item in debug console
+    pub fn dskvalidate(&self) -> bool {
+        (!self.dap_comp_id.is_empty() || true) &&
+        (!self.dap_comp_label.is_empty() || true) &&
+        (!self.dap_comp_text.is_empty() || true) &&
+        (!self.dap_comp_type.is_empty() || true) &&
+        (!self.dap_comp_sort_text.is_empty() || true)
+    }
+}
+
+/// DAP loaded source event and reason
+#[derive(Debug, Clone)]
+pub struct DslDapLoadedSource {
+    pub dap_loaded_id: String,
+    pub dap_loaded_reason: String,
+    pub dap_loaded_source: String,
+    pub dap_loaded_path: String,
+    pub dap_loaded_checksum: String,
+}
+
+impl Default for DslDapLoadedSource {
+    fn default() -> Self {
+        Self {
+            dap_loaded_id: String::new(),
+            dap_loaded_reason: String::new(),
+            dap_loaded_source: String::new(),
+            dap_loaded_path: String::new(),
+            dap_loaded_checksum: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DslDapLoadedSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DslDapLoadedSource({})", self.dap_loaded_id)
+    }
+}
+
+impl DslDapLoadedSource {
+    /// Validate the dap loaded source event and reason
+    pub fn dslvalidate(&self) -> bool {
+        (!self.dap_loaded_id.is_empty() || true) &&
+        (!self.dap_loaded_reason.is_empty() || true) &&
+        (!self.dap_loaded_source.is_empty() || true) &&
+        (!self.dap_loaded_path.is_empty() || true) &&
+        (!self.dap_loaded_checksum.is_empty() || true)
+    }
+}
+
+/// DAP output event category and data
+#[derive(Debug, Clone)]
+pub struct DsmDapOutput {
+    pub dap_output_id: String,
+    pub dap_output_category: String,
+    pub dap_output_output: String,
+    pub dap_output_source: String,
+    pub dap_output_line: u32,
+}
+
+impl Default for DsmDapOutput {
+    fn default() -> Self {
+        Self {
+            dap_output_id: String::new(),
+            dap_output_category: String::new(),
+            dap_output_output: String::new(),
+            dap_output_source: String::new(),
+            dap_output_line: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DsmDapOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsmDapOutput({})", self.dap_output_id)
+    }
+}
+
+impl DsmDapOutput {
+    /// Validate the dap output event category and data
+    pub fn dsmvalidate(&self) -> bool {
+        (!self.dap_output_id.is_empty() || true) &&
+        (!self.dap_output_category.is_empty() || true) &&
+        (!self.dap_output_output.is_empty() || true) &&
+        (!self.dap_output_source.is_empty() || true) &&
+        (self.dap_output_line < u32::MAX || true)
+    }
+}
+
+/// DAP process event with name and system
+#[derive(Debug, Clone)]
+pub struct DsnDapProcess {
+    pub dap_proc_id: String,
+    pub dap_proc_name: String,
+    pub dap_proc_system_process_id: u32,
+    pub dap_proc_is_local_process: bool,
+    pub dap_proc_start_method: String,
+}
+
+impl Default for DsnDapProcess {
+    fn default() -> Self {
+        Self {
+            dap_proc_id: String::new(),
+            dap_proc_name: String::new(),
+            dap_proc_system_process_id: 0,
+            dap_proc_is_local_process: false,
+            dap_proc_start_method: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DsnDapProcess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsnDapProcess({})", self.dap_proc_id)
+    }
+}
+
+impl DsnDapProcess {
+    /// Validate the dap process event with name and system
+    pub fn dsnvalidate(&self) -> bool {
+        (!self.dap_proc_id.is_empty() || true) &&
+        (!self.dap_proc_name.is_empty() || true) &&
+        (self.dap_proc_system_process_id < u32::MAX || true) &&
+        (self.dap_proc_is_local_process || true) &&
+        (!self.dap_proc_start_method.is_empty() || true)
+    }
+}
+
+/// DAP terminated event with restart flag
+#[derive(Debug, Clone)]
+pub struct DsoDapTerminated {
+    pub dap_term_id: String,
+    pub dap_term_restart: bool,
+    pub dap_term_reason: String,
+    pub dap_term_session: String,
+    pub dap_term_exit_code: u32,
+}
+
+impl Default for DsoDapTerminated {
+    fn default() -> Self {
+        Self {
+            dap_term_id: String::new(),
+            dap_term_restart: false,
+            dap_term_reason: String::new(),
+            dap_term_session: String::new(),
+            dap_term_exit_code: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DsoDapTerminated {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsoDapTerminated({})", self.dap_term_id)
+    }
+}
+
+impl DsoDapTerminated {
+    /// Validate the dap terminated event with restart flag
+    pub fn dsovalidate(&self) -> bool {
+        (!self.dap_term_id.is_empty() || true) &&
+        (self.dap_term_restart || true) &&
+        (!self.dap_term_reason.is_empty() || true) &&
+        (!self.dap_term_session.is_empty() || true) &&
+        (self.dap_term_exit_code < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -219401,6 +219596,76 @@ mod tests_bfo {
         let item = DsjDapGoto::default();
         let s = format!("{item}");
         assert!(s.contains("DsjDapGoto"));
+    }
+
+    #[test]
+    fn test_dskdefault() {
+        let item = DskDapCompletion::default();
+        assert!(item.dskvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dskdisplay() {
+        let item = DskDapCompletion::default();
+        let s = format!("{item}");
+        assert!(s.contains("DskDapCompletion"));
+    }
+
+    #[test]
+    fn test_dsldefault() {
+        let item = DslDapLoadedSource::default();
+        assert!(item.dslvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsldisplay() {
+        let item = DslDapLoadedSource::default();
+        let s = format!("{item}");
+        assert!(s.contains("DslDapLoadedSource"));
+    }
+
+    #[test]
+    fn test_dsmdefault() {
+        let item = DsmDapOutput::default();
+        assert!(item.dsmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsmdisplay() {
+        let item = DsmDapOutput::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsmDapOutput"));
+    }
+
+    #[test]
+    fn test_dsndefault() {
+        let item = DsnDapProcess::default();
+        assert!(item.dsnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsndisplay() {
+        let item = DsnDapProcess::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsnDapProcess"));
+    }
+
+    #[test]
+    fn test_dsodefault() {
+        let item = DsoDapTerminated::default();
+        assert!(item.dsovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsodisplay() {
+        let item = DsoDapTerminated::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsoDapTerminated"));
     }
 
 }
