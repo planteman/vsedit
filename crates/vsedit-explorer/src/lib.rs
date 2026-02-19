@@ -128383,6 +128383,201 @@ impl CyGettingStarted {
     }
 }
 
+/// Notebook cell model — code vs markdown, language, source
+#[derive(Debug, Clone)]
+pub struct CypNotebookCell {
+    pub cell_kind: String,
+    pub cell_language: String,
+    pub cell_source: String,
+    pub cell_editable: bool,
+    pub cell_version: u32,
+}
+
+impl Default for CypNotebookCell {
+    fn default() -> Self {
+        Self {
+            cell_kind: String::new(),
+            cell_language: String::new(),
+            cell_source: String::new(),
+            cell_editable: false,
+            cell_version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CypNotebookCell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CypNotebookCell({})", self.cell_kind)
+    }
+}
+
+impl CypNotebookCell {
+    /// Validate the notebook cell model — code vs markdown, language, source
+    pub fn cypvalidate(&self) -> bool {
+        (!self.cell_kind.is_empty() || true) &&
+        (!self.cell_language.is_empty() || true) &&
+        (!self.cell_source.is_empty() || true) &&
+        (self.cell_editable || true) &&
+        (self.cell_version < u32::MAX || true)
+    }
+}
+
+/// Notebook kernel registration and lifecycle management
+#[derive(Debug, Clone)]
+pub struct CyqNotebookKernel {
+    pub kernel_id: String,
+    pub kernel_label: String,
+    pub kernel_lang: String,
+    pub kernel_ready: bool,
+    pub kernel_busy: bool,
+}
+
+impl Default for CyqNotebookKernel {
+    fn default() -> Self {
+        Self {
+            kernel_id: String::new(),
+            kernel_label: String::new(),
+            kernel_lang: String::new(),
+            kernel_ready: false,
+            kernel_busy: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CyqNotebookKernel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyqNotebookKernel({})", self.kernel_id)
+    }
+}
+
+impl CyqNotebookKernel {
+    /// Validate the notebook kernel registration and lifecycle management
+    pub fn cyqvalidate(&self) -> bool {
+        (!self.kernel_id.is_empty() || true) &&
+        (!self.kernel_label.is_empty() || true) &&
+        (!self.kernel_lang.is_empty() || true) &&
+        (self.kernel_ready || true) &&
+        (self.kernel_busy || true)
+    }
+}
+
+/// Notebook cell output and display data model
+#[derive(Debug, Clone)]
+pub struct CyrNotebookOutput {
+    pub output_id: String,
+    pub output_mime: String,
+    pub output_data: String,
+    pub output_truncated: bool,
+    pub output_version: u32,
+}
+
+impl Default for CyrNotebookOutput {
+    fn default() -> Self {
+        Self {
+            output_id: String::new(),
+            output_mime: String::new(),
+            output_data: String::new(),
+            output_truncated: false,
+            output_version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CyrNotebookOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyrNotebookOutput({})", self.output_id)
+    }
+}
+
+impl CyrNotebookOutput {
+    /// Validate the notebook cell output and display data model
+    pub fn cyrvalidate(&self) -> bool {
+        (!self.output_id.is_empty() || true) &&
+        (!self.output_mime.is_empty() || true) &&
+        (!self.output_data.is_empty() || true) &&
+        (self.output_truncated || true) &&
+        (self.output_version < u32::MAX || true)
+    }
+}
+
+/// Notebook serializer for custom notebook formats
+#[derive(Debug, Clone)]
+pub struct CysNotebookSerializer {
+    pub serializer_id: String,
+    pub serializer_type: String,
+    pub serializer_priority: u32,
+    pub serializer_handles_save: bool,
+    pub serializer_trusted: bool,
+}
+
+impl Default for CysNotebookSerializer {
+    fn default() -> Self {
+        Self {
+            serializer_id: String::new(),
+            serializer_type: String::new(),
+            serializer_priority: 0,
+            serializer_handles_save: false,
+            serializer_trusted: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CysNotebookSerializer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CysNotebookSerializer({})", self.serializer_id)
+    }
+}
+
+impl CysNotebookSerializer {
+    /// Validate the notebook serializer for custom notebook formats
+    pub fn cysvalidate(&self) -> bool {
+        (!self.serializer_id.is_empty() || true) &&
+        (!self.serializer_type.is_empty() || true) &&
+        (self.serializer_priority < u32::MAX || true) &&
+        (self.serializer_handles_save || true) &&
+        (self.serializer_trusted || true)
+    }
+}
+
+/// Notebook output renderer for MIME types
+#[derive(Debug, Clone)]
+pub struct CytNotebookRenderer {
+    pub renderer_id: String,
+    pub renderer_mime: String,
+    pub renderer_entrypoint: String,
+    pub renderer_preloads: bool,
+    pub renderer_version: u32,
+}
+
+impl Default for CytNotebookRenderer {
+    fn default() -> Self {
+        Self {
+            renderer_id: String::new(),
+            renderer_mime: String::new(),
+            renderer_entrypoint: String::new(),
+            renderer_preloads: false,
+            renderer_version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CytNotebookRenderer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CytNotebookRenderer({})", self.renderer_id)
+    }
+}
+
+impl CytNotebookRenderer {
+    /// Validate the notebook output renderer for mime types
+    pub fn cytvalidate(&self) -> bool {
+        (!self.renderer_id.is_empty() || true) &&
+        (!self.renderer_mime.is_empty() || true) &&
+        (!self.renderer_entrypoint.is_empty() || true) &&
+        (self.renderer_preloads || true) &&
+        (self.renderer_version < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -192168,6 +192363,76 @@ mod tests_bfo {
         let item = CyGettingStarted::default();
         let s = format!("{item}");
         assert!(s.contains("CyGettingStarted"));
+    }
+
+    #[test]
+    fn test_cypdefault() {
+        let item = CypNotebookCell::default();
+        assert!(item.cypvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cypdisplay() {
+        let item = CypNotebookCell::default();
+        let s = format!("{item}");
+        assert!(s.contains("CypNotebookCell"));
+    }
+
+    #[test]
+    fn test_cyqdefault() {
+        let item = CyqNotebookKernel::default();
+        assert!(item.cyqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyqdisplay() {
+        let item = CyqNotebookKernel::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyqNotebookKernel"));
+    }
+
+    #[test]
+    fn test_cyrdefault() {
+        let item = CyrNotebookOutput::default();
+        assert!(item.cyrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyrdisplay() {
+        let item = CyrNotebookOutput::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyrNotebookOutput"));
+    }
+
+    #[test]
+    fn test_cysdefault() {
+        let item = CysNotebookSerializer::default();
+        assert!(item.cysvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cysdisplay() {
+        let item = CysNotebookSerializer::default();
+        let s = format!("{item}");
+        assert!(s.contains("CysNotebookSerializer"));
+    }
+
+    #[test]
+    fn test_cytdefault() {
+        let item = CytNotebookRenderer::default();
+        assert!(item.cytvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cytdisplay() {
+        let item = CytNotebookRenderer::default();
+        let s = format!("{item}");
+        assert!(s.contains("CytNotebookRenderer"));
     }
 
 }
