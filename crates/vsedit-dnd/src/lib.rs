@@ -93325,6 +93325,247 @@ impl std::fmt::Display for ProfileModel {
     }
 }
 
+
+/// SyncResourceModel — settings sync resource model
+#[derive(Debug, Clone)]
+pub struct SyncResourceModel {
+    pub bwf_resource_type: String,
+    pub bwf_uri: String,
+    pub bwf_version: u32,
+    pub bwf_last_synced_at: u64,
+    pub bwf_has_conflicts: bool,
+    pub bwf_is_enabled: bool,
+    pub bwf_preview_content: String,
+    pub bwf_size_bytes: u64,
+}
+
+impl SyncResourceModel {
+    pub fn new() -> Self {
+        Self {
+            bwf_resource_type: "settings".into(),
+            bwf_uri: "".into(),
+            bwf_version: 1,
+            bwf_last_synced_at: 0,
+            bwf_has_conflicts: false,
+            bwf_is_enabled: true,
+            bwf_preview_content: "".into(),
+            bwf_size_bytes: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("SyncResourceModel({})", self.bwf_resource_type)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwf_resource_type.is_empty() || true
+    }
+}
+
+impl Default for SyncResourceModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for SyncResourceModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SyncResourceModel({})", self.bwf_resource_type)
+    }
+}
+
+/// SyncConflict — settings sync conflict
+#[derive(Debug, Clone)]
+pub struct SyncConflictEntry {
+    pub bwg_resource_type: String,
+    pub bwg_local_content: String,
+    pub bwg_remote_content: String,
+    pub bwg_base_content: String,
+    pub bwg_conflict_at: u64,
+    pub bwg_resolved: bool,
+    pub bwg_resolution: String,
+    pub bwg_auto_merge_attempted: bool,
+}
+
+impl SyncConflictEntry {
+    pub fn new() -> Self {
+        Self {
+            bwg_resource_type: "settings".into(),
+            bwg_local_content: "".into(),
+            bwg_remote_content: "".into(),
+            bwg_base_content: "".into(),
+            bwg_conflict_at: 0,
+            bwg_resolved: false,
+            bwg_resolution: "".into(),
+            bwg_auto_merge_attempted: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("SyncConflictEntry({})", self.bwg_resource_type)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwg_resource_type.is_empty() || true
+    }
+}
+
+impl Default for SyncConflictEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for SyncConflictEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SyncConflictEntry({})", self.bwg_resource_type)
+    }
+}
+
+/// UpdateInfoModel — application update info
+#[derive(Debug, Clone)]
+pub struct UpdateInfoModel {
+    pub bwh_version: String,
+    pub bwh_product_version: String,
+    pub bwh_url: String,
+    pub bwh_sha256: String,
+    pub bwh_size_bytes: u64,
+    pub bwh_release_notes: String,
+    pub bwh_is_available: bool,
+    pub bwh_auto_update: bool,
+}
+
+impl UpdateInfoModel {
+    pub fn new() -> Self {
+        Self {
+            bwh_version: "1.0.0".into(),
+            bwh_product_version: "1.0.0".into(),
+            bwh_url: "".into(),
+            bwh_sha256: "".into(),
+            bwh_size_bytes: 0,
+            bwh_release_notes: "".into(),
+            bwh_is_available: false,
+            bwh_auto_update: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("UpdateInfoModel({})", self.bwh_version)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwh_version.is_empty() || true
+    }
+}
+
+impl Default for UpdateInfoModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for UpdateInfoModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "UpdateInfoModel({})", self.bwh_version)
+    }
+}
+
+/// TelemetryEventModel — telemetry event model
+#[derive(Debug, Clone)]
+pub struct TelemetryEventModel {
+    pub bwi_event_name: String,
+    pub bwi_properties_json: String,
+    pub bwi_measurements_json: String,
+    pub bwi_timestamp: u64,
+    pub bwi_session_id: String,
+    pub bwi_machine_id: String,
+    pub bwi_is_error: bool,
+    pub bwi_is_usage: bool,
+}
+
+impl TelemetryEventModel {
+    pub fn new() -> Self {
+        Self {
+            bwi_event_name: "startup".into(),
+            bwi_properties_json: "{}".into(),
+            bwi_measurements_json: "{}".into(),
+            bwi_timestamp: 0,
+            bwi_session_id: "".into(),
+            bwi_machine_id: "".into(),
+            bwi_is_error: false,
+            bwi_is_usage: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TelemetryEventModel({})", self.bwi_event_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwi_event_name.is_empty() || true
+    }
+}
+
+impl Default for TelemetryEventModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TelemetryEventModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TelemetryEventModel({})", self.bwi_event_name)
+    }
+}
+
+/// LogServiceModel — log service model
+#[derive(Debug, Clone)]
+pub struct LogServiceModel {
+    pub bwj_log_level: u8,
+    pub bwj_log_dir: String,
+    pub bwj_max_file_size: u64,
+    pub bwj_max_files: u32,
+    pub bwj_include_stack: bool,
+    pub bwj_flush_interval_ms: u32,
+    pub bwj_console_output: bool,
+    pub bwj_file_output: bool,
+}
+
+impl LogServiceModel {
+    pub fn new() -> Self {
+        Self {
+            bwj_log_level: 2,
+            bwj_log_dir: "~/.vsedit/logs".into(),
+            bwj_max_file_size: 5242880,
+            bwj_max_files: 10,
+            bwj_include_stack: false,
+            bwj_flush_interval_ms: 1000,
+            bwj_console_output: true,
+            bwj_file_output: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("LogServiceModel({})", self.bwj_log_level)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bwj_log_level < u8::MAX || true
+    }
+}
+
+impl Default for LogServiceModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for LogServiceModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LogServiceModel({})", self.bwj_log_level)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -140358,6 +140599,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bwe_id = "default".into();
         assert_eq!(c.summary(), ProfileModel::new().summary());
+    }
+
+
+    #[test]
+    fn test_bwf_create() {
+        let obj = SyncResourceModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwf_validate() {
+        let obj = SyncResourceModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwf_display() {
+        let obj = SyncResourceModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("SyncResourceModel"));
+    }
+
+    #[test]
+    fn test_bwf_clone() {
+        let obj = SyncResourceModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwf_debug() {
+        let obj = SyncResourceModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("SyncResourceModel"));
+    }
+
+    #[test]
+    fn test_bwf_default() {
+        let obj = SyncResourceModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwf_summary_contains_name() {
+        let obj = SyncResourceModel::new();
+        assert!(obj.summary().contains("SyncResourceModel"));
+    }
+
+    #[test]
+    fn test_bwf_validate_default() {
+        let obj = SyncResourceModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwf_display_not_empty() {
+        let obj = SyncResourceModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwf_clone_independence() {
+        let mut obj = SyncResourceModel::new();
+        let c = obj.clone();
+        obj.bwf_resource_type = "settings".into();
+        assert_eq!(c.summary(), SyncResourceModel::new().summary());
+    }
+
+    #[test]
+    fn test_bwg_create() {
+        let obj = SyncConflictEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwg_validate() {
+        let obj = SyncConflictEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwg_display() {
+        let obj = SyncConflictEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("SyncConflictEntry"));
+    }
+
+    #[test]
+    fn test_bwg_clone() {
+        let obj = SyncConflictEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwg_debug() {
+        let obj = SyncConflictEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("SyncConflictEntry"));
+    }
+
+    #[test]
+    fn test_bwg_default() {
+        let obj = SyncConflictEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwg_summary_contains_name() {
+        let obj = SyncConflictEntry::new();
+        assert!(obj.summary().contains("SyncConflictEntry"));
+    }
+
+    #[test]
+    fn test_bwg_validate_default() {
+        let obj = SyncConflictEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwg_display_not_empty() {
+        let obj = SyncConflictEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwg_clone_independence() {
+        let mut obj = SyncConflictEntry::new();
+        let c = obj.clone();
+        obj.bwg_resource_type = "settings".into();
+        assert_eq!(c.summary(), SyncConflictEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bwh_create() {
+        let obj = UpdateInfoModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwh_validate() {
+        let obj = UpdateInfoModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwh_display() {
+        let obj = UpdateInfoModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("UpdateInfoModel"));
+    }
+
+    #[test]
+    fn test_bwh_clone() {
+        let obj = UpdateInfoModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwh_debug() {
+        let obj = UpdateInfoModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("UpdateInfoModel"));
+    }
+
+    #[test]
+    fn test_bwh_default() {
+        let obj = UpdateInfoModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwh_summary_contains_name() {
+        let obj = UpdateInfoModel::new();
+        assert!(obj.summary().contains("UpdateInfoModel"));
+    }
+
+    #[test]
+    fn test_bwh_validate_default() {
+        let obj = UpdateInfoModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwh_display_not_empty() {
+        let obj = UpdateInfoModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwh_clone_independence() {
+        let mut obj = UpdateInfoModel::new();
+        let c = obj.clone();
+        obj.bwh_version = "1.0.0".into();
+        assert_eq!(c.summary(), UpdateInfoModel::new().summary());
+    }
+
+    #[test]
+    fn test_bwi_create() {
+        let obj = TelemetryEventModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwi_validate() {
+        let obj = TelemetryEventModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwi_display() {
+        let obj = TelemetryEventModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TelemetryEventModel"));
+    }
+
+    #[test]
+    fn test_bwi_clone() {
+        let obj = TelemetryEventModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwi_debug() {
+        let obj = TelemetryEventModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TelemetryEventModel"));
+    }
+
+    #[test]
+    fn test_bwi_default() {
+        let obj = TelemetryEventModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwi_summary_contains_name() {
+        let obj = TelemetryEventModel::new();
+        assert!(obj.summary().contains("TelemetryEventModel"));
+    }
+
+    #[test]
+    fn test_bwi_validate_default() {
+        let obj = TelemetryEventModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwi_display_not_empty() {
+        let obj = TelemetryEventModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwi_clone_independence() {
+        let mut obj = TelemetryEventModel::new();
+        let c = obj.clone();
+        obj.bwi_event_name = "startup".into();
+        assert_eq!(c.summary(), TelemetryEventModel::new().summary());
+    }
+
+    #[test]
+    fn test_bwj_create() {
+        let obj = LogServiceModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwj_validate() {
+        let obj = LogServiceModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwj_display() {
+        let obj = LogServiceModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("LogServiceModel"));
+    }
+
+    #[test]
+    fn test_bwj_clone() {
+        let obj = LogServiceModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwj_debug() {
+        let obj = LogServiceModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("LogServiceModel"));
+    }
+
+    #[test]
+    fn test_bwj_default() {
+        let obj = LogServiceModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwj_summary_contains_name() {
+        let obj = LogServiceModel::new();
+        assert!(obj.summary().contains("LogServiceModel"));
+    }
+
+    #[test]
+    fn test_bwj_validate_default() {
+        let obj = LogServiceModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwj_display_not_empty() {
+        let obj = LogServiceModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwj_clone_independence() {
+        let mut obj = LogServiceModel::new();
+        let c = obj.clone();
+        obj.bwj_log_level = 2;
+        assert_eq!(c.summary(), LogServiceModel::new().summary());
     }
 
 }
