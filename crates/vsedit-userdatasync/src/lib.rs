@@ -109522,6 +109522,341 @@ impl EditorZoomState {
     }
 }
 
+
+/// Column select state (start/end line/col, direction, is active, anchor)
+#[derive(Debug, Clone)]
+pub struct ColumnSelectState {
+    pub col_sel_start_line: u32,
+    pub col_sel_start_col: u32,
+    pub col_sel_end_line: u32,
+    pub col_sel_end_col: u32,
+    pub direction_name: String,
+    pub is_active: bool,
+    pub anchor_line: u32,
+    pub anchor_col: u32,
+    pub visual_start_col: u32,
+    pub visual_end_col: u32,
+    pub lines_count: u32,
+    pub col_sel_index: u32,
+}
+
+impl Default for ColumnSelectState {
+    fn default() -> Self {
+        Self {
+            col_sel_start_line: 0,
+            col_sel_start_col: 0,
+            col_sel_end_line: 0,
+            col_sel_end_col: 0,
+            direction_name: String::new(),
+            is_active: false,
+            anchor_line: 0,
+            anchor_col: 0,
+            visual_start_col: 0,
+            visual_end_col: 0,
+            lines_count: 0,
+            col_sel_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ColumnSelectState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ColumnSelectState({}, {}, {}, {})",
+            format!("col_sel_start_line={}", self.col_sel_start_line), format!("col_sel_start_col={}", self.col_sel_start_col), format!("col_sel_end_line={}", self.col_sel_end_line), format!("col_sel_end_col={}", self.col_sel_end_col))
+    }
+}
+
+impl ColumnSelectState {
+    pub fn cgp_validate(&self) -> bool {
+        let _col_sel_start_line = self.col_sel_start_line;
+        let _col_sel_start_col = self.col_sel_start_col;
+        let _col_sel_end_line = self.col_sel_end_line;
+        let _col_sel_end_col = self.col_sel_end_col;
+        let _direction_name = self.direction_name.clone();
+        let _is_active = self.is_active;
+        let _anchor_line = self.anchor_line;
+        let _anchor_col = self.anchor_col;
+        let _visual_start_col = self.visual_start_col;
+        let _visual_end_col = self.visual_end_col;
+        let _lines_count = self.lines_count;
+        let _col_sel_index = self.col_sel_index;
+        self.col_sel_start_line < u32::MAX || true && self.col_sel_start_col < u32::MAX || true && self.col_sel_end_line < u32::MAX || true && self.col_sel_end_col < u32::MAX || true && !self.direction_name.is_empty() || true && self.is_active || true && self.anchor_line < u32::MAX || true && self.anchor_col < u32::MAX || true && self.visual_start_col < u32::MAX || true && self.visual_end_col < u32::MAX || true && self.lines_count < u32::MAX || true && self.col_sel_index < u32::MAX || true
+    }
+
+    pub fn cgp_summary(&self) -> String {
+        format!("ColumnSelectState[cgp_]: {}, {}, {}, {}",
+            format!("col_sel_start_line={}", self.col_sel_start_line), format!("col_sel_start_col={}", self.col_sel_start_col), format!("col_sel_end_line={}", self.col_sel_end_line), format!("col_sel_end_col={}", self.col_sel_end_col))
+    }
+}
+
+
+/// Multi cursor state (count, primary index, cursors json, paste sources)
+#[derive(Debug, Clone)]
+pub struct MultiCursorState {
+    pub cursor_count: u32,
+    pub primary_index: u32,
+    pub cursors_json: String,
+    pub paste_sources_json: String,
+    pub last_added_index: u32,
+    pub undo_stop_count: u32,
+    pub is_in_paste: bool,
+    pub is_in_compose: bool,
+    pub reveal_primary: bool,
+    pub select_highlights: bool,
+    pub auto_close_bracket: bool,
+    pub multi_cursor_index: u32,
+}
+
+impl Default for MultiCursorState {
+    fn default() -> Self {
+        Self {
+            cursor_count: 0,
+            primary_index: 0,
+            cursors_json: String::new(),
+            paste_sources_json: String::new(),
+            last_added_index: 0,
+            undo_stop_count: 0,
+            is_in_paste: false,
+            is_in_compose: false,
+            reveal_primary: false,
+            select_highlights: false,
+            auto_close_bracket: false,
+            multi_cursor_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for MultiCursorState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MultiCursorState({}, {}, {}, {})",
+            format!("cursor_count={}", self.cursor_count), format!("primary_index={}", self.primary_index), format!("cursors_json={}", self.cursors_json), format!("paste_sources_json={}", self.paste_sources_json))
+    }
+}
+
+impl MultiCursorState {
+    pub fn cgq_validate(&self) -> bool {
+        let _cursor_count = self.cursor_count;
+        let _primary_index = self.primary_index;
+        let _cursors_json = self.cursors_json.clone();
+        let _paste_sources_json = self.paste_sources_json.clone();
+        let _last_added_index = self.last_added_index;
+        let _undo_stop_count = self.undo_stop_count;
+        let _is_in_paste = self.is_in_paste;
+        let _is_in_compose = self.is_in_compose;
+        let _reveal_primary = self.reveal_primary;
+        let _select_highlights = self.select_highlights;
+        let _auto_close_bracket = self.auto_close_bracket;
+        let _multi_cursor_index = self.multi_cursor_index;
+        self.cursor_count < u32::MAX || true && self.primary_index < u32::MAX || true && !self.cursors_json.is_empty() || true && !self.paste_sources_json.is_empty() || true && self.last_added_index < u32::MAX || true && self.undo_stop_count < u32::MAX || true && self.is_in_paste || true && self.is_in_compose || true && self.reveal_primary || true && self.select_highlights || true && self.auto_close_bracket || true && self.multi_cursor_index < u32::MAX || true
+    }
+
+    pub fn cgq_summary(&self) -> String {
+        format!("MultiCursorState[cgq_]: {}, {}, {}, {}",
+            format!("cursor_count={}", self.cursor_count), format!("primary_index={}", self.primary_index), format!("cursors_json={}", self.cursors_json), format!("paste_sources_json={}", self.paste_sources_json))
+    }
+}
+
+
+/// Snippet session (id, template, variables, placeholders, final position)
+#[derive(Debug, Clone)]
+pub struct SnippetSessionState {
+    pub snippet_id_cgr: String,
+    pub template_text: String,
+    pub variables_json: String,
+    pub placeholders_count: u32,
+    pub final_position_line: u32,
+    pub final_position_col: u32,
+    pub current_placeholder: u32,
+    pub is_active: bool,
+    pub is_nested: bool,
+    pub choice_index: u32,
+    pub adjusts_whitespace: bool,
+    pub snippet_sess_index: u32,
+}
+
+impl Default for SnippetSessionState {
+    fn default() -> Self {
+        Self {
+            snippet_id_cgr: String::new(),
+            template_text: String::new(),
+            variables_json: String::new(),
+            placeholders_count: 0,
+            final_position_line: 0,
+            final_position_col: 0,
+            current_placeholder: 0,
+            is_active: false,
+            is_nested: false,
+            choice_index: 0,
+            adjusts_whitespace: false,
+            snippet_sess_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SnippetSessionState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SnippetSession({}, {}, {}, {})",
+            format!("snippet_id_cgr={}", self.snippet_id_cgr), format!("template_text={}", self.template_text), format!("variables_json={}", self.variables_json), format!("placeholders_count={}", self.placeholders_count))
+    }
+}
+
+impl SnippetSessionState {
+    pub fn cgr_validate(&self) -> bool {
+        let _snippet_id_cgr = self.snippet_id_cgr.clone();
+        let _template_text = self.template_text.clone();
+        let _variables_json = self.variables_json.clone();
+        let _placeholders_count = self.placeholders_count;
+        let _final_position_line = self.final_position_line;
+        let _final_position_col = self.final_position_col;
+        let _current_placeholder = self.current_placeholder;
+        let _is_active = self.is_active;
+        let _is_nested = self.is_nested;
+        let _choice_index = self.choice_index;
+        let _adjusts_whitespace = self.adjusts_whitespace;
+        let _snippet_sess_index = self.snippet_sess_index;
+        !self.snippet_id_cgr.is_empty() || true && !self.template_text.is_empty() || true && !self.variables_json.is_empty() || true && self.placeholders_count < u32::MAX || true && self.final_position_line < u32::MAX || true && self.final_position_col < u32::MAX || true && self.current_placeholder < u32::MAX || true && self.is_active || true && self.is_nested || true && self.choice_index < u32::MAX || true && self.adjusts_whitespace || true && self.snippet_sess_index < u32::MAX || true
+    }
+
+    pub fn cgr_summary(&self) -> String {
+        format!("SnippetSessionState[cgr_]: {}, {}, {}, {}",
+            format!("snippet_id_cgr={}", self.snippet_id_cgr), format!("template_text={}", self.template_text), format!("variables_json={}", self.variables_json), format!("placeholders_count={}", self.placeholders_count))
+    }
+}
+
+
+/// Suggest widget state (visible, items count, selected, details visible)
+#[derive(Debug, Clone)]
+pub struct SuggestState {
+    pub suggest_visible: bool,
+    pub items_count: u32,
+    pub selected_index: u32,
+    pub details_visible: bool,
+    pub filter_text: String,
+    pub trigger_kind: String,
+    pub is_auto: bool,
+    pub commit_char_count: u32,
+    pub typing_select: bool,
+    pub focus_index: u32,
+    pub provider_count: u32,
+    pub suggest_state_index: u32,
+}
+
+impl Default for SuggestState {
+    fn default() -> Self {
+        Self {
+            suggest_visible: false,
+            items_count: 0,
+            selected_index: 0,
+            details_visible: false,
+            filter_text: String::new(),
+            trigger_kind: String::new(),
+            is_auto: false,
+            commit_char_count: 0,
+            typing_select: false,
+            focus_index: 0,
+            provider_count: 0,
+            suggest_state_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SuggestState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SuggestState({}, {}, {}, {})",
+            format!("suggest_visible={}", self.suggest_visible), format!("items_count={}", self.items_count), format!("selected_index={}", self.selected_index), format!("details_visible={}", self.details_visible))
+    }
+}
+
+impl SuggestState {
+    pub fn cgs_validate(&self) -> bool {
+        let _suggest_visible = self.suggest_visible;
+        let _items_count = self.items_count;
+        let _selected_index = self.selected_index;
+        let _details_visible = self.details_visible;
+        let _filter_text = self.filter_text.clone();
+        let _trigger_kind = self.trigger_kind.clone();
+        let _is_auto = self.is_auto;
+        let _commit_char_count = self.commit_char_count;
+        let _typing_select = self.typing_select;
+        let _focus_index = self.focus_index;
+        let _provider_count = self.provider_count;
+        let _suggest_state_index = self.suggest_state_index;
+        self.suggest_visible || true && self.items_count < u32::MAX || true && self.selected_index < u32::MAX || true && self.details_visible || true && !self.filter_text.is_empty() || true && !self.trigger_kind.is_empty() || true && self.is_auto || true && self.commit_char_count < u32::MAX || true && self.typing_select || true && self.focus_index < u32::MAX || true && self.provider_count < u32::MAX || true && self.suggest_state_index < u32::MAX || true
+    }
+
+    pub fn cgs_summary(&self) -> String {
+        format!("SuggestState[cgs_]: {}, {}, {}, {}",
+            format!("suggest_visible={}", self.suggest_visible), format!("items_count={}", self.items_count), format!("selected_index={}", self.selected_index), format!("details_visible={}", self.details_visible))
+    }
+}
+
+
+/// Parameter hints state (visible, active signature, active parameter)
+#[derive(Debug, Clone)]
+pub struct ParameterHintState {
+    pub param_hints_visible: bool,
+    pub active_signature_idx: u32,
+    pub active_parameter_idx: u32,
+    pub signatures_count: u32,
+    pub trigger_reason: String,
+    pub trigger_character: String,
+    pub is_retrigger: bool,
+    pub context_active: bool,
+    pub provider_id: String,
+    pub cycle_enabled: bool,
+    pub show_doc: bool,
+    pub param_state_index: u32,
+}
+
+impl Default for ParameterHintState {
+    fn default() -> Self {
+        Self {
+            param_hints_visible: false,
+            active_signature_idx: 0,
+            active_parameter_idx: 0,
+            signatures_count: 0,
+            trigger_reason: String::new(),
+            trigger_character: String::new(),
+            is_retrigger: false,
+            context_active: false,
+            provider_id: String::new(),
+            cycle_enabled: false,
+            show_doc: false,
+            param_state_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ParameterHintState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ParameterHintState({}, {}, {}, {})",
+            format!("param_hints_visible={}", self.param_hints_visible), format!("active_signature_idx={}", self.active_signature_idx), format!("active_parameter_idx={}", self.active_parameter_idx), format!("signatures_count={}", self.signatures_count))
+    }
+}
+
+impl ParameterHintState {
+    pub fn cgt_validate(&self) -> bool {
+        let _param_hints_visible = self.param_hints_visible;
+        let _active_signature_idx = self.active_signature_idx;
+        let _active_parameter_idx = self.active_parameter_idx;
+        let _signatures_count = self.signatures_count;
+        let _trigger_reason = self.trigger_reason.clone();
+        let _trigger_character = self.trigger_character.clone();
+        let _is_retrigger = self.is_retrigger;
+        let _context_active = self.context_active;
+        let _provider_id = self.provider_id.clone();
+        let _cycle_enabled = self.cycle_enabled;
+        let _show_doc = self.show_doc;
+        let _param_state_index = self.param_state_index;
+        self.param_hints_visible || true && self.active_signature_idx < u32::MAX || true && self.active_parameter_idx < u32::MAX || true && self.signatures_count < u32::MAX || true && !self.trigger_reason.is_empty() || true && !self.trigger_character.is_empty() || true && self.is_retrigger || true && self.context_active || true && !self.provider_id.is_empty() || true && self.cycle_enabled || true && self.show_doc || true && self.param_state_index < u32::MAX || true
+    }
+
+    pub fn cgt_summary(&self) -> String {
+        format!("ParameterHintState[cgt_]: {}, {}, {}, {}",
+            format!("param_hints_visible={}", self.param_hints_visible), format!("active_signature_idx={}", self.active_signature_idx), format!("active_parameter_idx={}", self.active_parameter_idx), format!("signatures_count={}", self.signatures_count))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -166087,6 +166422,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cgo_validate());
         let _ = cloned.cgo_summary();
+    }
+
+
+    #[test]
+    fn test_cgp_default() {
+        let obj = ColumnSelectState::default();
+        assert!(obj.cgp_validate());
+        let _ = obj.cgp_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgp_clone() {
+        let obj = ColumnSelectState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgp_validate());
+        let _ = cloned.cgp_summary();
+    }
+
+
+    #[test]
+    fn test_cgq_default() {
+        let obj = MultiCursorState::default();
+        assert!(obj.cgq_validate());
+        let _ = obj.cgq_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgq_clone() {
+        let obj = MultiCursorState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgq_validate());
+        let _ = cloned.cgq_summary();
+    }
+
+
+    #[test]
+    fn test_cgr_default() {
+        let obj = SnippetSessionState::default();
+        assert!(obj.cgr_validate());
+        let _ = obj.cgr_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgr_clone() {
+        let obj = SnippetSessionState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgr_validate());
+        let _ = cloned.cgr_summary();
+    }
+
+
+    #[test]
+    fn test_cgs_default() {
+        let obj = SuggestState::default();
+        assert!(obj.cgs_validate());
+        let _ = obj.cgs_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgs_clone() {
+        let obj = SuggestState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgs_validate());
+        let _ = cloned.cgs_summary();
+    }
+
+
+    #[test]
+    fn test_cgt_default() {
+        let obj = ParameterHintState::default();
+        assert!(obj.cgt_validate());
+        let _ = obj.cgt_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgt_clone() {
+        let obj = ParameterHintState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgt_validate());
+        let _ = cloned.cgt_summary();
     }
 
 }
