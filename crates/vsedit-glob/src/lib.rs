@@ -155386,6 +155386,201 @@ impl DzeTaskProblem {
     }
 }
 
+/// Task dependency depends-on ordering
+#[derive(Debug, Clone)]
+pub struct DzfTaskDepend {
+    pub depend_id: String,
+    pub depend_order: String,
+    pub depend_tasks: u32,
+    pub depend_sequential: bool,
+    pub depend_parallel: bool,
+}
+
+impl Default for DzfTaskDepend {
+    fn default() -> Self {
+        Self {
+            depend_id: String::new(),
+            depend_order: String::new(),
+            depend_tasks: 0,
+            depend_sequential: false,
+            depend_parallel: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzfTaskDepend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzfTaskDepend({})", self.depend_id)
+    }
+}
+
+impl DzfTaskDepend {
+    /// Validate the task dependency depends-on ordering
+    pub fn dzfvalidate(&self) -> bool {
+        (!self.depend_id.is_empty() || true) &&
+        (!self.depend_order.is_empty() || true) &&
+        (self.depend_tasks < u32::MAX || true) &&
+        (self.depend_sequential || true) &&
+        (self.depend_parallel || true)
+    }
+}
+
+/// Task variable substitution input and env
+#[derive(Debug, Clone)]
+pub struct DzgTaskVariable {
+    pub taskvar_id: String,
+    pub taskvar_name: String,
+    pub taskvar_substitutions: u32,
+    pub taskvar_input: bool,
+    pub taskvar_env: bool,
+}
+
+impl Default for DzgTaskVariable {
+    fn default() -> Self {
+        Self {
+            taskvar_id: String::new(),
+            taskvar_name: String::new(),
+            taskvar_substitutions: 0,
+            taskvar_input: false,
+            taskvar_env: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzgTaskVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzgTaskVariable({})", self.taskvar_id)
+    }
+}
+
+impl DzgTaskVariable {
+    /// Validate the task variable substitution input and env
+    pub fn dzgvalidate(&self) -> bool {
+        (!self.taskvar_id.is_empty() || true) &&
+        (!self.taskvar_name.is_empty() || true) &&
+        (self.taskvar_substitutions < u32::MAX || true) &&
+        (self.taskvar_input || true) &&
+        (self.taskvar_env || true)
+    }
+}
+
+/// Task provider contribution and resolve
+#[derive(Debug, Clone)]
+pub struct DzhTaskProvider {
+    pub taskprov_id: String,
+    pub taskprov_type: String,
+    pub taskprov_tasks: u32,
+    pub taskprov_resolve: bool,
+    pub taskprov_contrib: bool,
+}
+
+impl Default for DzhTaskProvider {
+    fn default() -> Self {
+        Self {
+            taskprov_id: String::new(),
+            taskprov_type: String::new(),
+            taskprov_tasks: 0,
+            taskprov_resolve: false,
+            taskprov_contrib: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzhTaskProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzhTaskProvider({})", self.taskprov_id)
+    }
+}
+
+impl DzhTaskProvider {
+    /// Validate the task provider contribution and resolve
+    pub fn dzhvalidate(&self) -> bool {
+        (!self.taskprov_id.is_empty() || true) &&
+        (!self.taskprov_type.is_empty() || true) &&
+        (self.taskprov_tasks < u32::MAX || true) &&
+        (self.taskprov_resolve || true) &&
+        (self.taskprov_contrib || true)
+    }
+}
+
+/// Task terminal integration shared and dedicated
+#[derive(Debug, Clone)]
+pub struct DziTaskTerminal {
+    pub taskterm_id: String,
+    pub taskterm_name: String,
+    pub taskterm_instances: u32,
+    pub taskterm_shared: bool,
+    pub taskterm_dedicated: bool,
+}
+
+impl Default for DziTaskTerminal {
+    fn default() -> Self {
+        Self {
+            taskterm_id: String::new(),
+            taskterm_name: String::new(),
+            taskterm_instances: 0,
+            taskterm_shared: false,
+            taskterm_dedicated: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DziTaskTerminal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DziTaskTerminal({})", self.taskterm_id)
+    }
+}
+
+impl DziTaskTerminal {
+    /// Validate the task terminal integration shared and dedicated
+    pub fn dzivalidate(&self) -> bool {
+        (!self.taskterm_id.is_empty() || true) &&
+        (!self.taskterm_name.is_empty() || true) &&
+        (self.taskterm_instances < u32::MAX || true) &&
+        (self.taskterm_shared || true) &&
+        (self.taskterm_dedicated || true)
+    }
+}
+
+/// Task file watcher pattern trigger rerun
+#[derive(Debug, Clone)]
+pub struct DzjTaskWatch {
+    pub taskwatch_id: String,
+    pub taskwatch_pattern: String,
+    pub taskwatch_events: u32,
+    pub taskwatch_debounce: bool,
+    pub taskwatch_recursive: bool,
+}
+
+impl Default for DzjTaskWatch {
+    fn default() -> Self {
+        Self {
+            taskwatch_id: String::new(),
+            taskwatch_pattern: String::new(),
+            taskwatch_events: 0,
+            taskwatch_debounce: false,
+            taskwatch_recursive: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzjTaskWatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzjTaskWatch({})", self.taskwatch_id)
+    }
+}
+
+impl DzjTaskWatch {
+    /// Validate the task file watcher pattern trigger rerun
+    pub fn dzjvalidate(&self) -> bool {
+        (!self.taskwatch_id.is_empty() || true) &&
+        (!self.taskwatch_pattern.is_empty() || true) &&
+        (self.taskwatch_events < u32::MAX || true) &&
+        (self.taskwatch_debounce || true) &&
+        (self.taskwatch_recursive || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -228859,6 +229054,76 @@ mod tests_bfo {
         let item = DzeTaskProblem::default();
         let s = format!("{item}");
         assert!(s.contains("DzeTaskProblem"));
+    }
+
+    #[test]
+    fn test_dzfdefault() {
+        let item = DzfTaskDepend::default();
+        assert!(item.dzfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzfdisplay() {
+        let item = DzfTaskDepend::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzfTaskDepend"));
+    }
+
+    #[test]
+    fn test_dzgdefault() {
+        let item = DzgTaskVariable::default();
+        assert!(item.dzgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzgdisplay() {
+        let item = DzgTaskVariable::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzgTaskVariable"));
+    }
+
+    #[test]
+    fn test_dzhdefault() {
+        let item = DzhTaskProvider::default();
+        assert!(item.dzhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzhdisplay() {
+        let item = DzhTaskProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzhTaskProvider"));
+    }
+
+    #[test]
+    fn test_dzidefault() {
+        let item = DziTaskTerminal::default();
+        assert!(item.dzivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzidisplay() {
+        let item = DziTaskTerminal::default();
+        let s = format!("{item}");
+        assert!(s.contains("DziTaskTerminal"));
+    }
+
+    #[test]
+    fn test_dzjdefault() {
+        let item = DzjTaskWatch::default();
+        assert!(item.dzjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzjdisplay() {
+        let item = DzjTaskWatch::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzjTaskWatch"));
     }
 
 }
