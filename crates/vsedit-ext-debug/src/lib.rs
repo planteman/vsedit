@@ -47196,3 +47196,502 @@ mod bac_tests {
         assert_eq!(ch.last_line().unwrap().text, "second");
     }
 }
+
+
+// --- bad_: Debug console model ---
+
+/// Debug console output kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BadConsoleOutputKind {
+    Stdout,
+    Stderr,
+    Console,
+    Important,
+    Warning,
+    Error,
+    StartGroup,
+    StartGroupCollapsed,
+    EndGroup,
+}
+
+impl BadConsoleOutputKind {
+    pub fn is_error_like(&self) -> bool {
+        matches!(self, Self::Stderr | Self::Error | Self::Warning)
+    }
+
+    pub fn prefix(&self) -> &'static str {
+        match self {
+            Self::Stdout => "",
+            Self::Stderr => "[stderr]",
+            Self::Console => "",
+            Self::Important => "[!]",
+            Self::Warning => "[warn]",
+            Self::Error => "[error]",
+            Self::StartGroup => "> ",
+            Self::StartGroupCollapsed => "> ",
+            Self::EndGroup => "",
+        }
+    }
+}
+
+/// A single entry in the debug console.
+#[derive(Debug, Clone)]
+pub struct BadConsoleEntry {
+    pub kind: BadConsoleOutputKind,
+    pub text: String,
+    pub source: Option<String>,
+    pub line: Option<u32>,
+    pub column: Option<u32>,
+    pub timestamp_ms: u64,
+    pub group_depth: u32,
+}
+
+impl BadConsoleEntry {
+    pub fn new(kind: BadConsoleOutputKind, text: &str, timestamp_ms: u64) -> Self {
+        Self {
+            kind,
+            text: text.to_string(),
+            source: None,
+            line: None,
+            column: None,
+            timestamp_ms,
+            group_depth: 0,
+        }
+    }
+
+    pub fn with_location(mut self, source: &str, line: u32, column: u32) -> Self {
+        self.source = Some(source.to_string());
+        self.line = Some(line);
+        self.column = Some(column);
+        self
+    }
+
+    pub fn has_location(&self) -> bool {
+        self.source.is_some() && self.line.is_some()
+    }
+
+    pub fn formatted(&self) -> String {
+        let prefix = self.kind.prefix();
+        if prefix.is_empty() {
+            self.text.clone()
+        } else {
+            format!("{} {}", prefix, self.text)
+        }
+    }
+
+    pub fn location_string(&self) -> Option<String> {
+        match (&self.source, self.line, self.column) {
+            (Some(src), Some(l), Some(c)) => Some(format!("{}:{}:{}", src, l, c)),
+            (Some(src), Some(l), None) => Some(format!("{}:{}", src, l)),
+            (Some(src), None, _) => Some(src.clone()),
+            _ => None,
+        }
+    }
+}
+
+/// An expression evaluation result in the debug console.
+#[derive(Debug, Clone)]
+pub struct BadEvalResult {
+    pub expression: String,
+    pub result: String,
+    pub type_name: Option<String>,
+    pub is_error: bool,
+    pub variables_reference: u64,
+    pub timestamp_ms: u64,
+}
+
+impl BadEvalResult {
+    pub fn success(expression: &str, result: &str, timestamp_ms: u64) -> Self {
+        Self {
+            expression: expression.to_string(),
+            result: result.to_string(),
+            type_name: None,
+            is_error: false,
+            variables_reference: 0,
+            timestamp_ms,
+        }
+    }
+
+    pub fn error(expression: &str, message: &str, timestamp_ms: u64) -> Self {
+        Self {
+            expression: expression.to_string(),
+            result: message.to_string(),
+            type_name: None,
+            is_error: true,
+            variables_reference: 0,
+            timestamp_ms,
+        }
+    }
+
+    pub fn with_type(mut self, type_name: &str) -> Self {
+        self.type_name = Some(type_name.to_string());
+        self
+    }
+
+    pub fn has_children(&self) -> bool {
+        self.variables_reference > 0
+    }
+}
+
+/// Debug console item — either output or an eval result.
+#[derive(Debug, Clone)]
+pub enum BadConsoleItem {
+    Output(BadConsoleEntry),
+    Eval(BadEvalResult),
+}
+
+impl BadConsoleItem {
+    pub fn timestamp_ms(&self) -> u64 {
+        match self {
+            Self::Output(e) => e.timestamp_ms,
+            Self::Eval(r) => r.timestamp_ms,
+        }
+    }
+
+    pub fn display_text(&self) -> String {
+        match self {
+            Self::Output(e) => e.formatted(),
+            Self::Eval(r) => {
+                if r.is_error {
+                    format!("! {} => {}", r.expression, r.result)
+                } else {
+                    format!("> {} => {}", r.expression, r.result)
+                }
+            }
+        }
+    }
+
+    pub fn is_error(&self) -> bool {
+        match self {
+            Self::Output(e) => e.kind.is_error_like(),
+            Self::Eval(r) => r.is_error,
+        }
+    }
+}
+
+/// The debug console model.
+#[derive(Debug, Clone)]
+pub struct BadDebugConsole {
+    items: Vec<BadConsoleItem>,
+    max_items: usize,
+    group_depth: u32,
+    input_history: Vec<String>,
+    history_index: Option<usize>,
+    current_input: String,
+    filter_text: Option<String>,
+    word_wrap: bool,
+}
+
+impl BadDebugConsole {
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            max_items: 10_000,
+            group_depth: 0,
+            input_history: Vec::new(),
+            history_index: None,
+            current_input: String::new(),
+            filter_text: None,
+            word_wrap: true,
+        }
+    }
+
+    pub fn append_output(&mut self, kind: BadConsoleOutputKind, text: &str, timestamp_ms: u64) {
+        match kind {
+            BadConsoleOutputKind::StartGroup | BadConsoleOutputKind::StartGroupCollapsed => {
+                let mut entry = BadConsoleEntry::new(kind, text, timestamp_ms);
+                entry.group_depth = self.group_depth;
+                self.items.push(BadConsoleItem::Output(entry));
+                self.group_depth += 1;
+            }
+            BadConsoleOutputKind::EndGroup => {
+                if self.group_depth > 0 {
+                    self.group_depth -= 1;
+                }
+                let mut entry = BadConsoleEntry::new(kind, text, timestamp_ms);
+                entry.group_depth = self.group_depth;
+                self.items.push(BadConsoleItem::Output(entry));
+            }
+            _ => {
+                let mut entry = BadConsoleEntry::new(kind, text, timestamp_ms);
+                entry.group_depth = self.group_depth;
+                self.items.push(BadConsoleItem::Output(entry));
+            }
+        }
+        self.trim_items();
+    }
+
+    pub fn append_eval(&mut self, result: BadEvalResult) {
+        if self.input_history.last().map(|s| s.as_str()) != Some(&result.expression) {
+            self.input_history.push(result.expression.clone());
+        }
+        self.items.push(BadConsoleItem::Eval(result));
+        self.trim_items();
+    }
+
+    fn trim_items(&mut self) {
+        if self.items.len() > self.max_items {
+            let excess = self.items.len() - self.max_items;
+            self.items.drain(0..excess);
+        }
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn items(&self) -> &[BadConsoleItem] {
+        &self.items
+    }
+
+    pub fn filtered_items(&self) -> Vec<&BadConsoleItem> {
+        match &self.filter_text {
+            Some(filter) => {
+                let f = filter.to_lowercase();
+                self.items.iter()
+                    .filter(|item| item.display_text().to_lowercase().contains(&f))
+                    .collect()
+            }
+            None => self.items.iter().collect(),
+        }
+    }
+
+    pub fn set_filter(&mut self, filter: Option<String>) {
+        self.filter_text = filter;
+    }
+
+    pub fn clear(&mut self) {
+        self.items.clear();
+        self.group_depth = 0;
+    }
+
+    pub fn error_count(&self) -> usize {
+        self.items.iter().filter(|i| i.is_error()).count()
+    }
+
+    pub fn set_input(&mut self, text: &str) {
+        self.current_input = text.to_string();
+    }
+
+    pub fn current_input(&self) -> &str {
+        &self.current_input
+    }
+
+    pub fn history_prev(&mut self) -> Option<&str> {
+        if self.input_history.is_empty() {
+            return None;
+        }
+        let idx = match self.history_index {
+            Some(i) => i.saturating_sub(1),
+            None => self.input_history.len() - 1,
+        };
+        self.history_index = Some(idx);
+        Some(&self.input_history[idx])
+    }
+
+    pub fn history_next(&mut self) -> Option<&str> {
+        match self.history_index {
+            Some(i) if i + 1 < self.input_history.len() => {
+                self.history_index = Some(i + 1);
+                Some(&self.input_history[i + 1])
+            }
+            _ => {
+                self.history_index = None;
+                None
+            }
+        }
+    }
+
+    pub fn history_count(&self) -> usize {
+        self.input_history.len()
+    }
+
+    pub fn set_word_wrap(&mut self, wrap: bool) {
+        self.word_wrap = wrap;
+    }
+
+    pub fn word_wrap(&self) -> bool {
+        self.word_wrap
+    }
+
+    pub fn tail(&self, n: usize) -> &[BadConsoleItem] {
+        let start = self.items.len().saturating_sub(n);
+        &self.items[start..]
+    }
+}
+
+#[cfg(test)]
+mod bad_tests {
+    use super::*;
+
+    #[test]
+    fn test_bad_output_kind_error_like() {
+        assert!(BadConsoleOutputKind::Stderr.is_error_like());
+        assert!(BadConsoleOutputKind::Error.is_error_like());
+        assert!(BadConsoleOutputKind::Warning.is_error_like());
+        assert!(!BadConsoleOutputKind::Stdout.is_error_like());
+        assert!(!BadConsoleOutputKind::Console.is_error_like());
+    }
+
+    #[test]
+    fn test_bad_console_entry_creation() {
+        let entry = BadConsoleEntry::new(BadConsoleOutputKind::Stdout, "hello", 1000);
+        assert_eq!(entry.formatted(), "hello");
+        assert!(!entry.has_location());
+    }
+
+    #[test]
+    fn test_bad_entry_with_location() {
+        let entry = BadConsoleEntry::new(BadConsoleOutputKind::Error, "fail", 500)
+            .with_location("main.js", 42, 10);
+        assert!(entry.has_location());
+        assert_eq!(entry.location_string(), Some("main.js:42:10".to_string()));
+    }
+
+    #[test]
+    fn test_bad_entry_location_variants() {
+        let e1 = BadConsoleEntry::new(BadConsoleOutputKind::Stdout, "x", 0);
+        assert_eq!(e1.location_string(), None);
+
+        let mut e2 = BadConsoleEntry::new(BadConsoleOutputKind::Stdout, "x", 0);
+        e2.source = Some("file.js".to_string());
+        e2.line = Some(10);
+        assert_eq!(e2.location_string(), Some("file.js:10".to_string()));
+    }
+
+    #[test]
+    fn test_bad_eval_result_success() {
+        let eval = BadEvalResult::success("2+2", "4", 100).with_type("number");
+        assert!(!eval.is_error);
+        assert_eq!(eval.type_name.as_deref(), Some("number"));
+        assert!(!eval.has_children());
+    }
+
+    #[test]
+    fn test_bad_eval_result_error() {
+        let eval = BadEvalResult::error("foo()", "ReferenceError", 200);
+        assert!(eval.is_error);
+    }
+
+    #[test]
+    fn test_bad_console_item_display() {
+        let output = BadConsoleItem::Output(
+            BadConsoleEntry::new(BadConsoleOutputKind::Error, "oops", 100)
+        );
+        assert!(output.display_text().contains("oops"));
+        assert!(output.is_error());
+
+        let eval = BadConsoleItem::Eval(BadEvalResult::success("1+1", "2", 200));
+        assert_eq!(eval.display_text(), "> 1+1 => 2");
+        assert!(!eval.is_error());
+    }
+
+    #[test]
+    fn test_bad_debug_console_append() {
+        let mut console = BadDebugConsole::new();
+        console.append_output(BadConsoleOutputKind::Stdout, "hello", 100);
+        console.append_output(BadConsoleOutputKind::Error, "fail", 200);
+        assert_eq!(console.item_count(), 2);
+        assert_eq!(console.error_count(), 1);
+    }
+
+    #[test]
+    fn test_bad_console_grouping() {
+        let mut console = BadDebugConsole::new();
+        console.append_output(BadConsoleOutputKind::StartGroup, "group1", 100);
+        console.append_output(BadConsoleOutputKind::Stdout, "inside", 200);
+        console.append_output(BadConsoleOutputKind::EndGroup, "", 300);
+        console.append_output(BadConsoleOutputKind::Stdout, "outside", 400);
+
+        if let BadConsoleItem::Output(e) = &console.items()[1] {
+            assert_eq!(e.group_depth, 1);
+        }
+        if let BadConsoleItem::Output(e) = &console.items()[3] {
+            assert_eq!(e.group_depth, 0);
+        }
+    }
+
+    #[test]
+    fn test_bad_console_eval() {
+        let mut console = BadDebugConsole::new();
+        console.append_eval(BadEvalResult::success("x", "42", 100));
+        assert_eq!(console.item_count(), 1);
+        assert_eq!(console.history_count(), 1);
+    }
+
+    #[test]
+    fn test_bad_console_filter() {
+        let mut console = BadDebugConsole::new();
+        console.append_output(BadConsoleOutputKind::Stdout, "hello world", 100);
+        console.append_output(BadConsoleOutputKind::Stdout, "goodbye", 200);
+
+        console.set_filter(Some("hello".to_string()));
+        assert_eq!(console.filtered_items().len(), 1);
+    }
+
+    #[test]
+    fn test_bad_console_history() {
+        let mut console = BadDebugConsole::new();
+        console.append_eval(BadEvalResult::success("a", "1", 100));
+        console.append_eval(BadEvalResult::success("b", "2", 200));
+
+        let prev = console.history_prev().map(|s| s.to_string());
+        assert_eq!(prev.as_deref(), Some("b"));
+        let prev = console.history_prev().map(|s| s.to_string());
+        assert_eq!(prev.as_deref(), Some("a"));
+        let next = console.history_next().map(|s| s.to_string());
+        assert_eq!(next.as_deref(), Some("b"));
+    }
+
+    #[test]
+    fn test_bad_console_clear() {
+        let mut console = BadDebugConsole::new();
+        console.append_output(BadConsoleOutputKind::Stdout, "test", 100);
+        console.append_output(BadConsoleOutputKind::StartGroup, "g", 200);
+        console.clear();
+        assert_eq!(console.item_count(), 0);
+    }
+
+    #[test]
+    fn test_bad_console_tail() {
+        let mut console = BadDebugConsole::new();
+        for i in 0..10 {
+            console.append_output(BadConsoleOutputKind::Stdout, &format!("line {}", i), i * 100);
+        }
+        let tail = console.tail(3);
+        assert_eq!(tail.len(), 3);
+    }
+
+    #[test]
+    fn test_bad_console_word_wrap() {
+        let mut console = BadDebugConsole::new();
+        assert!(console.word_wrap());
+        console.set_word_wrap(false);
+        assert!(!console.word_wrap());
+    }
+
+    #[test]
+    fn test_bad_console_input() {
+        let mut console = BadDebugConsole::new();
+        console.set_input("x + 1");
+        assert_eq!(console.current_input(), "x + 1");
+    }
+
+    #[test]
+    fn test_bad_console_trim() {
+        let mut console = BadDebugConsole::new();
+        console.max_items = 5;
+        for i in 0..10 {
+            console.append_output(BadConsoleOutputKind::Stdout, &format!("{}", i), i * 100);
+        }
+        assert_eq!(console.item_count(), 5);
+    }
+
+    #[test]
+    fn test_bad_console_timestamp() {
+        let item = BadConsoleItem::Output(
+            BadConsoleEntry::new(BadConsoleOutputKind::Stdout, "x", 12345)
+        );
+        assert_eq!(item.timestamp_ms(), 12345);
+    }
+}
