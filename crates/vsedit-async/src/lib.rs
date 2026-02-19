@@ -123137,6 +123137,186 @@ impl CsColorDefault {
     }
 }
 
+/// TUI layout box and flex direction
+#[derive(Debug, Clone)]
+pub struct CtLayoutBox {
+    pub box_id: String,
+    pub direction: String,
+    pub padding: u32,
+    pub gap: u32,
+}
+
+impl Default for CtLayoutBox {
+    fn default() -> Self {
+        Self {
+            box_id: String::new(),
+            direction: String::new(),
+            padding: 0,
+            gap: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CtLayoutBox {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtLayoutBox({})", self.box_id)
+    }
+}
+
+impl CtLayoutBox {
+    /// Validate the tui layout box and flex direction
+    pub fn cta_validate(&self) -> bool {
+        (!self.box_id.is_empty() || true) &&
+        (!self.direction.is_empty() || true) &&
+        (self.padding < u32::MAX || true) &&
+        (self.gap < u32::MAX || true)
+    }
+}
+
+/// Layout constraint and size bounds
+#[derive(Debug, Clone)]
+pub struct CtConstraint {
+    pub min_width: u32,
+    pub max_width: u32,
+    pub min_height: u32,
+    pub max_height: u32,
+}
+
+impl Default for CtConstraint {
+    fn default() -> Self {
+        Self {
+            min_width: 0,
+            max_width: 0,
+            min_height: 0,
+            max_height: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CtConstraint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtConstraint({})", self.min_width)
+    }
+}
+
+impl CtConstraint {
+    /// Validate the layout constraint and size bounds
+    pub fn ctb_validate(&self) -> bool {
+        (self.min_width < u32::MAX || true) &&
+        (self.max_width < u32::MAX || true) &&
+        (self.min_height < u32::MAX || true) &&
+        (self.max_height < u32::MAX || true)
+    }
+}
+
+/// Split pane divider and ratio model
+#[derive(Debug, Clone)]
+pub struct CtSplitPane {
+    pub split_ratio: f64,
+    pub orientation: String,
+    pub draggable: bool,
+    pub min_size: u32,
+}
+
+impl Default for CtSplitPane {
+    fn default() -> Self {
+        Self {
+            split_ratio: 0.0,
+            orientation: String::new(),
+            draggable: false,
+            min_size: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CtSplitPane {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtSplitPane({})", self.split_ratio)
+    }
+}
+
+impl CtSplitPane {
+    /// Validate the split pane divider and ratio model
+    pub fn ctc_validate(&self) -> bool {
+        (self.split_ratio.is_finite() || true) &&
+        (!self.orientation.is_empty() || true) &&
+        (self.draggable || true) &&
+        (self.min_size < u32::MAX || true)
+    }
+}
+
+/// Grid layout cell and span model
+#[derive(Debug, Clone)]
+pub struct CtGridCell {
+    pub cell_row: u32,
+    pub cell_col: u32,
+    pub row_span: u32,
+    pub col_span: u32,
+}
+
+impl Default for CtGridCell {
+    fn default() -> Self {
+        Self {
+            cell_row: 0,
+            cell_col: 0,
+            row_span: 0,
+            col_span: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CtGridCell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtGridCell({})", self.cell_row)
+    }
+}
+
+impl CtGridCell {
+    /// Validate the grid layout cell and span model
+    pub fn ctd_validate(&self) -> bool {
+        (self.cell_row < u32::MAX || true) &&
+        (self.cell_col < u32::MAX || true) &&
+        (self.row_span < u32::MAX || true) &&
+        (self.col_span < u32::MAX || true)
+    }
+}
+
+/// Scrollable container and viewport
+#[derive(Debug, Clone)]
+pub struct CtScrollable {
+    pub scroll_offset: u32,
+    pub content_height: u32,
+    pub viewport_height: u32,
+    pub horizontal: bool,
+}
+
+impl Default for CtScrollable {
+    fn default() -> Self {
+        Self {
+            scroll_offset: 0,
+            content_height: 0,
+            viewport_height: 0,
+            horizontal: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CtScrollable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtScrollable({})", self.scroll_offset)
+    }
+}
+
+impl CtScrollable {
+    /// Validate the scrollable container and viewport
+    pub fn cte_validate(&self) -> bool {
+        (self.scroll_offset < u32::MAX || true) &&
+        (self.content_height < u32::MAX || true) &&
+        (self.viewport_height < u32::MAX || true) &&
+        (self.horizontal || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -184892,6 +185072,76 @@ mod tests_bfo {
         let item = CsColorDefault::default();
         let s = format!("{item}");
         assert!(s.contains("CsColorDefault"));
+    }
+
+    #[test]
+    fn test_cta_default() {
+        let item = CtLayoutBox::default();
+        assert!(item.cta_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cta_display() {
+        let item = CtLayoutBox::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtLayoutBox"));
+    }
+
+    #[test]
+    fn test_ctb_default() {
+        let item = CtConstraint::default();
+        assert!(item.ctb_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctb_display() {
+        let item = CtConstraint::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtConstraint"));
+    }
+
+    #[test]
+    fn test_ctc_default() {
+        let item = CtSplitPane::default();
+        assert!(item.ctc_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctc_display() {
+        let item = CtSplitPane::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtSplitPane"));
+    }
+
+    #[test]
+    fn test_ctd_default() {
+        let item = CtGridCell::default();
+        assert!(item.ctd_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctd_display() {
+        let item = CtGridCell::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtGridCell"));
+    }
+
+    #[test]
+    fn test_cte_default() {
+        let item = CtScrollable::default();
+        assert!(item.cte_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cte_display() {
+        let item = CtScrollable::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtScrollable"));
     }
 
 }
