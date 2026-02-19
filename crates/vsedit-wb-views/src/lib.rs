@@ -56855,3 +56855,251 @@ mod bbc_tests {
         assert_eq!(ctx.resolve(BbcSnippetVar::TmCurrentWord), "println");
     }
 }
+
+
+// --- bbd_: Editor color picker/decorator model ---
+
+/// An RGBA color value.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BbdColor {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
+}
+
+impl BbdColor {
+    pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self { Self { r, g, b, a } }
+    pub fn rgb(r: f32, g: f32, b: f32) -> Self { Self { r, g, b, a: 1.0 } }
+    pub fn white() -> Self { Self::rgb(1.0, 1.0, 1.0) }
+    pub fn black() -> Self { Self::rgb(0.0, 0.0, 0.0) }
+    pub fn transparent() -> Self { Self::new(0.0, 0.0, 0.0, 0.0) }
+
+    pub fn to_hex(&self) -> String {
+        format!("#{:02x}{:02x}{:02x}",
+            (self.r * 255.0) as u8, (self.g * 255.0) as u8, (self.b * 255.0) as u8)
+    }
+
+    pub fn to_rgba_str(&self) -> String {
+        format!("rgba({}, {}, {}, {:.2})",
+            (self.r * 255.0) as u8, (self.g * 255.0) as u8,
+            (self.b * 255.0) as u8, self.a)
+    }
+
+    pub fn to_hsl(&self) -> (f32, f32, f32) {
+        let max = self.r.max(self.g).max(self.b);
+        let min = self.r.min(self.g).min(self.b);
+        let l = (max + min) / 2.0;
+        if (max - min).abs() < f32::EPSILON { return (0.0, 0.0, l); }
+        let d = max - min;
+        let s = if l > 0.5 { d / (2.0 - max - min) } else { d / (max + min) };
+        let h = if (max - self.r).abs() < f32::EPSILON {
+            (self.g - self.b) / d + if self.g < self.b { 6.0 } else { 0.0 }
+        } else if (max - self.g).abs() < f32::EPSILON {
+            (self.b - self.r) / d + 2.0
+        } else {
+            (self.r - self.g) / d + 4.0
+        };
+        (h / 6.0, s, l)
+    }
+
+    pub fn luminance(&self) -> f32 {
+        0.2126 * self.r + 0.7152 * self.g + 0.0722 * self.b
+    }
+
+    pub fn is_light(&self) -> bool { self.luminance() > 0.5 }
+    pub fn is_dark(&self) -> bool { !self.is_light() }
+
+    pub fn with_alpha(&self, a: f32) -> Self { Self { a, ..*self } }
+
+    pub fn mix(&self, other: &BbdColor, t: f32) -> BbdColor {
+        BbdColor {
+            r: self.r + (other.r - self.r) * t,
+            g: self.g + (other.g - self.g) * t,
+            b: self.b + (other.b - self.b) * t,
+            a: self.a + (other.a - self.a) * t,
+        }
+    }
+}
+
+/// A color occurrence in the document.
+#[derive(Debug, Clone)]
+pub struct BbdColorInfo {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub color: BbdColor,
+    pub original_text: String,
+}
+
+impl BbdColorInfo {
+    pub fn new(line: u32, sc: u32, ec: u32, color: BbdColor, text: &str) -> Self {
+        Self { line, start_col: sc, end_col: ec, color, original_text: text.to_string() }
+    }
+
+    pub fn length(&self) -> u32 { self.end_col - self.start_col }
+}
+
+/// The color picker model.
+#[derive(Debug)]
+pub struct BbdColorModel {
+    colors: Vec<BbdColorInfo>,
+    active_index: Option<usize>,
+    enabled: bool,
+    decorations_enabled: bool,
+}
+
+impl BbdColorModel {
+    pub fn new() -> Self {
+        Self { colors: Vec::new(), active_index: None, enabled: true, decorations_enabled: true }
+    }
+
+    pub fn set_colors(&mut self, colors: Vec<BbdColorInfo>) {
+        self.colors = colors;
+        self.active_index = None;
+    }
+
+    pub fn colors(&self) -> &[BbdColorInfo] { &self.colors }
+    pub fn color_count(&self) -> usize { self.colors.len() }
+
+    pub fn colors_on_line(&self, line: u32) -> Vec<&BbdColorInfo> {
+        self.colors.iter().filter(|c| c.line == line).collect()
+    }
+
+    pub fn color_at(&self, line: u32, col: u32) -> Option<&BbdColorInfo> {
+        self.colors.iter().find(|c| c.line == line && col >= c.start_col && col < c.end_col)
+    }
+
+    pub fn activate(&mut self, line: u32, col: u32) -> bool {
+        if let Some(idx) = self.colors.iter().position(|c| c.line == line && col >= c.start_col && col < c.end_col) {
+            self.active_index = Some(idx);
+            return true;
+        }
+        false
+    }
+
+    pub fn active_color(&self) -> Option<&BbdColorInfo> {
+        self.active_index.map(|i| &self.colors[i])
+    }
+
+    pub fn update_active_color(&mut self, color: BbdColor) -> bool {
+        if let Some(i) = self.active_index {
+            self.colors[i].color = color;
+            return true;
+        }
+        false
+    }
+
+    pub fn deactivate(&mut self) { self.active_index = None; }
+
+    pub fn set_enabled(&mut self, v: bool) { self.enabled = v; }
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn set_decorations_enabled(&mut self, v: bool) { self.decorations_enabled = v; }
+    pub fn decorations_enabled(&self) -> bool { self.decorations_enabled }
+
+    pub fn clear(&mut self) {
+        self.colors.clear();
+        self.active_index = None;
+    }
+}
+
+#[cfg(test)]
+mod bbd_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbd_color_basic() {
+        let c = BbdColor::rgb(1.0, 0.0, 0.0);
+        assert_eq!(c.to_hex(), "#ff0000");
+        assert_eq!(c.a, 1.0);
+    }
+
+    #[test]
+    fn test_bbd_color_rgba() {
+        let c = BbdColor::new(1.0, 1.0, 1.0, 0.5);
+        assert!(c.to_rgba_str().contains("0.50"));
+    }
+
+    #[test]
+    fn test_bbd_color_hsl() {
+        let c = BbdColor::rgb(1.0, 0.0, 0.0); // pure red
+        let (h, s, _l) = c.to_hsl();
+        assert!(h.abs() < 0.01); // hue ~0
+        assert!((s - 1.0).abs() < 0.01); // saturation 1
+    }
+
+    #[test]
+    fn test_bbd_color_luminance() {
+        assert!(BbdColor::white().is_light());
+        assert!(BbdColor::black().is_dark());
+    }
+
+    #[test]
+    fn test_bbd_color_mix() {
+        let a = BbdColor::black();
+        let b = BbdColor::white();
+        let mid = a.mix(&b, 0.5);
+        assert!((mid.r - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_bbd_color_alpha() {
+        let c = BbdColor::rgb(1.0, 0.0, 0.0).with_alpha(0.5);
+        assert_eq!(c.a, 0.5);
+        assert_eq!(c.r, 1.0);
+    }
+
+    #[test]
+    fn test_bbd_color_info() {
+        let ci = BbdColorInfo::new(5, 10, 17, BbdColor::rgb(1.0, 0.0, 0.0), "#ff0000");
+        assert_eq!(ci.length(), 7);
+    }
+
+    #[test]
+    fn test_bbd_model_lifecycle() {
+        let mut m = BbdColorModel::new();
+        m.set_colors(vec![
+            BbdColorInfo::new(1, 5, 12, BbdColor::rgb(1.0, 0.0, 0.0), "#ff0000"),
+            BbdColorInfo::new(3, 0, 7, BbdColor::rgb(0.0, 1.0, 0.0), "#00ff00"),
+        ]);
+        assert_eq!(m.color_count(), 2);
+        assert_eq!(m.colors_on_line(1).len(), 1);
+    }
+
+    #[test]
+    fn test_bbd_model_activate() {
+        let mut m = BbdColorModel::new();
+        m.set_colors(vec![
+            BbdColorInfo::new(1, 5, 12, BbdColor::rgb(1.0, 0.0, 0.0), "#ff0000"),
+        ]);
+        assert!(m.activate(1, 7));
+        assert!(m.active_color().is_some());
+        m.deactivate();
+        assert!(m.active_color().is_none());
+    }
+
+    #[test]
+    fn test_bbd_model_update() {
+        let mut m = BbdColorModel::new();
+        m.set_colors(vec![
+            BbdColorInfo::new(1, 0, 7, BbdColor::rgb(1.0, 0.0, 0.0), "#ff0000"),
+        ]);
+        m.activate(1, 3);
+        m.update_active_color(BbdColor::rgb(0.0, 0.0, 1.0));
+        assert_eq!(m.active_color().unwrap().color.b, 1.0);
+    }
+
+    #[test]
+    fn test_bbd_model_clear() {
+        let mut m = BbdColorModel::new();
+        m.set_colors(vec![BbdColorInfo::new(1, 0, 7, BbdColor::white(), "white")]);
+        m.clear();
+        assert_eq!(m.color_count(), 0);
+    }
+
+    #[test]
+    fn test_bbd_transparent() {
+        let c = BbdColor::transparent();
+        assert_eq!(c.a, 0.0);
+    }
+}
