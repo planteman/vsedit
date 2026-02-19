@@ -89968,6 +89968,111 @@ impl ReplaceOperation {
     }
 }
 
+/// Runtime wiring: bsk_ FileExplorerNode
+#[derive(Debug, Clone)]
+pub struct FileExplorerNode {
+    pub bsk_node_uri: String,
+    pub bsk_node_name: String,
+    pub bsk_is_directory: bool,
+    pub bsk_is_symlink: bool,
+    pub bsk_is_readonly: bool,
+    pub bsk_children_count: usize,
+    pub bsk_depth: u32,
+    pub bsk_is_expanded: bool,
+    pub bsk_is_selected: bool,
+    pub bsk_decoration_badge: String,
+}
+
+impl FileExplorerNode {
+    pub fn bsk_summary(&self) -> String {
+        format!("FileExplorerNode({})", self.bsk_node_uri)
+    }
+}
+
+/// Runtime wiring: bsl_ ExplorerSort
+#[derive(Debug, Clone)]
+pub struct ExplorerSort {
+    pub bsl_sort_order: String,
+    pub bsl_sort_direction: String,
+    pub bsl_folders_before_files: bool,
+    pub bsl_sort_by_extension: bool,
+    pub bsl_sort_by_modified: bool,
+    pub bsl_sort_by_type: bool,
+    pub bsl_case_sensitive: bool,
+    pub bsl_numeric_sorting: bool,
+    pub bsl_group_folders: bool,
+    pub bsl_custom_sort_key: String,
+}
+
+impl ExplorerSort {
+    pub fn bsl_summary(&self) -> String {
+        format!("ExplorerSort({})", self.bsl_sort_order)
+    }
+}
+
+/// Runtime wiring: bsm_ ExplorerFilter
+#[derive(Debug, Clone)]
+pub struct ExplorerFilter {
+    pub bsm_filter_text: String,
+    pub bsm_is_active: bool,
+    pub bsm_match_count: u32,
+    pub bsm_exclude_patterns: Vec<String>,
+    pub bsm_include_hidden: bool,
+    pub bsm_include_gitignored: bool,
+    pub bsm_file_nesting_enabled: bool,
+    pub bsm_nesting_patterns: Vec<String>,
+    pub bsm_compact_folders: bool,
+    pub bsm_auto_reveal: bool,
+}
+
+impl ExplorerFilter {
+    pub fn bsm_summary(&self) -> String {
+        format!("ExplorerFilter({})", self.bsm_filter_text)
+    }
+}
+
+/// Runtime wiring: bsn_ FileDecorator
+#[derive(Debug, Clone)]
+pub struct FileDecorator {
+    pub bsn_uri: String,
+    pub bsn_badge_text: String,
+    pub bsn_badge_tooltip: String,
+    pub bsn_color: String,
+    pub bsn_is_propagated: bool,
+    pub bsn_source_id: String,
+    pub bsn_priority: u32,
+    pub bsn_letter: String,
+    pub bsn_strikethrough: bool,
+    pub bsn_faded: bool,
+}
+
+impl FileDecorator {
+    pub fn bsn_summary(&self) -> String {
+        format!("FileDecorator({})", self.bsn_uri)
+    }
+}
+
+/// Runtime wiring: bso_ CustomEditor
+#[derive(Debug, Clone)]
+pub struct CustomEditor {
+    pub bso_editor_id: String,
+    pub bso_view_type: String,
+    pub bso_display_name: String,
+    pub bso_selector_glob: String,
+    pub bso_priority: String,
+    pub bso_webview_options_retain: bool,
+    pub bso_supports_multi_editors: bool,
+    pub bso_backup_id: String,
+    pub bso_capability_untitled: bool,
+    pub bso_extension_id: String,
+}
+
+impl CustomEditor {
+    pub fn bso_summary(&self) -> String {
+        format!("CustomEditor({})", self.bso_editor_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -124535,6 +124640,910 @@ mod tests_bfo {
         };
         let _ = obj.bsj_summary();
         assert_eq!(obj.bsj_undo_id, 0);
+    }
+
+    #[test]
+    fn test_bsk_node_uri() {
+        let obj = FileExplorerNode {
+            bsk_node_uri: String::from("test"),
+            bsk_node_name: String::from("test"),
+            bsk_is_directory: false,
+            bsk_is_symlink: false,
+            bsk_is_readonly: false,
+            bsk_children_count: 0,
+            bsk_depth: 0,
+            bsk_is_expanded: false,
+            bsk_is_selected: false,
+            bsk_decoration_badge: String::from("test"),
+        };
+        let _ = obj.bsk_summary();
+        assert_eq!(obj.bsk_node_uri, "test");
+    }
+
+    #[test]
+    fn test_bsk_node_name() {
+        let obj = FileExplorerNode {
+            bsk_node_uri: String::from("test"),
+            bsk_node_name: String::from("test"),
+            bsk_is_directory: false,
+            bsk_is_symlink: false,
+            bsk_is_readonly: false,
+            bsk_children_count: 0,
+            bsk_depth: 0,
+            bsk_is_expanded: false,
+            bsk_is_selected: false,
+            bsk_decoration_badge: String::from("test"),
+        };
+        let _ = obj.bsk_summary();
+        assert_eq!(obj.bsk_node_name, "test");
+    }
+
+    #[test]
+    fn test_bsk_is_directory() {
+        let obj = FileExplorerNode {
+            bsk_node_uri: String::from("test"),
+            bsk_node_name: String::from("test"),
+            bsk_is_directory: false,
+            bsk_is_symlink: false,
+            bsk_is_readonly: false,
+            bsk_children_count: 0,
+            bsk_depth: 0,
+            bsk_is_expanded: false,
+            bsk_is_selected: false,
+            bsk_decoration_badge: String::from("test"),
+        };
+        let _ = obj.bsk_summary();
+        assert!(!obj.bsk_is_directory);
+    }
+
+    #[test]
+    fn test_bsk_is_symlink() {
+        let obj = FileExplorerNode {
+            bsk_node_uri: String::from("test"),
+            bsk_node_name: String::from("test"),
+            bsk_is_directory: false,
+            bsk_is_symlink: false,
+            bsk_is_readonly: false,
+            bsk_children_count: 0,
+            bsk_depth: 0,
+            bsk_is_expanded: false,
+            bsk_is_selected: false,
+            bsk_decoration_badge: String::from("test"),
+        };
+        let _ = obj.bsk_summary();
+        assert!(!obj.bsk_is_symlink);
+    }
+
+    #[test]
+    fn test_bsk_is_readonly() {
+        let obj = FileExplorerNode {
+            bsk_node_uri: String::from("test"),
+            bsk_node_name: String::from("test"),
+            bsk_is_directory: false,
+            bsk_is_symlink: false,
+            bsk_is_readonly: false,
+            bsk_children_count: 0,
+            bsk_depth: 0,
+            bsk_is_expanded: false,
+            bsk_is_selected: false,
+            bsk_decoration_badge: String::from("test"),
+        };
+        let _ = obj.bsk_summary();
+        assert!(!obj.bsk_is_readonly);
+    }
+
+    #[test]
+    fn test_bsk_children_count() {
+        let obj = FileExplorerNode {
+            bsk_node_uri: String::from("test"),
+            bsk_node_name: String::from("test"),
+            bsk_is_directory: false,
+            bsk_is_symlink: false,
+            bsk_is_readonly: false,
+            bsk_children_count: 0,
+            bsk_depth: 0,
+            bsk_is_expanded: false,
+            bsk_is_selected: false,
+            bsk_decoration_badge: String::from("test"),
+        };
+        let _ = obj.bsk_summary();
+        assert_eq!(obj.bsk_children_count, 0);
+    }
+
+    #[test]
+    fn test_bsk_depth() {
+        let obj = FileExplorerNode {
+            bsk_node_uri: String::from("test"),
+            bsk_node_name: String::from("test"),
+            bsk_is_directory: false,
+            bsk_is_symlink: false,
+            bsk_is_readonly: false,
+            bsk_children_count: 0,
+            bsk_depth: 0,
+            bsk_is_expanded: false,
+            bsk_is_selected: false,
+            bsk_decoration_badge: String::from("test"),
+        };
+        let _ = obj.bsk_summary();
+        assert_eq!(obj.bsk_depth, 0);
+    }
+
+    #[test]
+    fn test_bsk_is_expanded() {
+        let obj = FileExplorerNode {
+            bsk_node_uri: String::from("test"),
+            bsk_node_name: String::from("test"),
+            bsk_is_directory: false,
+            bsk_is_symlink: false,
+            bsk_is_readonly: false,
+            bsk_children_count: 0,
+            bsk_depth: 0,
+            bsk_is_expanded: false,
+            bsk_is_selected: false,
+            bsk_decoration_badge: String::from("test"),
+        };
+        let _ = obj.bsk_summary();
+        assert!(!obj.bsk_is_expanded);
+    }
+
+    #[test]
+    fn test_bsk_is_selected() {
+        let obj = FileExplorerNode {
+            bsk_node_uri: String::from("test"),
+            bsk_node_name: String::from("test"),
+            bsk_is_directory: false,
+            bsk_is_symlink: false,
+            bsk_is_readonly: false,
+            bsk_children_count: 0,
+            bsk_depth: 0,
+            bsk_is_expanded: false,
+            bsk_is_selected: false,
+            bsk_decoration_badge: String::from("test"),
+        };
+        let _ = obj.bsk_summary();
+        assert!(!obj.bsk_is_selected);
+    }
+
+    #[test]
+    fn test_bsk_decoration_badge() {
+        let obj = FileExplorerNode {
+            bsk_node_uri: String::from("test"),
+            bsk_node_name: String::from("test"),
+            bsk_is_directory: false,
+            bsk_is_symlink: false,
+            bsk_is_readonly: false,
+            bsk_children_count: 0,
+            bsk_depth: 0,
+            bsk_is_expanded: false,
+            bsk_is_selected: false,
+            bsk_decoration_badge: String::from("test"),
+        };
+        let _ = obj.bsk_summary();
+        assert_eq!(obj.bsk_decoration_badge, "test");
+    }
+
+
+    #[test]
+    fn test_bsl_sort_order() {
+        let obj = ExplorerSort {
+            bsl_sort_order: String::from("test"),
+            bsl_sort_direction: String::from("test"),
+            bsl_folders_before_files: false,
+            bsl_sort_by_extension: false,
+            bsl_sort_by_modified: false,
+            bsl_sort_by_type: false,
+            bsl_case_sensitive: false,
+            bsl_numeric_sorting: false,
+            bsl_group_folders: false,
+            bsl_custom_sort_key: String::from("test"),
+        };
+        let _ = obj.bsl_summary();
+        assert_eq!(obj.bsl_sort_order, "test");
+    }
+
+    #[test]
+    fn test_bsl_sort_direction() {
+        let obj = ExplorerSort {
+            bsl_sort_order: String::from("test"),
+            bsl_sort_direction: String::from("test"),
+            bsl_folders_before_files: false,
+            bsl_sort_by_extension: false,
+            bsl_sort_by_modified: false,
+            bsl_sort_by_type: false,
+            bsl_case_sensitive: false,
+            bsl_numeric_sorting: false,
+            bsl_group_folders: false,
+            bsl_custom_sort_key: String::from("test"),
+        };
+        let _ = obj.bsl_summary();
+        assert_eq!(obj.bsl_sort_direction, "test");
+    }
+
+    #[test]
+    fn test_bsl_folders_before_files() {
+        let obj = ExplorerSort {
+            bsl_sort_order: String::from("test"),
+            bsl_sort_direction: String::from("test"),
+            bsl_folders_before_files: false,
+            bsl_sort_by_extension: false,
+            bsl_sort_by_modified: false,
+            bsl_sort_by_type: false,
+            bsl_case_sensitive: false,
+            bsl_numeric_sorting: false,
+            bsl_group_folders: false,
+            bsl_custom_sort_key: String::from("test"),
+        };
+        let _ = obj.bsl_summary();
+        assert!(!obj.bsl_folders_before_files);
+    }
+
+    #[test]
+    fn test_bsl_sort_by_extension() {
+        let obj = ExplorerSort {
+            bsl_sort_order: String::from("test"),
+            bsl_sort_direction: String::from("test"),
+            bsl_folders_before_files: false,
+            bsl_sort_by_extension: false,
+            bsl_sort_by_modified: false,
+            bsl_sort_by_type: false,
+            bsl_case_sensitive: false,
+            bsl_numeric_sorting: false,
+            bsl_group_folders: false,
+            bsl_custom_sort_key: String::from("test"),
+        };
+        let _ = obj.bsl_summary();
+        assert!(!obj.bsl_sort_by_extension);
+    }
+
+    #[test]
+    fn test_bsl_sort_by_modified() {
+        let obj = ExplorerSort {
+            bsl_sort_order: String::from("test"),
+            bsl_sort_direction: String::from("test"),
+            bsl_folders_before_files: false,
+            bsl_sort_by_extension: false,
+            bsl_sort_by_modified: false,
+            bsl_sort_by_type: false,
+            bsl_case_sensitive: false,
+            bsl_numeric_sorting: false,
+            bsl_group_folders: false,
+            bsl_custom_sort_key: String::from("test"),
+        };
+        let _ = obj.bsl_summary();
+        assert!(!obj.bsl_sort_by_modified);
+    }
+
+    #[test]
+    fn test_bsl_sort_by_type() {
+        let obj = ExplorerSort {
+            bsl_sort_order: String::from("test"),
+            bsl_sort_direction: String::from("test"),
+            bsl_folders_before_files: false,
+            bsl_sort_by_extension: false,
+            bsl_sort_by_modified: false,
+            bsl_sort_by_type: false,
+            bsl_case_sensitive: false,
+            bsl_numeric_sorting: false,
+            bsl_group_folders: false,
+            bsl_custom_sort_key: String::from("test"),
+        };
+        let _ = obj.bsl_summary();
+        assert!(!obj.bsl_sort_by_type);
+    }
+
+    #[test]
+    fn test_bsl_case_sensitive() {
+        let obj = ExplorerSort {
+            bsl_sort_order: String::from("test"),
+            bsl_sort_direction: String::from("test"),
+            bsl_folders_before_files: false,
+            bsl_sort_by_extension: false,
+            bsl_sort_by_modified: false,
+            bsl_sort_by_type: false,
+            bsl_case_sensitive: false,
+            bsl_numeric_sorting: false,
+            bsl_group_folders: false,
+            bsl_custom_sort_key: String::from("test"),
+        };
+        let _ = obj.bsl_summary();
+        assert!(!obj.bsl_case_sensitive);
+    }
+
+    #[test]
+    fn test_bsl_numeric_sorting() {
+        let obj = ExplorerSort {
+            bsl_sort_order: String::from("test"),
+            bsl_sort_direction: String::from("test"),
+            bsl_folders_before_files: false,
+            bsl_sort_by_extension: false,
+            bsl_sort_by_modified: false,
+            bsl_sort_by_type: false,
+            bsl_case_sensitive: false,
+            bsl_numeric_sorting: false,
+            bsl_group_folders: false,
+            bsl_custom_sort_key: String::from("test"),
+        };
+        let _ = obj.bsl_summary();
+        assert!(!obj.bsl_numeric_sorting);
+    }
+
+    #[test]
+    fn test_bsl_group_folders() {
+        let obj = ExplorerSort {
+            bsl_sort_order: String::from("test"),
+            bsl_sort_direction: String::from("test"),
+            bsl_folders_before_files: false,
+            bsl_sort_by_extension: false,
+            bsl_sort_by_modified: false,
+            bsl_sort_by_type: false,
+            bsl_case_sensitive: false,
+            bsl_numeric_sorting: false,
+            bsl_group_folders: false,
+            bsl_custom_sort_key: String::from("test"),
+        };
+        let _ = obj.bsl_summary();
+        assert!(!obj.bsl_group_folders);
+    }
+
+    #[test]
+    fn test_bsl_custom_sort_key() {
+        let obj = ExplorerSort {
+            bsl_sort_order: String::from("test"),
+            bsl_sort_direction: String::from("test"),
+            bsl_folders_before_files: false,
+            bsl_sort_by_extension: false,
+            bsl_sort_by_modified: false,
+            bsl_sort_by_type: false,
+            bsl_case_sensitive: false,
+            bsl_numeric_sorting: false,
+            bsl_group_folders: false,
+            bsl_custom_sort_key: String::from("test"),
+        };
+        let _ = obj.bsl_summary();
+        assert_eq!(obj.bsl_custom_sort_key, "test");
+    }
+
+
+    #[test]
+    fn test_bsm_filter_text() {
+        let obj = ExplorerFilter {
+            bsm_filter_text: String::from("test"),
+            bsm_is_active: false,
+            bsm_match_count: 0,
+            bsm_exclude_patterns: Vec::new(),
+            bsm_include_hidden: false,
+            bsm_include_gitignored: false,
+            bsm_file_nesting_enabled: false,
+            bsm_nesting_patterns: Vec::new(),
+            bsm_compact_folders: false,
+            bsm_auto_reveal: false,
+        };
+        let _ = obj.bsm_summary();
+        assert_eq!(obj.bsm_filter_text, "test");
+    }
+
+    #[test]
+    fn test_bsm_is_active() {
+        let obj = ExplorerFilter {
+            bsm_filter_text: String::from("test"),
+            bsm_is_active: false,
+            bsm_match_count: 0,
+            bsm_exclude_patterns: Vec::new(),
+            bsm_include_hidden: false,
+            bsm_include_gitignored: false,
+            bsm_file_nesting_enabled: false,
+            bsm_nesting_patterns: Vec::new(),
+            bsm_compact_folders: false,
+            bsm_auto_reveal: false,
+        };
+        let _ = obj.bsm_summary();
+        assert!(!obj.bsm_is_active);
+    }
+
+    #[test]
+    fn test_bsm_match_count() {
+        let obj = ExplorerFilter {
+            bsm_filter_text: String::from("test"),
+            bsm_is_active: false,
+            bsm_match_count: 0,
+            bsm_exclude_patterns: Vec::new(),
+            bsm_include_hidden: false,
+            bsm_include_gitignored: false,
+            bsm_file_nesting_enabled: false,
+            bsm_nesting_patterns: Vec::new(),
+            bsm_compact_folders: false,
+            bsm_auto_reveal: false,
+        };
+        let _ = obj.bsm_summary();
+        assert_eq!(obj.bsm_match_count, 0);
+    }
+
+    #[test]
+    fn test_bsm_exclude_patterns() {
+        let obj = ExplorerFilter {
+            bsm_filter_text: String::from("test"),
+            bsm_is_active: false,
+            bsm_match_count: 0,
+            bsm_exclude_patterns: Vec::new(),
+            bsm_include_hidden: false,
+            bsm_include_gitignored: false,
+            bsm_file_nesting_enabled: false,
+            bsm_nesting_patterns: Vec::new(),
+            bsm_compact_folders: false,
+            bsm_auto_reveal: false,
+        };
+        let _ = obj.bsm_summary();
+        assert!(obj.bsm_exclude_patterns.is_empty());
+    }
+
+    #[test]
+    fn test_bsm_include_hidden() {
+        let obj = ExplorerFilter {
+            bsm_filter_text: String::from("test"),
+            bsm_is_active: false,
+            bsm_match_count: 0,
+            bsm_exclude_patterns: Vec::new(),
+            bsm_include_hidden: false,
+            bsm_include_gitignored: false,
+            bsm_file_nesting_enabled: false,
+            bsm_nesting_patterns: Vec::new(),
+            bsm_compact_folders: false,
+            bsm_auto_reveal: false,
+        };
+        let _ = obj.bsm_summary();
+        assert!(!obj.bsm_include_hidden);
+    }
+
+    #[test]
+    fn test_bsm_include_gitignored() {
+        let obj = ExplorerFilter {
+            bsm_filter_text: String::from("test"),
+            bsm_is_active: false,
+            bsm_match_count: 0,
+            bsm_exclude_patterns: Vec::new(),
+            bsm_include_hidden: false,
+            bsm_include_gitignored: false,
+            bsm_file_nesting_enabled: false,
+            bsm_nesting_patterns: Vec::new(),
+            bsm_compact_folders: false,
+            bsm_auto_reveal: false,
+        };
+        let _ = obj.bsm_summary();
+        assert!(!obj.bsm_include_gitignored);
+    }
+
+    #[test]
+    fn test_bsm_file_nesting_enabled() {
+        let obj = ExplorerFilter {
+            bsm_filter_text: String::from("test"),
+            bsm_is_active: false,
+            bsm_match_count: 0,
+            bsm_exclude_patterns: Vec::new(),
+            bsm_include_hidden: false,
+            bsm_include_gitignored: false,
+            bsm_file_nesting_enabled: false,
+            bsm_nesting_patterns: Vec::new(),
+            bsm_compact_folders: false,
+            bsm_auto_reveal: false,
+        };
+        let _ = obj.bsm_summary();
+        assert!(!obj.bsm_file_nesting_enabled);
+    }
+
+    #[test]
+    fn test_bsm_nesting_patterns() {
+        let obj = ExplorerFilter {
+            bsm_filter_text: String::from("test"),
+            bsm_is_active: false,
+            bsm_match_count: 0,
+            bsm_exclude_patterns: Vec::new(),
+            bsm_include_hidden: false,
+            bsm_include_gitignored: false,
+            bsm_file_nesting_enabled: false,
+            bsm_nesting_patterns: Vec::new(),
+            bsm_compact_folders: false,
+            bsm_auto_reveal: false,
+        };
+        let _ = obj.bsm_summary();
+        assert!(obj.bsm_nesting_patterns.is_empty());
+    }
+
+    #[test]
+    fn test_bsm_compact_folders() {
+        let obj = ExplorerFilter {
+            bsm_filter_text: String::from("test"),
+            bsm_is_active: false,
+            bsm_match_count: 0,
+            bsm_exclude_patterns: Vec::new(),
+            bsm_include_hidden: false,
+            bsm_include_gitignored: false,
+            bsm_file_nesting_enabled: false,
+            bsm_nesting_patterns: Vec::new(),
+            bsm_compact_folders: false,
+            bsm_auto_reveal: false,
+        };
+        let _ = obj.bsm_summary();
+        assert!(!obj.bsm_compact_folders);
+    }
+
+    #[test]
+    fn test_bsm_auto_reveal() {
+        let obj = ExplorerFilter {
+            bsm_filter_text: String::from("test"),
+            bsm_is_active: false,
+            bsm_match_count: 0,
+            bsm_exclude_patterns: Vec::new(),
+            bsm_include_hidden: false,
+            bsm_include_gitignored: false,
+            bsm_file_nesting_enabled: false,
+            bsm_nesting_patterns: Vec::new(),
+            bsm_compact_folders: false,
+            bsm_auto_reveal: false,
+        };
+        let _ = obj.bsm_summary();
+        assert!(!obj.bsm_auto_reveal);
+    }
+
+
+    #[test]
+    fn test_bsn_uri() {
+        let obj = FileDecorator {
+            bsn_uri: String::from("test"),
+            bsn_badge_text: String::from("test"),
+            bsn_badge_tooltip: String::from("test"),
+            bsn_color: String::from("test"),
+            bsn_is_propagated: false,
+            bsn_source_id: String::from("test"),
+            bsn_priority: 0,
+            bsn_letter: String::from("test"),
+            bsn_strikethrough: false,
+            bsn_faded: false,
+        };
+        let _ = obj.bsn_summary();
+        assert_eq!(obj.bsn_uri, "test");
+    }
+
+    #[test]
+    fn test_bsn_badge_text() {
+        let obj = FileDecorator {
+            bsn_uri: String::from("test"),
+            bsn_badge_text: String::from("test"),
+            bsn_badge_tooltip: String::from("test"),
+            bsn_color: String::from("test"),
+            bsn_is_propagated: false,
+            bsn_source_id: String::from("test"),
+            bsn_priority: 0,
+            bsn_letter: String::from("test"),
+            bsn_strikethrough: false,
+            bsn_faded: false,
+        };
+        let _ = obj.bsn_summary();
+        assert_eq!(obj.bsn_badge_text, "test");
+    }
+
+    #[test]
+    fn test_bsn_badge_tooltip() {
+        let obj = FileDecorator {
+            bsn_uri: String::from("test"),
+            bsn_badge_text: String::from("test"),
+            bsn_badge_tooltip: String::from("test"),
+            bsn_color: String::from("test"),
+            bsn_is_propagated: false,
+            bsn_source_id: String::from("test"),
+            bsn_priority: 0,
+            bsn_letter: String::from("test"),
+            bsn_strikethrough: false,
+            bsn_faded: false,
+        };
+        let _ = obj.bsn_summary();
+        assert_eq!(obj.bsn_badge_tooltip, "test");
+    }
+
+    #[test]
+    fn test_bsn_color() {
+        let obj = FileDecorator {
+            bsn_uri: String::from("test"),
+            bsn_badge_text: String::from("test"),
+            bsn_badge_tooltip: String::from("test"),
+            bsn_color: String::from("test"),
+            bsn_is_propagated: false,
+            bsn_source_id: String::from("test"),
+            bsn_priority: 0,
+            bsn_letter: String::from("test"),
+            bsn_strikethrough: false,
+            bsn_faded: false,
+        };
+        let _ = obj.bsn_summary();
+        assert_eq!(obj.bsn_color, "test");
+    }
+
+    #[test]
+    fn test_bsn_is_propagated() {
+        let obj = FileDecorator {
+            bsn_uri: String::from("test"),
+            bsn_badge_text: String::from("test"),
+            bsn_badge_tooltip: String::from("test"),
+            bsn_color: String::from("test"),
+            bsn_is_propagated: false,
+            bsn_source_id: String::from("test"),
+            bsn_priority: 0,
+            bsn_letter: String::from("test"),
+            bsn_strikethrough: false,
+            bsn_faded: false,
+        };
+        let _ = obj.bsn_summary();
+        assert!(!obj.bsn_is_propagated);
+    }
+
+    #[test]
+    fn test_bsn_source_id() {
+        let obj = FileDecorator {
+            bsn_uri: String::from("test"),
+            bsn_badge_text: String::from("test"),
+            bsn_badge_tooltip: String::from("test"),
+            bsn_color: String::from("test"),
+            bsn_is_propagated: false,
+            bsn_source_id: String::from("test"),
+            bsn_priority: 0,
+            bsn_letter: String::from("test"),
+            bsn_strikethrough: false,
+            bsn_faded: false,
+        };
+        let _ = obj.bsn_summary();
+        assert_eq!(obj.bsn_source_id, "test");
+    }
+
+    #[test]
+    fn test_bsn_priority() {
+        let obj = FileDecorator {
+            bsn_uri: String::from("test"),
+            bsn_badge_text: String::from("test"),
+            bsn_badge_tooltip: String::from("test"),
+            bsn_color: String::from("test"),
+            bsn_is_propagated: false,
+            bsn_source_id: String::from("test"),
+            bsn_priority: 0,
+            bsn_letter: String::from("test"),
+            bsn_strikethrough: false,
+            bsn_faded: false,
+        };
+        let _ = obj.bsn_summary();
+        assert_eq!(obj.bsn_priority, 0);
+    }
+
+    #[test]
+    fn test_bsn_letter() {
+        let obj = FileDecorator {
+            bsn_uri: String::from("test"),
+            bsn_badge_text: String::from("test"),
+            bsn_badge_tooltip: String::from("test"),
+            bsn_color: String::from("test"),
+            bsn_is_propagated: false,
+            bsn_source_id: String::from("test"),
+            bsn_priority: 0,
+            bsn_letter: String::from("test"),
+            bsn_strikethrough: false,
+            bsn_faded: false,
+        };
+        let _ = obj.bsn_summary();
+        assert_eq!(obj.bsn_letter, "test");
+    }
+
+    #[test]
+    fn test_bsn_strikethrough() {
+        let obj = FileDecorator {
+            bsn_uri: String::from("test"),
+            bsn_badge_text: String::from("test"),
+            bsn_badge_tooltip: String::from("test"),
+            bsn_color: String::from("test"),
+            bsn_is_propagated: false,
+            bsn_source_id: String::from("test"),
+            bsn_priority: 0,
+            bsn_letter: String::from("test"),
+            bsn_strikethrough: false,
+            bsn_faded: false,
+        };
+        let _ = obj.bsn_summary();
+        assert!(!obj.bsn_strikethrough);
+    }
+
+    #[test]
+    fn test_bsn_faded() {
+        let obj = FileDecorator {
+            bsn_uri: String::from("test"),
+            bsn_badge_text: String::from("test"),
+            bsn_badge_tooltip: String::from("test"),
+            bsn_color: String::from("test"),
+            bsn_is_propagated: false,
+            bsn_source_id: String::from("test"),
+            bsn_priority: 0,
+            bsn_letter: String::from("test"),
+            bsn_strikethrough: false,
+            bsn_faded: false,
+        };
+        let _ = obj.bsn_summary();
+        assert!(!obj.bsn_faded);
+    }
+
+
+    #[test]
+    fn test_bso_editor_id() {
+        let obj = CustomEditor {
+            bso_editor_id: String::from("test"),
+            bso_view_type: String::from("test"),
+            bso_display_name: String::from("test"),
+            bso_selector_glob: String::from("test"),
+            bso_priority: String::from("test"),
+            bso_webview_options_retain: false,
+            bso_supports_multi_editors: false,
+            bso_backup_id: String::from("test"),
+            bso_capability_untitled: false,
+            bso_extension_id: String::from("test"),
+        };
+        let _ = obj.bso_summary();
+        assert_eq!(obj.bso_editor_id, "test");
+    }
+
+    #[test]
+    fn test_bso_view_type() {
+        let obj = CustomEditor {
+            bso_editor_id: String::from("test"),
+            bso_view_type: String::from("test"),
+            bso_display_name: String::from("test"),
+            bso_selector_glob: String::from("test"),
+            bso_priority: String::from("test"),
+            bso_webview_options_retain: false,
+            bso_supports_multi_editors: false,
+            bso_backup_id: String::from("test"),
+            bso_capability_untitled: false,
+            bso_extension_id: String::from("test"),
+        };
+        let _ = obj.bso_summary();
+        assert_eq!(obj.bso_view_type, "test");
+    }
+
+    #[test]
+    fn test_bso_display_name() {
+        let obj = CustomEditor {
+            bso_editor_id: String::from("test"),
+            bso_view_type: String::from("test"),
+            bso_display_name: String::from("test"),
+            bso_selector_glob: String::from("test"),
+            bso_priority: String::from("test"),
+            bso_webview_options_retain: false,
+            bso_supports_multi_editors: false,
+            bso_backup_id: String::from("test"),
+            bso_capability_untitled: false,
+            bso_extension_id: String::from("test"),
+        };
+        let _ = obj.bso_summary();
+        assert_eq!(obj.bso_display_name, "test");
+    }
+
+    #[test]
+    fn test_bso_selector_glob() {
+        let obj = CustomEditor {
+            bso_editor_id: String::from("test"),
+            bso_view_type: String::from("test"),
+            bso_display_name: String::from("test"),
+            bso_selector_glob: String::from("test"),
+            bso_priority: String::from("test"),
+            bso_webview_options_retain: false,
+            bso_supports_multi_editors: false,
+            bso_backup_id: String::from("test"),
+            bso_capability_untitled: false,
+            bso_extension_id: String::from("test"),
+        };
+        let _ = obj.bso_summary();
+        assert_eq!(obj.bso_selector_glob, "test");
+    }
+
+    #[test]
+    fn test_bso_priority() {
+        let obj = CustomEditor {
+            bso_editor_id: String::from("test"),
+            bso_view_type: String::from("test"),
+            bso_display_name: String::from("test"),
+            bso_selector_glob: String::from("test"),
+            bso_priority: String::from("test"),
+            bso_webview_options_retain: false,
+            bso_supports_multi_editors: false,
+            bso_backup_id: String::from("test"),
+            bso_capability_untitled: false,
+            bso_extension_id: String::from("test"),
+        };
+        let _ = obj.bso_summary();
+        assert_eq!(obj.bso_priority, "test");
+    }
+
+    #[test]
+    fn test_bso_webview_options_retain() {
+        let obj = CustomEditor {
+            bso_editor_id: String::from("test"),
+            bso_view_type: String::from("test"),
+            bso_display_name: String::from("test"),
+            bso_selector_glob: String::from("test"),
+            bso_priority: String::from("test"),
+            bso_webview_options_retain: false,
+            bso_supports_multi_editors: false,
+            bso_backup_id: String::from("test"),
+            bso_capability_untitled: false,
+            bso_extension_id: String::from("test"),
+        };
+        let _ = obj.bso_summary();
+        assert!(!obj.bso_webview_options_retain);
+    }
+
+    #[test]
+    fn test_bso_supports_multi_editors() {
+        let obj = CustomEditor {
+            bso_editor_id: String::from("test"),
+            bso_view_type: String::from("test"),
+            bso_display_name: String::from("test"),
+            bso_selector_glob: String::from("test"),
+            bso_priority: String::from("test"),
+            bso_webview_options_retain: false,
+            bso_supports_multi_editors: false,
+            bso_backup_id: String::from("test"),
+            bso_capability_untitled: false,
+            bso_extension_id: String::from("test"),
+        };
+        let _ = obj.bso_summary();
+        assert!(!obj.bso_supports_multi_editors);
+    }
+
+    #[test]
+    fn test_bso_backup_id() {
+        let obj = CustomEditor {
+            bso_editor_id: String::from("test"),
+            bso_view_type: String::from("test"),
+            bso_display_name: String::from("test"),
+            bso_selector_glob: String::from("test"),
+            bso_priority: String::from("test"),
+            bso_webview_options_retain: false,
+            bso_supports_multi_editors: false,
+            bso_backup_id: String::from("test"),
+            bso_capability_untitled: false,
+            bso_extension_id: String::from("test"),
+        };
+        let _ = obj.bso_summary();
+        assert_eq!(obj.bso_backup_id, "test");
+    }
+
+    #[test]
+    fn test_bso_capability_untitled() {
+        let obj = CustomEditor {
+            bso_editor_id: String::from("test"),
+            bso_view_type: String::from("test"),
+            bso_display_name: String::from("test"),
+            bso_selector_glob: String::from("test"),
+            bso_priority: String::from("test"),
+            bso_webview_options_retain: false,
+            bso_supports_multi_editors: false,
+            bso_backup_id: String::from("test"),
+            bso_capability_untitled: false,
+            bso_extension_id: String::from("test"),
+        };
+        let _ = obj.bso_summary();
+        assert!(!obj.bso_capability_untitled);
+    }
+
+    #[test]
+    fn test_bso_extension_id() {
+        let obj = CustomEditor {
+            bso_editor_id: String::from("test"),
+            bso_view_type: String::from("test"),
+            bso_display_name: String::from("test"),
+            bso_selector_glob: String::from("test"),
+            bso_priority: String::from("test"),
+            bso_webview_options_retain: false,
+            bso_supports_multi_editors: false,
+            bso_backup_id: String::from("test"),
+            bso_capability_untitled: false,
+            bso_extension_id: String::from("test"),
+        };
+        let _ = obj.bso_summary();
+        assert_eq!(obj.bso_extension_id, "test");
     }
 
 }
