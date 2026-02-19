@@ -86065,6 +86065,67 @@ pub struct BkeWordAtPosition { pub word: String, pub start_col: usize, pub end_c
 #[derive(Debug, Clone)]
 pub struct BkeWordSegmentation { pub ranges: Vec<BkeWordRange>, pub boundary_count: usize }
 
+
+// Indentation detection — auto-detect tabs/spaces, indent size, mixed indent handling
+#[derive(Debug, Clone)]
+pub struct BkfIndentInfo { pub use_tabs: bool, pub tab_size: usize, pub detected: bool, pub confidence: f64 }
+#[derive(Debug, Clone)]
+pub struct BkfIndentGuide { pub level: usize, pub col: usize, pub is_active: bool, pub scope_kind: u8 }
+#[derive(Debug, Clone)]
+pub struct BkfIndentAction { pub action: u8, pub indent_delta: i32, pub outdent_pattern: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BkfAutoIndentResult { pub indent_text: String, pub new_indent_level: usize, pub was_auto: bool }
+#[derive(Debug, Clone)]
+pub struct BkfIndentRules { pub increase_pattern: String, pub decrease_pattern: String, pub indent_next_line: Option<String>, pub unindented_line: Option<String> }
+
+// Bracket pair colorization — nested bracket colors, matching, mismatched detection
+#[derive(Debug, Clone)]
+pub struct BkgBracketPair { pub open: char, pub close: char, pub nesting_level: usize, pub color_index: u8 }
+#[derive(Debug, Clone)]
+pub struct BkgBracketMatch { pub open_line: usize, pub open_col: usize, pub close_line: usize, pub close_col: usize, pub pair_index: usize }
+#[derive(Debug, Clone)]
+pub struct BkgBracketColorConfig { pub enabled: bool, pub colors: Vec<u32>, pub independent_pairs: bool }
+#[derive(Debug, Clone)]
+pub struct BkgMismatchedBracket { pub line: usize, pub col: usize, pub bracket: char, pub expected: Option<char> }
+#[derive(Debug, Clone)]
+pub struct BkgBracketState { pub pairs: Vec<BkgBracketMatch>, pub mismatched: Vec<BkgMismatchedBracket>, pub max_nesting: usize }
+
+// Sticky scroll — pinned scope headers at top of editor, collapsible, configurable depth
+#[derive(Debug, Clone)]
+pub struct BkhStickyLine { pub line: usize, pub text: String, pub indent_level: usize, pub scope_kind: u8 }
+#[derive(Debug, Clone)]
+pub struct BkhStickyScrollState { pub lines: Vec<BkhStickyLine>, pub max_lines: usize, pub enabled: bool }
+#[derive(Debug, Clone)]
+pub struct BkhStickyScrollConfig { pub enabled: bool, pub max_line_count: usize, pub scroll_with_editor: bool }
+#[derive(Debug, Clone)]
+pub struct BkhScopeHeader { pub start_line: usize, pub end_line: usize, pub text: String, pub kind: u8 }
+#[derive(Debug, Clone)]
+pub struct BkhStickyScrollEvent { pub visible_lines: Vec<BkhStickyLine>, pub collapsed: bool }
+
+// Editor minimap rendering — minimap character blocks, slider position, highlighted regions
+#[derive(Debug, Clone)]
+pub struct BkiMinimapLine { pub line_number: usize, pub tokens: Vec<u32>, pub background: Option<u32> }
+#[derive(Debug, Clone)]
+pub struct BkiMinimapSlider { pub top_line: usize, pub height_lines: usize, pub dragging: bool }
+#[derive(Debug, Clone)]
+pub struct BkiMinimapConfig { pub enabled: bool, pub side: u8, pub show_slider: u8, pub render_chars: bool, pub max_column: usize }
+#[derive(Debug, Clone)]
+pub struct BkiMinimapHighlight { pub start_line: usize, pub end_line: usize, pub color: u32, pub kind: u8 }
+#[derive(Debug, Clone)]
+pub struct BkiMinimapState { pub lines: Vec<BkiMinimapLine>, pub slider: BkiMinimapSlider, pub highlights: Vec<BkiMinimapHighlight> }
+
+// Gutter widgets — line numbers, fold indicators, breakpoint icons, dirty indicators, gutter click
+#[derive(Debug, Clone)]
+pub struct BkjGutterDecoration { pub line: usize, pub icon: u8, pub color: u32, pub tooltip: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BkjLineNumberConfig { pub visible: bool, pub render_mode: u8, pub seed: usize }
+#[derive(Debug, Clone)]
+pub struct BkjFoldIndicator { pub line: usize, pub is_collapsed: bool, pub fold_end_line: usize }
+#[derive(Debug, Clone)]
+pub struct BkjGutterClickEvent { pub line: usize, pub gutter_type: u8, pub button: u8, pub modifiers: u8 }
+#[derive(Debug, Clone)]
+pub struct BkjGutterState { pub decorations: Vec<BkjGutterDecoration>, pub fold_indicators: Vec<BkjFoldIndicator>, pub line_number_width: usize }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -94665,4 +94726,104 @@ mod tests_bfo {
     fn test_bke_separator_category() { let r = BkeWordRange { start: 10, end: 11, text: ";".into(), category: 2 }; assert_eq!(r.category, 2); }
     #[test]
     fn test_bke_word_config_no_camel() { let c = BkeWordConfig { separators: String::new(), camel_case: false, snake_case: false }; assert!(!c.camel_case); }
+    #[test]
+    fn test_bkf_detect_spaces() { let i = BkfIndentInfo { use_tabs: false, tab_size: 4, detected: true, confidence: 0.95 }; assert!(!i.use_tabs); }
+    #[test]
+    fn test_bkf_detect_tabs() { let i = BkfIndentInfo { use_tabs: true, tab_size: 4, detected: true, confidence: 0.88 }; assert!(i.use_tabs); }
+    #[test]
+    fn test_bkf_active_guide() { let g = BkfIndentGuide { level: 2, col: 8, is_active: true, scope_kind: 1 }; assert!(g.is_active); }
+    #[test]
+    fn test_bkf_indent_action_none() { let a = BkfIndentAction { action: 0, indent_delta: 0, outdent_pattern: None }; assert_eq!(a.action, 0); }
+    #[test]
+    fn test_bkf_indent_action_increase() { let a = BkfIndentAction { action: 1, indent_delta: 1, outdent_pattern: None }; assert_eq!(a.indent_delta, 1); }
+    #[test]
+    fn test_bkf_auto_indent() { let r = BkfAutoIndentResult { indent_text: "    ".into(), new_indent_level: 1, was_auto: true }; assert!(r.was_auto); }
+    #[test]
+    fn test_bkf_indent_rules() { let r = BkfIndentRules { increase_pattern: "\\{$".into(), decrease_pattern: "^\\}".into(), indent_next_line: None, unindented_line: None }; assert!(r.increase_pattern.contains("{")); }
+    #[test]
+    fn test_bkf_low_confidence() { let i = BkfIndentInfo { use_tabs: false, tab_size: 2, detected: true, confidence: 0.3 }; assert!(i.confidence < 0.5); }
+    #[test]
+    fn test_bkf_guide_level_zero() { let g = BkfIndentGuide { level: 0, col: 0, is_active: false, scope_kind: 0 }; assert_eq!(g.level, 0); }
+    #[test]
+    fn test_bkf_outdent_pattern() { let a = BkfIndentAction { action: 2, indent_delta: -1, outdent_pattern: Some("^\\}".into()) }; assert!(a.outdent_pattern.is_some()); }
+    #[test]
+    fn test_bkg_paren_pair() { let p = BkgBracketPair { open: '(', close: ')', nesting_level: 0, color_index: 0 }; assert_eq!(p.open, '('); }
+    #[test]
+    fn test_bkg_nested_bracket() { let p = BkgBracketPair { open: '{', close: '}', nesting_level: 2, color_index: 2 }; assert_eq!(p.nesting_level, 2); }
+    #[test]
+    fn test_bkg_match_same_line() { let m = BkgBracketMatch { open_line: 5, open_col: 10, close_line: 5, close_col: 20, pair_index: 0 }; assert_eq!(m.open_line, m.close_line); }
+    #[test]
+    fn test_bkg_match_cross_line() { let m = BkgBracketMatch { open_line: 1, open_col: 15, close_line: 10, close_col: 0, pair_index: 1 }; assert!(m.close_line > m.open_line); }
+    #[test]
+    fn test_bkg_config_enabled() { let c = BkgBracketColorConfig { enabled: true, colors: vec![0xFF0000, 0x00FF00, 0x0000FF], independent_pairs: true }; assert_eq!(c.colors.len(), 3); }
+    #[test]
+    fn test_bkg_config_disabled() { let c = BkgBracketColorConfig { enabled: false, colors: vec![], independent_pairs: false }; assert!(!c.enabled); }
+    #[test]
+    fn test_bkg_mismatched_bracket() { let m = BkgMismatchedBracket { line: 3, col: 5, bracket: ')', expected: Some('(') }; assert_eq!(m.bracket, ')'); }
+    #[test]
+    fn test_bkg_no_expected() { let m = BkgMismatchedBracket { line: 7, col: 0, bracket: '}', expected: None }; assert!(m.expected.is_none()); }
+    #[test]
+    fn test_bkg_empty_state() { let s = BkgBracketState { pairs: vec![], mismatched: vec![], max_nesting: 0 }; assert_eq!(s.max_nesting, 0); }
+    #[test]
+    fn test_bkg_deep_nesting() { let s = BkgBracketState { pairs: vec![], mismatched: vec![], max_nesting: 15 }; assert_eq!(s.max_nesting, 15); }
+    #[test]
+    fn test_bkh_sticky_line() { let l = BkhStickyLine { line: 10, text: "fn main() {".into(), indent_level: 0, scope_kind: 1 }; assert_eq!(l.line, 10); }
+    #[test]
+    fn test_bkh_nested_sticky() { let l = BkhStickyLine { line: 15, text: "  if condition {".into(), indent_level: 1, scope_kind: 2 }; assert_eq!(l.indent_level, 1); }
+    #[test]
+    fn test_bkh_state_enabled() { let s = BkhStickyScrollState { lines: vec![], max_lines: 5, enabled: true }; assert!(s.enabled); }
+    #[test]
+    fn test_bkh_state_with_lines() { let l = BkhStickyLine { line: 1, text: "struct X {".into(), indent_level: 0, scope_kind: 3 }; let s = BkhStickyScrollState { lines: vec![l], max_lines: 5, enabled: true }; assert_eq!(s.lines.len(), 1); }
+    #[test]
+    fn test_bkh_config_default() { let c = BkhStickyScrollConfig { enabled: true, max_line_count: 5, scroll_with_editor: true }; assert_eq!(c.max_line_count, 5); }
+    #[test]
+    fn test_bkh_config_disabled() { let c = BkhStickyScrollConfig { enabled: false, max_line_count: 0, scroll_with_editor: false }; assert!(!c.enabled); }
+    #[test]
+    fn test_bkh_scope_header() { let h = BkhScopeHeader { start_line: 5, end_line: 20, text: "impl Foo {".into(), kind: 4 }; assert_eq!(h.end_line - h.start_line, 15); }
+    #[test]
+    fn test_bkh_event_visible() { let l = BkhStickyLine { line: 0, text: "mod x {".into(), indent_level: 0, scope_kind: 5 }; let e = BkhStickyScrollEvent { visible_lines: vec![l], collapsed: false }; assert!(!e.collapsed); }
+    #[test]
+    fn test_bkh_event_collapsed() { let e = BkhStickyScrollEvent { visible_lines: vec![], collapsed: true }; assert!(e.collapsed); }
+    #[test]
+    fn test_bkh_max_depth_three() { let lines: Vec<BkhStickyLine> = (0..3).map(|i| BkhStickyLine { line: i * 5, text: format!("level {i}"), indent_level: i, scope_kind: 1 }).collect(); let s = BkhStickyScrollState { lines, max_lines: 3, enabled: true }; assert_eq!(s.lines.len(), 3); }
+    #[test]
+    fn test_bki_line_basic() { let l = BkiMinimapLine { line_number: 0, tokens: vec![0xFF, 0xAA], background: None }; assert_eq!(l.tokens.len(), 2); }
+    #[test]
+    fn test_bki_line_with_bg() { let l = BkiMinimapLine { line_number: 5, tokens: vec![], background: Some(0x333333) }; assert!(l.background.is_some()); }
+    #[test]
+    fn test_bki_slider_basic() { let s = BkiMinimapSlider { top_line: 100, height_lines: 40, dragging: false }; assert!(!s.dragging); }
+    #[test]
+    fn test_bki_slider_dragging() { let s = BkiMinimapSlider { top_line: 200, height_lines: 30, dragging: true }; assert!(s.dragging); }
+    #[test]
+    fn test_bki_config_enabled() { let c = BkiMinimapConfig { enabled: true, side: 1, show_slider: 1, render_chars: true, max_column: 120 }; assert!(c.enabled); }
+    #[test]
+    fn test_bki_config_disabled() { let c = BkiMinimapConfig { enabled: false, side: 0, show_slider: 0, render_chars: false, max_column: 0 }; assert!(!c.enabled); }
+    #[test]
+    fn test_bki_highlight_search() { let h = BkiMinimapHighlight { start_line: 10, end_line: 10, color: 0xFFFF00, kind: 1 }; assert_eq!(h.kind, 1); }
+    #[test]
+    fn test_bki_highlight_change() { let h = BkiMinimapHighlight { start_line: 5, end_line: 8, color: 0x00FF00, kind: 2 }; assert_eq!(h.end_line - h.start_line, 3); }
+    #[test]
+    fn test_bki_empty_state() { let s = BkiMinimapSlider { top_line: 0, height_lines: 0, dragging: false }; let st = BkiMinimapState { lines: vec![], slider: s, highlights: vec![] }; assert!(st.lines.is_empty()); }
+    #[test]
+    fn test_bki_state_with_highlights() { let s = BkiMinimapSlider { top_line: 0, height_lines: 50, dragging: false }; let h = BkiMinimapHighlight { start_line: 0, end_line: 100, color: 0xFF0000, kind: 3 }; let st = BkiMinimapState { lines: vec![], slider: s, highlights: vec![h] }; assert_eq!(st.highlights.len(), 1); }
+    #[test]
+    fn test_bkj_breakpoint_icon() { let d = BkjGutterDecoration { line: 10, icon: 1, color: 0xFF0000, tooltip: Some("Breakpoint".into()) }; assert_eq!(d.icon, 1); }
+    #[test]
+    fn test_bkj_dirty_indicator() { let d = BkjGutterDecoration { line: 5, icon: 2, color: 0x00FF00, tooltip: None }; assert!(d.tooltip.is_none()); }
+    #[test]
+    fn test_bkj_line_numbers_visible() { let c = BkjLineNumberConfig { visible: true, render_mode: 0, seed: 1 }; assert!(c.visible); }
+    #[test]
+    fn test_bkj_relative_line_numbers() { let c = BkjLineNumberConfig { visible: true, render_mode: 1, seed: 50 }; assert_eq!(c.render_mode, 1); }
+    #[test]
+    fn test_bkj_fold_expanded() { let f = BkjFoldIndicator { line: 3, is_collapsed: false, fold_end_line: 10 }; assert!(!f.is_collapsed); }
+    #[test]
+    fn test_bkj_fold_collapsed() { let f = BkjFoldIndicator { line: 3, is_collapsed: true, fold_end_line: 10 }; assert!(f.is_collapsed); }
+    #[test]
+    fn test_bkj_click_left_button() { let e = BkjGutterClickEvent { line: 15, gutter_type: 0, button: 0, modifiers: 0 }; assert_eq!(e.button, 0); }
+    #[test]
+    fn test_bkj_click_with_ctrl() { let e = BkjGutterClickEvent { line: 20, gutter_type: 1, button: 0, modifiers: 1 }; assert_eq!(e.modifiers, 1); }
+    #[test]
+    fn test_bkj_empty_gutter_state() { let s = BkjGutterState { decorations: vec![], fold_indicators: vec![], line_number_width: 4 }; assert_eq!(s.line_number_width, 4); }
+    #[test]
+    fn test_bkj_gutter_with_folds() { let f = BkjFoldIndicator { line: 0, is_collapsed: false, fold_end_line: 5 }; let s = BkjGutterState { decorations: vec![], fold_indicators: vec![f], line_number_width: 5 }; assert_eq!(s.fold_indicators.len(), 1); }
 }
