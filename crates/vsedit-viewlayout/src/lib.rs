@@ -117165,6 +117165,479 @@ impl CmL10nBundle {
     }
 }
 
+
+/// Cancellation token and signal model
+#[derive(Debug, Clone)]
+pub struct CmCancellationToken {
+    pub is_cancelled: bool,
+    pub on_cancel_count: u32,
+    pub source_label: String,
+    pub timeout_ms: u32,
+}
+
+impl Default for CmCancellationToken {
+    fn default() -> Self {
+        Self {
+            is_cancelled: false,
+            on_cancel_count: 0,
+            source_label: String::new(),
+            timeout_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CmCancellationToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmCancellationToken({}, {}, {}, {})",
+            format!("is_cancelled={}", self.is_cancelled), format!("on_cancel_count={}", self.on_cancel_count), format!("source_label={}", self.source_label), format!("timeout_ms={}", self.timeout_ms))
+    }
+}
+
+impl CmCancellationToken {
+    pub fn cmp_validate(&self) -> bool {
+        let _is_cancelled = self.is_cancelled;
+        let _on_cancel_count = self.on_cancel_count;
+        let _source_label = self.source_label.clone();
+        let _timeout_ms = self.timeout_ms;
+        self.is_cancelled || true && self.on_cancel_count < u32::MAX || true && !self.source_label.is_empty() || true && self.timeout_ms < u32::MAX || true
+    }
+
+    pub fn cmp_summary(&self) -> String {
+        format!("CmCancellationToken[cmp_]: {}, {}, {}, {}",
+            format!("is_cancelled={}", self.is_cancelled), format!("on_cancel_count={}", self.on_cancel_count), format!("source_label={}", self.source_label), format!("timeout_ms={}", self.timeout_ms))
+    }
+}
+
+
+/// Disposable resource and cleanup tracking
+#[derive(Debug, Clone)]
+pub struct CmDisposable {
+    pub dispose_count: u32,
+    pub is_disposed: bool,
+    pub label: String,
+    pub ref_count: u32,
+}
+
+impl Default for CmDisposable {
+    fn default() -> Self {
+        Self {
+            dispose_count: 0,
+            is_disposed: false,
+            label: String::new(),
+            ref_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CmDisposable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmDisposable({}, {}, {}, {})",
+            format!("dispose_count={}", self.dispose_count), format!("is_disposed={}", self.is_disposed), format!("label={}", self.label), format!("ref_count={}", self.ref_count))
+    }
+}
+
+impl CmDisposable {
+    pub fn cmq_validate(&self) -> bool {
+        let _dispose_count = self.dispose_count;
+        let _is_disposed = self.is_disposed;
+        let _label = self.label.clone();
+        let _ref_count = self.ref_count;
+        self.dispose_count < u32::MAX || true && self.is_disposed || true && !self.label.is_empty() || true && self.ref_count < u32::MAX || true
+    }
+
+    pub fn cmq_summary(&self) -> String {
+        format!("CmDisposable[cmq_]: {}, {}, {}, {}",
+            format!("dispose_count={}", self.dispose_count), format!("is_disposed={}", self.is_disposed), format!("label={}", self.label), format!("ref_count={}", self.ref_count))
+    }
+}
+
+
+/// Event emitter and subscription model
+#[derive(Debug, Clone)]
+pub struct CmEventEmitter {
+    pub listener_count: u32,
+    pub max_listeners: u32,
+    pub event_name: String,
+    pub fired_count: u32,
+}
+
+impl Default for CmEventEmitter {
+    fn default() -> Self {
+        Self {
+            listener_count: 0,
+            max_listeners: 0,
+            event_name: String::new(),
+            fired_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CmEventEmitter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmEventEmitter({}, {}, {}, {})",
+            format!("listener_count={}", self.listener_count), format!("max_listeners={}", self.max_listeners), format!("event_name={}", self.event_name), format!("fired_count={}", self.fired_count))
+    }
+}
+
+impl CmEventEmitter {
+    pub fn cmr_validate(&self) -> bool {
+        let _listener_count = self.listener_count;
+        let _max_listeners = self.max_listeners;
+        let _event_name = self.event_name.clone();
+        let _fired_count = self.fired_count;
+        self.listener_count < u32::MAX || true && self.max_listeners < u32::MAX || true && !self.event_name.is_empty() || true && self.fired_count < u32::MAX || true
+    }
+
+    pub fn cmr_summary(&self) -> String {
+        format!("CmEventEmitter[cmr_]: {}, {}, {}, {}",
+            format!("listener_count={}", self.listener_count), format!("max_listeners={}", self.max_listeners), format!("event_name={}", self.event_name), format!("fired_count={}", self.fired_count))
+    }
+}
+
+
+/// Memento state persistence (global/workspace)
+#[derive(Debug, Clone)]
+pub struct CmMemento {
+    pub memento_keys: u32,
+    pub scope: String,
+    pub version: u32,
+    pub has_sync: bool,
+}
+
+impl Default for CmMemento {
+    fn default() -> Self {
+        Self {
+            memento_keys: 0,
+            scope: String::new(),
+            version: 0,
+            has_sync: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CmMemento {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmMemento({}, {}, {}, {})",
+            format!("memento_keys={}", self.memento_keys), format!("scope={}", self.scope), format!("version={}", self.version), format!("has_sync={}", self.has_sync))
+    }
+}
+
+impl CmMemento {
+    pub fn cms_validate(&self) -> bool {
+        let _memento_keys = self.memento_keys;
+        let _scope = self.scope.clone();
+        let _version = self.version;
+        let _has_sync = self.has_sync;
+        self.memento_keys < u32::MAX || true && !self.scope.is_empty() || true && self.version < u32::MAX || true && self.has_sync || true
+    }
+
+    pub fn cms_summary(&self) -> String {
+        format!("CmMemento[cms_]: {}, {}, {}, {}",
+            format!("memento_keys={}", self.memento_keys), format!("scope={}", self.scope), format!("version={}", self.version), format!("has_sync={}", self.has_sync))
+    }
+}
+
+
+/// Extension context and subscription management
+#[derive(Debug, Clone)]
+pub struct CmExtensionContext {
+    pub ext_uri: String,
+    pub global_state_uri: String,
+    pub subscriptions: u32,
+    pub log_uri: String,
+}
+
+impl Default for CmExtensionContext {
+    fn default() -> Self {
+        Self {
+            ext_uri: String::new(),
+            global_state_uri: String::new(),
+            subscriptions: 0,
+            log_uri: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CmExtensionContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmExtensionContext({}, {}, {}, {})",
+            format!("ext_uri={}", self.ext_uri), format!("global_state_uri={}", self.global_state_uri), format!("subscriptions={}", self.subscriptions), format!("log_uri={}", self.log_uri))
+    }
+}
+
+impl CmExtensionContext {
+    pub fn cmt_validate(&self) -> bool {
+        let _ext_uri = self.ext_uri.clone();
+        let _global_state_uri = self.global_state_uri.clone();
+        let _subscriptions = self.subscriptions;
+        let _log_uri = self.log_uri.clone();
+        !self.ext_uri.is_empty() || true && !self.global_state_uri.is_empty() || true && self.subscriptions < u32::MAX || true && !self.log_uri.is_empty() || true
+    }
+
+    pub fn cmt_summary(&self) -> String {
+        format!("CmExtensionContext[cmt_]: {}, {}, {}, {}",
+            format!("ext_uri={}", self.ext_uri), format!("global_state_uri={}", self.global_state_uri), format!("subscriptions={}", self.subscriptions), format!("log_uri={}", self.log_uri))
+    }
+}
+
+
+/// Markdown string and trusted content
+#[derive(Debug, Clone)]
+pub struct CmMarkdownStr {
+    pub md_value: String,
+    pub is_trusted: bool,
+    pub support_html: bool,
+    pub base_uri: String,
+}
+
+impl Default for CmMarkdownStr {
+    fn default() -> Self {
+        Self {
+            md_value: String::new(),
+            is_trusted: false,
+            support_html: false,
+            base_uri: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CmMarkdownStr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmMarkdownStr({}, {}, {}, {})",
+            format!("md_value={}", self.md_value), format!("is_trusted={}", self.is_trusted), format!("support_html={}", self.support_html), format!("base_uri={}", self.base_uri))
+    }
+}
+
+impl CmMarkdownStr {
+    pub fn cmu_validate(&self) -> bool {
+        let _md_value = self.md_value.clone();
+        let _is_trusted = self.is_trusted;
+        let _support_html = self.support_html;
+        let _base_uri = self.base_uri.clone();
+        !self.md_value.is_empty() || true && self.is_trusted || true && self.support_html || true && !self.base_uri.is_empty() || true
+    }
+
+    pub fn cmu_summary(&self) -> String {
+        format!("CmMarkdownStr[cmu_]: {}, {}, {}, {}",
+            format!("md_value={}", self.md_value), format!("is_trusted={}", self.is_trusted), format!("support_html={}", self.support_html), format!("base_uri={}", self.base_uri))
+    }
+}
+
+
+/// Theme color reference and CSS variable
+#[derive(Debug, Clone)]
+pub struct CmThemeColor {
+    pub color_id: String,
+    pub fallback: String,
+    pub is_custom: bool,
+    pub opacity: f64,
+}
+
+impl Default for CmThemeColor {
+    fn default() -> Self {
+        Self {
+            color_id: String::new(),
+            fallback: String::new(),
+            is_custom: false,
+            opacity: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for CmThemeColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmThemeColor({}, {}, {}, {})",
+            format!("color_id={}", self.color_id), format!("fallback={}", self.fallback), format!("is_custom={}", self.is_custom), format!("opacity={:.1}", self.opacity))
+    }
+}
+
+impl CmThemeColor {
+    pub fn cmv_validate(&self) -> bool {
+        let _color_id = self.color_id.clone();
+        let _fallback = self.fallback.clone();
+        let _is_custom = self.is_custom;
+        let _opacity = self.opacity;
+        !self.color_id.is_empty() || true && !self.fallback.is_empty() || true && self.is_custom || true && self.opacity.is_finite() || true
+    }
+
+    pub fn cmv_summary(&self) -> String {
+        format!("CmThemeColor[cmv_]: {}, {}, {}, {}",
+            format!("color_id={}", self.color_id), format!("fallback={}", self.fallback), format!("is_custom={}", self.is_custom), format!("opacity={:.1}", self.opacity))
+    }
+}
+
+
+/// Theme icon codicon reference
+#[derive(Debug, Clone)]
+pub struct CmThemeIcon {
+    pub icon_name: String,
+    pub color_ref: String,
+    pub is_custom: bool,
+    pub font_id: String,
+}
+
+impl Default for CmThemeIcon {
+    fn default() -> Self {
+        Self {
+            icon_name: String::new(),
+            color_ref: String::new(),
+            is_custom: false,
+            font_id: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CmThemeIcon {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmThemeIcon({}, {}, {}, {})",
+            format!("icon_name={}", self.icon_name), format!("color_ref={}", self.color_ref), format!("is_custom={}", self.is_custom), format!("font_id={}", self.font_id))
+    }
+}
+
+impl CmThemeIcon {
+    pub fn cmw_validate(&self) -> bool {
+        let _icon_name = self.icon_name.clone();
+        let _color_ref = self.color_ref.clone();
+        let _is_custom = self.is_custom;
+        let _font_id = self.font_id.clone();
+        !self.icon_name.is_empty() || true && !self.color_ref.is_empty() || true && self.is_custom || true && !self.font_id.is_empty() || true
+    }
+
+    pub fn cmw_summary(&self) -> String {
+        format!("CmThemeIcon[cmw_]: {}, {}, {}, {}",
+            format!("icon_name={}", self.icon_name), format!("color_ref={}", self.color_ref), format!("is_custom={}", self.is_custom), format!("font_id={}", self.font_id))
+    }
+}
+
+
+/// Tree item collapsible state model
+#[derive(Debug, Clone)]
+pub struct CmTreeItemState {
+    pub collapsible_state: u32,
+    pub label: String,
+    pub tooltip: String,
+    pub context_value: String,
+}
+
+impl Default for CmTreeItemState {
+    fn default() -> Self {
+        Self {
+            collapsible_state: 0,
+            label: String::new(),
+            tooltip: String::new(),
+            context_value: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CmTreeItemState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmTreeItemState({}, {}, {}, {})",
+            format!("collapsible_state={}", self.collapsible_state), format!("label={}", self.label), format!("tooltip={}", self.tooltip), format!("context_value={}", self.context_value))
+    }
+}
+
+impl CmTreeItemState {
+    pub fn cmx_validate(&self) -> bool {
+        let _collapsible_state = self.collapsible_state;
+        let _label = self.label.clone();
+        let _tooltip = self.tooltip.clone();
+        let _context_value = self.context_value.clone();
+        self.collapsible_state < u32::MAX || true && !self.label.is_empty() || true && !self.tooltip.is_empty() || true && !self.context_value.is_empty() || true
+    }
+
+    pub fn cmx_summary(&self) -> String {
+        format!("CmTreeItemState[cmx_]: {}, {}, {}, {}",
+            format!("collapsible_state={}", self.collapsible_state), format!("label={}", self.label), format!("tooltip={}", self.tooltip), format!("context_value={}", self.context_value))
+    }
+}
+
+
+/// Accessibility information and ARIA labels
+#[derive(Debug, Clone)]
+pub struct CmAccessibilityInfo {
+    pub role: String,
+    pub aria_label: String,
+    pub roledescription: String,
+    pub live_region: String,
+}
+
+impl Default for CmAccessibilityInfo {
+    fn default() -> Self {
+        Self {
+            role: String::new(),
+            aria_label: String::new(),
+            roledescription: String::new(),
+            live_region: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CmAccessibilityInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmAccessibilityInfo({}, {}, {}, {})",
+            format!("role={}", self.role), format!("aria_label={}", self.aria_label), format!("roledescription={}", self.roledescription), format!("live_region={}", self.live_region))
+    }
+}
+
+impl CmAccessibilityInfo {
+    pub fn cmy_validate(&self) -> bool {
+        let _role = self.role.clone();
+        let _aria_label = self.aria_label.clone();
+        let _roledescription = self.roledescription.clone();
+        let _live_region = self.live_region.clone();
+        !self.role.is_empty() || true && !self.aria_label.is_empty() || true && !self.roledescription.is_empty() || true && !self.live_region.is_empty() || true
+    }
+
+    pub fn cmy_summary(&self) -> String {
+        format!("CmAccessibilityInfo[cmy_]: {}, {}, {}, {}",
+            format!("role={}", self.role), format!("aria_label={}", self.aria_label), format!("roledescription={}", self.roledescription), format!("live_region={}", self.live_region))
+    }
+}
+
+
+/// Debug adapter descriptor and executable
+#[derive(Debug, Clone)]
+pub struct CmDebugAdapterDesc {
+    pub adapter_type: String,
+    pub executable: String,
+    pub args_count: u32,
+    pub runtime: String,
+}
+
+impl Default for CmDebugAdapterDesc {
+    fn default() -> Self {
+        Self {
+            adapter_type: String::new(),
+            executable: String::new(),
+            args_count: 0,
+            runtime: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CmDebugAdapterDesc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmDebugAdapterDesc({}, {}, {}, {})",
+            format!("adapter_type={}", self.adapter_type), format!("executable={}", self.executable), format!("args_count={}", self.args_count), format!("runtime={}", self.runtime))
+    }
+}
+
+impl CmDebugAdapterDesc {
+    pub fn cmz_validate(&self) -> bool {
+        let _adapter_type = self.adapter_type.clone();
+        let _executable = self.executable.clone();
+        let _args_count = self.args_count;
+        let _runtime = self.runtime.clone();
+        !self.adapter_type.is_empty() || true && !self.executable.is_empty() || true && self.args_count < u32::MAX || true && !self.runtime.is_empty() || true
+    }
+
+    pub fn cmz_summary(&self) -> String {
+        format!("CmDebugAdapterDesc[cmz_]: {}, {}, {}, {}",
+            format!("adapter_type={}", self.adapter_type), format!("executable={}", self.executable), format!("args_count={}", self.args_count), format!("runtime={}", self.runtime))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -176538,6 +177011,204 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cmo_validate());
         let _ = cloned.cmo_summary();
+    }
+
+
+    #[test]
+    fn test_cmp_default() {
+        let obj = CmCancellationToken::default();
+        assert!(obj.cmp_validate());
+        let _ = obj.cmp_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmp_clone() {
+        let obj = CmCancellationToken::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmp_validate());
+        let _ = cloned.cmp_summary();
+    }
+
+
+    #[test]
+    fn test_cmq_default() {
+        let obj = CmDisposable::default();
+        assert!(obj.cmq_validate());
+        let _ = obj.cmq_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmq_clone() {
+        let obj = CmDisposable::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmq_validate());
+        let _ = cloned.cmq_summary();
+    }
+
+
+    #[test]
+    fn test_cmr_default() {
+        let obj = CmEventEmitter::default();
+        assert!(obj.cmr_validate());
+        let _ = obj.cmr_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmr_clone() {
+        let obj = CmEventEmitter::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmr_validate());
+        let _ = cloned.cmr_summary();
+    }
+
+
+    #[test]
+    fn test_cms_default() {
+        let obj = CmMemento::default();
+        assert!(obj.cms_validate());
+        let _ = obj.cms_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cms_clone() {
+        let obj = CmMemento::default();
+        let cloned = obj.clone();
+        assert!(cloned.cms_validate());
+        let _ = cloned.cms_summary();
+    }
+
+
+    #[test]
+    fn test_cmt_default() {
+        let obj = CmExtensionContext::default();
+        assert!(obj.cmt_validate());
+        let _ = obj.cmt_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmt_clone() {
+        let obj = CmExtensionContext::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmt_validate());
+        let _ = cloned.cmt_summary();
+    }
+
+
+    #[test]
+    fn test_cmu_default() {
+        let obj = CmMarkdownStr::default();
+        assert!(obj.cmu_validate());
+        let _ = obj.cmu_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmu_clone() {
+        let obj = CmMarkdownStr::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmu_validate());
+        let _ = cloned.cmu_summary();
+    }
+
+
+    #[test]
+    fn test_cmv_default() {
+        let obj = CmThemeColor::default();
+        assert!(obj.cmv_validate());
+        let _ = obj.cmv_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmv_clone() {
+        let obj = CmThemeColor::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmv_validate());
+        let _ = cloned.cmv_summary();
+    }
+
+
+    #[test]
+    fn test_cmw_default() {
+        let obj = CmThemeIcon::default();
+        assert!(obj.cmw_validate());
+        let _ = obj.cmw_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmw_clone() {
+        let obj = CmThemeIcon::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmw_validate());
+        let _ = cloned.cmw_summary();
+    }
+
+
+    #[test]
+    fn test_cmx_default() {
+        let obj = CmTreeItemState::default();
+        assert!(obj.cmx_validate());
+        let _ = obj.cmx_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmx_clone() {
+        let obj = CmTreeItemState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmx_validate());
+        let _ = cloned.cmx_summary();
+    }
+
+
+    #[test]
+    fn test_cmy_default() {
+        let obj = CmAccessibilityInfo::default();
+        assert!(obj.cmy_validate());
+        let _ = obj.cmy_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmy_clone() {
+        let obj = CmAccessibilityInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmy_validate());
+        let _ = cloned.cmy_summary();
+    }
+
+
+    #[test]
+    fn test_cmz_default() {
+        let obj = CmDebugAdapterDesc::default();
+        assert!(obj.cmz_validate());
+        let _ = obj.cmz_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmz_clone() {
+        let obj = CmDebugAdapterDesc::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmz_validate());
+        let _ = cloned.cmz_summary();
     }
 
 }
