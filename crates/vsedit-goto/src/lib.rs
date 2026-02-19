@@ -58849,3 +58849,210 @@ mod bbl_tests {
         assert_eq!(r.enabled_count(), 1);
     }
 }
+
+
+// --- bbm_: Editor encoding model ---
+
+/// File encoding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbmEncoding {
+    Utf8, Utf8Bom, Utf16Le, Utf16Be, Ascii, Latin1, ShiftJis, Euc, Gbk, Big5,
+}
+
+impl BbmEncoding {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Utf8 => "UTF-8", Self::Utf8Bom => "UTF-8 with BOM",
+            Self::Utf16Le => "UTF-16 LE", Self::Utf16Be => "UTF-16 BE",
+            Self::Ascii => "ASCII", Self::Latin1 => "ISO 8859-1",
+            Self::ShiftJis => "Shift JIS", Self::Euc => "EUC-JP",
+            Self::Gbk => "GBK", Self::Big5 => "Big5",
+        }
+    }
+
+    pub fn is_unicode(&self) -> bool {
+        matches!(self, Self::Utf8 | Self::Utf8Bom | Self::Utf16Le | Self::Utf16Be)
+    }
+
+    pub fn has_bom(&self) -> bool {
+        matches!(self, Self::Utf8Bom | Self::Utf16Le | Self::Utf16Be)
+    }
+
+    pub fn bom_bytes(&self) -> &'static [u8] {
+        match self {
+            Self::Utf8Bom => &[0xEF, 0xBB, 0xBF],
+            Self::Utf16Le => &[0xFF, 0xFE],
+            Self::Utf16Be => &[0xFE, 0xFF],
+            _ => &[],
+        }
+    }
+}
+
+/// Line ending style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbmLineEnding {
+    Lf,
+    CrLf,
+    Cr,
+}
+
+impl BbmLineEnding {
+    pub fn label(&self) -> &'static str {
+        match self { Self::Lf => "LF", Self::CrLf => "CRLF", Self::Cr => "CR" }
+    }
+
+    pub fn bytes(&self) -> &'static [u8] {
+        match self { Self::Lf => b"\n", Self::CrLf => b"\r\n", Self::Cr => b"\r" }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self { Self::Lf => "\n", Self::CrLf => "\r\n", Self::Cr => "\r" }
+    }
+
+    pub fn is_windows(&self) -> bool { matches!(self, Self::CrLf) }
+}
+
+/// Encoding detection result.
+#[derive(Debug, Clone)]
+pub struct BbmDetectResult {
+    pub encoding: BbmEncoding,
+    pub line_ending: BbmLineEnding,
+    pub confidence: f64,
+    pub has_null_bytes: bool,
+}
+
+impl BbmDetectResult {
+    pub fn new(enc: BbmEncoding, le: BbmLineEnding, conf: f64) -> Self {
+        Self { encoding: enc, line_ending: le, confidence: conf, has_null_bytes: false }
+    }
+
+    pub fn is_binary(&self) -> bool { self.has_null_bytes }
+}
+
+/// The encoding model.
+#[derive(Debug)]
+pub struct BbmEncodingModel {
+    encoding: BbmEncoding,
+    line_ending: BbmLineEnding,
+    auto_detect: bool,
+    auto_guess_encoding: bool,
+    detected: Option<BbmDetectResult>,
+}
+
+impl BbmEncodingModel {
+    pub fn new() -> Self {
+        Self {
+            encoding: BbmEncoding::Utf8, line_ending: BbmLineEnding::Lf,
+            auto_detect: true, auto_guess_encoding: false, detected: None,
+        }
+    }
+
+    pub fn encoding(&self) -> BbmEncoding { self.encoding }
+    pub fn set_encoding(&mut self, e: BbmEncoding) { self.encoding = e; }
+
+    pub fn line_ending(&self) -> BbmLineEnding { self.line_ending }
+    pub fn set_line_ending(&mut self, le: BbmLineEnding) { self.line_ending = le; }
+
+    pub fn detect_from_bytes(&mut self, bytes: &[u8]) {
+        let has_null = bytes.contains(&0);
+        let has_bom_utf8 = bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
+        let has_bom_utf16le = bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE;
+        let has_bom_utf16be = bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF;
+
+        let enc = if has_bom_utf8 { BbmEncoding::Utf8Bom }
+            else if has_bom_utf16le { BbmEncoding::Utf16Le }
+            else if has_bom_utf16be { BbmEncoding::Utf16Be }
+            else { BbmEncoding::Utf8 };
+
+        let crlf = bytes.windows(2).filter(|w| w[0] == b'\r' && w[1] == b'\n').count();
+        let lf_only = bytes.iter().filter(|&&b| b == b'\n').count().saturating_sub(crlf);
+        let le = if crlf > lf_only { BbmLineEnding::CrLf } else { BbmLineEnding::Lf };
+
+        let mut result = BbmDetectResult::new(enc, le, 0.9);
+        result.has_null_bytes = has_null;
+        self.detected = Some(result);
+
+        if self.auto_detect {
+            self.encoding = enc;
+            self.line_ending = le;
+        }
+    }
+
+    pub fn detected(&self) -> Option<&BbmDetectResult> { self.detected.as_ref() }
+    pub fn is_binary(&self) -> bool { self.detected.as_ref().is_some_and(|d| d.is_binary()) }
+
+    pub fn status_text(&self) -> String {
+        format!("{} {}", self.encoding.label(), self.line_ending.label())
+    }
+
+    pub fn set_auto_detect(&mut self, v: bool) { self.auto_detect = v; }
+}
+
+#[cfg(test)]
+mod bbm_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbm_encoding() {
+        assert!(BbmEncoding::Utf8.is_unicode());
+        assert!(!BbmEncoding::Latin1.is_unicode());
+        assert!(BbmEncoding::Utf8Bom.has_bom());
+    }
+
+    #[test]
+    fn test_bbm_bom_bytes() {
+        assert_eq!(BbmEncoding::Utf8Bom.bom_bytes(), &[0xEF, 0xBB, 0xBF]);
+        assert!(BbmEncoding::Utf8.bom_bytes().is_empty());
+    }
+
+    #[test]
+    fn test_bbm_line_ending() {
+        assert_eq!(BbmLineEnding::Lf.as_str(), "\n");
+        assert!(BbmLineEnding::CrLf.is_windows());
+        assert!(!BbmLineEnding::Lf.is_windows());
+    }
+
+    #[test]
+    fn test_bbm_detect_utf8() {
+        let mut m = BbmEncodingModel::new();
+        m.detect_from_bytes(b"hello\nworld\n");
+        assert_eq!(m.encoding(), BbmEncoding::Utf8);
+        assert_eq!(m.line_ending(), BbmLineEnding::Lf);
+    }
+
+    #[test]
+    fn test_bbm_detect_crlf() {
+        let mut m = BbmEncodingModel::new();
+        m.detect_from_bytes(b"hello\r\nworld\r\n");
+        assert_eq!(m.line_ending(), BbmLineEnding::CrLf);
+    }
+
+    #[test]
+    fn test_bbm_detect_bom() {
+        let mut m = BbmEncodingModel::new();
+        let mut bytes = vec![0xEF, 0xBB, 0xBF];
+        bytes.extend_from_slice(b"hello");
+        m.detect_from_bytes(&bytes);
+        assert_eq!(m.encoding(), BbmEncoding::Utf8Bom);
+    }
+
+    #[test]
+    fn test_bbm_detect_binary() {
+        let mut m = BbmEncodingModel::new();
+        m.detect_from_bytes(&[0x00, 0x01, 0x02]);
+        assert!(m.is_binary());
+    }
+
+    #[test]
+    fn test_bbm_status() {
+        let m = BbmEncodingModel::new();
+        assert_eq!(m.status_text(), "UTF-8 LF");
+    }
+
+    #[test]
+    fn test_bbm_set_encoding() {
+        let mut m = BbmEncodingModel::new();
+        m.set_encoding(BbmEncoding::Latin1);
+        assert_eq!(m.encoding(), BbmEncoding::Latin1);
+    }
+}
