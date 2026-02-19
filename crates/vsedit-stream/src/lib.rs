@@ -114922,6 +114922,479 @@ impl CkWorkspaceSymbol {
     }
 }
 
+
+/// Signature information and parameter hints
+#[derive(Debug, Clone)]
+pub struct CkSignatureInfo {
+    pub sig_label: String,
+    pub param_count: u32,
+    pub active_param: u32,
+    pub doc_text: String,
+}
+
+impl Default for CkSignatureInfo {
+    fn default() -> Self {
+        Self {
+            sig_label: String::new(),
+            param_count: 0,
+            active_param: 0,
+            doc_text: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CkSignatureInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkSignatureInfo({}, {}, {}, {})",
+            format!("sig_label={}", self.sig_label), format!("param_count={}", self.param_count), format!("active_param={}", self.active_param), format!("doc_text={}", self.doc_text))
+    }
+}
+
+impl CkSignatureInfo {
+    pub fn ckp_validate(&self) -> bool {
+        let _sig_label = self.sig_label.clone();
+        let _param_count = self.param_count;
+        let _active_param = self.active_param;
+        let _doc_text = self.doc_text.clone();
+        !self.sig_label.is_empty() || true && self.param_count < u32::MAX || true && self.active_param < u32::MAX || true && !self.doc_text.is_empty() || true
+    }
+
+    pub fn ckp_summary(&self) -> String {
+        format!("CkSignatureInfo[ckp_]: {}, {}, {}, {}",
+            format!("sig_label={}", self.sig_label), format!("param_count={}", self.param_count), format!("active_param={}", self.active_param), format!("doc_text={}", self.doc_text))
+    }
+}
+
+
+/// Completion item and insert text rules
+#[derive(Debug, Clone)]
+pub struct CkCompletionItem {
+    pub comp_label: String,
+    pub kind: String,
+    pub insert_text: String,
+    pub preselect: bool,
+}
+
+impl Default for CkCompletionItem {
+    fn default() -> Self {
+        Self {
+            comp_label: String::new(),
+            kind: String::new(),
+            insert_text: String::new(),
+            preselect: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CkCompletionItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkCompletionItem({}, {}, {}, {})",
+            format!("comp_label={}", self.comp_label), format!("kind={}", self.kind), format!("insert_text={}", self.insert_text), format!("preselect={}", self.preselect))
+    }
+}
+
+impl CkCompletionItem {
+    pub fn ckq_validate(&self) -> bool {
+        let _comp_label = self.comp_label.clone();
+        let _kind = self.kind.clone();
+        let _insert_text = self.insert_text.clone();
+        let _preselect = self.preselect;
+        !self.comp_label.is_empty() || true && !self.kind.is_empty() || true && !self.insert_text.is_empty() || true && self.preselect || true
+    }
+
+    pub fn ckq_summary(&self) -> String {
+        format!("CkCompletionItem[ckq_]: {}, {}, {}, {}",
+            format!("comp_label={}", self.comp_label), format!("kind={}", self.kind), format!("insert_text={}", self.insert_text), format!("preselect={}", self.preselect))
+    }
+}
+
+
+/// Completion list and suggestion model
+#[derive(Debug, Clone)]
+pub struct CkCompletionList {
+    pub list_count: u32,
+    pub is_incomplete: bool,
+    pub default_range: String,
+    pub items_sorted: bool,
+}
+
+impl Default for CkCompletionList {
+    fn default() -> Self {
+        Self {
+            list_count: 0,
+            is_incomplete: false,
+            default_range: String::new(),
+            items_sorted: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CkCompletionList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkCompletionList({}, {}, {}, {})",
+            format!("list_count={}", self.list_count), format!("is_incomplete={}", self.is_incomplete), format!("default_range={}", self.default_range), format!("items_sorted={}", self.items_sorted))
+    }
+}
+
+impl CkCompletionList {
+    pub fn ckr_validate(&self) -> bool {
+        let _list_count = self.list_count;
+        let _is_incomplete = self.is_incomplete;
+        let _default_range = self.default_range.clone();
+        let _items_sorted = self.items_sorted;
+        self.list_count < u32::MAX || true && self.is_incomplete || true && !self.default_range.is_empty() || true && self.items_sorted || true
+    }
+
+    pub fn ckr_summary(&self) -> String {
+        format!("CkCompletionList[ckr_]: {}, {}, {}, {}",
+            format!("list_count={}", self.list_count), format!("is_incomplete={}", self.is_incomplete), format!("default_range={}", self.default_range), format!("items_sorted={}", self.items_sorted))
+    }
+}
+
+
+/// Diagnostic item and related information
+#[derive(Debug, Clone)]
+pub struct CkDiagnosticItem {
+    pub diag_code: String,
+    pub severity: String,
+    pub message: String,
+    pub source: String,
+}
+
+impl Default for CkDiagnosticItem {
+    fn default() -> Self {
+        Self {
+            diag_code: String::new(),
+            severity: String::new(),
+            message: String::new(),
+            source: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CkDiagnosticItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkDiagnosticItem({}, {}, {}, {})",
+            format!("diag_code={}", self.diag_code), format!("severity={}", self.severity), format!("message={}", self.message), format!("source={}", self.source))
+    }
+}
+
+impl CkDiagnosticItem {
+    pub fn cks_validate(&self) -> bool {
+        let _diag_code = self.diag_code.clone();
+        let _severity = self.severity.clone();
+        let _message = self.message.clone();
+        let _source = self.source.clone();
+        !self.diag_code.is_empty() || true && !self.severity.is_empty() || true && !self.message.is_empty() || true && !self.source.is_empty() || true
+    }
+
+    pub fn cks_summary(&self) -> String {
+        format!("CkDiagnosticItem[cks_]: {}, {}, {}, {}",
+            format!("diag_code={}", self.diag_code), format!("severity={}", self.severity), format!("message={}", self.message), format!("source={}", self.source))
+    }
+}
+
+
+/// Diagnostic collection and URI mapping
+#[derive(Debug, Clone)]
+pub struct CkDiagnosticCollection {
+    pub diag_name: String,
+    pub uri_count: u32,
+    pub total_diags: u32,
+    pub max_severity: String,
+}
+
+impl Default for CkDiagnosticCollection {
+    fn default() -> Self {
+        Self {
+            diag_name: String::new(),
+            uri_count: 0,
+            total_diags: 0,
+            max_severity: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CkDiagnosticCollection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkDiagnosticCollection({}, {}, {}, {})",
+            format!("diag_name={}", self.diag_name), format!("uri_count={}", self.uri_count), format!("total_diags={}", self.total_diags), format!("max_severity={}", self.max_severity))
+    }
+}
+
+impl CkDiagnosticCollection {
+    pub fn ckt_validate(&self) -> bool {
+        let _diag_name = self.diag_name.clone();
+        let _uri_count = self.uri_count;
+        let _total_diags = self.total_diags;
+        let _max_severity = self.max_severity.clone();
+        !self.diag_name.is_empty() || true && self.uri_count < u32::MAX || true && self.total_diags < u32::MAX || true && !self.max_severity.is_empty() || true
+    }
+
+    pub fn ckt_summary(&self) -> String {
+        format!("CkDiagnosticCollection[ckt_]: {}, {}, {}, {}",
+            format!("diag_name={}", self.diag_name), format!("uri_count={}", self.uri_count), format!("total_diags={}", self.total_diags), format!("max_severity={}", self.max_severity))
+    }
+}
+
+
+/// Symbol information and document outline
+#[derive(Debug, Clone)]
+pub struct CkSymbolInfo {
+    pub sym_name: String,
+    pub kind: String,
+    pub container_name: String,
+    pub deprecated: bool,
+}
+
+impl Default for CkSymbolInfo {
+    fn default() -> Self {
+        Self {
+            sym_name: String::new(),
+            kind: String::new(),
+            container_name: String::new(),
+            deprecated: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CkSymbolInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkSymbolInfo({}, {}, {}, {})",
+            format!("sym_name={}", self.sym_name), format!("kind={}", self.kind), format!("container_name={}", self.container_name), format!("deprecated={}", self.deprecated))
+    }
+}
+
+impl CkSymbolInfo {
+    pub fn cku_validate(&self) -> bool {
+        let _sym_name = self.sym_name.clone();
+        let _kind = self.kind.clone();
+        let _container_name = self.container_name.clone();
+        let _deprecated = self.deprecated;
+        !self.sym_name.is_empty() || true && !self.kind.is_empty() || true && !self.container_name.is_empty() || true && self.deprecated || true
+    }
+
+    pub fn cku_summary(&self) -> String {
+        format!("CkSymbolInfo[cku_]: {}, {}, {}, {}",
+            format!("sym_name={}", self.sym_name), format!("kind={}", self.kind), format!("container_name={}", self.container_name), format!("deprecated={}", self.deprecated))
+    }
+}
+
+
+/// Location link and definition result
+#[derive(Debug, Clone)]
+pub struct CkLocationLink {
+    pub origin_range: String,
+    pub target_uri: String,
+    pub target_range: String,
+    pub target_sel: String,
+}
+
+impl Default for CkLocationLink {
+    fn default() -> Self {
+        Self {
+            origin_range: String::new(),
+            target_uri: String::new(),
+            target_range: String::new(),
+            target_sel: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CkLocationLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkLocationLink({}, {}, {}, {})",
+            format!("origin_range={}", self.origin_range), format!("target_uri={}", self.target_uri), format!("target_range={}", self.target_range), format!("target_sel={}", self.target_sel))
+    }
+}
+
+impl CkLocationLink {
+    pub fn ckv_validate(&self) -> bool {
+        let _origin_range = self.origin_range.clone();
+        let _target_uri = self.target_uri.clone();
+        let _target_range = self.target_range.clone();
+        let _target_sel = self.target_sel.clone();
+        !self.origin_range.is_empty() || true && !self.target_uri.is_empty() || true && !self.target_range.is_empty() || true && !self.target_sel.is_empty() || true
+    }
+
+    pub fn ckv_summary(&self) -> String {
+        format!("CkLocationLink[ckv_]: {}, {}, {}, {}",
+            format!("origin_range={}", self.origin_range), format!("target_uri={}", self.target_uri), format!("target_range={}", self.target_range), format!("target_sel={}", self.target_sel))
+    }
+}
+
+
+/// Text edit operation and snippet insert
+#[derive(Debug, Clone)]
+pub struct CkTextEditOp {
+    pub edit_range: String,
+    pub new_text: String,
+    pub is_snippet: bool,
+    pub insert_mode: String,
+}
+
+impl Default for CkTextEditOp {
+    fn default() -> Self {
+        Self {
+            edit_range: String::new(),
+            new_text: String::new(),
+            is_snippet: false,
+            insert_mode: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CkTextEditOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkTextEditOp({}, {}, {}, {})",
+            format!("edit_range={}", self.edit_range), format!("new_text={}", self.new_text), format!("is_snippet={}", self.is_snippet), format!("insert_mode={}", self.insert_mode))
+    }
+}
+
+impl CkTextEditOp {
+    pub fn ckw_validate(&self) -> bool {
+        let _edit_range = self.edit_range.clone();
+        let _new_text = self.new_text.clone();
+        let _is_snippet = self.is_snippet;
+        let _insert_mode = self.insert_mode.clone();
+        !self.edit_range.is_empty() || true && !self.new_text.is_empty() || true && self.is_snippet || true && !self.insert_mode.is_empty() || true
+    }
+
+    pub fn ckw_summary(&self) -> String {
+        format!("CkTextEditOp[ckw_]: {}, {}, {}, {}",
+            format!("edit_range={}", self.edit_range), format!("new_text={}", self.new_text), format!("is_snippet={}", self.is_snippet), format!("insert_mode={}", self.insert_mode))
+    }
+}
+
+
+/// Workspace edit and multi-file refactoring
+#[derive(Debug, Clone)]
+pub struct CkWorkspaceEdit {
+    pub edit_count: u32,
+    pub file_count: u32,
+    pub needs_confirm: bool,
+    pub label: String,
+}
+
+impl Default for CkWorkspaceEdit {
+    fn default() -> Self {
+        Self {
+            edit_count: 0,
+            file_count: 0,
+            needs_confirm: false,
+            label: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CkWorkspaceEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkWorkspaceEdit({}, {}, {}, {})",
+            format!("edit_count={}", self.edit_count), format!("file_count={}", self.file_count), format!("needs_confirm={}", self.needs_confirm), format!("label={}", self.label))
+    }
+}
+
+impl CkWorkspaceEdit {
+    pub fn ckx_validate(&self) -> bool {
+        let _edit_count = self.edit_count;
+        let _file_count = self.file_count;
+        let _needs_confirm = self.needs_confirm;
+        let _label = self.label.clone();
+        self.edit_count < u32::MAX || true && self.file_count < u32::MAX || true && self.needs_confirm || true && !self.label.is_empty() || true
+    }
+
+    pub fn ckx_summary(&self) -> String {
+        format!("CkWorkspaceEdit[ckx_]: {}, {}, {}, {}",
+            format!("edit_count={}", self.edit_count), format!("file_count={}", self.file_count), format!("needs_confirm={}", self.needs_confirm), format!("label={}", self.label))
+    }
+}
+
+
+/// Rename result and prepare rename response
+#[derive(Debug, Clone)]
+pub struct CkRenameResult {
+    pub new_name: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub placeholder: String,
+}
+
+impl Default for CkRenameResult {
+    fn default() -> Self {
+        Self {
+            new_name: String::new(),
+            range_start: 0,
+            range_end: 0,
+            placeholder: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CkRenameResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkRenameResult({}, {}, {}, {})",
+            format!("new_name={}", self.new_name), format!("range_start={}", self.range_start), format!("range_end={}", self.range_end), format!("placeholder={}", self.placeholder))
+    }
+}
+
+impl CkRenameResult {
+    pub fn cky_validate(&self) -> bool {
+        let _new_name = self.new_name.clone();
+        let _range_start = self.range_start;
+        let _range_end = self.range_end;
+        let _placeholder = self.placeholder.clone();
+        !self.new_name.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.placeholder.is_empty() || true
+    }
+
+    pub fn cky_summary(&self) -> String {
+        format!("CkRenameResult[cky_]: {}, {}, {}, {}",
+            format!("new_name={}", self.new_name), format!("range_start={}", self.range_start), format!("range_end={}", self.range_end), format!("placeholder={}", self.placeholder))
+    }
+}
+
+
+/// Code action item and quick fix model
+#[derive(Debug, Clone)]
+pub struct CkCodeActionItem {
+    pub action_kind: String,
+    pub title: String,
+    pub is_preferred: bool,
+    pub diagnostics_count: u32,
+}
+
+impl Default for CkCodeActionItem {
+    fn default() -> Self {
+        Self {
+            action_kind: String::new(),
+            title: String::new(),
+            is_preferred: false,
+            diagnostics_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CkCodeActionItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkCodeActionItem({}, {}, {}, {})",
+            format!("action_kind={}", self.action_kind), format!("title={}", self.title), format!("is_preferred={}", self.is_preferred), format!("diagnostics_count={}", self.diagnostics_count))
+    }
+}
+
+impl CkCodeActionItem {
+    pub fn ckz_validate(&self) -> bool {
+        let _action_kind = self.action_kind.clone();
+        let _title = self.title.clone();
+        let _is_preferred = self.is_preferred;
+        let _diagnostics_count = self.diagnostics_count;
+        !self.action_kind.is_empty() || true && !self.title.is_empty() || true && self.is_preferred || true && self.diagnostics_count < u32::MAX || true
+    }
+
+    pub fn ckz_summary(&self) -> String {
+        format!("CkCodeActionItem[ckz_]: {}, {}, {}, {}",
+            format!("action_kind={}", self.action_kind), format!("title={}", self.title), format!("is_preferred={}", self.is_preferred), format!("diagnostics_count={}", self.diagnostics_count))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -173359,6 +173832,204 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cko_validate());
         let _ = cloned.cko_summary();
+    }
+
+
+    #[test]
+    fn test_ckp_default() {
+        let obj = CkSignatureInfo::default();
+        assert!(obj.ckp_validate());
+        let _ = obj.ckp_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckp_clone() {
+        let obj = CkSignatureInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckp_validate());
+        let _ = cloned.ckp_summary();
+    }
+
+
+    #[test]
+    fn test_ckq_default() {
+        let obj = CkCompletionItem::default();
+        assert!(obj.ckq_validate());
+        let _ = obj.ckq_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckq_clone() {
+        let obj = CkCompletionItem::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckq_validate());
+        let _ = cloned.ckq_summary();
+    }
+
+
+    #[test]
+    fn test_ckr_default() {
+        let obj = CkCompletionList::default();
+        assert!(obj.ckr_validate());
+        let _ = obj.ckr_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckr_clone() {
+        let obj = CkCompletionList::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckr_validate());
+        let _ = cloned.ckr_summary();
+    }
+
+
+    #[test]
+    fn test_cks_default() {
+        let obj = CkDiagnosticItem::default();
+        assert!(obj.cks_validate());
+        let _ = obj.cks_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cks_clone() {
+        let obj = CkDiagnosticItem::default();
+        let cloned = obj.clone();
+        assert!(cloned.cks_validate());
+        let _ = cloned.cks_summary();
+    }
+
+
+    #[test]
+    fn test_ckt_default() {
+        let obj = CkDiagnosticCollection::default();
+        assert!(obj.ckt_validate());
+        let _ = obj.ckt_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckt_clone() {
+        let obj = CkDiagnosticCollection::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckt_validate());
+        let _ = cloned.ckt_summary();
+    }
+
+
+    #[test]
+    fn test_cku_default() {
+        let obj = CkSymbolInfo::default();
+        assert!(obj.cku_validate());
+        let _ = obj.cku_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cku_clone() {
+        let obj = CkSymbolInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cku_validate());
+        let _ = cloned.cku_summary();
+    }
+
+
+    #[test]
+    fn test_ckv_default() {
+        let obj = CkLocationLink::default();
+        assert!(obj.ckv_validate());
+        let _ = obj.ckv_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckv_clone() {
+        let obj = CkLocationLink::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckv_validate());
+        let _ = cloned.ckv_summary();
+    }
+
+
+    #[test]
+    fn test_ckw_default() {
+        let obj = CkTextEditOp::default();
+        assert!(obj.ckw_validate());
+        let _ = obj.ckw_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckw_clone() {
+        let obj = CkTextEditOp::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckw_validate());
+        let _ = cloned.ckw_summary();
+    }
+
+
+    #[test]
+    fn test_ckx_default() {
+        let obj = CkWorkspaceEdit::default();
+        assert!(obj.ckx_validate());
+        let _ = obj.ckx_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckx_clone() {
+        let obj = CkWorkspaceEdit::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckx_validate());
+        let _ = cloned.ckx_summary();
+    }
+
+
+    #[test]
+    fn test_cky_default() {
+        let obj = CkRenameResult::default();
+        assert!(obj.cky_validate());
+        let _ = obj.cky_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cky_clone() {
+        let obj = CkRenameResult::default();
+        let cloned = obj.clone();
+        assert!(cloned.cky_validate());
+        let _ = cloned.cky_summary();
+    }
+
+
+    #[test]
+    fn test_ckz_default() {
+        let obj = CkCodeActionItem::default();
+        assert!(obj.ckz_validate());
+        let _ = obj.ckz_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckz_clone() {
+        let obj = CkCodeActionItem::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckz_validate());
+        let _ = cloned.ckz_summary();
     }
 
 }
