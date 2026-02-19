@@ -87858,6 +87858,132 @@ impl ColorPicker {
     }
 }
 
+/// Runtime wiring: bou_ BreadcrumbItem
+#[derive(Debug, Clone)]
+pub struct BreadcrumbItem {
+    pub bou_item_name: String,
+    pub bou_item_kind: u8,
+    pub bou_item_detail: String,
+    pub bou_uri: String,
+    pub bou_range_start_line: u32,
+    pub bou_range_end_line: u32,
+    pub bou_is_file: bool,
+    pub bou_parent_name: String,
+    pub bou_icon_id: String,
+    pub bou_depth: u32,
+}
+
+impl BreadcrumbItem {
+    pub fn bou_summary(&self) -> String {
+        format!("BreadcrumbItem({})", self.bou_item_name)
+    }
+}
+
+/// Runtime wiring: bov_ OutlineModel
+#[derive(Debug, Clone)]
+pub struct OutlineModel {
+    pub bov_root_children_count: usize,
+    pub bov_total_symbols: usize,
+    pub bov_uri: String,
+    pub bov_config_filter: String,
+    pub bov_sort_by: String,
+    pub bov_follow_cursor: bool,
+    pub bov_show_icons: bool,
+    pub bov_show_strings: bool,
+    pub bov_show_numbers: bool,
+    pub bov_show_booleans: bool,
+}
+
+impl OutlineModel {
+    pub fn bov_summary(&self) -> String {
+        format!("OutlineModel({})", self.bov_root_children_count)
+    }
+}
+
+/// Runtime wiring: bow_ StickyScroll
+#[derive(Debug, Clone)]
+pub struct StickyScroll {
+    pub bow_max_line_count: u32,
+    pub bow_enabled: bool,
+    pub bow_default_model: String,
+    pub bow_scroll_with_editor: bool,
+    pub bow_lines: Vec<u32>,
+    pub bow_indentation_levels: Vec<u32>,
+    pub bow_labels: Vec<String>,
+    pub bow_is_visible: bool,
+    pub bow_height_in_lines: u32,
+    pub bow_last_scroll_top: u32,
+}
+
+impl StickyScroll {
+    pub fn bow_summary(&self) -> String {
+        format!("StickyScroll({})", self.bow_max_line_count)
+    }
+}
+
+/// Runtime wiring: box_ MinimapSection
+#[derive(Debug, Clone)]
+pub struct MinimapSection {
+    pub box_start_line: u32,
+    pub box_end_line: u32,
+    pub box_decoration_color: String,
+    pub box_is_highlight: bool,
+    pub box_section_kind: String,
+    pub box_opacity: f64,
+    pub box_z_index: u32,
+    pub box_tooltip: String,
+    pub box_click_action: String,
+    pub box_is_overview_ruler: bool,
+}
+
+impl MinimapSection {
+    pub fn box_summary(&self) -> String {
+        format!("MinimapSection({})", self.box_start_line)
+    }
+}
+
+/// Runtime wiring: boy_ RulerMark
+#[derive(Debug, Clone)]
+pub struct RulerMark {
+    pub boy_ruler_position: u32,
+    pub boy_color: String,
+    pub boy_line_number: u32,
+    pub boy_is_overview: bool,
+    pub boy_category: String,
+    pub boy_priority: u32,
+    pub boy_is_visible: bool,
+    pub boy_lane: u8,
+    pub boy_tooltip: String,
+    pub boy_source_id: String,
+}
+
+impl RulerMark {
+    pub fn boy_summary(&self) -> String {
+        format!("RulerMark({})", self.boy_ruler_position)
+    }
+}
+
+/// Runtime wiring: boz_ EditorGroup
+#[derive(Debug, Clone)]
+pub struct EditorGroup {
+    pub boz_group_id: u32,
+    pub boz_editor_count: usize,
+    pub boz_active_editor_index: u32,
+    pub boz_preview_editor_id: Option<u32>,
+    pub boz_is_active_group: bool,
+    pub boz_orientation: String,
+    pub boz_group_label: String,
+    pub boz_locked: bool,
+    pub boz_size_fraction: f64,
+    pub boz_tab_count: u32,
+}
+
+impl EditorGroup {
+    pub fn boz_summary(&self) -> String {
+        format!("EditorGroup({})", self.boz_group_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -105429,6 +105555,1091 @@ mod tests_bfo {
         };
         let _ = obj.bot_summary();
         assert_eq!(obj.bot_range_end_col, 0);
+    }
+
+    #[test]
+    fn test_bou_item_name() {
+        let obj = BreadcrumbItem {
+            bou_item_name: String::from("test"),
+            bou_item_kind: 0,
+            bou_item_detail: String::from("test"),
+            bou_uri: String::from("test"),
+            bou_range_start_line: 0,
+            bou_range_end_line: 0,
+            bou_is_file: false,
+            bou_parent_name: String::from("test"),
+            bou_icon_id: String::from("test"),
+            bou_depth: 0,
+        };
+        let _ = obj.bou_summary();
+        assert_eq!(obj.bou_item_name, "test");
+    }
+
+    #[test]
+    fn test_bou_item_kind() {
+        let obj = BreadcrumbItem {
+            bou_item_name: String::from("test"),
+            bou_item_kind: 0,
+            bou_item_detail: String::from("test"),
+            bou_uri: String::from("test"),
+            bou_range_start_line: 0,
+            bou_range_end_line: 0,
+            bou_is_file: false,
+            bou_parent_name: String::from("test"),
+            bou_icon_id: String::from("test"),
+            bou_depth: 0,
+        };
+        let _ = obj.bou_summary();
+        assert_eq!(obj.bou_item_kind, 0);
+    }
+
+    #[test]
+    fn test_bou_item_detail() {
+        let obj = BreadcrumbItem {
+            bou_item_name: String::from("test"),
+            bou_item_kind: 0,
+            bou_item_detail: String::from("test"),
+            bou_uri: String::from("test"),
+            bou_range_start_line: 0,
+            bou_range_end_line: 0,
+            bou_is_file: false,
+            bou_parent_name: String::from("test"),
+            bou_icon_id: String::from("test"),
+            bou_depth: 0,
+        };
+        let _ = obj.bou_summary();
+        assert_eq!(obj.bou_item_detail, "test");
+    }
+
+    #[test]
+    fn test_bou_uri() {
+        let obj = BreadcrumbItem {
+            bou_item_name: String::from("test"),
+            bou_item_kind: 0,
+            bou_item_detail: String::from("test"),
+            bou_uri: String::from("test"),
+            bou_range_start_line: 0,
+            bou_range_end_line: 0,
+            bou_is_file: false,
+            bou_parent_name: String::from("test"),
+            bou_icon_id: String::from("test"),
+            bou_depth: 0,
+        };
+        let _ = obj.bou_summary();
+        assert_eq!(obj.bou_uri, "test");
+    }
+
+    #[test]
+    fn test_bou_range_start_line() {
+        let obj = BreadcrumbItem {
+            bou_item_name: String::from("test"),
+            bou_item_kind: 0,
+            bou_item_detail: String::from("test"),
+            bou_uri: String::from("test"),
+            bou_range_start_line: 0,
+            bou_range_end_line: 0,
+            bou_is_file: false,
+            bou_parent_name: String::from("test"),
+            bou_icon_id: String::from("test"),
+            bou_depth: 0,
+        };
+        let _ = obj.bou_summary();
+        assert_eq!(obj.bou_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_bou_range_end_line() {
+        let obj = BreadcrumbItem {
+            bou_item_name: String::from("test"),
+            bou_item_kind: 0,
+            bou_item_detail: String::from("test"),
+            bou_uri: String::from("test"),
+            bou_range_start_line: 0,
+            bou_range_end_line: 0,
+            bou_is_file: false,
+            bou_parent_name: String::from("test"),
+            bou_icon_id: String::from("test"),
+            bou_depth: 0,
+        };
+        let _ = obj.bou_summary();
+        assert_eq!(obj.bou_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_bou_is_file() {
+        let obj = BreadcrumbItem {
+            bou_item_name: String::from("test"),
+            bou_item_kind: 0,
+            bou_item_detail: String::from("test"),
+            bou_uri: String::from("test"),
+            bou_range_start_line: 0,
+            bou_range_end_line: 0,
+            bou_is_file: false,
+            bou_parent_name: String::from("test"),
+            bou_icon_id: String::from("test"),
+            bou_depth: 0,
+        };
+        let _ = obj.bou_summary();
+        assert!(!obj.bou_is_file);
+    }
+
+    #[test]
+    fn test_bou_parent_name() {
+        let obj = BreadcrumbItem {
+            bou_item_name: String::from("test"),
+            bou_item_kind: 0,
+            bou_item_detail: String::from("test"),
+            bou_uri: String::from("test"),
+            bou_range_start_line: 0,
+            bou_range_end_line: 0,
+            bou_is_file: false,
+            bou_parent_name: String::from("test"),
+            bou_icon_id: String::from("test"),
+            bou_depth: 0,
+        };
+        let _ = obj.bou_summary();
+        assert_eq!(obj.bou_parent_name, "test");
+    }
+
+    #[test]
+    fn test_bou_icon_id() {
+        let obj = BreadcrumbItem {
+            bou_item_name: String::from("test"),
+            bou_item_kind: 0,
+            bou_item_detail: String::from("test"),
+            bou_uri: String::from("test"),
+            bou_range_start_line: 0,
+            bou_range_end_line: 0,
+            bou_is_file: false,
+            bou_parent_name: String::from("test"),
+            bou_icon_id: String::from("test"),
+            bou_depth: 0,
+        };
+        let _ = obj.bou_summary();
+        assert_eq!(obj.bou_icon_id, "test");
+    }
+
+    #[test]
+    fn test_bou_depth() {
+        let obj = BreadcrumbItem {
+            bou_item_name: String::from("test"),
+            bou_item_kind: 0,
+            bou_item_detail: String::from("test"),
+            bou_uri: String::from("test"),
+            bou_range_start_line: 0,
+            bou_range_end_line: 0,
+            bou_is_file: false,
+            bou_parent_name: String::from("test"),
+            bou_icon_id: String::from("test"),
+            bou_depth: 0,
+        };
+        let _ = obj.bou_summary();
+        assert_eq!(obj.bou_depth, 0);
+    }
+
+
+    #[test]
+    fn test_bov_root_children_count() {
+        let obj = OutlineModel {
+            bov_root_children_count: 0,
+            bov_total_symbols: 0,
+            bov_uri: String::from("test"),
+            bov_config_filter: String::from("test"),
+            bov_sort_by: String::from("test"),
+            bov_follow_cursor: false,
+            bov_show_icons: false,
+            bov_show_strings: false,
+            bov_show_numbers: false,
+            bov_show_booleans: false,
+        };
+        let _ = obj.bov_summary();
+        assert_eq!(obj.bov_root_children_count, 0);
+    }
+
+    #[test]
+    fn test_bov_total_symbols() {
+        let obj = OutlineModel {
+            bov_root_children_count: 0,
+            bov_total_symbols: 0,
+            bov_uri: String::from("test"),
+            bov_config_filter: String::from("test"),
+            bov_sort_by: String::from("test"),
+            bov_follow_cursor: false,
+            bov_show_icons: false,
+            bov_show_strings: false,
+            bov_show_numbers: false,
+            bov_show_booleans: false,
+        };
+        let _ = obj.bov_summary();
+        assert_eq!(obj.bov_total_symbols, 0);
+    }
+
+    #[test]
+    fn test_bov_uri() {
+        let obj = OutlineModel {
+            bov_root_children_count: 0,
+            bov_total_symbols: 0,
+            bov_uri: String::from("test"),
+            bov_config_filter: String::from("test"),
+            bov_sort_by: String::from("test"),
+            bov_follow_cursor: false,
+            bov_show_icons: false,
+            bov_show_strings: false,
+            bov_show_numbers: false,
+            bov_show_booleans: false,
+        };
+        let _ = obj.bov_summary();
+        assert_eq!(obj.bov_uri, "test");
+    }
+
+    #[test]
+    fn test_bov_config_filter() {
+        let obj = OutlineModel {
+            bov_root_children_count: 0,
+            bov_total_symbols: 0,
+            bov_uri: String::from("test"),
+            bov_config_filter: String::from("test"),
+            bov_sort_by: String::from("test"),
+            bov_follow_cursor: false,
+            bov_show_icons: false,
+            bov_show_strings: false,
+            bov_show_numbers: false,
+            bov_show_booleans: false,
+        };
+        let _ = obj.bov_summary();
+        assert_eq!(obj.bov_config_filter, "test");
+    }
+
+    #[test]
+    fn test_bov_sort_by() {
+        let obj = OutlineModel {
+            bov_root_children_count: 0,
+            bov_total_symbols: 0,
+            bov_uri: String::from("test"),
+            bov_config_filter: String::from("test"),
+            bov_sort_by: String::from("test"),
+            bov_follow_cursor: false,
+            bov_show_icons: false,
+            bov_show_strings: false,
+            bov_show_numbers: false,
+            bov_show_booleans: false,
+        };
+        let _ = obj.bov_summary();
+        assert_eq!(obj.bov_sort_by, "test");
+    }
+
+    #[test]
+    fn test_bov_follow_cursor() {
+        let obj = OutlineModel {
+            bov_root_children_count: 0,
+            bov_total_symbols: 0,
+            bov_uri: String::from("test"),
+            bov_config_filter: String::from("test"),
+            bov_sort_by: String::from("test"),
+            bov_follow_cursor: false,
+            bov_show_icons: false,
+            bov_show_strings: false,
+            bov_show_numbers: false,
+            bov_show_booleans: false,
+        };
+        let _ = obj.bov_summary();
+        assert!(!obj.bov_follow_cursor);
+    }
+
+    #[test]
+    fn test_bov_show_icons() {
+        let obj = OutlineModel {
+            bov_root_children_count: 0,
+            bov_total_symbols: 0,
+            bov_uri: String::from("test"),
+            bov_config_filter: String::from("test"),
+            bov_sort_by: String::from("test"),
+            bov_follow_cursor: false,
+            bov_show_icons: false,
+            bov_show_strings: false,
+            bov_show_numbers: false,
+            bov_show_booleans: false,
+        };
+        let _ = obj.bov_summary();
+        assert!(!obj.bov_show_icons);
+    }
+
+    #[test]
+    fn test_bov_show_strings() {
+        let obj = OutlineModel {
+            bov_root_children_count: 0,
+            bov_total_symbols: 0,
+            bov_uri: String::from("test"),
+            bov_config_filter: String::from("test"),
+            bov_sort_by: String::from("test"),
+            bov_follow_cursor: false,
+            bov_show_icons: false,
+            bov_show_strings: false,
+            bov_show_numbers: false,
+            bov_show_booleans: false,
+        };
+        let _ = obj.bov_summary();
+        assert!(!obj.bov_show_strings);
+    }
+
+    #[test]
+    fn test_bov_show_numbers() {
+        let obj = OutlineModel {
+            bov_root_children_count: 0,
+            bov_total_symbols: 0,
+            bov_uri: String::from("test"),
+            bov_config_filter: String::from("test"),
+            bov_sort_by: String::from("test"),
+            bov_follow_cursor: false,
+            bov_show_icons: false,
+            bov_show_strings: false,
+            bov_show_numbers: false,
+            bov_show_booleans: false,
+        };
+        let _ = obj.bov_summary();
+        assert!(!obj.bov_show_numbers);
+    }
+
+    #[test]
+    fn test_bov_show_booleans() {
+        let obj = OutlineModel {
+            bov_root_children_count: 0,
+            bov_total_symbols: 0,
+            bov_uri: String::from("test"),
+            bov_config_filter: String::from("test"),
+            bov_sort_by: String::from("test"),
+            bov_follow_cursor: false,
+            bov_show_icons: false,
+            bov_show_strings: false,
+            bov_show_numbers: false,
+            bov_show_booleans: false,
+        };
+        let _ = obj.bov_summary();
+        assert!(!obj.bov_show_booleans);
+    }
+
+
+    #[test]
+    fn test_bow_max_line_count() {
+        let obj = StickyScroll {
+            bow_max_line_count: 0,
+            bow_enabled: false,
+            bow_default_model: String::from("test"),
+            bow_scroll_with_editor: false,
+            bow_lines: Vec::new(),
+            bow_indentation_levels: Vec::new(),
+            bow_labels: Vec::new(),
+            bow_is_visible: false,
+            bow_height_in_lines: 0,
+            bow_last_scroll_top: 0,
+        };
+        let _ = obj.bow_summary();
+        assert_eq!(obj.bow_max_line_count, 0);
+    }
+
+    #[test]
+    fn test_bow_enabled() {
+        let obj = StickyScroll {
+            bow_max_line_count: 0,
+            bow_enabled: false,
+            bow_default_model: String::from("test"),
+            bow_scroll_with_editor: false,
+            bow_lines: Vec::new(),
+            bow_indentation_levels: Vec::new(),
+            bow_labels: Vec::new(),
+            bow_is_visible: false,
+            bow_height_in_lines: 0,
+            bow_last_scroll_top: 0,
+        };
+        let _ = obj.bow_summary();
+        assert!(!obj.bow_enabled);
+    }
+
+    #[test]
+    fn test_bow_default_model() {
+        let obj = StickyScroll {
+            bow_max_line_count: 0,
+            bow_enabled: false,
+            bow_default_model: String::from("test"),
+            bow_scroll_with_editor: false,
+            bow_lines: Vec::new(),
+            bow_indentation_levels: Vec::new(),
+            bow_labels: Vec::new(),
+            bow_is_visible: false,
+            bow_height_in_lines: 0,
+            bow_last_scroll_top: 0,
+        };
+        let _ = obj.bow_summary();
+        assert_eq!(obj.bow_default_model, "test");
+    }
+
+    #[test]
+    fn test_bow_scroll_with_editor() {
+        let obj = StickyScroll {
+            bow_max_line_count: 0,
+            bow_enabled: false,
+            bow_default_model: String::from("test"),
+            bow_scroll_with_editor: false,
+            bow_lines: Vec::new(),
+            bow_indentation_levels: Vec::new(),
+            bow_labels: Vec::new(),
+            bow_is_visible: false,
+            bow_height_in_lines: 0,
+            bow_last_scroll_top: 0,
+        };
+        let _ = obj.bow_summary();
+        assert!(!obj.bow_scroll_with_editor);
+    }
+
+    #[test]
+    fn test_bow_lines() {
+        let obj = StickyScroll {
+            bow_max_line_count: 0,
+            bow_enabled: false,
+            bow_default_model: String::from("test"),
+            bow_scroll_with_editor: false,
+            bow_lines: Vec::new(),
+            bow_indentation_levels: Vec::new(),
+            bow_labels: Vec::new(),
+            bow_is_visible: false,
+            bow_height_in_lines: 0,
+            bow_last_scroll_top: 0,
+        };
+        let _ = obj.bow_summary();
+        assert!(obj.bow_lines.is_empty());
+    }
+
+    #[test]
+    fn test_bow_indentation_levels() {
+        let obj = StickyScroll {
+            bow_max_line_count: 0,
+            bow_enabled: false,
+            bow_default_model: String::from("test"),
+            bow_scroll_with_editor: false,
+            bow_lines: Vec::new(),
+            bow_indentation_levels: Vec::new(),
+            bow_labels: Vec::new(),
+            bow_is_visible: false,
+            bow_height_in_lines: 0,
+            bow_last_scroll_top: 0,
+        };
+        let _ = obj.bow_summary();
+        assert!(obj.bow_indentation_levels.is_empty());
+    }
+
+    #[test]
+    fn test_bow_labels() {
+        let obj = StickyScroll {
+            bow_max_line_count: 0,
+            bow_enabled: false,
+            bow_default_model: String::from("test"),
+            bow_scroll_with_editor: false,
+            bow_lines: Vec::new(),
+            bow_indentation_levels: Vec::new(),
+            bow_labels: Vec::new(),
+            bow_is_visible: false,
+            bow_height_in_lines: 0,
+            bow_last_scroll_top: 0,
+        };
+        let _ = obj.bow_summary();
+        assert!(obj.bow_labels.is_empty());
+    }
+
+    #[test]
+    fn test_bow_is_visible() {
+        let obj = StickyScroll {
+            bow_max_line_count: 0,
+            bow_enabled: false,
+            bow_default_model: String::from("test"),
+            bow_scroll_with_editor: false,
+            bow_lines: Vec::new(),
+            bow_indentation_levels: Vec::new(),
+            bow_labels: Vec::new(),
+            bow_is_visible: false,
+            bow_height_in_lines: 0,
+            bow_last_scroll_top: 0,
+        };
+        let _ = obj.bow_summary();
+        assert!(!obj.bow_is_visible);
+    }
+
+    #[test]
+    fn test_bow_height_in_lines() {
+        let obj = StickyScroll {
+            bow_max_line_count: 0,
+            bow_enabled: false,
+            bow_default_model: String::from("test"),
+            bow_scroll_with_editor: false,
+            bow_lines: Vec::new(),
+            bow_indentation_levels: Vec::new(),
+            bow_labels: Vec::new(),
+            bow_is_visible: false,
+            bow_height_in_lines: 0,
+            bow_last_scroll_top: 0,
+        };
+        let _ = obj.bow_summary();
+        assert_eq!(obj.bow_height_in_lines, 0);
+    }
+
+    #[test]
+    fn test_bow_last_scroll_top() {
+        let obj = StickyScroll {
+            bow_max_line_count: 0,
+            bow_enabled: false,
+            bow_default_model: String::from("test"),
+            bow_scroll_with_editor: false,
+            bow_lines: Vec::new(),
+            bow_indentation_levels: Vec::new(),
+            bow_labels: Vec::new(),
+            bow_is_visible: false,
+            bow_height_in_lines: 0,
+            bow_last_scroll_top: 0,
+        };
+        let _ = obj.bow_summary();
+        assert_eq!(obj.bow_last_scroll_top, 0);
+    }
+
+
+    #[test]
+    fn test_box_start_line() {
+        let obj = MinimapSection {
+            box_start_line: 0,
+            box_end_line: 0,
+            box_decoration_color: String::from("test"),
+            box_is_highlight: false,
+            box_section_kind: String::from("test"),
+            box_opacity: 0.0,
+            box_z_index: 0,
+            box_tooltip: String::from("test"),
+            box_click_action: String::from("test"),
+            box_is_overview_ruler: false,
+        };
+        let _ = obj.box_summary();
+        assert_eq!(obj.box_start_line, 0);
+    }
+
+    #[test]
+    fn test_box_end_line() {
+        let obj = MinimapSection {
+            box_start_line: 0,
+            box_end_line: 0,
+            box_decoration_color: String::from("test"),
+            box_is_highlight: false,
+            box_section_kind: String::from("test"),
+            box_opacity: 0.0,
+            box_z_index: 0,
+            box_tooltip: String::from("test"),
+            box_click_action: String::from("test"),
+            box_is_overview_ruler: false,
+        };
+        let _ = obj.box_summary();
+        assert_eq!(obj.box_end_line, 0);
+    }
+
+    #[test]
+    fn test_box_decoration_color() {
+        let obj = MinimapSection {
+            box_start_line: 0,
+            box_end_line: 0,
+            box_decoration_color: String::from("test"),
+            box_is_highlight: false,
+            box_section_kind: String::from("test"),
+            box_opacity: 0.0,
+            box_z_index: 0,
+            box_tooltip: String::from("test"),
+            box_click_action: String::from("test"),
+            box_is_overview_ruler: false,
+        };
+        let _ = obj.box_summary();
+        assert_eq!(obj.box_decoration_color, "test");
+    }
+
+    #[test]
+    fn test_box_is_highlight() {
+        let obj = MinimapSection {
+            box_start_line: 0,
+            box_end_line: 0,
+            box_decoration_color: String::from("test"),
+            box_is_highlight: false,
+            box_section_kind: String::from("test"),
+            box_opacity: 0.0,
+            box_z_index: 0,
+            box_tooltip: String::from("test"),
+            box_click_action: String::from("test"),
+            box_is_overview_ruler: false,
+        };
+        let _ = obj.box_summary();
+        assert!(!obj.box_is_highlight);
+    }
+
+    #[test]
+    fn test_box_section_kind() {
+        let obj = MinimapSection {
+            box_start_line: 0,
+            box_end_line: 0,
+            box_decoration_color: String::from("test"),
+            box_is_highlight: false,
+            box_section_kind: String::from("test"),
+            box_opacity: 0.0,
+            box_z_index: 0,
+            box_tooltip: String::from("test"),
+            box_click_action: String::from("test"),
+            box_is_overview_ruler: false,
+        };
+        let _ = obj.box_summary();
+        assert_eq!(obj.box_section_kind, "test");
+    }
+
+    #[test]
+    fn test_box_opacity() {
+        let obj = MinimapSection {
+            box_start_line: 0,
+            box_end_line: 0,
+            box_decoration_color: String::from("test"),
+            box_is_highlight: false,
+            box_section_kind: String::from("test"),
+            box_opacity: 0.0,
+            box_z_index: 0,
+            box_tooltip: String::from("test"),
+            box_click_action: String::from("test"),
+            box_is_overview_ruler: false,
+        };
+        let _ = obj.box_summary();
+        assert!((obj.box_opacity - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_box_z_index() {
+        let obj = MinimapSection {
+            box_start_line: 0,
+            box_end_line: 0,
+            box_decoration_color: String::from("test"),
+            box_is_highlight: false,
+            box_section_kind: String::from("test"),
+            box_opacity: 0.0,
+            box_z_index: 0,
+            box_tooltip: String::from("test"),
+            box_click_action: String::from("test"),
+            box_is_overview_ruler: false,
+        };
+        let _ = obj.box_summary();
+        assert_eq!(obj.box_z_index, 0);
+    }
+
+    #[test]
+    fn test_box_tooltip() {
+        let obj = MinimapSection {
+            box_start_line: 0,
+            box_end_line: 0,
+            box_decoration_color: String::from("test"),
+            box_is_highlight: false,
+            box_section_kind: String::from("test"),
+            box_opacity: 0.0,
+            box_z_index: 0,
+            box_tooltip: String::from("test"),
+            box_click_action: String::from("test"),
+            box_is_overview_ruler: false,
+        };
+        let _ = obj.box_summary();
+        assert_eq!(obj.box_tooltip, "test");
+    }
+
+    #[test]
+    fn test_box_click_action() {
+        let obj = MinimapSection {
+            box_start_line: 0,
+            box_end_line: 0,
+            box_decoration_color: String::from("test"),
+            box_is_highlight: false,
+            box_section_kind: String::from("test"),
+            box_opacity: 0.0,
+            box_z_index: 0,
+            box_tooltip: String::from("test"),
+            box_click_action: String::from("test"),
+            box_is_overview_ruler: false,
+        };
+        let _ = obj.box_summary();
+        assert_eq!(obj.box_click_action, "test");
+    }
+
+    #[test]
+    fn test_box_is_overview_ruler() {
+        let obj = MinimapSection {
+            box_start_line: 0,
+            box_end_line: 0,
+            box_decoration_color: String::from("test"),
+            box_is_highlight: false,
+            box_section_kind: String::from("test"),
+            box_opacity: 0.0,
+            box_z_index: 0,
+            box_tooltip: String::from("test"),
+            box_click_action: String::from("test"),
+            box_is_overview_ruler: false,
+        };
+        let _ = obj.box_summary();
+        assert!(!obj.box_is_overview_ruler);
+    }
+
+
+    #[test]
+    fn test_boy_ruler_position() {
+        let obj = RulerMark {
+            boy_ruler_position: 0,
+            boy_color: String::from("test"),
+            boy_line_number: 0,
+            boy_is_overview: false,
+            boy_category: String::from("test"),
+            boy_priority: 0,
+            boy_is_visible: false,
+            boy_lane: 0,
+            boy_tooltip: String::from("test"),
+            boy_source_id: String::from("test"),
+        };
+        let _ = obj.boy_summary();
+        assert_eq!(obj.boy_ruler_position, 0);
+    }
+
+    #[test]
+    fn test_boy_color() {
+        let obj = RulerMark {
+            boy_ruler_position: 0,
+            boy_color: String::from("test"),
+            boy_line_number: 0,
+            boy_is_overview: false,
+            boy_category: String::from("test"),
+            boy_priority: 0,
+            boy_is_visible: false,
+            boy_lane: 0,
+            boy_tooltip: String::from("test"),
+            boy_source_id: String::from("test"),
+        };
+        let _ = obj.boy_summary();
+        assert_eq!(obj.boy_color, "test");
+    }
+
+    #[test]
+    fn test_boy_line_number() {
+        let obj = RulerMark {
+            boy_ruler_position: 0,
+            boy_color: String::from("test"),
+            boy_line_number: 0,
+            boy_is_overview: false,
+            boy_category: String::from("test"),
+            boy_priority: 0,
+            boy_is_visible: false,
+            boy_lane: 0,
+            boy_tooltip: String::from("test"),
+            boy_source_id: String::from("test"),
+        };
+        let _ = obj.boy_summary();
+        assert_eq!(obj.boy_line_number, 0);
+    }
+
+    #[test]
+    fn test_boy_is_overview() {
+        let obj = RulerMark {
+            boy_ruler_position: 0,
+            boy_color: String::from("test"),
+            boy_line_number: 0,
+            boy_is_overview: false,
+            boy_category: String::from("test"),
+            boy_priority: 0,
+            boy_is_visible: false,
+            boy_lane: 0,
+            boy_tooltip: String::from("test"),
+            boy_source_id: String::from("test"),
+        };
+        let _ = obj.boy_summary();
+        assert!(!obj.boy_is_overview);
+    }
+
+    #[test]
+    fn test_boy_category() {
+        let obj = RulerMark {
+            boy_ruler_position: 0,
+            boy_color: String::from("test"),
+            boy_line_number: 0,
+            boy_is_overview: false,
+            boy_category: String::from("test"),
+            boy_priority: 0,
+            boy_is_visible: false,
+            boy_lane: 0,
+            boy_tooltip: String::from("test"),
+            boy_source_id: String::from("test"),
+        };
+        let _ = obj.boy_summary();
+        assert_eq!(obj.boy_category, "test");
+    }
+
+    #[test]
+    fn test_boy_priority() {
+        let obj = RulerMark {
+            boy_ruler_position: 0,
+            boy_color: String::from("test"),
+            boy_line_number: 0,
+            boy_is_overview: false,
+            boy_category: String::from("test"),
+            boy_priority: 0,
+            boy_is_visible: false,
+            boy_lane: 0,
+            boy_tooltip: String::from("test"),
+            boy_source_id: String::from("test"),
+        };
+        let _ = obj.boy_summary();
+        assert_eq!(obj.boy_priority, 0);
+    }
+
+    #[test]
+    fn test_boy_is_visible() {
+        let obj = RulerMark {
+            boy_ruler_position: 0,
+            boy_color: String::from("test"),
+            boy_line_number: 0,
+            boy_is_overview: false,
+            boy_category: String::from("test"),
+            boy_priority: 0,
+            boy_is_visible: false,
+            boy_lane: 0,
+            boy_tooltip: String::from("test"),
+            boy_source_id: String::from("test"),
+        };
+        let _ = obj.boy_summary();
+        assert!(!obj.boy_is_visible);
+    }
+
+    #[test]
+    fn test_boy_lane() {
+        let obj = RulerMark {
+            boy_ruler_position: 0,
+            boy_color: String::from("test"),
+            boy_line_number: 0,
+            boy_is_overview: false,
+            boy_category: String::from("test"),
+            boy_priority: 0,
+            boy_is_visible: false,
+            boy_lane: 0,
+            boy_tooltip: String::from("test"),
+            boy_source_id: String::from("test"),
+        };
+        let _ = obj.boy_summary();
+        assert_eq!(obj.boy_lane, 0);
+    }
+
+    #[test]
+    fn test_boy_tooltip() {
+        let obj = RulerMark {
+            boy_ruler_position: 0,
+            boy_color: String::from("test"),
+            boy_line_number: 0,
+            boy_is_overview: false,
+            boy_category: String::from("test"),
+            boy_priority: 0,
+            boy_is_visible: false,
+            boy_lane: 0,
+            boy_tooltip: String::from("test"),
+            boy_source_id: String::from("test"),
+        };
+        let _ = obj.boy_summary();
+        assert_eq!(obj.boy_tooltip, "test");
+    }
+
+    #[test]
+    fn test_boy_source_id() {
+        let obj = RulerMark {
+            boy_ruler_position: 0,
+            boy_color: String::from("test"),
+            boy_line_number: 0,
+            boy_is_overview: false,
+            boy_category: String::from("test"),
+            boy_priority: 0,
+            boy_is_visible: false,
+            boy_lane: 0,
+            boy_tooltip: String::from("test"),
+            boy_source_id: String::from("test"),
+        };
+        let _ = obj.boy_summary();
+        assert_eq!(obj.boy_source_id, "test");
+    }
+
+
+    #[test]
+    fn test_boz_group_id() {
+        let obj = EditorGroup {
+            boz_group_id: 0,
+            boz_editor_count: 0,
+            boz_active_editor_index: 0,
+            boz_preview_editor_id: None,
+            boz_is_active_group: false,
+            boz_orientation: String::from("test"),
+            boz_group_label: String::from("test"),
+            boz_locked: false,
+            boz_size_fraction: 0.0,
+            boz_tab_count: 0,
+        };
+        let _ = obj.boz_summary();
+        assert_eq!(obj.boz_group_id, 0);
+    }
+
+    #[test]
+    fn test_boz_editor_count() {
+        let obj = EditorGroup {
+            boz_group_id: 0,
+            boz_editor_count: 0,
+            boz_active_editor_index: 0,
+            boz_preview_editor_id: None,
+            boz_is_active_group: false,
+            boz_orientation: String::from("test"),
+            boz_group_label: String::from("test"),
+            boz_locked: false,
+            boz_size_fraction: 0.0,
+            boz_tab_count: 0,
+        };
+        let _ = obj.boz_summary();
+        assert_eq!(obj.boz_editor_count, 0);
+    }
+
+    #[test]
+    fn test_boz_active_editor_index() {
+        let obj = EditorGroup {
+            boz_group_id: 0,
+            boz_editor_count: 0,
+            boz_active_editor_index: 0,
+            boz_preview_editor_id: None,
+            boz_is_active_group: false,
+            boz_orientation: String::from("test"),
+            boz_group_label: String::from("test"),
+            boz_locked: false,
+            boz_size_fraction: 0.0,
+            boz_tab_count: 0,
+        };
+        let _ = obj.boz_summary();
+        assert_eq!(obj.boz_active_editor_index, 0);
+    }
+
+    #[test]
+    fn test_boz_preview_editor_id() {
+        let obj = EditorGroup {
+            boz_group_id: 0,
+            boz_editor_count: 0,
+            boz_active_editor_index: 0,
+            boz_preview_editor_id: None,
+            boz_is_active_group: false,
+            boz_orientation: String::from("test"),
+            boz_group_label: String::from("test"),
+            boz_locked: false,
+            boz_size_fraction: 0.0,
+            boz_tab_count: 0,
+        };
+        let _ = obj.boz_summary();
+        assert!(obj.boz_preview_editor_id.is_none());
+    }
+
+    #[test]
+    fn test_boz_is_active_group() {
+        let obj = EditorGroup {
+            boz_group_id: 0,
+            boz_editor_count: 0,
+            boz_active_editor_index: 0,
+            boz_preview_editor_id: None,
+            boz_is_active_group: false,
+            boz_orientation: String::from("test"),
+            boz_group_label: String::from("test"),
+            boz_locked: false,
+            boz_size_fraction: 0.0,
+            boz_tab_count: 0,
+        };
+        let _ = obj.boz_summary();
+        assert!(!obj.boz_is_active_group);
+    }
+
+    #[test]
+    fn test_boz_orientation() {
+        let obj = EditorGroup {
+            boz_group_id: 0,
+            boz_editor_count: 0,
+            boz_active_editor_index: 0,
+            boz_preview_editor_id: None,
+            boz_is_active_group: false,
+            boz_orientation: String::from("test"),
+            boz_group_label: String::from("test"),
+            boz_locked: false,
+            boz_size_fraction: 0.0,
+            boz_tab_count: 0,
+        };
+        let _ = obj.boz_summary();
+        assert_eq!(obj.boz_orientation, "test");
+    }
+
+    #[test]
+    fn test_boz_group_label() {
+        let obj = EditorGroup {
+            boz_group_id: 0,
+            boz_editor_count: 0,
+            boz_active_editor_index: 0,
+            boz_preview_editor_id: None,
+            boz_is_active_group: false,
+            boz_orientation: String::from("test"),
+            boz_group_label: String::from("test"),
+            boz_locked: false,
+            boz_size_fraction: 0.0,
+            boz_tab_count: 0,
+        };
+        let _ = obj.boz_summary();
+        assert_eq!(obj.boz_group_label, "test");
+    }
+
+    #[test]
+    fn test_boz_locked() {
+        let obj = EditorGroup {
+            boz_group_id: 0,
+            boz_editor_count: 0,
+            boz_active_editor_index: 0,
+            boz_preview_editor_id: None,
+            boz_is_active_group: false,
+            boz_orientation: String::from("test"),
+            boz_group_label: String::from("test"),
+            boz_locked: false,
+            boz_size_fraction: 0.0,
+            boz_tab_count: 0,
+        };
+        let _ = obj.boz_summary();
+        assert!(!obj.boz_locked);
+    }
+
+    #[test]
+    fn test_boz_size_fraction() {
+        let obj = EditorGroup {
+            boz_group_id: 0,
+            boz_editor_count: 0,
+            boz_active_editor_index: 0,
+            boz_preview_editor_id: None,
+            boz_is_active_group: false,
+            boz_orientation: String::from("test"),
+            boz_group_label: String::from("test"),
+            boz_locked: false,
+            boz_size_fraction: 0.0,
+            boz_tab_count: 0,
+        };
+        let _ = obj.boz_summary();
+        assert!((obj.boz_size_fraction - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_boz_tab_count() {
+        let obj = EditorGroup {
+            boz_group_id: 0,
+            boz_editor_count: 0,
+            boz_active_editor_index: 0,
+            boz_preview_editor_id: None,
+            boz_is_active_group: false,
+            boz_orientation: String::from("test"),
+            boz_group_label: String::from("test"),
+            boz_locked: false,
+            boz_size_fraction: 0.0,
+            boz_tab_count: 0,
+        };
+        let _ = obj.boz_summary();
+        assert_eq!(obj.boz_tab_count, 0);
     }
 
 }
