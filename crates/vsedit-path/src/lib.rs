@@ -90728,6 +90728,132 @@ impl DropEdit {
     }
 }
 
+/// Runtime wiring: btu_ PasteEdit
+#[derive(Debug, Clone)]
+pub struct PasteEdit {
+    pub btu_uri: String,
+    pub btu_paste_text: String,
+    pub btu_insert_text: String,
+    pub btu_position_line: u32,
+    pub btu_position_col: u32,
+    pub btu_additional_edits_count: u32,
+    pub btu_label: String,
+    pub btu_kind: String,
+    pub btu_needs_confirmation: bool,
+    pub btu_mime_type: String,
+}
+
+impl PasteEdit {
+    pub fn btu_summary(&self) -> String {
+        format!("PasteEdit({})", self.btu_uri)
+    }
+}
+
+/// Runtime wiring: btv_ DocumentLink
+#[derive(Debug, Clone)]
+pub struct DocumentLink {
+    pub btv_range_start_line: u32,
+    pub btv_range_start_col: u32,
+    pub btv_range_end_line: u32,
+    pub btv_range_end_col: u32,
+    pub btv_target_uri: String,
+    pub btv_tooltip: String,
+    pub btv_data_value: String,
+    pub btv_provider_id: String,
+    pub btv_is_resolved: bool,
+    pub btv_needs_resolve: bool,
+}
+
+impl DocumentLink {
+    pub fn btv_summary(&self) -> String {
+        format!("DocumentLink({})", self.btv_range_start_line)
+    }
+}
+
+/// Runtime wiring: btw_ DocumentColor
+#[derive(Debug, Clone)]
+pub struct DocumentColor {
+    pub btw_red: f64,
+    pub btw_green: f64,
+    pub btw_blue: f64,
+    pub btw_alpha: f64,
+    pub btw_range_start_line: u32,
+    pub btw_range_start_col: u32,
+    pub btw_range_end_line: u32,
+    pub btw_range_end_col: u32,
+    pub btw_presentation_label: String,
+    pub btw_provider_id: String,
+}
+
+impl DocumentColor {
+    pub fn btw_summary(&self) -> String {
+        format!("DocumentColor({})", self.btw_red)
+    }
+}
+
+/// Runtime wiring: btx_ FoldingRangeResult
+#[derive(Debug, Clone)]
+pub struct FoldingRangeResult {
+    pub btx_start_line: u32,
+    pub btx_start_character: Option<u32>,
+    pub btx_end_line: u32,
+    pub btx_end_character: Option<u32>,
+    pub btx_kind: String,
+    pub btx_collapsed_text: String,
+    pub btx_is_manual: bool,
+    pub btx_nesting_level: u32,
+    pub btx_provider_id: String,
+    pub btx_total_ranges: u32,
+}
+
+impl FoldingRangeResult {
+    pub fn btx_summary(&self) -> String {
+        format!("FoldingRangeResult({})", self.btx_start_line)
+    }
+}
+
+/// Runtime wiring: bty_ TextDocumentEdit
+#[derive(Debug, Clone)]
+pub struct TextDocumentEdit {
+    pub bty_uri: String,
+    pub bty_version: u64,
+    pub bty_edits_count: u32,
+    pub bty_annotation_id: String,
+    pub bty_annotation_label: String,
+    pub bty_needs_confirmation: bool,
+    pub bty_annotation_description: String,
+    pub bty_is_snippet: bool,
+    pub bty_insert_text_format: u8,
+    pub bty_new_text: String,
+}
+
+impl TextDocumentEdit {
+    pub fn bty_summary(&self) -> String {
+        format!("TextDocumentEdit({})", self.bty_uri)
+    }
+}
+
+/// Runtime wiring: btz_ WorkspaceConfig
+#[derive(Debug, Clone)]
+pub struct WorkspaceConfig {
+    pub btz_section: String,
+    pub btz_scope_uri: String,
+    pub btz_language_id: String,
+    pub btz_value_json: String,
+    pub btz_default_value_json: String,
+    pub btz_is_overridden: bool,
+    pub btz_override_count: u32,
+    pub btz_target_scope: String,
+    pub btz_is_language_override: bool,
+    pub btz_inspection_default: String,
+}
+
+impl WorkspaceConfig {
+    pub fn btz_summary(&self) -> String {
+        format!("WorkspaceConfig({})", self.btz_section)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -131804,6 +131930,1091 @@ mod tests_bfo {
         };
         let _ = obj.btt_summary();
         assert_eq!(obj.btt_provider_id, "test");
+    }
+
+    #[test]
+    fn test_btu_uri() {
+        let obj = PasteEdit {
+            btu_uri: String::from("test"),
+            btu_paste_text: String::from("test"),
+            btu_insert_text: String::from("test"),
+            btu_position_line: 0,
+            btu_position_col: 0,
+            btu_additional_edits_count: 0,
+            btu_label: String::from("test"),
+            btu_kind: String::from("test"),
+            btu_needs_confirmation: false,
+            btu_mime_type: String::from("test"),
+        };
+        let _ = obj.btu_summary();
+        assert_eq!(obj.btu_uri, "test");
+    }
+
+    #[test]
+    fn test_btu_paste_text() {
+        let obj = PasteEdit {
+            btu_uri: String::from("test"),
+            btu_paste_text: String::from("test"),
+            btu_insert_text: String::from("test"),
+            btu_position_line: 0,
+            btu_position_col: 0,
+            btu_additional_edits_count: 0,
+            btu_label: String::from("test"),
+            btu_kind: String::from("test"),
+            btu_needs_confirmation: false,
+            btu_mime_type: String::from("test"),
+        };
+        let _ = obj.btu_summary();
+        assert_eq!(obj.btu_paste_text, "test");
+    }
+
+    #[test]
+    fn test_btu_insert_text() {
+        let obj = PasteEdit {
+            btu_uri: String::from("test"),
+            btu_paste_text: String::from("test"),
+            btu_insert_text: String::from("test"),
+            btu_position_line: 0,
+            btu_position_col: 0,
+            btu_additional_edits_count: 0,
+            btu_label: String::from("test"),
+            btu_kind: String::from("test"),
+            btu_needs_confirmation: false,
+            btu_mime_type: String::from("test"),
+        };
+        let _ = obj.btu_summary();
+        assert_eq!(obj.btu_insert_text, "test");
+    }
+
+    #[test]
+    fn test_btu_position_line() {
+        let obj = PasteEdit {
+            btu_uri: String::from("test"),
+            btu_paste_text: String::from("test"),
+            btu_insert_text: String::from("test"),
+            btu_position_line: 0,
+            btu_position_col: 0,
+            btu_additional_edits_count: 0,
+            btu_label: String::from("test"),
+            btu_kind: String::from("test"),
+            btu_needs_confirmation: false,
+            btu_mime_type: String::from("test"),
+        };
+        let _ = obj.btu_summary();
+        assert_eq!(obj.btu_position_line, 0);
+    }
+
+    #[test]
+    fn test_btu_position_col() {
+        let obj = PasteEdit {
+            btu_uri: String::from("test"),
+            btu_paste_text: String::from("test"),
+            btu_insert_text: String::from("test"),
+            btu_position_line: 0,
+            btu_position_col: 0,
+            btu_additional_edits_count: 0,
+            btu_label: String::from("test"),
+            btu_kind: String::from("test"),
+            btu_needs_confirmation: false,
+            btu_mime_type: String::from("test"),
+        };
+        let _ = obj.btu_summary();
+        assert_eq!(obj.btu_position_col, 0);
+    }
+
+    #[test]
+    fn test_btu_additional_edits_count() {
+        let obj = PasteEdit {
+            btu_uri: String::from("test"),
+            btu_paste_text: String::from("test"),
+            btu_insert_text: String::from("test"),
+            btu_position_line: 0,
+            btu_position_col: 0,
+            btu_additional_edits_count: 0,
+            btu_label: String::from("test"),
+            btu_kind: String::from("test"),
+            btu_needs_confirmation: false,
+            btu_mime_type: String::from("test"),
+        };
+        let _ = obj.btu_summary();
+        assert_eq!(obj.btu_additional_edits_count, 0);
+    }
+
+    #[test]
+    fn test_btu_label() {
+        let obj = PasteEdit {
+            btu_uri: String::from("test"),
+            btu_paste_text: String::from("test"),
+            btu_insert_text: String::from("test"),
+            btu_position_line: 0,
+            btu_position_col: 0,
+            btu_additional_edits_count: 0,
+            btu_label: String::from("test"),
+            btu_kind: String::from("test"),
+            btu_needs_confirmation: false,
+            btu_mime_type: String::from("test"),
+        };
+        let _ = obj.btu_summary();
+        assert_eq!(obj.btu_label, "test");
+    }
+
+    #[test]
+    fn test_btu_kind() {
+        let obj = PasteEdit {
+            btu_uri: String::from("test"),
+            btu_paste_text: String::from("test"),
+            btu_insert_text: String::from("test"),
+            btu_position_line: 0,
+            btu_position_col: 0,
+            btu_additional_edits_count: 0,
+            btu_label: String::from("test"),
+            btu_kind: String::from("test"),
+            btu_needs_confirmation: false,
+            btu_mime_type: String::from("test"),
+        };
+        let _ = obj.btu_summary();
+        assert_eq!(obj.btu_kind, "test");
+    }
+
+    #[test]
+    fn test_btu_needs_confirmation() {
+        let obj = PasteEdit {
+            btu_uri: String::from("test"),
+            btu_paste_text: String::from("test"),
+            btu_insert_text: String::from("test"),
+            btu_position_line: 0,
+            btu_position_col: 0,
+            btu_additional_edits_count: 0,
+            btu_label: String::from("test"),
+            btu_kind: String::from("test"),
+            btu_needs_confirmation: false,
+            btu_mime_type: String::from("test"),
+        };
+        let _ = obj.btu_summary();
+        assert!(!obj.btu_needs_confirmation);
+    }
+
+    #[test]
+    fn test_btu_mime_type() {
+        let obj = PasteEdit {
+            btu_uri: String::from("test"),
+            btu_paste_text: String::from("test"),
+            btu_insert_text: String::from("test"),
+            btu_position_line: 0,
+            btu_position_col: 0,
+            btu_additional_edits_count: 0,
+            btu_label: String::from("test"),
+            btu_kind: String::from("test"),
+            btu_needs_confirmation: false,
+            btu_mime_type: String::from("test"),
+        };
+        let _ = obj.btu_summary();
+        assert_eq!(obj.btu_mime_type, "test");
+    }
+
+
+    #[test]
+    fn test_btv_range_start_line() {
+        let obj = DocumentLink {
+            btv_range_start_line: 0,
+            btv_range_start_col: 0,
+            btv_range_end_line: 0,
+            btv_range_end_col: 0,
+            btv_target_uri: String::from("test"),
+            btv_tooltip: String::from("test"),
+            btv_data_value: String::from("test"),
+            btv_provider_id: String::from("test"),
+            btv_is_resolved: false,
+            btv_needs_resolve: false,
+        };
+        let _ = obj.btv_summary();
+        assert_eq!(obj.btv_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_btv_range_start_col() {
+        let obj = DocumentLink {
+            btv_range_start_line: 0,
+            btv_range_start_col: 0,
+            btv_range_end_line: 0,
+            btv_range_end_col: 0,
+            btv_target_uri: String::from("test"),
+            btv_tooltip: String::from("test"),
+            btv_data_value: String::from("test"),
+            btv_provider_id: String::from("test"),
+            btv_is_resolved: false,
+            btv_needs_resolve: false,
+        };
+        let _ = obj.btv_summary();
+        assert_eq!(obj.btv_range_start_col, 0);
+    }
+
+    #[test]
+    fn test_btv_range_end_line() {
+        let obj = DocumentLink {
+            btv_range_start_line: 0,
+            btv_range_start_col: 0,
+            btv_range_end_line: 0,
+            btv_range_end_col: 0,
+            btv_target_uri: String::from("test"),
+            btv_tooltip: String::from("test"),
+            btv_data_value: String::from("test"),
+            btv_provider_id: String::from("test"),
+            btv_is_resolved: false,
+            btv_needs_resolve: false,
+        };
+        let _ = obj.btv_summary();
+        assert_eq!(obj.btv_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_btv_range_end_col() {
+        let obj = DocumentLink {
+            btv_range_start_line: 0,
+            btv_range_start_col: 0,
+            btv_range_end_line: 0,
+            btv_range_end_col: 0,
+            btv_target_uri: String::from("test"),
+            btv_tooltip: String::from("test"),
+            btv_data_value: String::from("test"),
+            btv_provider_id: String::from("test"),
+            btv_is_resolved: false,
+            btv_needs_resolve: false,
+        };
+        let _ = obj.btv_summary();
+        assert_eq!(obj.btv_range_end_col, 0);
+    }
+
+    #[test]
+    fn test_btv_target_uri() {
+        let obj = DocumentLink {
+            btv_range_start_line: 0,
+            btv_range_start_col: 0,
+            btv_range_end_line: 0,
+            btv_range_end_col: 0,
+            btv_target_uri: String::from("test"),
+            btv_tooltip: String::from("test"),
+            btv_data_value: String::from("test"),
+            btv_provider_id: String::from("test"),
+            btv_is_resolved: false,
+            btv_needs_resolve: false,
+        };
+        let _ = obj.btv_summary();
+        assert_eq!(obj.btv_target_uri, "test");
+    }
+
+    #[test]
+    fn test_btv_tooltip() {
+        let obj = DocumentLink {
+            btv_range_start_line: 0,
+            btv_range_start_col: 0,
+            btv_range_end_line: 0,
+            btv_range_end_col: 0,
+            btv_target_uri: String::from("test"),
+            btv_tooltip: String::from("test"),
+            btv_data_value: String::from("test"),
+            btv_provider_id: String::from("test"),
+            btv_is_resolved: false,
+            btv_needs_resolve: false,
+        };
+        let _ = obj.btv_summary();
+        assert_eq!(obj.btv_tooltip, "test");
+    }
+
+    #[test]
+    fn test_btv_data_value() {
+        let obj = DocumentLink {
+            btv_range_start_line: 0,
+            btv_range_start_col: 0,
+            btv_range_end_line: 0,
+            btv_range_end_col: 0,
+            btv_target_uri: String::from("test"),
+            btv_tooltip: String::from("test"),
+            btv_data_value: String::from("test"),
+            btv_provider_id: String::from("test"),
+            btv_is_resolved: false,
+            btv_needs_resolve: false,
+        };
+        let _ = obj.btv_summary();
+        assert_eq!(obj.btv_data_value, "test");
+    }
+
+    #[test]
+    fn test_btv_provider_id() {
+        let obj = DocumentLink {
+            btv_range_start_line: 0,
+            btv_range_start_col: 0,
+            btv_range_end_line: 0,
+            btv_range_end_col: 0,
+            btv_target_uri: String::from("test"),
+            btv_tooltip: String::from("test"),
+            btv_data_value: String::from("test"),
+            btv_provider_id: String::from("test"),
+            btv_is_resolved: false,
+            btv_needs_resolve: false,
+        };
+        let _ = obj.btv_summary();
+        assert_eq!(obj.btv_provider_id, "test");
+    }
+
+    #[test]
+    fn test_btv_is_resolved() {
+        let obj = DocumentLink {
+            btv_range_start_line: 0,
+            btv_range_start_col: 0,
+            btv_range_end_line: 0,
+            btv_range_end_col: 0,
+            btv_target_uri: String::from("test"),
+            btv_tooltip: String::from("test"),
+            btv_data_value: String::from("test"),
+            btv_provider_id: String::from("test"),
+            btv_is_resolved: false,
+            btv_needs_resolve: false,
+        };
+        let _ = obj.btv_summary();
+        assert!(!obj.btv_is_resolved);
+    }
+
+    #[test]
+    fn test_btv_needs_resolve() {
+        let obj = DocumentLink {
+            btv_range_start_line: 0,
+            btv_range_start_col: 0,
+            btv_range_end_line: 0,
+            btv_range_end_col: 0,
+            btv_target_uri: String::from("test"),
+            btv_tooltip: String::from("test"),
+            btv_data_value: String::from("test"),
+            btv_provider_id: String::from("test"),
+            btv_is_resolved: false,
+            btv_needs_resolve: false,
+        };
+        let _ = obj.btv_summary();
+        assert!(!obj.btv_needs_resolve);
+    }
+
+
+    #[test]
+    fn test_btw_red() {
+        let obj = DocumentColor {
+            btw_red: 0.0,
+            btw_green: 0.0,
+            btw_blue: 0.0,
+            btw_alpha: 0.0,
+            btw_range_start_line: 0,
+            btw_range_start_col: 0,
+            btw_range_end_line: 0,
+            btw_range_end_col: 0,
+            btw_presentation_label: String::from("test"),
+            btw_provider_id: String::from("test"),
+        };
+        let _ = obj.btw_summary();
+        assert!((obj.btw_red - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_btw_green() {
+        let obj = DocumentColor {
+            btw_red: 0.0,
+            btw_green: 0.0,
+            btw_blue: 0.0,
+            btw_alpha: 0.0,
+            btw_range_start_line: 0,
+            btw_range_start_col: 0,
+            btw_range_end_line: 0,
+            btw_range_end_col: 0,
+            btw_presentation_label: String::from("test"),
+            btw_provider_id: String::from("test"),
+        };
+        let _ = obj.btw_summary();
+        assert!((obj.btw_green - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_btw_blue() {
+        let obj = DocumentColor {
+            btw_red: 0.0,
+            btw_green: 0.0,
+            btw_blue: 0.0,
+            btw_alpha: 0.0,
+            btw_range_start_line: 0,
+            btw_range_start_col: 0,
+            btw_range_end_line: 0,
+            btw_range_end_col: 0,
+            btw_presentation_label: String::from("test"),
+            btw_provider_id: String::from("test"),
+        };
+        let _ = obj.btw_summary();
+        assert!((obj.btw_blue - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_btw_alpha() {
+        let obj = DocumentColor {
+            btw_red: 0.0,
+            btw_green: 0.0,
+            btw_blue: 0.0,
+            btw_alpha: 0.0,
+            btw_range_start_line: 0,
+            btw_range_start_col: 0,
+            btw_range_end_line: 0,
+            btw_range_end_col: 0,
+            btw_presentation_label: String::from("test"),
+            btw_provider_id: String::from("test"),
+        };
+        let _ = obj.btw_summary();
+        assert!((obj.btw_alpha - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_btw_range_start_line() {
+        let obj = DocumentColor {
+            btw_red: 0.0,
+            btw_green: 0.0,
+            btw_blue: 0.0,
+            btw_alpha: 0.0,
+            btw_range_start_line: 0,
+            btw_range_start_col: 0,
+            btw_range_end_line: 0,
+            btw_range_end_col: 0,
+            btw_presentation_label: String::from("test"),
+            btw_provider_id: String::from("test"),
+        };
+        let _ = obj.btw_summary();
+        assert_eq!(obj.btw_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_btw_range_start_col() {
+        let obj = DocumentColor {
+            btw_red: 0.0,
+            btw_green: 0.0,
+            btw_blue: 0.0,
+            btw_alpha: 0.0,
+            btw_range_start_line: 0,
+            btw_range_start_col: 0,
+            btw_range_end_line: 0,
+            btw_range_end_col: 0,
+            btw_presentation_label: String::from("test"),
+            btw_provider_id: String::from("test"),
+        };
+        let _ = obj.btw_summary();
+        assert_eq!(obj.btw_range_start_col, 0);
+    }
+
+    #[test]
+    fn test_btw_range_end_line() {
+        let obj = DocumentColor {
+            btw_red: 0.0,
+            btw_green: 0.0,
+            btw_blue: 0.0,
+            btw_alpha: 0.0,
+            btw_range_start_line: 0,
+            btw_range_start_col: 0,
+            btw_range_end_line: 0,
+            btw_range_end_col: 0,
+            btw_presentation_label: String::from("test"),
+            btw_provider_id: String::from("test"),
+        };
+        let _ = obj.btw_summary();
+        assert_eq!(obj.btw_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_btw_range_end_col() {
+        let obj = DocumentColor {
+            btw_red: 0.0,
+            btw_green: 0.0,
+            btw_blue: 0.0,
+            btw_alpha: 0.0,
+            btw_range_start_line: 0,
+            btw_range_start_col: 0,
+            btw_range_end_line: 0,
+            btw_range_end_col: 0,
+            btw_presentation_label: String::from("test"),
+            btw_provider_id: String::from("test"),
+        };
+        let _ = obj.btw_summary();
+        assert_eq!(obj.btw_range_end_col, 0);
+    }
+
+    #[test]
+    fn test_btw_presentation_label() {
+        let obj = DocumentColor {
+            btw_red: 0.0,
+            btw_green: 0.0,
+            btw_blue: 0.0,
+            btw_alpha: 0.0,
+            btw_range_start_line: 0,
+            btw_range_start_col: 0,
+            btw_range_end_line: 0,
+            btw_range_end_col: 0,
+            btw_presentation_label: String::from("test"),
+            btw_provider_id: String::from("test"),
+        };
+        let _ = obj.btw_summary();
+        assert_eq!(obj.btw_presentation_label, "test");
+    }
+
+    #[test]
+    fn test_btw_provider_id() {
+        let obj = DocumentColor {
+            btw_red: 0.0,
+            btw_green: 0.0,
+            btw_blue: 0.0,
+            btw_alpha: 0.0,
+            btw_range_start_line: 0,
+            btw_range_start_col: 0,
+            btw_range_end_line: 0,
+            btw_range_end_col: 0,
+            btw_presentation_label: String::from("test"),
+            btw_provider_id: String::from("test"),
+        };
+        let _ = obj.btw_summary();
+        assert_eq!(obj.btw_provider_id, "test");
+    }
+
+
+    #[test]
+    fn test_btx_start_line() {
+        let obj = FoldingRangeResult {
+            btx_start_line: 0,
+            btx_start_character: None,
+            btx_end_line: 0,
+            btx_end_character: None,
+            btx_kind: String::from("test"),
+            btx_collapsed_text: String::from("test"),
+            btx_is_manual: false,
+            btx_nesting_level: 0,
+            btx_provider_id: String::from("test"),
+            btx_total_ranges: 0,
+        };
+        let _ = obj.btx_summary();
+        assert_eq!(obj.btx_start_line, 0);
+    }
+
+    #[test]
+    fn test_btx_start_character() {
+        let obj = FoldingRangeResult {
+            btx_start_line: 0,
+            btx_start_character: None,
+            btx_end_line: 0,
+            btx_end_character: None,
+            btx_kind: String::from("test"),
+            btx_collapsed_text: String::from("test"),
+            btx_is_manual: false,
+            btx_nesting_level: 0,
+            btx_provider_id: String::from("test"),
+            btx_total_ranges: 0,
+        };
+        let _ = obj.btx_summary();
+        assert!(obj.btx_start_character.is_none());
+    }
+
+    #[test]
+    fn test_btx_end_line() {
+        let obj = FoldingRangeResult {
+            btx_start_line: 0,
+            btx_start_character: None,
+            btx_end_line: 0,
+            btx_end_character: None,
+            btx_kind: String::from("test"),
+            btx_collapsed_text: String::from("test"),
+            btx_is_manual: false,
+            btx_nesting_level: 0,
+            btx_provider_id: String::from("test"),
+            btx_total_ranges: 0,
+        };
+        let _ = obj.btx_summary();
+        assert_eq!(obj.btx_end_line, 0);
+    }
+
+    #[test]
+    fn test_btx_end_character() {
+        let obj = FoldingRangeResult {
+            btx_start_line: 0,
+            btx_start_character: None,
+            btx_end_line: 0,
+            btx_end_character: None,
+            btx_kind: String::from("test"),
+            btx_collapsed_text: String::from("test"),
+            btx_is_manual: false,
+            btx_nesting_level: 0,
+            btx_provider_id: String::from("test"),
+            btx_total_ranges: 0,
+        };
+        let _ = obj.btx_summary();
+        assert!(obj.btx_end_character.is_none());
+    }
+
+    #[test]
+    fn test_btx_kind() {
+        let obj = FoldingRangeResult {
+            btx_start_line: 0,
+            btx_start_character: None,
+            btx_end_line: 0,
+            btx_end_character: None,
+            btx_kind: String::from("test"),
+            btx_collapsed_text: String::from("test"),
+            btx_is_manual: false,
+            btx_nesting_level: 0,
+            btx_provider_id: String::from("test"),
+            btx_total_ranges: 0,
+        };
+        let _ = obj.btx_summary();
+        assert_eq!(obj.btx_kind, "test");
+    }
+
+    #[test]
+    fn test_btx_collapsed_text() {
+        let obj = FoldingRangeResult {
+            btx_start_line: 0,
+            btx_start_character: None,
+            btx_end_line: 0,
+            btx_end_character: None,
+            btx_kind: String::from("test"),
+            btx_collapsed_text: String::from("test"),
+            btx_is_manual: false,
+            btx_nesting_level: 0,
+            btx_provider_id: String::from("test"),
+            btx_total_ranges: 0,
+        };
+        let _ = obj.btx_summary();
+        assert_eq!(obj.btx_collapsed_text, "test");
+    }
+
+    #[test]
+    fn test_btx_is_manual() {
+        let obj = FoldingRangeResult {
+            btx_start_line: 0,
+            btx_start_character: None,
+            btx_end_line: 0,
+            btx_end_character: None,
+            btx_kind: String::from("test"),
+            btx_collapsed_text: String::from("test"),
+            btx_is_manual: false,
+            btx_nesting_level: 0,
+            btx_provider_id: String::from("test"),
+            btx_total_ranges: 0,
+        };
+        let _ = obj.btx_summary();
+        assert!(!obj.btx_is_manual);
+    }
+
+    #[test]
+    fn test_btx_nesting_level() {
+        let obj = FoldingRangeResult {
+            btx_start_line: 0,
+            btx_start_character: None,
+            btx_end_line: 0,
+            btx_end_character: None,
+            btx_kind: String::from("test"),
+            btx_collapsed_text: String::from("test"),
+            btx_is_manual: false,
+            btx_nesting_level: 0,
+            btx_provider_id: String::from("test"),
+            btx_total_ranges: 0,
+        };
+        let _ = obj.btx_summary();
+        assert_eq!(obj.btx_nesting_level, 0);
+    }
+
+    #[test]
+    fn test_btx_provider_id() {
+        let obj = FoldingRangeResult {
+            btx_start_line: 0,
+            btx_start_character: None,
+            btx_end_line: 0,
+            btx_end_character: None,
+            btx_kind: String::from("test"),
+            btx_collapsed_text: String::from("test"),
+            btx_is_manual: false,
+            btx_nesting_level: 0,
+            btx_provider_id: String::from("test"),
+            btx_total_ranges: 0,
+        };
+        let _ = obj.btx_summary();
+        assert_eq!(obj.btx_provider_id, "test");
+    }
+
+    #[test]
+    fn test_btx_total_ranges() {
+        let obj = FoldingRangeResult {
+            btx_start_line: 0,
+            btx_start_character: None,
+            btx_end_line: 0,
+            btx_end_character: None,
+            btx_kind: String::from("test"),
+            btx_collapsed_text: String::from("test"),
+            btx_is_manual: false,
+            btx_nesting_level: 0,
+            btx_provider_id: String::from("test"),
+            btx_total_ranges: 0,
+        };
+        let _ = obj.btx_summary();
+        assert_eq!(obj.btx_total_ranges, 0);
+    }
+
+
+    #[test]
+    fn test_bty_uri() {
+        let obj = TextDocumentEdit {
+            bty_uri: String::from("test"),
+            bty_version: 0,
+            bty_edits_count: 0,
+            bty_annotation_id: String::from("test"),
+            bty_annotation_label: String::from("test"),
+            bty_needs_confirmation: false,
+            bty_annotation_description: String::from("test"),
+            bty_is_snippet: false,
+            bty_insert_text_format: 0,
+            bty_new_text: String::from("test"),
+        };
+        let _ = obj.bty_summary();
+        assert_eq!(obj.bty_uri, "test");
+    }
+
+    #[test]
+    fn test_bty_version() {
+        let obj = TextDocumentEdit {
+            bty_uri: String::from("test"),
+            bty_version: 0,
+            bty_edits_count: 0,
+            bty_annotation_id: String::from("test"),
+            bty_annotation_label: String::from("test"),
+            bty_needs_confirmation: false,
+            bty_annotation_description: String::from("test"),
+            bty_is_snippet: false,
+            bty_insert_text_format: 0,
+            bty_new_text: String::from("test"),
+        };
+        let _ = obj.bty_summary();
+        assert_eq!(obj.bty_version, 0);
+    }
+
+    #[test]
+    fn test_bty_edits_count() {
+        let obj = TextDocumentEdit {
+            bty_uri: String::from("test"),
+            bty_version: 0,
+            bty_edits_count: 0,
+            bty_annotation_id: String::from("test"),
+            bty_annotation_label: String::from("test"),
+            bty_needs_confirmation: false,
+            bty_annotation_description: String::from("test"),
+            bty_is_snippet: false,
+            bty_insert_text_format: 0,
+            bty_new_text: String::from("test"),
+        };
+        let _ = obj.bty_summary();
+        assert_eq!(obj.bty_edits_count, 0);
+    }
+
+    #[test]
+    fn test_bty_annotation_id() {
+        let obj = TextDocumentEdit {
+            bty_uri: String::from("test"),
+            bty_version: 0,
+            bty_edits_count: 0,
+            bty_annotation_id: String::from("test"),
+            bty_annotation_label: String::from("test"),
+            bty_needs_confirmation: false,
+            bty_annotation_description: String::from("test"),
+            bty_is_snippet: false,
+            bty_insert_text_format: 0,
+            bty_new_text: String::from("test"),
+        };
+        let _ = obj.bty_summary();
+        assert_eq!(obj.bty_annotation_id, "test");
+    }
+
+    #[test]
+    fn test_bty_annotation_label() {
+        let obj = TextDocumentEdit {
+            bty_uri: String::from("test"),
+            bty_version: 0,
+            bty_edits_count: 0,
+            bty_annotation_id: String::from("test"),
+            bty_annotation_label: String::from("test"),
+            bty_needs_confirmation: false,
+            bty_annotation_description: String::from("test"),
+            bty_is_snippet: false,
+            bty_insert_text_format: 0,
+            bty_new_text: String::from("test"),
+        };
+        let _ = obj.bty_summary();
+        assert_eq!(obj.bty_annotation_label, "test");
+    }
+
+    #[test]
+    fn test_bty_needs_confirmation() {
+        let obj = TextDocumentEdit {
+            bty_uri: String::from("test"),
+            bty_version: 0,
+            bty_edits_count: 0,
+            bty_annotation_id: String::from("test"),
+            bty_annotation_label: String::from("test"),
+            bty_needs_confirmation: false,
+            bty_annotation_description: String::from("test"),
+            bty_is_snippet: false,
+            bty_insert_text_format: 0,
+            bty_new_text: String::from("test"),
+        };
+        let _ = obj.bty_summary();
+        assert!(!obj.bty_needs_confirmation);
+    }
+
+    #[test]
+    fn test_bty_annotation_description() {
+        let obj = TextDocumentEdit {
+            bty_uri: String::from("test"),
+            bty_version: 0,
+            bty_edits_count: 0,
+            bty_annotation_id: String::from("test"),
+            bty_annotation_label: String::from("test"),
+            bty_needs_confirmation: false,
+            bty_annotation_description: String::from("test"),
+            bty_is_snippet: false,
+            bty_insert_text_format: 0,
+            bty_new_text: String::from("test"),
+        };
+        let _ = obj.bty_summary();
+        assert_eq!(obj.bty_annotation_description, "test");
+    }
+
+    #[test]
+    fn test_bty_is_snippet() {
+        let obj = TextDocumentEdit {
+            bty_uri: String::from("test"),
+            bty_version: 0,
+            bty_edits_count: 0,
+            bty_annotation_id: String::from("test"),
+            bty_annotation_label: String::from("test"),
+            bty_needs_confirmation: false,
+            bty_annotation_description: String::from("test"),
+            bty_is_snippet: false,
+            bty_insert_text_format: 0,
+            bty_new_text: String::from("test"),
+        };
+        let _ = obj.bty_summary();
+        assert!(!obj.bty_is_snippet);
+    }
+
+    #[test]
+    fn test_bty_insert_text_format() {
+        let obj = TextDocumentEdit {
+            bty_uri: String::from("test"),
+            bty_version: 0,
+            bty_edits_count: 0,
+            bty_annotation_id: String::from("test"),
+            bty_annotation_label: String::from("test"),
+            bty_needs_confirmation: false,
+            bty_annotation_description: String::from("test"),
+            bty_is_snippet: false,
+            bty_insert_text_format: 0,
+            bty_new_text: String::from("test"),
+        };
+        let _ = obj.bty_summary();
+        assert_eq!(obj.bty_insert_text_format, 0);
+    }
+
+    #[test]
+    fn test_bty_new_text() {
+        let obj = TextDocumentEdit {
+            bty_uri: String::from("test"),
+            bty_version: 0,
+            bty_edits_count: 0,
+            bty_annotation_id: String::from("test"),
+            bty_annotation_label: String::from("test"),
+            bty_needs_confirmation: false,
+            bty_annotation_description: String::from("test"),
+            bty_is_snippet: false,
+            bty_insert_text_format: 0,
+            bty_new_text: String::from("test"),
+        };
+        let _ = obj.bty_summary();
+        assert_eq!(obj.bty_new_text, "test");
+    }
+
+
+    #[test]
+    fn test_btz_section() {
+        let obj = WorkspaceConfig {
+            btz_section: String::from("test"),
+            btz_scope_uri: String::from("test"),
+            btz_language_id: String::from("test"),
+            btz_value_json: String::from("test"),
+            btz_default_value_json: String::from("test"),
+            btz_is_overridden: false,
+            btz_override_count: 0,
+            btz_target_scope: String::from("test"),
+            btz_is_language_override: false,
+            btz_inspection_default: String::from("test"),
+        };
+        let _ = obj.btz_summary();
+        assert_eq!(obj.btz_section, "test");
+    }
+
+    #[test]
+    fn test_btz_scope_uri() {
+        let obj = WorkspaceConfig {
+            btz_section: String::from("test"),
+            btz_scope_uri: String::from("test"),
+            btz_language_id: String::from("test"),
+            btz_value_json: String::from("test"),
+            btz_default_value_json: String::from("test"),
+            btz_is_overridden: false,
+            btz_override_count: 0,
+            btz_target_scope: String::from("test"),
+            btz_is_language_override: false,
+            btz_inspection_default: String::from("test"),
+        };
+        let _ = obj.btz_summary();
+        assert_eq!(obj.btz_scope_uri, "test");
+    }
+
+    #[test]
+    fn test_btz_language_id() {
+        let obj = WorkspaceConfig {
+            btz_section: String::from("test"),
+            btz_scope_uri: String::from("test"),
+            btz_language_id: String::from("test"),
+            btz_value_json: String::from("test"),
+            btz_default_value_json: String::from("test"),
+            btz_is_overridden: false,
+            btz_override_count: 0,
+            btz_target_scope: String::from("test"),
+            btz_is_language_override: false,
+            btz_inspection_default: String::from("test"),
+        };
+        let _ = obj.btz_summary();
+        assert_eq!(obj.btz_language_id, "test");
+    }
+
+    #[test]
+    fn test_btz_value_json() {
+        let obj = WorkspaceConfig {
+            btz_section: String::from("test"),
+            btz_scope_uri: String::from("test"),
+            btz_language_id: String::from("test"),
+            btz_value_json: String::from("test"),
+            btz_default_value_json: String::from("test"),
+            btz_is_overridden: false,
+            btz_override_count: 0,
+            btz_target_scope: String::from("test"),
+            btz_is_language_override: false,
+            btz_inspection_default: String::from("test"),
+        };
+        let _ = obj.btz_summary();
+        assert_eq!(obj.btz_value_json, "test");
+    }
+
+    #[test]
+    fn test_btz_default_value_json() {
+        let obj = WorkspaceConfig {
+            btz_section: String::from("test"),
+            btz_scope_uri: String::from("test"),
+            btz_language_id: String::from("test"),
+            btz_value_json: String::from("test"),
+            btz_default_value_json: String::from("test"),
+            btz_is_overridden: false,
+            btz_override_count: 0,
+            btz_target_scope: String::from("test"),
+            btz_is_language_override: false,
+            btz_inspection_default: String::from("test"),
+        };
+        let _ = obj.btz_summary();
+        assert_eq!(obj.btz_default_value_json, "test");
+    }
+
+    #[test]
+    fn test_btz_is_overridden() {
+        let obj = WorkspaceConfig {
+            btz_section: String::from("test"),
+            btz_scope_uri: String::from("test"),
+            btz_language_id: String::from("test"),
+            btz_value_json: String::from("test"),
+            btz_default_value_json: String::from("test"),
+            btz_is_overridden: false,
+            btz_override_count: 0,
+            btz_target_scope: String::from("test"),
+            btz_is_language_override: false,
+            btz_inspection_default: String::from("test"),
+        };
+        let _ = obj.btz_summary();
+        assert!(!obj.btz_is_overridden);
+    }
+
+    #[test]
+    fn test_btz_override_count() {
+        let obj = WorkspaceConfig {
+            btz_section: String::from("test"),
+            btz_scope_uri: String::from("test"),
+            btz_language_id: String::from("test"),
+            btz_value_json: String::from("test"),
+            btz_default_value_json: String::from("test"),
+            btz_is_overridden: false,
+            btz_override_count: 0,
+            btz_target_scope: String::from("test"),
+            btz_is_language_override: false,
+            btz_inspection_default: String::from("test"),
+        };
+        let _ = obj.btz_summary();
+        assert_eq!(obj.btz_override_count, 0);
+    }
+
+    #[test]
+    fn test_btz_target_scope() {
+        let obj = WorkspaceConfig {
+            btz_section: String::from("test"),
+            btz_scope_uri: String::from("test"),
+            btz_language_id: String::from("test"),
+            btz_value_json: String::from("test"),
+            btz_default_value_json: String::from("test"),
+            btz_is_overridden: false,
+            btz_override_count: 0,
+            btz_target_scope: String::from("test"),
+            btz_is_language_override: false,
+            btz_inspection_default: String::from("test"),
+        };
+        let _ = obj.btz_summary();
+        assert_eq!(obj.btz_target_scope, "test");
+    }
+
+    #[test]
+    fn test_btz_is_language_override() {
+        let obj = WorkspaceConfig {
+            btz_section: String::from("test"),
+            btz_scope_uri: String::from("test"),
+            btz_language_id: String::from("test"),
+            btz_value_json: String::from("test"),
+            btz_default_value_json: String::from("test"),
+            btz_is_overridden: false,
+            btz_override_count: 0,
+            btz_target_scope: String::from("test"),
+            btz_is_language_override: false,
+            btz_inspection_default: String::from("test"),
+        };
+        let _ = obj.btz_summary();
+        assert!(!obj.btz_is_language_override);
+    }
+
+    #[test]
+    fn test_btz_inspection_default() {
+        let obj = WorkspaceConfig {
+            btz_section: String::from("test"),
+            btz_scope_uri: String::from("test"),
+            btz_language_id: String::from("test"),
+            btz_value_json: String::from("test"),
+            btz_default_value_json: String::from("test"),
+            btz_is_overridden: false,
+            btz_override_count: 0,
+            btz_target_scope: String::from("test"),
+            btz_is_language_override: false,
+            btz_inspection_default: String::from("test"),
+        };
+        let _ = obj.btz_summary();
+        assert_eq!(obj.btz_inspection_default, "test");
     }
 
 }
