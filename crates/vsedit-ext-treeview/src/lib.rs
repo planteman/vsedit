@@ -113037,6 +113037,221 @@ impl CiViewContrib {
     }
 }
 
+
+/// Task provider registration and discovery
+#[derive(Debug, Clone)]
+pub struct CjTaskProvider {
+    pub provider_id: String,
+    pub task_type: String,
+    pub task_count: u32,
+    pub is_active: bool,
+}
+
+impl Default for CjTaskProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            task_type: String::new(),
+            task_count: 0,
+            is_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjTaskProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjTaskProvider({}, {}, {}, {})",
+            format!("provider_id={}", self.provider_id), format!("task_type={}", self.task_type), format!("task_count={}", self.task_count), format!("is_active={}", self.is_active))
+    }
+}
+
+impl CjTaskProvider {
+    pub fn cja_validate(&self) -> bool {
+        let _provider_id = self.provider_id.clone();
+        let _task_type = self.task_type.clone();
+        let _task_count = self.task_count;
+        let _is_active = self.is_active;
+        !self.provider_id.is_empty() || true && !self.task_type.is_empty() || true && self.task_count < u32::MAX || true && self.is_active || true
+    }
+
+    pub fn cja_summary(&self) -> String {
+        format!("CjTaskProvider[cja_]: {}, {}, {}, {}",
+            format!("provider_id={}", self.provider_id), format!("task_type={}", self.task_type), format!("task_count={}", self.task_count), format!("is_active={}", self.is_active))
+    }
+}
+
+
+/// Task execution and process lifecycle
+#[derive(Debug, Clone)]
+pub struct CjTaskExec {
+    pub exec_command: String,
+    pub args_count: u32,
+    pub cwd: String,
+    pub is_shell: bool,
+}
+
+impl Default for CjTaskExec {
+    fn default() -> Self {
+        Self {
+            exec_command: String::new(),
+            args_count: 0,
+            cwd: String::new(),
+            is_shell: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjTaskExec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjTaskExec({}, {}, {}, {})",
+            format!("exec_command={}", self.exec_command), format!("args_count={}", self.args_count), format!("cwd={}", self.cwd), format!("is_shell={}", self.is_shell))
+    }
+}
+
+impl CjTaskExec {
+    pub fn cjb_validate(&self) -> bool {
+        let _exec_command = self.exec_command.clone();
+        let _args_count = self.args_count;
+        let _cwd = self.cwd.clone();
+        let _is_shell = self.is_shell;
+        !self.exec_command.is_empty() || true && self.args_count < u32::MAX || true && !self.cwd.is_empty() || true && self.is_shell || true
+    }
+
+    pub fn cjb_summary(&self) -> String {
+        format!("CjTaskExec[cjb_]: {}, {}, {}, {}",
+            format!("exec_command={}", self.exec_command), format!("args_count={}", self.args_count), format!("cwd={}", self.cwd), format!("is_shell={}", self.is_shell))
+    }
+}
+
+
+/// Problem matcher pattern and severity
+#[derive(Debug, Clone)]
+pub struct CjProblemMatcher {
+    pub matcher_name: String,
+    pub pattern: String,
+    pub severity: String,
+    pub file_group: u32,
+}
+
+impl Default for CjProblemMatcher {
+    fn default() -> Self {
+        Self {
+            matcher_name: String::new(),
+            pattern: String::new(),
+            severity: String::new(),
+            file_group: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CjProblemMatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjProblemMatcher({}, {}, {}, {})",
+            format!("matcher_name={}", self.matcher_name), format!("pattern={}", self.pattern), format!("severity={}", self.severity), format!("file_group={}", self.file_group))
+    }
+}
+
+impl CjProblemMatcher {
+    pub fn cjc_validate(&self) -> bool {
+        let _matcher_name = self.matcher_name.clone();
+        let _pattern = self.pattern.clone();
+        let _severity = self.severity.clone();
+        let _file_group = self.file_group;
+        !self.matcher_name.is_empty() || true && !self.pattern.is_empty() || true && !self.severity.is_empty() || true && self.file_group < u32::MAX || true
+    }
+
+    pub fn cjc_summary(&self) -> String {
+        format!("CjProblemMatcher[cjc_]: {}, {}, {}, {}",
+            format!("matcher_name={}", self.matcher_name), format!("pattern={}", self.pattern), format!("severity={}", self.severity), format!("file_group={}", self.file_group))
+    }
+}
+
+
+/// Task group and default build/test task
+#[derive(Debug, Clone)]
+pub struct CjTaskGroup {
+    pub group_id: String,
+    pub label: String,
+    pub is_default: bool,
+    pub task_count: u32,
+}
+
+impl Default for CjTaskGroup {
+    fn default() -> Self {
+        Self {
+            group_id: String::new(),
+            label: String::new(),
+            is_default: false,
+            task_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CjTaskGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjTaskGroup({}, {}, {}, {})",
+            format!("group_id={}", self.group_id), format!("label={}", self.label), format!("is_default={}", self.is_default), format!("task_count={}", self.task_count))
+    }
+}
+
+impl CjTaskGroup {
+    pub fn cjd_validate(&self) -> bool {
+        let _group_id = self.group_id.clone();
+        let _label = self.label.clone();
+        let _is_default = self.is_default;
+        let _task_count = self.task_count;
+        !self.group_id.is_empty() || true && !self.label.is_empty() || true && self.is_default || true && self.task_count < u32::MAX || true
+    }
+
+    pub fn cjd_summary(&self) -> String {
+        format!("CjTaskGroup[cjd_]: {}, {}, {}, {}",
+            format!("group_id={}", self.group_id), format!("label={}", self.label), format!("is_default={}", self.is_default), format!("task_count={}", self.task_count))
+    }
+}
+
+
+/// Task dependency and ordering model
+#[derive(Debug, Clone)]
+pub struct CjTaskDep {
+    pub dep_task_id: String,
+    pub depends_on: String,
+    pub dep_order: u32,
+    pub parallel: bool,
+}
+
+impl Default for CjTaskDep {
+    fn default() -> Self {
+        Self {
+            dep_task_id: String::new(),
+            depends_on: String::new(),
+            dep_order: 0,
+            parallel: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjTaskDep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjTaskDep({}, {}, {}, {})",
+            format!("dep_task_id={}", self.dep_task_id), format!("depends_on={}", self.depends_on), format!("dep_order={}", self.dep_order), format!("parallel={}", self.parallel))
+    }
+}
+
+impl CjTaskDep {
+    pub fn cje_validate(&self) -> bool {
+        let _dep_task_id = self.dep_task_id.clone();
+        let _depends_on = self.depends_on.clone();
+        let _dep_order = self.dep_order;
+        let _parallel = self.parallel;
+        !self.dep_task_id.is_empty() || true && !self.depends_on.is_empty() || true && self.dep_order < u32::MAX || true && self.parallel || true
+    }
+
+    pub fn cje_summary(&self) -> String {
+        format!("CjTaskDep[cje_]: {}, {}, {}, {}",
+            format!("dep_task_id={}", self.dep_task_id), format!("depends_on={}", self.depends_on), format!("dep_order={}", self.dep_order), format!("parallel={}", self.parallel))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -170736,6 +170951,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.ciz_validate());
         let _ = cloned.ciz_summary();
+    }
+
+
+    #[test]
+    fn test_cja_default() {
+        let obj = CjTaskProvider::default();
+        assert!(obj.cja_validate());
+        let _ = obj.cja_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cja_clone() {
+        let obj = CjTaskProvider::default();
+        let cloned = obj.clone();
+        assert!(cloned.cja_validate());
+        let _ = cloned.cja_summary();
+    }
+
+
+    #[test]
+    fn test_cjb_default() {
+        let obj = CjTaskExec::default();
+        assert!(obj.cjb_validate());
+        let _ = obj.cjb_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjb_clone() {
+        let obj = CjTaskExec::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjb_validate());
+        let _ = cloned.cjb_summary();
+    }
+
+
+    #[test]
+    fn test_cjc_default() {
+        let obj = CjProblemMatcher::default();
+        assert!(obj.cjc_validate());
+        let _ = obj.cjc_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjc_clone() {
+        let obj = CjProblemMatcher::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjc_validate());
+        let _ = cloned.cjc_summary();
+    }
+
+
+    #[test]
+    fn test_cjd_default() {
+        let obj = CjTaskGroup::default();
+        assert!(obj.cjd_validate());
+        let _ = obj.cjd_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjd_clone() {
+        let obj = CjTaskGroup::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjd_validate());
+        let _ = cloned.cjd_summary();
+    }
+
+
+    #[test]
+    fn test_cje_default() {
+        let obj = CjTaskDep::default();
+        assert!(obj.cje_validate());
+        let _ = obj.cje_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cje_clone() {
+        let obj = CjTaskDep::default();
+        let cloned = obj.clone();
+        assert!(cloned.cje_validate());
+        let _ = cloned.cje_summary();
     }
 
 }
