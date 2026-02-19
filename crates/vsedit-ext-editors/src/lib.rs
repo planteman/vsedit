@@ -87451,6 +87451,132 @@ impl ProxyConfig {
     }
 }
 
+/// Runtime wiring: bnu_ WindowManagement
+#[derive(Debug, Clone)]
+pub struct WindowManagement {
+    pub bnu_window_id: u32,
+    pub bnu_title: String,
+    pub bnu_width: u32,
+    pub bnu_height: u32,
+    pub bnu_is_fullscreen: bool,
+    pub bnu_is_maximized: bool,
+    pub bnu_is_focused: bool,
+    pub bnu_position_x: i32,
+    pub bnu_position_y: i32,
+    pub bnu_display_id: u32,
+}
+
+impl WindowManagement {
+    pub fn bnu_summary(&self) -> String {
+        format!("WindowManagement({})", self.bnu_window_id)
+    }
+}
+
+/// Runtime wiring: bnv_ MultiWindow
+#[derive(Debug, Clone)]
+pub struct MultiWindow {
+    pub bnv_primary_window_id: u32,
+    pub bnv_secondary_ids: Vec<u32>,
+    pub bnv_active_window_id: u32,
+    pub bnv_window_count: usize,
+    pub bnv_layout_mode: String,
+    pub bnv_sync_scroll: bool,
+    pub bnv_share_clipboard: bool,
+    pub bnv_focus_follows_mouse: bool,
+    pub bnv_auto_arrange: bool,
+    pub bnv_cascade_offset: u32,
+}
+
+impl MultiWindow {
+    pub fn bnv_summary(&self) -> String {
+        format!("MultiWindow({})", self.bnv_primary_window_id)
+    }
+}
+
+/// Runtime wiring: bnw_ ElectronCompat
+#[derive(Debug, Clone)]
+pub struct ElectronCompat {
+    pub bnw_api_version: String,
+    pub bnw_platform: String,
+    pub bnw_arch: String,
+    pub bnw_node_version: String,
+    pub bnw_chrome_version: String,
+    pub bnw_electron_version: String,
+    pub bnw_is_packaged: bool,
+    pub bnw_app_path: String,
+    pub bnw_user_data_path: String,
+    pub bnw_resource_path: String,
+}
+
+impl ElectronCompat {
+    pub fn bnw_summary(&self) -> String {
+        format!("ElectronCompat({})", self.bnw_api_version)
+    }
+}
+
+/// Runtime wiring: bnx_ NativeDialog
+#[derive(Debug, Clone)]
+pub struct NativeDialog {
+    pub bnx_dialog_type: String,
+    pub bnx_title: String,
+    pub bnx_message: String,
+    pub bnx_detail: String,
+    pub bnx_buttons: Vec<String>,
+    pub bnx_default_button: u8,
+    pub bnx_cancel_button: u8,
+    pub bnx_default_path: String,
+    pub bnx_filters_count: usize,
+    pub bnx_is_modal: bool,
+}
+
+impl NativeDialog {
+    pub fn bnx_summary(&self) -> String {
+        format!("NativeDialog({})", self.bnx_dialog_type)
+    }
+}
+
+/// Runtime wiring: bny_ SystemInfo
+#[derive(Debug, Clone)]
+pub struct SystemInfo {
+    pub bny_os_name: String,
+    pub bny_os_version: String,
+    pub bny_os_release: String,
+    pub bny_cpu_model: String,
+    pub bny_cpu_count: u32,
+    pub bny_total_memory: u64,
+    pub bny_free_memory: u64,
+    pub bny_home_dir: String,
+    pub bny_temp_dir: String,
+    pub bny_hostname: String,
+}
+
+impl SystemInfo {
+    pub fn bny_summary(&self) -> String {
+        format!("SystemInfo({})", self.bny_os_name)
+    }
+}
+
+/// Runtime wiring: bnz_ AppLifecycle
+#[derive(Debug, Clone)]
+pub struct AppLifecycle {
+    pub bnz_app_name: String,
+    pub bnz_app_version: String,
+    pub bnz_uptime_seconds: u64,
+    pub bnz_is_quitting: bool,
+    pub bnz_restart_requested: bool,
+    pub bnz_exit_code: i32,
+    pub bnz_startup_time_ms: u64,
+    pub bnz_extensions_loaded: usize,
+    pub bnz_workspace_count: usize,
+    pub bnz_crash_reporter_enabled: bool,
+}
+
+impl AppLifecycle {
+    pub fn bnz_summary(&self) -> String {
+        format!("AppLifecycle({})", self.bnz_app_name)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -100321,6 +100447,1091 @@ mod tests_bfo {
         };
         let _ = obj.bnt_summary();
         assert_eq!(obj.bnt_connection_timeout, 0);
+    }
+
+    #[test]
+    fn test_bnu_window_id() {
+        let obj = WindowManagement {
+            bnu_window_id: 0,
+            bnu_title: String::from("test"),
+            bnu_width: 0,
+            bnu_height: 0,
+            bnu_is_fullscreen: false,
+            bnu_is_maximized: false,
+            bnu_is_focused: false,
+            bnu_position_x: 0,
+            bnu_position_y: 0,
+            bnu_display_id: 0,
+        };
+        let _ = obj.bnu_summary();
+        assert_eq!(obj.bnu_window_id, 0);
+    }
+
+    #[test]
+    fn test_bnu_title() {
+        let obj = WindowManagement {
+            bnu_window_id: 0,
+            bnu_title: String::from("test"),
+            bnu_width: 0,
+            bnu_height: 0,
+            bnu_is_fullscreen: false,
+            bnu_is_maximized: false,
+            bnu_is_focused: false,
+            bnu_position_x: 0,
+            bnu_position_y: 0,
+            bnu_display_id: 0,
+        };
+        let _ = obj.bnu_summary();
+        assert_eq!(obj.bnu_title, "test");
+    }
+
+    #[test]
+    fn test_bnu_width() {
+        let obj = WindowManagement {
+            bnu_window_id: 0,
+            bnu_title: String::from("test"),
+            bnu_width: 0,
+            bnu_height: 0,
+            bnu_is_fullscreen: false,
+            bnu_is_maximized: false,
+            bnu_is_focused: false,
+            bnu_position_x: 0,
+            bnu_position_y: 0,
+            bnu_display_id: 0,
+        };
+        let _ = obj.bnu_summary();
+        assert_eq!(obj.bnu_width, 0);
+    }
+
+    #[test]
+    fn test_bnu_height() {
+        let obj = WindowManagement {
+            bnu_window_id: 0,
+            bnu_title: String::from("test"),
+            bnu_width: 0,
+            bnu_height: 0,
+            bnu_is_fullscreen: false,
+            bnu_is_maximized: false,
+            bnu_is_focused: false,
+            bnu_position_x: 0,
+            bnu_position_y: 0,
+            bnu_display_id: 0,
+        };
+        let _ = obj.bnu_summary();
+        assert_eq!(obj.bnu_height, 0);
+    }
+
+    #[test]
+    fn test_bnu_is_fullscreen() {
+        let obj = WindowManagement {
+            bnu_window_id: 0,
+            bnu_title: String::from("test"),
+            bnu_width: 0,
+            bnu_height: 0,
+            bnu_is_fullscreen: false,
+            bnu_is_maximized: false,
+            bnu_is_focused: false,
+            bnu_position_x: 0,
+            bnu_position_y: 0,
+            bnu_display_id: 0,
+        };
+        let _ = obj.bnu_summary();
+        assert!(!obj.bnu_is_fullscreen);
+    }
+
+    #[test]
+    fn test_bnu_is_maximized() {
+        let obj = WindowManagement {
+            bnu_window_id: 0,
+            bnu_title: String::from("test"),
+            bnu_width: 0,
+            bnu_height: 0,
+            bnu_is_fullscreen: false,
+            bnu_is_maximized: false,
+            bnu_is_focused: false,
+            bnu_position_x: 0,
+            bnu_position_y: 0,
+            bnu_display_id: 0,
+        };
+        let _ = obj.bnu_summary();
+        assert!(!obj.bnu_is_maximized);
+    }
+
+    #[test]
+    fn test_bnu_is_focused() {
+        let obj = WindowManagement {
+            bnu_window_id: 0,
+            bnu_title: String::from("test"),
+            bnu_width: 0,
+            bnu_height: 0,
+            bnu_is_fullscreen: false,
+            bnu_is_maximized: false,
+            bnu_is_focused: false,
+            bnu_position_x: 0,
+            bnu_position_y: 0,
+            bnu_display_id: 0,
+        };
+        let _ = obj.bnu_summary();
+        assert!(!obj.bnu_is_focused);
+    }
+
+    #[test]
+    fn test_bnu_position_x() {
+        let obj = WindowManagement {
+            bnu_window_id: 0,
+            bnu_title: String::from("test"),
+            bnu_width: 0,
+            bnu_height: 0,
+            bnu_is_fullscreen: false,
+            bnu_is_maximized: false,
+            bnu_is_focused: false,
+            bnu_position_x: 0,
+            bnu_position_y: 0,
+            bnu_display_id: 0,
+        };
+        let _ = obj.bnu_summary();
+        assert_eq!(obj.bnu_position_x, 0);
+    }
+
+    #[test]
+    fn test_bnu_position_y() {
+        let obj = WindowManagement {
+            bnu_window_id: 0,
+            bnu_title: String::from("test"),
+            bnu_width: 0,
+            bnu_height: 0,
+            bnu_is_fullscreen: false,
+            bnu_is_maximized: false,
+            bnu_is_focused: false,
+            bnu_position_x: 0,
+            bnu_position_y: 0,
+            bnu_display_id: 0,
+        };
+        let _ = obj.bnu_summary();
+        assert_eq!(obj.bnu_position_y, 0);
+    }
+
+    #[test]
+    fn test_bnu_display_id() {
+        let obj = WindowManagement {
+            bnu_window_id: 0,
+            bnu_title: String::from("test"),
+            bnu_width: 0,
+            bnu_height: 0,
+            bnu_is_fullscreen: false,
+            bnu_is_maximized: false,
+            bnu_is_focused: false,
+            bnu_position_x: 0,
+            bnu_position_y: 0,
+            bnu_display_id: 0,
+        };
+        let _ = obj.bnu_summary();
+        assert_eq!(obj.bnu_display_id, 0);
+    }
+
+
+    #[test]
+    fn test_bnv_primary_window_id() {
+        let obj = MultiWindow {
+            bnv_primary_window_id: 0,
+            bnv_secondary_ids: Vec::new(),
+            bnv_active_window_id: 0,
+            bnv_window_count: 0,
+            bnv_layout_mode: String::from("test"),
+            bnv_sync_scroll: false,
+            bnv_share_clipboard: false,
+            bnv_focus_follows_mouse: false,
+            bnv_auto_arrange: false,
+            bnv_cascade_offset: 0,
+        };
+        let _ = obj.bnv_summary();
+        assert_eq!(obj.bnv_primary_window_id, 0);
+    }
+
+    #[test]
+    fn test_bnv_secondary_ids() {
+        let obj = MultiWindow {
+            bnv_primary_window_id: 0,
+            bnv_secondary_ids: Vec::new(),
+            bnv_active_window_id: 0,
+            bnv_window_count: 0,
+            bnv_layout_mode: String::from("test"),
+            bnv_sync_scroll: false,
+            bnv_share_clipboard: false,
+            bnv_focus_follows_mouse: false,
+            bnv_auto_arrange: false,
+            bnv_cascade_offset: 0,
+        };
+        let _ = obj.bnv_summary();
+        assert!(obj.bnv_secondary_ids.is_empty());
+    }
+
+    #[test]
+    fn test_bnv_active_window_id() {
+        let obj = MultiWindow {
+            bnv_primary_window_id: 0,
+            bnv_secondary_ids: Vec::new(),
+            bnv_active_window_id: 0,
+            bnv_window_count: 0,
+            bnv_layout_mode: String::from("test"),
+            bnv_sync_scroll: false,
+            bnv_share_clipboard: false,
+            bnv_focus_follows_mouse: false,
+            bnv_auto_arrange: false,
+            bnv_cascade_offset: 0,
+        };
+        let _ = obj.bnv_summary();
+        assert_eq!(obj.bnv_active_window_id, 0);
+    }
+
+    #[test]
+    fn test_bnv_window_count() {
+        let obj = MultiWindow {
+            bnv_primary_window_id: 0,
+            bnv_secondary_ids: Vec::new(),
+            bnv_active_window_id: 0,
+            bnv_window_count: 0,
+            bnv_layout_mode: String::from("test"),
+            bnv_sync_scroll: false,
+            bnv_share_clipboard: false,
+            bnv_focus_follows_mouse: false,
+            bnv_auto_arrange: false,
+            bnv_cascade_offset: 0,
+        };
+        let _ = obj.bnv_summary();
+        assert_eq!(obj.bnv_window_count, 0);
+    }
+
+    #[test]
+    fn test_bnv_layout_mode() {
+        let obj = MultiWindow {
+            bnv_primary_window_id: 0,
+            bnv_secondary_ids: Vec::new(),
+            bnv_active_window_id: 0,
+            bnv_window_count: 0,
+            bnv_layout_mode: String::from("test"),
+            bnv_sync_scroll: false,
+            bnv_share_clipboard: false,
+            bnv_focus_follows_mouse: false,
+            bnv_auto_arrange: false,
+            bnv_cascade_offset: 0,
+        };
+        let _ = obj.bnv_summary();
+        assert_eq!(obj.bnv_layout_mode, "test");
+    }
+
+    #[test]
+    fn test_bnv_sync_scroll() {
+        let obj = MultiWindow {
+            bnv_primary_window_id: 0,
+            bnv_secondary_ids: Vec::new(),
+            bnv_active_window_id: 0,
+            bnv_window_count: 0,
+            bnv_layout_mode: String::from("test"),
+            bnv_sync_scroll: false,
+            bnv_share_clipboard: false,
+            bnv_focus_follows_mouse: false,
+            bnv_auto_arrange: false,
+            bnv_cascade_offset: 0,
+        };
+        let _ = obj.bnv_summary();
+        assert!(!obj.bnv_sync_scroll);
+    }
+
+    #[test]
+    fn test_bnv_share_clipboard() {
+        let obj = MultiWindow {
+            bnv_primary_window_id: 0,
+            bnv_secondary_ids: Vec::new(),
+            bnv_active_window_id: 0,
+            bnv_window_count: 0,
+            bnv_layout_mode: String::from("test"),
+            bnv_sync_scroll: false,
+            bnv_share_clipboard: false,
+            bnv_focus_follows_mouse: false,
+            bnv_auto_arrange: false,
+            bnv_cascade_offset: 0,
+        };
+        let _ = obj.bnv_summary();
+        assert!(!obj.bnv_share_clipboard);
+    }
+
+    #[test]
+    fn test_bnv_focus_follows_mouse() {
+        let obj = MultiWindow {
+            bnv_primary_window_id: 0,
+            bnv_secondary_ids: Vec::new(),
+            bnv_active_window_id: 0,
+            bnv_window_count: 0,
+            bnv_layout_mode: String::from("test"),
+            bnv_sync_scroll: false,
+            bnv_share_clipboard: false,
+            bnv_focus_follows_mouse: false,
+            bnv_auto_arrange: false,
+            bnv_cascade_offset: 0,
+        };
+        let _ = obj.bnv_summary();
+        assert!(!obj.bnv_focus_follows_mouse);
+    }
+
+    #[test]
+    fn test_bnv_auto_arrange() {
+        let obj = MultiWindow {
+            bnv_primary_window_id: 0,
+            bnv_secondary_ids: Vec::new(),
+            bnv_active_window_id: 0,
+            bnv_window_count: 0,
+            bnv_layout_mode: String::from("test"),
+            bnv_sync_scroll: false,
+            bnv_share_clipboard: false,
+            bnv_focus_follows_mouse: false,
+            bnv_auto_arrange: false,
+            bnv_cascade_offset: 0,
+        };
+        let _ = obj.bnv_summary();
+        assert!(!obj.bnv_auto_arrange);
+    }
+
+    #[test]
+    fn test_bnv_cascade_offset() {
+        let obj = MultiWindow {
+            bnv_primary_window_id: 0,
+            bnv_secondary_ids: Vec::new(),
+            bnv_active_window_id: 0,
+            bnv_window_count: 0,
+            bnv_layout_mode: String::from("test"),
+            bnv_sync_scroll: false,
+            bnv_share_clipboard: false,
+            bnv_focus_follows_mouse: false,
+            bnv_auto_arrange: false,
+            bnv_cascade_offset: 0,
+        };
+        let _ = obj.bnv_summary();
+        assert_eq!(obj.bnv_cascade_offset, 0);
+    }
+
+
+    #[test]
+    fn test_bnw_api_version() {
+        let obj = ElectronCompat {
+            bnw_api_version: String::from("test"),
+            bnw_platform: String::from("test"),
+            bnw_arch: String::from("test"),
+            bnw_node_version: String::from("test"),
+            bnw_chrome_version: String::from("test"),
+            bnw_electron_version: String::from("test"),
+            bnw_is_packaged: false,
+            bnw_app_path: String::from("test"),
+            bnw_user_data_path: String::from("test"),
+            bnw_resource_path: String::from("test"),
+        };
+        let _ = obj.bnw_summary();
+        assert_eq!(obj.bnw_api_version, "test");
+    }
+
+    #[test]
+    fn test_bnw_platform() {
+        let obj = ElectronCompat {
+            bnw_api_version: String::from("test"),
+            bnw_platform: String::from("test"),
+            bnw_arch: String::from("test"),
+            bnw_node_version: String::from("test"),
+            bnw_chrome_version: String::from("test"),
+            bnw_electron_version: String::from("test"),
+            bnw_is_packaged: false,
+            bnw_app_path: String::from("test"),
+            bnw_user_data_path: String::from("test"),
+            bnw_resource_path: String::from("test"),
+        };
+        let _ = obj.bnw_summary();
+        assert_eq!(obj.bnw_platform, "test");
+    }
+
+    #[test]
+    fn test_bnw_arch() {
+        let obj = ElectronCompat {
+            bnw_api_version: String::from("test"),
+            bnw_platform: String::from("test"),
+            bnw_arch: String::from("test"),
+            bnw_node_version: String::from("test"),
+            bnw_chrome_version: String::from("test"),
+            bnw_electron_version: String::from("test"),
+            bnw_is_packaged: false,
+            bnw_app_path: String::from("test"),
+            bnw_user_data_path: String::from("test"),
+            bnw_resource_path: String::from("test"),
+        };
+        let _ = obj.bnw_summary();
+        assert_eq!(obj.bnw_arch, "test");
+    }
+
+    #[test]
+    fn test_bnw_node_version() {
+        let obj = ElectronCompat {
+            bnw_api_version: String::from("test"),
+            bnw_platform: String::from("test"),
+            bnw_arch: String::from("test"),
+            bnw_node_version: String::from("test"),
+            bnw_chrome_version: String::from("test"),
+            bnw_electron_version: String::from("test"),
+            bnw_is_packaged: false,
+            bnw_app_path: String::from("test"),
+            bnw_user_data_path: String::from("test"),
+            bnw_resource_path: String::from("test"),
+        };
+        let _ = obj.bnw_summary();
+        assert_eq!(obj.bnw_node_version, "test");
+    }
+
+    #[test]
+    fn test_bnw_chrome_version() {
+        let obj = ElectronCompat {
+            bnw_api_version: String::from("test"),
+            bnw_platform: String::from("test"),
+            bnw_arch: String::from("test"),
+            bnw_node_version: String::from("test"),
+            bnw_chrome_version: String::from("test"),
+            bnw_electron_version: String::from("test"),
+            bnw_is_packaged: false,
+            bnw_app_path: String::from("test"),
+            bnw_user_data_path: String::from("test"),
+            bnw_resource_path: String::from("test"),
+        };
+        let _ = obj.bnw_summary();
+        assert_eq!(obj.bnw_chrome_version, "test");
+    }
+
+    #[test]
+    fn test_bnw_electron_version() {
+        let obj = ElectronCompat {
+            bnw_api_version: String::from("test"),
+            bnw_platform: String::from("test"),
+            bnw_arch: String::from("test"),
+            bnw_node_version: String::from("test"),
+            bnw_chrome_version: String::from("test"),
+            bnw_electron_version: String::from("test"),
+            bnw_is_packaged: false,
+            bnw_app_path: String::from("test"),
+            bnw_user_data_path: String::from("test"),
+            bnw_resource_path: String::from("test"),
+        };
+        let _ = obj.bnw_summary();
+        assert_eq!(obj.bnw_electron_version, "test");
+    }
+
+    #[test]
+    fn test_bnw_is_packaged() {
+        let obj = ElectronCompat {
+            bnw_api_version: String::from("test"),
+            bnw_platform: String::from("test"),
+            bnw_arch: String::from("test"),
+            bnw_node_version: String::from("test"),
+            bnw_chrome_version: String::from("test"),
+            bnw_electron_version: String::from("test"),
+            bnw_is_packaged: false,
+            bnw_app_path: String::from("test"),
+            bnw_user_data_path: String::from("test"),
+            bnw_resource_path: String::from("test"),
+        };
+        let _ = obj.bnw_summary();
+        assert!(!obj.bnw_is_packaged);
+    }
+
+    #[test]
+    fn test_bnw_app_path() {
+        let obj = ElectronCompat {
+            bnw_api_version: String::from("test"),
+            bnw_platform: String::from("test"),
+            bnw_arch: String::from("test"),
+            bnw_node_version: String::from("test"),
+            bnw_chrome_version: String::from("test"),
+            bnw_electron_version: String::from("test"),
+            bnw_is_packaged: false,
+            bnw_app_path: String::from("test"),
+            bnw_user_data_path: String::from("test"),
+            bnw_resource_path: String::from("test"),
+        };
+        let _ = obj.bnw_summary();
+        assert_eq!(obj.bnw_app_path, "test");
+    }
+
+    #[test]
+    fn test_bnw_user_data_path() {
+        let obj = ElectronCompat {
+            bnw_api_version: String::from("test"),
+            bnw_platform: String::from("test"),
+            bnw_arch: String::from("test"),
+            bnw_node_version: String::from("test"),
+            bnw_chrome_version: String::from("test"),
+            bnw_electron_version: String::from("test"),
+            bnw_is_packaged: false,
+            bnw_app_path: String::from("test"),
+            bnw_user_data_path: String::from("test"),
+            bnw_resource_path: String::from("test"),
+        };
+        let _ = obj.bnw_summary();
+        assert_eq!(obj.bnw_user_data_path, "test");
+    }
+
+    #[test]
+    fn test_bnw_resource_path() {
+        let obj = ElectronCompat {
+            bnw_api_version: String::from("test"),
+            bnw_platform: String::from("test"),
+            bnw_arch: String::from("test"),
+            bnw_node_version: String::from("test"),
+            bnw_chrome_version: String::from("test"),
+            bnw_electron_version: String::from("test"),
+            bnw_is_packaged: false,
+            bnw_app_path: String::from("test"),
+            bnw_user_data_path: String::from("test"),
+            bnw_resource_path: String::from("test"),
+        };
+        let _ = obj.bnw_summary();
+        assert_eq!(obj.bnw_resource_path, "test");
+    }
+
+
+    #[test]
+    fn test_bnx_dialog_type() {
+        let obj = NativeDialog {
+            bnx_dialog_type: String::from("test"),
+            bnx_title: String::from("test"),
+            bnx_message: String::from("test"),
+            bnx_detail: String::from("test"),
+            bnx_buttons: Vec::new(),
+            bnx_default_button: 0,
+            bnx_cancel_button: 0,
+            bnx_default_path: String::from("test"),
+            bnx_filters_count: 0,
+            bnx_is_modal: false,
+        };
+        let _ = obj.bnx_summary();
+        assert_eq!(obj.bnx_dialog_type, "test");
+    }
+
+    #[test]
+    fn test_bnx_title() {
+        let obj = NativeDialog {
+            bnx_dialog_type: String::from("test"),
+            bnx_title: String::from("test"),
+            bnx_message: String::from("test"),
+            bnx_detail: String::from("test"),
+            bnx_buttons: Vec::new(),
+            bnx_default_button: 0,
+            bnx_cancel_button: 0,
+            bnx_default_path: String::from("test"),
+            bnx_filters_count: 0,
+            bnx_is_modal: false,
+        };
+        let _ = obj.bnx_summary();
+        assert_eq!(obj.bnx_title, "test");
+    }
+
+    #[test]
+    fn test_bnx_message() {
+        let obj = NativeDialog {
+            bnx_dialog_type: String::from("test"),
+            bnx_title: String::from("test"),
+            bnx_message: String::from("test"),
+            bnx_detail: String::from("test"),
+            bnx_buttons: Vec::new(),
+            bnx_default_button: 0,
+            bnx_cancel_button: 0,
+            bnx_default_path: String::from("test"),
+            bnx_filters_count: 0,
+            bnx_is_modal: false,
+        };
+        let _ = obj.bnx_summary();
+        assert_eq!(obj.bnx_message, "test");
+    }
+
+    #[test]
+    fn test_bnx_detail() {
+        let obj = NativeDialog {
+            bnx_dialog_type: String::from("test"),
+            bnx_title: String::from("test"),
+            bnx_message: String::from("test"),
+            bnx_detail: String::from("test"),
+            bnx_buttons: Vec::new(),
+            bnx_default_button: 0,
+            bnx_cancel_button: 0,
+            bnx_default_path: String::from("test"),
+            bnx_filters_count: 0,
+            bnx_is_modal: false,
+        };
+        let _ = obj.bnx_summary();
+        assert_eq!(obj.bnx_detail, "test");
+    }
+
+    #[test]
+    fn test_bnx_buttons() {
+        let obj = NativeDialog {
+            bnx_dialog_type: String::from("test"),
+            bnx_title: String::from("test"),
+            bnx_message: String::from("test"),
+            bnx_detail: String::from("test"),
+            bnx_buttons: Vec::new(),
+            bnx_default_button: 0,
+            bnx_cancel_button: 0,
+            bnx_default_path: String::from("test"),
+            bnx_filters_count: 0,
+            bnx_is_modal: false,
+        };
+        let _ = obj.bnx_summary();
+        assert!(obj.bnx_buttons.is_empty());
+    }
+
+    #[test]
+    fn test_bnx_default_button() {
+        let obj = NativeDialog {
+            bnx_dialog_type: String::from("test"),
+            bnx_title: String::from("test"),
+            bnx_message: String::from("test"),
+            bnx_detail: String::from("test"),
+            bnx_buttons: Vec::new(),
+            bnx_default_button: 0,
+            bnx_cancel_button: 0,
+            bnx_default_path: String::from("test"),
+            bnx_filters_count: 0,
+            bnx_is_modal: false,
+        };
+        let _ = obj.bnx_summary();
+        assert_eq!(obj.bnx_default_button, 0);
+    }
+
+    #[test]
+    fn test_bnx_cancel_button() {
+        let obj = NativeDialog {
+            bnx_dialog_type: String::from("test"),
+            bnx_title: String::from("test"),
+            bnx_message: String::from("test"),
+            bnx_detail: String::from("test"),
+            bnx_buttons: Vec::new(),
+            bnx_default_button: 0,
+            bnx_cancel_button: 0,
+            bnx_default_path: String::from("test"),
+            bnx_filters_count: 0,
+            bnx_is_modal: false,
+        };
+        let _ = obj.bnx_summary();
+        assert_eq!(obj.bnx_cancel_button, 0);
+    }
+
+    #[test]
+    fn test_bnx_default_path() {
+        let obj = NativeDialog {
+            bnx_dialog_type: String::from("test"),
+            bnx_title: String::from("test"),
+            bnx_message: String::from("test"),
+            bnx_detail: String::from("test"),
+            bnx_buttons: Vec::new(),
+            bnx_default_button: 0,
+            bnx_cancel_button: 0,
+            bnx_default_path: String::from("test"),
+            bnx_filters_count: 0,
+            bnx_is_modal: false,
+        };
+        let _ = obj.bnx_summary();
+        assert_eq!(obj.bnx_default_path, "test");
+    }
+
+    #[test]
+    fn test_bnx_filters_count() {
+        let obj = NativeDialog {
+            bnx_dialog_type: String::from("test"),
+            bnx_title: String::from("test"),
+            bnx_message: String::from("test"),
+            bnx_detail: String::from("test"),
+            bnx_buttons: Vec::new(),
+            bnx_default_button: 0,
+            bnx_cancel_button: 0,
+            bnx_default_path: String::from("test"),
+            bnx_filters_count: 0,
+            bnx_is_modal: false,
+        };
+        let _ = obj.bnx_summary();
+        assert_eq!(obj.bnx_filters_count, 0);
+    }
+
+    #[test]
+    fn test_bnx_is_modal() {
+        let obj = NativeDialog {
+            bnx_dialog_type: String::from("test"),
+            bnx_title: String::from("test"),
+            bnx_message: String::from("test"),
+            bnx_detail: String::from("test"),
+            bnx_buttons: Vec::new(),
+            bnx_default_button: 0,
+            bnx_cancel_button: 0,
+            bnx_default_path: String::from("test"),
+            bnx_filters_count: 0,
+            bnx_is_modal: false,
+        };
+        let _ = obj.bnx_summary();
+        assert!(!obj.bnx_is_modal);
+    }
+
+
+    #[test]
+    fn test_bny_os_name() {
+        let obj = SystemInfo {
+            bny_os_name: String::from("test"),
+            bny_os_version: String::from("test"),
+            bny_os_release: String::from("test"),
+            bny_cpu_model: String::from("test"),
+            bny_cpu_count: 0,
+            bny_total_memory: 0,
+            bny_free_memory: 0,
+            bny_home_dir: String::from("test"),
+            bny_temp_dir: String::from("test"),
+            bny_hostname: String::from("test"),
+        };
+        let _ = obj.bny_summary();
+        assert_eq!(obj.bny_os_name, "test");
+    }
+
+    #[test]
+    fn test_bny_os_version() {
+        let obj = SystemInfo {
+            bny_os_name: String::from("test"),
+            bny_os_version: String::from("test"),
+            bny_os_release: String::from("test"),
+            bny_cpu_model: String::from("test"),
+            bny_cpu_count: 0,
+            bny_total_memory: 0,
+            bny_free_memory: 0,
+            bny_home_dir: String::from("test"),
+            bny_temp_dir: String::from("test"),
+            bny_hostname: String::from("test"),
+        };
+        let _ = obj.bny_summary();
+        assert_eq!(obj.bny_os_version, "test");
+    }
+
+    #[test]
+    fn test_bny_os_release() {
+        let obj = SystemInfo {
+            bny_os_name: String::from("test"),
+            bny_os_version: String::from("test"),
+            bny_os_release: String::from("test"),
+            bny_cpu_model: String::from("test"),
+            bny_cpu_count: 0,
+            bny_total_memory: 0,
+            bny_free_memory: 0,
+            bny_home_dir: String::from("test"),
+            bny_temp_dir: String::from("test"),
+            bny_hostname: String::from("test"),
+        };
+        let _ = obj.bny_summary();
+        assert_eq!(obj.bny_os_release, "test");
+    }
+
+    #[test]
+    fn test_bny_cpu_model() {
+        let obj = SystemInfo {
+            bny_os_name: String::from("test"),
+            bny_os_version: String::from("test"),
+            bny_os_release: String::from("test"),
+            bny_cpu_model: String::from("test"),
+            bny_cpu_count: 0,
+            bny_total_memory: 0,
+            bny_free_memory: 0,
+            bny_home_dir: String::from("test"),
+            bny_temp_dir: String::from("test"),
+            bny_hostname: String::from("test"),
+        };
+        let _ = obj.bny_summary();
+        assert_eq!(obj.bny_cpu_model, "test");
+    }
+
+    #[test]
+    fn test_bny_cpu_count() {
+        let obj = SystemInfo {
+            bny_os_name: String::from("test"),
+            bny_os_version: String::from("test"),
+            bny_os_release: String::from("test"),
+            bny_cpu_model: String::from("test"),
+            bny_cpu_count: 0,
+            bny_total_memory: 0,
+            bny_free_memory: 0,
+            bny_home_dir: String::from("test"),
+            bny_temp_dir: String::from("test"),
+            bny_hostname: String::from("test"),
+        };
+        let _ = obj.bny_summary();
+        assert_eq!(obj.bny_cpu_count, 0);
+    }
+
+    #[test]
+    fn test_bny_total_memory() {
+        let obj = SystemInfo {
+            bny_os_name: String::from("test"),
+            bny_os_version: String::from("test"),
+            bny_os_release: String::from("test"),
+            bny_cpu_model: String::from("test"),
+            bny_cpu_count: 0,
+            bny_total_memory: 0,
+            bny_free_memory: 0,
+            bny_home_dir: String::from("test"),
+            bny_temp_dir: String::from("test"),
+            bny_hostname: String::from("test"),
+        };
+        let _ = obj.bny_summary();
+        assert_eq!(obj.bny_total_memory, 0);
+    }
+
+    #[test]
+    fn test_bny_free_memory() {
+        let obj = SystemInfo {
+            bny_os_name: String::from("test"),
+            bny_os_version: String::from("test"),
+            bny_os_release: String::from("test"),
+            bny_cpu_model: String::from("test"),
+            bny_cpu_count: 0,
+            bny_total_memory: 0,
+            bny_free_memory: 0,
+            bny_home_dir: String::from("test"),
+            bny_temp_dir: String::from("test"),
+            bny_hostname: String::from("test"),
+        };
+        let _ = obj.bny_summary();
+        assert_eq!(obj.bny_free_memory, 0);
+    }
+
+    #[test]
+    fn test_bny_home_dir() {
+        let obj = SystemInfo {
+            bny_os_name: String::from("test"),
+            bny_os_version: String::from("test"),
+            bny_os_release: String::from("test"),
+            bny_cpu_model: String::from("test"),
+            bny_cpu_count: 0,
+            bny_total_memory: 0,
+            bny_free_memory: 0,
+            bny_home_dir: String::from("test"),
+            bny_temp_dir: String::from("test"),
+            bny_hostname: String::from("test"),
+        };
+        let _ = obj.bny_summary();
+        assert_eq!(obj.bny_home_dir, "test");
+    }
+
+    #[test]
+    fn test_bny_temp_dir() {
+        let obj = SystemInfo {
+            bny_os_name: String::from("test"),
+            bny_os_version: String::from("test"),
+            bny_os_release: String::from("test"),
+            bny_cpu_model: String::from("test"),
+            bny_cpu_count: 0,
+            bny_total_memory: 0,
+            bny_free_memory: 0,
+            bny_home_dir: String::from("test"),
+            bny_temp_dir: String::from("test"),
+            bny_hostname: String::from("test"),
+        };
+        let _ = obj.bny_summary();
+        assert_eq!(obj.bny_temp_dir, "test");
+    }
+
+    #[test]
+    fn test_bny_hostname() {
+        let obj = SystemInfo {
+            bny_os_name: String::from("test"),
+            bny_os_version: String::from("test"),
+            bny_os_release: String::from("test"),
+            bny_cpu_model: String::from("test"),
+            bny_cpu_count: 0,
+            bny_total_memory: 0,
+            bny_free_memory: 0,
+            bny_home_dir: String::from("test"),
+            bny_temp_dir: String::from("test"),
+            bny_hostname: String::from("test"),
+        };
+        let _ = obj.bny_summary();
+        assert_eq!(obj.bny_hostname, "test");
+    }
+
+
+    #[test]
+    fn test_bnz_app_name() {
+        let obj = AppLifecycle {
+            bnz_app_name: String::from("test"),
+            bnz_app_version: String::from("test"),
+            bnz_uptime_seconds: 0,
+            bnz_is_quitting: false,
+            bnz_restart_requested: false,
+            bnz_exit_code: 0,
+            bnz_startup_time_ms: 0,
+            bnz_extensions_loaded: 0,
+            bnz_workspace_count: 0,
+            bnz_crash_reporter_enabled: false,
+        };
+        let _ = obj.bnz_summary();
+        assert_eq!(obj.bnz_app_name, "test");
+    }
+
+    #[test]
+    fn test_bnz_app_version() {
+        let obj = AppLifecycle {
+            bnz_app_name: String::from("test"),
+            bnz_app_version: String::from("test"),
+            bnz_uptime_seconds: 0,
+            bnz_is_quitting: false,
+            bnz_restart_requested: false,
+            bnz_exit_code: 0,
+            bnz_startup_time_ms: 0,
+            bnz_extensions_loaded: 0,
+            bnz_workspace_count: 0,
+            bnz_crash_reporter_enabled: false,
+        };
+        let _ = obj.bnz_summary();
+        assert_eq!(obj.bnz_app_version, "test");
+    }
+
+    #[test]
+    fn test_bnz_uptime_seconds() {
+        let obj = AppLifecycle {
+            bnz_app_name: String::from("test"),
+            bnz_app_version: String::from("test"),
+            bnz_uptime_seconds: 0,
+            bnz_is_quitting: false,
+            bnz_restart_requested: false,
+            bnz_exit_code: 0,
+            bnz_startup_time_ms: 0,
+            bnz_extensions_loaded: 0,
+            bnz_workspace_count: 0,
+            bnz_crash_reporter_enabled: false,
+        };
+        let _ = obj.bnz_summary();
+        assert_eq!(obj.bnz_uptime_seconds, 0);
+    }
+
+    #[test]
+    fn test_bnz_is_quitting() {
+        let obj = AppLifecycle {
+            bnz_app_name: String::from("test"),
+            bnz_app_version: String::from("test"),
+            bnz_uptime_seconds: 0,
+            bnz_is_quitting: false,
+            bnz_restart_requested: false,
+            bnz_exit_code: 0,
+            bnz_startup_time_ms: 0,
+            bnz_extensions_loaded: 0,
+            bnz_workspace_count: 0,
+            bnz_crash_reporter_enabled: false,
+        };
+        let _ = obj.bnz_summary();
+        assert!(!obj.bnz_is_quitting);
+    }
+
+    #[test]
+    fn test_bnz_restart_requested() {
+        let obj = AppLifecycle {
+            bnz_app_name: String::from("test"),
+            bnz_app_version: String::from("test"),
+            bnz_uptime_seconds: 0,
+            bnz_is_quitting: false,
+            bnz_restart_requested: false,
+            bnz_exit_code: 0,
+            bnz_startup_time_ms: 0,
+            bnz_extensions_loaded: 0,
+            bnz_workspace_count: 0,
+            bnz_crash_reporter_enabled: false,
+        };
+        let _ = obj.bnz_summary();
+        assert!(!obj.bnz_restart_requested);
+    }
+
+    #[test]
+    fn test_bnz_exit_code() {
+        let obj = AppLifecycle {
+            bnz_app_name: String::from("test"),
+            bnz_app_version: String::from("test"),
+            bnz_uptime_seconds: 0,
+            bnz_is_quitting: false,
+            bnz_restart_requested: false,
+            bnz_exit_code: 0,
+            bnz_startup_time_ms: 0,
+            bnz_extensions_loaded: 0,
+            bnz_workspace_count: 0,
+            bnz_crash_reporter_enabled: false,
+        };
+        let _ = obj.bnz_summary();
+        assert_eq!(obj.bnz_exit_code, 0);
+    }
+
+    #[test]
+    fn test_bnz_startup_time_ms() {
+        let obj = AppLifecycle {
+            bnz_app_name: String::from("test"),
+            bnz_app_version: String::from("test"),
+            bnz_uptime_seconds: 0,
+            bnz_is_quitting: false,
+            bnz_restart_requested: false,
+            bnz_exit_code: 0,
+            bnz_startup_time_ms: 0,
+            bnz_extensions_loaded: 0,
+            bnz_workspace_count: 0,
+            bnz_crash_reporter_enabled: false,
+        };
+        let _ = obj.bnz_summary();
+        assert_eq!(obj.bnz_startup_time_ms, 0);
+    }
+
+    #[test]
+    fn test_bnz_extensions_loaded() {
+        let obj = AppLifecycle {
+            bnz_app_name: String::from("test"),
+            bnz_app_version: String::from("test"),
+            bnz_uptime_seconds: 0,
+            bnz_is_quitting: false,
+            bnz_restart_requested: false,
+            bnz_exit_code: 0,
+            bnz_startup_time_ms: 0,
+            bnz_extensions_loaded: 0,
+            bnz_workspace_count: 0,
+            bnz_crash_reporter_enabled: false,
+        };
+        let _ = obj.bnz_summary();
+        assert_eq!(obj.bnz_extensions_loaded, 0);
+    }
+
+    #[test]
+    fn test_bnz_workspace_count() {
+        let obj = AppLifecycle {
+            bnz_app_name: String::from("test"),
+            bnz_app_version: String::from("test"),
+            bnz_uptime_seconds: 0,
+            bnz_is_quitting: false,
+            bnz_restart_requested: false,
+            bnz_exit_code: 0,
+            bnz_startup_time_ms: 0,
+            bnz_extensions_loaded: 0,
+            bnz_workspace_count: 0,
+            bnz_crash_reporter_enabled: false,
+        };
+        let _ = obj.bnz_summary();
+        assert_eq!(obj.bnz_workspace_count, 0);
+    }
+
+    #[test]
+    fn test_bnz_crash_reporter_enabled() {
+        let obj = AppLifecycle {
+            bnz_app_name: String::from("test"),
+            bnz_app_version: String::from("test"),
+            bnz_uptime_seconds: 0,
+            bnz_is_quitting: false,
+            bnz_restart_requested: false,
+            bnz_exit_code: 0,
+            bnz_startup_time_ms: 0,
+            bnz_extensions_loaded: 0,
+            bnz_workspace_count: 0,
+            bnz_crash_reporter_enabled: false,
+        };
+        let _ = obj.bnz_summary();
+        assert!(!obj.bnz_crash_reporter_enabled);
     }
 
 }
