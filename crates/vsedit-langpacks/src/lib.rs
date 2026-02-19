@@ -68515,3 +68515,198 @@ mod bdk_tests {
         assert_eq!(h.active_signature().unwrap().active_parameter, 0); // stays at 0 (only 1 param)
     }
 }
+
+
+// --- bdl_: Editor goto definition / peek model ---
+
+/// Definition location.
+#[derive(Debug, Clone)]
+pub struct BdlLocation {
+    pub uri: String,
+    pub line: u32,
+    pub col: u32,
+    pub end_line: Option<u32>,
+    pub end_col: Option<u32>,
+}
+
+impl BdlLocation {
+    pub fn new(uri: &str, line: u32, col: u32) -> Self {
+        Self { uri: uri.to_string(), line, col, end_line: None, end_col: None }
+    }
+
+    pub fn with_end(mut self, line: u32, col: u32) -> Self { self.end_line = Some(line); self.end_col = Some(col); self }
+
+    pub fn filename(&self) -> &str { self.uri.rsplit('/').next().unwrap_or(&self.uri) }
+    pub fn display(&self) -> String { format!("{}:{}:{}", self.filename(), self.line, self.col) }
+}
+
+/// Go to definition result kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BdlGotoKind { Definition, Declaration, TypeDefinition, Implementation, Reference }
+
+/// A peek view showing definitions inline.
+#[derive(Debug)]
+pub struct BdlPeekView {
+    locations: Vec<BdlLocation>,
+    kind: BdlGotoKind,
+    cursor: usize,
+    preview_lines: Vec<String>,
+    visible: bool,
+}
+
+impl BdlPeekView {
+    pub fn new(kind: BdlGotoKind) -> Self {
+        Self { locations: Vec::new(), kind, cursor: 0, preview_lines: Vec::new(), visible: false }
+    }
+
+    pub fn show(&mut self, locations: Vec<BdlLocation>) {
+        self.locations = locations;
+        self.cursor = 0;
+        self.visible = !self.locations.is_empty();
+    }
+
+    pub fn hide(&mut self) { self.visible = false; }
+    pub fn is_visible(&self) -> bool { self.visible }
+    pub fn kind(&self) -> BdlGotoKind { self.kind }
+
+    pub fn current_location(&self) -> Option<&BdlLocation> { self.locations.get(self.cursor) }
+    pub fn location_count(&self) -> usize { self.locations.len() }
+
+    pub fn next_location(&mut self) {
+        if !self.locations.is_empty() { self.cursor = (self.cursor + 1) % self.locations.len(); }
+    }
+
+    pub fn prev_location(&mut self) {
+        if !self.locations.is_empty() { self.cursor = self.cursor.checked_sub(1).unwrap_or(self.locations.len() - 1); }
+    }
+
+    pub fn set_preview(&mut self, lines: Vec<String>) { self.preview_lines = lines; }
+
+    pub fn render(&self) -> Vec<String> {
+        if !self.visible { return Vec::new(); }
+        let mut out = Vec::new();
+        let kind_label = match self.kind {
+            BdlGotoKind::Definition => "Definition",
+            BdlGotoKind::Declaration => "Declaration",
+            BdlGotoKind::TypeDefinition => "Type Definition",
+            BdlGotoKind::Implementation => "Implementation",
+            BdlGotoKind::Reference => "References",
+        };
+        out.push(format!("{} ({}/{})", kind_label, self.cursor + 1, self.locations.len()));
+        for (i, loc) in self.locations.iter().enumerate() {
+            let marker = if i == self.cursor { "› " } else { "  " };
+            out.push(format!("{}{}", marker, loc.display()));
+        }
+        if !self.preview_lines.is_empty() {
+            out.push("───────".to_string());
+            out.extend(self.preview_lines.iter().cloned());
+        }
+        out
+    }
+}
+
+/// Manages goto operations.
+#[derive(Debug)]
+pub struct BdlGotoManager {
+    peek: Option<BdlPeekView>,
+    history: Vec<BdlLocation>,
+}
+
+impl BdlGotoManager {
+    pub fn new() -> Self { Self { peek: None, history: Vec::new() } }
+
+    pub fn goto(&mut self, kind: BdlGotoKind, locations: Vec<BdlLocation>) {
+        if locations.len() == 1 {
+            self.history.push(locations[0].clone());
+        } else {
+            let mut peek = BdlPeekView::new(kind);
+            peek.show(locations);
+            self.peek = Some(peek);
+        }
+    }
+
+    pub fn peek_view(&self) -> Option<&BdlPeekView> { self.peek.as_ref() }
+    pub fn peek_view_mut(&mut self) -> Option<&mut BdlPeekView> { self.peek.as_mut() }
+    pub fn close_peek(&mut self) { self.peek = None; }
+    pub fn go_back(&mut self) -> Option<BdlLocation> { self.history.pop() }
+    pub fn history_depth(&self) -> usize { self.history.len() }
+}
+
+#[cfg(test)]
+mod bdl_tests {
+    use super::*;
+
+    #[test]
+    fn test_bdl_location() {
+        let l = BdlLocation::new("/src/main.rs", 10, 5);
+        assert_eq!(l.filename(), "main.rs");
+        assert!(l.display().contains("10:5"));
+    }
+
+    #[test]
+    fn test_bdl_peek_show() {
+        let mut pv = BdlPeekView::new(BdlGotoKind::Definition);
+        pv.show(vec![BdlLocation::new("a.rs", 1, 0), BdlLocation::new("b.rs", 5, 0)]);
+        assert!(pv.is_visible());
+        assert_eq!(pv.location_count(), 2);
+    }
+
+    #[test]
+    fn test_bdl_peek_nav() {
+        let mut pv = BdlPeekView::new(BdlGotoKind::Reference);
+        pv.show(vec![BdlLocation::new("a.rs", 1, 0), BdlLocation::new("b.rs", 5, 0)]);
+        pv.next_location();
+        assert_eq!(pv.current_location().unwrap().uri, "b.rs");
+    }
+
+    #[test]
+    fn test_bdl_peek_render() {
+        let mut pv = BdlPeekView::new(BdlGotoKind::Definition);
+        pv.show(vec![BdlLocation::new("a.rs", 1, 0)]);
+        let lines = pv.render();
+        assert!(lines[0].contains("Definition"));
+    }
+
+    #[test]
+    fn test_bdl_goto_single() {
+        let mut mgr = BdlGotoManager::new();
+        mgr.goto(BdlGotoKind::Definition, vec![BdlLocation::new("a.rs", 1, 0)]);
+        assert!(mgr.peek_view().is_none()); // single = direct jump
+        assert_eq!(mgr.history_depth(), 1);
+    }
+
+    #[test]
+    fn test_bdl_goto_multiple() {
+        let mut mgr = BdlGotoManager::new();
+        mgr.goto(BdlGotoKind::Reference, vec![BdlLocation::new("a.rs", 1, 0), BdlLocation::new("b.rs", 2, 0)]);
+        assert!(mgr.peek_view().is_some());
+    }
+
+    #[test]
+    fn test_bdl_go_back() {
+        let mut mgr = BdlGotoManager::new();
+        mgr.goto(BdlGotoKind::Definition, vec![BdlLocation::new("a.rs", 1, 0)]);
+        let back = mgr.go_back().unwrap();
+        assert_eq!(back.uri, "a.rs");
+    }
+
+    #[test]
+    fn test_bdl_close_peek() {
+        let mut mgr = BdlGotoManager::new();
+        mgr.goto(BdlGotoKind::Reference, vec![BdlLocation::new("a.rs", 1, 0), BdlLocation::new("b.rs", 2, 0)]);
+        mgr.close_peek();
+        assert!(mgr.peek_view().is_none());
+    }
+
+    #[test]
+    fn test_bdl_location_end() {
+        let l = BdlLocation::new("a.rs", 1, 0).with_end(1, 10);
+        assert_eq!(l.end_col, Some(10));
+    }
+
+    #[test]
+    fn test_bdl_kind() {
+        let pv = BdlPeekView::new(BdlGotoKind::Implementation);
+        assert_eq!(pv.kind(), BdlGotoKind::Implementation);
+    }
+}
