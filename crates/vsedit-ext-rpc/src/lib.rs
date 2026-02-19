@@ -72039,3 +72039,1059 @@ mod tests_bdz {
         assert_eq!(bound[0].id, "save");
     }
 }
+
+// bea_: Editor scroll model — scroll position, smooth scrolling,
+// scroll acceleration, viewport tracking, scroll-past-end
+
+/// Scroll direction
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BeaScrollDirection {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+/// Scroll animation type
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BeaScrollAnimation {
+    None,
+    Smooth,
+    Instant,
+}
+
+/// Editor scroll state
+#[derive(Debug, Clone)]
+pub struct BeaScrollState {
+    pub top_line: usize,
+    pub left_col: usize,
+    pub viewport_lines: usize,
+    pub viewport_cols: usize,
+    pub total_lines: usize,
+    pub total_cols: usize,
+    pub smooth_scrolling: bool,
+    pub scroll_past_end: bool,
+    pub scroll_speed: f64,
+}
+
+impl Default for BeaScrollState {
+    fn default() -> Self {
+        Self {
+            top_line: 0, left_col: 0,
+            viewport_lines: 40, viewport_cols: 120,
+            total_lines: 0, total_cols: 0,
+            smooth_scrolling: true,
+            scroll_past_end: false,
+            scroll_speed: 3.0,
+        }
+    }
+}
+
+impl BeaScrollState {
+    pub fn new(viewport_lines: usize, viewport_cols: usize) -> Self {
+        Self { viewport_lines, viewport_cols, ..Default::default() }
+    }
+
+    pub fn max_top_line(&self) -> usize {
+        if self.scroll_past_end {
+            self.total_lines.saturating_sub(1)
+        } else {
+            self.total_lines.saturating_sub(self.viewport_lines)
+        }
+    }
+
+    pub fn visible_range(&self) -> (usize, usize) {
+        (self.top_line, (self.top_line + self.viewport_lines).min(self.total_lines))
+    }
+
+    pub fn is_line_visible(&self, line: usize) -> bool {
+        line >= self.top_line && line < self.top_line + self.viewport_lines
+    }
+
+    pub fn scroll_to_line(&mut self, line: usize) {
+        self.top_line = line.min(self.max_top_line());
+    }
+
+    pub fn scroll_by(&mut self, lines: isize) {
+        let new_top = if lines >= 0 {
+            self.top_line.saturating_add(lines as usize)
+        } else {
+            self.top_line.saturating_sub((-lines) as usize)
+        };
+        self.top_line = new_top.min(self.max_top_line());
+    }
+
+    pub fn scroll_to_reveal(&mut self, line: usize, margin: usize) {
+        if line < self.top_line + margin {
+            self.top_line = line.saturating_sub(margin);
+        } else if line >= self.top_line + self.viewport_lines - margin {
+            self.scroll_to_line(line.saturating_sub(self.viewport_lines - margin - 1));
+        }
+    }
+
+    pub fn page_up(&mut self) {
+        self.scroll_by(-(self.viewport_lines as isize));
+    }
+
+    pub fn page_down(&mut self) {
+        self.scroll_by(self.viewport_lines as isize);
+    }
+
+    pub fn scroll_to_top(&mut self) {
+        self.top_line = 0;
+    }
+
+    pub fn scroll_to_bottom(&mut self) {
+        self.top_line = self.max_top_line();
+    }
+
+    pub fn scroll_fraction(&self) -> f64 {
+        if self.total_lines == 0 { return 0.0; }
+        self.top_line as f64 / self.total_lines as f64
+    }
+
+    pub fn is_at_top(&self) -> bool { self.top_line == 0 }
+
+    pub fn is_at_bottom(&self) -> bool {
+        self.top_line >= self.max_top_line()
+    }
+}
+
+#[cfg(test)]
+mod tests_bea {
+    use super::*;
+
+    #[test]
+    fn test_bea_scroll_defaults() {
+        let s = BeaScrollState::default();
+        assert!(s.smooth_scrolling);
+        assert!(!s.scroll_past_end);
+        assert_eq!(s.scroll_speed, 3.0);
+    }
+
+    #[test]
+    fn test_bea_visible_range() {
+        let mut s = BeaScrollState::new(10, 80);
+        s.total_lines = 100;
+        assert_eq!(s.visible_range(), (0, 10));
+        s.top_line = 50;
+        assert_eq!(s.visible_range(), (50, 60));
+    }
+
+    #[test]
+    fn test_bea_is_line_visible() {
+        let mut s = BeaScrollState::new(10, 80);
+        s.total_lines = 100;
+        s.top_line = 20;
+        assert!(s.is_line_visible(25));
+        assert!(!s.is_line_visible(10));
+        assert!(!s.is_line_visible(30));
+    }
+
+    #[test]
+    fn test_bea_scroll_by() {
+        let mut s = BeaScrollState::new(10, 80);
+        s.total_lines = 100;
+        s.scroll_by(5);
+        assert_eq!(s.top_line, 5);
+        s.scroll_by(-3);
+        assert_eq!(s.top_line, 2);
+        s.scroll_by(-10);
+        assert_eq!(s.top_line, 0);
+    }
+
+    #[test]
+    fn test_bea_scroll_to_line() {
+        let mut s = BeaScrollState::new(10, 80);
+        s.total_lines = 50;
+        s.scroll_to_line(45);
+        assert_eq!(s.top_line, 40); // max is 50-10=40
+    }
+
+    #[test]
+    fn test_bea_page_up_down() {
+        let mut s = BeaScrollState::new(10, 80);
+        s.total_lines = 100;
+        s.page_down();
+        assert_eq!(s.top_line, 10);
+        s.page_up();
+        assert_eq!(s.top_line, 0);
+    }
+
+    #[test]
+    fn test_bea_scroll_to_top_bottom() {
+        let mut s = BeaScrollState::new(10, 80);
+        s.total_lines = 100;
+        s.scroll_to_bottom();
+        assert_eq!(s.top_line, 90);
+        assert!(s.is_at_bottom());
+        s.scroll_to_top();
+        assert!(s.is_at_top());
+    }
+
+    #[test]
+    fn test_bea_scroll_reveal() {
+        let mut s = BeaScrollState::new(10, 80);
+        s.total_lines = 100;
+        s.top_line = 20;
+        s.scroll_to_reveal(15, 2);
+        assert_eq!(s.top_line, 13);
+    }
+
+    #[test]
+    fn test_bea_scroll_fraction() {
+        let mut s = BeaScrollState::new(10, 80);
+        s.total_lines = 100;
+        s.top_line = 50;
+        assert!((s.scroll_fraction() - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_bea_scroll_past_end() {
+        let mut s = BeaScrollState::new(10, 80);
+        s.total_lines = 100;
+        s.scroll_past_end = true;
+        s.scroll_to_line(99);
+        assert_eq!(s.top_line, 99);
+    }
+}
+
+// beb_: Editor cursor blink model — blink phases, blink rate, cursor style,
+// visibility toggling, animation timer, cursor width
+
+/// Cursor style
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BebCursorStyle {
+    Line,
+    Block,
+    Underline,
+    LineThin,
+    BlockOutline,
+    UnderlineThin,
+}
+
+impl BebCursorStyle {
+    pub fn is_block(&self) -> bool {
+        matches!(self, BebCursorStyle::Block | BebCursorStyle::BlockOutline)
+    }
+
+    pub fn is_line(&self) -> bool {
+        matches!(self, BebCursorStyle::Line | BebCursorStyle::LineThin)
+    }
+
+    pub fn width(&self) -> u32 {
+        match self {
+            BebCursorStyle::Line => 2,
+            BebCursorStyle::LineThin => 1,
+            BebCursorStyle::Block | BebCursorStyle::BlockOutline => 0,
+            BebCursorStyle::Underline => 0,
+            BebCursorStyle::UnderlineThin => 0,
+        }
+    }
+}
+
+/// Cursor blink phase
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BebBlinkPhase {
+    On,
+    Off,
+}
+
+/// Cursor blink animation type
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BebBlinkAnimation {
+    Blink,
+    Smooth,
+    Phase,
+    Expand,
+    Solid,
+}
+
+impl BebBlinkAnimation {
+    pub fn is_animated(&self) -> bool {
+        *self != BebBlinkAnimation::Solid
+    }
+}
+
+/// Cursor blink state
+#[derive(Debug, Clone)]
+pub struct BebCursorBlink {
+    pub style: BebCursorStyle,
+    pub animation: BebBlinkAnimation,
+    pub blink_rate_ms: u64,
+    pub phase: BebBlinkPhase,
+    pub visible: bool,
+    pub elapsed_ms: u64,
+    pub paused: bool,
+}
+
+impl Default for BebCursorBlink {
+    fn default() -> Self {
+        Self {
+            style: BebCursorStyle::Line,
+            animation: BebBlinkAnimation::Blink,
+            blink_rate_ms: 530,
+            phase: BebBlinkPhase::On,
+            visible: true,
+            elapsed_ms: 0,
+            paused: false,
+        }
+    }
+}
+
+impl BebCursorBlink {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn tick(&mut self, delta_ms: u64) {
+        if self.paused || !self.animation.is_animated() { return; }
+        self.elapsed_ms += delta_ms;
+        if self.elapsed_ms >= self.blink_rate_ms {
+            self.elapsed_ms -= self.blink_rate_ms;
+            self.phase = match self.phase {
+                BebBlinkPhase::On => BebBlinkPhase::Off,
+                BebBlinkPhase::Off => BebBlinkPhase::On,
+            };
+            self.visible = self.phase == BebBlinkPhase::On;
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.elapsed_ms = 0;
+        self.phase = BebBlinkPhase::On;
+        self.visible = true;
+    }
+
+    pub fn pause(&mut self) {
+        self.paused = true;
+        self.visible = true;
+    }
+
+    pub fn resume(&mut self) {
+        self.paused = false;
+        self.reset();
+    }
+
+    pub fn set_style(&mut self, style: BebCursorStyle) {
+        self.style = style;
+    }
+
+    pub fn set_blink_rate(&mut self, ms: u64) {
+        self.blink_rate_ms = ms;
+        self.reset();
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.paused || !self.animation.is_animated() || self.visible
+    }
+
+    pub fn opacity(&self) -> f64 {
+        if self.is_visible() { 1.0 } else { 0.0 }
+    }
+}
+
+#[cfg(test)]
+mod tests_beb {
+    use super::*;
+
+    #[test]
+    fn test_beb_cursor_style() {
+        assert!(BebCursorStyle::Block.is_block());
+        assert!(BebCursorStyle::Line.is_line());
+        assert!(!BebCursorStyle::Underline.is_block());
+        assert_eq!(BebCursorStyle::Line.width(), 2);
+        assert_eq!(BebCursorStyle::LineThin.width(), 1);
+    }
+
+    #[test]
+    fn test_beb_blink_animation() {
+        assert!(BebBlinkAnimation::Blink.is_animated());
+        assert!(!BebBlinkAnimation::Solid.is_animated());
+    }
+
+    #[test]
+    fn test_beb_blink_defaults() {
+        let b = BebCursorBlink::new();
+        assert_eq!(b.blink_rate_ms, 530);
+        assert!(b.is_visible());
+        assert_eq!(b.opacity(), 1.0);
+    }
+
+    #[test]
+    fn test_beb_blink_tick() {
+        let mut b = BebCursorBlink::new();
+        b.tick(200);
+        assert!(b.is_visible());
+        b.tick(400); // 600ms > 530ms → toggles off
+        assert!(!b.visible);
+        assert!(!b.is_visible());
+    }
+
+    #[test]
+    fn test_beb_blink_reset() {
+        let mut b = BebCursorBlink::new();
+        b.tick(600);
+        assert!(!b.visible);
+        b.reset();
+        assert!(b.visible);
+        assert_eq!(b.elapsed_ms, 0);
+    }
+
+    #[test]
+    fn test_beb_blink_pause_resume() {
+        let mut b = BebCursorBlink::new();
+        b.tick(600);
+        b.pause();
+        assert!(b.is_visible()); // paused always visible
+        b.tick(600); // no-op while paused
+        assert!(b.is_visible());
+        b.resume();
+        assert!(b.is_visible()); // just resumed, reset
+    }
+
+    #[test]
+    fn test_beb_blink_solid() {
+        let mut b = BebCursorBlink::new();
+        b.animation = BebBlinkAnimation::Solid;
+        b.tick(1000);
+        assert!(b.is_visible()); // solid never blinks
+    }
+
+    #[test]
+    fn test_beb_set_style() {
+        let mut b = BebCursorBlink::new();
+        b.set_style(BebCursorStyle::Block);
+        assert_eq!(b.style, BebCursorStyle::Block);
+    }
+
+    #[test]
+    fn test_beb_set_blink_rate() {
+        let mut b = BebCursorBlink::new();
+        b.set_blink_rate(1000);
+        assert_eq!(b.blink_rate_ms, 1000);
+        assert_eq!(b.elapsed_ms, 0);
+    }
+
+    #[test]
+    fn test_beb_opacity() {
+        let mut b = BebCursorBlink::new();
+        assert_eq!(b.opacity(), 1.0);
+        b.tick(600);
+        assert_eq!(b.opacity(), 0.0);
+    }
+}
+
+// bec_: Editor indentation model — indent size, tab/spaces, auto-indent,
+// indent guides, re-indent, trim trailing whitespace
+
+/// Indent mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BecIndentMode {
+    Tabs,
+    Spaces,
+}
+
+/// Auto-indent behavior
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BecAutoIndent {
+    None,
+    Keep,
+    Brackets,
+    Advanced,
+    Full,
+}
+
+impl BecAutoIndent {
+    pub fn should_increase_after_open_bracket(&self) -> bool {
+        matches!(self, BecAutoIndent::Brackets | BecAutoIndent::Advanced | BecAutoIndent::Full)
+    }
+
+    pub fn should_decrease_before_close_bracket(&self) -> bool {
+        matches!(self, BecAutoIndent::Brackets | BecAutoIndent::Advanced | BecAutoIndent::Full)
+    }
+}
+
+/// Indentation configuration
+#[derive(Debug, Clone)]
+pub struct BecIndentConfig {
+    pub mode: BecIndentMode,
+    pub size: usize,
+    pub auto_indent: BecAutoIndent,
+    pub detect_indentation: bool,
+    pub trim_trailing_whitespace: bool,
+    pub insert_final_newline: bool,
+    pub render_guides: bool,
+    pub guide_active_color: String,
+    pub guide_inactive_color: String,
+}
+
+impl Default for BecIndentConfig {
+    fn default() -> Self {
+        Self {
+            mode: BecIndentMode::Spaces,
+            size: 4,
+            auto_indent: BecAutoIndent::Advanced,
+            detect_indentation: true,
+            trim_trailing_whitespace: false,
+            insert_final_newline: false,
+            render_guides: true,
+            guide_active_color: "#707070".to_string(),
+            guide_inactive_color: "#404040".to_string(),
+        }
+    }
+}
+
+impl BecIndentConfig {
+    pub fn indent_string(&self) -> String {
+        match self.mode {
+            BecIndentMode::Tabs => "\t".to_string(),
+            BecIndentMode::Spaces => " ".repeat(self.size),
+        }
+    }
+
+    pub fn indent_at_level(&self, level: usize) -> String {
+        self.indent_string().repeat(level)
+    }
+
+    pub fn measure_indent(&self, line: &str) -> usize {
+        let spaces: usize = line.chars().take_while(|c| c.is_whitespace()).map(|c| {
+            if c == '\t' { self.size } else { 1 }
+        }).sum();
+        spaces / self.size
+    }
+
+    pub fn normalize_indent(&self, line: &str) -> String {
+        let level = self.measure_indent(line);
+        let content = line.trim_start();
+        format!("{}{}", self.indent_at_level(level), content)
+    }
+
+    pub fn trim_trailing(&self, line: &str) -> String {
+        if self.trim_trailing_whitespace {
+            line.trim_end().to_string()
+        } else {
+            line.to_string()
+        }
+    }
+}
+
+/// Detect indentation from text content
+pub fn bec_detect_indentation(lines: &[&str]) -> (BecIndentMode, usize) {
+    let mut tab_count = 0;
+    let mut space_counts = [0usize; 9]; // indices 1..8
+    for line in lines {
+        if line.is_empty() { continue; }
+        if line.starts_with('\t') {
+            tab_count += 1;
+        } else {
+            let spaces = line.chars().take_while(|c| *c == ' ').count();
+            if spaces > 0 && spaces <= 8 {
+                space_counts[spaces] += 1;
+            }
+        }
+    }
+    if tab_count > space_counts.iter().sum::<usize>() / 2 {
+        return (BecIndentMode::Tabs, 4);
+    }
+    let best_size = (2..=8).max_by_key(|&s| space_counts[s]).unwrap_or(4);
+    (BecIndentMode::Spaces, best_size)
+}
+
+#[cfg(test)]
+mod tests_bec {
+    use super::*;
+
+    #[test]
+    fn test_bec_indent_string() {
+        let cfg = BecIndentConfig::default();
+        assert_eq!(cfg.indent_string(), "    ");
+        let mut cfg2 = BecIndentConfig::default();
+        cfg2.mode = BecIndentMode::Tabs;
+        assert_eq!(cfg2.indent_string(), "\t");
+    }
+
+    #[test]
+    fn test_bec_indent_at_level() {
+        let cfg = BecIndentConfig::default();
+        assert_eq!(cfg.indent_at_level(2), "        ");
+    }
+
+    #[test]
+    fn test_bec_measure_indent() {
+        let cfg = BecIndentConfig::default();
+        assert_eq!(cfg.measure_indent("        hello"), 2);
+        assert_eq!(cfg.measure_indent("hello"), 0);
+    }
+
+    #[test]
+    fn test_bec_normalize_indent() {
+        let cfg = BecIndentConfig::default();
+        let result = cfg.normalize_indent("        hello");
+        assert_eq!(result, "        hello");
+    }
+
+    #[test]
+    fn test_bec_trim_trailing() {
+        let mut cfg = BecIndentConfig::default();
+        cfg.trim_trailing_whitespace = true;
+        assert_eq!(cfg.trim_trailing("hello   "), "hello");
+        cfg.trim_trailing_whitespace = false;
+        assert_eq!(cfg.trim_trailing("hello   "), "hello   ");
+    }
+
+    #[test]
+    fn test_bec_auto_indent() {
+        assert!(BecAutoIndent::Brackets.should_increase_after_open_bracket());
+        assert!(!BecAutoIndent::Keep.should_increase_after_open_bracket());
+        assert!(!BecAutoIndent::None.should_decrease_before_close_bracket());
+    }
+
+    #[test]
+    fn test_bec_detect_spaces() {
+        let lines = vec!["  a", "  b", "  c", "    d"];
+        let (mode, size) = bec_detect_indentation(&lines);
+        assert_eq!(mode, BecIndentMode::Spaces);
+        assert_eq!(size, 2);
+    }
+
+    #[test]
+    fn test_bec_detect_tabs() {
+        let lines = vec!["\ta", "\tb", "\t\tc"];
+        let (mode, _) = bec_detect_indentation(&lines);
+        assert_eq!(mode, BecIndentMode::Tabs);
+    }
+
+    #[test]
+    fn test_bec_config_defaults() {
+        let cfg = BecIndentConfig::default();
+        assert_eq!(cfg.size, 4);
+        assert!(cfg.detect_indentation);
+        assert!(cfg.render_guides);
+    }
+
+    #[test]
+    fn test_bec_detect_empty_lines() {
+        let lines = vec!["", "", "    x"];
+        let (mode, size) = bec_detect_indentation(&lines);
+        assert_eq!(mode, BecIndentMode::Spaces);
+        assert_eq!(size, 4);
+    }
+}
+
+// bed_: Editor line numbers model — line number rendering, relative line
+// numbers, interval display, gutter width calculation
+
+/// Line number display mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BedLineNumberMode {
+    On,
+    Off,
+    Relative,
+    Interval,
+}
+
+/// Line number configuration
+#[derive(Debug, Clone)]
+pub struct BedLineNumberConfig {
+    pub mode: BedLineNumberMode,
+    pub interval: usize,
+    pub min_width: usize,
+}
+
+impl Default for BedLineNumberConfig {
+    fn default() -> Self {
+        Self { mode: BedLineNumberMode::On, interval: 10, min_width: 3 }
+    }
+}
+
+impl BedLineNumberConfig {
+    pub fn gutter_width(&self, total_lines: usize) -> usize {
+        if self.mode == BedLineNumberMode::Off { return 0; }
+        let digits = if total_lines == 0 { 1 } else { (total_lines as f64).log10().floor() as usize + 1 };
+        digits.max(self.min_width)
+    }
+
+    pub fn render_number(&self, line: usize, cursor_line: usize, total_lines: usize) -> String {
+        match self.mode {
+            BedLineNumberMode::Off => String::new(),
+            BedLineNumberMode::On => {
+                let w = self.gutter_width(total_lines);
+                format!("{:>width$}", line + 1, width = w)
+            }
+            BedLineNumberMode::Relative => {
+                let w = self.gutter_width(total_lines);
+                if line == cursor_line {
+                    format!("{:>width$}", line + 1, width = w)
+                } else {
+                    let rel = if line > cursor_line { line - cursor_line } else { cursor_line - line };
+                    format!("{:>width$}", rel, width = w)
+                }
+            }
+            BedLineNumberMode::Interval => {
+                let w = self.gutter_width(total_lines);
+                let num = line + 1;
+                if line == cursor_line || num % self.interval == 0 || num == 1 {
+                    format!("{:>width$}", num, width = w)
+                } else {
+                    " ".repeat(w)
+                }
+            }
+        }
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.mode != BedLineNumberMode::Off
+    }
+}
+
+/// Gutter item kinds
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BedGutterItem {
+    LineNumber,
+    FoldingIndicator,
+    BreakpointMargin,
+    ChangeIndicator,
+    AnnotationMargin,
+}
+
+/// Gutter layout
+#[derive(Debug, Clone)]
+pub struct BedGutterLayout {
+    pub items: Vec<BedGutterItem>,
+    pub line_number_width: usize,
+    pub folding_width: usize,
+    pub change_width: usize,
+    pub breakpoint_width: usize,
+}
+
+impl Default for BedGutterLayout {
+    fn default() -> Self {
+        Self {
+            items: vec![
+                BedGutterItem::BreakpointMargin,
+                BedGutterItem::LineNumber,
+                BedGutterItem::FoldingIndicator,
+            ],
+            line_number_width: 4,
+            folding_width: 1,
+            change_width: 1,
+            breakpoint_width: 2,
+        }
+    }
+}
+
+impl BedGutterLayout {
+    pub fn total_width(&self) -> usize {
+        self.items.iter().map(|item| match item {
+            BedGutterItem::LineNumber => self.line_number_width,
+            BedGutterItem::FoldingIndicator => self.folding_width,
+            BedGutterItem::BreakpointMargin => self.breakpoint_width,
+            BedGutterItem::ChangeIndicator => self.change_width,
+            BedGutterItem::AnnotationMargin => 2,
+        }).sum()
+    }
+
+    pub fn has_item(&self, item: BedGutterItem) -> bool {
+        self.items.contains(&item)
+    }
+}
+
+#[cfg(test)]
+mod tests_bed {
+    use super::*;
+
+    #[test]
+    fn test_bed_gutter_width() {
+        let cfg = BedLineNumberConfig::default();
+        assert_eq!(cfg.gutter_width(99), 3);
+        assert_eq!(cfg.gutter_width(1000), 4);
+        assert_eq!(cfg.gutter_width(0), 3);
+    }
+
+    #[test]
+    fn test_bed_render_on() {
+        let cfg = BedLineNumberConfig::default();
+        assert_eq!(cfg.render_number(0, 0, 100), "  1");
+        assert_eq!(cfg.render_number(99, 0, 100), "100");
+    }
+
+    #[test]
+    fn test_bed_render_relative() {
+        let mut cfg = BedLineNumberConfig::default();
+        cfg.mode = BedLineNumberMode::Relative;
+        assert_eq!(cfg.render_number(10, 10, 100), " 11"); // current line shows absolute
+        assert_eq!(cfg.render_number(7, 10, 100), "  3"); // 3 lines up
+    }
+
+    #[test]
+    fn test_bed_render_interval() {
+        let mut cfg = BedLineNumberConfig::default();
+        cfg.mode = BedLineNumberMode::Interval;
+        assert_eq!(cfg.render_number(0, 5, 100), "  1"); // line 1 always shown
+        assert_eq!(cfg.render_number(9, 5, 100), " 10"); // multiple of interval
+        assert_eq!(cfg.render_number(5, 5, 100), "  6"); // cursor line
+        assert_eq!(cfg.render_number(3, 5, 100), "   "); // not shown
+    }
+
+    #[test]
+    fn test_bed_render_off() {
+        let mut cfg = BedLineNumberConfig::default();
+        cfg.mode = BedLineNumberMode::Off;
+        assert_eq!(cfg.render_number(0, 0, 100), "");
+        assert_eq!(cfg.gutter_width(100), 0);
+    }
+
+    #[test]
+    fn test_bed_is_visible() {
+        assert!(BedLineNumberConfig::default().is_visible());
+        let mut cfg = BedLineNumberConfig::default();
+        cfg.mode = BedLineNumberMode::Off;
+        assert!(!cfg.is_visible());
+    }
+
+    #[test]
+    fn test_bed_gutter_layout() {
+        let layout = BedGutterLayout::default();
+        assert_eq!(layout.total_width(), 7); // 2+4+1
+        assert!(layout.has_item(BedGutterItem::LineNumber));
+        assert!(!layout.has_item(BedGutterItem::ChangeIndicator));
+    }
+
+    #[test]
+    fn test_bed_gutter_layout_custom() {
+        let layout = BedGutterLayout {
+            items: vec![BedGutterItem::LineNumber, BedGutterItem::ChangeIndicator],
+            line_number_width: 5,
+            change_width: 2,
+            ..Default::default()
+        };
+        assert_eq!(layout.total_width(), 7); // 5+2
+    }
+
+    #[test]
+    fn test_bed_gutter_items() {
+        assert_ne!(BedGutterItem::LineNumber, BedGutterItem::FoldingIndicator);
+        assert_eq!(BedGutterItem::BreakpointMargin, BedGutterItem::BreakpointMargin);
+    }
+
+    #[test]
+    fn test_bed_line_number_modes() {
+        assert_ne!(BedLineNumberMode::On, BedLineNumberMode::Off);
+        assert_ne!(BedLineNumberMode::Relative, BedLineNumberMode::Interval);
+    }
+}
+
+// bee_: Editor folding model — fold regions, fold state, expand/collapse,
+// fold levels, fold ranges from indentation and language
+
+/// Fold state for a region
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BeeFoldState {
+    Expanded,
+    Collapsed,
+}
+
+/// Fold range source
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BeeFoldSource {
+    Indentation,
+    Language,
+    Region,
+    Manual,
+}
+
+/// A foldable region
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BeeFoldRange {
+    pub start_line: usize,
+    pub end_line: usize,
+    pub state: BeeFoldState,
+    pub source: BeeFoldSource,
+    pub level: usize,
+}
+
+impl BeeFoldRange {
+    pub fn new(start: usize, end: usize, source: BeeFoldSource) -> Self {
+        Self { start_line: start, end_line: end, state: BeeFoldState::Expanded, source, level: 0 }
+    }
+
+    pub fn with_level(mut self, level: usize) -> Self {
+        self.level = level; self
+    }
+
+    pub fn toggle(&mut self) {
+        self.state = match self.state {
+            BeeFoldState::Expanded => BeeFoldState::Collapsed,
+            BeeFoldState::Collapsed => BeeFoldState::Expanded,
+        };
+    }
+
+    pub fn collapse(&mut self) { self.state = BeeFoldState::Collapsed; }
+    pub fn expand(&mut self) { self.state = BeeFoldState::Expanded; }
+
+    pub fn is_collapsed(&self) -> bool { self.state == BeeFoldState::Collapsed }
+    pub fn is_expanded(&self) -> bool { self.state == BeeFoldState::Expanded }
+
+    pub fn line_count(&self) -> usize { self.end_line - self.start_line + 1 }
+    pub fn hidden_lines(&self) -> usize {
+        if self.is_collapsed() { self.end_line - self.start_line } else { 0 }
+    }
+
+    pub fn contains_line(&self, line: usize) -> bool {
+        line >= self.start_line && line <= self.end_line
+    }
+
+    pub fn is_hidden_line(&self, line: usize) -> bool {
+        self.is_collapsed() && line > self.start_line && line <= self.end_line
+    }
+}
+
+/// Fold model managing all fold regions
+#[derive(Debug, Clone, Default)]
+pub struct BeeFoldModel {
+    pub ranges: Vec<BeeFoldRange>,
+}
+
+impl BeeFoldModel {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn set_ranges(&mut self, ranges: Vec<BeeFoldRange>) {
+        self.ranges = ranges;
+    }
+
+    pub fn fold_at_line(&self, line: usize) -> Option<&BeeFoldRange> {
+        self.ranges.iter().find(|r| r.start_line == line)
+    }
+
+    pub fn fold_at_line_mut(&mut self, line: usize) -> Option<&mut BeeFoldRange> {
+        self.ranges.iter_mut().find(|r| r.start_line == line)
+    }
+
+    pub fn toggle_at(&mut self, line: usize) -> bool {
+        if let Some(r) = self.fold_at_line_mut(line) { r.toggle(); true } else { false }
+    }
+
+    pub fn collapse_all(&mut self) {
+        for r in &mut self.ranges { r.collapse(); }
+    }
+
+    pub fn expand_all(&mut self) {
+        for r in &mut self.ranges { r.expand(); }
+    }
+
+    pub fn is_line_hidden(&self, line: usize) -> bool {
+        self.ranges.iter().any(|r| r.is_hidden_line(line))
+    }
+
+    pub fn visible_line_count(&self, total_lines: usize) -> usize {
+        (0..total_lines).filter(|&l| !self.is_line_hidden(l)).count()
+    }
+
+    pub fn collapsed_count(&self) -> usize {
+        self.ranges.iter().filter(|r| r.is_collapsed()).count()
+    }
+
+    pub fn total_hidden_lines(&self) -> usize {
+        self.ranges.iter().map(|r| r.hidden_lines()).sum()
+    }
+
+    pub fn fold_count(&self) -> usize { self.ranges.len() }
+}
+
+#[cfg(test)]
+mod tests_bee {
+    use super::*;
+
+    #[test]
+    fn test_bee_fold_range_basic() {
+        let mut r = BeeFoldRange::new(5, 15, BeeFoldSource::Language);
+        assert!(r.is_expanded());
+        assert_eq!(r.line_count(), 11);
+        assert_eq!(r.hidden_lines(), 0);
+        r.collapse();
+        assert!(r.is_collapsed());
+        assert_eq!(r.hidden_lines(), 10);
+    }
+
+    #[test]
+    fn test_bee_fold_range_toggle() {
+        let mut r = BeeFoldRange::new(0, 5, BeeFoldSource::Indentation);
+        r.toggle();
+        assert!(r.is_collapsed());
+        r.toggle();
+        assert!(r.is_expanded());
+    }
+
+    #[test]
+    fn test_bee_fold_range_contains() {
+        let r = BeeFoldRange::new(10, 20, BeeFoldSource::Region);
+        assert!(r.contains_line(15));
+        assert!(!r.contains_line(25));
+    }
+
+    #[test]
+    fn test_bee_fold_range_hidden() {
+        let mut r = BeeFoldRange::new(5, 10, BeeFoldSource::Language);
+        assert!(!r.is_hidden_line(6));
+        r.collapse();
+        assert!(!r.is_hidden_line(5)); // start line still visible
+        assert!(r.is_hidden_line(6));
+        assert!(r.is_hidden_line(10));
+    }
+
+    #[test]
+    fn test_bee_fold_model_toggle() {
+        let mut model = BeeFoldModel::new();
+        model.set_ranges(vec![
+            BeeFoldRange::new(5, 10, BeeFoldSource::Language),
+            BeeFoldRange::new(15, 20, BeeFoldSource::Language),
+        ]);
+        assert!(model.toggle_at(5));
+        assert!(model.fold_at_line(5).unwrap().is_collapsed());
+        assert!(!model.toggle_at(3)); // no fold at line 3
+    }
+
+    #[test]
+    fn test_bee_fold_model_collapse_expand_all() {
+        let mut model = BeeFoldModel::new();
+        model.set_ranges(vec![
+            BeeFoldRange::new(0, 5, BeeFoldSource::Indentation),
+            BeeFoldRange::new(10, 15, BeeFoldSource::Indentation),
+        ]);
+        model.collapse_all();
+        assert_eq!(model.collapsed_count(), 2);
+        model.expand_all();
+        assert_eq!(model.collapsed_count(), 0);
+    }
+
+    #[test]
+    fn test_bee_fold_model_hidden_lines() {
+        let mut model = BeeFoldModel::new();
+        model.set_ranges(vec![BeeFoldRange::new(5, 10, BeeFoldSource::Language)]);
+        model.toggle_at(5);
+        assert!(model.is_line_hidden(7));
+        assert!(!model.is_line_hidden(5));
+        assert_eq!(model.total_hidden_lines(), 5);
+        assert_eq!(model.visible_line_count(20), 15);
+    }
+
+    #[test]
+    fn test_bee_fold_model_count() {
+        let mut model = BeeFoldModel::new();
+        model.set_ranges(vec![
+            BeeFoldRange::new(0, 5, BeeFoldSource::Region),
+        ]);
+        assert_eq!(model.fold_count(), 1);
+    }
+
+    #[test]
+    fn test_bee_fold_level() {
+        let r = BeeFoldRange::new(5, 10, BeeFoldSource::Indentation).with_level(2);
+        assert_eq!(r.level, 2);
+    }
+
+    #[test]
+    fn test_bee_fold_sources() {
+        assert_ne!(BeeFoldSource::Indentation, BeeFoldSource::Language);
+        assert_ne!(BeeFoldSource::Region, BeeFoldSource::Manual);
+    }
+}
