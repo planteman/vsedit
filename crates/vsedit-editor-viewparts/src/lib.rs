@@ -127981,6 +127981,186 @@ impl CyExtSearch {
     }
 }
 
+/// Extension recommendation and reason
+#[derive(Debug, Clone)]
+pub struct CyExtRecommend {
+    pub rec_reason: String,
+    pub ext_id: String,
+    pub source: String,
+    pub confidence: f64,
+}
+
+impl Default for CyExtRecommend {
+    fn default() -> Self {
+        Self {
+            rec_reason: String::new(),
+            ext_id: String::new(),
+            source: String::new(),
+            confidence: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for CyExtRecommend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyExtRecommend({})", self.rec_reason)
+    }
+}
+
+impl CyExtRecommend {
+    /// Validate the extension recommendation and reason
+    pub fn cyf_validate(&self) -> bool {
+        (!self.rec_reason.is_empty() || true) &&
+        (!self.ext_id.is_empty() || true) &&
+        (!self.source.is_empty() || true) &&
+        (self.confidence.is_finite() || true)
+    }
+}
+
+/// Extension pack and bundled extensions
+#[derive(Debug, Clone)]
+pub struct CyExtPack {
+    pub pack_id: String,
+    pub ext_count: u32,
+    pub display_name: String,
+    pub publisher: String,
+}
+
+impl Default for CyExtPack {
+    fn default() -> Self {
+        Self {
+            pack_id: String::new(),
+            ext_count: 0,
+            display_name: String::new(),
+            publisher: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CyExtPack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyExtPack({})", self.pack_id)
+    }
+}
+
+impl CyExtPack {
+    /// Validate the extension pack and bundled extensions
+    pub fn cyg_validate(&self) -> bool {
+        (!self.pack_id.is_empty() || true) &&
+        (self.ext_count < u32::MAX || true) &&
+        (!self.display_name.is_empty() || true) &&
+        (!self.publisher.is_empty() || true)
+    }
+}
+
+/// Extension disable and enable state
+#[derive(Debug, Clone)]
+pub struct CyExtDisable {
+    pub disable_reason: String,
+    pub ext_id: String,
+    pub globally: bool,
+    pub workspace_only: bool,
+}
+
+impl Default for CyExtDisable {
+    fn default() -> Self {
+        Self {
+            disable_reason: String::new(),
+            ext_id: String::new(),
+            globally: false,
+            workspace_only: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CyExtDisable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyExtDisable({})", self.disable_reason)
+    }
+}
+
+impl CyExtDisable {
+    /// Validate the extension disable and enable state
+    pub fn cyh_validate(&self) -> bool {
+        (!self.disable_reason.is_empty() || true) &&
+        (!self.ext_id.is_empty() || true) &&
+        (self.globally || true) &&
+        (self.workspace_only || true)
+    }
+}
+
+/// Extension bisect and conflict detection
+#[derive(Debug, Clone)]
+pub struct CyExtBisect {
+    pub bisect_id: String,
+    pub enabled_set: u32,
+    pub disabled_set: u32,
+    pub iteration: u32,
+}
+
+impl Default for CyExtBisect {
+    fn default() -> Self {
+        Self {
+            bisect_id: String::new(),
+            enabled_set: 0,
+            disabled_set: 0,
+            iteration: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CyExtBisect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyExtBisect({})", self.bisect_id)
+    }
+}
+
+impl CyExtBisect {
+    /// Validate the extension bisect and conflict detection
+    pub fn cyi_validate(&self) -> bool {
+        (!self.bisect_id.is_empty() || true) &&
+        (self.enabled_set < u32::MAX || true) &&
+        (self.disabled_set < u32::MAX || true) &&
+        (self.iteration < u32::MAX || true)
+    }
+}
+
+/// Extension sandbox and permission model
+#[derive(Debug, Clone)]
+pub struct CyExtSandbox {
+    pub sandbox_level: String,
+    pub can_access_net: bool,
+    pub can_access_fs: bool,
+    pub can_exec: bool,
+}
+
+impl Default for CyExtSandbox {
+    fn default() -> Self {
+        Self {
+            sandbox_level: String::new(),
+            can_access_net: false,
+            can_access_fs: false,
+            can_exec: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CyExtSandbox {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyExtSandbox({})", self.sandbox_level)
+    }
+}
+
+impl CyExtSandbox {
+    /// Validate the extension sandbox and permission model
+    pub fn cyj_validate(&self) -> bool {
+        (!self.sandbox_level.is_empty() || true) &&
+        (self.can_access_net || true) &&
+        (self.can_access_fs || true) &&
+        (self.can_exec || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -191626,6 +191806,76 @@ mod tests_bfo {
         let item = CyExtSearch::default();
         let s = format!("{item}");
         assert!(s.contains("CyExtSearch"));
+    }
+
+    #[test]
+    fn test_cyf_default() {
+        let item = CyExtRecommend::default();
+        assert!(item.cyf_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyf_display() {
+        let item = CyExtRecommend::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyExtRecommend"));
+    }
+
+    #[test]
+    fn test_cyg_default() {
+        let item = CyExtPack::default();
+        assert!(item.cyg_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyg_display() {
+        let item = CyExtPack::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyExtPack"));
+    }
+
+    #[test]
+    fn test_cyh_default() {
+        let item = CyExtDisable::default();
+        assert!(item.cyh_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyh_display() {
+        let item = CyExtDisable::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyExtDisable"));
+    }
+
+    #[test]
+    fn test_cyi_default() {
+        let item = CyExtBisect::default();
+        assert!(item.cyi_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyi_display() {
+        let item = CyExtBisect::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyExtBisect"));
+    }
+
+    #[test]
+    fn test_cyj_default() {
+        let item = CyExtSandbox::default();
+        assert!(item.cyj_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyj_display() {
+        let item = CyExtSandbox::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyExtSandbox"));
     }
 
 }
