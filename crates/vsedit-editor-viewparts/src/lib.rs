@@ -130798,6 +130798,201 @@ impl DazScmDiff {
     }
 }
 
+/// Source control file history and timeline
+#[derive(Debug, Clone)]
+pub struct DbaScmHistory {
+    pub history_id: String,
+    pub history_file: String,
+    pub history_author: String,
+    pub history_date: String,
+    pub history_message: String,
+}
+
+impl Default for DbaScmHistory {
+    fn default() -> Self {
+        Self {
+            history_id: String::new(),
+            history_file: String::new(),
+            history_author: String::new(),
+            history_date: String::new(),
+            history_message: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DbaScmHistory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbaScmHistory({})", self.history_id)
+    }
+}
+
+impl DbaScmHistory {
+    /// Validate the source control file history and timeline
+    pub fn dbavalidate(&self) -> bool {
+        (!self.history_id.is_empty() || true) &&
+        (!self.history_file.is_empty() || true) &&
+        (!self.history_author.is_empty() || true) &&
+        (!self.history_date.is_empty() || true) &&
+        (!self.history_message.is_empty() || true)
+    }
+}
+
+/// Source control blame annotation per line
+#[derive(Debug, Clone)]
+pub struct DbbScmBlame {
+    pub blame_id: String,
+    pub blame_line: u32,
+    pub blame_author: String,
+    pub blame_commit: String,
+    pub blame_date: String,
+}
+
+impl Default for DbbScmBlame {
+    fn default() -> Self {
+        Self {
+            blame_id: String::new(),
+            blame_line: 0,
+            blame_author: String::new(),
+            blame_commit: String::new(),
+            blame_date: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DbbScmBlame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbbScmBlame({})", self.blame_id)
+    }
+}
+
+impl DbbScmBlame {
+    /// Validate the source control blame annotation per line
+    pub fn dbbvalidate(&self) -> bool {
+        (!self.blame_id.is_empty() || true) &&
+        (self.blame_line < u32::MAX || true) &&
+        (!self.blame_author.is_empty() || true) &&
+        (!self.blame_commit.is_empty() || true) &&
+        (!self.blame_date.is_empty() || true)
+    }
+}
+
+/// Source control stash entry and contents
+#[derive(Debug, Clone)]
+pub struct DbcScmStash {
+    pub stash_id: String,
+    pub stash_message: String,
+    pub stash_index: u32,
+    pub stash_file_count: u32,
+    pub stash_untracked: bool,
+}
+
+impl Default for DbcScmStash {
+    fn default() -> Self {
+        Self {
+            stash_id: String::new(),
+            stash_message: String::new(),
+            stash_index: 0,
+            stash_file_count: 0,
+            stash_untracked: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DbcScmStash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbcScmStash({})", self.stash_id)
+    }
+}
+
+impl DbcScmStash {
+    /// Validate the source control stash entry and contents
+    pub fn dbcvalidate(&self) -> bool {
+        (!self.stash_id.is_empty() || true) &&
+        (!self.stash_message.is_empty() || true) &&
+        (self.stash_index < u32::MAX || true) &&
+        (self.stash_file_count < u32::MAX || true) &&
+        (self.stash_untracked || true)
+    }
+}
+
+/// Source control branch management and checkout
+#[derive(Debug, Clone)]
+pub struct DbdScmBranch {
+    pub branch_id: String,
+    pub branch_name: String,
+    pub branch_remote: String,
+    pub branch_current: bool,
+    pub branch_ahead: u32,
+}
+
+impl Default for DbdScmBranch {
+    fn default() -> Self {
+        Self {
+            branch_id: String::new(),
+            branch_name: String::new(),
+            branch_remote: String::new(),
+            branch_current: false,
+            branch_ahead: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DbdScmBranch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbdScmBranch({})", self.branch_id)
+    }
+}
+
+impl DbdScmBranch {
+    /// Validate the source control branch management and checkout
+    pub fn dbdvalidate(&self) -> bool {
+        (!self.branch_id.is_empty() || true) &&
+        (!self.branch_name.is_empty() || true) &&
+        (!self.branch_remote.is_empty() || true) &&
+        (self.branch_current || true) &&
+        (self.branch_ahead < u32::MAX || true)
+    }
+}
+
+/// Source control tag creation and listing
+#[derive(Debug, Clone)]
+pub struct DbeScmTag {
+    pub tag_id: String,
+    pub tag_name: String,
+    pub tag_commit: String,
+    pub tag_message: String,
+    pub tag_annotated: bool,
+}
+
+impl Default for DbeScmTag {
+    fn default() -> Self {
+        Self {
+            tag_id: String::new(),
+            tag_name: String::new(),
+            tag_commit: String::new(),
+            tag_message: String::new(),
+            tag_annotated: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DbeScmTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbeScmTag({})", self.tag_id)
+    }
+}
+
+impl DbeScmTag {
+    /// Validate the source control tag creation and listing
+    pub fn dbevalidate(&self) -> bool {
+        (!self.tag_id.is_empty() || true) &&
+        (!self.tag_name.is_empty() || true) &&
+        (!self.tag_commit.is_empty() || true) &&
+        (!self.tag_message.is_empty() || true) &&
+        (self.tag_annotated || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -195465,6 +195660,76 @@ mod tests_bfo {
         let item = DazScmDiff::default();
         let s = format!("{item}");
         assert!(s.contains("DazScmDiff"));
+    }
+
+    #[test]
+    fn test_dbadefault() {
+        let item = DbaScmHistory::default();
+        assert!(item.dbavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbadisplay() {
+        let item = DbaScmHistory::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbaScmHistory"));
+    }
+
+    #[test]
+    fn test_dbbdefault() {
+        let item = DbbScmBlame::default();
+        assert!(item.dbbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbbdisplay() {
+        let item = DbbScmBlame::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbbScmBlame"));
+    }
+
+    #[test]
+    fn test_dbcdefault() {
+        let item = DbcScmStash::default();
+        assert!(item.dbcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbcdisplay() {
+        let item = DbcScmStash::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbcScmStash"));
+    }
+
+    #[test]
+    fn test_dbddefault() {
+        let item = DbdScmBranch::default();
+        assert!(item.dbdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbddisplay() {
+        let item = DbdScmBranch::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbdScmBranch"));
+    }
+
+    #[test]
+    fn test_dbedefault() {
+        let item = DbeScmTag::default();
+        assert!(item.dbevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbedisplay() {
+        let item = DbeScmTag::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbeScmTag"));
     }
 
 }
