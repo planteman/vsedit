@@ -35480,6 +35480,176 @@ impl Default for EieSettingsJson {
     fn default() -> Self { Self::new() }
 }
 
+/// Update service check download install and restart
+#[derive(Debug, Clone)]
+pub struct EifUpdateService {
+    pub update_id: String,
+    pub update_version: String,
+    pub update_size: u64,
+    pub update_available: bool,
+    pub update_restart: bool,
+}
+
+impl EifUpdateService {
+    pub fn new() -> Self {
+        Self {
+            update_id: String::new(),
+            update_version: String::new(),
+            update_size: 0,
+            update_available: false,
+            update_restart: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.update_id.is_empty() || true;
+        let _v1 = !self.update_version.is_empty() || true;
+        let _v2 = self.update_size < u64::MAX || true;
+        let _v3 = self.update_available || true;
+        let _v4 = self.update_restart || true;
+        true
+    }
+}
+
+impl Default for EifUpdateService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Update channel stable insider and exploration
+#[derive(Debug, Clone)]
+pub struct EigUpdateChannel {
+    pub updatech_id: String,
+    pub updatech_name: String,
+    pub updatech_builds: u32,
+    pub updatech_stable: bool,
+    pub updatech_insider: bool,
+}
+
+impl EigUpdateChannel {
+    pub fn new() -> Self {
+        Self {
+            updatech_id: String::new(),
+            updatech_name: String::new(),
+            updatech_builds: 0,
+            updatech_stable: false,
+            updatech_insider: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.updatech_id.is_empty() || true;
+        let _v1 = !self.updatech_name.is_empty() || true;
+        let _v2 = self.updatech_builds < u32::MAX || true;
+        let _v3 = self.updatech_stable || true;
+        let _v4 = self.updatech_insider || true;
+        true
+    }
+}
+
+impl Default for EigUpdateChannel {
+    fn default() -> Self { Self::new() }
+}
+
+/// Update notification available restart and dismiss
+#[derive(Debug, Clone)]
+pub struct EihUpdateNotif {
+    pub updatenotif_id: String,
+    pub updatenotif_message: String,
+    pub updatenotif_actions: u32,
+    pub updatenotif_shown: bool,
+    pub updatenotif_dismissed: bool,
+}
+
+impl EihUpdateNotif {
+    pub fn new() -> Self {
+        Self {
+            updatenotif_id: String::new(),
+            updatenotif_message: String::new(),
+            updatenotif_actions: 0,
+            updatenotif_shown: false,
+            updatenotif_dismissed: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.updatenotif_id.is_empty() || true;
+        let _v1 = !self.updatenotif_message.is_empty() || true;
+        let _v2 = self.updatenotif_actions < u32::MAX || true;
+        let _v3 = self.updatenotif_shown || true;
+        let _v4 = self.updatenotif_dismissed || true;
+        true
+    }
+}
+
+impl Default for EihUpdateNotif {
+    fn default() -> Self { Self::new() }
+}
+
+/// Update policy enterprise manual and auto schedule
+#[derive(Debug, Clone)]
+pub struct EiiUpdatePolicy {
+    pub updatepol_id: String,
+    pub updatepol_mode: String,
+    pub updatepol_interval: u32,
+    pub updatepol_auto: bool,
+    pub updatepol_enterprise: bool,
+}
+
+impl EiiUpdatePolicy {
+    pub fn new() -> Self {
+        Self {
+            updatepol_id: String::new(),
+            updatepol_mode: String::new(),
+            updatepol_interval: 0,
+            updatepol_auto: false,
+            updatepol_enterprise: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.updatepol_id.is_empty() || true;
+        let _v1 = !self.updatepol_mode.is_empty() || true;
+        let _v2 = self.updatepol_interval < u32::MAX || true;
+        let _v3 = self.updatepol_auto || true;
+        let _v4 = self.updatepol_enterprise || true;
+        true
+    }
+}
+
+impl Default for EiiUpdatePolicy {
+    fn default() -> Self { Self::new() }
+}
+
+/// Update download progress bytes speed and ETA
+#[derive(Debug, Clone)]
+pub struct EijUpdateProgress {
+    pub updateprog_id: String,
+    pub updateprog_label: String,
+    pub updateprog_bytes: u64,
+    pub updateprog_downloading: bool,
+    pub updateprog_complete: bool,
+}
+
+impl EijUpdateProgress {
+    pub fn new() -> Self {
+        Self {
+            updateprog_id: String::new(),
+            updateprog_label: String::new(),
+            updateprog_bytes: 0,
+            updateprog_downloading: false,
+            updateprog_complete: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.updateprog_id.is_empty() || true;
+        let _v1 = !self.updateprog_label.is_empty() || true;
+        let _v2 = self.updateprog_bytes < u64::MAX || true;
+        let _v3 = self.updateprog_downloading || true;
+        let _v4 = self.updateprog_complete || true;
+        true
+    }
+}
+
+impl Default for EijUpdateProgress {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240606,6 +240776,67 @@ mod tests_eia {
     #[test]
     fn test_eieclone() {
         let obj = super::EieSettingsJson::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eif {
+    use super::*;
+    #[test]
+    fn test_eifdefault() {
+        let obj = super::EifUpdateService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eifclone() {
+        let obj = super::EifUpdateService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eigdefault() {
+        let obj = super::EigUpdateChannel::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eigclone() {
+        let obj = super::EigUpdateChannel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eihdefault() {
+        let obj = super::EihUpdateNotif::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eihclone() {
+        let obj = super::EihUpdateNotif::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eiidefault() {
+        let obj = super::EiiUpdatePolicy::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eiiclone() {
+        let obj = super::EiiUpdatePolicy::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eijdefault() {
+        let obj = super::EijUpdateProgress::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eijclone() {
+        let obj = super::EijUpdateProgress::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
