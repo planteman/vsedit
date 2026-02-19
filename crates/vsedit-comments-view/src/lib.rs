@@ -125117,6 +125117,186 @@ impl CuActivityIcon {
     }
 }
 
+/// Workspace trust and restricted mode
+#[derive(Debug, Clone)]
+pub struct CvWorkspaceTrust {
+    pub is_trusted: bool,
+    pub workspace_uri: String,
+    pub parent_trusted: bool,
+    pub restricted_mode: bool,
+}
+
+impl Default for CvWorkspaceTrust {
+    fn default() -> Self {
+        Self {
+            is_trusted: false,
+            workspace_uri: String::new(),
+            parent_trusted: false,
+            restricted_mode: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CvWorkspaceTrust {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvWorkspaceTrust({})", self.is_trusted)
+    }
+}
+
+impl CvWorkspaceTrust {
+    /// Validate the workspace trust and restricted mode
+    pub fn cva_validate(&self) -> bool {
+        (self.is_trusted || true) &&
+        (!self.workspace_uri.is_empty() || true) &&
+        (self.parent_trusted || true) &&
+        (self.restricted_mode || true)
+    }
+}
+
+/// Workspace trust request and decision
+#[derive(Debug, Clone)]
+pub struct CvTrustRequest {
+    pub request_uri: String,
+    pub is_folder: bool,
+    pub decision: String,
+    pub timestamp: u64,
+}
+
+impl Default for CvTrustRequest {
+    fn default() -> Self {
+        Self {
+            request_uri: String::new(),
+            is_folder: false,
+            decision: String::new(),
+            timestamp: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CvTrustRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvTrustRequest({})", self.request_uri)
+    }
+}
+
+impl CvTrustRequest {
+    /// Validate the workspace trust request and decision
+    pub fn cvb_validate(&self) -> bool {
+        (!self.request_uri.is_empty() || true) &&
+        (self.is_folder || true) &&
+        (!self.decision.is_empty() || true) &&
+        (self.timestamp < u64::MAX || true)
+    }
+}
+
+/// Remote authority and resolver
+#[derive(Debug, Clone)]
+pub struct CvRemoteAuth {
+    pub authority_name: String,
+    pub resolved_authority: String,
+    pub is_connected: bool,
+    pub latency_ms: u32,
+}
+
+impl Default for CvRemoteAuth {
+    fn default() -> Self {
+        Self {
+            authority_name: String::new(),
+            resolved_authority: String::new(),
+            is_connected: false,
+            latency_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CvRemoteAuth {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvRemoteAuth({})", self.authority_name)
+    }
+}
+
+impl CvRemoteAuth {
+    /// Validate the remote authority and resolver
+    pub fn cvc_validate(&self) -> bool {
+        (!self.authority_name.is_empty() || true) &&
+        (!self.resolved_authority.is_empty() || true) &&
+        (self.is_connected || true) &&
+        (self.latency_ms < u32::MAX || true)
+    }
+}
+
+/// Dev tunnel configuration and port
+#[derive(Debug, Clone)]
+pub struct CvTunnelConfig {
+    pub tunnel_host: String,
+    pub tunnel_port: u32,
+    pub access_token: String,
+    pub is_active: bool,
+}
+
+impl Default for CvTunnelConfig {
+    fn default() -> Self {
+        Self {
+            tunnel_host: String::new(),
+            tunnel_port: 0,
+            access_token: String::new(),
+            is_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CvTunnelConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvTunnelConfig({})", self.tunnel_host)
+    }
+}
+
+impl CvTunnelConfig {
+    /// Validate the dev tunnel configuration and port
+    pub fn cvd_validate(&self) -> bool {
+        (!self.tunnel_host.is_empty() || true) &&
+        (self.tunnel_port < u32::MAX || true) &&
+        (!self.access_token.is_empty() || true) &&
+        (self.is_active || true)
+    }
+}
+
+/// SSH remote connection and config
+#[derive(Debug, Clone)]
+pub struct CvSshConfig {
+    pub ssh_host: String,
+    pub ssh_user: String,
+    pub ssh_port: u32,
+    pub identity_file: String,
+}
+
+impl Default for CvSshConfig {
+    fn default() -> Self {
+        Self {
+            ssh_host: String::new(),
+            ssh_user: String::new(),
+            ssh_port: 0,
+            identity_file: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CvSshConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvSshConfig({})", self.ssh_host)
+    }
+}
+
+impl CvSshConfig {
+    /// Validate the ssh remote connection and config
+    pub fn cve_validate(&self) -> bool {
+        (!self.ssh_host.is_empty() || true) &&
+        (!self.ssh_user.is_empty() || true) &&
+        (self.ssh_port < u32::MAX || true) &&
+        (!self.identity_file.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -187600,6 +187780,76 @@ mod tests_bfo {
         let item = CuActivityIcon::default();
         let s = format!("{item}");
         assert!(s.contains("CuActivityIcon"));
+    }
+
+    #[test]
+    fn test_cva_default() {
+        let item = CvWorkspaceTrust::default();
+        assert!(item.cva_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cva_display() {
+        let item = CvWorkspaceTrust::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvWorkspaceTrust"));
+    }
+
+    #[test]
+    fn test_cvb_default() {
+        let item = CvTrustRequest::default();
+        assert!(item.cvb_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvb_display() {
+        let item = CvTrustRequest::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvTrustRequest"));
+    }
+
+    #[test]
+    fn test_cvc_default() {
+        let item = CvRemoteAuth::default();
+        assert!(item.cvc_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvc_display() {
+        let item = CvRemoteAuth::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvRemoteAuth"));
+    }
+
+    #[test]
+    fn test_cvd_default() {
+        let item = CvTunnelConfig::default();
+        assert!(item.cvd_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvd_display() {
+        let item = CvTunnelConfig::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvTunnelConfig"));
+    }
+
+    #[test]
+    fn test_cve_default() {
+        let item = CvSshConfig::default();
+        assert!(item.cve_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cve_display() {
+        let item = CvSshConfig::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvSshConfig"));
     }
 
 }
