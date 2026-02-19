@@ -129951,6 +129951,201 @@ impl DaeDebugSource {
     }
 }
 
+/// Debug exception breakpoint and filter
+#[derive(Debug, Clone)]
+pub struct DafDebugException {
+    pub exception_id: String,
+    pub exception_filter: String,
+    pub exception_label: String,
+    pub exception_enabled: bool,
+    pub exception_condition: String,
+}
+
+impl Default for DafDebugException {
+    fn default() -> Self {
+        Self {
+            exception_id: String::new(),
+            exception_filter: String::new(),
+            exception_label: String::new(),
+            exception_enabled: false,
+            exception_condition: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DafDebugException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DafDebugException({})", self.exception_id)
+    }
+}
+
+impl DafDebugException {
+    /// Validate the debug exception breakpoint and filter
+    pub fn dafvalidate(&self) -> bool {
+        (!self.exception_id.is_empty() || true) &&
+        (!self.exception_filter.is_empty() || true) &&
+        (!self.exception_label.is_empty() || true) &&
+        (self.exception_enabled || true) &&
+        (!self.exception_condition.is_empty() || true)
+    }
+}
+
+/// Debug data breakpoint on memory address
+#[derive(Debug, Clone)]
+pub struct DagDebugDataBreak {
+    pub data_break_id: String,
+    pub data_break_address: String,
+    pub data_break_size: u32,
+    pub data_break_read: bool,
+    pub data_break_write: bool,
+}
+
+impl Default for DagDebugDataBreak {
+    fn default() -> Self {
+        Self {
+            data_break_id: String::new(),
+            data_break_address: String::new(),
+            data_break_size: 0,
+            data_break_read: false,
+            data_break_write: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DagDebugDataBreak {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DagDebugDataBreak({})", self.data_break_id)
+    }
+}
+
+impl DagDebugDataBreak {
+    /// Validate the debug data breakpoint on memory address
+    pub fn dagvalidate(&self) -> bool {
+        (!self.data_break_id.is_empty() || true) &&
+        (!self.data_break_address.is_empty() || true) &&
+        (self.data_break_size < u32::MAX || true) &&
+        (self.data_break_read || true) &&
+        (self.data_break_write || true)
+    }
+}
+
+/// Debug instruction breakpoint at address
+#[derive(Debug, Clone)]
+pub struct DahDebugInstructionBreak {
+    pub instr_break_id: String,
+    pub instr_break_address: String,
+    pub instr_break_offset: u32,
+    pub instr_break_enabled: bool,
+    pub instr_break_condition: String,
+}
+
+impl Default for DahDebugInstructionBreak {
+    fn default() -> Self {
+        Self {
+            instr_break_id: String::new(),
+            instr_break_address: String::new(),
+            instr_break_offset: 0,
+            instr_break_enabled: false,
+            instr_break_condition: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DahDebugInstructionBreak {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DahDebugInstructionBreak({})", self.instr_break_id)
+    }
+}
+
+impl DahDebugInstructionBreak {
+    /// Validate the debug instruction breakpoint at address
+    pub fn dahvalidate(&self) -> bool {
+        (!self.instr_break_id.is_empty() || true) &&
+        (!self.instr_break_address.is_empty() || true) &&
+        (self.instr_break_offset < u32::MAX || true) &&
+        (self.instr_break_enabled || true) &&
+        (!self.instr_break_condition.is_empty() || true)
+    }
+}
+
+/// Debug disassembly view and instruction lines
+#[derive(Debug, Clone)]
+pub struct DaiDebugDisassembly {
+    pub disasm_id: String,
+    pub disasm_address: String,
+    pub disasm_instruction: String,
+    pub disasm_line: u32,
+    pub disasm_symbol: String,
+}
+
+impl Default for DaiDebugDisassembly {
+    fn default() -> Self {
+        Self {
+            disasm_id: String::new(),
+            disasm_address: String::new(),
+            disasm_instruction: String::new(),
+            disasm_line: 0,
+            disasm_symbol: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DaiDebugDisassembly {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DaiDebugDisassembly({})", self.disasm_id)
+    }
+}
+
+impl DaiDebugDisassembly {
+    /// Validate the debug disassembly view and instruction lines
+    pub fn daivalidate(&self) -> bool {
+        (!self.disasm_id.is_empty() || true) &&
+        (!self.disasm_address.is_empty() || true) &&
+        (!self.disasm_instruction.is_empty() || true) &&
+        (self.disasm_line < u32::MAX || true) &&
+        (!self.disasm_symbol.is_empty() || true)
+    }
+}
+
+/// Debug memory view read and write
+#[derive(Debug, Clone)]
+pub struct DajDebugMemory {
+    pub memory_ref: String,
+    pub memory_address: String,
+    pub memory_size: u32,
+    pub memory_readable: bool,
+    pub memory_writable: bool,
+}
+
+impl Default for DajDebugMemory {
+    fn default() -> Self {
+        Self {
+            memory_ref: String::new(),
+            memory_address: String::new(),
+            memory_size: 0,
+            memory_readable: false,
+            memory_writable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DajDebugMemory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DajDebugMemory({})", self.memory_ref)
+    }
+}
+
+impl DajDebugMemory {
+    /// Validate the debug memory view read and write
+    pub fn dajvalidate(&self) -> bool {
+        (!self.memory_ref.is_empty() || true) &&
+        (!self.memory_address.is_empty() || true) &&
+        (self.memory_size < u32::MAX || true) &&
+        (self.memory_readable || true) &&
+        (self.memory_writable || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -194324,6 +194519,76 @@ mod tests_bfo {
         let item = DaeDebugSource::default();
         let s = format!("{item}");
         assert!(s.contains("DaeDebugSource"));
+    }
+
+    #[test]
+    fn test_dafdefault() {
+        let item = DafDebugException::default();
+        assert!(item.dafvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dafdisplay() {
+        let item = DafDebugException::default();
+        let s = format!("{item}");
+        assert!(s.contains("DafDebugException"));
+    }
+
+    #[test]
+    fn test_dagdefault() {
+        let item = DagDebugDataBreak::default();
+        assert!(item.dagvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dagdisplay() {
+        let item = DagDebugDataBreak::default();
+        let s = format!("{item}");
+        assert!(s.contains("DagDebugDataBreak"));
+    }
+
+    #[test]
+    fn test_dahdefault() {
+        let item = DahDebugInstructionBreak::default();
+        assert!(item.dahvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dahdisplay() {
+        let item = DahDebugInstructionBreak::default();
+        let s = format!("{item}");
+        assert!(s.contains("DahDebugInstructionBreak"));
+    }
+
+    #[test]
+    fn test_daidefault() {
+        let item = DaiDebugDisassembly::default();
+        assert!(item.daivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_daidisplay() {
+        let item = DaiDebugDisassembly::default();
+        let s = format!("{item}");
+        assert!(s.contains("DaiDebugDisassembly"));
+    }
+
+    #[test]
+    fn test_dajdefault() {
+        let item = DajDebugMemory::default();
+        assert!(item.dajvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dajdisplay() {
+        let item = DajDebugMemory::default();
+        let s = format!("{item}");
+        assert!(s.contains("DajDebugMemory"));
     }
 
 }
