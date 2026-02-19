@@ -63527,3 +63527,174 @@ mod bci_tests {
         assert_eq!(qp.title.as_deref(), Some("Select Language"));
     }
 }
+
+
+// --- bcj_: Editor input box model ---
+
+/// Validation severity for input box.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcjInputSeverity { Info, Warning, Error }
+
+/// Validation result.
+#[derive(Debug, Clone)]
+pub struct BcjValidation {
+    pub message: String,
+    pub severity: BcjInputSeverity,
+}
+
+impl BcjValidation {
+    pub fn error(msg: &str) -> Self { Self { message: msg.to_string(), severity: BcjInputSeverity::Error } }
+    pub fn warning(msg: &str) -> Self { Self { message: msg.to_string(), severity: BcjInputSeverity::Warning } }
+    pub fn info(msg: &str) -> Self { Self { message: msg.to_string(), severity: BcjInputSeverity::Info } }
+}
+
+/// An input box for user text entry.
+#[derive(Debug)]
+pub struct BcjInputBox {
+    value: String,
+    placeholder: String,
+    prompt: Option<String>,
+    title: Option<String>,
+    password: bool,
+    cursor_pos: usize,
+    validation: Option<BcjValidation>,
+    step: Option<(usize, usize)>,
+}
+
+impl BcjInputBox {
+    pub fn new(placeholder: &str) -> Self {
+        Self { value: String::new(), placeholder: placeholder.to_string(), prompt: None, title: None, password: false, cursor_pos: 0, validation: None, step: None }
+    }
+
+    pub fn value(&self) -> &str { &self.value }
+    pub fn placeholder(&self) -> &str { &self.placeholder }
+    pub fn prompt(&self) -> Option<&str> { self.prompt.as_deref() }
+    pub fn title(&self) -> Option<&str> { self.title.as_deref() }
+    pub fn is_password(&self) -> bool { self.password }
+    pub fn cursor_pos(&self) -> usize { self.cursor_pos }
+    pub fn validation(&self) -> Option<&BcjValidation> { self.validation.as_ref() }
+    pub fn is_valid(&self) -> bool { !matches!(self.validation, Some(BcjValidation { severity: BcjInputSeverity::Error, .. })) }
+
+    pub fn set_value(&mut self, v: &str) { self.value = v.to_string(); self.cursor_pos = self.value.len(); }
+    pub fn set_prompt(&mut self, p: &str) { self.prompt = Some(p.to_string()); }
+    pub fn set_title(&mut self, t: &str) { self.title = Some(t.to_string()); }
+    pub fn set_password(&mut self, p: bool) { self.password = p; }
+    pub fn set_step(&mut self, current: usize, total: usize) { self.step = Some((current, total)); }
+    pub fn set_validation(&mut self, v: Option<BcjValidation>) { self.validation = v; }
+
+    pub fn insert_char(&mut self, ch: char) {
+        if self.cursor_pos <= self.value.len() {
+            self.value.insert(self.cursor_pos, ch);
+            self.cursor_pos += ch.len_utf8();
+        }
+    }
+
+    pub fn delete_back(&mut self) {
+        if self.cursor_pos > 0 {
+            let prev = self.value[..self.cursor_pos].chars().last().map(|c| c.len_utf8()).unwrap_or(0);
+            self.cursor_pos -= prev;
+            self.value.remove(self.cursor_pos);
+        }
+    }
+
+    pub fn move_cursor(&mut self, delta: i32) {
+        let new_pos = (self.cursor_pos as i32 + delta).max(0).min(self.value.len() as i32) as usize;
+        self.cursor_pos = new_pos;
+    }
+
+    pub fn display_value(&self) -> String {
+        if self.password { "•".repeat(self.value.len()) } else { self.value.clone() }
+    }
+
+    pub fn render(&self, width: usize) -> Vec<String> {
+        let mut lines = Vec::new();
+        if let Some(t) = &self.title { lines.push(t.clone()); }
+        if let Some(p) = &self.prompt { lines.push(p.clone()); }
+        let val = if self.value.is_empty() { self.placeholder.clone() } else { self.display_value() };
+        lines.push(format!("[{}]", &val[..val.len().min(width.saturating_sub(2))]));
+        if let Some(v) = &self.validation { lines.push(format!("  {} {}", match v.severity { BcjInputSeverity::Error => "✗", BcjInputSeverity::Warning => "⚠", BcjInputSeverity::Info => "ℹ" }, v.message)); }
+        if let Some((cur, tot)) = self.step { lines.push(format!("  Step {} of {}", cur, tot)); }
+        lines
+    }
+}
+
+#[cfg(test)]
+mod bcj_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcj_new() {
+        let ib = BcjInputBox::new("Enter name...");
+        assert_eq!(ib.placeholder(), "Enter name...");
+        assert!(ib.value().is_empty());
+    }
+
+    #[test]
+    fn test_bcj_insert() {
+        let mut ib = BcjInputBox::new("");
+        ib.insert_char('h');
+        ib.insert_char('i');
+        assert_eq!(ib.value(), "hi");
+    }
+
+    #[test]
+    fn test_bcj_delete() {
+        let mut ib = BcjInputBox::new("");
+        ib.set_value("hello");
+        ib.delete_back();
+        assert_eq!(ib.value(), "hell");
+    }
+
+    #[test]
+    fn test_bcj_cursor_move() {
+        let mut ib = BcjInputBox::new("");
+        ib.set_value("abc");
+        ib.move_cursor(-1);
+        assert_eq!(ib.cursor_pos(), 2);
+    }
+
+    #[test]
+    fn test_bcj_password() {
+        let mut ib = BcjInputBox::new("");
+        ib.set_password(true);
+        ib.set_value("secret");
+        assert_eq!(ib.display_value(), "••••••");
+    }
+
+    #[test]
+    fn test_bcj_validation() {
+        let mut ib = BcjInputBox::new("");
+        ib.set_validation(Some(BcjValidation::error("Required")));
+        assert!(!ib.is_valid());
+    }
+
+    #[test]
+    fn test_bcj_valid_default() {
+        let ib = BcjInputBox::new("");
+        assert!(ib.is_valid());
+    }
+
+    #[test]
+    fn test_bcj_render() {
+        let mut ib = BcjInputBox::new("placeholder");
+        ib.set_title("Rename Symbol");
+        ib.set_prompt("Enter new name:");
+        let lines = ib.render(40);
+        assert!(lines.len() >= 3);
+    }
+
+    #[test]
+    fn test_bcj_step() {
+        let mut ib = BcjInputBox::new("");
+        ib.set_step(2, 5);
+        let lines = ib.render(40);
+        assert!(lines.iter().any(|l| l.contains("Step 2 of 5")));
+    }
+
+    #[test]
+    fn test_bcj_warning_valid() {
+        let mut ib = BcjInputBox::new("");
+        ib.set_validation(Some(BcjValidation::warning("Careful")));
+        assert!(ib.is_valid()); // warnings don't block
+    }
+}
