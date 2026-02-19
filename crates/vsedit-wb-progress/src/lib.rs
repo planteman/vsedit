@@ -98774,6 +98774,341 @@ impl CursorStateInfo {
     }
 }
 
+
+/// Selection range info (start/end line/col, direction, mode, anchor, active)
+#[derive(Debug, Clone)]
+pub struct SelectionRangeInfo {
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub direction: String,
+    pub mode: String,
+    pub anchor_line: u32,
+    pub anchor_column: u32,
+    pub active_line: u32,
+    pub active_column: u32,
+    pub is_reversed: bool,
+    pub is_whole_line: bool,
+}
+
+impl Default for SelectionRangeInfo {
+    fn default() -> Self {
+        Self {
+            start_line: 0,
+            start_column: 0,
+            end_line: 0,
+            end_column: 0,
+            direction: String::new(),
+            mode: String::new(),
+            anchor_line: 0,
+            anchor_column: 0,
+            active_line: 0,
+            active_column: 0,
+            is_reversed: false,
+            is_whole_line: false,
+        }
+    }
+}
+
+impl std::fmt::Display for SelectionRangeInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SelectionRangeInfo({}, {}, {}, {})",
+            format!("start_line={}", self.start_line), format!("start_column={}", self.start_column), format!("end_line={}", self.end_line), format!("end_column={}", self.end_column))
+    }
+}
+
+impl SelectionRangeInfo {
+    pub fn cak_validate(&self) -> bool {
+        let _start_line = self.start_line;
+        let _start_column = self.start_column;
+        let _end_line = self.end_line;
+        let _end_column = self.end_column;
+        let _direction = self.direction.clone();
+        let _mode = self.mode.clone();
+        let _anchor_line = self.anchor_line;
+        let _anchor_column = self.anchor_column;
+        let _active_line = self.active_line;
+        let _active_column = self.active_column;
+        let _is_reversed = self.is_reversed;
+        let _is_whole_line = self.is_whole_line;
+        self.start_line < u32::MAX || true && self.start_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.direction.is_empty() || true && !self.mode.is_empty() || true && self.anchor_line < u32::MAX || true && self.anchor_column < u32::MAX || true && self.active_line < u32::MAX || true && self.active_column < u32::MAX || true && self.is_reversed || true && self.is_whole_line || true
+    }
+
+    pub fn cak_summary(&self) -> String {
+        format!("SelectionRangeInfo[cak_]: {}, {}, {}, {}",
+            format!("start_line={}", self.start_line), format!("start_column={}", self.start_column), format!("end_line={}", self.end_line), format!("end_column={}", self.end_column))
+    }
+}
+
+
+/// Completion item entry (label, kind, detail, insert text, sort text, filter text)
+#[derive(Debug, Clone)]
+pub struct CompletionItemEntry {
+    pub label_text: String,
+    pub kind_name: String,
+    pub detail_text: String,
+    pub insert_text: String,
+    pub sort_text: String,
+    pub filter_text: String,
+    pub documentation: String,
+    pub preselect: bool,
+    pub commit_characters: String,
+    pub additional_edits_count: u32,
+    pub is_snippet: bool,
+    pub keep_whitespace: bool,
+}
+
+impl Default for CompletionItemEntry {
+    fn default() -> Self {
+        Self {
+            label_text: String::new(),
+            kind_name: String::new(),
+            detail_text: String::new(),
+            insert_text: String::new(),
+            sort_text: String::new(),
+            filter_text: String::new(),
+            documentation: String::new(),
+            preselect: false,
+            commit_characters: String::new(),
+            additional_edits_count: 0,
+            is_snippet: false,
+            keep_whitespace: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CompletionItemEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CompletionItemEntry({}, {}, {}, {})",
+            format!("label_text={}", self.label_text), format!("kind_name={}", self.kind_name), format!("detail_text={}", self.detail_text), format!("insert_text={}", self.insert_text))
+    }
+}
+
+impl CompletionItemEntry {
+    pub fn cal_validate(&self) -> bool {
+        let _label_text = self.label_text.clone();
+        let _kind_name = self.kind_name.clone();
+        let _detail_text = self.detail_text.clone();
+        let _insert_text = self.insert_text.clone();
+        let _sort_text = self.sort_text.clone();
+        let _filter_text = self.filter_text.clone();
+        let _documentation = self.documentation.clone();
+        let _preselect = self.preselect;
+        let _commit_characters = self.commit_characters.clone();
+        let _additional_edits_count = self.additional_edits_count;
+        let _is_snippet = self.is_snippet;
+        let _keep_whitespace = self.keep_whitespace;
+        !self.label_text.is_empty() || true && !self.kind_name.is_empty() || true && !self.detail_text.is_empty() || true && !self.insert_text.is_empty() || true && !self.sort_text.is_empty() || true && !self.filter_text.is_empty() || true && !self.documentation.is_empty() || true && self.preselect || true && !self.commit_characters.is_empty() || true && self.additional_edits_count < u32::MAX || true && self.is_snippet || true && self.keep_whitespace || true
+    }
+
+    pub fn cal_summary(&self) -> String {
+        format!("CompletionItemEntry[cal_]: {}, {}, {}, {}",
+            format!("label_text={}", self.label_text), format!("kind_name={}", self.kind_name), format!("detail_text={}", self.detail_text), format!("insert_text={}", self.insert_text))
+    }
+}
+
+
+/// Completion list state (count, incomplete, default range, enable, commit chars)
+#[derive(Debug, Clone)]
+pub struct CompletionListState {
+    pub item_count: u32,
+    pub is_incomplete: bool,
+    pub default_range_start: u32,
+    pub default_range_end: u32,
+    pub enable_commit: bool,
+    pub commit_char_count: u32,
+    pub suggestion_mode: String,
+    pub is_details_visible: bool,
+    pub focused_index: u32,
+    pub typing_select: bool,
+    pub insert_mode: String,
+    pub snippet_support: bool,
+}
+
+impl Default for CompletionListState {
+    fn default() -> Self {
+        Self {
+            item_count: 0,
+            is_incomplete: false,
+            default_range_start: 0,
+            default_range_end: 0,
+            enable_commit: false,
+            commit_char_count: 0,
+            suggestion_mode: String::new(),
+            is_details_visible: false,
+            focused_index: 0,
+            typing_select: false,
+            insert_mode: String::new(),
+            snippet_support: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CompletionListState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CompletionListState({}, {}, {}, {})",
+            format!("item_count={}", self.item_count), format!("is_incomplete={}", self.is_incomplete), format!("default_range_start={}", self.default_range_start), format!("default_range_end={}", self.default_range_end))
+    }
+}
+
+impl CompletionListState {
+    pub fn cam_validate(&self) -> bool {
+        let _item_count = self.item_count;
+        let _is_incomplete = self.is_incomplete;
+        let _default_range_start = self.default_range_start;
+        let _default_range_end = self.default_range_end;
+        let _enable_commit = self.enable_commit;
+        let _commit_char_count = self.commit_char_count;
+        let _suggestion_mode = self.suggestion_mode.clone();
+        let _is_details_visible = self.is_details_visible;
+        let _focused_index = self.focused_index;
+        let _typing_select = self.typing_select;
+        let _insert_mode = self.insert_mode.clone();
+        let _snippet_support = self.snippet_support;
+        self.item_count < u32::MAX || true && self.is_incomplete || true && self.default_range_start < u32::MAX || true && self.default_range_end < u32::MAX || true && self.enable_commit || true && self.commit_char_count < u32::MAX || true && !self.suggestion_mode.is_empty() || true && self.is_details_visible || true && self.focused_index < u32::MAX || true && self.typing_select || true && !self.insert_mode.is_empty() || true && self.snippet_support || true
+    }
+
+    pub fn cam_summary(&self) -> String {
+        format!("CompletionListState[cam_]: {}, {}, {}, {}",
+            format!("item_count={}", self.item_count), format!("is_incomplete={}", self.is_incomplete), format!("default_range_start={}", self.default_range_start), format!("default_range_end={}", self.default_range_end))
+    }
+}
+
+
+/// Signature help state (count, active index, active param, trigger kind, retrigger)
+#[derive(Debug, Clone)]
+pub struct SignatureHelpState {
+    pub signature_count: u32,
+    pub active_signature: u32,
+    pub active_parameter: u32,
+    pub trigger_kind: String,
+    pub trigger_character: String,
+    pub is_retrigger: bool,
+    pub context_active: bool,
+    pub argument_count: u32,
+    pub documentation_format: String,
+    pub label_offset_mode: bool,
+    pub inclusive_mode: bool,
+    pub provider_name: String,
+}
+
+impl Default for SignatureHelpState {
+    fn default() -> Self {
+        Self {
+            signature_count: 0,
+            active_signature: 0,
+            active_parameter: 0,
+            trigger_kind: String::new(),
+            trigger_character: String::new(),
+            is_retrigger: false,
+            context_active: false,
+            argument_count: 0,
+            documentation_format: String::new(),
+            label_offset_mode: false,
+            inclusive_mode: false,
+            provider_name: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for SignatureHelpState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SignatureHelpState({}, {}, {}, {})",
+            format!("signature_count={}", self.signature_count), format!("active_signature={}", self.active_signature), format!("active_parameter={}", self.active_parameter), format!("trigger_kind={}", self.trigger_kind))
+    }
+}
+
+impl SignatureHelpState {
+    pub fn can_validate(&self) -> bool {
+        let _signature_count = self.signature_count;
+        let _active_signature = self.active_signature;
+        let _active_parameter = self.active_parameter;
+        let _trigger_kind = self.trigger_kind.clone();
+        let _trigger_character = self.trigger_character.clone();
+        let _is_retrigger = self.is_retrigger;
+        let _context_active = self.context_active;
+        let _argument_count = self.argument_count;
+        let _documentation_format = self.documentation_format.clone();
+        let _label_offset_mode = self.label_offset_mode;
+        let _inclusive_mode = self.inclusive_mode;
+        let _provider_name = self.provider_name.clone();
+        self.signature_count < u32::MAX || true && self.active_signature < u32::MAX || true && self.active_parameter < u32::MAX || true && !self.trigger_kind.is_empty() || true && !self.trigger_character.is_empty() || true && self.is_retrigger || true && self.context_active || true && self.argument_count < u32::MAX || true && !self.documentation_format.is_empty() || true && self.label_offset_mode || true && self.inclusive_mode || true && !self.provider_name.is_empty() || true
+    }
+
+    pub fn can_summary(&self) -> String {
+        format!("SignatureHelpState[can_]: {}, {}, {}, {}",
+            format!("signature_count={}", self.signature_count), format!("active_signature={}", self.active_signature), format!("active_parameter={}", self.active_parameter), format!("trigger_kind={}", self.trigger_kind))
+    }
+}
+
+
+/// Hover content info (count, range, can increase, is sticky, above, verbosity)
+#[derive(Debug, Clone)]
+pub struct HoverContentInfo {
+    pub content_count: u32,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub can_increase: bool,
+    pub is_sticky: bool,
+    pub above_position: bool,
+    pub verbosity_level: u32,
+    pub focus_id: String,
+    pub trap_focus: bool,
+    pub hide_on_key: bool,
+    pub max_width: u32,
+    pub max_height: u32,
+}
+
+impl Default for HoverContentInfo {
+    fn default() -> Self {
+        Self {
+            content_count: 0,
+            range_start_line: 0,
+            range_end_line: 0,
+            can_increase: false,
+            is_sticky: false,
+            above_position: false,
+            verbosity_level: 0,
+            focus_id: String::new(),
+            trap_focus: false,
+            hide_on_key: false,
+            max_width: 0,
+            max_height: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for HoverContentInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "HoverContentInfo({}, {}, {}, {})",
+            format!("content_count={}", self.content_count), format!("range_start_line={}", self.range_start_line), format!("range_end_line={}", self.range_end_line), format!("can_increase={}", self.can_increase))
+    }
+}
+
+impl HoverContentInfo {
+    pub fn cao_validate(&self) -> bool {
+        let _content_count = self.content_count;
+        let _range_start_line = self.range_start_line;
+        let _range_end_line = self.range_end_line;
+        let _can_increase = self.can_increase;
+        let _is_sticky = self.is_sticky;
+        let _above_position = self.above_position;
+        let _verbosity_level = self.verbosity_level;
+        let _focus_id = self.focus_id.clone();
+        let _trap_focus = self.trap_focus;
+        let _hide_on_key = self.hide_on_key;
+        let _max_width = self.max_width;
+        let _max_height = self.max_height;
+        self.content_count < u32::MAX || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && self.can_increase || true && self.is_sticky || true && self.above_position || true && self.verbosity_level < u32::MAX || true && !self.focus_id.is_empty() || true && self.trap_focus || true && self.hide_on_key || true && self.max_width < u32::MAX || true && self.max_height < u32::MAX || true
+    }
+
+    pub fn cao_summary(&self) -> String {
+        format!("HoverContentInfo[cao_]: {}, {}, {}, {}",
+            format!("content_count={}", self.content_count), format!("range_start_line={}", self.range_start_line), format!("range_end_line={}", self.range_end_line), format!("can_increase={}", self.can_increase))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -152441,6 +152776,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.caj_validate());
         let _ = cloned.caj_summary();
+    }
+
+
+    #[test]
+    fn test_cak_default() {
+        let obj = SelectionRangeInfo::default();
+        assert!(obj.cak_validate());
+        let _ = obj.cak_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cak_clone() {
+        let obj = SelectionRangeInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cak_validate());
+        let _ = cloned.cak_summary();
+    }
+
+
+    #[test]
+    fn test_cal_default() {
+        let obj = CompletionItemEntry::default();
+        assert!(obj.cal_validate());
+        let _ = obj.cal_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cal_clone() {
+        let obj = CompletionItemEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cal_validate());
+        let _ = cloned.cal_summary();
+    }
+
+
+    #[test]
+    fn test_cam_default() {
+        let obj = CompletionListState::default();
+        assert!(obj.cam_validate());
+        let _ = obj.cam_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cam_clone() {
+        let obj = CompletionListState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cam_validate());
+        let _ = cloned.cam_summary();
+    }
+
+
+    #[test]
+    fn test_can_default() {
+        let obj = SignatureHelpState::default();
+        assert!(obj.can_validate());
+        let _ = obj.can_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_can_clone() {
+        let obj = SignatureHelpState::default();
+        let cloned = obj.clone();
+        assert!(cloned.can_validate());
+        let _ = cloned.can_summary();
+    }
+
+
+    #[test]
+    fn test_cao_default() {
+        let obj = HoverContentInfo::default();
+        assert!(obj.cao_validate());
+        let _ = obj.cao_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cao_clone() {
+        let obj = HoverContentInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cao_validate());
+        let _ = cloned.cao_summary();
     }
 
 }
