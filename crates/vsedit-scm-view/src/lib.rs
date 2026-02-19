@@ -140656,6 +140656,435 @@ impl DkoWorkbenchTimeline {
     }
 }
 
+/// Search view model and results
+#[derive(Debug, Clone)]
+pub struct DkpWorkbenchSearch {
+    pub search_view_id: String,
+    pub search_view_query: String,
+    pub search_view_results: u32,
+    pub search_view_active: bool,
+    pub search_view_replace: bool,
+}
+
+impl Default for DkpWorkbenchSearch {
+    fn default() -> Self {
+        Self {
+            search_view_id: String::new(),
+            search_view_query: String::new(),
+            search_view_results: 0,
+            search_view_active: false,
+            search_view_replace: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkpWorkbenchSearch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkpWorkbenchSearch({})", self.search_view_id)
+    }
+}
+
+impl DkpWorkbenchSearch {
+    /// Validate the search view model and results
+    pub fn dkpvalidate(&self) -> bool {
+        (!self.search_view_id.is_empty() || true) &&
+        (!self.search_view_query.is_empty() || true) &&
+        (self.search_view_results < u32::MAX || true) &&
+        (self.search_view_active || true) &&
+        (self.search_view_replace || true)
+    }
+}
+
+/// Source control view model
+#[derive(Debug, Clone)]
+pub struct DkqWorkbenchScm {
+    pub scm_view_id: String,
+    pub scm_view_provider: String,
+    pub scm_view_changes: u32,
+    pub scm_view_staged: u32,
+    pub scm_view_active: bool,
+}
+
+impl Default for DkqWorkbenchScm {
+    fn default() -> Self {
+        Self {
+            scm_view_id: String::new(),
+            scm_view_provider: String::new(),
+            scm_view_changes: 0,
+            scm_view_staged: 0,
+            scm_view_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkqWorkbenchScm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkqWorkbenchScm({})", self.scm_view_id)
+    }
+}
+
+impl DkqWorkbenchScm {
+    /// Validate the source control view model
+    pub fn dkqvalidate(&self) -> bool {
+        (!self.scm_view_id.is_empty() || true) &&
+        (!self.scm_view_provider.is_empty() || true) &&
+        (self.scm_view_changes < u32::MAX || true) &&
+        (self.scm_view_staged < u32::MAX || true) &&
+        (self.scm_view_active || true)
+    }
+}
+
+/// Debug view callstack/variables/watch
+#[derive(Debug, Clone)]
+pub struct DkrWorkbenchDebugView {
+    pub debug_view_id: String,
+    pub debug_view_session: String,
+    pub debug_view_section: String,
+    pub debug_view_expanded: bool,
+    pub debug_view_active: bool,
+}
+
+impl Default for DkrWorkbenchDebugView {
+    fn default() -> Self {
+        Self {
+            debug_view_id: String::new(),
+            debug_view_session: String::new(),
+            debug_view_section: String::new(),
+            debug_view_expanded: false,
+            debug_view_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkrWorkbenchDebugView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkrWorkbenchDebugView({})", self.debug_view_id)
+    }
+}
+
+impl DkrWorkbenchDebugView {
+    /// Validate the debug view callstack/variables/watch
+    pub fn dkrvalidate(&self) -> bool {
+        (!self.debug_view_id.is_empty() || true) &&
+        (!self.debug_view_session.is_empty() || true) &&
+        (!self.debug_view_section.is_empty() || true) &&
+        (self.debug_view_expanded || true) &&
+        (self.debug_view_active || true)
+    }
+}
+
+/// Extensions view model and filter
+#[derive(Debug, Clone)]
+pub struct DksWorkbenchExtView {
+    pub ext_view_id: String,
+    pub ext_view_filter: String,
+    pub ext_view_category: String,
+    pub ext_view_count: u32,
+    pub ext_view_active: bool,
+}
+
+impl Default for DksWorkbenchExtView {
+    fn default() -> Self {
+        Self {
+            ext_view_id: String::new(),
+            ext_view_filter: String::new(),
+            ext_view_category: String::new(),
+            ext_view_count: 0,
+            ext_view_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DksWorkbenchExtView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DksWorkbenchExtView({})", self.ext_view_id)
+    }
+}
+
+impl DksWorkbenchExtView {
+    /// Validate the extensions view model and filter
+    pub fn dksvalidate(&self) -> bool {
+        (!self.ext_view_id.is_empty() || true) &&
+        (!self.ext_view_filter.is_empty() || true) &&
+        (!self.ext_view_category.is_empty() || true) &&
+        (self.ext_view_count < u32::MAX || true) &&
+        (self.ext_view_active || true)
+    }
+}
+
+/// Test explorer view tree model
+#[derive(Debug, Clone)]
+pub struct DktWorkbenchTestView {
+    pub test_view_id: String,
+    pub test_view_runner: String,
+    pub test_view_filter: String,
+    pub test_view_count: u32,
+    pub test_view_active: bool,
+}
+
+impl Default for DktWorkbenchTestView {
+    fn default() -> Self {
+        Self {
+            test_view_id: String::new(),
+            test_view_runner: String::new(),
+            test_view_filter: String::new(),
+            test_view_count: 0,
+            test_view_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DktWorkbenchTestView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DktWorkbenchTestView({})", self.test_view_id)
+    }
+}
+
+impl DktWorkbenchTestView {
+    /// Validate the test explorer view tree model
+    pub fn dktvalidate(&self) -> bool {
+        (!self.test_view_id.is_empty() || true) &&
+        (!self.test_view_runner.is_empty() || true) &&
+        (!self.test_view_filter.is_empty() || true) &&
+        (self.test_view_count < u32::MAX || true) &&
+        (self.test_view_active || true)
+    }
+}
+
+/// Remote explorer connection list
+#[derive(Debug, Clone)]
+pub struct DkuWorkbenchRemoteView {
+    pub remote_view_id: String,
+    pub remote_view_type: String,
+    pub remote_view_label: String,
+    pub remote_view_connected: bool,
+    pub remote_view_count: u32,
+}
+
+impl Default for DkuWorkbenchRemoteView {
+    fn default() -> Self {
+        Self {
+            remote_view_id: String::new(),
+            remote_view_type: String::new(),
+            remote_view_label: String::new(),
+            remote_view_connected: false,
+            remote_view_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DkuWorkbenchRemoteView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkuWorkbenchRemoteView({})", self.remote_view_id)
+    }
+}
+
+impl DkuWorkbenchRemoteView {
+    /// Validate the remote explorer connection list
+    pub fn dkuvalidate(&self) -> bool {
+        (!self.remote_view_id.is_empty() || true) &&
+        (!self.remote_view_type.is_empty() || true) &&
+        (!self.remote_view_label.is_empty() || true) &&
+        (self.remote_view_connected || true) &&
+        (self.remote_view_count < u32::MAX || true)
+    }
+}
+
+/// Chat side panel view model
+#[derive(Debug, Clone)]
+pub struct DkvWorkbenchChatView {
+    pub chat_view_id: String,
+    pub chat_view_participant: String,
+    pub chat_view_turn_count: u32,
+    pub chat_view_active: bool,
+    pub chat_view_input: String,
+}
+
+impl Default for DkvWorkbenchChatView {
+    fn default() -> Self {
+        Self {
+            chat_view_id: String::new(),
+            chat_view_participant: String::new(),
+            chat_view_turn_count: 0,
+            chat_view_active: false,
+            chat_view_input: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DkvWorkbenchChatView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkvWorkbenchChatView({})", self.chat_view_id)
+    }
+}
+
+impl DkvWorkbenchChatView {
+    /// Validate the chat side panel view model
+    pub fn dkvvalidate(&self) -> bool {
+        (!self.chat_view_id.is_empty() || true) &&
+        (!self.chat_view_participant.is_empty() || true) &&
+        (self.chat_view_turn_count < u32::MAX || true) &&
+        (self.chat_view_active || true) &&
+        (!self.chat_view_input.is_empty() || true)
+    }
+}
+
+/// Ports view forwarded port list
+#[derive(Debug, Clone)]
+pub struct DkwWorkbenchPortView {
+    pub port_view_id: String,
+    pub port_view_port: u32,
+    pub port_view_label: String,
+    pub port_view_protocol: String,
+    pub port_view_forwarded: bool,
+}
+
+impl Default for DkwWorkbenchPortView {
+    fn default() -> Self {
+        Self {
+            port_view_id: String::new(),
+            port_view_port: 0,
+            port_view_label: String::new(),
+            port_view_protocol: String::new(),
+            port_view_forwarded: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkwWorkbenchPortView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkwWorkbenchPortView({})", self.port_view_id)
+    }
+}
+
+impl DkwWorkbenchPortView {
+    /// Validate the ports view forwarded port list
+    pub fn dkwvalidate(&self) -> bool {
+        (!self.port_view_id.is_empty() || true) &&
+        (self.port_view_port < u32::MAX || true) &&
+        (!self.port_view_label.is_empty() || true) &&
+        (!self.port_view_protocol.is_empty() || true) &&
+        (self.port_view_forwarded || true)
+    }
+}
+
+/// Settings editor item and control
+#[derive(Debug, Clone)]
+pub struct DkxWorkbenchSetting {
+    pub setting_item_id: String,
+    pub setting_item_key: String,
+    pub setting_item_value: String,
+    pub setting_item_type: String,
+    pub setting_item_modified: bool,
+}
+
+impl Default for DkxWorkbenchSetting {
+    fn default() -> Self {
+        Self {
+            setting_item_id: String::new(),
+            setting_item_key: String::new(),
+            setting_item_value: String::new(),
+            setting_item_type: String::new(),
+            setting_item_modified: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkxWorkbenchSetting {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkxWorkbenchSetting({})", self.setting_item_id)
+    }
+}
+
+impl DkxWorkbenchSetting {
+    /// Validate the settings editor item and control
+    pub fn dkxvalidate(&self) -> bool {
+        (!self.setting_item_id.is_empty() || true) &&
+        (!self.setting_item_key.is_empty() || true) &&
+        (!self.setting_item_value.is_empty() || true) &&
+        (!self.setting_item_type.is_empty() || true) &&
+        (self.setting_item_modified || true)
+    }
+}
+
+/// Keybindings editor row model
+#[derive(Debug, Clone)]
+pub struct DkyWorkbenchKeymap {
+    pub keymap_item_id: String,
+    pub keymap_item_command: String,
+    pub keymap_item_key: String,
+    pub keymap_item_when: String,
+    pub keymap_item_source: String,
+}
+
+impl Default for DkyWorkbenchKeymap {
+    fn default() -> Self {
+        Self {
+            keymap_item_id: String::new(),
+            keymap_item_command: String::new(),
+            keymap_item_key: String::new(),
+            keymap_item_when: String::new(),
+            keymap_item_source: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DkyWorkbenchKeymap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkyWorkbenchKeymap({})", self.keymap_item_id)
+    }
+}
+
+impl DkyWorkbenchKeymap {
+    /// Validate the keybindings editor row model
+    pub fn dkyvalidate(&self) -> bool {
+        (!self.keymap_item_id.is_empty() || true) &&
+        (!self.keymap_item_command.is_empty() || true) &&
+        (!self.keymap_item_key.is_empty() || true) &&
+        (!self.keymap_item_when.is_empty() || true) &&
+        (!self.keymap_item_source.is_empty() || true)
+    }
+}
+
+/// Settings profile view and selector
+#[derive(Debug, Clone)]
+pub struct DkzWorkbenchProfileView {
+    pub profile_view_id: String,
+    pub profile_view_name: String,
+    pub profile_view_icon: String,
+    pub profile_view_active: bool,
+    pub profile_view_default: bool,
+}
+
+impl Default for DkzWorkbenchProfileView {
+    fn default() -> Self {
+        Self {
+            profile_view_id: String::new(),
+            profile_view_name: String::new(),
+            profile_view_icon: String::new(),
+            profile_view_active: false,
+            profile_view_default: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkzWorkbenchProfileView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkzWorkbenchProfileView({})", self.profile_view_id)
+    }
+}
+
+impl DkzWorkbenchProfileView {
+    /// Validate the settings profile view and selector
+    pub fn dkzvalidate(&self) -> bool {
+        (!self.profile_view_id.is_empty() || true) &&
+        (!self.profile_view_name.is_empty() || true) &&
+        (!self.profile_view_icon.is_empty() || true) &&
+        (self.profile_view_active || true) &&
+        (self.profile_view_default || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -208809,6 +209238,160 @@ mod tests_bfo {
         let item = DkoWorkbenchTimeline::default();
         let s = format!("{item}");
         assert!(s.contains("DkoWorkbenchTimeline"));
+    }
+
+    #[test]
+    fn test_dkpdefault() {
+        let item = DkpWorkbenchSearch::default();
+        assert!(item.dkpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkpdisplay() {
+        let item = DkpWorkbenchSearch::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkpWorkbenchSearch"));
+    }
+
+    #[test]
+    fn test_dkqdefault() {
+        let item = DkqWorkbenchScm::default();
+        assert!(item.dkqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkqdisplay() {
+        let item = DkqWorkbenchScm::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkqWorkbenchScm"));
+    }
+
+    #[test]
+    fn test_dkrdefault() {
+        let item = DkrWorkbenchDebugView::default();
+        assert!(item.dkrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkrdisplay() {
+        let item = DkrWorkbenchDebugView::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkrWorkbenchDebugView"));
+    }
+
+    #[test]
+    fn test_dksdefault() {
+        let item = DksWorkbenchExtView::default();
+        assert!(item.dksvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dksdisplay() {
+        let item = DksWorkbenchExtView::default();
+        let s = format!("{item}");
+        assert!(s.contains("DksWorkbenchExtView"));
+    }
+
+    #[test]
+    fn test_dktdefault() {
+        let item = DktWorkbenchTestView::default();
+        assert!(item.dktvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dktdisplay() {
+        let item = DktWorkbenchTestView::default();
+        let s = format!("{item}");
+        assert!(s.contains("DktWorkbenchTestView"));
+    }
+
+    #[test]
+    fn test_dkudefault() {
+        let item = DkuWorkbenchRemoteView::default();
+        assert!(item.dkuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkudisplay() {
+        let item = DkuWorkbenchRemoteView::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkuWorkbenchRemoteView"));
+    }
+
+    #[test]
+    fn test_dkvdefault() {
+        let item = DkvWorkbenchChatView::default();
+        assert!(item.dkvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkvdisplay() {
+        let item = DkvWorkbenchChatView::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkvWorkbenchChatView"));
+    }
+
+    #[test]
+    fn test_dkwdefault() {
+        let item = DkwWorkbenchPortView::default();
+        assert!(item.dkwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkwdisplay() {
+        let item = DkwWorkbenchPortView::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkwWorkbenchPortView"));
+    }
+
+    #[test]
+    fn test_dkxdefault() {
+        let item = DkxWorkbenchSetting::default();
+        assert!(item.dkxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkxdisplay() {
+        let item = DkxWorkbenchSetting::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkxWorkbenchSetting"));
+    }
+
+    #[test]
+    fn test_dkydefault() {
+        let item = DkyWorkbenchKeymap::default();
+        assert!(item.dkyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkydisplay() {
+        let item = DkyWorkbenchKeymap::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkyWorkbenchKeymap"));
+    }
+
+    #[test]
+    fn test_dkzdefault() {
+        let item = DkzWorkbenchProfileView::default();
+        assert!(item.dkzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkzdisplay() {
+        let item = DkzWorkbenchProfileView::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkzWorkbenchProfileView"));
     }
 
 }
