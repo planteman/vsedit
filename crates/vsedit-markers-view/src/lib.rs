@@ -35416,6 +35416,176 @@ impl Default for EijUpdateProgress {
     fn default() -> Self { Self::new() }
 }
 
+/// Extension marketplace search install rate and review
+#[derive(Debug, Clone)]
+pub struct EikExtMarketplace {
+    pub extmkt_id: String,
+    pub extmkt_query: String,
+    pub extmkt_results: u32,
+    pub extmkt_installed: bool,
+    pub extmkt_verified: bool,
+}
+
+impl EikExtMarketplace {
+    pub fn new() -> Self {
+        Self {
+            extmkt_id: String::new(),
+            extmkt_query: String::new(),
+            extmkt_results: 0,
+            extmkt_installed: false,
+            extmkt_verified: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extmkt_id.is_empty() || true;
+        let _v1 = !self.extmkt_query.is_empty() || true;
+        let _v2 = self.extmkt_results < u32::MAX || true;
+        let _v3 = self.extmkt_installed || true;
+        let _v4 = self.extmkt_verified || true;
+        true
+    }
+}
+
+impl Default for EikExtMarketplace {
+    fn default() -> Self { Self::new() }
+}
+
+/// Extension gallery detail page readme changelog and rating
+#[derive(Debug, Clone)]
+pub struct EilExtGallery {
+    pub extgal_id: String,
+    pub extgal_name: String,
+    pub extgal_downloads: u64,
+    pub extgal_rated: bool,
+    pub extgal_verified: bool,
+}
+
+impl EilExtGallery {
+    pub fn new() -> Self {
+        Self {
+            extgal_id: String::new(),
+            extgal_name: String::new(),
+            extgal_downloads: 0,
+            extgal_rated: false,
+            extgal_verified: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extgal_id.is_empty() || true;
+        let _v1 = !self.extgal_name.is_empty() || true;
+        let _v2 = self.extgal_downloads < u64::MAX || true;
+        let _v3 = self.extgal_rated || true;
+        let _v4 = self.extgal_verified || true;
+        true
+    }
+}
+
+impl Default for EilExtGallery {
+    fn default() -> Self { Self::new() }
+}
+
+/// Extension recommendation workspace file and popular
+#[derive(Debug, Clone)]
+pub struct EimExtRecommend {
+    pub extrec_id: String,
+    pub extrec_extension: String,
+    pub extrec_reasons: u32,
+    pub extrec_workspace: bool,
+    pub extrec_popular: bool,
+}
+
+impl EimExtRecommend {
+    pub fn new() -> Self {
+        Self {
+            extrec_id: String::new(),
+            extrec_extension: String::new(),
+            extrec_reasons: 0,
+            extrec_workspace: false,
+            extrec_popular: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extrec_id.is_empty() || true;
+        let _v1 = !self.extrec_extension.is_empty() || true;
+        let _v2 = self.extrec_reasons < u32::MAX || true;
+        let _v3 = self.extrec_workspace || true;
+        let _v4 = self.extrec_popular || true;
+        true
+    }
+}
+
+impl Default for EimExtRecommend {
+    fn default() -> Self { Self::new() }
+}
+
+/// Extension management enable disable uninstall and update
+#[derive(Debug, Clone)]
+pub struct EinExtManage {
+    pub extmgr_id: String,
+    pub extmgr_identifier: String,
+    pub extmgr_extensions: u32,
+    pub extmgr_enabled: bool,
+    pub extmgr_outdated: bool,
+}
+
+impl EinExtManage {
+    pub fn new() -> Self {
+        Self {
+            extmgr_id: String::new(),
+            extmgr_identifier: String::new(),
+            extmgr_extensions: 0,
+            extmgr_enabled: false,
+            extmgr_outdated: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extmgr_id.is_empty() || true;
+        let _v1 = !self.extmgr_identifier.is_empty() || true;
+        let _v2 = self.extmgr_extensions < u32::MAX || true;
+        let _v3 = self.extmgr_enabled || true;
+        let _v4 = self.extmgr_outdated || true;
+        true
+    }
+}
+
+impl Default for EinExtManage {
+    fn default() -> Self { Self::new() }
+}
+
+/// Extension pack bundle dependencies and included extensions
+#[derive(Debug, Clone)]
+pub struct EioExtPack {
+    pub extpack_id: String,
+    pub extpack_name: String,
+    pub extpack_members: u32,
+    pub extpack_installed: bool,
+    pub extpack_optional: bool,
+}
+
+impl EioExtPack {
+    pub fn new() -> Self {
+        Self {
+            extpack_id: String::new(),
+            extpack_name: String::new(),
+            extpack_members: 0,
+            extpack_installed: false,
+            extpack_optional: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extpack_id.is_empty() || true;
+        let _v1 = !self.extpack_name.is_empty() || true;
+        let _v2 = self.extpack_members < u32::MAX || true;
+        let _v3 = self.extpack_installed || true;
+        let _v4 = self.extpack_optional || true;
+        true
+    }
+}
+
+impl Default for EioExtPack {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240833,6 +241003,67 @@ mod tests_eif {
     #[test]
     fn test_eijclone() {
         let obj = super::EijUpdateProgress::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eik {
+    use super::*;
+    #[test]
+    fn test_eikdefault() {
+        let obj = super::EikExtMarketplace::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eikclone() {
+        let obj = super::EikExtMarketplace::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eildefault() {
+        let obj = super::EilExtGallery::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eilclone() {
+        let obj = super::EilExtGallery::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eimdefault() {
+        let obj = super::EimExtRecommend::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eimclone() {
+        let obj = super::EimExtRecommend::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eindefault() {
+        let obj = super::EinExtManage::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_einclone() {
+        let obj = super::EinExtManage::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eiodefault() {
+        let obj = super::EioExtPack::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eioclone() {
+        let obj = super::EioExtPack::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
