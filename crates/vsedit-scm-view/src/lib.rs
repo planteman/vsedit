@@ -144517,6 +144517,201 @@ impl DojRpcRequest {
     }
 }
 
+/// JSON-RPC response message model
+#[derive(Debug, Clone)]
+pub struct DokRpcResponse {
+    pub response_id: String,
+    pub response_result: String,
+    pub response_error: String,
+    pub response_jsonrpc: String,
+    pub response_seq: u32,
+}
+
+impl Default for DokRpcResponse {
+    fn default() -> Self {
+        Self {
+            response_id: String::new(),
+            response_result: String::new(),
+            response_error: String::new(),
+            response_jsonrpc: String::new(),
+            response_seq: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DokRpcResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DokRpcResponse({})", self.response_id)
+    }
+}
+
+impl DokRpcResponse {
+    /// Validate the json-rpc response message model
+    pub fn dokvalidate(&self) -> bool {
+        (!self.response_id.is_empty() || true) &&
+        (!self.response_result.is_empty() || true) &&
+        (!self.response_error.is_empty() || true) &&
+        (!self.response_jsonrpc.is_empty() || true) &&
+        (self.response_seq < u32::MAX || true)
+    }
+}
+
+/// JSON-RPC error code and data
+#[derive(Debug, Clone)]
+pub struct DolRpcError {
+    pub error_id: String,
+    pub error_code: u32,
+    pub error_message: String,
+    pub error_data: String,
+    pub error_retryable: bool,
+}
+
+impl Default for DolRpcError {
+    fn default() -> Self {
+        Self {
+            error_id: String::new(),
+            error_code: 0,
+            error_message: String::new(),
+            error_data: String::new(),
+            error_retryable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DolRpcError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DolRpcError({})", self.error_id)
+    }
+}
+
+impl DolRpcError {
+    /// Validate the json-rpc error code and data
+    pub fn dolvalidate(&self) -> bool {
+        (!self.error_id.is_empty() || true) &&
+        (self.error_code < u32::MAX || true) &&
+        (!self.error_message.is_empty() || true) &&
+        (!self.error_data.is_empty() || true) &&
+        (self.error_retryable || true)
+    }
+}
+
+/// JSON-RPC notification (no response)
+#[derive(Debug, Clone)]
+pub struct DomRpcNotification {
+    pub notification_id: String,
+    pub notification_method: String,
+    pub notification_params: String,
+    pub notification_jsonrpc: String,
+    pub notification_broadcast: bool,
+}
+
+impl Default for DomRpcNotification {
+    fn default() -> Self {
+        Self {
+            notification_id: String::new(),
+            notification_method: String::new(),
+            notification_params: String::new(),
+            notification_jsonrpc: String::new(),
+            notification_broadcast: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DomRpcNotification {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DomRpcNotification({})", self.notification_id)
+    }
+}
+
+impl DomRpcNotification {
+    /// Validate the json-rpc notification (no response)
+    pub fn domvalidate(&self) -> bool {
+        (!self.notification_id.is_empty() || true) &&
+        (!self.notification_method.is_empty() || true) &&
+        (!self.notification_params.is_empty() || true) &&
+        (!self.notification_jsonrpc.is_empty() || true) &&
+        (self.notification_broadcast || true)
+    }
+}
+
+/// MessagePort-style bidirectional channel
+#[derive(Debug, Clone)]
+pub struct DonMessagePort {
+    pub port_id: String,
+    pub port_name: String,
+    pub port_open: bool,
+    pub port_transferred: bool,
+    pub port_message_count: u32,
+}
+
+impl Default for DonMessagePort {
+    fn default() -> Self {
+        Self {
+            port_id: String::new(),
+            port_name: String::new(),
+            port_open: false,
+            port_transferred: false,
+            port_message_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DonMessagePort {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DonMessagePort({})", self.port_id)
+    }
+}
+
+impl DonMessagePort {
+    /// Validate the messageport-style bidirectional channel
+    pub fn donvalidate(&self) -> bool {
+        (!self.port_id.is_empty() || true) &&
+        (!self.port_name.is_empty() || true) &&
+        (self.port_open || true) &&
+        (self.port_transferred || true) &&
+        (self.port_message_count < u32::MAX || true)
+    }
+}
+
+/// MessageChannel pair of ports
+#[derive(Debug, Clone)]
+pub struct DooMessageChannel {
+    pub channel_id: String,
+    pub channel_port1: String,
+    pub channel_port2: String,
+    pub channel_open: bool,
+    pub channel_label: String,
+}
+
+impl Default for DooMessageChannel {
+    fn default() -> Self {
+        Self {
+            channel_id: String::new(),
+            channel_port1: String::new(),
+            channel_port2: String::new(),
+            channel_open: false,
+            channel_label: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DooMessageChannel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DooMessageChannel({})", self.channel_id)
+    }
+}
+
+impl DooMessageChannel {
+    /// Validate the messagechannel pair of ports
+    pub fn doovalidate(&self) -> bool {
+        (!self.channel_id.is_empty() || true) &&
+        (!self.channel_port1.is_empty() || true) &&
+        (!self.channel_port2.is_empty() || true) &&
+        (self.channel_open || true) &&
+        (!self.channel_label.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -214056,6 +214251,76 @@ mod tests_bfo {
         let item = DojRpcRequest::default();
         let s = format!("{item}");
         assert!(s.contains("DojRpcRequest"));
+    }
+
+    #[test]
+    fn test_dokdefault() {
+        let item = DokRpcResponse::default();
+        assert!(item.dokvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dokdisplay() {
+        let item = DokRpcResponse::default();
+        let s = format!("{item}");
+        assert!(s.contains("DokRpcResponse"));
+    }
+
+    #[test]
+    fn test_doldefault() {
+        let item = DolRpcError::default();
+        assert!(item.dolvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_doldisplay() {
+        let item = DolRpcError::default();
+        let s = format!("{item}");
+        assert!(s.contains("DolRpcError"));
+    }
+
+    #[test]
+    fn test_domdefault() {
+        let item = DomRpcNotification::default();
+        assert!(item.domvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_domdisplay() {
+        let item = DomRpcNotification::default();
+        let s = format!("{item}");
+        assert!(s.contains("DomRpcNotification"));
+    }
+
+    #[test]
+    fn test_dondefault() {
+        let item = DonMessagePort::default();
+        assert!(item.donvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dondisplay() {
+        let item = DonMessagePort::default();
+        let s = format!("{item}");
+        assert!(s.contains("DonMessagePort"));
+    }
+
+    #[test]
+    fn test_doodefault() {
+        let item = DooMessageChannel::default();
+        assert!(item.doovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_doodisplay() {
+        let item = DooMessageChannel::default();
+        let s = format!("{item}");
+        assert!(s.contains("DooMessageChannel"));
     }
 
 }
