@@ -82843,6 +82843,292 @@ impl BhePanelModel {
 }
 
 
+
+// bhf_ Editor Sidebar Model
+
+/// Sidebar position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BhfSidebarPosition { Left, Right }
+
+/// Sidebar view state.
+#[derive(Debug, Clone)]
+pub struct BhfSidebarModel {
+    pub position: BhfSidebarPosition,
+    pub width: u16,
+    pub is_visible: bool,
+    pub active_view_id: Option<String>,
+    pub views: Vec<String>,
+}
+
+impl BhfSidebarModel {
+    pub fn new() -> Self {
+        Self { position: BhfSidebarPosition::Left, width: 250, is_visible: true, active_view_id: None, views: Vec::new() }
+    }
+    pub fn set_position(&mut self, pos: BhfSidebarPosition) { self.position = pos; }
+    pub fn set_width(&mut self, w: u16) { self.width = w.max(150).min(800); }
+    pub fn toggle(&mut self) { self.is_visible = !self.is_visible; }
+    pub fn set_active_view(&mut self, id: &str) { self.active_view_id = Some(id.to_string()); self.is_visible = true; }
+    pub fn register_view(&mut self, id: &str) { if !self.views.contains(&id.to_string()) { self.views.push(id.to_string()); } }
+    pub fn view_count(&self) -> usize { self.views.len() }
+    pub fn active_view(&self) -> Option<&str> { self.active_view_id.as_deref() }
+    pub fn is_visible(&self) -> bool { self.is_visible }
+}
+
+
+// bhg_ Editor Explorer Tree Model
+
+/// File explorer entry kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BhgExplorerEntryKind { File, Directory, SymLink }
+
+/// A file explorer tree node.
+#[derive(Debug, Clone)]
+pub struct BhgExplorerNode {
+    pub name: String,
+    pub path: String,
+    pub kind: BhgExplorerEntryKind,
+    pub children: Vec<BhgExplorerNode>,
+    pub is_expanded: bool,
+    pub is_selected: bool,
+}
+
+/// Explorer tree model.
+#[derive(Debug, Clone)]
+pub struct BhgExplorerModel {
+    pub root: Option<BhgExplorerNode>,
+    pub show_hidden: bool,
+}
+
+impl BhgExplorerModel {
+    pub fn new() -> Self { Self { root: None, show_hidden: false } }
+    pub fn set_root(&mut self, node: BhgExplorerNode) { self.root = Some(node); }
+    pub fn toggle_hidden(&mut self) { self.show_hidden = !self.show_hidden; }
+
+    pub fn total_entries(&self) -> usize {
+        fn count(n: &BhgExplorerNode) -> usize { 1 + n.children.iter().map(|c| count(c)).sum::<usize>() }
+        self.root.as_ref().map(|r| count(r)).unwrap_or(0)
+    }
+
+    pub fn depth(&self) -> usize {
+        fn measure(n: &BhgExplorerNode) -> usize {
+            if n.children.is_empty() { 1 } else { 1 + n.children.iter().map(|c| measure(c)).max().unwrap_or(0) }
+        }
+        self.root.as_ref().map(|r| measure(r)).unwrap_or(0)
+    }
+
+    pub fn find_by_path(&self, path: &str) -> Option<&BhgExplorerNode> {
+        fn find<'a>(n: &'a BhgExplorerNode, path: &str) -> Option<&'a BhgExplorerNode> {
+            if n.path == path { return Some(n); }
+            for c in &n.children { if let Some(found) = find(c, path) { return Some(found); } }
+            None
+        }
+        self.root.as_ref().and_then(|r| find(r, path))
+    }
+
+    pub fn toggle_expand(&mut self, path: &str) {
+        fn toggle(n: &mut BhgExplorerNode, path: &str) -> bool {
+            if n.path == path { n.is_expanded = !n.is_expanded; return true; }
+            for c in &mut n.children { if toggle(c, path) { return true; } }
+            false
+        }
+        if let Some(r) = &mut self.root { toggle(r, path); }
+    }
+}
+
+
+// bhh_ Editor Problems Panel Model
+
+/// Problem severity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BhhProblemSeverity { Error, Warning, Info, Hint }
+
+/// A diagnostic problem entry.
+#[derive(Debug, Clone)]
+pub struct BhhProblem {
+    pub file: String,
+    pub line: usize,
+    pub column: usize,
+    pub end_line: usize,
+    pub end_column: usize,
+    pub severity: BhhProblemSeverity,
+    pub message: String,
+    pub source: Option<String>,
+    pub code: Option<String>,
+}
+
+/// Problems panel model.
+#[derive(Debug, Clone)]
+pub struct BhhProblemsModel {
+    problems: Vec<BhhProblem>,
+    filter_text: String,
+    show_errors: bool,
+    show_warnings: bool,
+    show_infos: bool,
+}
+
+impl BhhProblemsModel {
+    pub fn new() -> Self {
+        Self { problems: Vec::new(), filter_text: String::new(), show_errors: true, show_warnings: true, show_infos: true }
+    }
+    pub fn set_problems(&mut self, problems: Vec<BhhProblem>) { self.problems = problems; }
+    pub fn set_filter(&mut self, text: &str) { self.filter_text = text.to_string(); }
+
+    pub fn error_count(&self) -> usize { self.problems.iter().filter(|p| p.severity == BhhProblemSeverity::Error).count() }
+    pub fn warning_count(&self) -> usize { self.problems.iter().filter(|p| p.severity == BhhProblemSeverity::Warning).count() }
+    pub fn info_count(&self) -> usize { self.problems.iter().filter(|p| p.severity == BhhProblemSeverity::Info || p.severity == BhhProblemSeverity::Hint).count() }
+    pub fn total(&self) -> usize { self.problems.len() }
+
+    pub fn problems_for_file(&self, file: &str) -> Vec<&BhhProblem> {
+        self.problems.iter().filter(|p| p.file == file).collect()
+    }
+
+    pub fn filtered_problems(&self) -> Vec<&BhhProblem> {
+        self.problems.iter().filter(|p| {
+            match p.severity {
+                BhhProblemSeverity::Error => self.show_errors,
+                BhhProblemSeverity::Warning => self.show_warnings,
+                BhhProblemSeverity::Info | BhhProblemSeverity::Hint => self.show_infos,
+            }
+        }).filter(|p| {
+            self.filter_text.is_empty() || p.message.contains(&self.filter_text) || p.file.contains(&self.filter_text)
+        }).collect()
+    }
+
+    pub fn toggle_errors(&mut self) { self.show_errors = !self.show_errors; }
+    pub fn toggle_warnings(&mut self) { self.show_warnings = !self.show_warnings; }
+    pub fn clear(&mut self) { self.problems.clear(); }
+
+    pub fn affected_files(&self) -> Vec<&str> {
+        let mut f: Vec<&str> = self.problems.iter().map(|p| p.file.as_str()).collect();
+        f.sort(); f.dedup(); f
+    }
+}
+
+
+// bhi_ Editor Output Channel Model
+
+/// An output channel in the output panel.
+#[derive(Debug, Clone)]
+pub struct BhiOutputChannel {
+    pub id: String,
+    pub name: String,
+    pub content: String,
+    pub is_log: bool,
+    pub max_lines: usize,
+}
+
+/// Output panel model.
+#[derive(Debug, Clone)]
+pub struct BhiOutputModel {
+    channels: Vec<BhiOutputChannel>,
+    active_channel_id: Option<String>,
+}
+
+impl BhiOutputModel {
+    pub fn new() -> Self { Self { channels: Vec::new(), active_channel_id: None } }
+
+    pub fn create_channel(&mut self, id: &str, name: &str, is_log: bool) {
+        self.channels.push(BhiOutputChannel { id: id.to_string(), name: name.to_string(), content: String::new(), is_log, max_lines: 10000 });
+        if self.active_channel_id.is_none() { self.active_channel_id = Some(id.to_string()); }
+    }
+
+    pub fn append(&mut self, channel_id: &str, text: &str) {
+        if let Some(ch) = self.channels.iter_mut().find(|c| c.id == channel_id) {
+            ch.content.push_str(text);
+            let line_count = ch.content.lines().count();
+            if line_count > ch.max_lines {
+                let excess = line_count - ch.max_lines;
+                let mut removed = 0;
+                let mut pos = 0;
+                for (i, c) in ch.content.char_indices() { if c == '\n' { removed += 1; if removed >= excess { pos = i + 1; break; } } }
+                ch.content = ch.content[pos..].to_string();
+            }
+        }
+    }
+
+    pub fn clear_channel(&mut self, channel_id: &str) {
+        if let Some(ch) = self.channels.iter_mut().find(|c| c.id == channel_id) { ch.content.clear(); }
+    }
+
+    pub fn set_active(&mut self, id: &str) { self.active_channel_id = Some(id.to_string()); }
+
+    pub fn active_channel(&self) -> Option<&BhiOutputChannel> {
+        self.active_channel_id.as_ref().and_then(|id| self.channels.iter().find(|c| &c.id == id))
+    }
+
+    pub fn remove_channel(&mut self, id: &str) { self.channels.retain(|c| c.id != id); }
+    pub fn channel_count(&self) -> usize { self.channels.len() }
+    pub fn channel_names(&self) -> Vec<&str> { self.channels.iter().map(|c| c.name.as_str()).collect() }
+}
+
+
+// bhj_ Editor Debug Console Model
+
+/// Debug console entry kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BhjConsoleEntryKind { Input, Output, Error, Warning, Info }
+
+/// A debug console entry.
+#[derive(Debug, Clone)]
+pub struct BhjConsoleEntry {
+    pub kind: BhjConsoleEntryKind,
+    pub text: String,
+    pub source: Option<String>,
+    pub line: Option<usize>,
+}
+
+/// Debug console model.
+#[derive(Debug, Clone)]
+pub struct BhjDebugConsole {
+    entries: Vec<BhjConsoleEntry>,
+    input_history: Vec<String>,
+    history_index: Option<usize>,
+    current_input: String,
+}
+
+impl BhjDebugConsole {
+    pub fn new() -> Self { Self { entries: Vec::new(), input_history: Vec::new(), history_index: None, current_input: String::new() } }
+
+    pub fn add_output(&mut self, text: &str) { self.entries.push(BhjConsoleEntry { kind: BhjConsoleEntryKind::Output, text: text.to_string(), source: None, line: None }); }
+    pub fn add_error(&mut self, text: &str) { self.entries.push(BhjConsoleEntry { kind: BhjConsoleEntryKind::Error, text: text.to_string(), source: None, line: None }); }
+
+    pub fn execute_input(&mut self, input: &str) {
+        self.entries.push(BhjConsoleEntry { kind: BhjConsoleEntryKind::Input, text: input.to_string(), source: None, line: None });
+        self.input_history.push(input.to_string());
+        self.history_index = None;
+        self.current_input.clear();
+    }
+
+    pub fn history_prev(&mut self) -> Option<&str> {
+        if self.input_history.is_empty() { return None; }
+        let idx = match self.history_index {
+            Some(i) if i > 0 => i - 1,
+            None => self.input_history.len() - 1,
+            _ => return self.input_history.first().map(|s| s.as_str()),
+        };
+        self.history_index = Some(idx);
+        self.input_history.get(idx).map(|s| s.as_str())
+    }
+
+    pub fn history_next(&mut self) -> Option<&str> {
+        if let Some(i) = self.history_index {
+            if i + 1 < self.input_history.len() {
+                self.history_index = Some(i + 1);
+                return self.input_history.get(i + 1).map(|s| s.as_str());
+            }
+            self.history_index = None;
+        }
+        None
+    }
+
+    pub fn set_input(&mut self, text: &str) { self.current_input = text.to_string(); }
+    pub fn current_input(&self) -> &str { &self.current_input }
+    pub fn entry_count(&self) -> usize { self.entries.len() }
+    pub fn clear(&mut self) { self.entries.clear(); }
+    pub fn entries(&self) -> &[BhjConsoleEntry] { &self.entries }
+}
+
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -86851,6 +87137,444 @@ mod tests_bfo {
         p.add_tab(BhePanelTab { id: "a".into(), label: "A".into(), icon: None, badge_count: None, is_visible: true });
         p.add_tab(BhePanelTab { id: "b".into(), label: "B".into(), icon: None, badge_count: None, is_visible: false });
         assert_eq!(p.visible_tabs().len(), 1);
+    }
+
+
+
+    // bhf_ tests
+
+    #[test]
+    fn test_bhf_sidebar_creation() {
+        let s = BhfSidebarModel::new();
+        assert!(s.is_visible());
+        assert_eq!(s.position, BhfSidebarPosition::Left);
+        assert_eq!(s.width, 250);
+    }
+
+    #[test]
+    fn test_bhf_set_position() {
+        let mut s = BhfSidebarModel::new();
+        s.set_position(BhfSidebarPosition::Right);
+        assert_eq!(s.position, BhfSidebarPosition::Right);
+    }
+
+    #[test]
+    fn test_bhf_width_clamp() {
+        let mut s = BhfSidebarModel::new();
+        s.set_width(50);
+        assert_eq!(s.width, 150);
+        s.set_width(2000);
+        assert_eq!(s.width, 800);
+    }
+
+    #[test]
+    fn test_bhf_toggle() {
+        let mut s = BhfSidebarModel::new();
+        s.toggle();
+        assert!(!s.is_visible());
+        s.toggle();
+        assert!(s.is_visible());
+    }
+
+    #[test]
+    fn test_bhf_set_active_view() {
+        let mut s = BhfSidebarModel::new();
+        s.toggle(); // hide
+        s.set_active_view("explorer");
+        assert!(s.is_visible()); // auto-shows
+        assert_eq!(s.active_view(), Some("explorer"));
+    }
+
+    #[test]
+    fn test_bhf_register_views() {
+        let mut s = BhfSidebarModel::new();
+        s.register_view("explorer");
+        s.register_view("search");
+        s.register_view("explorer"); // duplicate
+        assert_eq!(s.view_count(), 2);
+    }
+
+    #[test]
+    fn test_bhf_position_variants() {
+        let positions = [BhfSidebarPosition::Left, BhfSidebarPosition::Right];
+        assert_eq!(positions.len(), 2);
+    }
+
+    #[test]
+    fn test_bhf_no_active_initially() {
+        let s = BhfSidebarModel::new();
+        assert!(s.active_view().is_none());
+    }
+
+    #[test]
+    fn test_bhf_normal_width() {
+        let mut s = BhfSidebarModel::new();
+        s.set_width(300);
+        assert_eq!(s.width, 300);
+    }
+
+    #[test]
+    fn test_bhf_empty_views() {
+        let s = BhfSidebarModel::new();
+        assert_eq!(s.view_count(), 0);
+    }
+
+
+    // bhg_ tests
+
+    #[test]
+    fn test_bhg_explorer_creation() {
+        let m = BhgExplorerModel::new();
+        assert!(m.root.is_none());
+        assert_eq!(m.total_entries(), 0);
+    }
+
+    #[test]
+    fn test_bhg_set_root() {
+        let mut m = BhgExplorerModel::new();
+        m.set_root(BhgExplorerNode {
+            name: "project".into(), path: "/project".into(), kind: BhgExplorerEntryKind::Directory,
+            children: vec![
+                BhgExplorerNode { name: "src".into(), path: "/project/src".into(), kind: BhgExplorerEntryKind::Directory, children: vec![
+                    BhgExplorerNode { name: "main.rs".into(), path: "/project/src/main.rs".into(), kind: BhgExplorerEntryKind::File, children: vec![], is_expanded: false, is_selected: false },
+                ], is_expanded: true, is_selected: false },
+            ],
+            is_expanded: true, is_selected: false,
+        });
+        assert_eq!(m.total_entries(), 3);
+        assert_eq!(m.depth(), 3);
+    }
+
+    #[test]
+    fn test_bhg_find_by_path() {
+        let mut m = BhgExplorerModel::new();
+        m.set_root(BhgExplorerNode {
+            name: "root".into(), path: "/root".into(), kind: BhgExplorerEntryKind::Directory,
+            children: vec![BhgExplorerNode { name: "a.rs".into(), path: "/root/a.rs".into(), kind: BhgExplorerEntryKind::File, children: vec![], is_expanded: false, is_selected: false }],
+            is_expanded: true, is_selected: false,
+        });
+        assert!(m.find_by_path("/root/a.rs").is_some());
+        assert!(m.find_by_path("/nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_bhg_toggle_expand() {
+        let mut m = BhgExplorerModel::new();
+        m.set_root(BhgExplorerNode {
+            name: "root".into(), path: "/root".into(), kind: BhgExplorerEntryKind::Directory,
+            children: vec![], is_expanded: true, is_selected: false,
+        });
+        m.toggle_expand("/root");
+        assert!(!m.root.as_ref().unwrap().is_expanded);
+    }
+
+    #[test]
+    fn test_bhg_toggle_hidden() {
+        let mut m = BhgExplorerModel::new();
+        assert!(!m.show_hidden);
+        m.toggle_hidden();
+        assert!(m.show_hidden);
+    }
+
+    #[test]
+    fn test_bhg_entry_kind_variants() {
+        let kinds = [BhgExplorerEntryKind::File, BhgExplorerEntryKind::Directory, BhgExplorerEntryKind::SymLink];
+        assert_eq!(kinds.len(), 3);
+    }
+
+    #[test]
+    fn test_bhg_empty_depth() {
+        let m = BhgExplorerModel::new();
+        assert_eq!(m.depth(), 0);
+    }
+
+    #[test]
+    fn test_bhg_single_file() {
+        let mut m = BhgExplorerModel::new();
+        m.set_root(BhgExplorerNode { name: "f.rs".into(), path: "/f.rs".into(), kind: BhgExplorerEntryKind::File, children: vec![], is_expanded: false, is_selected: false });
+        assert_eq!(m.total_entries(), 1);
+        assert_eq!(m.depth(), 1);
+    }
+
+    #[test]
+    fn test_bhg_selected_flag() {
+        let node = BhgExplorerNode { name: "x".into(), path: "/x".into(), kind: BhgExplorerEntryKind::File, children: vec![], is_expanded: false, is_selected: true };
+        assert!(node.is_selected);
+    }
+
+    #[test]
+    fn test_bhg_symlink() {
+        let node = BhgExplorerNode { name: "link".into(), path: "/link".into(), kind: BhgExplorerEntryKind::SymLink, children: vec![], is_expanded: false, is_selected: false };
+        assert_eq!(node.kind, BhgExplorerEntryKind::SymLink);
+    }
+
+
+    // bhh_ tests
+
+    #[test]
+    fn test_bhh_problems_creation() {
+        let m = BhhProblemsModel::new();
+        assert_eq!(m.total(), 0);
+    }
+
+    #[test]
+    fn test_bhh_set_problems() {
+        let mut m = BhhProblemsModel::new();
+        m.set_problems(vec![
+            BhhProblem { file: "a.rs".into(), line: 1, column: 0, end_line: 1, end_column: 5, severity: BhhProblemSeverity::Error, message: "err".into(), source: None, code: None },
+            BhhProblem { file: "b.rs".into(), line: 5, column: 0, end_line: 5, end_column: 10, severity: BhhProblemSeverity::Warning, message: "warn".into(), source: Some("rustc".into()), code: Some("E0001".into()) },
+        ]);
+        assert_eq!(m.total(), 2);
+        assert_eq!(m.error_count(), 1);
+        assert_eq!(m.warning_count(), 1);
+    }
+
+    #[test]
+    fn test_bhh_problems_for_file() {
+        let mut m = BhhProblemsModel::new();
+        m.set_problems(vec![
+            BhhProblem { file: "a.rs".into(), line: 1, column: 0, end_line: 1, end_column: 5, severity: BhhProblemSeverity::Error, message: "e1".into(), source: None, code: None },
+            BhhProblem { file: "a.rs".into(), line: 3, column: 0, end_line: 3, end_column: 5, severity: BhhProblemSeverity::Warning, message: "w1".into(), source: None, code: None },
+            BhhProblem { file: "b.rs".into(), line: 1, column: 0, end_line: 1, end_column: 5, severity: BhhProblemSeverity::Error, message: "e2".into(), source: None, code: None },
+        ]);
+        assert_eq!(m.problems_for_file("a.rs").len(), 2);
+    }
+
+    #[test]
+    fn test_bhh_filter() {
+        let mut m = BhhProblemsModel::new();
+        m.set_problems(vec![
+            BhhProblem { file: "a.rs".into(), line: 1, column: 0, end_line: 1, end_column: 5, severity: BhhProblemSeverity::Error, message: "unused variable".into(), source: None, code: None },
+            BhhProblem { file: "b.rs".into(), line: 1, column: 0, end_line: 1, end_column: 5, severity: BhhProblemSeverity::Error, message: "type mismatch".into(), source: None, code: None },
+        ]);
+        m.set_filter("unused");
+        assert_eq!(m.filtered_problems().len(), 1);
+    }
+
+    #[test]
+    fn test_bhh_toggle_severity() {
+        let mut m = BhhProblemsModel::new();
+        m.set_problems(vec![
+            BhhProblem { file: "a.rs".into(), line: 1, column: 0, end_line: 1, end_column: 5, severity: BhhProblemSeverity::Error, message: "e".into(), source: None, code: None },
+            BhhProblem { file: "a.rs".into(), line: 2, column: 0, end_line: 2, end_column: 5, severity: BhhProblemSeverity::Warning, message: "w".into(), source: None, code: None },
+        ]);
+        m.toggle_errors();
+        assert_eq!(m.filtered_problems().len(), 1);
+    }
+
+    #[test]
+    fn test_bhh_affected_files() {
+        let mut m = BhhProblemsModel::new();
+        m.set_problems(vec![
+            BhhProblem { file: "a.rs".into(), line: 1, column: 0, end_line: 1, end_column: 1, severity: BhhProblemSeverity::Error, message: "".into(), source: None, code: None },
+            BhhProblem { file: "a.rs".into(), line: 2, column: 0, end_line: 2, end_column: 1, severity: BhhProblemSeverity::Error, message: "".into(), source: None, code: None },
+            BhhProblem { file: "b.rs".into(), line: 1, column: 0, end_line: 1, end_column: 1, severity: BhhProblemSeverity::Warning, message: "".into(), source: None, code: None },
+        ]);
+        assert_eq!(m.affected_files().len(), 2);
+    }
+
+    #[test]
+    fn test_bhh_clear() {
+        let mut m = BhhProblemsModel::new();
+        m.set_problems(vec![BhhProblem { file: "x".into(), line: 1, column: 0, end_line: 1, end_column: 1, severity: BhhProblemSeverity::Error, message: "".into(), source: None, code: None }]);
+        m.clear();
+        assert_eq!(m.total(), 0);
+    }
+
+    #[test]
+    fn test_bhh_severity_variants() {
+        let sevs = [BhhProblemSeverity::Error, BhhProblemSeverity::Warning, BhhProblemSeverity::Info, BhhProblemSeverity::Hint];
+        assert_eq!(sevs.len(), 4);
+    }
+
+    #[test]
+    fn test_bhh_info_count() {
+        let mut m = BhhProblemsModel::new();
+        m.set_problems(vec![
+            BhhProblem { file: "a.rs".into(), line: 1, column: 0, end_line: 1, end_column: 1, severity: BhhProblemSeverity::Info, message: "".into(), source: None, code: None },
+            BhhProblem { file: "a.rs".into(), line: 2, column: 0, end_line: 2, end_column: 1, severity: BhhProblemSeverity::Hint, message: "".into(), source: None, code: None },
+        ]);
+        assert_eq!(m.info_count(), 2);
+    }
+
+    #[test]
+    fn test_bhh_source_code() {
+        let p = BhhProblem { file: "a.rs".into(), line: 1, column: 0, end_line: 1, end_column: 1, severity: BhhProblemSeverity::Error, message: "err".into(), source: Some("rustc".into()), code: Some("E0308".into()) };
+        assert_eq!(p.source.as_deref(), Some("rustc"));
+        assert_eq!(p.code.as_deref(), Some("E0308"));
+    }
+
+
+    // bhi_ tests
+
+    #[test]
+    fn test_bhi_output_creation() {
+        let m = BhiOutputModel::new();
+        assert_eq!(m.channel_count(), 0);
+        assert!(m.active_channel().is_none());
+    }
+
+    #[test]
+    fn test_bhi_create_channel() {
+        let mut m = BhiOutputModel::new();
+        m.create_channel("git", "Git", false);
+        m.create_channel("ext", "Extension Host", true);
+        assert_eq!(m.channel_count(), 2);
+        assert_eq!(m.active_channel().unwrap().id, "git");
+    }
+
+    #[test]
+    fn test_bhi_append() {
+        let mut m = BhiOutputModel::new();
+        m.create_channel("log", "Log", false);
+        m.append("log", "line 1\n");
+        m.append("log", "line 2\n");
+        assert!(m.active_channel().unwrap().content.contains("line 1"));
+        assert!(m.active_channel().unwrap().content.contains("line 2"));
+    }
+
+    #[test]
+    fn test_bhi_clear() {
+        let mut m = BhiOutputModel::new();
+        m.create_channel("log", "Log", false);
+        m.append("log", "data\n");
+        m.clear_channel("log");
+        assert!(m.active_channel().unwrap().content.is_empty());
+    }
+
+    #[test]
+    fn test_bhi_switch_active() {
+        let mut m = BhiOutputModel::new();
+        m.create_channel("a", "A", false);
+        m.create_channel("b", "B", false);
+        m.set_active("b");
+        assert_eq!(m.active_channel().unwrap().id, "b");
+    }
+
+    #[test]
+    fn test_bhi_remove() {
+        let mut m = BhiOutputModel::new();
+        m.create_channel("a", "A", false);
+        m.remove_channel("a");
+        assert_eq!(m.channel_count(), 0);
+    }
+
+    #[test]
+    fn test_bhi_channel_names() {
+        let mut m = BhiOutputModel::new();
+        m.create_channel("a", "Alpha", false);
+        m.create_channel("b", "Beta", false);
+        assert_eq!(m.channel_names(), vec!["Alpha", "Beta"]);
+    }
+
+    #[test]
+    fn test_bhi_is_log() {
+        let mut m = BhiOutputModel::new();
+        m.create_channel("log", "Log", true);
+        assert!(m.active_channel().unwrap().is_log);
+    }
+
+    #[test]
+    fn test_bhi_max_lines() {
+        let mut m = BhiOutputModel::new();
+        m.create_channel("log", "Log", false);
+        if let Some(ch) = m.channels.iter_mut().find(|c| c.id == "log") { ch.max_lines = 3; }
+        m.append("log", "a\nb\nc\nd\ne\n");
+        let lines: Vec<&str> = m.active_channel().unwrap().content.lines().collect();
+        assert!(lines.len() <= 3);
+    }
+
+    #[test]
+    fn test_bhi_append_nonexistent() {
+        let mut m = BhiOutputModel::new();
+        m.append("nonexistent", "data"); // no-op, no panic
+        assert_eq!(m.channel_count(), 0);
+    }
+
+
+    // bhj_ tests
+
+    #[test]
+    fn test_bhj_console_creation() {
+        let c = BhjDebugConsole::new();
+        assert_eq!(c.entry_count(), 0);
+        assert!(c.current_input().is_empty());
+    }
+
+    #[test]
+    fn test_bhj_add_output() {
+        let mut c = BhjDebugConsole::new();
+        c.add_output("hello");
+        c.add_error("oops");
+        assert_eq!(c.entry_count(), 2);
+        assert_eq!(c.entries()[0].kind, BhjConsoleEntryKind::Output);
+        assert_eq!(c.entries()[1].kind, BhjConsoleEntryKind::Error);
+    }
+
+    #[test]
+    fn test_bhj_execute_input() {
+        let mut c = BhjDebugConsole::new();
+        c.execute_input("x + 1");
+        assert_eq!(c.entry_count(), 1);
+        assert_eq!(c.entries()[0].kind, BhjConsoleEntryKind::Input);
+        assert_eq!(c.entries()[0].text, "x + 1");
+    }
+
+    #[test]
+    fn test_bhj_history() {
+        let mut c = BhjDebugConsole::new();
+        c.execute_input("cmd1");
+        c.execute_input("cmd2");
+        c.execute_input("cmd3");
+        assert_eq!(c.history_prev(), Some("cmd3"));
+        assert_eq!(c.history_prev(), Some("cmd2"));
+        assert_eq!(c.history_prev(), Some("cmd1"));
+        assert_eq!(c.history_next(), Some("cmd2"));
+    }
+
+    #[test]
+    fn test_bhj_empty_history() {
+        let mut c = BhjDebugConsole::new();
+        assert!(c.history_prev().is_none());
+        assert!(c.history_next().is_none());
+    }
+
+    #[test]
+    fn test_bhj_set_input() {
+        let mut c = BhjDebugConsole::new();
+        c.set_input("test");
+        assert_eq!(c.current_input(), "test");
+    }
+
+    #[test]
+    fn test_bhj_clear() {
+        let mut c = BhjDebugConsole::new();
+        c.add_output("x");
+        c.clear();
+        assert_eq!(c.entry_count(), 0);
+    }
+
+    #[test]
+    fn test_bhj_entry_kind_variants() {
+        let kinds = [BhjConsoleEntryKind::Input, BhjConsoleEntryKind::Output, BhjConsoleEntryKind::Error, BhjConsoleEntryKind::Warning, BhjConsoleEntryKind::Info];
+        assert_eq!(kinds.len(), 5);
+    }
+
+    #[test]
+    fn test_bhj_input_clears_after_execute() {
+        let mut c = BhjDebugConsole::new();
+        c.set_input("hello");
+        c.execute_input("hello");
+        assert!(c.current_input().is_empty());
+    }
+
+    #[test]
+    fn test_bhj_history_wraps_at_start() {
+        let mut c = BhjDebugConsole::new();
+        c.execute_input("only");
+        c.history_prev();
+        let result = c.history_prev();
+        assert_eq!(result, Some("only"));
     }
 
 
