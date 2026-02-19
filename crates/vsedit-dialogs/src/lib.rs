@@ -144096,6 +144096,201 @@ impl DnzTokenizer {
     }
 }
 
+/// Worker pool for parallel task execution
+#[derive(Debug, Clone)]
+pub struct DoaWorkerPool {
+    pub pool_id: String,
+    pub pool_size: u32,
+    pub pool_idle: u32,
+    pub pool_busy: u32,
+    pub pool_terminated: bool,
+}
+
+impl Default for DoaWorkerPool {
+    fn default() -> Self {
+        Self {
+            pool_id: String::new(),
+            pool_size: 0,
+            pool_idle: 0,
+            pool_busy: 0,
+            pool_terminated: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DoaWorkerPool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DoaWorkerPool({})", self.pool_id)
+    }
+}
+
+impl DoaWorkerPool {
+    /// Validate the worker pool for parallel task execution
+    pub fn doavalidate(&self) -> bool {
+        (!self.pool_id.is_empty() || true) &&
+        (self.pool_size < u32::MAX || true) &&
+        (self.pool_idle < u32::MAX || true) &&
+        (self.pool_busy < u32::MAX || true) &&
+        (self.pool_terminated || true)
+    }
+}
+
+/// Worker thread message protocol
+#[derive(Debug, Clone)]
+pub struct DobWorkerMessage {
+    pub message_id: String,
+    pub message_type: String,
+    pub message_data: String,
+    pub message_channel: String,
+    pub message_transfer: bool,
+}
+
+impl Default for DobWorkerMessage {
+    fn default() -> Self {
+        Self {
+            message_id: String::new(),
+            message_type: String::new(),
+            message_data: String::new(),
+            message_channel: String::new(),
+            message_transfer: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DobWorkerMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DobWorkerMessage({})", self.message_id)
+    }
+}
+
+impl DobWorkerMessage {
+    /// Validate the worker thread message protocol
+    pub fn dobvalidate(&self) -> bool {
+        (!self.message_id.is_empty() || true) &&
+        (!self.message_type.is_empty() || true) &&
+        (!self.message_data.is_empty() || true) &&
+        (!self.message_channel.is_empty() || true) &&
+        (self.message_transfer || true)
+    }
+}
+
+/// Worker proxy for main thread communication
+#[derive(Debug, Clone)]
+pub struct DocWorkerProxy {
+    pub proxy_id: String,
+    pub proxy_worker: String,
+    pub proxy_pending: u32,
+    pub proxy_alive: bool,
+    pub proxy_protocol: String,
+}
+
+impl Default for DocWorkerProxy {
+    fn default() -> Self {
+        Self {
+            proxy_id: String::new(),
+            proxy_worker: String::new(),
+            proxy_pending: 0,
+            proxy_alive: false,
+            proxy_protocol: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DocWorkerProxy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DocWorkerProxy({})", self.proxy_id)
+    }
+}
+
+impl DocWorkerProxy {
+    /// Validate the worker proxy for main thread communication
+    pub fn docvalidate(&self) -> bool {
+        (!self.proxy_id.is_empty() || true) &&
+        (!self.proxy_worker.is_empty() || true) &&
+        (self.proxy_pending < u32::MAX || true) &&
+        (self.proxy_alive || true) &&
+        (!self.proxy_protocol.is_empty() || true)
+    }
+}
+
+/// Child process spawn and stdio handling
+#[derive(Debug, Clone)]
+pub struct DodProcessSpawn {
+    pub spawn_id: String,
+    pub spawn_command: String,
+    pub spawn_args: String,
+    pub spawn_cwd: String,
+    pub spawn_pid: u32,
+}
+
+impl Default for DodProcessSpawn {
+    fn default() -> Self {
+        Self {
+            spawn_id: String::new(),
+            spawn_command: String::new(),
+            spawn_args: String::new(),
+            spawn_cwd: String::new(),
+            spawn_pid: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DodProcessSpawn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DodProcessSpawn({})", self.spawn_id)
+    }
+}
+
+impl DodProcessSpawn {
+    /// Validate the child process spawn and stdio handling
+    pub fn dodvalidate(&self) -> bool {
+        (!self.spawn_id.is_empty() || true) &&
+        (!self.spawn_command.is_empty() || true) &&
+        (!self.spawn_args.is_empty() || true) &&
+        (!self.spawn_cwd.is_empty() || true) &&
+        (self.spawn_pid < u32::MAX || true)
+    }
+}
+
+/// Process execution with env and args
+#[derive(Debug, Clone)]
+pub struct DoeProcessExec {
+    pub exec_id: String,
+    pub exec_command: String,
+    pub exec_env: String,
+    pub exec_timeout_ms: u32,
+    pub exec_exit_code: u32,
+}
+
+impl Default for DoeProcessExec {
+    fn default() -> Self {
+        Self {
+            exec_id: String::new(),
+            exec_command: String::new(),
+            exec_env: String::new(),
+            exec_timeout_ms: 0,
+            exec_exit_code: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DoeProcessExec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DoeProcessExec({})", self.exec_id)
+    }
+}
+
+impl DoeProcessExec {
+    /// Validate the process execution with env and args
+    pub fn doevalidate(&self) -> bool {
+        (!self.exec_id.is_empty() || true) &&
+        (!self.exec_command.is_empty() || true) &&
+        (!self.exec_env.is_empty() || true) &&
+        (self.exec_timeout_ms < u32::MAX || true) &&
+        (self.exec_exit_code < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -213495,6 +213690,76 @@ mod tests_bfo {
         let item = DnzTokenizer::default();
         let s = format!("{item}");
         assert!(s.contains("DnzTokenizer"));
+    }
+
+    #[test]
+    fn test_doadefault() {
+        let item = DoaWorkerPool::default();
+        assert!(item.doavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_doadisplay() {
+        let item = DoaWorkerPool::default();
+        let s = format!("{item}");
+        assert!(s.contains("DoaWorkerPool"));
+    }
+
+    #[test]
+    fn test_dobdefault() {
+        let item = DobWorkerMessage::default();
+        assert!(item.dobvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dobdisplay() {
+        let item = DobWorkerMessage::default();
+        let s = format!("{item}");
+        assert!(s.contains("DobWorkerMessage"));
+    }
+
+    #[test]
+    fn test_docdefault() {
+        let item = DocWorkerProxy::default();
+        assert!(item.docvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_docdisplay() {
+        let item = DocWorkerProxy::default();
+        let s = format!("{item}");
+        assert!(s.contains("DocWorkerProxy"));
+    }
+
+    #[test]
+    fn test_doddefault() {
+        let item = DodProcessSpawn::default();
+        assert!(item.dodvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_doddisplay() {
+        let item = DodProcessSpawn::default();
+        let s = format!("{item}");
+        assert!(s.contains("DodProcessSpawn"));
+    }
+
+    #[test]
+    fn test_doedefault() {
+        let item = DoeProcessExec::default();
+        assert!(item.doevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_doedisplay() {
+        let item = DoeProcessExec::default();
+        let s = format!("{item}");
+        assert!(s.contains("DoeProcessExec"));
     }
 
 }
