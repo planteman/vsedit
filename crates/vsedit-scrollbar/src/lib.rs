@@ -64129,3 +64129,190 @@ mod bcl_tests {
         assert!(BclFileEntry::file("x", 1500000).human_size().contains("MB"));
     }
 }
+
+
+// --- bcm_: Editor progress indicator model ---
+
+/// Progress location in the UI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcmProgressLocation { Notification, StatusBar, Window }
+
+/// A progress task.
+#[derive(Debug, Clone)]
+pub struct BcmProgressTask {
+    pub id: u64,
+    pub title: String,
+    pub location: BcmProgressLocation,
+    pub percentage: Option<f64>,
+    pub message: Option<String>,
+    pub cancellable: bool,
+    pub cancelled: bool,
+    pub done: bool,
+}
+
+impl BcmProgressTask {
+    pub fn new(id: u64, title: &str, loc: BcmProgressLocation) -> Self {
+        Self { id, title: title.to_string(), location: loc, percentage: None, message: None, cancellable: false, cancelled: false, done: false }
+    }
+
+    pub fn with_cancellable(mut self) -> Self { self.cancellable = true; self }
+
+    pub fn report(&mut self, pct: Option<f64>, msg: Option<&str>) {
+        self.percentage = pct;
+        self.message = msg.map(|s| s.to_string());
+    }
+
+    pub fn finish(&mut self) { self.done = true; self.percentage = Some(100.0); }
+    pub fn cancel(&mut self) { if self.cancellable { self.cancelled = true; self.done = true; } }
+
+    pub fn is_indeterminate(&self) -> bool { self.percentage.is_none() && !self.done }
+
+    pub fn render_bar(&self, width: usize) -> String {
+        if self.done {
+            let status = if self.cancelled { "Cancelled" } else { "Done" };
+            return format!("{}: {}", self.title, status);
+        }
+        match self.percentage {
+            Some(pct) => {
+                let filled = ((pct / 100.0) * width as f64) as usize;
+                let empty = width.saturating_sub(filled);
+                let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty));
+                let msg = self.message.as_deref().unwrap_or("");
+                format!("{}: [{}] {:.0}% {}", self.title, bar, pct, msg)
+            }
+            None => {
+                let msg = self.message.as_deref().unwrap_or("");
+                format!("{}: ⠋ {} ", self.title, msg)
+            }
+        }
+    }
+}
+
+/// Manages all active progress tasks.
+#[derive(Debug)]
+pub struct BcmProgressManager {
+    tasks: Vec<BcmProgressTask>,
+    next_id: u64,
+}
+
+impl BcmProgressManager {
+    pub fn new() -> Self { Self { tasks: Vec::new(), next_id: 1 } }
+
+    pub fn start(&mut self, title: &str, loc: BcmProgressLocation) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.tasks.push(BcmProgressTask::new(id, title, loc));
+        id
+    }
+
+    pub fn start_cancellable(&mut self, title: &str, loc: BcmProgressLocation) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.tasks.push(BcmProgressTask::new(id, title, loc).with_cancellable());
+        id
+    }
+
+    pub fn report(&mut self, id: u64, pct: Option<f64>, msg: Option<&str>) {
+        if let Some(t) = self.tasks.iter_mut().find(|t| t.id == id) { t.report(pct, msg); }
+    }
+
+    pub fn finish(&mut self, id: u64) {
+        if let Some(t) = self.tasks.iter_mut().find(|t| t.id == id) { t.finish(); }
+    }
+
+    pub fn cancel(&mut self, id: u64) {
+        if let Some(t) = self.tasks.iter_mut().find(|t| t.id == id) { t.cancel(); }
+    }
+
+    pub fn active_tasks(&self) -> Vec<&BcmProgressTask> { self.tasks.iter().filter(|t| !t.done).collect() }
+    pub fn all_tasks(&self) -> &[BcmProgressTask] { &self.tasks }
+    pub fn cleanup_done(&mut self) { self.tasks.retain(|t| !t.done); }
+
+    pub fn by_location(&self, loc: BcmProgressLocation) -> Vec<&BcmProgressTask> {
+        self.tasks.iter().filter(|t| t.location == loc && !t.done).collect()
+    }
+}
+
+#[cfg(test)]
+mod bcm_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcm_start() {
+        let mut pm = BcmProgressManager::new();
+        let id = pm.start("Loading", BcmProgressLocation::Notification);
+        assert_eq!(pm.active_tasks().len(), 1);
+        assert_eq!(id, 1);
+    }
+
+    #[test]
+    fn test_bcm_report() {
+        let mut pm = BcmProgressManager::new();
+        let id = pm.start("Indexing", BcmProgressLocation::Window);
+        pm.report(id, Some(50.0), Some("halfway"));
+        let t = &pm.all_tasks()[0];
+        assert_eq!(t.percentage, Some(50.0));
+    }
+
+    #[test]
+    fn test_bcm_finish() {
+        let mut pm = BcmProgressManager::new();
+        let id = pm.start("Build", BcmProgressLocation::StatusBar);
+        pm.finish(id);
+        assert_eq!(pm.active_tasks().len(), 0);
+    }
+
+    #[test]
+    fn test_bcm_cancel() {
+        let mut pm = BcmProgressManager::new();
+        let id = pm.start_cancellable("Search", BcmProgressLocation::Notification);
+        pm.cancel(id);
+        assert!(pm.all_tasks()[0].cancelled);
+    }
+
+    #[test]
+    fn test_bcm_indeterminate() {
+        let t = BcmProgressTask::new(1, "Loading", BcmProgressLocation::Notification);
+        assert!(t.is_indeterminate());
+    }
+
+    #[test]
+    fn test_bcm_render_bar() {
+        let mut t = BcmProgressTask::new(1, "Build", BcmProgressLocation::Window);
+        t.report(Some(50.0), None);
+        let bar = t.render_bar(10);
+        assert!(bar.contains("50%"));
+    }
+
+    #[test]
+    fn test_bcm_render_done() {
+        let mut t = BcmProgressTask::new(1, "X", BcmProgressLocation::Window);
+        t.finish();
+        assert!(t.render_bar(10).contains("Done"));
+    }
+
+    #[test]
+    fn test_bcm_by_location() {
+        let mut pm = BcmProgressManager::new();
+        pm.start("A", BcmProgressLocation::StatusBar);
+        pm.start("B", BcmProgressLocation::Notification);
+        assert_eq!(pm.by_location(BcmProgressLocation::StatusBar).len(), 1);
+    }
+
+    #[test]
+    fn test_bcm_cleanup() {
+        let mut pm = BcmProgressManager::new();
+        let id = pm.start("X", BcmProgressLocation::Window);
+        pm.finish(id);
+        pm.cleanup_done();
+        assert!(pm.all_tasks().is_empty());
+    }
+
+    #[test]
+    fn test_bcm_non_cancellable() {
+        let mut pm = BcmProgressManager::new();
+        let id = pm.start("X", BcmProgressLocation::Window);
+        pm.cancel(id);
+        assert!(!pm.all_tasks()[0].cancelled); // not cancellable
+    }
+}
