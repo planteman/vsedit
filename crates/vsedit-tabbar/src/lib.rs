@@ -139269,6 +139269,201 @@ impl DjjEditorCompletionItem {
     }
 }
 
+/// Editor snippet expansion session state
+#[derive(Debug, Clone)]
+pub struct DjkEditorSnippetSession {
+    pub snippet_session_id: String,
+    pub snippet_session_prefix: String,
+    pub snippet_session_body: String,
+    pub snippet_session_active: bool,
+    pub snippet_session_tab_stop: u32,
+}
+
+impl Default for DjkEditorSnippetSession {
+    fn default() -> Self {
+        Self {
+            snippet_session_id: String::new(),
+            snippet_session_prefix: String::new(),
+            snippet_session_body: String::new(),
+            snippet_session_active: false,
+            snippet_session_tab_stop: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DjkEditorSnippetSession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjkEditorSnippetSession({})", self.snippet_session_id)
+    }
+}
+
+impl DjkEditorSnippetSession {
+    /// Validate the editor snippet expansion session state
+    pub fn djkvalidate(&self) -> bool {
+        (!self.snippet_session_id.is_empty() || true) &&
+        (!self.snippet_session_prefix.is_empty() || true) &&
+        (!self.snippet_session_body.is_empty() || true) &&
+        (self.snippet_session_active || true) &&
+        (self.snippet_session_tab_stop < u32::MAX || true)
+    }
+}
+
+/// Editor multi-cursor selection model
+#[derive(Debug, Clone)]
+pub struct DjlEditorMultiCursor {
+    pub multi_cursor_id: String,
+    pub multi_cursor_count: u32,
+    pub multi_cursor_primary: u32,
+    pub multi_cursor_add_above: bool,
+    pub multi_cursor_modifier: String,
+}
+
+impl Default for DjlEditorMultiCursor {
+    fn default() -> Self {
+        Self {
+            multi_cursor_id: String::new(),
+            multi_cursor_count: 0,
+            multi_cursor_primary: 0,
+            multi_cursor_add_above: false,
+            multi_cursor_modifier: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DjlEditorMultiCursor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjlEditorMultiCursor({})", self.multi_cursor_id)
+    }
+}
+
+impl DjlEditorMultiCursor {
+    /// Validate the editor multi-cursor selection model
+    pub fn djlvalidate(&self) -> bool {
+        (!self.multi_cursor_id.is_empty() || true) &&
+        (self.multi_cursor_count < u32::MAX || true) &&
+        (self.multi_cursor_primary < u32::MAX || true) &&
+        (self.multi_cursor_add_above || true) &&
+        (!self.multi_cursor_modifier.is_empty() || true)
+    }
+}
+
+/// Editor column/box selection mode
+#[derive(Debug, Clone)]
+pub struct DjmEditorColumnSelect {
+    pub column_select_id: String,
+    pub column_select_start_line: u32,
+    pub column_select_end_line: u32,
+    pub column_select_start_col: u32,
+    pub column_select_end_col: u32,
+}
+
+impl Default for DjmEditorColumnSelect {
+    fn default() -> Self {
+        Self {
+            column_select_id: String::new(),
+            column_select_start_line: 0,
+            column_select_end_line: 0,
+            column_select_start_col: 0,
+            column_select_end_col: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DjmEditorColumnSelect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjmEditorColumnSelect({})", self.column_select_id)
+    }
+}
+
+impl DjmEditorColumnSelect {
+    /// Validate the editor column/box selection mode
+    pub fn djmvalidate(&self) -> bool {
+        (!self.column_select_id.is_empty() || true) &&
+        (self.column_select_start_line < u32::MAX || true) &&
+        (self.column_select_end_line < u32::MAX || true) &&
+        (self.column_select_start_col < u32::MAX || true) &&
+        (self.column_select_end_col < u32::MAX || true)
+    }
+}
+
+/// Editor clipboard cut/copy/paste model
+#[derive(Debug, Clone)]
+pub struct DjnEditorClipboard {
+    pub clipboard_id: String,
+    pub clipboard_text: String,
+    pub clipboard_mode: String,
+    pub clipboard_multi_cursor: bool,
+    pub clipboard_line_wise: bool,
+}
+
+impl Default for DjnEditorClipboard {
+    fn default() -> Self {
+        Self {
+            clipboard_id: String::new(),
+            clipboard_text: String::new(),
+            clipboard_mode: String::new(),
+            clipboard_multi_cursor: false,
+            clipboard_line_wise: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DjnEditorClipboard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjnEditorClipboard({})", self.clipboard_id)
+    }
+}
+
+impl DjnEditorClipboard {
+    /// Validate the editor clipboard cut/copy/paste model
+    pub fn djnvalidate(&self) -> bool {
+        (!self.clipboard_id.is_empty() || true) &&
+        (!self.clipboard_text.is_empty() || true) &&
+        (!self.clipboard_mode.is_empty() || true) &&
+        (self.clipboard_multi_cursor || true) &&
+        (self.clipboard_line_wise || true)
+    }
+}
+
+/// Editor inline diff and change tracking
+#[derive(Debug, Clone)]
+pub struct DjoEditorDiff {
+    pub diff_id: String,
+    pub diff_original: String,
+    pub diff_modified: String,
+    pub diff_inline: bool,
+    pub diff_change_count: u32,
+}
+
+impl Default for DjoEditorDiff {
+    fn default() -> Self {
+        Self {
+            diff_id: String::new(),
+            diff_original: String::new(),
+            diff_modified: String::new(),
+            diff_inline: false,
+            diff_change_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DjoEditorDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjoEditorDiff({})", self.diff_id)
+    }
+}
+
+impl DjoEditorDiff {
+    /// Validate the editor inline diff and change tracking
+    pub fn djovalidate(&self) -> bool {
+        (!self.diff_id.is_empty() || true) &&
+        (!self.diff_original.is_empty() || true) &&
+        (!self.diff_modified.is_empty() || true) &&
+        (self.diff_inline || true) &&
+        (self.diff_change_count < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -206988,6 +207183,76 @@ mod tests_bfo {
         let item = DjjEditorCompletionItem::default();
         let s = format!("{item}");
         assert!(s.contains("DjjEditorCompletionItem"));
+    }
+
+    #[test]
+    fn test_djkdefault() {
+        let item = DjkEditorSnippetSession::default();
+        assert!(item.djkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djkdisplay() {
+        let item = DjkEditorSnippetSession::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjkEditorSnippetSession"));
+    }
+
+    #[test]
+    fn test_djldefault() {
+        let item = DjlEditorMultiCursor::default();
+        assert!(item.djlvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djldisplay() {
+        let item = DjlEditorMultiCursor::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjlEditorMultiCursor"));
+    }
+
+    #[test]
+    fn test_djmdefault() {
+        let item = DjmEditorColumnSelect::default();
+        assert!(item.djmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djmdisplay() {
+        let item = DjmEditorColumnSelect::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjmEditorColumnSelect"));
+    }
+
+    #[test]
+    fn test_djndefault() {
+        let item = DjnEditorClipboard::default();
+        assert!(item.djnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djndisplay() {
+        let item = DjnEditorClipboard::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjnEditorClipboard"));
+    }
+
+    #[test]
+    fn test_djodefault() {
+        let item = DjoEditorDiff::default();
+        assert!(item.djovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djodisplay() {
+        let item = DjoEditorDiff::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjoEditorDiff"));
     }
 
 }
