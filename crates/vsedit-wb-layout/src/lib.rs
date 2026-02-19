@@ -67826,3 +67826,156 @@ mod bdf_tests {
         assert_eq!(s.template_name(), "my-snippet");
     }
 }
+
+
+// --- bdg_: Editor linked editing ranges model ---
+
+/// A text range (line, start_col, end_col).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BdgRange {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+}
+
+impl BdgRange {
+    pub fn new(line: u32, start: u32, end: u32) -> Self { Self { line, start_col: start, end_col: end } }
+    pub fn len(&self) -> u32 { self.end_col.saturating_sub(self.start_col) }
+    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn contains_col(&self, col: u32) -> bool { col >= self.start_col && col <= self.end_col }
+}
+
+/// A group of linked editing ranges that change together.
+#[derive(Debug, Clone)]
+pub struct BdgLinkedGroup {
+    pub ranges: Vec<BdgRange>,
+    pub word_pattern: Option<String>,
+}
+
+impl BdgLinkedGroup {
+    pub fn new(ranges: Vec<BdgRange>) -> Self { Self { ranges, word_pattern: None } }
+    pub fn with_pattern(mut self, p: &str) -> Self { self.word_pattern = Some(p.to_string()); self }
+    pub fn range_count(&self) -> usize { self.ranges.len() }
+    pub fn contains_position(&self, line: u32, col: u32) -> bool { self.ranges.iter().any(|r| r.line == line && r.contains_col(col)) }
+}
+
+/// Manages linked editing sessions.
+#[derive(Debug)]
+pub struct BdgLinkedEditingManager {
+    active_group: Option<BdgLinkedGroup>,
+    enabled: bool,
+}
+
+impl BdgLinkedEditingManager {
+    pub fn new() -> Self { Self { active_group: None, enabled: true } }
+
+    pub fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; if !enabled { self.active_group = None; } }
+    pub fn is_enabled(&self) -> bool { self.enabled }
+
+    pub fn set_group(&mut self, group: BdgLinkedGroup) {
+        if self.enabled { self.active_group = Some(group); }
+    }
+
+    pub fn clear_group(&mut self) { self.active_group = None; }
+
+    pub fn active_group(&self) -> Option<&BdgLinkedGroup> { self.active_group.as_ref() }
+    pub fn has_active(&self) -> bool { self.active_group.is_some() }
+
+    pub fn ranges_at(&self, line: u32, col: u32) -> Vec<&BdgRange> {
+        match &self.active_group {
+            Some(g) if g.contains_position(line, col) => g.ranges.iter().collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    pub fn apply_edit(&mut self, line: u32, col: u32, new_text: &str) -> Vec<(BdgRange, String)> {
+        let ranges = self.ranges_at(line, col);
+        ranges.into_iter().map(|r| (*r, new_text.to_string())).collect()
+    }
+
+    pub fn all_lines_affected(&self) -> Vec<u32> {
+        match &self.active_group {
+            Some(g) => { let mut lines: Vec<_> = g.ranges.iter().map(|r| r.line).collect(); lines.sort(); lines.dedup(); lines }
+            None => Vec::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod bdg_tests {
+    use super::*;
+
+    #[test]
+    fn test_bdg_range() {
+        let r = BdgRange::new(5, 10, 20);
+        assert_eq!(r.len(), 10);
+        assert!(r.contains_col(15));
+        assert!(!r.contains_col(25));
+    }
+
+    #[test]
+    fn test_bdg_range_empty() {
+        let r = BdgRange::new(0, 5, 5);
+        assert!(r.is_empty());
+    }
+
+    #[test]
+    fn test_bdg_group() {
+        let g = BdgLinkedGroup::new(vec![BdgRange::new(1, 0, 5), BdgRange::new(3, 10, 15)]);
+        assert_eq!(g.range_count(), 2);
+        assert!(g.contains_position(1, 3));
+        assert!(!g.contains_position(2, 0));
+    }
+
+    #[test]
+    fn test_bdg_group_pattern() {
+        let g = BdgLinkedGroup::new(vec![]).with_pattern("\\w+");
+        assert_eq!(g.word_pattern.as_deref(), Some("\\w+"));
+    }
+
+    #[test]
+    fn test_bdg_manager_new() {
+        let m = BdgLinkedEditingManager::new();
+        assert!(m.is_enabled());
+        assert!(!m.has_active());
+    }
+
+    #[test]
+    fn test_bdg_set_group() {
+        let mut m = BdgLinkedEditingManager::new();
+        m.set_group(BdgLinkedGroup::new(vec![BdgRange::new(0, 0, 5)]));
+        assert!(m.has_active());
+    }
+
+    #[test]
+    fn test_bdg_clear() {
+        let mut m = BdgLinkedEditingManager::new();
+        m.set_group(BdgLinkedGroup::new(vec![BdgRange::new(0, 0, 5)]));
+        m.clear_group();
+        assert!(!m.has_active());
+    }
+
+    #[test]
+    fn test_bdg_ranges_at() {
+        let mut m = BdgLinkedEditingManager::new();
+        m.set_group(BdgLinkedGroup::new(vec![BdgRange::new(1, 0, 5), BdgRange::new(5, 0, 5)]));
+        assert_eq!(m.ranges_at(1, 3).len(), 2);
+        assert_eq!(m.ranges_at(10, 0).len(), 0);
+    }
+
+    #[test]
+    fn test_bdg_apply_edit() {
+        let mut m = BdgLinkedEditingManager::new();
+        m.set_group(BdgLinkedGroup::new(vec![BdgRange::new(0, 0, 3), BdgRange::new(5, 10, 13)]));
+        let edits = m.apply_edit(0, 1, "newName");
+        assert_eq!(edits.len(), 2);
+    }
+
+    #[test]
+    fn test_bdg_disabled() {
+        let mut m = BdgLinkedEditingManager::new();
+        m.set_enabled(false);
+        m.set_group(BdgLinkedGroup::new(vec![BdgRange::new(0, 0, 5)]));
+        assert!(!m.has_active());
+    }
+}
