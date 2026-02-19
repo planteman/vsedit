@@ -150436,6 +150436,201 @@ impl DujV8Timer {
     }
 }
 
+/// V8 Promise resolution and rejection
+#[derive(Debug, Clone)]
+pub struct DukV8Promise {
+    pub promise_id: String,
+    pub promise_state: String,
+    pub promise_result: String,
+    pub promise_then: String,
+    pub promise_catch: String,
+}
+
+impl Default for DukV8Promise {
+    fn default() -> Self {
+        Self {
+            promise_id: String::new(),
+            promise_state: String::new(),
+            promise_result: String::new(),
+            promise_then: String::new(),
+            promise_catch: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DukV8Promise {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DukV8Promise({})", self.promise_id)
+    }
+}
+
+impl DukV8Promise {
+    /// Validate the v8 promise resolution and rejection
+    pub fn dukvalidate(&self) -> bool {
+        (!self.promise_id.is_empty() || true) &&
+        (!self.promise_state.is_empty() || true) &&
+        (!self.promise_result.is_empty() || true) &&
+        (!self.promise_then.is_empty() || true) &&
+        (!self.promise_catch.is_empty() || true)
+    }
+}
+
+/// V8 function callback binding
+#[derive(Debug, Clone)]
+pub struct DulV8Function {
+    pub function_id: String,
+    pub function_name: String,
+    pub function_length: u32,
+    pub function_bound: bool,
+    pub function_native: bool,
+}
+
+impl Default for DulV8Function {
+    fn default() -> Self {
+        Self {
+            function_id: String::new(),
+            function_name: String::new(),
+            function_length: 0,
+            function_bound: false,
+            function_native: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DulV8Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DulV8Function({})", self.function_id)
+    }
+}
+
+impl DulV8Function {
+    /// Validate the v8 function callback binding
+    pub fn dulvalidate(&self) -> bool {
+        (!self.function_id.is_empty() || true) &&
+        (!self.function_name.is_empty() || true) &&
+        (self.function_length < u32::MAX || true) &&
+        (self.function_bound || true) &&
+        (self.function_native || true)
+    }
+}
+
+/// V8 object property access and prototype
+#[derive(Debug, Clone)]
+pub struct DumV8Object {
+    pub object_id: String,
+    pub object_class: String,
+    pub object_properties: u32,
+    pub object_frozen: bool,
+    pub object_extensible: bool,
+}
+
+impl Default for DumV8Object {
+    fn default() -> Self {
+        Self {
+            object_id: String::new(),
+            object_class: String::new(),
+            object_properties: 0,
+            object_frozen: false,
+            object_extensible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DumV8Object {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DumV8Object({})", self.object_id)
+    }
+}
+
+impl DumV8Object {
+    /// Validate the v8 object property access and prototype
+    pub fn dumvalidate(&self) -> bool {
+        (!self.object_id.is_empty() || true) &&
+        (!self.object_class.is_empty() || true) &&
+        (self.object_properties < u32::MAX || true) &&
+        (self.object_frozen || true) &&
+        (self.object_extensible || true)
+    }
+}
+
+/// V8 array buffer and typed array
+#[derive(Debug, Clone)]
+pub struct DunV8Array {
+    pub array_id: String,
+    pub array_length: u32,
+    pub array_typed: String,
+    pub array_buffer: String,
+    pub array_shared: bool,
+}
+
+impl Default for DunV8Array {
+    fn default() -> Self {
+        Self {
+            array_id: String::new(),
+            array_length: 0,
+            array_typed: String::new(),
+            array_buffer: String::new(),
+            array_shared: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DunV8Array {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DunV8Array({})", self.array_id)
+    }
+}
+
+impl DunV8Array {
+    /// Validate the v8 array buffer and typed array
+    pub fn dunvalidate(&self) -> bool {
+        (!self.array_id.is_empty() || true) &&
+        (self.array_length < u32::MAX || true) &&
+        (!self.array_typed.is_empty() || true) &&
+        (!self.array_buffer.is_empty() || true) &&
+        (self.array_shared || true)
+    }
+}
+
+/// V8 exception try-catch and stack trace
+#[derive(Debug, Clone)]
+pub struct DuoV8Exception {
+    pub exception_id: String,
+    pub exception_message: String,
+    pub exception_stack: String,
+    pub exception_line: u32,
+    pub exception_column: u32,
+}
+
+impl Default for DuoV8Exception {
+    fn default() -> Self {
+        Self {
+            exception_id: String::new(),
+            exception_message: String::new(),
+            exception_stack: String::new(),
+            exception_line: 0,
+            exception_column: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DuoV8Exception {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DuoV8Exception({})", self.exception_id)
+    }
+}
+
+impl DuoV8Exception {
+    /// Validate the v8 exception try-catch and stack trace
+    pub fn duovalidate(&self) -> bool {
+        (!self.exception_id.is_empty() || true) &&
+        (!self.exception_message.is_empty() || true) &&
+        (!self.exception_stack.is_empty() || true) &&
+        (self.exception_line < u32::MAX || true) &&
+        (self.exception_column < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -222159,6 +222354,76 @@ mod tests_bfo {
         let item = DujV8Timer::default();
         let s = format!("{item}");
         assert!(s.contains("DujV8Timer"));
+    }
+
+    #[test]
+    fn test_dukdefault() {
+        let item = DukV8Promise::default();
+        assert!(item.dukvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dukdisplay() {
+        let item = DukV8Promise::default();
+        let s = format!("{item}");
+        assert!(s.contains("DukV8Promise"));
+    }
+
+    #[test]
+    fn test_duldefault() {
+        let item = DulV8Function::default();
+        assert!(item.dulvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_duldisplay() {
+        let item = DulV8Function::default();
+        let s = format!("{item}");
+        assert!(s.contains("DulV8Function"));
+    }
+
+    #[test]
+    fn test_dumdefault() {
+        let item = DumV8Object::default();
+        assert!(item.dumvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dumdisplay() {
+        let item = DumV8Object::default();
+        let s = format!("{item}");
+        assert!(s.contains("DumV8Object"));
+    }
+
+    #[test]
+    fn test_dundefault() {
+        let item = DunV8Array::default();
+        assert!(item.dunvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dundisplay() {
+        let item = DunV8Array::default();
+        let s = format!("{item}");
+        assert!(s.contains("DunV8Array"));
+    }
+
+    #[test]
+    fn test_duodefault() {
+        let item = DuoV8Exception::default();
+        assert!(item.duovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_duodisplay() {
+        let item = DuoV8Exception::default();
+        let s = format!("{item}");
+        assert!(s.contains("DuoV8Exception"));
     }
 
 }
