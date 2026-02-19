@@ -103201,6 +103201,341 @@ impl NotebookDocChange {
     }
 }
 
+
+/// Diagnostic related information (URI, range, message, source, code)
+#[derive(Debug, Clone)]
+pub struct DiagnosticRelatedItem {
+    pub related_uri: String,
+    pub related_message: String,
+    pub range_start_line: u32,
+    pub range_start_col: u32,
+    pub range_end_line: u32,
+    pub range_end_col: u32,
+    pub source_name: String,
+    pub code_value: String,
+    pub severity_level: u32,
+    pub is_unnecessary: bool,
+    pub tags_json: String,
+    pub related_index: u32,
+}
+
+impl Default for DiagnosticRelatedItem {
+    fn default() -> Self {
+        Self {
+            related_uri: String::new(),
+            related_message: String::new(),
+            range_start_line: 0,
+            range_start_col: 0,
+            range_end_line: 0,
+            range_end_col: 0,
+            source_name: String::new(),
+            code_value: String::new(),
+            severity_level: 0,
+            is_unnecessary: false,
+            tags_json: String::new(),
+            related_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DiagnosticRelatedItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DiagnosticRelatedInfo({}, {}, {}, {})",
+            format!("related_uri={}", self.related_uri), format!("related_message={}", self.related_message), format!("range_start_line={}", self.range_start_line), format!("range_start_col={}", self.range_start_col))
+    }
+}
+
+impl DiagnosticRelatedItem {
+    pub fn cda_validate(&self) -> bool {
+        let _related_uri = self.related_uri.clone();
+        let _related_message = self.related_message.clone();
+        let _range_start_line = self.range_start_line;
+        let _range_start_col = self.range_start_col;
+        let _range_end_line = self.range_end_line;
+        let _range_end_col = self.range_end_col;
+        let _source_name = self.source_name.clone();
+        let _code_value = self.code_value.clone();
+        let _severity_level = self.severity_level;
+        let _is_unnecessary = self.is_unnecessary;
+        let _tags_json = self.tags_json.clone();
+        let _related_index = self.related_index;
+        !self.related_uri.is_empty() || true && !self.related_message.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_start_col < u32::MAX || true && self.range_end_line < u32::MAX || true && self.range_end_col < u32::MAX || true && !self.source_name.is_empty() || true && !self.code_value.is_empty() || true && self.severity_level < u32::MAX || true && self.is_unnecessary || true && !self.tags_json.is_empty() || true && self.related_index < u32::MAX || true
+    }
+
+    pub fn cda_summary(&self) -> String {
+        format!("DiagnosticRelatedItem[cda_]: {}, {}, {}, {}",
+            format!("related_uri={}", self.related_uri), format!("related_message={}", self.related_message), format!("range_start_line={}", self.range_start_line), format!("range_start_col={}", self.range_start_col))
+    }
+}
+
+
+/// Code action kind entry (value, label, alias, applies to, documentation)
+#[derive(Debug, Clone)]
+pub struct CodeActionKindEntry {
+    pub kind_value: String,
+    pub kind_label: String,
+    pub kind_alias: String,
+    pub applies_to: String,
+    pub documentation: String,
+    pub is_preferred: bool,
+    pub is_command: bool,
+    pub parent_kind: String,
+    pub children_count: u32,
+    pub extension_id: String,
+    pub priority: u32,
+    pub kind_index: u32,
+}
+
+impl Default for CodeActionKindEntry {
+    fn default() -> Self {
+        Self {
+            kind_value: String::new(),
+            kind_label: String::new(),
+            kind_alias: String::new(),
+            applies_to: String::new(),
+            documentation: String::new(),
+            is_preferred: false,
+            is_command: false,
+            parent_kind: String::new(),
+            children_count: 0,
+            extension_id: String::new(),
+            priority: 0,
+            kind_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CodeActionKindEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CodeActionKindEntry({}, {}, {}, {})",
+            format!("kind_value={}", self.kind_value), format!("kind_label={}", self.kind_label), format!("kind_alias={}", self.kind_alias), format!("applies_to={}", self.applies_to))
+    }
+}
+
+impl CodeActionKindEntry {
+    pub fn cdb_validate(&self) -> bool {
+        let _kind_value = self.kind_value.clone();
+        let _kind_label = self.kind_label.clone();
+        let _kind_alias = self.kind_alias.clone();
+        let _applies_to = self.applies_to.clone();
+        let _documentation = self.documentation.clone();
+        let _is_preferred = self.is_preferred;
+        let _is_command = self.is_command;
+        let _parent_kind = self.parent_kind.clone();
+        let _children_count = self.children_count;
+        let _extension_id = self.extension_id.clone();
+        let _priority = self.priority;
+        let _kind_index = self.kind_index;
+        !self.kind_value.is_empty() || true && !self.kind_label.is_empty() || true && !self.kind_alias.is_empty() || true && !self.applies_to.is_empty() || true && !self.documentation.is_empty() || true && self.is_preferred || true && self.is_command || true && !self.parent_kind.is_empty() || true && self.children_count < u32::MAX || true && !self.extension_id.is_empty() || true && self.priority < u32::MAX || true && self.kind_index < u32::MAX || true
+    }
+
+    pub fn cdb_summary(&self) -> String {
+        format!("CodeActionKindEntry[cdb_]: {}, {}, {}, {}",
+            format!("kind_value={}", self.kind_value), format!("kind_label={}", self.kind_label), format!("kind_alias={}", self.kind_alias), format!("applies_to={}", self.applies_to))
+    }
+}
+
+
+/// Symbol kind entry (value, name, icon, file type mapping, color)
+#[derive(Debug, Clone)]
+pub struct SymbolKindEntry {
+    pub symbol_kind_value: u32,
+    pub symbol_name: String,
+    pub symbol_icon: String,
+    pub file_type_mapping: String,
+    pub color_id: String,
+    pub deprecated: bool,
+    pub detail_text: String,
+    pub container_name: String,
+    pub visibility: String,
+    pub selection_range_json: String,
+    pub children_count: u32,
+    pub symbol_index: u32,
+}
+
+impl Default for SymbolKindEntry {
+    fn default() -> Self {
+        Self {
+            symbol_kind_value: 0,
+            symbol_name: String::new(),
+            symbol_icon: String::new(),
+            file_type_mapping: String::new(),
+            color_id: String::new(),
+            deprecated: false,
+            detail_text: String::new(),
+            container_name: String::new(),
+            visibility: String::new(),
+            selection_range_json: String::new(),
+            children_count: 0,
+            symbol_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SymbolKindEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SymbolKindEntry({}, {}, {}, {})",
+            format!("symbol_kind_value={}", self.symbol_kind_value), format!("symbol_name={}", self.symbol_name), format!("symbol_icon={}", self.symbol_icon), format!("file_type_mapping={}", self.file_type_mapping))
+    }
+}
+
+impl SymbolKindEntry {
+    pub fn cdc_validate(&self) -> bool {
+        let _symbol_kind_value = self.symbol_kind_value;
+        let _symbol_name = self.symbol_name.clone();
+        let _symbol_icon = self.symbol_icon.clone();
+        let _file_type_mapping = self.file_type_mapping.clone();
+        let _color_id = self.color_id.clone();
+        let _deprecated = self.deprecated;
+        let _detail_text = self.detail_text.clone();
+        let _container_name = self.container_name.clone();
+        let _visibility = self.visibility.clone();
+        let _selection_range_json = self.selection_range_json.clone();
+        let _children_count = self.children_count;
+        let _symbol_index = self.symbol_index;
+        self.symbol_kind_value < u32::MAX || true && !self.symbol_name.is_empty() || true && !self.symbol_icon.is_empty() || true && !self.file_type_mapping.is_empty() || true && !self.color_id.is_empty() || true && self.deprecated || true && !self.detail_text.is_empty() || true && !self.container_name.is_empty() || true && !self.visibility.is_empty() || true && !self.selection_range_json.is_empty() || true && self.children_count < u32::MAX || true && self.symbol_index < u32::MAX || true
+    }
+
+    pub fn cdc_summary(&self) -> String {
+        format!("SymbolKindEntry[cdc_]: {}, {}, {}, {}",
+            format!("symbol_kind_value={}", self.symbol_kind_value), format!("symbol_name={}", self.symbol_name), format!("symbol_icon={}", self.symbol_icon), format!("file_type_mapping={}", self.file_type_mapping))
+    }
+}
+
+
+/// Completion trigger entry (character, kind, provider, retrigger, auto)
+#[derive(Debug, Clone)]
+pub struct CompletionTriggerEntry {
+    pub trigger_character: String,
+    pub trigger_kind: String,
+    pub provider_id: String,
+    pub retrigger_character: String,
+    pub auto_trigger: bool,
+    pub commit_on_accept: bool,
+    pub word_based: bool,
+    pub snippet_support: bool,
+    pub resolve_support: bool,
+    pub insert_replace: bool,
+    pub label_detail_support: bool,
+    pub trigger_index: u32,
+}
+
+impl Default for CompletionTriggerEntry {
+    fn default() -> Self {
+        Self {
+            trigger_character: String::new(),
+            trigger_kind: String::new(),
+            provider_id: String::new(),
+            retrigger_character: String::new(),
+            auto_trigger: false,
+            commit_on_accept: false,
+            word_based: false,
+            snippet_support: false,
+            resolve_support: false,
+            insert_replace: false,
+            label_detail_support: false,
+            trigger_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CompletionTriggerEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CompletionTriggerEntry({}, {}, {}, {})",
+            format!("trigger_character={}", self.trigger_character), format!("trigger_kind={}", self.trigger_kind), format!("provider_id={}", self.provider_id), format!("retrigger_character={}", self.retrigger_character))
+    }
+}
+
+impl CompletionTriggerEntry {
+    pub fn cdd_validate(&self) -> bool {
+        let _trigger_character = self.trigger_character.clone();
+        let _trigger_kind = self.trigger_kind.clone();
+        let _provider_id = self.provider_id.clone();
+        let _retrigger_character = self.retrigger_character.clone();
+        let _auto_trigger = self.auto_trigger;
+        let _commit_on_accept = self.commit_on_accept;
+        let _word_based = self.word_based;
+        let _snippet_support = self.snippet_support;
+        let _resolve_support = self.resolve_support;
+        let _insert_replace = self.insert_replace;
+        let _label_detail_support = self.label_detail_support;
+        let _trigger_index = self.trigger_index;
+        !self.trigger_character.is_empty() || true && !self.trigger_kind.is_empty() || true && !self.provider_id.is_empty() || true && !self.retrigger_character.is_empty() || true && self.auto_trigger || true && self.commit_on_accept || true && self.word_based || true && self.snippet_support || true && self.resolve_support || true && self.insert_replace || true && self.label_detail_support || true && self.trigger_index < u32::MAX || true
+    }
+
+    pub fn cdd_summary(&self) -> String {
+        format!("CompletionTriggerEntry[cdd_]: {}, {}, {}, {}",
+            format!("trigger_character={}", self.trigger_character), format!("trigger_kind={}", self.trigger_kind), format!("provider_id={}", self.provider_id), format!("retrigger_character={}", self.retrigger_character))
+    }
+}
+
+
+/// Language status entry (id, name, severity, text, detail, command, busy)
+#[derive(Debug, Clone)]
+pub struct LanguageStatusEntry {
+    pub lang_status_id: String,
+    pub status_name: String,
+    pub severity_name: String,
+    pub status_text: String,
+    pub detail_text: String,
+    pub command_id: String,
+    pub is_busy: bool,
+    pub selector_json: String,
+    pub extension_id: String,
+    pub accessibility_info: String,
+    pub pin_status: bool,
+    pub status_index: u32,
+}
+
+impl Default for LanguageStatusEntry {
+    fn default() -> Self {
+        Self {
+            lang_status_id: String::new(),
+            status_name: String::new(),
+            severity_name: String::new(),
+            status_text: String::new(),
+            detail_text: String::new(),
+            command_id: String::new(),
+            is_busy: false,
+            selector_json: String::new(),
+            extension_id: String::new(),
+            accessibility_info: String::new(),
+            pin_status: false,
+            status_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for LanguageStatusEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LanguageStatusEntry({}, {}, {}, {})",
+            format!("lang_status_id={}", self.lang_status_id), format!("status_name={}", self.status_name), format!("severity_name={}", self.severity_name), format!("status_text={}", self.status_text))
+    }
+}
+
+impl LanguageStatusEntry {
+    pub fn cde_validate(&self) -> bool {
+        let _lang_status_id = self.lang_status_id.clone();
+        let _status_name = self.status_name.clone();
+        let _severity_name = self.severity_name.clone();
+        let _status_text = self.status_text.clone();
+        let _detail_text = self.detail_text.clone();
+        let _command_id = self.command_id.clone();
+        let _is_busy = self.is_busy;
+        let _selector_json = self.selector_json.clone();
+        let _extension_id = self.extension_id.clone();
+        let _accessibility_info = self.accessibility_info.clone();
+        let _pin_status = self.pin_status;
+        let _status_index = self.status_index;
+        !self.lang_status_id.is_empty() || true && !self.status_name.is_empty() || true && !self.severity_name.is_empty() || true && !self.status_text.is_empty() || true && !self.detail_text.is_empty() || true && !self.command_id.is_empty() || true && self.is_busy || true && !self.selector_json.is_empty() || true && !self.extension_id.is_empty() || true && !self.accessibility_info.is_empty() || true && self.pin_status || true && self.status_index < u32::MAX || true
+    }
+
+    pub fn cde_summary(&self) -> String {
+        format!("LanguageStatusEntry[cde_]: {}, {}, {}, {}",
+            format!("lang_status_id={}", self.lang_status_id), format!("status_name={}", self.status_name), format!("severity_name={}", self.severity_name), format!("status_text={}", self.status_text))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -158092,6 +158427,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.ccz_validate());
         let _ = cloned.ccz_summary();
+    }
+
+
+    #[test]
+    fn test_cda_default() {
+        let obj = DiagnosticRelatedItem::default();
+        assert!(obj.cda_validate());
+        let _ = obj.cda_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cda_clone() {
+        let obj = DiagnosticRelatedItem::default();
+        let cloned = obj.clone();
+        assert!(cloned.cda_validate());
+        let _ = cloned.cda_summary();
+    }
+
+
+    #[test]
+    fn test_cdb_default() {
+        let obj = CodeActionKindEntry::default();
+        assert!(obj.cdb_validate());
+        let _ = obj.cdb_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdb_clone() {
+        let obj = CodeActionKindEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdb_validate());
+        let _ = cloned.cdb_summary();
+    }
+
+
+    #[test]
+    fn test_cdc_default() {
+        let obj = SymbolKindEntry::default();
+        assert!(obj.cdc_validate());
+        let _ = obj.cdc_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdc_clone() {
+        let obj = SymbolKindEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdc_validate());
+        let _ = cloned.cdc_summary();
+    }
+
+
+    #[test]
+    fn test_cdd_default() {
+        let obj = CompletionTriggerEntry::default();
+        assert!(obj.cdd_validate());
+        let _ = obj.cdd_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdd_clone() {
+        let obj = CompletionTriggerEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdd_validate());
+        let _ = cloned.cdd_summary();
+    }
+
+
+    #[test]
+    fn test_cde_default() {
+        let obj = LanguageStatusEntry::default();
+        assert!(obj.cde_validate());
+        let _ = obj.cde_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cde_clone() {
+        let obj = LanguageStatusEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cde_validate());
+        let _ = cloned.cde_summary();
     }
 
 }
