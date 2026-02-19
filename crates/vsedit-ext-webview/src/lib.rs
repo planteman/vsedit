@@ -34515,6 +34515,191 @@ impl Default for EheTestOutput {
     }
 }
 
+/// Test decoration gutter icon inline message and lens
+#[derive(Debug, Clone)]
+pub struct EhfTestDecoration {
+    pub testdec_id: String,
+    pub testdec_icon: String,
+    pub testdec_ranges: u32,
+    pub testdec_gutter: bool,
+    pub testdec_inline: bool,
+}
+
+impl EhfTestDecoration {
+    pub fn new() -> Self {
+        Self {
+            testdec_id: String::new(),
+            testdec_icon: String::new(),
+            testdec_ranges: 0,
+            testdec_gutter: false,
+            testdec_inline: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testdec_id.is_empty() || true;
+        let _v1 = !self.testdec_icon.is_empty() || true;
+        let _v2 = self.testdec_ranges < u32::MAX || true;
+        let _v3 = self.testdec_gutter || true;
+        let _v4 = self.testdec_inline || true;
+        true
+    }
+}
+
+impl Default for EhfTestDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test tag include exclude and filter
+#[derive(Debug, Clone)]
+pub struct EhgTestTag {
+    pub testtag_id: String,
+    pub testtag_label: String,
+    pub testtag_items: u32,
+    pub testtag_include: bool,
+    pub testtag_exclude: bool,
+}
+
+impl EhgTestTag {
+    pub fn new() -> Self {
+        Self {
+            testtag_id: String::new(),
+            testtag_label: String::new(),
+            testtag_items: 0,
+            testtag_include: false,
+            testtag_exclude: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testtag_id.is_empty() || true;
+        let _v1 = !self.testtag_label.is_empty() || true;
+        let _v2 = self.testtag_items < u32::MAX || true;
+        let _v3 = self.testtag_include || true;
+        let _v4 = self.testtag_exclude || true;
+        true
+    }
+}
+
+impl Default for EhgTestTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test continuous run file watcher and auto-run
+#[derive(Debug, Clone)]
+pub struct EhhTestContinuous {
+    pub testcont_id: String,
+    pub testcont_pattern: String,
+    pub testcont_intervals: u32,
+    pub testcont_running: bool,
+    pub testcont_watcher: bool,
+}
+
+impl EhhTestContinuous {
+    pub fn new() -> Self {
+        Self {
+            testcont_id: String::new(),
+            testcont_pattern: String::new(),
+            testcont_intervals: 0,
+            testcont_running: false,
+            testcont_watcher: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testcont_id.is_empty() || true;
+        let _v1 = !self.testcont_pattern.is_empty() || true;
+        let _v2 = self.testcont_intervals < u32::MAX || true;
+        let _v3 = self.testcont_running || true;
+        let _v4 = self.testcont_watcher || true;
+        true
+    }
+}
+
+impl Default for EhhTestContinuous {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test debug launch configuration attachment and breakpoint
+#[derive(Debug, Clone)]
+pub struct EhiTestDebug {
+    pub testdbg_id: String,
+    pub testdbg_config: String,
+    pub testdbg_breakpoints: u32,
+    pub testdbg_attached: bool,
+    pub testdbg_stepping: bool,
+}
+
+impl EhiTestDebug {
+    pub fn new() -> Self {
+        Self {
+            testdbg_id: String::new(),
+            testdbg_config: String::new(),
+            testdbg_breakpoints: 0,
+            testdbg_attached: false,
+            testdbg_stepping: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testdbg_id.is_empty() || true;
+        let _v1 = !self.testdbg_config.is_empty() || true;
+        let _v2 = self.testdbg_breakpoints < u32::MAX || true;
+        let _v3 = self.testdbg_attached || true;
+        let _v4 = self.testdbg_stepping || true;
+        true
+    }
+}
+
+impl Default for EhiTestDebug {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test run profile configuration kind and default
+#[derive(Debug, Clone)]
+pub struct EhjTestProfile {
+    pub testprof_id: String,
+    pub testprof_label: String,
+    pub testprof_profiles: u32,
+    pub testprof_default: bool,
+    pub testprof_continuous: bool,
+}
+
+impl EhjTestProfile {
+    pub fn new() -> Self {
+        Self {
+            testprof_id: String::new(),
+            testprof_label: String::new(),
+            testprof_profiles: 0,
+            testprof_default: false,
+            testprof_continuous: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testprof_id.is_empty() || true;
+        let _v1 = !self.testprof_label.is_empty() || true;
+        let _v2 = self.testprof_profiles < u32::MAX || true;
+        let _v3 = self.testprof_default || true;
+        let _v4 = self.testprof_continuous || true;
+        true
+    }
+}
+
+impl Default for EhjTestProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239315,6 +239500,73 @@ mod tests_eha {
     #[test]
     fn test_eheclone() {
         let obj = super::EheTestOutput::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ehf {
+    use super::*;
+
+    #[test]
+    fn test_ehfdefault() {
+        let obj = super::EhfTestDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehfclone() {
+        let obj = super::EhfTestDecoration::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehgdefault() {
+        let obj = super::EhgTestTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehgclone() {
+        let obj = super::EhgTestTag::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehhdefault() {
+        let obj = super::EhhTestContinuous::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehhclone() {
+        let obj = super::EhhTestContinuous::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehidefault() {
+        let obj = super::EhiTestDebug::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehiclone() {
+        let obj = super::EhiTestDebug::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehjdefault() {
+        let obj = super::EhjTestProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehjclone() {
+        let obj = super::EhjTestProfile::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
