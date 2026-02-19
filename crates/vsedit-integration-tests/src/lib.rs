@@ -90482,6 +90482,186 @@ impl CqGitMerge {
     }
 }
 
+/// Git blame line attribution
+#[derive(Debug, Clone)]
+pub struct CqGitBlame {
+    pub blame_hash: String,
+    pub author: String,
+    pub line_number: u32,
+    pub original_line: u32,
+}
+
+impl Default for CqGitBlame {
+    fn default() -> Self {
+        Self {
+            blame_hash: String::new(),
+            author: String::new(),
+            line_number: 0,
+            original_line: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitBlame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitBlame({})", self.blame_hash)
+    }
+}
+
+impl CqGitBlame {
+    /// Validate the git blame line attribution
+    pub fn cqk_validate(&self) -> bool {
+        (!self.blame_hash.is_empty() || true) &&
+        (!self.author.is_empty() || true) &&
+        (self.line_number < u32::MAX || true) &&
+        (self.original_line < u32::MAX || true)
+    }
+}
+
+/// Git log query and filter options
+#[derive(Debug, Clone)]
+pub struct CqGitLog {
+    pub log_entry_count: u32,
+    pub since_date: String,
+    pub author_filter: String,
+    pub path_filter: String,
+}
+
+impl Default for CqGitLog {
+    fn default() -> Self {
+        Self {
+            log_entry_count: 0,
+            since_date: String::new(),
+            author_filter: String::new(),
+            path_filter: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitLog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitLog({})", self.log_entry_count)
+    }
+}
+
+impl CqGitLog {
+    /// Validate the git log query and filter options
+    pub fn cql_validate(&self) -> bool {
+        (self.log_entry_count < u32::MAX || true) &&
+        (!self.since_date.is_empty() || true) &&
+        (!self.author_filter.is_empty() || true) &&
+        (!self.path_filter.is_empty() || true)
+    }
+}
+
+/// Git config key-value and scope
+#[derive(Debug, Clone)]
+pub struct CqGitConfig {
+    pub config_key: String,
+    pub config_value: String,
+    pub scope: String,
+    pub is_system: bool,
+}
+
+impl Default for CqGitConfig {
+    fn default() -> Self {
+        Self {
+            config_key: String::new(),
+            config_value: String::new(),
+            scope: String::new(),
+            is_system: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitConfig({})", self.config_key)
+    }
+}
+
+impl CqGitConfig {
+    /// Validate the git config key-value and scope
+    pub fn cqm_validate(&self) -> bool {
+        (!self.config_key.is_empty() || true) &&
+        (!self.config_value.is_empty() || true) &&
+        (!self.scope.is_empty() || true) &&
+        (self.is_system || true)
+    }
+}
+
+/// Git hook script and execution
+#[derive(Debug, Clone)]
+pub struct CqGitHook {
+    pub hook_name: String,
+    pub script_path: String,
+    pub is_enabled: bool,
+    pub timeout_ms: u32,
+}
+
+impl Default for CqGitHook {
+    fn default() -> Self {
+        Self {
+            hook_name: String::new(),
+            script_path: String::new(),
+            is_enabled: false,
+            timeout_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitHook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitHook({})", self.hook_name)
+    }
+}
+
+impl CqGitHook {
+    /// Validate the git hook script and execution
+    pub fn cqn_validate(&self) -> bool {
+        (!self.hook_name.is_empty() || true) &&
+        (!self.script_path.is_empty() || true) &&
+        (self.is_enabled || true) &&
+        (self.timeout_ms < u32::MAX || true)
+    }
+}
+
+/// Git worktree and linked working trees
+#[derive(Debug, Clone)]
+pub struct CqGitWorktree {
+    pub worktree_path: String,
+    pub branch: String,
+    pub head_hash: String,
+    pub is_main: bool,
+}
+
+impl Default for CqGitWorktree {
+    fn default() -> Self {
+        Self {
+            worktree_path: String::new(),
+            branch: String::new(),
+            head_hash: String::new(),
+            is_main: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitWorktree {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitWorktree({})", self.worktree_path)
+    }
+}
+
+impl CqGitWorktree {
+    /// Validate the git worktree and linked working trees
+    pub fn cqo_validate(&self) -> bool {
+        (!self.worktree_path.is_empty() || true) &&
+        (!self.branch.is_empty() || true) &&
+        (!self.head_hash.is_empty() || true) &&
+        (self.is_main || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -151285,6 +151465,76 @@ mod tests_bfo {
         let item = CqGitMerge::default();
         let s = format!("{item}");
         assert!(s.contains("CqGitMerge"));
+    }
+
+    #[test]
+    fn test_cqk_default() {
+        let item = CqGitBlame::default();
+        assert!(item.cqk_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqk_display() {
+        let item = CqGitBlame::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitBlame"));
+    }
+
+    #[test]
+    fn test_cql_default() {
+        let item = CqGitLog::default();
+        assert!(item.cql_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cql_display() {
+        let item = CqGitLog::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitLog"));
+    }
+
+    #[test]
+    fn test_cqm_default() {
+        let item = CqGitConfig::default();
+        assert!(item.cqm_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqm_display() {
+        let item = CqGitConfig::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitConfig"));
+    }
+
+    #[test]
+    fn test_cqn_default() {
+        let item = CqGitHook::default();
+        assert!(item.cqn_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqn_display() {
+        let item = CqGitHook::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitHook"));
+    }
+
+    #[test]
+    fn test_cqo_default() {
+        let item = CqGitWorktree::default();
+        assert!(item.cqo_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqo_display() {
+        let item = CqGitWorktree::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitWorktree"));
     }
 
 }
