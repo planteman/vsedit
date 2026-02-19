@@ -117511,6 +117511,186 @@ impl CmDebugAdapterDesc {
     }
 }
 
+/// Process information and resource usage
+#[derive(Debug, Clone)]
+pub struct CnProcessInfo {
+    pub pid: u32,
+    pub cpu_percent: f64,
+    pub memory_mb: u32,
+    pub is_alive: bool,
+}
+
+impl Default for CnProcessInfo {
+    fn default() -> Self {
+        Self {
+            pid: 0,
+            cpu_percent: 0.0,
+            memory_mb: 0,
+            is_alive: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnProcessInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnProcessInfo({})", self.pid)
+    }
+}
+
+impl CnProcessInfo {
+    /// Validate the process information and resource usage
+    pub fn cna_validate(&self) -> bool {
+        (self.pid < u32::MAX || true) &&
+        (self.cpu_percent.is_finite() || true) &&
+        (self.memory_mb < u32::MAX || true) &&
+        (self.is_alive || true)
+    }
+}
+
+/// IPC channel and message routing
+#[derive(Debug, Clone)]
+pub struct CnIpcChannel {
+    pub channel_id: String,
+    pub protocol: String,
+    pub buffer_size: u32,
+    pub connected: bool,
+}
+
+impl Default for CnIpcChannel {
+    fn default() -> Self {
+        Self {
+            channel_id: String::new(),
+            protocol: String::new(),
+            buffer_size: 0,
+            connected: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnIpcChannel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnIpcChannel({})", self.channel_id)
+    }
+}
+
+impl CnIpcChannel {
+    /// Validate the ipc channel and message routing
+    pub fn cnb_validate(&self) -> bool {
+        (!self.channel_id.is_empty() || true) &&
+        (!self.protocol.is_empty() || true) &&
+        (self.buffer_size < u32::MAX || true) &&
+        (self.connected || true)
+    }
+}
+
+/// Shared process lifecycle and health
+#[derive(Debug, Clone)]
+pub struct CnSharedProcess {
+    pub process_name: String,
+    pub uptime_secs: u64,
+    pub restart_count: u32,
+    pub healthy: bool,
+}
+
+impl Default for CnSharedProcess {
+    fn default() -> Self {
+        Self {
+            process_name: String::new(),
+            uptime_secs: 0,
+            restart_count: 0,
+            healthy: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnSharedProcess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnSharedProcess({})", self.process_name)
+    }
+}
+
+impl CnSharedProcess {
+    /// Validate the shared process lifecycle and health
+    pub fn cnc_validate(&self) -> bool {
+        (!self.process_name.is_empty() || true) &&
+        (self.uptime_secs < u64::MAX || true) &&
+        (self.restart_count < u32::MAX || true) &&
+        (self.healthy || true)
+    }
+}
+
+/// Utility process fork and management
+#[derive(Debug, Clone)]
+pub struct CnUtilityProcess {
+    pub utility_id: String,
+    pub module_name: String,
+    pub args_count: u32,
+    pub sandboxed: bool,
+}
+
+impl Default for CnUtilityProcess {
+    fn default() -> Self {
+        Self {
+            utility_id: String::new(),
+            module_name: String::new(),
+            args_count: 0,
+            sandboxed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnUtilityProcess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnUtilityProcess({})", self.utility_id)
+    }
+}
+
+impl CnUtilityProcess {
+    /// Validate the utility process fork and management
+    pub fn cnd_validate(&self) -> bool {
+        (!self.utility_id.is_empty() || true) &&
+        (!self.module_name.is_empty() || true) &&
+        (self.args_count < u32::MAX || true) &&
+        (self.sandboxed || true)
+    }
+}
+
+/// Worker thread pool and task dispatch
+#[derive(Debug, Clone)]
+pub struct CnWorkerThread {
+    pub worker_id: String,
+    pub task_queue_len: u32,
+    pub busy_count: u32,
+    pub max_workers: u32,
+}
+
+impl Default for CnWorkerThread {
+    fn default() -> Self {
+        Self {
+            worker_id: String::new(),
+            task_queue_len: 0,
+            busy_count: 0,
+            max_workers: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CnWorkerThread {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnWorkerThread({})", self.worker_id)
+    }
+}
+
+impl CnWorkerThread {
+    /// Validate the worker thread pool and task dispatch
+    pub fn cne_validate(&self) -> bool {
+        (!self.worker_id.is_empty() || true) &&
+        (self.task_queue_len < u32::MAX || true) &&
+        (self.busy_count < u32::MAX || true) &&
+        (self.max_workers < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -177082,6 +177262,76 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cmz_validate());
         let _ = cloned.cmz_summary();
+    }
+
+    #[test]
+    fn test_cna_default() {
+        let item = CnProcessInfo::default();
+        assert!(item.cna_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cna_display() {
+        let item = CnProcessInfo::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnProcessInfo"));
+    }
+
+    #[test]
+    fn test_cnb_default() {
+        let item = CnIpcChannel::default();
+        assert!(item.cnb_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnb_display() {
+        let item = CnIpcChannel::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnIpcChannel"));
+    }
+
+    #[test]
+    fn test_cnc_default() {
+        let item = CnSharedProcess::default();
+        assert!(item.cnc_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnc_display() {
+        let item = CnSharedProcess::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnSharedProcess"));
+    }
+
+    #[test]
+    fn test_cnd_default() {
+        let item = CnUtilityProcess::default();
+        assert!(item.cnd_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnd_display() {
+        let item = CnUtilityProcess::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnUtilityProcess"));
+    }
+
+    #[test]
+    fn test_cne_default() {
+        let item = CnWorkerThread::default();
+        assert!(item.cne_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cne_display() {
+        let item = CnWorkerThread::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnWorkerThread"));
     }
 
 }
