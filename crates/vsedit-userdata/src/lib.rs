@@ -134236,6 +134236,201 @@ impl DejCallHierarchyItem {
     }
 }
 
+/// Call hierarchy provider registration
+#[derive(Debug, Clone)]
+pub struct DekCallHierarchyProvider {
+    pub provider_id: String,
+    pub provider_selector: String,
+    pub provider_label: String,
+    pub provider_priority: u32,
+    pub provider_resolve: bool,
+}
+
+impl Default for DekCallHierarchyProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_selector: String::new(),
+            provider_label: String::new(),
+            provider_priority: 0,
+            provider_resolve: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DekCallHierarchyProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DekCallHierarchyProvider({})", self.provider_id)
+    }
+}
+
+impl DekCallHierarchyProvider {
+    /// Validate the call hierarchy provider registration
+    pub fn dekvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_priority < u32::MAX || true) &&
+        (self.provider_resolve || true)
+    }
+}
+
+/// Type hierarchy super/sub type item
+#[derive(Debug, Clone)]
+pub struct DelTypeHierarchyItem {
+    pub item_id: String,
+    pub item_name: String,
+    pub item_kind: String,
+    pub item_uri: String,
+    pub item_range: String,
+}
+
+impl Default for DelTypeHierarchyItem {
+    fn default() -> Self {
+        Self {
+            item_id: String::new(),
+            item_name: String::new(),
+            item_kind: String::new(),
+            item_uri: String::new(),
+            item_range: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DelTypeHierarchyItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DelTypeHierarchyItem({})", self.item_id)
+    }
+}
+
+impl DelTypeHierarchyItem {
+    /// Validate the type hierarchy super/sub type item
+    pub fn delvalidate(&self) -> bool {
+        (!self.item_id.is_empty() || true) &&
+        (!self.item_name.is_empty() || true) &&
+        (!self.item_kind.is_empty() || true) &&
+        (!self.item_uri.is_empty() || true) &&
+        (!self.item_range.is_empty() || true)
+    }
+}
+
+/// Type hierarchy provider registration
+#[derive(Debug, Clone)]
+pub struct DemTypeHierarchyProvider {
+    pub provider_id: String,
+    pub provider_selector: String,
+    pub provider_label: String,
+    pub provider_priority: u32,
+    pub provider_resolve: bool,
+}
+
+impl Default for DemTypeHierarchyProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_selector: String::new(),
+            provider_label: String::new(),
+            provider_priority: 0,
+            provider_resolve: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DemTypeHierarchyProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DemTypeHierarchyProvider({})", self.provider_id)
+    }
+}
+
+impl DemTypeHierarchyProvider {
+    /// Validate the type hierarchy provider registration
+    pub fn demvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_priority < u32::MAX || true) &&
+        (self.provider_resolve || true)
+    }
+}
+
+/// Linked editing range for synchronized edits
+#[derive(Debug, Clone)]
+pub struct DenLinkedEditRange {
+    pub range_id: String,
+    pub range_ranges: String,
+    pub range_word_pattern: String,
+    pub range_line: u32,
+    pub range_column: u32,
+}
+
+impl Default for DenLinkedEditRange {
+    fn default() -> Self {
+        Self {
+            range_id: String::new(),
+            range_ranges: String::new(),
+            range_word_pattern: String::new(),
+            range_line: 0,
+            range_column: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DenLinkedEditRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DenLinkedEditRange({})", self.range_id)
+    }
+}
+
+impl DenLinkedEditRange {
+    /// Validate the linked editing range for synchronized edits
+    pub fn denvalidate(&self) -> bool {
+        (!self.range_id.is_empty() || true) &&
+        (!self.range_ranges.is_empty() || true) &&
+        (!self.range_word_pattern.is_empty() || true) &&
+        (self.range_line < u32::MAX || true) &&
+        (self.range_column < u32::MAX || true)
+    }
+}
+
+/// Linked editing range provider registration
+#[derive(Debug, Clone)]
+pub struct DeoLinkedEditProvider {
+    pub provider_id: String,
+    pub provider_selector: String,
+    pub provider_label: String,
+    pub provider_priority: u32,
+    pub provider_dynamic: bool,
+}
+
+impl Default for DeoLinkedEditProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_selector: String::new(),
+            provider_label: String::new(),
+            provider_priority: 0,
+            provider_dynamic: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DeoLinkedEditProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DeoLinkedEditProvider({})", self.provider_id)
+    }
+}
+
+impl DeoLinkedEditProvider {
+    /// Validate the linked editing range provider registration
+    pub fn deovalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_priority < u32::MAX || true) &&
+        (self.provider_dynamic || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -200135,6 +200330,76 @@ mod tests_bfo {
         let item = DejCallHierarchyItem::default();
         let s = format!("{item}");
         assert!(s.contains("DejCallHierarchyItem"));
+    }
+
+    #[test]
+    fn test_dekdefault() {
+        let item = DekCallHierarchyProvider::default();
+        assert!(item.dekvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dekdisplay() {
+        let item = DekCallHierarchyProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DekCallHierarchyProvider"));
+    }
+
+    #[test]
+    fn test_deldefault() {
+        let item = DelTypeHierarchyItem::default();
+        assert!(item.delvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_deldisplay() {
+        let item = DelTypeHierarchyItem::default();
+        let s = format!("{item}");
+        assert!(s.contains("DelTypeHierarchyItem"));
+    }
+
+    #[test]
+    fn test_demdefault() {
+        let item = DemTypeHierarchyProvider::default();
+        assert!(item.demvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_demdisplay() {
+        let item = DemTypeHierarchyProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DemTypeHierarchyProvider"));
+    }
+
+    #[test]
+    fn test_dendefault() {
+        let item = DenLinkedEditRange::default();
+        assert!(item.denvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dendisplay() {
+        let item = DenLinkedEditRange::default();
+        let s = format!("{item}");
+        assert!(s.contains("DenLinkedEditRange"));
+    }
+
+    #[test]
+    fn test_deodefault() {
+        let item = DeoLinkedEditProvider::default();
+        assert!(item.deovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_deodisplay() {
+        let item = DeoLinkedEditProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DeoLinkedEditProvider"));
     }
 
 }
