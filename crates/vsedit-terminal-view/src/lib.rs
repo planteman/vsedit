@@ -82065,6 +82065,363 @@ impl BgtWhitespaceModel {
 }
 
 
+
+// bgu_ Editor Line Numbers Model
+
+/// Line numbers display mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BguLineNumberMode {
+    On,
+    Off,
+    Relative,
+    Interval,
+}
+
+/// Line numbers model.
+#[derive(Debug, Clone)]
+pub struct BguLineNumbersModel {
+    pub mode: BguLineNumberMode,
+    pub interval: usize,
+    pub current_line: usize,
+    pub total_lines: usize,
+}
+
+impl BguLineNumbersModel {
+    pub fn new(total: usize) -> Self {
+        Self { mode: BguLineNumberMode::On, interval: 10, current_line: 1, total_lines: total }
+    }
+
+    pub fn set_mode(&mut self, mode: BguLineNumberMode) { self.mode = mode; }
+    pub fn set_current_line(&mut self, line: usize) { self.current_line = line; }
+    pub fn set_total_lines(&mut self, total: usize) { self.total_lines = total; }
+
+    pub fn display_number(&self, line: usize) -> Option<String> {
+        match self.mode {
+            BguLineNumberMode::Off => None,
+            BguLineNumberMode::On => Some(line.to_string()),
+            BguLineNumberMode::Relative => {
+                if line == self.current_line { Some(line.to_string()) }
+                else { Some(((line as isize) - (self.current_line as isize)).unsigned_abs().to_string()) }
+            }
+            BguLineNumberMode::Interval => {
+                if line == self.current_line || line % self.interval == 0 || line == 1 {
+                    Some(line.to_string())
+                } else { None }
+            }
+        }
+    }
+
+    pub fn gutter_width(&self) -> usize {
+        let digits = format!("{}", self.total_lines).len();
+        digits.max(2) + 1
+    }
+
+    pub fn is_visible(&self) -> bool { self.mode != BguLineNumberMode::Off }
+}
+
+
+// bgv_ Editor Cursor Style Model
+
+/// Multi-cursor behavior when typing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgvMultiCursorModifier {
+    CtrlCmd,
+    Alt,
+}
+
+/// Cursor surrounding pairs insertion mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgvAutoSurround {
+    LanguageDefined,
+    Quotes,
+    Brackets,
+    Never,
+}
+
+/// Cursor behavior model.
+#[derive(Debug, Clone)]
+pub struct BgvCursorBehavior {
+    pub multi_cursor_modifier: BgvMultiCursorModifier,
+    pub auto_surround: BgvAutoSurround,
+    pub cursor_smooth_caret: bool,
+    pub cursor_width: u32,
+    pub sticky_tab_stops: bool,
+    pub cursor_surrounding_lines: usize,
+    pub cursor_surrounding_lines_style: BgvSurroundingStyle,
+}
+
+/// How surrounding lines are calculated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgvSurroundingStyle {
+    Default,
+    All,
+}
+
+impl BgvCursorBehavior {
+    pub fn new() -> Self {
+        Self {
+            multi_cursor_modifier: BgvMultiCursorModifier::Alt,
+            auto_surround: BgvAutoSurround::LanguageDefined,
+            cursor_smooth_caret: true,
+            cursor_width: 2,
+            sticky_tab_stops: false,
+            cursor_surrounding_lines: 0,
+            cursor_surrounding_lines_style: BgvSurroundingStyle::Default,
+        }
+    }
+
+    pub fn visible_range(&self, current_line: usize, total_lines: usize) -> (usize, usize) {
+        let margin = self.cursor_surrounding_lines;
+        let start = current_line.saturating_sub(margin);
+        let end = (current_line + margin).min(total_lines);
+        (start, end)
+    }
+
+    pub fn set_width(&mut self, w: u32) { self.cursor_width = w.max(1).min(10); }
+    pub fn toggle_smooth_caret(&mut self) { self.cursor_smooth_caret = !self.cursor_smooth_caret; }
+    pub fn toggle_sticky_tabs(&mut self) { self.sticky_tab_stops = !self.sticky_tab_stops; }
+}
+
+
+// bgw_ Editor Tab Completion Model
+
+/// Tab completion mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgwTabCompletionMode {
+    On,
+    Off,
+    OnlySnippets,
+}
+
+/// Tab completion model for controlling tab behavior in the editor.
+#[derive(Debug, Clone)]
+pub struct BgwTabCompletionModel {
+    pub mode: BgwTabCompletionMode,
+    pub has_active_suggestion: bool,
+    pub has_active_snippet: bool,
+    pub accept_on_tab: bool,
+}
+
+impl BgwTabCompletionModel {
+    pub fn new() -> Self {
+        Self {
+            mode: BgwTabCompletionMode::Off,
+            has_active_suggestion: false,
+            has_active_snippet: false,
+            accept_on_tab: false,
+        }
+    }
+
+    pub fn set_mode(&mut self, mode: BgwTabCompletionMode) { self.mode = mode; }
+
+    pub fn should_accept_on_tab(&self) -> bool {
+        match self.mode {
+            BgwTabCompletionMode::Off => false,
+            BgwTabCompletionMode::On => self.has_active_suggestion,
+            BgwTabCompletionMode::OnlySnippets => self.has_active_snippet,
+        }
+    }
+
+    pub fn should_insert_tab(&self) -> bool {
+        !self.should_accept_on_tab()
+    }
+
+    pub fn set_suggestion_active(&mut self, active: bool) { self.has_active_suggestion = active; }
+    pub fn set_snippet_active(&mut self, active: bool) { self.has_active_snippet = active; }
+
+    pub fn is_enabled(&self) -> bool { self.mode != BgwTabCompletionMode::Off }
+}
+
+
+// bgx_ Editor Auto Save Model
+
+/// Auto save mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgxAutoSaveMode {
+    Off,
+    AfterDelay,
+    OnFocusChange,
+    OnWindowChange,
+}
+
+/// Auto save configuration model.
+#[derive(Debug, Clone)]
+pub struct BgxAutoSaveModel {
+    pub mode: BgxAutoSaveMode,
+    pub delay_ms: u64,
+    pub pending_save: bool,
+    pub last_save_tick: u64,
+    pub dirty_since_tick: Option<u64>,
+}
+
+impl BgxAutoSaveModel {
+    pub fn new() -> Self {
+        Self {
+            mode: BgxAutoSaveMode::Off, delay_ms: 1000,
+            pending_save: false, last_save_tick: 0, dirty_since_tick: None,
+        }
+    }
+
+    pub fn set_mode(&mut self, mode: BgxAutoSaveMode) { self.mode = mode; }
+    pub fn set_delay(&mut self, ms: u64) { self.delay_ms = ms.max(100); }
+
+    pub fn mark_dirty(&mut self, tick: u64) {
+        if self.dirty_since_tick.is_none() { self.dirty_since_tick = Some(tick); }
+    }
+
+    pub fn mark_saved(&mut self, tick: u64) {
+        self.dirty_since_tick = None;
+        self.pending_save = false;
+        self.last_save_tick = tick;
+    }
+
+    pub fn should_save(&self, current_tick: u64) -> bool {
+        match self.mode {
+            BgxAutoSaveMode::Off => false,
+            BgxAutoSaveMode::AfterDelay => {
+                if let Some(dirty_tick) = self.dirty_since_tick {
+                    current_tick - dirty_tick >= self.delay_ms
+                } else { false }
+            }
+            BgxAutoSaveMode::OnFocusChange | BgxAutoSaveMode::OnWindowChange => {
+                self.dirty_since_tick.is_some()
+            }
+        }
+    }
+
+    pub fn on_focus_change(&mut self) -> bool {
+        if self.mode == BgxAutoSaveMode::OnFocusChange && self.dirty_since_tick.is_some() {
+            self.pending_save = true; true
+        } else { false }
+    }
+
+    pub fn on_window_change(&mut self) -> bool {
+        if self.mode == BgxAutoSaveMode::OnWindowChange && self.dirty_since_tick.is_some() {
+            self.pending_save = true; true
+        } else { false }
+    }
+
+    pub fn is_dirty(&self) -> bool { self.dirty_since_tick.is_some() }
+    pub fn is_enabled(&self) -> bool { self.mode != BgxAutoSaveMode::Off }
+}
+
+
+// bgy_ Editor Format On Type Model
+
+/// Format trigger kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgyFormatTrigger {
+    OnType,
+    OnPaste,
+    OnSave,
+    Manual,
+}
+
+/// Format on type model.
+#[derive(Debug, Clone)]
+pub struct BgyFormatOnTypeModel {
+    pub enabled_on_type: bool,
+    pub enabled_on_paste: bool,
+    pub enabled_on_save: bool,
+    pub trigger_chars: Vec<char>,
+    pub default_formatter: Option<String>,
+}
+
+impl BgyFormatOnTypeModel {
+    pub fn new() -> Self {
+        Self {
+            enabled_on_type: false, enabled_on_paste: false, enabled_on_save: false,
+            trigger_chars: vec!['}', ';', '\n'],
+            default_formatter: None,
+        }
+    }
+
+    pub fn should_format(&self, trigger: BgyFormatTrigger) -> bool {
+        match trigger {
+            BgyFormatTrigger::OnType => self.enabled_on_type,
+            BgyFormatTrigger::OnPaste => self.enabled_on_paste,
+            BgyFormatTrigger::OnSave => self.enabled_on_save,
+            BgyFormatTrigger::Manual => true,
+        }
+    }
+
+    pub fn is_trigger_char(&self, ch: char) -> bool { self.trigger_chars.contains(&ch) }
+    pub fn add_trigger_char(&mut self, ch: char) { if !self.trigger_chars.contains(&ch) { self.trigger_chars.push(ch); } }
+    pub fn remove_trigger_char(&mut self, ch: char) { self.trigger_chars.retain(|&c| c != ch); }
+
+    pub fn set_formatter(&mut self, id: &str) { self.default_formatter = Some(id.to_string()); }
+    pub fn clear_formatter(&mut self) { self.default_formatter = None; }
+
+    pub fn toggle_on_type(&mut self) { self.enabled_on_type = !self.enabled_on_type; }
+    pub fn toggle_on_paste(&mut self) { self.enabled_on_paste = !self.enabled_on_paste; }
+    pub fn toggle_on_save(&mut self) { self.enabled_on_save = !self.enabled_on_save; }
+}
+
+
+// bgz_ Editor Accessibility Model
+
+/// Screen reader accessibility mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgzAccessibilityMode {
+    Auto,
+    On,
+    Off,
+}
+
+/// Accessibility support level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgzAccessibilitySupport {
+    Unknown,
+    Enabled,
+    Disabled,
+}
+
+/// Editor accessibility model.
+#[derive(Debug, Clone)]
+pub struct BgzAccessibilityModel {
+    pub mode: BgzAccessibilityMode,
+    pub support: BgzAccessibilitySupport,
+    pub page_size: usize,
+    pub announce_messages: bool,
+    pub tab_focus_mode: bool,
+    pub high_contrast: bool,
+}
+
+impl BgzAccessibilityModel {
+    pub fn new() -> Self {
+        Self {
+            mode: BgzAccessibilityMode::Auto,
+            support: BgzAccessibilitySupport::Unknown,
+            page_size: 10,
+            announce_messages: true,
+            tab_focus_mode: false,
+            high_contrast: false,
+        }
+    }
+
+    pub fn is_screen_reader_active(&self) -> bool {
+        match self.mode {
+            BgzAccessibilityMode::On => true,
+            BgzAccessibilityMode::Off => false,
+            BgzAccessibilityMode::Auto => self.support == BgzAccessibilitySupport::Enabled,
+        }
+    }
+
+    pub fn set_mode(&mut self, mode: BgzAccessibilityMode) { self.mode = mode; }
+    pub fn set_support(&mut self, support: BgzAccessibilitySupport) { self.support = support; }
+    pub fn toggle_tab_focus(&mut self) { self.tab_focus_mode = !self.tab_focus_mode; }
+    pub fn toggle_high_contrast(&mut self) { self.high_contrast = !self.high_contrast; }
+
+    pub fn effective_page_size(&self) -> usize {
+        if self.is_screen_reader_active() { self.page_size } else { 0 }
+    }
+
+    pub fn should_announce(&self) -> bool {
+        self.announce_messages && self.is_screen_reader_active()
+    }
+}
+
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -85166,6 +85523,492 @@ mod tests_bfo {
             BgtWhitespaceMode::All,
         ];
         assert_eq!(modes.len(), 5);
+    }
+
+
+
+    // bgu_ tests
+
+    #[test]
+    fn test_bgu_creation() {
+        let m = BguLineNumbersModel::new(100);
+        assert_eq!(m.mode, BguLineNumberMode::On);
+        assert_eq!(m.total_lines, 100);
+    }
+
+    #[test]
+    fn test_bgu_on_mode() {
+        let m = BguLineNumbersModel::new(100);
+        assert_eq!(m.display_number(42), Some("42".to_string()));
+    }
+
+    #[test]
+    fn test_bgu_off_mode() {
+        let mut m = BguLineNumbersModel::new(100);
+        m.set_mode(BguLineNumberMode::Off);
+        assert_eq!(m.display_number(42), None);
+        assert!(!m.is_visible());
+    }
+
+    #[test]
+    fn test_bgu_relative_mode() {
+        let mut m = BguLineNumbersModel::new(100);
+        m.set_mode(BguLineNumberMode::Relative);
+        m.set_current_line(10);
+        assert_eq!(m.display_number(10), Some("10".to_string()));
+        assert_eq!(m.display_number(13), Some("3".to_string()));
+        assert_eq!(m.display_number(7), Some("3".to_string()));
+    }
+
+    #[test]
+    fn test_bgu_interval_mode() {
+        let mut m = BguLineNumbersModel::new(100);
+        m.set_mode(BguLineNumberMode::Interval);
+        m.set_current_line(15);
+        assert_eq!(m.display_number(15), Some("15".to_string()));
+        assert_eq!(m.display_number(1), Some("1".to_string()));
+        assert_eq!(m.display_number(10), Some("10".to_string()));
+        assert_eq!(m.display_number(5), None);
+    }
+
+    #[test]
+    fn test_bgu_gutter_width() {
+        let m = BguLineNumbersModel::new(100);
+        assert_eq!(m.gutter_width(), 4); // "100" = 3 digits + 1
+    }
+
+    #[test]
+    fn test_bgu_small_file_gutter() {
+        let m = BguLineNumbersModel::new(5);
+        assert_eq!(m.gutter_width(), 3); // min 2 digits + 1
+    }
+
+    #[test]
+    fn test_bgu_mode_variants() {
+        let modes = [BguLineNumberMode::On, BguLineNumberMode::Off, BguLineNumberMode::Relative, BguLineNumberMode::Interval];
+        assert_eq!(modes.len(), 4);
+    }
+
+    #[test]
+    fn test_bgu_set_total() {
+        let mut m = BguLineNumbersModel::new(10);
+        m.set_total_lines(5000);
+        assert_eq!(m.gutter_width(), 5); // "5000" = 4 digits + 1
+    }
+
+    #[test]
+    fn test_bgu_relative_at_current() {
+        let mut m = BguLineNumbersModel::new(100);
+        m.set_mode(BguLineNumberMode::Relative);
+        m.set_current_line(50);
+        assert_eq!(m.display_number(50), Some("50".to_string()));
+    }
+
+    #[test]
+    fn test_bgu_visible() {
+        let m = BguLineNumbersModel::new(100);
+        assert!(m.is_visible());
+    }
+
+
+    // bgv_ tests
+
+    #[test]
+    fn test_bgv_cursor_behavior_creation() {
+        let b = BgvCursorBehavior::new();
+        assert_eq!(b.multi_cursor_modifier, BgvMultiCursorModifier::Alt);
+        assert_eq!(b.auto_surround, BgvAutoSurround::LanguageDefined);
+        assert!(b.cursor_smooth_caret);
+    }
+
+    #[test]
+    fn test_bgv_visible_range() {
+        let mut b = BgvCursorBehavior::new();
+        b.cursor_surrounding_lines = 5;
+        let (s, e) = b.visible_range(10, 100);
+        assert_eq!(s, 5);
+        assert_eq!(e, 15);
+    }
+
+    #[test]
+    fn test_bgv_visible_range_clamp() {
+        let mut b = BgvCursorBehavior::new();
+        b.cursor_surrounding_lines = 10;
+        let (s, _) = b.visible_range(3, 100);
+        assert_eq!(s, 0);
+    }
+
+    #[test]
+    fn test_bgv_set_width() {
+        let mut b = BgvCursorBehavior::new();
+        b.set_width(0);
+        assert_eq!(b.cursor_width, 1);
+        b.set_width(99);
+        assert_eq!(b.cursor_width, 10);
+    }
+
+    #[test]
+    fn test_bgv_toggle_smooth() {
+        let mut b = BgvCursorBehavior::new();
+        b.toggle_smooth_caret();
+        assert!(!b.cursor_smooth_caret);
+    }
+
+    #[test]
+    fn test_bgv_toggle_sticky() {
+        let mut b = BgvCursorBehavior::new();
+        b.toggle_sticky_tabs();
+        assert!(b.sticky_tab_stops);
+    }
+
+    #[test]
+    fn test_bgv_multi_cursor_variants() {
+        let mods = [BgvMultiCursorModifier::CtrlCmd, BgvMultiCursorModifier::Alt];
+        assert_eq!(mods.len(), 2);
+    }
+
+    #[test]
+    fn test_bgv_auto_surround_variants() {
+        let modes = [BgvAutoSurround::LanguageDefined, BgvAutoSurround::Quotes, BgvAutoSurround::Brackets, BgvAutoSurround::Never];
+        assert_eq!(modes.len(), 4);
+    }
+
+    #[test]
+    fn test_bgv_surrounding_style_variants() {
+        let styles = [BgvSurroundingStyle::Default, BgvSurroundingStyle::All];
+        assert_eq!(styles.len(), 2);
+    }
+
+    #[test]
+    fn test_bgv_zero_surrounding() {
+        let b = BgvCursorBehavior::new();
+        let (s, e) = b.visible_range(50, 100);
+        assert_eq!(s, 50);
+        assert_eq!(e, 50);
+    }
+
+
+    // bgw_ tests
+
+    #[test]
+    fn test_bgw_tab_completion_creation() {
+        let m = BgwTabCompletionModel::new();
+        assert_eq!(m.mode, BgwTabCompletionMode::Off);
+        assert!(!m.is_enabled());
+    }
+
+    #[test]
+    fn test_bgw_off_mode() {
+        let m = BgwTabCompletionModel::new();
+        assert!(!m.should_accept_on_tab());
+        assert!(m.should_insert_tab());
+    }
+
+    #[test]
+    fn test_bgw_on_mode_with_suggestion() {
+        let mut m = BgwTabCompletionModel::new();
+        m.set_mode(BgwTabCompletionMode::On);
+        m.set_suggestion_active(true);
+        assert!(m.should_accept_on_tab());
+        assert!(!m.should_insert_tab());
+    }
+
+    #[test]
+    fn test_bgw_on_mode_no_suggestion() {
+        let mut m = BgwTabCompletionModel::new();
+        m.set_mode(BgwTabCompletionMode::On);
+        assert!(!m.should_accept_on_tab());
+        assert!(m.should_insert_tab());
+    }
+
+    #[test]
+    fn test_bgw_snippets_only() {
+        let mut m = BgwTabCompletionModel::new();
+        m.set_mode(BgwTabCompletionMode::OnlySnippets);
+        m.set_suggestion_active(true);
+        assert!(!m.should_accept_on_tab()); // not a snippet
+        m.set_snippet_active(true);
+        assert!(m.should_accept_on_tab());
+    }
+
+    #[test]
+    fn test_bgw_is_enabled() {
+        let mut m = BgwTabCompletionModel::new();
+        assert!(!m.is_enabled());
+        m.set_mode(BgwTabCompletionMode::On);
+        assert!(m.is_enabled());
+    }
+
+    #[test]
+    fn test_bgw_mode_variants() {
+        let modes = [BgwTabCompletionMode::On, BgwTabCompletionMode::Off, BgwTabCompletionMode::OnlySnippets];
+        assert_eq!(modes.len(), 3);
+    }
+
+    #[test]
+    fn test_bgw_set_suggestion() {
+        let mut m = BgwTabCompletionModel::new();
+        m.set_suggestion_active(true);
+        assert!(m.has_active_suggestion);
+        m.set_suggestion_active(false);
+        assert!(!m.has_active_suggestion);
+    }
+
+    #[test]
+    fn test_bgw_set_snippet() {
+        let mut m = BgwTabCompletionModel::new();
+        m.set_snippet_active(true);
+        assert!(m.has_active_snippet);
+    }
+
+    #[test]
+    fn test_bgw_accept_on_tab_flag() {
+        let mut m = BgwTabCompletionModel::new();
+        m.accept_on_tab = true;
+        assert!(m.accept_on_tab);
+    }
+
+
+    // bgx_ tests
+
+    #[test]
+    fn test_bgx_autosave_creation() {
+        let m = BgxAutoSaveModel::new();
+        assert_eq!(m.mode, BgxAutoSaveMode::Off);
+        assert!(!m.is_enabled());
+        assert!(!m.is_dirty());
+    }
+
+    #[test]
+    fn test_bgx_off_never_saves() {
+        let mut m = BgxAutoSaveModel::new();
+        m.mark_dirty(100);
+        assert!(!m.should_save(2000));
+    }
+
+    #[test]
+    fn test_bgx_after_delay() {
+        let mut m = BgxAutoSaveModel::new();
+        m.set_mode(BgxAutoSaveMode::AfterDelay);
+        m.set_delay(500);
+        m.mark_dirty(100);
+        assert!(!m.should_save(400));
+        assert!(m.should_save(600));
+    }
+
+    #[test]
+    fn test_bgx_mark_saved() {
+        let mut m = BgxAutoSaveModel::new();
+        m.set_mode(BgxAutoSaveMode::AfterDelay);
+        m.mark_dirty(100);
+        m.mark_saved(200);
+        assert!(!m.is_dirty());
+        assert!(!m.should_save(300));
+    }
+
+    #[test]
+    fn test_bgx_focus_change() {
+        let mut m = BgxAutoSaveModel::new();
+        m.set_mode(BgxAutoSaveMode::OnFocusChange);
+        m.mark_dirty(100);
+        assert!(m.on_focus_change());
+        assert!(m.pending_save);
+    }
+
+    #[test]
+    fn test_bgx_window_change() {
+        let mut m = BgxAutoSaveModel::new();
+        m.set_mode(BgxAutoSaveMode::OnWindowChange);
+        m.mark_dirty(100);
+        assert!(m.on_window_change());
+    }
+
+    #[test]
+    fn test_bgx_no_focus_when_clean() {
+        let mut m = BgxAutoSaveModel::new();
+        m.set_mode(BgxAutoSaveMode::OnFocusChange);
+        assert!(!m.on_focus_change());
+    }
+
+    #[test]
+    fn test_bgx_delay_clamp() {
+        let mut m = BgxAutoSaveModel::new();
+        m.set_delay(10);
+        assert_eq!(m.delay_ms, 100);
+    }
+
+    #[test]
+    fn test_bgx_mode_variants() {
+        let modes = [BgxAutoSaveMode::Off, BgxAutoSaveMode::AfterDelay, BgxAutoSaveMode::OnFocusChange, BgxAutoSaveMode::OnWindowChange];
+        assert_eq!(modes.len(), 4);
+    }
+
+    #[test]
+    fn test_bgx_dirty_tracking() {
+        let mut m = BgxAutoSaveModel::new();
+        m.mark_dirty(50);
+        assert!(m.is_dirty());
+        assert_eq!(m.dirty_since_tick, Some(50));
+        m.mark_dirty(100); // should not update
+        assert_eq!(m.dirty_since_tick, Some(50));
+    }
+
+
+    // bgy_ tests
+
+    #[test]
+    fn test_bgy_format_creation() {
+        let m = BgyFormatOnTypeModel::new();
+        assert!(!m.enabled_on_type);
+        assert!(!m.enabled_on_paste);
+        assert!(!m.enabled_on_save);
+    }
+
+    #[test]
+    fn test_bgy_should_format() {
+        let mut m = BgyFormatOnTypeModel::new();
+        assert!(!m.should_format(BgyFormatTrigger::OnType));
+        assert!(m.should_format(BgyFormatTrigger::Manual));
+        m.toggle_on_type();
+        assert!(m.should_format(BgyFormatTrigger::OnType));
+    }
+
+    #[test]
+    fn test_bgy_trigger_chars() {
+        let m = BgyFormatOnTypeModel::new();
+        assert!(m.is_trigger_char('}'));
+        assert!(m.is_trigger_char(';'));
+        assert!(!m.is_trigger_char('a'));
+    }
+
+    #[test]
+    fn test_bgy_add_remove_trigger() {
+        let mut m = BgyFormatOnTypeModel::new();
+        m.add_trigger_char(')');
+        assert!(m.is_trigger_char(')'));
+        m.remove_trigger_char(')');
+        assert!(!m.is_trigger_char(')'));
+    }
+
+    #[test]
+    fn test_bgy_formatter() {
+        let mut m = BgyFormatOnTypeModel::new();
+        m.set_formatter("prettier");
+        assert_eq!(m.default_formatter.as_deref(), Some("prettier"));
+        m.clear_formatter();
+        assert!(m.default_formatter.is_none());
+    }
+
+    #[test]
+    fn test_bgy_toggle_on_paste() {
+        let mut m = BgyFormatOnTypeModel::new();
+        m.toggle_on_paste();
+        assert!(m.should_format(BgyFormatTrigger::OnPaste));
+    }
+
+    #[test]
+    fn test_bgy_toggle_on_save() {
+        let mut m = BgyFormatOnTypeModel::new();
+        m.toggle_on_save();
+        assert!(m.should_format(BgyFormatTrigger::OnSave));
+    }
+
+    #[test]
+    fn test_bgy_no_duplicate_trigger() {
+        let mut m = BgyFormatOnTypeModel::new();
+        let initial = m.trigger_chars.len();
+        m.add_trigger_char('}');
+        assert_eq!(m.trigger_chars.len(), initial);
+    }
+
+    #[test]
+    fn test_bgy_trigger_variants() {
+        let triggers = [BgyFormatTrigger::OnType, BgyFormatTrigger::OnPaste, BgyFormatTrigger::OnSave, BgyFormatTrigger::Manual];
+        assert_eq!(triggers.len(), 4);
+    }
+
+    #[test]
+    fn test_bgy_manual_always_true() {
+        let m = BgyFormatOnTypeModel::new();
+        assert!(m.should_format(BgyFormatTrigger::Manual));
+    }
+
+
+    // bgz_ tests
+
+    #[test]
+    fn test_bgz_accessibility_creation() {
+        let m = BgzAccessibilityModel::new();
+        assert_eq!(m.mode, BgzAccessibilityMode::Auto);
+        assert_eq!(m.support, BgzAccessibilitySupport::Unknown);
+    }
+
+    #[test]
+    fn test_bgz_screen_reader_auto() {
+        let mut m = BgzAccessibilityModel::new();
+        assert!(!m.is_screen_reader_active());
+        m.set_support(BgzAccessibilitySupport::Enabled);
+        assert!(m.is_screen_reader_active());
+    }
+
+    #[test]
+    fn test_bgz_screen_reader_on() {
+        let mut m = BgzAccessibilityModel::new();
+        m.set_mode(BgzAccessibilityMode::On);
+        assert!(m.is_screen_reader_active());
+    }
+
+    #[test]
+    fn test_bgz_screen_reader_off() {
+        let mut m = BgzAccessibilityModel::new();
+        m.set_mode(BgzAccessibilityMode::Off);
+        m.set_support(BgzAccessibilitySupport::Enabled);
+        assert!(!m.is_screen_reader_active());
+    }
+
+    #[test]
+    fn test_bgz_tab_focus() {
+        let mut m = BgzAccessibilityModel::new();
+        assert!(!m.tab_focus_mode);
+        m.toggle_tab_focus();
+        assert!(m.tab_focus_mode);
+    }
+
+    #[test]
+    fn test_bgz_high_contrast() {
+        let mut m = BgzAccessibilityModel::new();
+        m.toggle_high_contrast();
+        assert!(m.high_contrast);
+    }
+
+    #[test]
+    fn test_bgz_effective_page_size() {
+        let mut m = BgzAccessibilityModel::new();
+        assert_eq!(m.effective_page_size(), 0);
+        m.set_mode(BgzAccessibilityMode::On);
+        assert_eq!(m.effective_page_size(), 10);
+    }
+
+    #[test]
+    fn test_bgz_should_announce() {
+        let mut m = BgzAccessibilityModel::new();
+        assert!(!m.should_announce());
+        m.set_mode(BgzAccessibilityMode::On);
+        assert!(m.should_announce());
+        m.announce_messages = false;
+        assert!(!m.should_announce());
+    }
+
+    #[test]
+    fn test_bgz_mode_variants() {
+        let modes = [BgzAccessibilityMode::Auto, BgzAccessibilityMode::On, BgzAccessibilityMode::Off];
+        assert_eq!(modes.len(), 3);
+    }
+
+    #[test]
+    fn test_bgz_support_variants() {
+        let supports = [BgzAccessibilitySupport::Unknown, BgzAccessibilitySupport::Enabled, BgzAccessibilitySupport::Disabled];
+        assert_eq!(supports.len(), 3);
     }
 
 
