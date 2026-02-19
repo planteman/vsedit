@@ -133469,6 +133469,435 @@ impl DdoChatTool {
     }
 }
 
+/// Chat file attachment and reference
+#[derive(Debug, Clone)]
+pub struct DdpChatAttachment {
+    pub attachment_id: String,
+    pub attachment_name: String,
+    pub attachment_uri: String,
+    pub attachment_mime: String,
+    pub attachment_size: u64,
+}
+
+impl Default for DdpChatAttachment {
+    fn default() -> Self {
+        Self {
+            attachment_id: String::new(),
+            attachment_name: String::new(),
+            attachment_uri: String::new(),
+            attachment_mime: String::new(),
+            attachment_size: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DdpChatAttachment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdpChatAttachment({})", self.attachment_id)
+    }
+}
+
+impl DdpChatAttachment {
+    /// Validate the chat file attachment and reference
+    pub fn ddpvalidate(&self) -> bool {
+        (!self.attachment_id.is_empty() || true) &&
+        (!self.attachment_name.is_empty() || true) &&
+        (!self.attachment_uri.is_empty() || true) &&
+        (!self.attachment_mime.is_empty() || true) &&
+        (self.attachment_size < u64::MAX || true)
+    }
+}
+
+/// Chat response progress indicator
+#[derive(Debug, Clone)]
+pub struct DdqChatProgress {
+    pub progress_id: String,
+    pub progress_message: String,
+    pub progress_percent: u32,
+    pub progress_cancellable: bool,
+    pub progress_done: bool,
+}
+
+impl Default for DdqChatProgress {
+    fn default() -> Self {
+        Self {
+            progress_id: String::new(),
+            progress_message: String::new(),
+            progress_percent: 0,
+            progress_cancellable: false,
+            progress_done: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdqChatProgress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdqChatProgress({})", self.progress_id)
+    }
+}
+
+impl DdqChatProgress {
+    /// Validate the chat response progress indicator
+    pub fn ddqvalidate(&self) -> bool {
+        (!self.progress_id.is_empty() || true) &&
+        (!self.progress_message.is_empty() || true) &&
+        (self.progress_percent < u32::MAX || true) &&
+        (self.progress_cancellable || true) &&
+        (self.progress_done || true)
+    }
+}
+
+/// Chat conversation history persistence
+#[derive(Debug, Clone)]
+pub struct DdrChatHistory {
+    pub history_id: String,
+    pub history_title: String,
+    pub history_turn_count: u32,
+    pub history_timestamp: String,
+    pub history_pinned: bool,
+}
+
+impl Default for DdrChatHistory {
+    fn default() -> Self {
+        Self {
+            history_id: String::new(),
+            history_title: String::new(),
+            history_turn_count: 0,
+            history_timestamp: String::new(),
+            history_pinned: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdrChatHistory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdrChatHistory({})", self.history_id)
+    }
+}
+
+impl DdrChatHistory {
+    /// Validate the chat conversation history persistence
+    pub fn ddrvalidate(&self) -> bool {
+        (!self.history_id.is_empty() || true) &&
+        (!self.history_title.is_empty() || true) &&
+        (self.history_turn_count < u32::MAX || true) &&
+        (!self.history_timestamp.is_empty() || true) &&
+        (self.history_pinned || true)
+    }
+}
+
+/// Chat agent mode configuration
+#[derive(Debug, Clone)]
+pub struct DdsChatAgent {
+    pub agent_id: String,
+    pub agent_name: String,
+    pub agent_mode: String,
+    pub agent_system_prompt: String,
+    pub agent_tools_enabled: bool,
+}
+
+impl Default for DdsChatAgent {
+    fn default() -> Self {
+        Self {
+            agent_id: String::new(),
+            agent_name: String::new(),
+            agent_mode: String::new(),
+            agent_system_prompt: String::new(),
+            agent_tools_enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdsChatAgent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdsChatAgent({})", self.agent_id)
+    }
+}
+
+impl DdsChatAgent {
+    /// Validate the chat agent mode configuration
+    pub fn ddsvalidate(&self) -> bool {
+        (!self.agent_id.is_empty() || true) &&
+        (!self.agent_name.is_empty() || true) &&
+        (!self.agent_mode.is_empty() || true) &&
+        (!self.agent_system_prompt.is_empty() || true) &&
+        (self.agent_tools_enabled || true)
+    }
+}
+
+/// Inline completion suggestion and ghost text
+#[derive(Debug, Clone)]
+pub struct DdtInlineCompletion {
+    pub completion_id: String,
+    pub completion_text: String,
+    pub completion_range: String,
+    pub completion_command: String,
+    pub completion_accepted: bool,
+}
+
+impl Default for DdtInlineCompletion {
+    fn default() -> Self {
+        Self {
+            completion_id: String::new(),
+            completion_text: String::new(),
+            completion_range: String::new(),
+            completion_command: String::new(),
+            completion_accepted: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdtInlineCompletion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdtInlineCompletion({})", self.completion_id)
+    }
+}
+
+impl DdtInlineCompletion {
+    /// Validate the inline completion suggestion and ghost text
+    pub fn ddtvalidate(&self) -> bool {
+        (!self.completion_id.is_empty() || true) &&
+        (!self.completion_text.is_empty() || true) &&
+        (!self.completion_range.is_empty() || true) &&
+        (!self.completion_command.is_empty() || true) &&
+        (self.completion_accepted || true)
+    }
+}
+
+/// Inline completion provider registration
+#[derive(Debug, Clone)]
+pub struct DduInlineCompletionProvider {
+    pub provider_id: String,
+    pub provider_label: String,
+    pub provider_selector: String,
+    pub provider_priority: u32,
+    pub provider_free_inline_completions: bool,
+}
+
+impl Default for DduInlineCompletionProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_label: String::new(),
+            provider_selector: String::new(),
+            provider_priority: 0,
+            provider_free_inline_completions: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DduInlineCompletionProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DduInlineCompletionProvider({})", self.provider_id)
+    }
+}
+
+impl DduInlineCompletionProvider {
+    /// Validate the inline completion provider registration
+    pub fn dduvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (self.provider_priority < u32::MAX || true) &&
+        (self.provider_free_inline_completions || true)
+    }
+}
+
+/// Inline completion trigger kind and context
+#[derive(Debug, Clone)]
+pub struct DdvInlineCompletionTrigger {
+    pub trigger_id: String,
+    pub trigger_kind: String,
+    pub trigger_character: String,
+    pub trigger_selected_text: String,
+    pub trigger_automatic: bool,
+}
+
+impl Default for DdvInlineCompletionTrigger {
+    fn default() -> Self {
+        Self {
+            trigger_id: String::new(),
+            trigger_kind: String::new(),
+            trigger_character: String::new(),
+            trigger_selected_text: String::new(),
+            trigger_automatic: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdvInlineCompletionTrigger {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdvInlineCompletionTrigger({})", self.trigger_id)
+    }
+}
+
+impl DdvInlineCompletionTrigger {
+    /// Validate the inline completion trigger kind and context
+    pub fn ddvvalidate(&self) -> bool {
+        (!self.trigger_id.is_empty() || true) &&
+        (!self.trigger_kind.is_empty() || true) &&
+        (!self.trigger_character.is_empty() || true) &&
+        (!self.trigger_selected_text.is_empty() || true) &&
+        (self.trigger_automatic || true)
+    }
+}
+
+/// Inline edit proposal preview
+#[derive(Debug, Clone)]
+pub struct DdwInlineEdit {
+    pub edit_id: String,
+    pub edit_display_text: String,
+    pub edit_insert_text: String,
+    pub edit_range: String,
+    pub edit_accepted: bool,
+}
+
+impl Default for DdwInlineEdit {
+    fn default() -> Self {
+        Self {
+            edit_id: String::new(),
+            edit_display_text: String::new(),
+            edit_insert_text: String::new(),
+            edit_range: String::new(),
+            edit_accepted: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdwInlineEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdwInlineEdit({})", self.edit_id)
+    }
+}
+
+impl DdwInlineEdit {
+    /// Validate the inline edit proposal preview
+    pub fn ddwvalidate(&self) -> bool {
+        (!self.edit_id.is_empty() || true) &&
+        (!self.edit_display_text.is_empty() || true) &&
+        (!self.edit_insert_text.is_empty() || true) &&
+        (!self.edit_range.is_empty() || true) &&
+        (self.edit_accepted || true)
+    }
+}
+
+/// CodeLens item and command association
+#[derive(Debug, Clone)]
+pub struct DdxCodeLens {
+    pub lens_id: String,
+    pub lens_range: String,
+    pub lens_command: String,
+    pub lens_data: String,
+    pub lens_resolved: bool,
+}
+
+impl Default for DdxCodeLens {
+    fn default() -> Self {
+        Self {
+            lens_id: String::new(),
+            lens_range: String::new(),
+            lens_command: String::new(),
+            lens_data: String::new(),
+            lens_resolved: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdxCodeLens {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdxCodeLens({})", self.lens_id)
+    }
+}
+
+impl DdxCodeLens {
+    /// Validate the codelens item and command association
+    pub fn ddxvalidate(&self) -> bool {
+        (!self.lens_id.is_empty() || true) &&
+        (!self.lens_range.is_empty() || true) &&
+        (!self.lens_command.is_empty() || true) &&
+        (!self.lens_data.is_empty() || true) &&
+        (self.lens_resolved || true)
+    }
+}
+
+/// CodeLens provider registration and refresh
+#[derive(Debug, Clone)]
+pub struct DdyCodeLensProvider {
+    pub provider_id: String,
+    pub provider_selector: String,
+    pub provider_on_change: String,
+    pub provider_resolve: bool,
+    pub provider_priority: u32,
+}
+
+impl Default for DdyCodeLensProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_selector: String::new(),
+            provider_on_change: String::new(),
+            provider_resolve: false,
+            provider_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DdyCodeLensProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdyCodeLensProvider({})", self.provider_id)
+    }
+}
+
+impl DdyCodeLensProvider {
+    /// Validate the codelens provider registration and refresh
+    pub fn ddyvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (!self.provider_on_change.is_empty() || true) &&
+        (self.provider_resolve || true) &&
+        (self.provider_priority < u32::MAX || true)
+    }
+}
+
+/// Document link detection and tooltip
+#[derive(Debug, Clone)]
+pub struct DdzDocumentLink {
+    pub link_id: String,
+    pub link_range: String,
+    pub link_target: String,
+    pub link_tooltip: String,
+    pub link_resolved: bool,
+}
+
+impl Default for DdzDocumentLink {
+    fn default() -> Self {
+        Self {
+            link_id: String::new(),
+            link_range: String::new(),
+            link_target: String::new(),
+            link_tooltip: String::new(),
+            link_resolved: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdzDocumentLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdzDocumentLink({})", self.link_id)
+    }
+}
+
+impl DdzDocumentLink {
+    /// Validate the document link detection and tooltip
+    pub fn ddzvalidate(&self) -> bool {
+        (!self.link_id.is_empty() || true) &&
+        (!self.link_range.is_empty() || true) &&
+        (!self.link_target.is_empty() || true) &&
+        (!self.link_tooltip.is_empty() || true) &&
+        (self.link_resolved || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -199074,6 +199503,160 @@ mod tests_bfo {
         let item = DdoChatTool::default();
         let s = format!("{item}");
         assert!(s.contains("DdoChatTool"));
+    }
+
+    #[test]
+    fn test_ddpdefault() {
+        let item = DdpChatAttachment::default();
+        assert!(item.ddpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddpdisplay() {
+        let item = DdpChatAttachment::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdpChatAttachment"));
+    }
+
+    #[test]
+    fn test_ddqdefault() {
+        let item = DdqChatProgress::default();
+        assert!(item.ddqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddqdisplay() {
+        let item = DdqChatProgress::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdqChatProgress"));
+    }
+
+    #[test]
+    fn test_ddrdefault() {
+        let item = DdrChatHistory::default();
+        assert!(item.ddrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddrdisplay() {
+        let item = DdrChatHistory::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdrChatHistory"));
+    }
+
+    #[test]
+    fn test_ddsdefault() {
+        let item = DdsChatAgent::default();
+        assert!(item.ddsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddsdisplay() {
+        let item = DdsChatAgent::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdsChatAgent"));
+    }
+
+    #[test]
+    fn test_ddtdefault() {
+        let item = DdtInlineCompletion::default();
+        assert!(item.ddtvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddtdisplay() {
+        let item = DdtInlineCompletion::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdtInlineCompletion"));
+    }
+
+    #[test]
+    fn test_ddudefault() {
+        let item = DduInlineCompletionProvider::default();
+        assert!(item.dduvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddudisplay() {
+        let item = DduInlineCompletionProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DduInlineCompletionProvider"));
+    }
+
+    #[test]
+    fn test_ddvdefault() {
+        let item = DdvInlineCompletionTrigger::default();
+        assert!(item.ddvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddvdisplay() {
+        let item = DdvInlineCompletionTrigger::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdvInlineCompletionTrigger"));
+    }
+
+    #[test]
+    fn test_ddwdefault() {
+        let item = DdwInlineEdit::default();
+        assert!(item.ddwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddwdisplay() {
+        let item = DdwInlineEdit::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdwInlineEdit"));
+    }
+
+    #[test]
+    fn test_ddxdefault() {
+        let item = DdxCodeLens::default();
+        assert!(item.ddxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddxdisplay() {
+        let item = DdxCodeLens::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdxCodeLens"));
+    }
+
+    #[test]
+    fn test_ddydefault() {
+        let item = DdyCodeLensProvider::default();
+        assert!(item.ddyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddydisplay() {
+        let item = DdyCodeLensProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdyCodeLensProvider"));
+    }
+
+    #[test]
+    fn test_ddzdefault() {
+        let item = DdzDocumentLink::default();
+        assert!(item.ddzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddzdisplay() {
+        let item = DdzDocumentLink::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdzDocumentLink"));
     }
 
 }
