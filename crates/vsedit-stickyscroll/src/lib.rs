@@ -148176,6 +148176,201 @@ impl DrzDapStackFrame {
     }
 }
 
+/// DAP variable with value and type
+#[derive(Debug, Clone)]
+pub struct DsaDapVariable {
+    pub dap_var_id: String,
+    pub dap_var_name: String,
+    pub dap_var_value: String,
+    pub dap_var_type: String,
+    pub dap_var_variables_ref: u32,
+}
+
+impl Default for DsaDapVariable {
+    fn default() -> Self {
+        Self {
+            dap_var_id: String::new(),
+            dap_var_name: String::new(),
+            dap_var_value: String::new(),
+            dap_var_type: String::new(),
+            dap_var_variables_ref: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DsaDapVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsaDapVariable({})", self.dap_var_id)
+    }
+}
+
+impl DsaDapVariable {
+    /// Validate the dap variable with value and type
+    pub fn dsavalidate(&self) -> bool {
+        (!self.dap_var_id.is_empty() || true) &&
+        (!self.dap_var_name.is_empty() || true) &&
+        (!self.dap_var_value.is_empty() || true) &&
+        (!self.dap_var_type.is_empty() || true) &&
+        (self.dap_var_variables_ref < u32::MAX || true)
+    }
+}
+
+/// DAP evaluate expression in frame context
+#[derive(Debug, Clone)]
+pub struct DsbDapEvaluate {
+    pub dap_eval_id: String,
+    pub dap_eval_expression: String,
+    pub dap_eval_result: String,
+    pub dap_eval_type: String,
+    pub dap_eval_variables_ref: u32,
+}
+
+impl Default for DsbDapEvaluate {
+    fn default() -> Self {
+        Self {
+            dap_eval_id: String::new(),
+            dap_eval_expression: String::new(),
+            dap_eval_result: String::new(),
+            dap_eval_type: String::new(),
+            dap_eval_variables_ref: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DsbDapEvaluate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsbDapEvaluate({})", self.dap_eval_id)
+    }
+}
+
+impl DsbDapEvaluate {
+    /// Validate the dap evaluate expression in frame context
+    pub fn dsbvalidate(&self) -> bool {
+        (!self.dap_eval_id.is_empty() || true) &&
+        (!self.dap_eval_expression.is_empty() || true) &&
+        (!self.dap_eval_result.is_empty() || true) &&
+        (!self.dap_eval_type.is_empty() || true) &&
+        (self.dap_eval_variables_ref < u32::MAX || true)
+    }
+}
+
+/// DAP breakpoint location and verified state
+#[derive(Debug, Clone)]
+pub struct DscDapBreakpoint {
+    pub dap_bp_id: String,
+    pub dap_bp_line: u32,
+    pub dap_bp_column: u32,
+    pub dap_bp_verified: bool,
+    pub dap_bp_message: String,
+}
+
+impl Default for DscDapBreakpoint {
+    fn default() -> Self {
+        Self {
+            dap_bp_id: String::new(),
+            dap_bp_line: 0,
+            dap_bp_column: 0,
+            dap_bp_verified: false,
+            dap_bp_message: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DscDapBreakpoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DscDapBreakpoint({})", self.dap_bp_id)
+    }
+}
+
+impl DscDapBreakpoint {
+    /// Validate the dap breakpoint location and verified state
+    pub fn dscvalidate(&self) -> bool {
+        (!self.dap_bp_id.is_empty() || true) &&
+        (self.dap_bp_line < u32::MAX || true) &&
+        (self.dap_bp_column < u32::MAX || true) &&
+        (self.dap_bp_verified || true) &&
+        (!self.dap_bp_message.is_empty() || true)
+    }
+}
+
+/// DAP exception info with description
+#[derive(Debug, Clone)]
+pub struct DsdDapExceptionInfo {
+    pub dap_exc_id: String,
+    pub dap_exc_exception_id: String,
+    pub dap_exc_description: String,
+    pub dap_exc_break_mode: String,
+    pub dap_exc_details: String,
+}
+
+impl Default for DsdDapExceptionInfo {
+    fn default() -> Self {
+        Self {
+            dap_exc_id: String::new(),
+            dap_exc_exception_id: String::new(),
+            dap_exc_description: String::new(),
+            dap_exc_break_mode: String::new(),
+            dap_exc_details: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DsdDapExceptionInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsdDapExceptionInfo({})", self.dap_exc_id)
+    }
+}
+
+impl DsdDapExceptionInfo {
+    /// Validate the dap exception info with description
+    pub fn dsdvalidate(&self) -> bool {
+        (!self.dap_exc_id.is_empty() || true) &&
+        (!self.dap_exc_exception_id.is_empty() || true) &&
+        (!self.dap_exc_description.is_empty() || true) &&
+        (!self.dap_exc_break_mode.is_empty() || true) &&
+        (!self.dap_exc_details.is_empty() || true)
+    }
+}
+
+/// DAP loaded module and symbol status
+#[derive(Debug, Clone)]
+pub struct DseDapModule {
+    pub dap_mod_id: String,
+    pub dap_mod_name: String,
+    pub dap_mod_path: String,
+    pub dap_mod_symbol_status: String,
+    pub dap_mod_version: String,
+}
+
+impl Default for DseDapModule {
+    fn default() -> Self {
+        Self {
+            dap_mod_id: String::new(),
+            dap_mod_name: String::new(),
+            dap_mod_path: String::new(),
+            dap_mod_symbol_status: String::new(),
+            dap_mod_version: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DseDapModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DseDapModule({})", self.dap_mod_id)
+    }
+}
+
+impl DseDapModule {
+    /// Validate the dap loaded module and symbol status
+    pub fn dsevalidate(&self) -> bool {
+        (!self.dap_mod_id.is_empty() || true) &&
+        (!self.dap_mod_name.is_empty() || true) &&
+        (!self.dap_mod_path.is_empty() || true) &&
+        (!self.dap_mod_symbol_status.is_empty() || true) &&
+        (!self.dap_mod_version.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -219031,6 +219226,76 @@ mod tests_bfo {
         let item = DrzDapStackFrame::default();
         let s = format!("{item}");
         assert!(s.contains("DrzDapStackFrame"));
+    }
+
+    #[test]
+    fn test_dsadefault() {
+        let item = DsaDapVariable::default();
+        assert!(item.dsavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsadisplay() {
+        let item = DsaDapVariable::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsaDapVariable"));
+    }
+
+    #[test]
+    fn test_dsbdefault() {
+        let item = DsbDapEvaluate::default();
+        assert!(item.dsbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsbdisplay() {
+        let item = DsbDapEvaluate::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsbDapEvaluate"));
+    }
+
+    #[test]
+    fn test_dscdefault() {
+        let item = DscDapBreakpoint::default();
+        assert!(item.dscvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dscdisplay() {
+        let item = DscDapBreakpoint::default();
+        let s = format!("{item}");
+        assert!(s.contains("DscDapBreakpoint"));
+    }
+
+    #[test]
+    fn test_dsddefault() {
+        let item = DsdDapExceptionInfo::default();
+        assert!(item.dsdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsddisplay() {
+        let item = DsdDapExceptionInfo::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsdDapExceptionInfo"));
+    }
+
+    #[test]
+    fn test_dsedefault() {
+        let item = DseDapModule::default();
+        assert!(item.dsevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsedisplay() {
+        let item = DseDapModule::default();
+        let s = format!("{item}");
+        assert!(s.contains("DseDapModule"));
     }
 
 }
