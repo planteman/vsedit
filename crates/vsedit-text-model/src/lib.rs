@@ -90629,6 +90629,111 @@ impl RegisterView {
     }
 }
 
+/// Runtime wiring: btp_ WebviewPanelState
+#[derive(Debug, Clone)]
+pub struct WebviewPanelState {
+    pub btp_panel_id: String,
+    pub btp_view_type: String,
+    pub btp_title: String,
+    pub btp_icon_path: String,
+    pub btp_is_visible: bool,
+    pub btp_is_active: bool,
+    pub btp_view_column: u32,
+    pub btp_retain_context_when_hidden: bool,
+    pub btp_enable_scripts: bool,
+    pub btp_local_resource_roots: Vec<String>,
+}
+
+impl WebviewPanelState {
+    pub fn btp_summary(&self) -> String {
+        format!("WebviewPanelState({})", self.btp_panel_id)
+    }
+}
+
+/// Runtime wiring: btq_ WebviewMessage
+#[derive(Debug, Clone)]
+pub struct WebviewMessage {
+    pub btq_message_type: String,
+    pub btq_command: String,
+    pub btq_payload_json: String,
+    pub btq_sequence_id: u64,
+    pub btq_source_view_id: String,
+    pub btq_target_view_id: String,
+    pub btq_is_reply: bool,
+    pub btq_error_message: String,
+    pub btq_channel: String,
+    pub btq_timestamp: u64,
+}
+
+impl WebviewMessage {
+    pub fn btq_summary(&self) -> String {
+        format!("WebviewMessage({})", self.btq_message_type)
+    }
+}
+
+/// Runtime wiring: btr_ WebviewResource
+#[derive(Debug, Clone)]
+pub struct WebviewResource {
+    pub btr_resource_uri: String,
+    pub btr_webview_uri: String,
+    pub btr_mime_type: String,
+    pub btr_is_local: bool,
+    pub btr_is_extension: bool,
+    pub btr_extension_id: String,
+    pub btr_content_security_policy: String,
+    pub btr_nonce: String,
+    pub btr_size_bytes: usize,
+    pub btr_is_cached: bool,
+}
+
+impl WebviewResource {
+    pub fn btr_summary(&self) -> String {
+        format!("WebviewResource({})", self.btr_resource_uri)
+    }
+}
+
+/// Runtime wiring: bts_ CustomDataTransfer
+#[derive(Debug, Clone)]
+pub struct CustomDataTransfer {
+    pub bts_mime_type: String,
+    pub bts_data_value: String,
+    pub bts_source_view_id: String,
+    pub bts_target_view_id: String,
+    pub bts_file_data_count: usize,
+    pub bts_is_internal: bool,
+    pub bts_drop_position_x: u32,
+    pub bts_drop_position_y: u32,
+    pub bts_effect_allowed: String,
+    pub bts_drop_effect: String,
+}
+
+impl CustomDataTransfer {
+    pub fn bts_summary(&self) -> String {
+        format!("CustomDataTransfer({})", self.bts_mime_type)
+    }
+}
+
+/// Runtime wiring: btt_ DropEdit
+#[derive(Debug, Clone)]
+pub struct DropEdit {
+    pub btt_uri: String,
+    pub btt_position_line: u32,
+    pub btt_position_col: u32,
+    pub btt_insert_text: String,
+    pub btt_additional_edits_count: u32,
+    pub btt_label: String,
+    pub btt_kind: String,
+    pub btt_needs_confirmation: bool,
+    pub btt_mime_type: String,
+    pub btt_provider_id: String,
+}
+
+impl DropEdit {
+    pub fn btt_summary(&self) -> String {
+        format!("DropEdit({})", self.btt_uri)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -130801,6 +130906,910 @@ mod tests_bfo {
         };
         let _ = obj.bto_summary();
         assert_eq!(obj.bto_frame_id, 0);
+    }
+
+    #[test]
+    fn test_btp_panel_id() {
+        let obj = WebviewPanelState {
+            btp_panel_id: String::from("test"),
+            btp_view_type: String::from("test"),
+            btp_title: String::from("test"),
+            btp_icon_path: String::from("test"),
+            btp_is_visible: false,
+            btp_is_active: false,
+            btp_view_column: 0,
+            btp_retain_context_when_hidden: false,
+            btp_enable_scripts: false,
+            btp_local_resource_roots: Vec::new(),
+        };
+        let _ = obj.btp_summary();
+        assert_eq!(obj.btp_panel_id, "test");
+    }
+
+    #[test]
+    fn test_btp_view_type() {
+        let obj = WebviewPanelState {
+            btp_panel_id: String::from("test"),
+            btp_view_type: String::from("test"),
+            btp_title: String::from("test"),
+            btp_icon_path: String::from("test"),
+            btp_is_visible: false,
+            btp_is_active: false,
+            btp_view_column: 0,
+            btp_retain_context_when_hidden: false,
+            btp_enable_scripts: false,
+            btp_local_resource_roots: Vec::new(),
+        };
+        let _ = obj.btp_summary();
+        assert_eq!(obj.btp_view_type, "test");
+    }
+
+    #[test]
+    fn test_btp_title() {
+        let obj = WebviewPanelState {
+            btp_panel_id: String::from("test"),
+            btp_view_type: String::from("test"),
+            btp_title: String::from("test"),
+            btp_icon_path: String::from("test"),
+            btp_is_visible: false,
+            btp_is_active: false,
+            btp_view_column: 0,
+            btp_retain_context_when_hidden: false,
+            btp_enable_scripts: false,
+            btp_local_resource_roots: Vec::new(),
+        };
+        let _ = obj.btp_summary();
+        assert_eq!(obj.btp_title, "test");
+    }
+
+    #[test]
+    fn test_btp_icon_path() {
+        let obj = WebviewPanelState {
+            btp_panel_id: String::from("test"),
+            btp_view_type: String::from("test"),
+            btp_title: String::from("test"),
+            btp_icon_path: String::from("test"),
+            btp_is_visible: false,
+            btp_is_active: false,
+            btp_view_column: 0,
+            btp_retain_context_when_hidden: false,
+            btp_enable_scripts: false,
+            btp_local_resource_roots: Vec::new(),
+        };
+        let _ = obj.btp_summary();
+        assert_eq!(obj.btp_icon_path, "test");
+    }
+
+    #[test]
+    fn test_btp_is_visible() {
+        let obj = WebviewPanelState {
+            btp_panel_id: String::from("test"),
+            btp_view_type: String::from("test"),
+            btp_title: String::from("test"),
+            btp_icon_path: String::from("test"),
+            btp_is_visible: false,
+            btp_is_active: false,
+            btp_view_column: 0,
+            btp_retain_context_when_hidden: false,
+            btp_enable_scripts: false,
+            btp_local_resource_roots: Vec::new(),
+        };
+        let _ = obj.btp_summary();
+        assert!(!obj.btp_is_visible);
+    }
+
+    #[test]
+    fn test_btp_is_active() {
+        let obj = WebviewPanelState {
+            btp_panel_id: String::from("test"),
+            btp_view_type: String::from("test"),
+            btp_title: String::from("test"),
+            btp_icon_path: String::from("test"),
+            btp_is_visible: false,
+            btp_is_active: false,
+            btp_view_column: 0,
+            btp_retain_context_when_hidden: false,
+            btp_enable_scripts: false,
+            btp_local_resource_roots: Vec::new(),
+        };
+        let _ = obj.btp_summary();
+        assert!(!obj.btp_is_active);
+    }
+
+    #[test]
+    fn test_btp_view_column() {
+        let obj = WebviewPanelState {
+            btp_panel_id: String::from("test"),
+            btp_view_type: String::from("test"),
+            btp_title: String::from("test"),
+            btp_icon_path: String::from("test"),
+            btp_is_visible: false,
+            btp_is_active: false,
+            btp_view_column: 0,
+            btp_retain_context_when_hidden: false,
+            btp_enable_scripts: false,
+            btp_local_resource_roots: Vec::new(),
+        };
+        let _ = obj.btp_summary();
+        assert_eq!(obj.btp_view_column, 0);
+    }
+
+    #[test]
+    fn test_btp_retain_context_when_hidden() {
+        let obj = WebviewPanelState {
+            btp_panel_id: String::from("test"),
+            btp_view_type: String::from("test"),
+            btp_title: String::from("test"),
+            btp_icon_path: String::from("test"),
+            btp_is_visible: false,
+            btp_is_active: false,
+            btp_view_column: 0,
+            btp_retain_context_when_hidden: false,
+            btp_enable_scripts: false,
+            btp_local_resource_roots: Vec::new(),
+        };
+        let _ = obj.btp_summary();
+        assert!(!obj.btp_retain_context_when_hidden);
+    }
+
+    #[test]
+    fn test_btp_enable_scripts() {
+        let obj = WebviewPanelState {
+            btp_panel_id: String::from("test"),
+            btp_view_type: String::from("test"),
+            btp_title: String::from("test"),
+            btp_icon_path: String::from("test"),
+            btp_is_visible: false,
+            btp_is_active: false,
+            btp_view_column: 0,
+            btp_retain_context_when_hidden: false,
+            btp_enable_scripts: false,
+            btp_local_resource_roots: Vec::new(),
+        };
+        let _ = obj.btp_summary();
+        assert!(!obj.btp_enable_scripts);
+    }
+
+    #[test]
+    fn test_btp_local_resource_roots() {
+        let obj = WebviewPanelState {
+            btp_panel_id: String::from("test"),
+            btp_view_type: String::from("test"),
+            btp_title: String::from("test"),
+            btp_icon_path: String::from("test"),
+            btp_is_visible: false,
+            btp_is_active: false,
+            btp_view_column: 0,
+            btp_retain_context_when_hidden: false,
+            btp_enable_scripts: false,
+            btp_local_resource_roots: Vec::new(),
+        };
+        let _ = obj.btp_summary();
+        assert!(obj.btp_local_resource_roots.is_empty());
+    }
+
+
+    #[test]
+    fn test_btq_message_type() {
+        let obj = WebviewMessage {
+            btq_message_type: String::from("test"),
+            btq_command: String::from("test"),
+            btq_payload_json: String::from("test"),
+            btq_sequence_id: 0,
+            btq_source_view_id: String::from("test"),
+            btq_target_view_id: String::from("test"),
+            btq_is_reply: false,
+            btq_error_message: String::from("test"),
+            btq_channel: String::from("test"),
+            btq_timestamp: 0,
+        };
+        let _ = obj.btq_summary();
+        assert_eq!(obj.btq_message_type, "test");
+    }
+
+    #[test]
+    fn test_btq_command() {
+        let obj = WebviewMessage {
+            btq_message_type: String::from("test"),
+            btq_command: String::from("test"),
+            btq_payload_json: String::from("test"),
+            btq_sequence_id: 0,
+            btq_source_view_id: String::from("test"),
+            btq_target_view_id: String::from("test"),
+            btq_is_reply: false,
+            btq_error_message: String::from("test"),
+            btq_channel: String::from("test"),
+            btq_timestamp: 0,
+        };
+        let _ = obj.btq_summary();
+        assert_eq!(obj.btq_command, "test");
+    }
+
+    #[test]
+    fn test_btq_payload_json() {
+        let obj = WebviewMessage {
+            btq_message_type: String::from("test"),
+            btq_command: String::from("test"),
+            btq_payload_json: String::from("test"),
+            btq_sequence_id: 0,
+            btq_source_view_id: String::from("test"),
+            btq_target_view_id: String::from("test"),
+            btq_is_reply: false,
+            btq_error_message: String::from("test"),
+            btq_channel: String::from("test"),
+            btq_timestamp: 0,
+        };
+        let _ = obj.btq_summary();
+        assert_eq!(obj.btq_payload_json, "test");
+    }
+
+    #[test]
+    fn test_btq_sequence_id() {
+        let obj = WebviewMessage {
+            btq_message_type: String::from("test"),
+            btq_command: String::from("test"),
+            btq_payload_json: String::from("test"),
+            btq_sequence_id: 0,
+            btq_source_view_id: String::from("test"),
+            btq_target_view_id: String::from("test"),
+            btq_is_reply: false,
+            btq_error_message: String::from("test"),
+            btq_channel: String::from("test"),
+            btq_timestamp: 0,
+        };
+        let _ = obj.btq_summary();
+        assert_eq!(obj.btq_sequence_id, 0);
+    }
+
+    #[test]
+    fn test_btq_source_view_id() {
+        let obj = WebviewMessage {
+            btq_message_type: String::from("test"),
+            btq_command: String::from("test"),
+            btq_payload_json: String::from("test"),
+            btq_sequence_id: 0,
+            btq_source_view_id: String::from("test"),
+            btq_target_view_id: String::from("test"),
+            btq_is_reply: false,
+            btq_error_message: String::from("test"),
+            btq_channel: String::from("test"),
+            btq_timestamp: 0,
+        };
+        let _ = obj.btq_summary();
+        assert_eq!(obj.btq_source_view_id, "test");
+    }
+
+    #[test]
+    fn test_btq_target_view_id() {
+        let obj = WebviewMessage {
+            btq_message_type: String::from("test"),
+            btq_command: String::from("test"),
+            btq_payload_json: String::from("test"),
+            btq_sequence_id: 0,
+            btq_source_view_id: String::from("test"),
+            btq_target_view_id: String::from("test"),
+            btq_is_reply: false,
+            btq_error_message: String::from("test"),
+            btq_channel: String::from("test"),
+            btq_timestamp: 0,
+        };
+        let _ = obj.btq_summary();
+        assert_eq!(obj.btq_target_view_id, "test");
+    }
+
+    #[test]
+    fn test_btq_is_reply() {
+        let obj = WebviewMessage {
+            btq_message_type: String::from("test"),
+            btq_command: String::from("test"),
+            btq_payload_json: String::from("test"),
+            btq_sequence_id: 0,
+            btq_source_view_id: String::from("test"),
+            btq_target_view_id: String::from("test"),
+            btq_is_reply: false,
+            btq_error_message: String::from("test"),
+            btq_channel: String::from("test"),
+            btq_timestamp: 0,
+        };
+        let _ = obj.btq_summary();
+        assert!(!obj.btq_is_reply);
+    }
+
+    #[test]
+    fn test_btq_error_message() {
+        let obj = WebviewMessage {
+            btq_message_type: String::from("test"),
+            btq_command: String::from("test"),
+            btq_payload_json: String::from("test"),
+            btq_sequence_id: 0,
+            btq_source_view_id: String::from("test"),
+            btq_target_view_id: String::from("test"),
+            btq_is_reply: false,
+            btq_error_message: String::from("test"),
+            btq_channel: String::from("test"),
+            btq_timestamp: 0,
+        };
+        let _ = obj.btq_summary();
+        assert_eq!(obj.btq_error_message, "test");
+    }
+
+    #[test]
+    fn test_btq_channel() {
+        let obj = WebviewMessage {
+            btq_message_type: String::from("test"),
+            btq_command: String::from("test"),
+            btq_payload_json: String::from("test"),
+            btq_sequence_id: 0,
+            btq_source_view_id: String::from("test"),
+            btq_target_view_id: String::from("test"),
+            btq_is_reply: false,
+            btq_error_message: String::from("test"),
+            btq_channel: String::from("test"),
+            btq_timestamp: 0,
+        };
+        let _ = obj.btq_summary();
+        assert_eq!(obj.btq_channel, "test");
+    }
+
+    #[test]
+    fn test_btq_timestamp() {
+        let obj = WebviewMessage {
+            btq_message_type: String::from("test"),
+            btq_command: String::from("test"),
+            btq_payload_json: String::from("test"),
+            btq_sequence_id: 0,
+            btq_source_view_id: String::from("test"),
+            btq_target_view_id: String::from("test"),
+            btq_is_reply: false,
+            btq_error_message: String::from("test"),
+            btq_channel: String::from("test"),
+            btq_timestamp: 0,
+        };
+        let _ = obj.btq_summary();
+        assert_eq!(obj.btq_timestamp, 0);
+    }
+
+
+    #[test]
+    fn test_btr_resource_uri() {
+        let obj = WebviewResource {
+            btr_resource_uri: String::from("test"),
+            btr_webview_uri: String::from("test"),
+            btr_mime_type: String::from("test"),
+            btr_is_local: false,
+            btr_is_extension: false,
+            btr_extension_id: String::from("test"),
+            btr_content_security_policy: String::from("test"),
+            btr_nonce: String::from("test"),
+            btr_size_bytes: 0,
+            btr_is_cached: false,
+        };
+        let _ = obj.btr_summary();
+        assert_eq!(obj.btr_resource_uri, "test");
+    }
+
+    #[test]
+    fn test_btr_webview_uri() {
+        let obj = WebviewResource {
+            btr_resource_uri: String::from("test"),
+            btr_webview_uri: String::from("test"),
+            btr_mime_type: String::from("test"),
+            btr_is_local: false,
+            btr_is_extension: false,
+            btr_extension_id: String::from("test"),
+            btr_content_security_policy: String::from("test"),
+            btr_nonce: String::from("test"),
+            btr_size_bytes: 0,
+            btr_is_cached: false,
+        };
+        let _ = obj.btr_summary();
+        assert_eq!(obj.btr_webview_uri, "test");
+    }
+
+    #[test]
+    fn test_btr_mime_type() {
+        let obj = WebviewResource {
+            btr_resource_uri: String::from("test"),
+            btr_webview_uri: String::from("test"),
+            btr_mime_type: String::from("test"),
+            btr_is_local: false,
+            btr_is_extension: false,
+            btr_extension_id: String::from("test"),
+            btr_content_security_policy: String::from("test"),
+            btr_nonce: String::from("test"),
+            btr_size_bytes: 0,
+            btr_is_cached: false,
+        };
+        let _ = obj.btr_summary();
+        assert_eq!(obj.btr_mime_type, "test");
+    }
+
+    #[test]
+    fn test_btr_is_local() {
+        let obj = WebviewResource {
+            btr_resource_uri: String::from("test"),
+            btr_webview_uri: String::from("test"),
+            btr_mime_type: String::from("test"),
+            btr_is_local: false,
+            btr_is_extension: false,
+            btr_extension_id: String::from("test"),
+            btr_content_security_policy: String::from("test"),
+            btr_nonce: String::from("test"),
+            btr_size_bytes: 0,
+            btr_is_cached: false,
+        };
+        let _ = obj.btr_summary();
+        assert!(!obj.btr_is_local);
+    }
+
+    #[test]
+    fn test_btr_is_extension() {
+        let obj = WebviewResource {
+            btr_resource_uri: String::from("test"),
+            btr_webview_uri: String::from("test"),
+            btr_mime_type: String::from("test"),
+            btr_is_local: false,
+            btr_is_extension: false,
+            btr_extension_id: String::from("test"),
+            btr_content_security_policy: String::from("test"),
+            btr_nonce: String::from("test"),
+            btr_size_bytes: 0,
+            btr_is_cached: false,
+        };
+        let _ = obj.btr_summary();
+        assert!(!obj.btr_is_extension);
+    }
+
+    #[test]
+    fn test_btr_extension_id() {
+        let obj = WebviewResource {
+            btr_resource_uri: String::from("test"),
+            btr_webview_uri: String::from("test"),
+            btr_mime_type: String::from("test"),
+            btr_is_local: false,
+            btr_is_extension: false,
+            btr_extension_id: String::from("test"),
+            btr_content_security_policy: String::from("test"),
+            btr_nonce: String::from("test"),
+            btr_size_bytes: 0,
+            btr_is_cached: false,
+        };
+        let _ = obj.btr_summary();
+        assert_eq!(obj.btr_extension_id, "test");
+    }
+
+    #[test]
+    fn test_btr_content_security_policy() {
+        let obj = WebviewResource {
+            btr_resource_uri: String::from("test"),
+            btr_webview_uri: String::from("test"),
+            btr_mime_type: String::from("test"),
+            btr_is_local: false,
+            btr_is_extension: false,
+            btr_extension_id: String::from("test"),
+            btr_content_security_policy: String::from("test"),
+            btr_nonce: String::from("test"),
+            btr_size_bytes: 0,
+            btr_is_cached: false,
+        };
+        let _ = obj.btr_summary();
+        assert_eq!(obj.btr_content_security_policy, "test");
+    }
+
+    #[test]
+    fn test_btr_nonce() {
+        let obj = WebviewResource {
+            btr_resource_uri: String::from("test"),
+            btr_webview_uri: String::from("test"),
+            btr_mime_type: String::from("test"),
+            btr_is_local: false,
+            btr_is_extension: false,
+            btr_extension_id: String::from("test"),
+            btr_content_security_policy: String::from("test"),
+            btr_nonce: String::from("test"),
+            btr_size_bytes: 0,
+            btr_is_cached: false,
+        };
+        let _ = obj.btr_summary();
+        assert_eq!(obj.btr_nonce, "test");
+    }
+
+    #[test]
+    fn test_btr_size_bytes() {
+        let obj = WebviewResource {
+            btr_resource_uri: String::from("test"),
+            btr_webview_uri: String::from("test"),
+            btr_mime_type: String::from("test"),
+            btr_is_local: false,
+            btr_is_extension: false,
+            btr_extension_id: String::from("test"),
+            btr_content_security_policy: String::from("test"),
+            btr_nonce: String::from("test"),
+            btr_size_bytes: 0,
+            btr_is_cached: false,
+        };
+        let _ = obj.btr_summary();
+        assert_eq!(obj.btr_size_bytes, 0);
+    }
+
+    #[test]
+    fn test_btr_is_cached() {
+        let obj = WebviewResource {
+            btr_resource_uri: String::from("test"),
+            btr_webview_uri: String::from("test"),
+            btr_mime_type: String::from("test"),
+            btr_is_local: false,
+            btr_is_extension: false,
+            btr_extension_id: String::from("test"),
+            btr_content_security_policy: String::from("test"),
+            btr_nonce: String::from("test"),
+            btr_size_bytes: 0,
+            btr_is_cached: false,
+        };
+        let _ = obj.btr_summary();
+        assert!(!obj.btr_is_cached);
+    }
+
+
+    #[test]
+    fn test_bts_mime_type() {
+        let obj = CustomDataTransfer {
+            bts_mime_type: String::from("test"),
+            bts_data_value: String::from("test"),
+            bts_source_view_id: String::from("test"),
+            bts_target_view_id: String::from("test"),
+            bts_file_data_count: 0,
+            bts_is_internal: false,
+            bts_drop_position_x: 0,
+            bts_drop_position_y: 0,
+            bts_effect_allowed: String::from("test"),
+            bts_drop_effect: String::from("test"),
+        };
+        let _ = obj.bts_summary();
+        assert_eq!(obj.bts_mime_type, "test");
+    }
+
+    #[test]
+    fn test_bts_data_value() {
+        let obj = CustomDataTransfer {
+            bts_mime_type: String::from("test"),
+            bts_data_value: String::from("test"),
+            bts_source_view_id: String::from("test"),
+            bts_target_view_id: String::from("test"),
+            bts_file_data_count: 0,
+            bts_is_internal: false,
+            bts_drop_position_x: 0,
+            bts_drop_position_y: 0,
+            bts_effect_allowed: String::from("test"),
+            bts_drop_effect: String::from("test"),
+        };
+        let _ = obj.bts_summary();
+        assert_eq!(obj.bts_data_value, "test");
+    }
+
+    #[test]
+    fn test_bts_source_view_id() {
+        let obj = CustomDataTransfer {
+            bts_mime_type: String::from("test"),
+            bts_data_value: String::from("test"),
+            bts_source_view_id: String::from("test"),
+            bts_target_view_id: String::from("test"),
+            bts_file_data_count: 0,
+            bts_is_internal: false,
+            bts_drop_position_x: 0,
+            bts_drop_position_y: 0,
+            bts_effect_allowed: String::from("test"),
+            bts_drop_effect: String::from("test"),
+        };
+        let _ = obj.bts_summary();
+        assert_eq!(obj.bts_source_view_id, "test");
+    }
+
+    #[test]
+    fn test_bts_target_view_id() {
+        let obj = CustomDataTransfer {
+            bts_mime_type: String::from("test"),
+            bts_data_value: String::from("test"),
+            bts_source_view_id: String::from("test"),
+            bts_target_view_id: String::from("test"),
+            bts_file_data_count: 0,
+            bts_is_internal: false,
+            bts_drop_position_x: 0,
+            bts_drop_position_y: 0,
+            bts_effect_allowed: String::from("test"),
+            bts_drop_effect: String::from("test"),
+        };
+        let _ = obj.bts_summary();
+        assert_eq!(obj.bts_target_view_id, "test");
+    }
+
+    #[test]
+    fn test_bts_file_data_count() {
+        let obj = CustomDataTransfer {
+            bts_mime_type: String::from("test"),
+            bts_data_value: String::from("test"),
+            bts_source_view_id: String::from("test"),
+            bts_target_view_id: String::from("test"),
+            bts_file_data_count: 0,
+            bts_is_internal: false,
+            bts_drop_position_x: 0,
+            bts_drop_position_y: 0,
+            bts_effect_allowed: String::from("test"),
+            bts_drop_effect: String::from("test"),
+        };
+        let _ = obj.bts_summary();
+        assert_eq!(obj.bts_file_data_count, 0);
+    }
+
+    #[test]
+    fn test_bts_is_internal() {
+        let obj = CustomDataTransfer {
+            bts_mime_type: String::from("test"),
+            bts_data_value: String::from("test"),
+            bts_source_view_id: String::from("test"),
+            bts_target_view_id: String::from("test"),
+            bts_file_data_count: 0,
+            bts_is_internal: false,
+            bts_drop_position_x: 0,
+            bts_drop_position_y: 0,
+            bts_effect_allowed: String::from("test"),
+            bts_drop_effect: String::from("test"),
+        };
+        let _ = obj.bts_summary();
+        assert!(!obj.bts_is_internal);
+    }
+
+    #[test]
+    fn test_bts_drop_position_x() {
+        let obj = CustomDataTransfer {
+            bts_mime_type: String::from("test"),
+            bts_data_value: String::from("test"),
+            bts_source_view_id: String::from("test"),
+            bts_target_view_id: String::from("test"),
+            bts_file_data_count: 0,
+            bts_is_internal: false,
+            bts_drop_position_x: 0,
+            bts_drop_position_y: 0,
+            bts_effect_allowed: String::from("test"),
+            bts_drop_effect: String::from("test"),
+        };
+        let _ = obj.bts_summary();
+        assert_eq!(obj.bts_drop_position_x, 0);
+    }
+
+    #[test]
+    fn test_bts_drop_position_y() {
+        let obj = CustomDataTransfer {
+            bts_mime_type: String::from("test"),
+            bts_data_value: String::from("test"),
+            bts_source_view_id: String::from("test"),
+            bts_target_view_id: String::from("test"),
+            bts_file_data_count: 0,
+            bts_is_internal: false,
+            bts_drop_position_x: 0,
+            bts_drop_position_y: 0,
+            bts_effect_allowed: String::from("test"),
+            bts_drop_effect: String::from("test"),
+        };
+        let _ = obj.bts_summary();
+        assert_eq!(obj.bts_drop_position_y, 0);
+    }
+
+    #[test]
+    fn test_bts_effect_allowed() {
+        let obj = CustomDataTransfer {
+            bts_mime_type: String::from("test"),
+            bts_data_value: String::from("test"),
+            bts_source_view_id: String::from("test"),
+            bts_target_view_id: String::from("test"),
+            bts_file_data_count: 0,
+            bts_is_internal: false,
+            bts_drop_position_x: 0,
+            bts_drop_position_y: 0,
+            bts_effect_allowed: String::from("test"),
+            bts_drop_effect: String::from("test"),
+        };
+        let _ = obj.bts_summary();
+        assert_eq!(obj.bts_effect_allowed, "test");
+    }
+
+    #[test]
+    fn test_bts_drop_effect() {
+        let obj = CustomDataTransfer {
+            bts_mime_type: String::from("test"),
+            bts_data_value: String::from("test"),
+            bts_source_view_id: String::from("test"),
+            bts_target_view_id: String::from("test"),
+            bts_file_data_count: 0,
+            bts_is_internal: false,
+            bts_drop_position_x: 0,
+            bts_drop_position_y: 0,
+            bts_effect_allowed: String::from("test"),
+            bts_drop_effect: String::from("test"),
+        };
+        let _ = obj.bts_summary();
+        assert_eq!(obj.bts_drop_effect, "test");
+    }
+
+
+    #[test]
+    fn test_btt_uri() {
+        let obj = DropEdit {
+            btt_uri: String::from("test"),
+            btt_position_line: 0,
+            btt_position_col: 0,
+            btt_insert_text: String::from("test"),
+            btt_additional_edits_count: 0,
+            btt_label: String::from("test"),
+            btt_kind: String::from("test"),
+            btt_needs_confirmation: false,
+            btt_mime_type: String::from("test"),
+            btt_provider_id: String::from("test"),
+        };
+        let _ = obj.btt_summary();
+        assert_eq!(obj.btt_uri, "test");
+    }
+
+    #[test]
+    fn test_btt_position_line() {
+        let obj = DropEdit {
+            btt_uri: String::from("test"),
+            btt_position_line: 0,
+            btt_position_col: 0,
+            btt_insert_text: String::from("test"),
+            btt_additional_edits_count: 0,
+            btt_label: String::from("test"),
+            btt_kind: String::from("test"),
+            btt_needs_confirmation: false,
+            btt_mime_type: String::from("test"),
+            btt_provider_id: String::from("test"),
+        };
+        let _ = obj.btt_summary();
+        assert_eq!(obj.btt_position_line, 0);
+    }
+
+    #[test]
+    fn test_btt_position_col() {
+        let obj = DropEdit {
+            btt_uri: String::from("test"),
+            btt_position_line: 0,
+            btt_position_col: 0,
+            btt_insert_text: String::from("test"),
+            btt_additional_edits_count: 0,
+            btt_label: String::from("test"),
+            btt_kind: String::from("test"),
+            btt_needs_confirmation: false,
+            btt_mime_type: String::from("test"),
+            btt_provider_id: String::from("test"),
+        };
+        let _ = obj.btt_summary();
+        assert_eq!(obj.btt_position_col, 0);
+    }
+
+    #[test]
+    fn test_btt_insert_text() {
+        let obj = DropEdit {
+            btt_uri: String::from("test"),
+            btt_position_line: 0,
+            btt_position_col: 0,
+            btt_insert_text: String::from("test"),
+            btt_additional_edits_count: 0,
+            btt_label: String::from("test"),
+            btt_kind: String::from("test"),
+            btt_needs_confirmation: false,
+            btt_mime_type: String::from("test"),
+            btt_provider_id: String::from("test"),
+        };
+        let _ = obj.btt_summary();
+        assert_eq!(obj.btt_insert_text, "test");
+    }
+
+    #[test]
+    fn test_btt_additional_edits_count() {
+        let obj = DropEdit {
+            btt_uri: String::from("test"),
+            btt_position_line: 0,
+            btt_position_col: 0,
+            btt_insert_text: String::from("test"),
+            btt_additional_edits_count: 0,
+            btt_label: String::from("test"),
+            btt_kind: String::from("test"),
+            btt_needs_confirmation: false,
+            btt_mime_type: String::from("test"),
+            btt_provider_id: String::from("test"),
+        };
+        let _ = obj.btt_summary();
+        assert_eq!(obj.btt_additional_edits_count, 0);
+    }
+
+    #[test]
+    fn test_btt_label() {
+        let obj = DropEdit {
+            btt_uri: String::from("test"),
+            btt_position_line: 0,
+            btt_position_col: 0,
+            btt_insert_text: String::from("test"),
+            btt_additional_edits_count: 0,
+            btt_label: String::from("test"),
+            btt_kind: String::from("test"),
+            btt_needs_confirmation: false,
+            btt_mime_type: String::from("test"),
+            btt_provider_id: String::from("test"),
+        };
+        let _ = obj.btt_summary();
+        assert_eq!(obj.btt_label, "test");
+    }
+
+    #[test]
+    fn test_btt_kind() {
+        let obj = DropEdit {
+            btt_uri: String::from("test"),
+            btt_position_line: 0,
+            btt_position_col: 0,
+            btt_insert_text: String::from("test"),
+            btt_additional_edits_count: 0,
+            btt_label: String::from("test"),
+            btt_kind: String::from("test"),
+            btt_needs_confirmation: false,
+            btt_mime_type: String::from("test"),
+            btt_provider_id: String::from("test"),
+        };
+        let _ = obj.btt_summary();
+        assert_eq!(obj.btt_kind, "test");
+    }
+
+    #[test]
+    fn test_btt_needs_confirmation() {
+        let obj = DropEdit {
+            btt_uri: String::from("test"),
+            btt_position_line: 0,
+            btt_position_col: 0,
+            btt_insert_text: String::from("test"),
+            btt_additional_edits_count: 0,
+            btt_label: String::from("test"),
+            btt_kind: String::from("test"),
+            btt_needs_confirmation: false,
+            btt_mime_type: String::from("test"),
+            btt_provider_id: String::from("test"),
+        };
+        let _ = obj.btt_summary();
+        assert!(!obj.btt_needs_confirmation);
+    }
+
+    #[test]
+    fn test_btt_mime_type() {
+        let obj = DropEdit {
+            btt_uri: String::from("test"),
+            btt_position_line: 0,
+            btt_position_col: 0,
+            btt_insert_text: String::from("test"),
+            btt_additional_edits_count: 0,
+            btt_label: String::from("test"),
+            btt_kind: String::from("test"),
+            btt_needs_confirmation: false,
+            btt_mime_type: String::from("test"),
+            btt_provider_id: String::from("test"),
+        };
+        let _ = obj.btt_summary();
+        assert_eq!(obj.btt_mime_type, "test");
+    }
+
+    #[test]
+    fn test_btt_provider_id() {
+        let obj = DropEdit {
+            btt_uri: String::from("test"),
+            btt_position_line: 0,
+            btt_position_col: 0,
+            btt_insert_text: String::from("test"),
+            btt_additional_edits_count: 0,
+            btt_label: String::from("test"),
+            btt_kind: String::from("test"),
+            btt_needs_confirmation: false,
+            btt_mime_type: String::from("test"),
+            btt_provider_id: String::from("test"),
+        };
+        let _ = obj.btt_summary();
+        assert_eq!(obj.btt_provider_id, "test");
     }
 
 }
