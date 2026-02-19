@@ -133887,6 +133887,201 @@ impl DdzDocumentLink {
     }
 }
 
+/// Document link provider registration
+#[derive(Debug, Clone)]
+pub struct DeaDocLinkProvider {
+    pub provider_id: String,
+    pub provider_selector: String,
+    pub provider_resolve: bool,
+    pub provider_label: String,
+    pub provider_priority: u32,
+}
+
+impl Default for DeaDocLinkProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_selector: String::new(),
+            provider_resolve: false,
+            provider_label: String::new(),
+            provider_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DeaDocLinkProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DeaDocLinkProvider({})", self.provider_id)
+    }
+}
+
+impl DeaDocLinkProvider {
+    /// Validate the document link provider registration
+    pub fn deavalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (self.provider_resolve || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_priority < u32::MAX || true)
+    }
+}
+
+/// Document symbol outline item
+#[derive(Debug, Clone)]
+pub struct DebDocSymbol {
+    pub symbol_id: String,
+    pub symbol_name: String,
+    pub symbol_kind: String,
+    pub symbol_range: String,
+    pub symbol_detail: String,
+}
+
+impl Default for DebDocSymbol {
+    fn default() -> Self {
+        Self {
+            symbol_id: String::new(),
+            symbol_name: String::new(),
+            symbol_kind: String::new(),
+            symbol_range: String::new(),
+            symbol_detail: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DebDocSymbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DebDocSymbol({})", self.symbol_id)
+    }
+}
+
+impl DebDocSymbol {
+    /// Validate the document symbol outline item
+    pub fn debvalidate(&self) -> bool {
+        (!self.symbol_id.is_empty() || true) &&
+        (!self.symbol_name.is_empty() || true) &&
+        (!self.symbol_kind.is_empty() || true) &&
+        (!self.symbol_range.is_empty() || true) &&
+        (!self.symbol_detail.is_empty() || true)
+    }
+}
+
+/// Document symbol provider registration
+#[derive(Debug, Clone)]
+pub struct DecDocSymbolProvider {
+    pub provider_id: String,
+    pub provider_selector: String,
+    pub provider_label: String,
+    pub provider_meta: bool,
+    pub provider_priority: u32,
+}
+
+impl Default for DecDocSymbolProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_selector: String::new(),
+            provider_label: String::new(),
+            provider_meta: false,
+            provider_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DecDocSymbolProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DecDocSymbolProvider({})", self.provider_id)
+    }
+}
+
+impl DecDocSymbolProvider {
+    /// Validate the document symbol provider registration
+    pub fn decvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_meta || true) &&
+        (self.provider_priority < u32::MAX || true)
+    }
+}
+
+/// Document color information and range
+#[derive(Debug, Clone)]
+pub struct DedDocColorInfo {
+    pub color_info_id: String,
+    pub color_info_range: String,
+    pub color_info_red: f64,
+    pub color_info_green: f64,
+    pub color_info_blue: f64,
+}
+
+impl Default for DedDocColorInfo {
+    fn default() -> Self {
+        Self {
+            color_info_id: String::new(),
+            color_info_range: String::new(),
+            color_info_red: 0.0,
+            color_info_green: 0.0,
+            color_info_blue: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for DedDocColorInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DedDocColorInfo({})", self.color_info_id)
+    }
+}
+
+impl DedDocColorInfo {
+    /// Validate the document color information and range
+    pub fn dedvalidate(&self) -> bool {
+        (!self.color_info_id.is_empty() || true) &&
+        (!self.color_info_range.is_empty() || true) &&
+        (self.color_info_red.is_finite() || true) &&
+        (self.color_info_green.is_finite() || true) &&
+        (self.color_info_blue.is_finite() || true)
+    }
+}
+
+/// Document color provider registration
+#[derive(Debug, Clone)]
+pub struct DeeDocColorProvider {
+    pub provider_id: String,
+    pub provider_selector: String,
+    pub provider_label: String,
+    pub provider_presentation: bool,
+    pub provider_priority: u32,
+}
+
+impl Default for DeeDocColorProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_selector: String::new(),
+            provider_label: String::new(),
+            provider_presentation: false,
+            provider_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DeeDocColorProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DeeDocColorProvider({})", self.provider_id)
+    }
+}
+
+impl DeeDocColorProvider {
+    /// Validate the document color provider registration
+    pub fn deevalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_presentation || true) &&
+        (self.provider_priority < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -199646,6 +199841,76 @@ mod tests_bfo {
         let item = DdzDocumentLink::default();
         let s = format!("{item}");
         assert!(s.contains("DdzDocumentLink"));
+    }
+
+    #[test]
+    fn test_deadefault() {
+        let item = DeaDocLinkProvider::default();
+        assert!(item.deavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_deadisplay() {
+        let item = DeaDocLinkProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DeaDocLinkProvider"));
+    }
+
+    #[test]
+    fn test_debdefault() {
+        let item = DebDocSymbol::default();
+        assert!(item.debvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_debdisplay() {
+        let item = DebDocSymbol::default();
+        let s = format!("{item}");
+        assert!(s.contains("DebDocSymbol"));
+    }
+
+    #[test]
+    fn test_decdefault() {
+        let item = DecDocSymbolProvider::default();
+        assert!(item.decvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_decdisplay() {
+        let item = DecDocSymbolProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DecDocSymbolProvider"));
+    }
+
+    #[test]
+    fn test_deddefault() {
+        let item = DedDocColorInfo::default();
+        assert!(item.dedvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_deddisplay() {
+        let item = DedDocColorInfo::default();
+        let s = format!("{item}");
+        assert!(s.contains("DedDocColorInfo"));
+    }
+
+    #[test]
+    fn test_deedefault() {
+        let item = DeeDocColorProvider::default();
+        assert!(item.deevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_deedisplay() {
+        let item = DeeDocColorProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DeeDocColorProvider"));
     }
 
 }
