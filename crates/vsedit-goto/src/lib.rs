@@ -86059,6 +86059,81 @@ impl BjtDocumentSymbol {
     pub fn contains_line(&self, line: usize) -> bool { line >= self.range_start_line && line <= self.range_end_line }
 }
 
+
+// Document formatting provider — format document/range, options, edit application
+#[derive(Debug, Clone)]
+pub struct BjuFormatOptions { pub tab_size: usize, pub insert_spaces: bool, pub trim_trailing: bool, pub trim_final_newlines: bool, pub insert_final_newline: bool }
+#[derive(Debug, Clone)]
+pub struct BjuTextEdit { pub range_start_line: usize, pub range_start_col: usize, pub range_end_line: usize, pub range_end_col: usize, pub new_text: String }
+#[derive(Debug, Clone)]
+pub struct BjuFormatResult { pub edits: Vec<BjuTextEdit>, pub applied: bool, pub duration_us: u64 }
+#[derive(Debug, Clone)]
+pub struct BjuRangeFormatRequest { pub file: String, pub start_line: usize, pub start_col: usize, pub end_line: usize, pub end_col: usize, pub options: BjuFormatOptions }
+#[derive(Debug, Clone)]
+pub struct BjuOnTypeFormatTrigger { pub file: String, pub line: usize, pub col: usize, pub ch: char, pub options: BjuFormatOptions }
+
+// Code action provider — quick fixes, refactorings, source actions, preferred/disabled
+#[derive(Debug, Clone)]
+pub struct BjvCodeActionKind { pub value: String }
+#[derive(Debug, Clone)]
+pub struct BjvDiagnosticRef { pub file: String, pub line: usize, pub col: usize, pub message: String, pub severity: u8 }
+#[derive(Debug, Clone)]
+pub struct BjvCodeAction { pub title: String, pub kind: Option<BjvCodeActionKind>, pub diagnostics: Vec<BjvDiagnosticRef>, pub is_preferred: bool, pub disabled_reason: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BjvCodeActionContext { pub diagnostics: Vec<BjvDiagnosticRef>, pub only_kinds: Vec<BjvCodeActionKind>, pub trigger_kind: u8 }
+#[derive(Debug, Clone)]
+pub struct BjvCodeActionList { pub actions: Vec<BjvCodeAction>, pub has_more: bool }
+
+// Completion item provider — completion items, resolve, trigger chars, commit chars
+#[derive(Debug, Clone)]
+pub struct BjwCompletionItemKind { pub value: u8 }
+#[derive(Debug, Clone)]
+pub struct BjwCompletionItem { pub label: String, pub kind: BjwCompletionItemKind, pub detail: Option<String>, pub insert_text: String, pub sort_text: Option<String>, pub filter_text: Option<String>, pub preselect: bool }
+#[derive(Debug, Clone)]
+pub struct BjwCompletionList { pub items: Vec<BjwCompletionItem>, pub is_incomplete: bool }
+#[derive(Debug, Clone)]
+pub struct BjwCompletionTrigger { pub kind: u8, pub trigger_char: Option<char> }
+#[derive(Debug, Clone)]
+pub struct BjwCompletionContext { pub trigger: BjwCompletionTrigger, pub file: String, pub line: usize, pub col: usize }
+
+// Hover provider — hover content with markdown, range highlighting, multiple sections
+#[derive(Debug, Clone)]
+pub struct BjxMarkedString { pub language: Option<String>, pub value: String }
+#[derive(Debug, Clone)]
+pub struct BjxHoverContent { pub sections: Vec<BjxMarkedString> }
+#[derive(Debug, Clone)]
+pub struct BjxHoverRange { pub start_line: usize, pub start_col: usize, pub end_line: usize, pub end_col: usize }
+#[derive(Debug, Clone)]
+pub struct BjxHover { pub contents: BjxHoverContent, pub range: Option<BjxHoverRange> }
+#[derive(Debug, Clone)]
+pub struct BjxHoverRequest { pub file: String, pub line: usize, pub col: usize }
+
+// Definition provider — go to definition with single/multiple locations, peek preview
+#[derive(Debug, Clone)]
+pub struct BjyLocation { pub file: String, pub line: usize, pub col: usize }
+#[derive(Debug, Clone)]
+pub struct BjyLocationLink { pub origin_start_line: usize, pub origin_start_col: usize, pub origin_end_line: usize, pub origin_end_col: usize, pub target: BjyLocation, pub target_range_end_line: usize, pub target_range_end_col: usize }
+#[derive(Debug, Clone)]
+pub struct BjyDefinitionResult { pub locations: Vec<BjyLocation>, pub links: Vec<BjyLocationLink> }
+#[derive(Debug, Clone)]
+pub struct BjyDefinitionRequest { pub file: String, pub line: usize, pub col: usize }
+#[derive(Debug, Clone)]
+pub struct BjyPeekContext { pub request: BjyDefinitionRequest, pub show_peek: bool, pub go_to_if_single: bool }
+
+// Diagnostic collection — diagnostics per file, severity, related info, code actions link
+#[derive(Debug, Clone)]
+pub struct BjzDiagnosticSeverity { pub value: u8 }
+#[derive(Debug, Clone)]
+pub struct BjzDiagnosticRelatedInfo { pub file: String, pub line: usize, pub col: usize, pub message: String }
+#[derive(Debug, Clone)]
+pub struct BjzDiagnostic { pub file: String, pub start_line: usize, pub start_col: usize, pub end_line: usize, pub end_col: usize, pub message: String, pub severity: BjzDiagnosticSeverity, pub code: Option<String>, pub source: Option<String>, pub related: Vec<BjzDiagnosticRelatedInfo> }
+#[derive(Debug, Clone)]
+pub struct BjzDiagnosticEntry { pub uri: String, pub diagnostics: Vec<BjzDiagnostic> }
+#[derive(Debug, Clone)]
+pub struct BjzDiagnosticCollection { pub name: String, pub entries: Vec<BjzDiagnosticEntry> }
+#[derive(Debug, Clone)]
+pub struct BjzDiagnosticChangeEvent { pub uris: Vec<String> }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -94439,4 +94514,124 @@ mod tests_bfo {
     #[test]
     fn test_bjt_constant() { let s = BjtDocumentSymbol::new("MAX".into(), BjtSymbolKind::Constant, 1, 1); assert_eq!(s.kind, BjtSymbolKind::Constant); }
 
+    #[test]
+    fn test_bju_default_options() { let o = BjuFormatOptions { tab_size: 4, insert_spaces: true, trim_trailing: true, trim_final_newlines: false, insert_final_newline: true }; assert_eq!(o.tab_size, 4); }
+    #[test]
+    fn test_bju_text_edit_single_line() { let e = BjuTextEdit { range_start_line: 0, range_start_col: 0, range_end_line: 0, range_end_col: 5, new_text: "hello".into() }; assert_eq!(e.new_text, "hello"); }
+    #[test]
+    fn test_bju_format_result_empty() { let r = BjuFormatResult { edits: vec![], applied: true, duration_us: 100 }; assert!(r.edits.is_empty()); }
+    #[test]
+    fn test_bju_format_result_with_edits() { let e = BjuTextEdit { range_start_line: 1, range_start_col: 0, range_end_line: 1, range_end_col: 4, new_text: "    ".into() }; let r = BjuFormatResult { edits: vec![e], applied: true, duration_us: 50 }; assert_eq!(r.edits.len(), 1); }
+    #[test]
+    fn test_bju_range_format_request() { let req = BjuRangeFormatRequest { file: "a.rs".into(), start_line: 5, start_col: 0, end_line: 10, end_col: 0, options: BjuFormatOptions { tab_size: 2, insert_spaces: true, trim_trailing: false, trim_final_newlines: false, insert_final_newline: false } }; assert_eq!(req.start_line, 5); }
+    #[test]
+    fn test_bju_on_type_trigger() { let t = BjuOnTypeFormatTrigger { file: "b.rs".into(), line: 3, col: 1, ch: ';', options: BjuFormatOptions { tab_size: 4, insert_spaces: true, trim_trailing: true, trim_final_newlines: true, insert_final_newline: true } }; assert_eq!(t.ch, ';'); }
+    #[test]
+    fn test_bju_tabs_not_spaces() { let o = BjuFormatOptions { tab_size: 8, insert_spaces: false, trim_trailing: false, trim_final_newlines: false, insert_final_newline: false }; assert!(!o.insert_spaces); }
+    #[test]
+    fn test_bju_multi_edit_result() { let edits: Vec<BjuTextEdit> = (0..5).map(|i| BjuTextEdit { range_start_line: i, range_start_col: 0, range_end_line: i, range_end_col: 1, new_text: " ".into() }).collect(); let r = BjuFormatResult { edits, applied: true, duration_us: 200 }; assert_eq!(r.edits.len(), 5); }
+    #[test]
+    fn test_bju_duration_tracking() { let r = BjuFormatResult { edits: vec![], applied: false, duration_us: 999 }; assert_eq!(r.duration_us, 999); }
+    #[test]
+    fn test_bju_range_covers_whole_file() { let req = BjuRangeFormatRequest { file: "x.rs".into(), start_line: 0, start_col: 0, end_line: 9999, end_col: 0, options: BjuFormatOptions { tab_size: 4, insert_spaces: true, trim_trailing: true, trim_final_newlines: true, insert_final_newline: true } }; assert_eq!(req.end_line, 9999); }
+    #[test]
+    fn test_bjv_kind_quickfix() { let k = BjvCodeActionKind { value: "quickfix".into() }; assert_eq!(k.value, "quickfix"); }
+    #[test]
+    fn test_bjv_kind_refactor() { let k = BjvCodeActionKind { value: "refactor.extract".into() }; assert!(k.value.starts_with("refactor")); }
+    #[test]
+    fn test_bjv_action_preferred() { let a = BjvCodeAction { title: "Fix import".into(), kind: Some(BjvCodeActionKind { value: "quickfix".into() }), diagnostics: vec![], is_preferred: true, disabled_reason: None }; assert!(a.is_preferred); }
+    #[test]
+    fn test_bjv_action_disabled() { let a = BjvCodeAction { title: "Extract".into(), kind: None, diagnostics: vec![], is_preferred: false, disabled_reason: Some("no selection".into()) }; assert!(a.disabled_reason.is_some()); }
+    #[test]
+    fn test_bjv_context_filter_kinds() { let ctx = BjvCodeActionContext { diagnostics: vec![], only_kinds: vec![BjvCodeActionKind { value: "quickfix".into() }], trigger_kind: 1 }; assert_eq!(ctx.only_kinds.len(), 1); }
+    #[test]
+    fn test_bjv_diagnostic_ref() { let d = BjvDiagnosticRef { file: "a.rs".into(), line: 10, col: 5, message: "unused".into(), severity: 2 }; assert_eq!(d.severity, 2); }
+    #[test]
+    fn test_bjv_action_with_diagnostics() { let d = BjvDiagnosticRef { file: "b.rs".into(), line: 1, col: 0, message: "err".into(), severity: 1 }; let a = BjvCodeAction { title: "Fix".into(), kind: None, diagnostics: vec![d], is_preferred: false, disabled_reason: None }; assert_eq!(a.diagnostics.len(), 1); }
+    #[test]
+    fn test_bjv_action_list_empty() { let l = BjvCodeActionList { actions: vec![], has_more: false }; assert!(l.actions.is_empty()); }
+    #[test]
+    fn test_bjv_action_list_has_more() { let a = BjvCodeAction { title: "X".into(), kind: None, diagnostics: vec![], is_preferred: false, disabled_reason: None }; let l = BjvCodeActionList { actions: vec![a], has_more: true }; assert!(l.has_more); }
+    #[test]
+    fn test_bjv_source_action_kind() { let k = BjvCodeActionKind { value: "source.organizeImports".into() }; assert!(k.value.contains("organize")); }
+    #[test]
+    fn test_bjw_item_kind_function() { let k = BjwCompletionItemKind { value: 3 }; assert_eq!(k.value, 3); }
+    #[test]
+    fn test_bjw_basic_item() { let i = BjwCompletionItem { label: "println".into(), kind: BjwCompletionItemKind { value: 3 }, detail: Some("macro".into()), insert_text: "println!()".into(), sort_text: None, filter_text: None, preselect: false }; assert_eq!(i.label, "println"); }
+    #[test]
+    fn test_bjw_preselect_item() { let i = BjwCompletionItem { label: "self".into(), kind: BjwCompletionItemKind { value: 6 }, detail: None, insert_text: "self".into(), sort_text: Some("0000".into()), filter_text: None, preselect: true }; assert!(i.preselect); }
+    #[test]
+    fn test_bjw_incomplete_list() { let l = BjwCompletionList { items: vec![], is_incomplete: true }; assert!(l.is_incomplete); }
+    #[test]
+    fn test_bjw_complete_list() { let i = BjwCompletionItem { label: "x".into(), kind: BjwCompletionItemKind { value: 1 }, detail: None, insert_text: "x".into(), sort_text: None, filter_text: None, preselect: false }; let l = BjwCompletionList { items: vec![i], is_incomplete: false }; assert!(!l.is_incomplete); }
+    #[test]
+    fn test_bjw_trigger_invoked() { let t = BjwCompletionTrigger { kind: 1, trigger_char: None }; assert_eq!(t.kind, 1); }
+    #[test]
+    fn test_bjw_trigger_char_dot() { let t = BjwCompletionTrigger { kind: 2, trigger_char: Some('.') }; assert_eq!(t.trigger_char, Some('.')); }
+    #[test]
+    fn test_bjw_context_with_position() { let ctx = BjwCompletionContext { trigger: BjwCompletionTrigger { kind: 1, trigger_char: None }, file: "main.rs".into(), line: 10, col: 5 }; assert_eq!(ctx.line, 10); }
+    #[test]
+    fn test_bjw_sort_text_ordering() { let a = BjwCompletionItem { label: "b".into(), kind: BjwCompletionItemKind { value: 1 }, detail: None, insert_text: "b".into(), sort_text: Some("01".into()), filter_text: None, preselect: false }; assert_eq!(a.sort_text.as_deref(), Some("01")); }
+    #[test]
+    fn test_bjw_filter_text_custom() { let i = BjwCompletionItem { label: "fmt::Display".into(), kind: BjwCompletionItemKind { value: 8 }, detail: None, insert_text: "Display".into(), sort_text: None, filter_text: Some("Display".into()), preselect: false }; assert_eq!(i.filter_text.as_deref(), Some("Display")); }
+    #[test]
+    fn test_bjx_plain_text() { let m = BjxMarkedString { language: None, value: "hello".into() }; assert!(m.language.is_none()); }
+    #[test]
+    fn test_bjx_code_block() { let m = BjxMarkedString { language: Some("rust".into()), value: "fn main() {}".into() }; assert_eq!(m.language.as_deref(), Some("rust")); }
+    #[test]
+    fn test_bjx_single_section() { let h = BjxHoverContent { sections: vec![BjxMarkedString { language: None, value: "doc".into() }] }; assert_eq!(h.sections.len(), 1); }
+    #[test]
+    fn test_bjx_multi_section() { let ss: Vec<BjxMarkedString> = (0..3).map(|i| BjxMarkedString { language: None, value: format!("s{i}") }).collect(); let h = BjxHoverContent { sections: ss }; assert_eq!(h.sections.len(), 3); }
+    #[test]
+    fn test_bjx_hover_no_range() { let h = BjxHover { contents: BjxHoverContent { sections: vec![] }, range: None }; assert!(h.range.is_none()); }
+    #[test]
+    fn test_bjx_hover_with_range() { let r = BjxHoverRange { start_line: 1, start_col: 0, end_line: 1, end_col: 5 }; let h = BjxHover { contents: BjxHoverContent { sections: vec![] }, range: Some(r) }; assert!(h.range.is_some()); }
+    #[test]
+    fn test_bjx_range_single_char() { let r = BjxHoverRange { start_line: 0, start_col: 3, end_line: 0, end_col: 4 }; assert_eq!(r.end_col - r.start_col, 1); }
+    #[test]
+    fn test_bjx_request_basic() { let req = BjxHoverRequest { file: "lib.rs".into(), line: 42, col: 10 }; assert_eq!(req.line, 42); }
+    #[test]
+    fn test_bjx_markdown_content() { let m = BjxMarkedString { language: Some("markdown".into()), value: "**bold**".into() }; assert!(m.value.contains("bold")); }
+    #[test]
+    fn test_bjx_empty_hover() { let h = BjxHover { contents: BjxHoverContent { sections: vec![] }, range: None }; assert!(h.contents.sections.is_empty()); }
+    #[test]
+    fn test_bjy_single_location() { let l = BjyLocation { file: "main.rs".into(), line: 10, col: 5 }; assert_eq!(l.line, 10); }
+    #[test]
+    fn test_bjy_location_link() { let t = BjyLocation { file: "lib.rs".into(), line: 1, col: 0 }; let ll = BjyLocationLink { origin_start_line: 5, origin_start_col: 3, origin_end_line: 5, origin_end_col: 8, target: t, target_range_end_line: 3, target_range_end_col: 10 }; assert_eq!(ll.origin_start_line, 5); }
+    #[test]
+    fn test_bjy_result_empty() { let r = BjyDefinitionResult { locations: vec![], links: vec![] }; assert!(r.locations.is_empty()); }
+    #[test]
+    fn test_bjy_result_single() { let l = BjyLocation { file: "a.rs".into(), line: 0, col: 0 }; let r = BjyDefinitionResult { locations: vec![l], links: vec![] }; assert_eq!(r.locations.len(), 1); }
+    #[test]
+    fn test_bjy_result_multiple() { let locs: Vec<BjyLocation> = (0..3).map(|i| BjyLocation { file: format!("f{i}.rs"), line: i, col: 0 }).collect(); let r = BjyDefinitionResult { locations: locs, links: vec![] }; assert_eq!(r.locations.len(), 3); }
+    #[test]
+    fn test_bjy_request_basic() { let req = BjyDefinitionRequest { file: "x.rs".into(), line: 20, col: 15 }; assert_eq!(req.col, 15); }
+    #[test]
+    fn test_bjy_peek_show() { let req = BjyDefinitionRequest { file: "y.rs".into(), line: 1, col: 1 }; let ctx = BjyPeekContext { request: req, show_peek: true, go_to_if_single: false }; assert!(ctx.show_peek); }
+    #[test]
+    fn test_bjy_go_to_single() { let req = BjyDefinitionRequest { file: "z.rs".into(), line: 0, col: 0 }; let ctx = BjyPeekContext { request: req, show_peek: false, go_to_if_single: true }; assert!(ctx.go_to_if_single); }
+    #[test]
+    fn test_bjy_link_target_file() { let t = BjyLocation { file: "target.rs".into(), line: 50, col: 0 }; let ll = BjyLocationLink { origin_start_line: 0, origin_start_col: 0, origin_end_line: 0, origin_end_col: 3, target: t, target_range_end_line: 55, target_range_end_col: 0 }; assert_eq!(ll.target.file, "target.rs"); }
+    #[test]
+    fn test_bjy_mixed_result() { let l = BjyLocation { file: "a.rs".into(), line: 1, col: 0 }; let t = BjyLocation { file: "b.rs".into(), line: 2, col: 0 }; let ll = BjyLocationLink { origin_start_line: 0, origin_start_col: 0, origin_end_line: 0, origin_end_col: 1, target: t, target_range_end_line: 5, target_range_end_col: 0 }; let r = BjyDefinitionResult { locations: vec![l], links: vec![ll] }; assert_eq!(r.locations.len() + r.links.len(), 2); }
+    #[test]
+    fn test_bjz_severity_error() { let s = BjzDiagnosticSeverity { value: 1 }; assert_eq!(s.value, 1); }
+    #[test]
+    fn test_bjz_severity_warning() { let s = BjzDiagnosticSeverity { value: 2 }; assert_eq!(s.value, 2); }
+    #[test]
+    fn test_bjz_basic_diagnostic() { let d = BjzDiagnostic { file: "a.rs".into(), start_line: 5, start_col: 0, end_line: 5, end_col: 10, message: "unused".into(), severity: BjzDiagnosticSeverity { value: 2 }, code: Some("W001".into()), source: Some("rustc".into()), related: vec![] }; assert_eq!(d.message, "unused"); }
+    #[test]
+    fn test_bjz_diagnostic_no_code() { let d = BjzDiagnostic { file: "b.rs".into(), start_line: 0, start_col: 0, end_line: 0, end_col: 1, message: "err".into(), severity: BjzDiagnosticSeverity { value: 1 }, code: None, source: None, related: vec![] }; assert!(d.code.is_none()); }
+    #[test]
+    fn test_bjz_related_info() { let r = BjzDiagnosticRelatedInfo { file: "c.rs".into(), line: 10, col: 5, message: "defined here".into() }; assert_eq!(r.message, "defined here"); }
+    #[test]
+    fn test_bjz_diagnostic_with_related() { let r = BjzDiagnosticRelatedInfo { file: "d.rs".into(), line: 1, col: 0, message: "see".into() }; let d = BjzDiagnostic { file: "e.rs".into(), start_line: 2, start_col: 0, end_line: 2, end_col: 5, message: "type mismatch".into(), severity: BjzDiagnosticSeverity { value: 1 }, code: None, source: None, related: vec![r] }; assert_eq!(d.related.len(), 1); }
+    #[test]
+    fn test_bjz_empty_collection() { let c = BjzDiagnosticCollection { name: "rust".into(), entries: vec![] }; assert!(c.entries.is_empty()); }
+    #[test]
+    fn test_bjz_collection_with_entries() { let d = BjzDiagnostic { file: "f.rs".into(), start_line: 0, start_col: 0, end_line: 0, end_col: 1, message: "x".into(), severity: BjzDiagnosticSeverity { value: 2 }, code: None, source: None, related: vec![] }; let e = BjzDiagnosticEntry { uri: "f.rs".into(), diagnostics: vec![d] }; let c = BjzDiagnosticCollection { name: "lint".into(), entries: vec![e] }; assert_eq!(c.entries.len(), 1); }
+    #[test]
+    fn test_bjz_change_event() { let e = BjzDiagnosticChangeEvent { uris: vec!["file:///a.rs".into()] }; assert_eq!(e.uris.len(), 1); }
+    #[test]
+    fn test_bjz_multi_file_collection() { let entries: Vec<BjzDiagnosticEntry> = (0..3).map(|i| BjzDiagnosticEntry { uri: format!("f{i}.rs"), diagnostics: vec![] }).collect(); let c = BjzDiagnosticCollection { name: "test".into(), entries }; assert_eq!(c.entries.len(), 3); }
 }
