@@ -85686,6 +85686,168 @@ impl BjjSignatureHelpProvider {
     pub fn is_retrigger(&self, ch: char) -> bool { self.retrigger_characters.contains(&ch) }
 }
 
+
+/// Selection range (bjk_)
+#[derive(Debug, Clone)]
+pub struct BjkSelectionRange {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub parent: Option<Box<BjkSelectionRange>>,
+}
+
+impl BjkSelectionRange {
+    pub fn new(sl: usize, sc: usize, el: usize, ec: usize) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec, parent: None }
+    }
+    pub fn with_parent(mut self, parent: BjkSelectionRange) -> Self {
+        self.parent = Some(Box::new(parent));
+        self
+    }
+    pub fn expand(&self) -> Option<&BjkSelectionRange> { self.parent.as_deref() }
+    pub fn depth(&self) -> usize {
+        let mut d = 0;
+        let mut current = self.parent.as_deref();
+        while let Some(p) = current { d += 1; current = p.parent.as_deref(); }
+        d
+    }
+    pub fn contains(&self, line: usize, col: usize) -> bool {
+        (line > self.start_line || (line == self.start_line && col >= self.start_col)) &&
+        (line < self.end_line || (line == self.end_line && col <= self.end_col))
+    }
+    pub fn is_single_line(&self) -> bool { self.start_line == self.end_line }
+}
+
+
+/// Linked editing ranges (bjl_)
+#[derive(Debug, Clone)]
+pub struct BjlLinkedEditingRanges {
+    pub ranges: Vec<(usize, usize, usize, usize)>,
+    pub word_pattern: Option<String>,
+}
+
+impl BjlLinkedEditingRanges {
+    pub fn new() -> Self { Self { ranges: Vec::new(), word_pattern: None } }
+    pub fn add_range(&mut self, start_line: usize, start_col: usize, end_line: usize, end_col: usize) {
+        self.ranges.push((start_line, start_col, end_line, end_col));
+    }
+    pub fn set_word_pattern(&mut self, pattern: String) { self.word_pattern = Some(pattern); }
+    pub fn range_count(&self) -> usize { self.ranges.len() }
+    pub fn contains_position(&self, line: usize, col: usize) -> bool {
+        self.ranges.iter().any(|&(sl, sc, el, ec)| {
+            (line > sl || (line == sl && col >= sc)) && (line < el || (line == el && col <= ec))
+        })
+    }
+    pub fn is_empty(&self) -> bool { self.ranges.is_empty() }
+}
+
+/// Linked editing provider (bjl_)
+#[derive(Debug, Clone)]
+pub struct BjlLinkedEditingProvider {
+    pub language_ids: Vec<String>,
+}
+
+impl BjlLinkedEditingProvider {
+    pub fn new(languages: Vec<String>) -> Self { Self { language_ids: languages } }
+    pub fn supports_language(&self, lang: &str) -> bool { self.language_ids.iter().any(|l| l == lang) }
+}
+
+
+/// Type definition location (bjm_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjmTypeDefinitionLocation {
+    pub uri: String,
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+}
+
+/// Type definition result (bjm_)
+#[derive(Debug, Clone)]
+pub struct BjmTypeDefinitionResult {
+    pub locations: Vec<BjmTypeDefinitionLocation>,
+}
+
+impl BjmTypeDefinitionResult {
+    pub fn new() -> Self { Self { locations: Vec::new() } }
+    pub fn single(uri: String, line: usize, col: usize) -> Self {
+        Self { locations: vec![BjmTypeDefinitionLocation { uri, start_line: line, start_col: col, end_line: line, end_col: col }] }
+    }
+    pub fn add_location(&mut self, loc: BjmTypeDefinitionLocation) { self.locations.push(loc); }
+    pub fn is_empty(&self) -> bool { self.locations.is_empty() }
+    pub fn is_single(&self) -> bool { self.locations.len() == 1 }
+    pub fn first(&self) -> Option<&BjmTypeDefinitionLocation> { self.locations.first() }
+    pub fn count(&self) -> usize { self.locations.len() }
+}
+
+
+/// Implementation location (bjn_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjnImplementationLocation {
+    pub uri: String,
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub preview: Option<String>,
+}
+
+/// Implementation result (bjn_)
+#[derive(Debug, Clone)]
+pub struct BjnImplementationResult {
+    pub locations: Vec<BjnImplementationLocation>,
+}
+
+impl BjnImplementationResult {
+    pub fn new() -> Self { Self { locations: Vec::new() } }
+    pub fn add(&mut self, loc: BjnImplementationLocation) { self.locations.push(loc); }
+    pub fn by_file(&self) -> std::collections::HashMap<&str, Vec<&BjnImplementationLocation>> {
+        let mut map: std::collections::HashMap<&str, Vec<&BjnImplementationLocation>> = std::collections::HashMap::new();
+        for loc in &self.locations { map.entry(&loc.uri).or_default().push(loc); }
+        map
+    }
+    pub fn count(&self) -> usize { self.locations.len() }
+    pub fn is_empty(&self) -> bool { self.locations.is_empty() }
+    pub fn file_count(&self) -> usize { self.by_file().len() }
+    pub fn first(&self) -> Option<&BjnImplementationLocation> { self.locations.first() }
+}
+
+
+/// Declaration location (bjo_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjoDeclarationLocation {
+    pub uri: String,
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+}
+
+/// Declaration result (bjo_)
+#[derive(Debug, Clone)]
+pub struct BjoDeclarationResult {
+    pub locations: Vec<BjoDeclarationLocation>,
+}
+
+impl BjoDeclarationResult {
+    pub fn new() -> Self { Self { locations: Vec::new() } }
+    pub fn add(&mut self, loc: BjoDeclarationLocation) { self.locations.push(loc); }
+    pub fn count(&self) -> usize { self.locations.len() }
+    pub fn is_empty(&self) -> bool { self.locations.is_empty() }
+    pub fn first(&self) -> Option<&BjoDeclarationLocation> { self.locations.first() }
+    pub fn in_same_file(&self, uri: &str) -> Vec<&BjoDeclarationLocation> {
+        self.locations.iter().filter(|l| l.uri == uri).collect()
+    }
+    pub fn unique_files(&self) -> Vec<&str> {
+        let mut files: Vec<&str> = self.locations.iter().map(|l| l.uri.as_str()).collect();
+        files.sort();
+        files.dedup();
+        files
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -93645,6 +93807,315 @@ mod tests_bfo {
     fn test_bjj_sig_documentation() {
         let s = BjjSignatureInfo { label: "fn f()".into(), documentation: Some("Does a thing".into()), parameters: vec![] };
         assert!(s.documentation.is_some());
+    }
+
+
+    #[test]
+    fn test_bjk_selection_range_new() {
+        let r = BjkSelectionRange::new(1, 0, 1, 10);
+        assert!(r.is_single_line());
+        assert!(r.parent.is_none());
+    }
+    #[test]
+    fn test_bjk_with_parent() {
+        let parent = BjkSelectionRange::new(0, 0, 10, 0);
+        let child = BjkSelectionRange::new(5, 2, 5, 8).with_parent(parent);
+        assert!(child.expand().is_some());
+    }
+    #[test]
+    fn test_bjk_depth() {
+        let root = BjkSelectionRange::new(0, 0, 100, 0);
+        let mid = BjkSelectionRange::new(5, 0, 20, 0).with_parent(root);
+        let leaf = BjkSelectionRange::new(10, 5, 10, 15).with_parent(mid);
+        assert_eq!(leaf.depth(), 2);
+    }
+    #[test]
+    fn test_bjk_contains() {
+        let r = BjkSelectionRange::new(5, 10, 5, 20);
+        assert!(r.contains(5, 15));
+        assert!(!r.contains(5, 5));
+        assert!(!r.contains(6, 0));
+    }
+    #[test]
+    fn test_bjk_multi_line() {
+        let r = BjkSelectionRange::new(5, 0, 10, 0);
+        assert!(!r.is_single_line());
+        assert!(r.contains(7, 5));
+    }
+    #[test]
+    fn test_bjk_expand_none() {
+        let r = BjkSelectionRange::new(1, 0, 1, 5);
+        assert!(r.expand().is_none());
+    }
+    #[test]
+    fn test_bjk_zero_depth() {
+        let r = BjkSelectionRange::new(1, 0, 1, 5);
+        assert_eq!(r.depth(), 0);
+    }
+    #[test]
+    fn test_bjk_deep_chain() {
+        let r0 = BjkSelectionRange::new(0, 0, 100, 0);
+        let r1 = BjkSelectionRange::new(1, 0, 50, 0).with_parent(r0);
+        let r2 = BjkSelectionRange::new(2, 0, 25, 0).with_parent(r1);
+        let r3 = BjkSelectionRange::new(3, 0, 10, 0).with_parent(r2);
+        assert_eq!(r3.depth(), 3);
+    }
+    #[test]
+    fn test_bjk_boundary_contains() {
+        let r = BjkSelectionRange::new(5, 10, 5, 20);
+        assert!(r.contains(5, 10));
+        assert!(r.contains(5, 20));
+    }
+    #[test]
+    fn test_bjk_expand_fields() {
+        let parent = BjkSelectionRange::new(0, 0, 50, 0);
+        let child = BjkSelectionRange::new(10, 0, 20, 0).with_parent(parent);
+        let expanded = child.expand().unwrap();
+        assert_eq!(expanded.end_line, 50);
+    }
+
+
+    #[test]
+    fn test_bjl_linked_ranges_new() {
+        let r = BjlLinkedEditingRanges::new();
+        assert!(r.is_empty());
+    }
+    #[test]
+    fn test_bjl_add_range() {
+        let mut r = BjlLinkedEditingRanges::new();
+        r.add_range(1, 5, 1, 10);
+        r.add_range(5, 5, 5, 10);
+        assert_eq!(r.range_count(), 2);
+    }
+    #[test]
+    fn test_bjl_contains_position() {
+        let mut r = BjlLinkedEditingRanges::new();
+        r.add_range(1, 5, 1, 10);
+        assert!(r.contains_position(1, 7));
+        assert!(!r.contains_position(1, 3));
+    }
+    #[test]
+    fn test_bjl_word_pattern() {
+        let mut r = BjlLinkedEditingRanges::new();
+        r.set_word_pattern(r"[a-zA-Z][\w]*".into());
+        assert!(r.word_pattern.is_some());
+    }
+    #[test]
+    fn test_bjl_provider() {
+        let p = BjlLinkedEditingProvider::new(vec!["html".into(), "xml".into()]);
+        assert!(p.supports_language("html"));
+        assert!(!p.supports_language("rust"));
+    }
+    #[test]
+    fn test_bjl_empty_check() {
+        let r = BjlLinkedEditingRanges::new();
+        assert!(r.is_empty());
+    }
+    #[test]
+    fn test_bjl_boundary_check() {
+        let mut r = BjlLinkedEditingRanges::new();
+        r.add_range(5, 10, 5, 20);
+        assert!(r.contains_position(5, 10));
+        assert!(r.contains_position(5, 20));
+    }
+    #[test]
+    fn test_bjl_multiple_languages() {
+        let p = BjlLinkedEditingProvider::new(vec!["html".into(), "xml".into(), "vue".into()]);
+        assert_eq!(p.language_ids.len(), 3);
+    }
+    #[test]
+    fn test_bjl_no_pattern() {
+        let r = BjlLinkedEditingRanges::new();
+        assert!(r.word_pattern.is_none());
+    }
+    #[test]
+    fn test_bjl_multi_line_range() {
+        let mut r = BjlLinkedEditingRanges::new();
+        r.add_range(1, 0, 3, 10);
+        assert!(r.contains_position(2, 5));
+    }
+
+
+    #[test]
+    fn test_bjm_result_new() {
+        let r = BjmTypeDefinitionResult::new();
+        assert!(r.is_empty());
+    }
+    #[test]
+    fn test_bjm_single() {
+        let r = BjmTypeDefinitionResult::single("lib.rs".into(), 10, 5);
+        assert!(r.is_single());
+        assert_eq!(r.first().unwrap().uri, "lib.rs");
+    }
+    #[test]
+    fn test_bjm_add_location() {
+        let mut r = BjmTypeDefinitionResult::new();
+        r.add_location(BjmTypeDefinitionLocation { uri: "a.rs".into(), start_line: 1, start_col: 0, end_line: 1, end_col: 10 });
+        r.add_location(BjmTypeDefinitionLocation { uri: "b.rs".into(), start_line: 5, start_col: 0, end_line: 5, end_col: 10 });
+        assert_eq!(r.count(), 2);
+        assert!(!r.is_single());
+    }
+    #[test]
+    fn test_bjm_empty() {
+        let r = BjmTypeDefinitionResult::new();
+        assert!(r.first().is_none());
+    }
+    #[test]
+    fn test_bjm_location_fields() {
+        let l = BjmTypeDefinitionLocation { uri: "types.rs".into(), start_line: 42, start_col: 8, end_line: 42, end_col: 20 };
+        assert_eq!(l.start_line, 42);
+    }
+    #[test]
+    fn test_bjm_count() {
+        let r = BjmTypeDefinitionResult::new();
+        assert_eq!(r.count(), 0);
+    }
+    #[test]
+    fn test_bjm_multi_file() {
+        let mut r = BjmTypeDefinitionResult::new();
+        for i in 0..3 {
+            r.add_location(BjmTypeDefinitionLocation { uri: format!("f{i}.rs"), start_line: i, start_col: 0, end_line: i, end_col: 5 });
+        }
+        assert_eq!(r.count(), 3);
+    }
+    #[test]
+    fn test_bjm_same_file() {
+        let mut r = BjmTypeDefinitionResult::new();
+        r.add_location(BjmTypeDefinitionLocation { uri: "a.rs".into(), start_line: 1, start_col: 0, end_line: 1, end_col: 5 });
+        r.add_location(BjmTypeDefinitionLocation { uri: "a.rs".into(), start_line: 10, start_col: 0, end_line: 10, end_col: 5 });
+        assert_eq!(r.count(), 2);
+    }
+    #[test]
+    fn test_bjm_first_location() {
+        let r = BjmTypeDefinitionResult::single("x.rs".into(), 0, 0);
+        assert_eq!(r.first().unwrap().start_line, 0);
+    }
+    #[test]
+    fn test_bjm_not_empty() {
+        let r = BjmTypeDefinitionResult::single("x.rs".into(), 0, 0);
+        assert!(!r.is_empty());
+    }
+
+
+    #[test]
+    fn test_bjn_result_new() {
+        let r = BjnImplementationResult::new();
+        assert!(r.is_empty());
+    }
+    #[test]
+    fn test_bjn_add() {
+        let mut r = BjnImplementationResult::new();
+        r.add(BjnImplementationLocation { uri: "impl.rs".into(), start_line: 10, start_col: 0, end_line: 10, end_col: 20, preview: Some("impl Trait for Struct".into()) });
+        assert_eq!(r.count(), 1);
+    }
+    #[test]
+    fn test_bjn_by_file() {
+        let mut r = BjnImplementationResult::new();
+        r.add(BjnImplementationLocation { uri: "a.rs".into(), start_line: 1, start_col: 0, end_line: 1, end_col: 10, preview: None });
+        r.add(BjnImplementationLocation { uri: "a.rs".into(), start_line: 20, start_col: 0, end_line: 20, end_col: 10, preview: None });
+        r.add(BjnImplementationLocation { uri: "b.rs".into(), start_line: 5, start_col: 0, end_line: 5, end_col: 10, preview: None });
+        assert_eq!(r.file_count(), 2);
+        assert_eq!(r.by_file().get("a.rs").unwrap().len(), 2);
+    }
+    #[test]
+    fn test_bjn_empty() {
+        let r = BjnImplementationResult::new();
+        assert!(r.first().is_none());
+    }
+    #[test]
+    fn test_bjn_preview() {
+        let l = BjnImplementationLocation { uri: "x.rs".into(), start_line: 1, start_col: 0, end_line: 1, end_col: 30, preview: Some("impl Display for MyType".into()) };
+        assert!(l.preview.is_some());
+    }
+    #[test]
+    fn test_bjn_file_count() {
+        let r = BjnImplementationResult::new();
+        assert_eq!(r.file_count(), 0);
+    }
+    #[test]
+    fn test_bjn_single_result() {
+        let mut r = BjnImplementationResult::new();
+        r.add(BjnImplementationLocation { uri: "x.rs".into(), start_line: 1, start_col: 0, end_line: 1, end_col: 5, preview: None });
+        assert_eq!(r.count(), 1);
+    }
+    #[test]
+    fn test_bjn_first() {
+        let mut r = BjnImplementationResult::new();
+        r.add(BjnImplementationLocation { uri: "first.rs".into(), start_line: 1, start_col: 0, end_line: 1, end_col: 5, preview: None });
+        assert_eq!(r.first().unwrap().uri, "first.rs");
+    }
+    #[test]
+    fn test_bjn_many_impls() {
+        let mut r = BjnImplementationResult::new();
+        for i in 0..10 { r.add(BjnImplementationLocation { uri: format!("f{i}.rs"), start_line: i, start_col: 0, end_line: i, end_col: 5, preview: None }); }
+        assert_eq!(r.count(), 10);
+        assert_eq!(r.file_count(), 10);
+    }
+    #[test]
+    fn test_bjn_no_preview() {
+        let l = BjnImplementationLocation { uri: "x.rs".into(), start_line: 1, start_col: 0, end_line: 1, end_col: 5, preview: None };
+        assert!(l.preview.is_none());
+    }
+
+
+    #[test]
+    fn test_bjo_result_new() {
+        let r = BjoDeclarationResult::new();
+        assert!(r.is_empty());
+    }
+    #[test]
+    fn test_bjo_add() {
+        let mut r = BjoDeclarationResult::new();
+        r.add(BjoDeclarationLocation { uri: "header.h".into(), start_line: 10, start_col: 0, end_line: 10, end_col: 20 });
+        assert_eq!(r.count(), 1);
+    }
+    #[test]
+    fn test_bjo_first() {
+        let mut r = BjoDeclarationResult::new();
+        r.add(BjoDeclarationLocation { uri: "a.rs".into(), start_line: 5, start_col: 0, end_line: 5, end_col: 10 });
+        assert_eq!(r.first().unwrap().start_line, 5);
+    }
+    #[test]
+    fn test_bjo_in_same_file() {
+        let mut r = BjoDeclarationResult::new();
+        r.add(BjoDeclarationLocation { uri: "a.rs".into(), start_line: 1, start_col: 0, end_line: 1, end_col: 5 });
+        r.add(BjoDeclarationLocation { uri: "b.rs".into(), start_line: 10, start_col: 0, end_line: 10, end_col: 5 });
+        assert_eq!(r.in_same_file("a.rs").len(), 1);
+    }
+    #[test]
+    fn test_bjo_unique_files() {
+        let mut r = BjoDeclarationResult::new();
+        r.add(BjoDeclarationLocation { uri: "a.rs".into(), start_line: 1, start_col: 0, end_line: 1, end_col: 5 });
+        r.add(BjoDeclarationLocation { uri: "a.rs".into(), start_line: 10, start_col: 0, end_line: 10, end_col: 5 });
+        r.add(BjoDeclarationLocation { uri: "b.rs".into(), start_line: 1, start_col: 0, end_line: 1, end_col: 5 });
+        assert_eq!(r.unique_files().len(), 2);
+    }
+    #[test]
+    fn test_bjo_empty_first() {
+        let r = BjoDeclarationResult::new();
+        assert!(r.first().is_none());
+    }
+    #[test]
+    fn test_bjo_location_fields() {
+        let l = BjoDeclarationLocation { uri: "types.d.ts".into(), start_line: 100, start_col: 4, end_line: 100, end_col: 20 };
+        assert_eq!(l.uri, "types.d.ts");
+    }
+    #[test]
+    fn test_bjo_count() {
+        let mut r = BjoDeclarationResult::new();
+        for i in 0..5 { r.add(BjoDeclarationLocation { uri: format!("f{i}"), start_line: 0, start_col: 0, end_line: 0, end_col: 0 }); }
+        assert_eq!(r.count(), 5);
+    }
+    #[test]
+    fn test_bjo_not_empty() {
+        let mut r = BjoDeclarationResult::new();
+        r.add(BjoDeclarationLocation { uri: "x".into(), start_line: 0, start_col: 0, end_line: 0, end_col: 0 });
+        assert!(!r.is_empty());
+    }
+    #[test]
+    fn test_bjo_empty_same_file() {
+        let r = BjoDeclarationResult::new();
+        assert!(r.in_same_file("x").is_empty());
     }
 
 }
