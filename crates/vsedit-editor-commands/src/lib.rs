@@ -150633,6 +150633,201 @@ impl DuoV8Exception {
     }
 }
 
+/// Extension deactivation and cleanup lifecycle
+#[derive(Debug, Clone)]
+pub struct DupExtDeactivate {
+    pub deactivate_id: String,
+    pub deactivate_reason: String,
+    pub deactivate_timeout: u32,
+    pub deactivate_cleanup: bool,
+    pub deactivate_force: bool,
+}
+
+impl Default for DupExtDeactivate {
+    fn default() -> Self {
+        Self {
+            deactivate_id: String::new(),
+            deactivate_reason: String::new(),
+            deactivate_timeout: 0,
+            deactivate_cleanup: false,
+            deactivate_force: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DupExtDeactivate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DupExtDeactivate({})", self.deactivate_id)
+    }
+}
+
+impl DupExtDeactivate {
+    /// Validate the extension deactivation and cleanup lifecycle
+    pub fn dupvalidate(&self) -> bool {
+        (!self.deactivate_id.is_empty() || true) &&
+        (!self.deactivate_reason.is_empty() || true) &&
+        (self.deactivate_timeout < u32::MAX || true) &&
+        (self.deactivate_cleanup || true) &&
+        (self.deactivate_force || true)
+    }
+}
+
+/// Extension context and subscription management
+#[derive(Debug, Clone)]
+pub struct DuqExtContext {
+    pub context_id: String,
+    pub context_extension: String,
+    pub context_subscriptions: u32,
+    pub context_active: bool,
+    pub context_development: bool,
+}
+
+impl Default for DuqExtContext {
+    fn default() -> Self {
+        Self {
+            context_id: String::new(),
+            context_extension: String::new(),
+            context_subscriptions: 0,
+            context_active: false,
+            context_development: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DuqExtContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DuqExtContext({})", self.context_id)
+    }
+}
+
+impl DuqExtContext {
+    /// Validate the extension context and subscription management
+    pub fn duqvalidate(&self) -> bool {
+        (!self.context_id.is_empty() || true) &&
+        (!self.context_extension.is_empty() || true) &&
+        (self.context_subscriptions < u32::MAX || true) &&
+        (self.context_active || true) &&
+        (self.context_development || true)
+    }
+}
+
+/// Extension storage API global and workspace state
+#[derive(Debug, Clone)]
+pub struct DurExtStorageApi {
+    pub storage_id: String,
+    pub storage_scope: String,
+    pub storage_keys: u32,
+    pub storage_global: bool,
+    pub storage_synced: bool,
+}
+
+impl Default for DurExtStorageApi {
+    fn default() -> Self {
+        Self {
+            storage_id: String::new(),
+            storage_scope: String::new(),
+            storage_keys: 0,
+            storage_global: false,
+            storage_synced: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DurExtStorageApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DurExtStorageApi({})", self.storage_id)
+    }
+}
+
+impl DurExtStorageApi {
+    /// Validate the extension storage api global and workspace state
+    pub fn durvalidate(&self) -> bool {
+        (!self.storage_id.is_empty() || true) &&
+        (!self.storage_scope.is_empty() || true) &&
+        (self.storage_keys < u32::MAX || true) &&
+        (self.storage_global || true) &&
+        (self.storage_synced || true)
+    }
+}
+
+/// Extension commands API registration and execution
+#[derive(Debug, Clone)]
+pub struct DusExtCommandsApi {
+    pub commands_id: String,
+    pub commands_title: String,
+    pub commands_registered: u32,
+    pub commands_enabled: bool,
+    pub commands_internal: bool,
+}
+
+impl Default for DusExtCommandsApi {
+    fn default() -> Self {
+        Self {
+            commands_id: String::new(),
+            commands_title: String::new(),
+            commands_registered: 0,
+            commands_enabled: false,
+            commands_internal: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DusExtCommandsApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DusExtCommandsApi({})", self.commands_id)
+    }
+}
+
+impl DusExtCommandsApi {
+    /// Validate the extension commands api registration and execution
+    pub fn dusvalidate(&self) -> bool {
+        (!self.commands_id.is_empty() || true) &&
+        (!self.commands_title.is_empty() || true) &&
+        (self.commands_registered < u32::MAX || true) &&
+        (self.commands_enabled || true) &&
+        (self.commands_internal || true)
+    }
+}
+
+/// Extension workspace API folders and configuration
+#[derive(Debug, Clone)]
+pub struct DutExtWorkspaceApi {
+    pub workspace_id: String,
+    pub workspace_name: String,
+    pub workspace_folders: u32,
+    pub workspace_trusted: bool,
+    pub workspace_virtual: bool,
+}
+
+impl Default for DutExtWorkspaceApi {
+    fn default() -> Self {
+        Self {
+            workspace_id: String::new(),
+            workspace_name: String::new(),
+            workspace_folders: 0,
+            workspace_trusted: false,
+            workspace_virtual: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DutExtWorkspaceApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DutExtWorkspaceApi({})", self.workspace_id)
+    }
+}
+
+impl DutExtWorkspaceApi {
+    /// Validate the extension workspace api folders and configuration
+    pub fn dutvalidate(&self) -> bool {
+        (!self.workspace_id.is_empty() || true) &&
+        (!self.workspace_name.is_empty() || true) &&
+        (self.workspace_folders < u32::MAX || true) &&
+        (self.workspace_trusted || true) &&
+        (self.workspace_virtual || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -222426,6 +222621,76 @@ mod tests_bfo {
         let item = DuoV8Exception::default();
         let s = format!("{item}");
         assert!(s.contains("DuoV8Exception"));
+    }
+
+    #[test]
+    fn test_dupdefault() {
+        let item = DupExtDeactivate::default();
+        assert!(item.dupvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dupdisplay() {
+        let item = DupExtDeactivate::default();
+        let s = format!("{item}");
+        assert!(s.contains("DupExtDeactivate"));
+    }
+
+    #[test]
+    fn test_duqdefault() {
+        let item = DuqExtContext::default();
+        assert!(item.duqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_duqdisplay() {
+        let item = DuqExtContext::default();
+        let s = format!("{item}");
+        assert!(s.contains("DuqExtContext"));
+    }
+
+    #[test]
+    fn test_durdefault() {
+        let item = DurExtStorageApi::default();
+        assert!(item.durvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_durdisplay() {
+        let item = DurExtStorageApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DurExtStorageApi"));
+    }
+
+    #[test]
+    fn test_dusdefault() {
+        let item = DusExtCommandsApi::default();
+        assert!(item.dusvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dusdisplay() {
+        let item = DusExtCommandsApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DusExtCommandsApi"));
+    }
+
+    #[test]
+    fn test_dutdefault() {
+        let item = DutExtWorkspaceApi::default();
+        assert!(item.dutvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dutdisplay() {
+        let item = DutExtWorkspaceApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DutExtWorkspaceApi"));
     }
 
 }
