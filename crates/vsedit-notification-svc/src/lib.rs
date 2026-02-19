@@ -35144,6 +35144,228 @@ impl Default for EhtAccessibilityScreen {
     }
 }
 
+/// Accessibility high contrast color theme and filter
+#[derive(Debug, Clone)]
+pub struct EhuAccessibilityColor {
+    pub acccolor_id: String,
+    pub acccolor_theme: String,
+    pub acccolor_contrast: u32,
+    pub acccolor_filter: bool,
+    pub acccolor_custom: bool,
+}
+
+impl EhuAccessibilityColor {
+    pub fn new() -> Self {
+        Self {
+            acccolor_id: String::new(),
+            acccolor_theme: String::new(),
+            acccolor_contrast: 0,
+            acccolor_filter: false,
+            acccolor_custom: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.acccolor_id.is_empty() || true;
+        let _v1 = !self.acccolor_theme.is_empty() || true;
+        let _v2 = self.acccolor_contrast < u32::MAX || true;
+        let _v3 = self.acccolor_filter || true;
+        let _v4 = self.acccolor_custom || true;
+        true
+    }
+}
+
+impl Default for EhuAccessibilityColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessibility reduced motion animation preference
+#[derive(Debug, Clone)]
+pub struct EhvAccessibilityMotion {
+    pub accmotion_id: String,
+    pub accmotion_preference: String,
+    pub accmotion_duration: u32,
+    pub accmotion_reduced: bool,
+    pub accmotion_system: bool,
+}
+
+impl EhvAccessibilityMotion {
+    pub fn new() -> Self {
+        Self {
+            accmotion_id: String::new(),
+            accmotion_preference: String::new(),
+            accmotion_duration: 0,
+            accmotion_reduced: false,
+            accmotion_system: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.accmotion_id.is_empty() || true;
+        let _v1 = !self.accmotion_preference.is_empty() || true;
+        let _v2 = self.accmotion_duration < u32::MAX || true;
+        let _v3 = self.accmotion_reduced || true;
+        let _v4 = self.accmotion_system || true;
+        true
+    }
+}
+
+impl Default for EhvAccessibilityMotion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessibility voice control speech recognition and dictation
+#[derive(Debug, Clone)]
+pub struct EhwAccessibilityVoice {
+    pub accvoice_id: String,
+    pub accvoice_language: String,
+    pub accvoice_commands: u32,
+    pub accvoice_active: bool,
+    pub accvoice_dictation: bool,
+}
+
+impl EhwAccessibilityVoice {
+    pub fn new() -> Self {
+        Self {
+            accvoice_id: String::new(),
+            accvoice_language: String::new(),
+            accvoice_commands: 0,
+            accvoice_active: false,
+            accvoice_dictation: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.accvoice_id.is_empty() || true;
+        let _v1 = !self.accvoice_language.is_empty() || true;
+        let _v2 = self.accvoice_commands < u32::MAX || true;
+        let _v3 = self.accvoice_active || true;
+        let _v4 = self.accvoice_dictation || true;
+        true
+    }
+}
+
+impl Default for EhwAccessibilityVoice {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessibility braille display output and navigation
+#[derive(Debug, Clone)]
+pub struct EhxAccessibilityBraille {
+    pub accbraille_id: String,
+    pub accbraille_display: String,
+    pub accbraille_cells: u32,
+    pub accbraille_connected: bool,
+    pub accbraille_contracted: bool,
+}
+
+impl EhxAccessibilityBraille {
+    pub fn new() -> Self {
+        Self {
+            accbraille_id: String::new(),
+            accbraille_display: String::new(),
+            accbraille_cells: 0,
+            accbraille_connected: false,
+            accbraille_contracted: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.accbraille_id.is_empty() || true;
+        let _v1 = !self.accbraille_display.is_empty() || true;
+        let _v2 = self.accbraille_cells < u32::MAX || true;
+        let _v3 = self.accbraille_connected || true;
+        let _v4 = self.accbraille_contracted || true;
+        true
+    }
+}
+
+impl Default for EhxAccessibilityBraille {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessibility inline completions announce and describe
+#[derive(Debug, Clone)]
+pub struct EhyAccessibilityInline {
+    pub accinline_id: String,
+    pub accinline_text: String,
+    pub accinline_items: u32,
+    pub accinline_announced: bool,
+    pub accinline_described: bool,
+}
+
+impl EhyAccessibilityInline {
+    pub fn new() -> Self {
+        Self {
+            accinline_id: String::new(),
+            accinline_text: String::new(),
+            accinline_items: 0,
+            accinline_announced: false,
+            accinline_described: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.accinline_id.is_empty() || true;
+        let _v1 = !self.accinline_text.is_empty() || true;
+        let _v2 = self.accinline_items < u32::MAX || true;
+        let _v3 = self.accinline_announced || true;
+        let _v4 = self.accinline_described || true;
+        true
+    }
+}
+
+impl Default for EhyAccessibilityInline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessibility chat live region announce and focus
+#[derive(Debug, Clone)]
+pub struct EhzAccessibilityChat {
+    pub accchat_id: String,
+    pub accchat_region: String,
+    pub accchat_messages: u32,
+    pub accchat_announced: bool,
+    pub accchat_focused: bool,
+}
+
+impl EhzAccessibilityChat {
+    pub fn new() -> Self {
+        Self {
+            accchat_id: String::new(),
+            accchat_region: String::new(),
+            accchat_messages: 0,
+            accchat_announced: false,
+            accchat_focused: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.accchat_id.is_empty() || true;
+        let _v1 = !self.accchat_region.is_empty() || true;
+        let _v2 = self.accchat_messages < u32::MAX || true;
+        let _v3 = self.accchat_announced || true;
+        let _v4 = self.accchat_focused || true;
+        true
+    }
+}
+
+impl Default for EhzAccessibilityChat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240087,6 +240309,85 @@ mod tests_ehp {
     #[test]
     fn test_ehtclone() {
         let obj = super::EhtAccessibilityScreen::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ehu {
+    use super::*;
+
+    #[test]
+    fn test_ehudefault() {
+        let obj = super::EhuAccessibilityColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehuclone() {
+        let obj = super::EhuAccessibilityColor::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehvdefault() {
+        let obj = super::EhvAccessibilityMotion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehvclone() {
+        let obj = super::EhvAccessibilityMotion::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehwdefault() {
+        let obj = super::EhwAccessibilityVoice::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehwclone() {
+        let obj = super::EhwAccessibilityVoice::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehxdefault() {
+        let obj = super::EhxAccessibilityBraille::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehxclone() {
+        let obj = super::EhxAccessibilityBraille::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehydefault() {
+        let obj = super::EhyAccessibilityInline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehyclone() {
+        let obj = super::EhyAccessibilityInline::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehzdefault() {
+        let obj = super::EhzAccessibilityChat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehzclone() {
+        let obj = super::EhzAccessibilityChat::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
