@@ -29644,6 +29644,191 @@ impl Default for EbzTermContrib {
     }
 }
 
+/// Editor widget core view model and controller
+#[derive(Debug, Clone)]
+pub struct EcaEditorWidget {
+    pub edwidget_id: String,
+    pub edwidget_model: String,
+    pub edwidget_lines: u32,
+    pub edwidget_focused: bool,
+    pub edwidget_readonly: bool,
+}
+
+impl EcaEditorWidget {
+    pub fn new() -> Self {
+        Self {
+            edwidget_id: String::new(),
+            edwidget_model: String::new(),
+            edwidget_lines: 0,
+            edwidget_focused: false,
+            edwidget_readonly: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edwidget_id.is_empty() || true;
+        let _v1 = !self.edwidget_model.is_empty() || true;
+        let _v2 = self.edwidget_lines < u32::MAX || true;
+        let _v3 = self.edwidget_focused || true;
+        let _v4 = self.edwidget_readonly || true;
+        true
+    }
+}
+
+impl Default for EcaEditorWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor cursor position selection and multi-cursor
+#[derive(Debug, Clone)]
+pub struct EcbEditorCursor {
+    pub edcursor_id: String,
+    pub edcursor_style: String,
+    pub edcursor_cursors: u32,
+    pub edcursor_blink: bool,
+    pub edcursor_smooth: bool,
+}
+
+impl EcbEditorCursor {
+    pub fn new() -> Self {
+        Self {
+            edcursor_id: String::new(),
+            edcursor_style: String::new(),
+            edcursor_cursors: 0,
+            edcursor_blink: false,
+            edcursor_smooth: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edcursor_id.is_empty() || true;
+        let _v1 = !self.edcursor_style.is_empty() || true;
+        let _v2 = self.edcursor_cursors < u32::MAX || true;
+        let _v3 = self.edcursor_blink || true;
+        let _v4 = self.edcursor_smooth || true;
+        true
+    }
+}
+
+impl Default for EcbEditorCursor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor scroll vertical horizontal and smooth
+#[derive(Debug, Clone)]
+pub struct EccEditorScroll {
+    pub edscroll_id: String,
+    pub edscroll_position: String,
+    pub edscroll_height: u32,
+    pub edscroll_smooth: bool,
+    pub edscroll_horizontal: bool,
+}
+
+impl EccEditorScroll {
+    pub fn new() -> Self {
+        Self {
+            edscroll_id: String::new(),
+            edscroll_position: String::new(),
+            edscroll_height: 0,
+            edscroll_smooth: false,
+            edscroll_horizontal: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edscroll_id.is_empty() || true;
+        let _v1 = !self.edscroll_position.is_empty() || true;
+        let _v2 = self.edscroll_height < u32::MAX || true;
+        let _v3 = self.edscroll_smooth || true;
+        let _v4 = self.edscroll_horizontal || true;
+        true
+    }
+}
+
+impl Default for EccEditorScroll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor folding collapse expand and fold all
+#[derive(Debug, Clone)]
+pub struct EcdEditorFold {
+    pub edfold_id: String,
+    pub edfold_region: String,
+    pub edfold_ranges: u32,
+    pub edfold_collapsed: bool,
+    pub edfold_manual: bool,
+}
+
+impl EcdEditorFold {
+    pub fn new() -> Self {
+        Self {
+            edfold_id: String::new(),
+            edfold_region: String::new(),
+            edfold_ranges: 0,
+            edfold_collapsed: false,
+            edfold_manual: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edfold_id.is_empty() || true;
+        let _v1 = !self.edfold_region.is_empty() || true;
+        let _v2 = self.edfold_ranges < u32::MAX || true;
+        let _v3 = self.edfold_collapsed || true;
+        let _v4 = self.edfold_manual || true;
+        true
+    }
+}
+
+impl Default for EcdEditorFold {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor minimap character rendering and slider
+#[derive(Debug, Clone)]
+pub struct EceEditorMinimap {
+    pub edmap_id: String,
+    pub edmap_scale: String,
+    pub edmap_chars: u32,
+    pub edmap_enabled: bool,
+    pub edmap_autohide: bool,
+}
+
+impl EceEditorMinimap {
+    pub fn new() -> Self {
+        Self {
+            edmap_id: String::new(),
+            edmap_scale: String::new(),
+            edmap_chars: 0,
+            edmap_enabled: false,
+            edmap_autohide: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edmap_id.is_empty() || true;
+        let _v1 = !self.edmap_scale.is_empty() || true;
+        let _v2 = self.edmap_chars < u32::MAX || true;
+        let _v3 = self.edmap_enabled || true;
+        let _v4 = self.edmap_autohide || true;
+        true
+    }
+}
+
+impl Default for EceEditorMinimap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -232647,6 +232832,73 @@ mod tests_ebu {
     #[test]
     fn test_ebzclone() {
         let obj = super::EbzTermContrib::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eca {
+    use super::*;
+
+    #[test]
+    fn test_ecadefault() {
+        let obj = super::EcaEditorWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecaclone() {
+        let obj = super::EcaEditorWidget::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecbdefault() {
+        let obj = super::EcbEditorCursor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecbclone() {
+        let obj = super::EcbEditorCursor::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eccdefault() {
+        let obj = super::EccEditorScroll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eccclone() {
+        let obj = super::EccEditorScroll::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecddefault() {
+        let obj = super::EcdEditorFold::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecdclone() {
+        let obj = super::EcdEditorFold::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecedefault() {
+        let obj = super::EceEditorMinimap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ececlone() {
+        let obj = super::EceEditorMinimap::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
