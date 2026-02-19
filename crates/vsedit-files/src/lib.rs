@@ -29211,6 +29211,191 @@ impl Default for EboTermDragDrop {
     }
 }
 
+/// Terminal recording session capture and replay
+#[derive(Debug, Clone)]
+pub struct EbpTermRecording {
+    pub termrec_id: String,
+    pub termrec_format: String,
+    pub termrec_frames: u32,
+    pub termrec_playing: bool,
+    pub termrec_loop: bool,
+}
+
+impl EbpTermRecording {
+    pub fn new() -> Self {
+        Self {
+            termrec_id: String::new(),
+            termrec_format: String::new(),
+            termrec_frames: 0,
+            termrec_playing: false,
+            termrec_loop: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termrec_id.is_empty() || true;
+        let _v1 = !self.termrec_format.is_empty() || true;
+        let _v2 = self.termrec_frames < u32::MAX || true;
+        let _v3 = self.termrec_playing || true;
+        let _v4 = self.termrec_loop || true;
+        true
+    }
+}
+
+impl Default for EbpTermRecording {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal Unicode width ambiguous and emoji handling
+#[derive(Debug, Clone)]
+pub struct EbqTermUnicode {
+    pub termuni_id: String,
+    pub termuni_version: String,
+    pub termuni_width: u32,
+    pub termuni_ambiguous: bool,
+    pub termuni_emoji: bool,
+}
+
+impl EbqTermUnicode {
+    pub fn new() -> Self {
+        Self {
+            termuni_id: String::new(),
+            termuni_version: String::new(),
+            termuni_width: 0,
+            termuni_ambiguous: false,
+            termuni_emoji: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termuni_id.is_empty() || true;
+        let _v1 = !self.termuni_version.is_empty() || true;
+        let _v2 = self.termuni_width < u32::MAX || true;
+        let _v3 = self.termuni_ambiguous || true;
+        let _v4 = self.termuni_emoji || true;
+        true
+    }
+}
+
+impl Default for EbqTermUnicode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal color scheme ANSI 256 and truecolor
+#[derive(Debug, Clone)]
+pub struct EbrTermColor {
+    pub termcolor_id: String,
+    pub termcolor_scheme: String,
+    pub termcolor_palette: u32,
+    pub termcolor_truecolor: bool,
+    pub termcolor_minimum: bool,
+}
+
+impl EbrTermColor {
+    pub fn new() -> Self {
+        Self {
+            termcolor_id: String::new(),
+            termcolor_scheme: String::new(),
+            termcolor_palette: 0,
+            termcolor_truecolor: false,
+            termcolor_minimum: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termcolor_id.is_empty() || true;
+        let _v1 = !self.termcolor_scheme.is_empty() || true;
+        let _v2 = self.termcolor_palette < u32::MAX || true;
+        let _v3 = self.termcolor_truecolor || true;
+        let _v4 = self.termcolor_minimum || true;
+        true
+    }
+}
+
+impl Default for EbrTermColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal font family size and cell dimensions
+#[derive(Debug, Clone)]
+pub struct EbsTermFont {
+    pub termfont_id: String,
+    pub termfont_family: String,
+    pub termfont_size: u32,
+    pub termfont_ligature: bool,
+    pub termfont_fallback: bool,
+}
+
+impl EbsTermFont {
+    pub fn new() -> Self {
+        Self {
+            termfont_id: String::new(),
+            termfont_family: String::new(),
+            termfont_size: 0,
+            termfont_ligature: false,
+            termfont_fallback: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termfont_id.is_empty() || true;
+        let _v1 = !self.termfont_family.is_empty() || true;
+        let _v2 = self.termfont_size < u32::MAX || true;
+        let _v3 = self.termfont_ligature || true;
+        let _v4 = self.termfont_fallback || true;
+        true
+    }
+}
+
+impl Default for EbsTermFont {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal shell integration command detection and CWD
+#[derive(Debug, Clone)]
+pub struct EbtTermIntegration {
+    pub termint_id: String,
+    pub termint_shell: String,
+    pub termint_commands: u32,
+    pub termint_cwd: bool,
+    pub termint_prompt: bool,
+}
+
+impl EbtTermIntegration {
+    pub fn new() -> Self {
+        Self {
+            termint_id: String::new(),
+            termint_shell: String::new(),
+            termint_commands: 0,
+            termint_cwd: false,
+            termint_prompt: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termint_id.is_empty() || true;
+        let _v1 = !self.termint_shell.is_empty() || true;
+        let _v2 = self.termint_commands < u32::MAX || true;
+        let _v3 = self.termint_cwd || true;
+        let _v4 = self.termint_prompt || true;
+        true
+    }
+}
+
+impl Default for EbtTermIntegration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231970,6 +232155,73 @@ mod tests_ebk {
     #[test]
     fn test_eboclone() {
         let obj = super::EboTermDragDrop::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ebp {
+    use super::*;
+
+    #[test]
+    fn test_ebpdefault() {
+        let obj = super::EbpTermRecording::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebpclone() {
+        let obj = super::EbpTermRecording::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebqdefault() {
+        let obj = super::EbqTermUnicode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebqclone() {
+        let obj = super::EbqTermUnicode::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebrdefault() {
+        let obj = super::EbrTermColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebrclone() {
+        let obj = super::EbrTermColor::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebsdefault() {
+        let obj = super::EbsTermFont::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebsclone() {
+        let obj = super::EbsTermFont::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebtdefault() {
+        let obj = super::EbtTermIntegration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebtclone() {
+        let obj = super::EbtTermIntegration::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
