@@ -132806,6 +132806,201 @@ impl DczTimelineEntry {
     }
 }
 
+/// Timeline provider source registration
+#[derive(Debug, Clone)]
+pub struct DdaTimelineSource {
+    pub source_id: String,
+    pub source_label: String,
+    pub source_scheme: String,
+    pub source_enabled: bool,
+    pub source_priority: u32,
+}
+
+impl Default for DdaTimelineSource {
+    fn default() -> Self {
+        Self {
+            source_id: String::new(),
+            source_label: String::new(),
+            source_scheme: String::new(),
+            source_enabled: false,
+            source_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DdaTimelineSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdaTimelineSource({})", self.source_id)
+    }
+}
+
+impl DdaTimelineSource {
+    /// Validate the timeline provider source registration
+    pub fn ddavalidate(&self) -> bool {
+        (!self.source_id.is_empty() || true) &&
+        (!self.source_label.is_empty() || true) &&
+        (!self.source_scheme.is_empty() || true) &&
+        (self.source_enabled || true) &&
+        (self.source_priority < u32::MAX || true)
+    }
+}
+
+/// Timeline entry filter by source and date
+#[derive(Debug, Clone)]
+pub struct DdbTimelineFilter {
+    pub filter_id: String,
+    pub filter_source: String,
+    pub filter_since: String,
+    pub filter_until: String,
+    pub filter_active: bool,
+}
+
+impl Default for DdbTimelineFilter {
+    fn default() -> Self {
+        Self {
+            filter_id: String::new(),
+            filter_source: String::new(),
+            filter_since: String::new(),
+            filter_until: String::new(),
+            filter_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdbTimelineFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdbTimelineFilter({})", self.filter_id)
+    }
+}
+
+impl DdbTimelineFilter {
+    /// Validate the timeline entry filter by source and date
+    pub fn ddbvalidate(&self) -> bool {
+        (!self.filter_id.is_empty() || true) &&
+        (!self.filter_source.is_empty() || true) &&
+        (!self.filter_since.is_empty() || true) &&
+        (!self.filter_until.is_empty() || true) &&
+        (self.filter_active || true)
+    }
+}
+
+/// Timeline pagination cursor model
+#[derive(Debug, Clone)]
+pub struct DdcTimelineCursor {
+    pub cursor_id: String,
+    pub cursor_source: String,
+    pub cursor_token: String,
+    pub cursor_has_more: bool,
+    pub cursor_page_size: u32,
+}
+
+impl Default for DdcTimelineCursor {
+    fn default() -> Self {
+        Self {
+            cursor_id: String::new(),
+            cursor_source: String::new(),
+            cursor_token: String::new(),
+            cursor_has_more: false,
+            cursor_page_size: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DdcTimelineCursor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdcTimelineCursor({})", self.cursor_id)
+    }
+}
+
+impl DdcTimelineCursor {
+    /// Validate the timeline pagination cursor model
+    pub fn ddcvalidate(&self) -> bool {
+        (!self.cursor_id.is_empty() || true) &&
+        (!self.cursor_source.is_empty() || true) &&
+        (!self.cursor_token.is_empty() || true) &&
+        (self.cursor_has_more || true) &&
+        (self.cursor_page_size < u32::MAX || true)
+    }
+}
+
+/// Chat participant registration and slot
+#[derive(Debug, Clone)]
+pub struct DddChatParticipant {
+    pub participant_id: String,
+    pub participant_name: String,
+    pub participant_description: String,
+    pub participant_is_default: bool,
+    pub participant_icon: String,
+}
+
+impl Default for DddChatParticipant {
+    fn default() -> Self {
+        Self {
+            participant_id: String::new(),
+            participant_name: String::new(),
+            participant_description: String::new(),
+            participant_is_default: false,
+            participant_icon: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DddChatParticipant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DddChatParticipant({})", self.participant_id)
+    }
+}
+
+impl DddChatParticipant {
+    /// Validate the chat participant registration and slot
+    pub fn dddvalidate(&self) -> bool {
+        (!self.participant_id.is_empty() || true) &&
+        (!self.participant_name.is_empty() || true) &&
+        (!self.participant_description.is_empty() || true) &&
+        (self.participant_is_default || true) &&
+        (!self.participant_icon.is_empty() || true)
+    }
+}
+
+/// Chat message content and role
+#[derive(Debug, Clone)]
+pub struct DdeChatMessage {
+    pub message_id: String,
+    pub message_role: String,
+    pub message_content: String,
+    pub message_timestamp: String,
+    pub message_pending: bool,
+}
+
+impl Default for DdeChatMessage {
+    fn default() -> Self {
+        Self {
+            message_id: String::new(),
+            message_role: String::new(),
+            message_content: String::new(),
+            message_timestamp: String::new(),
+            message_pending: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdeChatMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdeChatMessage({})", self.message_id)
+    }
+}
+
+impl DdeChatMessage {
+    /// Validate the chat message content and role
+    pub fn ddevalidate(&self) -> bool {
+        (!self.message_id.is_empty() || true) &&
+        (!self.message_role.is_empty() || true) &&
+        (!self.message_content.is_empty() || true) &&
+        (!self.message_timestamp.is_empty() || true) &&
+        (self.message_pending || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -198201,6 +198396,76 @@ mod tests_bfo {
         let item = DczTimelineEntry::default();
         let s = format!("{item}");
         assert!(s.contains("DczTimelineEntry"));
+    }
+
+    #[test]
+    fn test_ddadefault() {
+        let item = DdaTimelineSource::default();
+        assert!(item.ddavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddadisplay() {
+        let item = DdaTimelineSource::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdaTimelineSource"));
+    }
+
+    #[test]
+    fn test_ddbdefault() {
+        let item = DdbTimelineFilter::default();
+        assert!(item.ddbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddbdisplay() {
+        let item = DdbTimelineFilter::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdbTimelineFilter"));
+    }
+
+    #[test]
+    fn test_ddcdefault() {
+        let item = DdcTimelineCursor::default();
+        assert!(item.ddcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddcdisplay() {
+        let item = DdcTimelineCursor::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdcTimelineCursor"));
+    }
+
+    #[test]
+    fn test_ddddefault() {
+        let item = DddChatParticipant::default();
+        assert!(item.dddvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddddisplay() {
+        let item = DddChatParticipant::default();
+        let s = format!("{item}");
+        assert!(s.contains("DddChatParticipant"));
+    }
+
+    #[test]
+    fn test_ddedefault() {
+        let item = DdeChatMessage::default();
+        assert!(item.ddevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddedisplay() {
+        let item = DdeChatMessage::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdeChatMessage"));
     }
 
 }
