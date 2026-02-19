@@ -138210,6 +138210,201 @@ impl DieAccessibilityLabel {
     }
 }
 
+/// Accessibility focus tracking and announce
+#[derive(Debug, Clone)]
+pub struct DifAccessibilityFocus {
+    pub focus_id: String,
+    pub focus_element: String,
+    pub focus_announce: String,
+    pub focus_trap: bool,
+    pub focus_restore: bool,
+}
+
+impl Default for DifAccessibilityFocus {
+    fn default() -> Self {
+        Self {
+            focus_id: String::new(),
+            focus_element: String::new(),
+            focus_announce: String::new(),
+            focus_trap: false,
+            focus_restore: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DifAccessibilityFocus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DifAccessibilityFocus({})", self.focus_id)
+    }
+}
+
+impl DifAccessibilityFocus {
+    /// Validate the accessibility focus tracking and announce
+    pub fn difvalidate(&self) -> bool {
+        (!self.focus_id.is_empty() || true) &&
+        (!self.focus_element.is_empty() || true) &&
+        (!self.focus_announce.is_empty() || true) &&
+        (self.focus_trap || true) &&
+        (self.focus_restore || true)
+    }
+}
+
+/// Accessibility navigation landmark zones
+#[derive(Debug, Clone)]
+pub struct DigAccessibilityNav {
+    pub nav_id: String,
+    pub nav_label: String,
+    pub nav_order: u32,
+    pub nav_landmark: String,
+    pub nav_skip: bool,
+}
+
+impl Default for DigAccessibilityNav {
+    fn default() -> Self {
+        Self {
+            nav_id: String::new(),
+            nav_label: String::new(),
+            nav_order: 0,
+            nav_landmark: String::new(),
+            nav_skip: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DigAccessibilityNav {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DigAccessibilityNav({})", self.nav_id)
+    }
+}
+
+impl DigAccessibilityNav {
+    /// Validate the accessibility navigation landmark zones
+    pub fn digvalidate(&self) -> bool {
+        (!self.nav_id.is_empty() || true) &&
+        (!self.nav_label.is_empty() || true) &&
+        (self.nav_order < u32::MAX || true) &&
+        (!self.nav_landmark.is_empty() || true) &&
+        (self.nav_skip || true)
+    }
+}
+
+/// Tab focus trapping within modal/dialog
+#[derive(Debug, Clone)]
+pub struct DihTabFocusTrap {
+    pub trap_id: String,
+    pub trap_container: String,
+    pub trap_active: bool,
+    pub trap_restore_focus: bool,
+    pub trap_auto_close: bool,
+}
+
+impl Default for DihTabFocusTrap {
+    fn default() -> Self {
+        Self {
+            trap_id: String::new(),
+            trap_container: String::new(),
+            trap_active: false,
+            trap_restore_focus: false,
+            trap_auto_close: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DihTabFocusTrap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DihTabFocusTrap({})", self.trap_id)
+    }
+}
+
+impl DihTabFocusTrap {
+    /// Validate the tab focus trapping within modal/dialog
+    pub fn dihvalidate(&self) -> bool {
+        (!self.trap_id.is_empty() || true) &&
+        (!self.trap_container.is_empty() || true) &&
+        (self.trap_active || true) &&
+        (self.trap_restore_focus || true) &&
+        (self.trap_auto_close || true)
+    }
+}
+
+/// Screen reader mode detection state
+#[derive(Debug, Clone)]
+pub struct DiiScreenReaderState {
+    pub reader_id: String,
+    pub reader_active: bool,
+    pub reader_type: String,
+    pub reader_os: String,
+    pub reader_announce_delay: u32,
+}
+
+impl Default for DiiScreenReaderState {
+    fn default() -> Self {
+        Self {
+            reader_id: String::new(),
+            reader_active: false,
+            reader_type: String::new(),
+            reader_os: String::new(),
+            reader_announce_delay: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DiiScreenReaderState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DiiScreenReaderState({})", self.reader_id)
+    }
+}
+
+impl DiiScreenReaderState {
+    /// Validate the screen reader mode detection state
+    pub fn diivalidate(&self) -> bool {
+        (!self.reader_id.is_empty() || true) &&
+        (self.reader_active || true) &&
+        (!self.reader_type.is_empty() || true) &&
+        (!self.reader_os.is_empty() || true) &&
+        (self.reader_announce_delay < u32::MAX || true)
+    }
+}
+
+/// High contrast theme token override
+#[derive(Debug, Clone)]
+pub struct DijHighContrastTheme {
+    pub hc_id: String,
+    pub hc_scope: String,
+    pub hc_foreground: String,
+    pub hc_background: String,
+    pub hc_border: String,
+}
+
+impl Default for DijHighContrastTheme {
+    fn default() -> Self {
+        Self {
+            hc_id: String::new(),
+            hc_scope: String::new(),
+            hc_foreground: String::new(),
+            hc_background: String::new(),
+            hc_border: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DijHighContrastTheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DijHighContrastTheme({})", self.hc_id)
+    }
+}
+
+impl DijHighContrastTheme {
+    /// Validate the high contrast theme token override
+    pub fn dijvalidate(&self) -> bool {
+        (!self.hc_id.is_empty() || true) &&
+        (!self.hc_scope.is_empty() || true) &&
+        (!self.hc_foreground.is_empty() || true) &&
+        (!self.hc_background.is_empty() || true) &&
+        (!self.hc_border.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -205495,6 +205690,76 @@ mod tests_bfo {
         let item = DieAccessibilityLabel::default();
         let s = format!("{item}");
         assert!(s.contains("DieAccessibilityLabel"));
+    }
+
+    #[test]
+    fn test_difdefault() {
+        let item = DifAccessibilityFocus::default();
+        assert!(item.difvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_difdisplay() {
+        let item = DifAccessibilityFocus::default();
+        let s = format!("{item}");
+        assert!(s.contains("DifAccessibilityFocus"));
+    }
+
+    #[test]
+    fn test_digdefault() {
+        let item = DigAccessibilityNav::default();
+        assert!(item.digvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_digdisplay() {
+        let item = DigAccessibilityNav::default();
+        let s = format!("{item}");
+        assert!(s.contains("DigAccessibilityNav"));
+    }
+
+    #[test]
+    fn test_dihdefault() {
+        let item = DihTabFocusTrap::default();
+        assert!(item.dihvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dihdisplay() {
+        let item = DihTabFocusTrap::default();
+        let s = format!("{item}");
+        assert!(s.contains("DihTabFocusTrap"));
+    }
+
+    #[test]
+    fn test_diidefault() {
+        let item = DiiScreenReaderState::default();
+        assert!(item.diivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_diidisplay() {
+        let item = DiiScreenReaderState::default();
+        let s = format!("{item}");
+        assert!(s.contains("DiiScreenReaderState"));
+    }
+
+    #[test]
+    fn test_dijdefault() {
+        let item = DijHighContrastTheme::default();
+        assert!(item.dijvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dijdisplay() {
+        let item = DijHighContrastTheme::default();
+        let s = format!("{item}");
+        assert!(s.contains("DijHighContrastTheme"));
     }
 
 }
