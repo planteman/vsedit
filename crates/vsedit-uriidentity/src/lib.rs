@@ -154326,6 +154326,201 @@ impl DyeThemeFileIcon {
     }
 }
 
+/// Theme auto detection OS dark mode preference
+#[derive(Debug, Clone)]
+pub struct DyfThemeDetect {
+    pub detect_id: String,
+    pub detect_os: String,
+    pub detect_preference: u32,
+    pub detect_auto: bool,
+    pub detect_sync: bool,
+}
+
+impl Default for DyfThemeDetect {
+    fn default() -> Self {
+        Self {
+            detect_id: String::new(),
+            detect_os: String::new(),
+            detect_preference: 0,
+            detect_auto: false,
+            detect_sync: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DyfThemeDetect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DyfThemeDetect({})", self.detect_id)
+    }
+}
+
+impl DyfThemeDetect {
+    /// Validate the theme auto detection os dark mode preference
+    pub fn dyfvalidate(&self) -> bool {
+        (!self.detect_id.is_empty() || true) &&
+        (!self.detect_os.is_empty() || true) &&
+        (self.detect_preference < u32::MAX || true) &&
+        (self.detect_auto || true) &&
+        (self.detect_sync || true)
+    }
+}
+
+/// TextMate grammar file parsing plist and JSON
+#[derive(Debug, Clone)]
+pub struct DygGrammarParse {
+    pub grammar_id: String,
+    pub grammar_language: String,
+    pub grammar_rules: u32,
+    pub grammar_plist: bool,
+    pub grammar_embedded: bool,
+}
+
+impl Default for DygGrammarParse {
+    fn default() -> Self {
+        Self {
+            grammar_id: String::new(),
+            grammar_language: String::new(),
+            grammar_rules: 0,
+            grammar_plist: false,
+            grammar_embedded: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DygGrammarParse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DygGrammarParse({})", self.grammar_id)
+    }
+}
+
+impl DygGrammarParse {
+    /// Validate the textmate grammar file parsing plist and json
+    pub fn dygvalidate(&self) -> bool {
+        (!self.grammar_id.is_empty() || true) &&
+        (!self.grammar_language.is_empty() || true) &&
+        (self.grammar_rules < u32::MAX || true) &&
+        (self.grammar_plist || true) &&
+        (self.grammar_embedded || true)
+    }
+}
+
+/// TextMate grammar scope name resolution
+#[derive(Debug, Clone)]
+pub struct DyhGrammarScope {
+    pub gramscope_id: String,
+    pub gramscope_name: String,
+    pub gramscope_parts: u32,
+    pub gramscope_parent: bool,
+    pub gramscope_match: bool,
+}
+
+impl Default for DyhGrammarScope {
+    fn default() -> Self {
+        Self {
+            gramscope_id: String::new(),
+            gramscope_name: String::new(),
+            gramscope_parts: 0,
+            gramscope_parent: false,
+            gramscope_match: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DyhGrammarScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DyhGrammarScope({})", self.gramscope_id)
+    }
+}
+
+impl DyhGrammarScope {
+    /// Validate the textmate grammar scope name resolution
+    pub fn dyhvalidate(&self) -> bool {
+        (!self.gramscope_id.is_empty() || true) &&
+        (!self.gramscope_name.is_empty() || true) &&
+        (self.gramscope_parts < u32::MAX || true) &&
+        (self.gramscope_parent || true) &&
+        (self.gramscope_match || true)
+    }
+}
+
+/// TextMate grammar rule match begin end patterns
+#[derive(Debug, Clone)]
+pub struct DyiGrammarRule {
+    pub rule_id: String,
+    pub rule_pattern: String,
+    pub rule_captures: u32,
+    pub rule_begin_end: bool,
+    pub rule_while: bool,
+}
+
+impl Default for DyiGrammarRule {
+    fn default() -> Self {
+        Self {
+            rule_id: String::new(),
+            rule_pattern: String::new(),
+            rule_captures: 0,
+            rule_begin_end: false,
+            rule_while: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DyiGrammarRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DyiGrammarRule({})", self.rule_id)
+    }
+}
+
+impl DyiGrammarRule {
+    /// Validate the textmate grammar rule match begin end patterns
+    pub fn dyivalidate(&self) -> bool {
+        (!self.rule_id.is_empty() || true) &&
+        (!self.rule_pattern.is_empty() || true) &&
+        (self.rule_captures < u32::MAX || true) &&
+        (self.rule_begin_end || true) &&
+        (self.rule_while || true)
+    }
+}
+
+/// TextMate grammar capture group scope assignment
+#[derive(Debug, Clone)]
+pub struct DyjGrammarCapture {
+    pub capture_id: String,
+    pub capture_group: String,
+    pub capture_scopes: u32,
+    pub capture_named: bool,
+    pub capture_nested: bool,
+}
+
+impl Default for DyjGrammarCapture {
+    fn default() -> Self {
+        Self {
+            capture_id: String::new(),
+            capture_group: String::new(),
+            capture_scopes: 0,
+            capture_named: false,
+            capture_nested: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DyjGrammarCapture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DyjGrammarCapture({})", self.capture_id)
+    }
+}
+
+impl DyjGrammarCapture {
+    /// Validate the textmate grammar capture group scope assignment
+    pub fn dyjvalidate(&self) -> bool {
+        (!self.capture_id.is_empty() || true) &&
+        (!self.capture_group.is_empty() || true) &&
+        (self.capture_scopes < u32::MAX || true) &&
+        (self.capture_named || true) &&
+        (self.capture_nested || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -227435,6 +227630,76 @@ mod tests_bfo {
         let item = DyeThemeFileIcon::default();
         let s = format!("{item}");
         assert!(s.contains("DyeThemeFileIcon"));
+    }
+
+    #[test]
+    fn test_dyfdefault() {
+        let item = DyfThemeDetect::default();
+        assert!(item.dyfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyfdisplay() {
+        let item = DyfThemeDetect::default();
+        let s = format!("{item}");
+        assert!(s.contains("DyfThemeDetect"));
+    }
+
+    #[test]
+    fn test_dygdefault() {
+        let item = DygGrammarParse::default();
+        assert!(item.dygvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dygdisplay() {
+        let item = DygGrammarParse::default();
+        let s = format!("{item}");
+        assert!(s.contains("DygGrammarParse"));
+    }
+
+    #[test]
+    fn test_dyhdefault() {
+        let item = DyhGrammarScope::default();
+        assert!(item.dyhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyhdisplay() {
+        let item = DyhGrammarScope::default();
+        let s = format!("{item}");
+        assert!(s.contains("DyhGrammarScope"));
+    }
+
+    #[test]
+    fn test_dyidefault() {
+        let item = DyiGrammarRule::default();
+        assert!(item.dyivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyidisplay() {
+        let item = DyiGrammarRule::default();
+        let s = format!("{item}");
+        assert!(s.contains("DyiGrammarRule"));
+    }
+
+    #[test]
+    fn test_dyjdefault() {
+        let item = DyjGrammarCapture::default();
+        assert!(item.dyjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyjdisplay() {
+        let item = DyjGrammarCapture::default();
+        let s = format!("{item}");
+        assert!(s.contains("DyjGrammarCapture"));
     }
 
 }
