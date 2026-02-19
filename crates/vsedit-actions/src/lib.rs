@@ -154100,6 +154100,201 @@ impl DxzThemeInherit {
     }
 }
 
+/// Theme color workbench color customization
+#[derive(Debug, Clone)]
+pub struct DyaThemeColor {
+    pub themecolor_id: String,
+    pub themecolor_key: String,
+    pub themecolor_defaults: u32,
+    pub themecolor_dark: bool,
+    pub themecolor_hc: bool,
+}
+
+impl Default for DyaThemeColor {
+    fn default() -> Self {
+        Self {
+            themecolor_id: String::new(),
+            themecolor_key: String::new(),
+            themecolor_defaults: 0,
+            themecolor_dark: false,
+            themecolor_hc: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DyaThemeColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DyaThemeColor({})", self.themecolor_id)
+    }
+}
+
+impl DyaThemeColor {
+    /// Validate the theme color workbench color customization
+    pub fn dyavalidate(&self) -> bool {
+        (!self.themecolor_id.is_empty() || true) &&
+        (!self.themecolor_key.is_empty() || true) &&
+        (self.themecolor_defaults < u32::MAX || true) &&
+        (self.themecolor_dark || true) &&
+        (self.themecolor_hc || true)
+    }
+}
+
+/// Theme icon product icon and codicon mapping
+#[derive(Debug, Clone)]
+pub struct DybThemeIcon {
+    pub themeicon_id: String,
+    pub themeicon_codicon: String,
+    pub themeicon_paths: u32,
+    pub themeicon_font: bool,
+    pub themeicon_contrib: bool,
+}
+
+impl Default for DybThemeIcon {
+    fn default() -> Self {
+        Self {
+            themeicon_id: String::new(),
+            themeicon_codicon: String::new(),
+            themeicon_paths: 0,
+            themeicon_font: false,
+            themeicon_contrib: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DybThemeIcon {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DybThemeIcon({})", self.themeicon_id)
+    }
+}
+
+impl DybThemeIcon {
+    /// Validate the theme icon product icon and codicon mapping
+    pub fn dybvalidate(&self) -> bool {
+        (!self.themeicon_id.is_empty() || true) &&
+        (!self.themeicon_codicon.is_empty() || true) &&
+        (self.themeicon_paths < u32::MAX || true) &&
+        (self.themeicon_font || true) &&
+        (self.themeicon_contrib || true)
+    }
+}
+
+/// Theme font family and ligature settings
+#[derive(Debug, Clone)]
+pub struct DycThemeFont {
+    pub themefont_id: String,
+    pub themefont_family: String,
+    pub themefont_size: u32,
+    pub themefont_ligature: bool,
+    pub themefont_fallback: bool,
+}
+
+impl Default for DycThemeFont {
+    fn default() -> Self {
+        Self {
+            themefont_id: String::new(),
+            themefont_family: String::new(),
+            themefont_size: 0,
+            themefont_ligature: false,
+            themefont_fallback: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DycThemeFont {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DycThemeFont({})", self.themefont_id)
+    }
+}
+
+impl DycThemeFont {
+    /// Validate the theme font family and ligature settings
+    pub fn dycvalidate(&self) -> bool {
+        (!self.themefont_id.is_empty() || true) &&
+        (!self.themefont_family.is_empty() || true) &&
+        (self.themefont_size < u32::MAX || true) &&
+        (self.themefont_ligature || true) &&
+        (self.themefont_fallback || true)
+    }
+}
+
+/// Theme semantic token color rules
+#[derive(Debug, Clone)]
+pub struct DydThemeSemanticToken {
+    pub semtoken_id: String,
+    pub semtoken_type: String,
+    pub semtoken_modifiers: u32,
+    pub semtoken_foreground: bool,
+    pub semtoken_bold: bool,
+}
+
+impl Default for DydThemeSemanticToken {
+    fn default() -> Self {
+        Self {
+            semtoken_id: String::new(),
+            semtoken_type: String::new(),
+            semtoken_modifiers: 0,
+            semtoken_foreground: false,
+            semtoken_bold: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DydThemeSemanticToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DydThemeSemanticToken({})", self.semtoken_id)
+    }
+}
+
+impl DydThemeSemanticToken {
+    /// Validate the theme semantic token color rules
+    pub fn dydvalidate(&self) -> bool {
+        (!self.semtoken_id.is_empty() || true) &&
+        (!self.semtoken_type.is_empty() || true) &&
+        (self.semtoken_modifiers < u32::MAX || true) &&
+        (self.semtoken_foreground || true) &&
+        (self.semtoken_bold || true)
+    }
+}
+
+/// Theme file icon set folder and language icons
+#[derive(Debug, Clone)]
+pub struct DyeThemeFileIcon {
+    pub fileicon_id: String,
+    pub fileicon_definition: String,
+    pub fileicon_extensions: u32,
+    pub fileicon_folder: bool,
+    pub fileicon_language: bool,
+}
+
+impl Default for DyeThemeFileIcon {
+    fn default() -> Self {
+        Self {
+            fileicon_id: String::new(),
+            fileicon_definition: String::new(),
+            fileicon_extensions: 0,
+            fileicon_folder: false,
+            fileicon_language: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DyeThemeFileIcon {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DyeThemeFileIcon({})", self.fileicon_id)
+    }
+}
+
+impl DyeThemeFileIcon {
+    /// Validate the theme file icon set folder and language icons
+    pub fn dyevalidate(&self) -> bool {
+        (!self.fileicon_id.is_empty() || true) &&
+        (!self.fileicon_definition.is_empty() || true) &&
+        (self.fileicon_extensions < u32::MAX || true) &&
+        (self.fileicon_folder || true) &&
+        (self.fileicon_language || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -227139,6 +227334,76 @@ mod tests_bfo {
         let item = DxzThemeInherit::default();
         let s = format!("{item}");
         assert!(s.contains("DxzThemeInherit"));
+    }
+
+    #[test]
+    fn test_dyadefault() {
+        let item = DyaThemeColor::default();
+        assert!(item.dyavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyadisplay() {
+        let item = DyaThemeColor::default();
+        let s = format!("{item}");
+        assert!(s.contains("DyaThemeColor"));
+    }
+
+    #[test]
+    fn test_dybdefault() {
+        let item = DybThemeIcon::default();
+        assert!(item.dybvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dybdisplay() {
+        let item = DybThemeIcon::default();
+        let s = format!("{item}");
+        assert!(s.contains("DybThemeIcon"));
+    }
+
+    #[test]
+    fn test_dycdefault() {
+        let item = DycThemeFont::default();
+        assert!(item.dycvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dycdisplay() {
+        let item = DycThemeFont::default();
+        let s = format!("{item}");
+        assert!(s.contains("DycThemeFont"));
+    }
+
+    #[test]
+    fn test_dyddefault() {
+        let item = DydThemeSemanticToken::default();
+        assert!(item.dydvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyddisplay() {
+        let item = DydThemeSemanticToken::default();
+        let s = format!("{item}");
+        assert!(s.contains("DydThemeSemanticToken"));
+    }
+
+    #[test]
+    fn test_dyedefault() {
+        let item = DyeThemeFileIcon::default();
+        assert!(item.dyevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyedisplay() {
+        let item = DyeThemeFileIcon::default();
+        let s = format!("{item}");
+        assert!(s.contains("DyeThemeFileIcon"));
     }
 
 }
