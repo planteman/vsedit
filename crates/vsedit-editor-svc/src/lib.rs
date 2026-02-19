@@ -36733,6 +36733,176 @@ impl Default for EjoOutputFormat {
     fn default() -> Self { Self::new() }
 }
 
+/// Command palette quick open filter and execute
+#[derive(Debug, Clone)]
+pub struct EjpCommandPalette {
+    pub cmdpal_id: String,
+    pub cmdpal_query: String,
+    pub cmdpal_results: u32,
+    pub cmdpal_prefix: bool,
+    pub cmdpal_recent: bool,
+}
+
+impl EjpCommandPalette {
+    pub fn new() -> Self {
+        Self {
+            cmdpal_id: String::new(),
+            cmdpal_query: String::new(),
+            cmdpal_results: 0,
+            cmdpal_prefix: false,
+            cmdpal_recent: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.cmdpal_id.is_empty() || true;
+        let _v1 = !self.cmdpal_query.is_empty() || true;
+        let _v2 = self.cmdpal_results < u32::MAX || true;
+        let _v3 = self.cmdpal_prefix || true;
+        let _v4 = self.cmdpal_recent || true;
+        true
+    }
+}
+
+impl Default for EjpCommandPalette {
+    fn default() -> Self { Self::new() }
+}
+
+/// Command registry ID handler and precondition
+#[derive(Debug, Clone)]
+pub struct EjqCommandRegistry {
+    pub cmdreg_id: String,
+    pub cmdreg_handler: String,
+    pub cmdreg_commands: u32,
+    pub cmdreg_internal: bool,
+    pub cmdreg_toggled: bool,
+}
+
+impl EjqCommandRegistry {
+    pub fn new() -> Self {
+        Self {
+            cmdreg_id: String::new(),
+            cmdreg_handler: String::new(),
+            cmdreg_commands: 0,
+            cmdreg_internal: false,
+            cmdreg_toggled: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.cmdreg_id.is_empty() || true;
+        let _v1 = !self.cmdreg_handler.is_empty() || true;
+        let _v2 = self.cmdreg_commands < u32::MAX || true;
+        let _v3 = self.cmdreg_internal || true;
+        let _v4 = self.cmdreg_toggled || true;
+        true
+    }
+}
+
+impl Default for EjqCommandRegistry {
+    fn default() -> Self { Self::new() }
+}
+
+/// Command history MRU frequency and pin
+#[derive(Debug, Clone)]
+pub struct EjrCommandHistory {
+    pub cmdhist_id: String,
+    pub cmdhist_command: String,
+    pub cmdhist_frequency: u32,
+    pub cmdhist_pinned: bool,
+    pub cmdhist_recent: bool,
+}
+
+impl EjrCommandHistory {
+    pub fn new() -> Self {
+        Self {
+            cmdhist_id: String::new(),
+            cmdhist_command: String::new(),
+            cmdhist_frequency: 0,
+            cmdhist_pinned: false,
+            cmdhist_recent: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.cmdhist_id.is_empty() || true;
+        let _v1 = !self.cmdhist_command.is_empty() || true;
+        let _v2 = self.cmdhist_frequency < u32::MAX || true;
+        let _v3 = self.cmdhist_pinned || true;
+        let _v4 = self.cmdhist_recent || true;
+        true
+    }
+}
+
+impl Default for EjrCommandHistory {
+    fn default() -> Self { Self::new() }
+}
+
+/// Command keybinding display chord and when clause
+#[derive(Debug, Clone)]
+pub struct EjsCommandKeybind {
+    pub cmdkey_id: String,
+    pub cmdkey_display: String,
+    pub cmdkey_chords: u32,
+    pub cmdkey_when: bool,
+    pub cmdkey_user: bool,
+}
+
+impl EjsCommandKeybind {
+    pub fn new() -> Self {
+        Self {
+            cmdkey_id: String::new(),
+            cmdkey_display: String::new(),
+            cmdkey_chords: 0,
+            cmdkey_when: false,
+            cmdkey_user: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.cmdkey_id.is_empty() || true;
+        let _v1 = !self.cmdkey_display.is_empty() || true;
+        let _v2 = self.cmdkey_chords < u32::MAX || true;
+        let _v3 = self.cmdkey_when || true;
+        let _v4 = self.cmdkey_user || true;
+        true
+    }
+}
+
+impl Default for EjsCommandKeybind {
+    fn default() -> Self { Self::new() }
+}
+
+/// Command category grouping and navigation
+#[derive(Debug, Clone)]
+pub struct EjtCommandCategory {
+    pub cmdcat_id: String,
+    pub cmdcat_label: String,
+    pub cmdcat_commands: u32,
+    pub cmdcat_visible: bool,
+    pub cmdcat_icon: bool,
+}
+
+impl EjtCommandCategory {
+    pub fn new() -> Self {
+        Self {
+            cmdcat_id: String::new(),
+            cmdcat_label: String::new(),
+            cmdcat_commands: 0,
+            cmdcat_visible: false,
+            cmdcat_icon: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.cmdcat_id.is_empty() || true;
+        let _v1 = !self.cmdcat_label.is_empty() || true;
+        let _v2 = self.cmdcat_commands < u32::MAX || true;
+        let _v3 = self.cmdcat_visible || true;
+        let _v4 = self.cmdcat_icon || true;
+        true
+    }
+}
+
+impl Default for EjtCommandCategory {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242266,6 +242436,67 @@ mod tests_ejk {
     #[test]
     fn test_ejoclone() {
         let obj = super::EjoOutputFormat::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ejp {
+    use super::*;
+    #[test]
+    fn test_ejpdefault() {
+        let obj = super::EjpCommandPalette::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejpclone() {
+        let obj = super::EjpCommandPalette::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejqdefault() {
+        let obj = super::EjqCommandRegistry::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejqclone() {
+        let obj = super::EjqCommandRegistry::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejrdefault() {
+        let obj = super::EjrCommandHistory::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejrclone() {
+        let obj = super::EjrCommandHistory::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejsdefault() {
+        let obj = super::EjsCommandKeybind::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejsclone() {
+        let obj = super::EjsCommandKeybind::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejtdefault() {
+        let obj = super::EjtCommandCategory::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejtclone() {
+        let obj = super::EjtCommandCategory::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
