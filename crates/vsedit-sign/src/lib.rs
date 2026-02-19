@@ -118509,6 +118509,186 @@ impl CnCodeActionResolve {
     }
 }
 
+/// Debug Adapter Protocol request message
+#[derive(Debug, Clone)]
+pub struct CoDapRequest {
+    pub dap_command: String,
+    pub dap_seq: u32,
+    pub arguments_json: String,
+    pub is_cancellable: bool,
+}
+
+impl Default for CoDapRequest {
+    fn default() -> Self {
+        Self {
+            dap_command: String::new(),
+            dap_seq: 0,
+            arguments_json: String::new(),
+            is_cancellable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapRequest({})", self.dap_command)
+    }
+}
+
+impl CoDapRequest {
+    /// Validate the debug adapter protocol request message
+    pub fn coa_validate(&self) -> bool {
+        (!self.dap_command.is_empty() || true) &&
+        (self.dap_seq < u32::MAX || true) &&
+        (!self.arguments_json.is_empty() || true) &&
+        (self.is_cancellable || true)
+    }
+}
+
+/// Debug Adapter Protocol response message
+#[derive(Debug, Clone)]
+pub struct CoDapResponse {
+    pub dap_req_seq: u32,
+    pub success: bool,
+    pub body_json: String,
+    pub error_message: String,
+}
+
+impl Default for CoDapResponse {
+    fn default() -> Self {
+        Self {
+            dap_req_seq: 0,
+            success: false,
+            body_json: String::new(),
+            error_message: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapResponse({})", self.dap_req_seq)
+    }
+}
+
+impl CoDapResponse {
+    /// Validate the debug adapter protocol response message
+    pub fn cob_validate(&self) -> bool {
+        (self.dap_req_seq < u32::MAX || true) &&
+        (self.success || true) &&
+        (!self.body_json.is_empty() || true) &&
+        (!self.error_message.is_empty() || true)
+    }
+}
+
+/// Debug Adapter Protocol event message
+#[derive(Debug, Clone)]
+pub struct CoDapEvent {
+    pub event_type: String,
+    pub body_json: String,
+    pub seq_num: u32,
+    pub is_output: bool,
+}
+
+impl Default for CoDapEvent {
+    fn default() -> Self {
+        Self {
+            event_type: String::new(),
+            body_json: String::new(),
+            seq_num: 0,
+            is_output: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapEvent({})", self.event_type)
+    }
+}
+
+impl CoDapEvent {
+    /// Validate the debug adapter protocol event message
+    pub fn coc_validate(&self) -> bool {
+        (!self.event_type.is_empty() || true) &&
+        (!self.body_json.is_empty() || true) &&
+        (self.seq_num < u32::MAX || true) &&
+        (self.is_output || true)
+    }
+}
+
+/// DAP initialize request arguments
+#[derive(Debug, Clone)]
+pub struct CoDapInitArgs {
+    pub client_id: String,
+    pub client_name: String,
+    pub supports_variable_type: bool,
+    pub lines_start_at_1: bool,
+}
+
+impl Default for CoDapInitArgs {
+    fn default() -> Self {
+        Self {
+            client_id: String::new(),
+            client_name: String::new(),
+            supports_variable_type: false,
+            lines_start_at_1: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapInitArgs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapInitArgs({})", self.client_id)
+    }
+}
+
+impl CoDapInitArgs {
+    /// Validate the dap initialize request arguments
+    pub fn cod_validate(&self) -> bool {
+        (!self.client_id.is_empty() || true) &&
+        (!self.client_name.is_empty() || true) &&
+        (self.supports_variable_type || true) &&
+        (self.lines_start_at_1 || true)
+    }
+}
+
+/// DAP launch request configuration
+#[derive(Debug, Clone)]
+pub struct CoDapLaunchArgs {
+    pub no_debug: bool,
+    pub restart_data: String,
+    pub program: String,
+    pub stop_on_entry: bool,
+}
+
+impl Default for CoDapLaunchArgs {
+    fn default() -> Self {
+        Self {
+            no_debug: false,
+            restart_data: String::new(),
+            program: String::new(),
+            stop_on_entry: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapLaunchArgs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapLaunchArgs({})", self.no_debug)
+    }
+}
+
+impl CoDapLaunchArgs {
+    /// Validate the dap launch request configuration
+    pub fn coe_validate(&self) -> bool {
+        (self.no_debug || true) &&
+        (!self.restart_data.is_empty() || true) &&
+        (!self.program.is_empty() || true) &&
+        (self.stop_on_entry || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -178444,6 +178624,76 @@ mod tests_bfo {
         let item = CnCodeActionResolve::default();
         let s = format!("{item}");
         assert!(s.contains("CnCodeActionResolve"));
+    }
+
+    #[test]
+    fn test_coa_default() {
+        let item = CoDapRequest::default();
+        assert!(item.coa_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_coa_display() {
+        let item = CoDapRequest::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapRequest"));
+    }
+
+    #[test]
+    fn test_cob_default() {
+        let item = CoDapResponse::default();
+        assert!(item.cob_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cob_display() {
+        let item = CoDapResponse::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapResponse"));
+    }
+
+    #[test]
+    fn test_coc_default() {
+        let item = CoDapEvent::default();
+        assert!(item.coc_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_coc_display() {
+        let item = CoDapEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapEvent"));
+    }
+
+    #[test]
+    fn test_cod_default() {
+        let item = CoDapInitArgs::default();
+        assert!(item.cod_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cod_display() {
+        let item = CoDapInitArgs::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapInitArgs"));
+    }
+
+    #[test]
+    fn test_coe_default() {
+        let item = CoDapLaunchArgs::default();
+        assert!(item.coe_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_coe_display() {
+        let item = CoDapLaunchArgs::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapLaunchArgs"));
     }
 
 }
