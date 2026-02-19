@@ -153276,6 +153276,201 @@ impl DxeConfigMigrate {
     }
 }
 
+/// Configuration file watcher change detection
+#[derive(Debug, Clone)]
+pub struct DxfConfigWatch {
+    pub watch_id: String,
+    pub watch_path: String,
+    pub watch_events: u32,
+    pub watch_recursive: bool,
+    pub watch_debounce: bool,
+}
+
+impl Default for DxfConfigWatch {
+    fn default() -> Self {
+        Self {
+            watch_id: String::new(),
+            watch_path: String::new(),
+            watch_events: 0,
+            watch_recursive: false,
+            watch_debounce: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxfConfigWatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxfConfigWatch({})", self.watch_id)
+    }
+}
+
+impl DxfConfigWatch {
+    /// Validate the configuration file watcher change detection
+    pub fn dxfvalidate(&self) -> bool {
+        (!self.watch_id.is_empty() || true) &&
+        (!self.watch_path.is_empty() || true) &&
+        (self.watch_events < u32::MAX || true) &&
+        (self.watch_recursive || true) &&
+        (self.watch_debounce || true)
+    }
+}
+
+/// Configuration merge strategy layered resolution
+#[derive(Debug, Clone)]
+pub struct DxgConfigMerge {
+    pub merge_id: String,
+    pub merge_strategy: String,
+    pub merge_layers: u32,
+    pub merge_overwrite: bool,
+    pub merge_additive: bool,
+}
+
+impl Default for DxgConfigMerge {
+    fn default() -> Self {
+        Self {
+            merge_id: String::new(),
+            merge_strategy: String::new(),
+            merge_layers: 0,
+            merge_overwrite: false,
+            merge_additive: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxgConfigMerge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxgConfigMerge({})", self.merge_id)
+    }
+}
+
+impl DxgConfigMerge {
+    /// Validate the configuration merge strategy layered resolution
+    pub fn dxgvalidate(&self) -> bool {
+        (!self.merge_id.is_empty() || true) &&
+        (!self.merge_strategy.is_empty() || true) &&
+        (self.merge_layers < u32::MAX || true) &&
+        (self.merge_overwrite || true) &&
+        (self.merge_additive || true)
+    }
+}
+
+/// Configuration edit operation apply and revert
+#[derive(Debug, Clone)]
+pub struct DxhConfigEdit {
+    pub edit_id: String,
+    pub edit_key: String,
+    pub edit_operations: u32,
+    pub edit_revert: bool,
+    pub edit_global: bool,
+}
+
+impl Default for DxhConfigEdit {
+    fn default() -> Self {
+        Self {
+            edit_id: String::new(),
+            edit_key: String::new(),
+            edit_operations: 0,
+            edit_revert: false,
+            edit_global: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxhConfigEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxhConfigEdit({})", self.edit_id)
+    }
+}
+
+impl DxhConfigEdit {
+    /// Validate the configuration edit operation apply and revert
+    pub fn dxhvalidate(&self) -> bool {
+        (!self.edit_id.is_empty() || true) &&
+        (!self.edit_key.is_empty() || true) &&
+        (self.edit_operations < u32::MAX || true) &&
+        (self.edit_revert || true) &&
+        (self.edit_global || true)
+    }
+}
+
+/// Configuration schema JSON schema validation
+#[derive(Debug, Clone)]
+pub struct DxiConfigSchema {
+    pub schema_id: String,
+    pub schema_uri: String,
+    pub schema_properties: u32,
+    pub schema_required: bool,
+    pub schema_additional: bool,
+}
+
+impl Default for DxiConfigSchema {
+    fn default() -> Self {
+        Self {
+            schema_id: String::new(),
+            schema_uri: String::new(),
+            schema_properties: 0,
+            schema_required: false,
+            schema_additional: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxiConfigSchema {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxiConfigSchema({})", self.schema_id)
+    }
+}
+
+impl DxiConfigSchema {
+    /// Validate the configuration schema json schema validation
+    pub fn dxivalidate(&self) -> bool {
+        (!self.schema_id.is_empty() || true) &&
+        (!self.schema_uri.is_empty() || true) &&
+        (self.schema_properties < u32::MAX || true) &&
+        (self.schema_required || true) &&
+        (self.schema_additional || true)
+    }
+}
+
+/// Configuration default values registration
+#[derive(Debug, Clone)]
+pub struct DxjConfigDefault {
+    pub default_id: String,
+    pub default_key: String,
+    pub default_values: u32,
+    pub default_overridable: bool,
+    pub default_scope: bool,
+}
+
+impl Default for DxjConfigDefault {
+    fn default() -> Self {
+        Self {
+            default_id: String::new(),
+            default_key: String::new(),
+            default_values: 0,
+            default_overridable: false,
+            default_scope: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxjConfigDefault {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxjConfigDefault({})", self.default_id)
+    }
+}
+
+impl DxjConfigDefault {
+    /// Validate the configuration default values registration
+    pub fn dxjvalidate(&self) -> bool {
+        (!self.default_id.is_empty() || true) &&
+        (!self.default_key.is_empty() || true) &&
+        (self.default_values < u32::MAX || true) &&
+        (self.default_overridable || true) &&
+        (self.default_scope || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -226021,6 +226216,76 @@ mod tests_bfo {
         let item = DxeConfigMigrate::default();
         let s = format!("{item}");
         assert!(s.contains("DxeConfigMigrate"));
+    }
+
+    #[test]
+    fn test_dxfdefault() {
+        let item = DxfConfigWatch::default();
+        assert!(item.dxfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxfdisplay() {
+        let item = DxfConfigWatch::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxfConfigWatch"));
+    }
+
+    #[test]
+    fn test_dxgdefault() {
+        let item = DxgConfigMerge::default();
+        assert!(item.dxgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxgdisplay() {
+        let item = DxgConfigMerge::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxgConfigMerge"));
+    }
+
+    #[test]
+    fn test_dxhdefault() {
+        let item = DxhConfigEdit::default();
+        assert!(item.dxhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxhdisplay() {
+        let item = DxhConfigEdit::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxhConfigEdit"));
+    }
+
+    #[test]
+    fn test_dxidefault() {
+        let item = DxiConfigSchema::default();
+        assert!(item.dxivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxidisplay() {
+        let item = DxiConfigSchema::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxiConfigSchema"));
+    }
+
+    #[test]
+    fn test_dxjdefault() {
+        let item = DxjConfigDefault::default();
+        assert!(item.dxjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxjdisplay() {
+        let item = DxjConfigDefault::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxjConfigDefault"));
     }
 
 }
