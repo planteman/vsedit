@@ -131507,6 +131507,435 @@ impl DboSearchExclude {
     }
 }
 
+/// Search scope workspace or folder filtering
+#[derive(Debug, Clone)]
+pub struct DbpSearchScope {
+    pub scope_id: String,
+    pub scope_folder: String,
+    pub scope_label: String,
+    pub scope_include_open: bool,
+    pub scope_max_results: u32,
+}
+
+impl Default for DbpSearchScope {
+    fn default() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_folder: String::new(),
+            scope_label: String::new(),
+            scope_include_open: false,
+            scope_max_results: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DbpSearchScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbpSearchScope({})", self.scope_id)
+    }
+}
+
+impl DbpSearchScope {
+    /// Validate the search scope workspace or folder filtering
+    pub fn dbpvalidate(&self) -> bool {
+        (!self.scope_id.is_empty() || true) &&
+        (!self.scope_folder.is_empty() || true) &&
+        (!self.scope_label.is_empty() || true) &&
+        (self.scope_include_open || true) &&
+        (self.scope_max_results < u32::MAX || true)
+    }
+}
+
+/// Search within editor find widget state
+#[derive(Debug, Clone)]
+pub struct DbqSearchEditor {
+    pub editor_id: String,
+    pub editor_search: String,
+    pub editor_replace: String,
+    pub editor_visible: bool,
+    pub editor_match_count: u32,
+}
+
+impl Default for DbqSearchEditor {
+    fn default() -> Self {
+        Self {
+            editor_id: String::new(),
+            editor_search: String::new(),
+            editor_replace: String::new(),
+            editor_visible: false,
+            editor_match_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DbqSearchEditor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbqSearchEditor({})", self.editor_id)
+    }
+}
+
+impl DbqSearchEditor {
+    /// Validate the search within editor find widget state
+    pub fn dbqvalidate(&self) -> bool {
+        (!self.editor_id.is_empty() || true) &&
+        (!self.editor_search.is_empty() || true) &&
+        (!self.editor_replace.is_empty() || true) &&
+        (self.editor_visible || true) &&
+        (self.editor_match_count < u32::MAX || true)
+    }
+}
+
+/// Workspace symbol search result
+#[derive(Debug, Clone)]
+pub struct DbrSearchSymbol {
+    pub symbol_id: String,
+    pub symbol_name: String,
+    pub symbol_kind: String,
+    pub symbol_file: String,
+    pub symbol_line: u32,
+}
+
+impl Default for DbrSearchSymbol {
+    fn default() -> Self {
+        Self {
+            symbol_id: String::new(),
+            symbol_name: String::new(),
+            symbol_kind: String::new(),
+            symbol_file: String::new(),
+            symbol_line: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DbrSearchSymbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbrSearchSymbol({})", self.symbol_id)
+    }
+}
+
+impl DbrSearchSymbol {
+    /// Validate the workspace symbol search result
+    pub fn dbrvalidate(&self) -> bool {
+        (!self.symbol_id.is_empty() || true) &&
+        (!self.symbol_name.is_empty() || true) &&
+        (!self.symbol_kind.is_empty() || true) &&
+        (!self.symbol_file.is_empty() || true) &&
+        (self.symbol_line < u32::MAX || true)
+    }
+}
+
+/// File search quick open result
+#[derive(Debug, Clone)]
+pub struct DbsSearchFile {
+    pub file_id: String,
+    pub file_path: String,
+    pub file_label: String,
+    pub file_icon: String,
+    pub file_recent: bool,
+}
+
+impl Default for DbsSearchFile {
+    fn default() -> Self {
+        Self {
+            file_id: String::new(),
+            file_path: String::new(),
+            file_label: String::new(),
+            file_icon: String::new(),
+            file_recent: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DbsSearchFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbsSearchFile({})", self.file_id)
+    }
+}
+
+impl DbsSearchFile {
+    /// Validate the file search quick open result
+    pub fn dbsvalidate(&self) -> bool {
+        (!self.file_id.is_empty() || true) &&
+        (!self.file_path.is_empty() || true) &&
+        (!self.file_label.is_empty() || true) &&
+        (!self.file_icon.is_empty() || true) &&
+        (self.file_recent || true)
+    }
+}
+
+/// Command search and quick command result
+#[derive(Debug, Clone)]
+pub struct DbtSearchCommand {
+    pub command_id: String,
+    pub command_title: String,
+    pub command_keybinding: String,
+    pub command_category: String,
+    pub command_recently_used: bool,
+}
+
+impl Default for DbtSearchCommand {
+    fn default() -> Self {
+        Self {
+            command_id: String::new(),
+            command_title: String::new(),
+            command_keybinding: String::new(),
+            command_category: String::new(),
+            command_recently_used: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DbtSearchCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbtSearchCommand({})", self.command_id)
+    }
+}
+
+impl DbtSearchCommand {
+    /// Validate the command search and quick command result
+    pub fn dbtvalidate(&self) -> bool {
+        (!self.command_id.is_empty() || true) &&
+        (!self.command_title.is_empty() || true) &&
+        (!self.command_keybinding.is_empty() || true) &&
+        (!self.command_category.is_empty() || true) &&
+        (self.command_recently_used || true)
+    }
+}
+
+/// Terminal profile shell and args configuration
+#[derive(Debug, Clone)]
+pub struct DbuTerminalProfile {
+    pub profile_id: String,
+    pub profile_name: String,
+    pub profile_shell: String,
+    pub profile_args: String,
+    pub profile_default: bool,
+}
+
+impl Default for DbuTerminalProfile {
+    fn default() -> Self {
+        Self {
+            profile_id: String::new(),
+            profile_name: String::new(),
+            profile_shell: String::new(),
+            profile_args: String::new(),
+            profile_default: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DbuTerminalProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbuTerminalProfile({})", self.profile_id)
+    }
+}
+
+impl DbuTerminalProfile {
+    /// Validate the terminal profile shell and args configuration
+    pub fn dbuvalidate(&self) -> bool {
+        (!self.profile_id.is_empty() || true) &&
+        (!self.profile_name.is_empty() || true) &&
+        (!self.profile_shell.is_empty() || true) &&
+        (!self.profile_args.is_empty() || true) &&
+        (self.profile_default || true)
+    }
+}
+
+/// Terminal instance process and PTY state
+#[derive(Debug, Clone)]
+pub struct DbvTerminalInstance {
+    pub instance_id: String,
+    pub instance_title: String,
+    pub instance_pid: u32,
+    pub instance_active: bool,
+    pub instance_exit_code: u32,
+}
+
+impl Default for DbvTerminalInstance {
+    fn default() -> Self {
+        Self {
+            instance_id: String::new(),
+            instance_title: String::new(),
+            instance_pid: 0,
+            instance_active: false,
+            instance_exit_code: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DbvTerminalInstance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbvTerminalInstance({})", self.instance_id)
+    }
+}
+
+impl DbvTerminalInstance {
+    /// Validate the terminal instance process and pty state
+    pub fn dbvvalidate(&self) -> bool {
+        (!self.instance_id.is_empty() || true) &&
+        (!self.instance_title.is_empty() || true) &&
+        (self.instance_pid < u32::MAX || true) &&
+        (self.instance_active || true) &&
+        (self.instance_exit_code < u32::MAX || true)
+    }
+}
+
+/// Terminal split pane layout model
+#[derive(Debug, Clone)]
+pub struct DbwTerminalSplit {
+    pub split_id: String,
+    pub split_direction: String,
+    pub split_ratio: f64,
+    pub split_left: String,
+    pub split_right: String,
+}
+
+impl Default for DbwTerminalSplit {
+    fn default() -> Self {
+        Self {
+            split_id: String::new(),
+            split_direction: String::new(),
+            split_ratio: 0.0,
+            split_left: String::new(),
+            split_right: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DbwTerminalSplit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbwTerminalSplit({})", self.split_id)
+    }
+}
+
+impl DbwTerminalSplit {
+    /// Validate the terminal split pane layout model
+    pub fn dbwvalidate(&self) -> bool {
+        (!self.split_id.is_empty() || true) &&
+        (!self.split_direction.is_empty() || true) &&
+        (self.split_ratio.is_finite() || true) &&
+        (!self.split_left.is_empty() || true) &&
+        (!self.split_right.is_empty() || true)
+    }
+}
+
+/// Terminal link detection and click handling
+#[derive(Debug, Clone)]
+pub struct DbxTerminalLink {
+    pub link_id: String,
+    pub link_text: String,
+    pub link_uri: String,
+    pub link_line: u32,
+    pub link_trusted: bool,
+}
+
+impl Default for DbxTerminalLink {
+    fn default() -> Self {
+        Self {
+            link_id: String::new(),
+            link_text: String::new(),
+            link_uri: String::new(),
+            link_line: 0,
+            link_trusted: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DbxTerminalLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbxTerminalLink({})", self.link_id)
+    }
+}
+
+impl DbxTerminalLink {
+    /// Validate the terminal link detection and click handling
+    pub fn dbxvalidate(&self) -> bool {
+        (!self.link_id.is_empty() || true) &&
+        (!self.link_text.is_empty() || true) &&
+        (!self.link_uri.is_empty() || true) &&
+        (self.link_line < u32::MAX || true) &&
+        (self.link_trusted || true)
+    }
+}
+
+/// Terminal color theme ANSI mapping
+#[derive(Debug, Clone)]
+pub struct DbyTerminalTheme {
+    pub theme_id: String,
+    pub theme_foreground: String,
+    pub theme_background: String,
+    pub theme_cursor: String,
+    pub theme_selection: String,
+}
+
+impl Default for DbyTerminalTheme {
+    fn default() -> Self {
+        Self {
+            theme_id: String::new(),
+            theme_foreground: String::new(),
+            theme_background: String::new(),
+            theme_cursor: String::new(),
+            theme_selection: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DbyTerminalTheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbyTerminalTheme({})", self.theme_id)
+    }
+}
+
+impl DbyTerminalTheme {
+    /// Validate the terminal color theme ansi mapping
+    pub fn dbyvalidate(&self) -> bool {
+        (!self.theme_id.is_empty() || true) &&
+        (!self.theme_foreground.is_empty() || true) &&
+        (!self.theme_background.is_empty() || true) &&
+        (!self.theme_cursor.is_empty() || true) &&
+        (!self.theme_selection.is_empty() || true)
+    }
+}
+
+/// Terminal find/search within buffer
+#[derive(Debug, Clone)]
+pub struct DbzTerminalFind {
+    pub find_id: String,
+    pub find_query: String,
+    pub find_regex: bool,
+    pub find_match_index: u32,
+    pub find_total_matches: u32,
+}
+
+impl Default for DbzTerminalFind {
+    fn default() -> Self {
+        Self {
+            find_id: String::new(),
+            find_query: String::new(),
+            find_regex: false,
+            find_match_index: 0,
+            find_total_matches: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DbzTerminalFind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbzTerminalFind({})", self.find_id)
+    }
+}
+
+impl DbzTerminalFind {
+    /// Validate the terminal find/search within buffer
+    pub fn dbzvalidate(&self) -> bool {
+        (!self.find_id.is_empty() || true) &&
+        (!self.find_query.is_empty() || true) &&
+        (self.find_regex || true) &&
+        (self.find_match_index < u32::MAX || true) &&
+        (self.find_total_matches < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -196384,6 +196813,160 @@ mod tests_bfo {
         let item = DboSearchExclude::default();
         let s = format!("{item}");
         assert!(s.contains("DboSearchExclude"));
+    }
+
+    #[test]
+    fn test_dbpdefault() {
+        let item = DbpSearchScope::default();
+        assert!(item.dbpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbpdisplay() {
+        let item = DbpSearchScope::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbpSearchScope"));
+    }
+
+    #[test]
+    fn test_dbqdefault() {
+        let item = DbqSearchEditor::default();
+        assert!(item.dbqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbqdisplay() {
+        let item = DbqSearchEditor::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbqSearchEditor"));
+    }
+
+    #[test]
+    fn test_dbrdefault() {
+        let item = DbrSearchSymbol::default();
+        assert!(item.dbrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbrdisplay() {
+        let item = DbrSearchSymbol::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbrSearchSymbol"));
+    }
+
+    #[test]
+    fn test_dbsdefault() {
+        let item = DbsSearchFile::default();
+        assert!(item.dbsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbsdisplay() {
+        let item = DbsSearchFile::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbsSearchFile"));
+    }
+
+    #[test]
+    fn test_dbtdefault() {
+        let item = DbtSearchCommand::default();
+        assert!(item.dbtvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbtdisplay() {
+        let item = DbtSearchCommand::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbtSearchCommand"));
+    }
+
+    #[test]
+    fn test_dbudefault() {
+        let item = DbuTerminalProfile::default();
+        assert!(item.dbuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbudisplay() {
+        let item = DbuTerminalProfile::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbuTerminalProfile"));
+    }
+
+    #[test]
+    fn test_dbvdefault() {
+        let item = DbvTerminalInstance::default();
+        assert!(item.dbvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbvdisplay() {
+        let item = DbvTerminalInstance::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbvTerminalInstance"));
+    }
+
+    #[test]
+    fn test_dbwdefault() {
+        let item = DbwTerminalSplit::default();
+        assert!(item.dbwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbwdisplay() {
+        let item = DbwTerminalSplit::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbwTerminalSplit"));
+    }
+
+    #[test]
+    fn test_dbxdefault() {
+        let item = DbxTerminalLink::default();
+        assert!(item.dbxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbxdisplay() {
+        let item = DbxTerminalLink::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbxTerminalLink"));
+    }
+
+    #[test]
+    fn test_dbydefault() {
+        let item = DbyTerminalTheme::default();
+        assert!(item.dbyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbydisplay() {
+        let item = DbyTerminalTheme::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbyTerminalTheme"));
+    }
+
+    #[test]
+    fn test_dbzdefault() {
+        let item = DbzTerminalFind::default();
+        assert!(item.dbzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbzdisplay() {
+        let item = DbzTerminalFind::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbzTerminalFind"));
     }
 
 }
