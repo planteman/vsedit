@@ -87844,6 +87844,111 @@ impl SnippetSession {
     }
 }
 
+/// Runtime wiring: bop_ GotoSymbol
+#[derive(Debug, Clone)]
+pub struct GotoSymbol {
+    pub bop_symbol_name: String,
+    pub bop_symbol_kind: u8,
+    pub bop_container_name: String,
+    pub bop_uri: String,
+    pub bop_range_start_line: u32,
+    pub bop_range_start_col: u32,
+    pub bop_range_end_line: u32,
+    pub bop_range_end_col: u32,
+    pub bop_tags: Vec<u8>,
+    pub bop_detail: String,
+}
+
+impl GotoSymbol {
+    pub fn bop_summary(&self) -> String {
+        format!("GotoSymbol({})", self.bop_symbol_name)
+    }
+}
+
+/// Runtime wiring: boq_ PeekView
+#[derive(Debug, Clone)]
+pub struct PeekView {
+    pub boq_peek_uri: String,
+    pub boq_peek_line: u32,
+    pub boq_peek_column: u32,
+    pub boq_reference_count: u32,
+    pub boq_is_open: bool,
+    pub boq_view_height: u32,
+    pub boq_title: String,
+    pub boq_entries: Vec<String>,
+    pub boq_selected_index: u32,
+    pub boq_show_header: bool,
+}
+
+impl PeekView {
+    pub fn boq_summary(&self) -> String {
+        format!("PeekView({})", self.boq_peek_uri)
+    }
+}
+
+/// Runtime wiring: bor_ ParameterHints
+#[derive(Debug, Clone)]
+pub struct ParameterHints {
+    pub bor_signature_index: u32,
+    pub bor_parameter_index: u32,
+    pub bor_signature_count: u32,
+    pub bor_active_signature_label: String,
+    pub bor_active_parameter_label: String,
+    pub bor_documentation: String,
+    pub bor_is_retrigger: bool,
+    pub bor_trigger_character: String,
+    pub bor_context_is_active: bool,
+    pub bor_trigger_kind: u8,
+}
+
+impl ParameterHints {
+    pub fn bor_summary(&self) -> String {
+        format!("ParameterHints({})", self.bor_signature_index)
+    }
+}
+
+/// Runtime wiring: bos_ LinkDetector
+#[derive(Debug, Clone)]
+pub struct LinkDetector {
+    pub bos_link_text: String,
+    pub bos_link_uri: String,
+    pub bos_link_start_col: u32,
+    pub bos_link_end_col: u32,
+    pub bos_link_line: u32,
+    pub bos_is_web_link: bool,
+    pub bos_is_file_link: bool,
+    pub bos_tooltip: String,
+    pub bos_provider_id: String,
+    pub bos_is_trusted: bool,
+}
+
+impl LinkDetector {
+    pub fn bos_summary(&self) -> String {
+        format!("LinkDetector({})", self.bos_link_text)
+    }
+}
+
+/// Runtime wiring: bot_ ColorPicker
+#[derive(Debug, Clone)]
+pub struct ColorPicker {
+    pub bot_red: f64,
+    pub bot_green: f64,
+    pub bot_blue: f64,
+    pub bot_alpha: f64,
+    pub bot_color_format: String,
+    pub bot_original_text: String,
+    pub bot_range_start_line: u32,
+    pub bot_range_start_col: u32,
+    pub bot_range_end_line: u32,
+    pub bot_range_end_col: u32,
+}
+
+impl ColorPicker {
+    pub fn bot_summary(&self) -> String {
+        format!("ColorPicker({})", self.bot_red)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -104511,6 +104616,910 @@ mod tests_bfo {
         };
         let _ = obj.boo_summary();
         assert_eq!(obj.boo_final_tabstop_col, 0);
+    }
+
+    #[test]
+    fn test_bop_symbol_name() {
+        let obj = GotoSymbol {
+            bop_symbol_name: String::from("test"),
+            bop_symbol_kind: 0,
+            bop_container_name: String::from("test"),
+            bop_uri: String::from("test"),
+            bop_range_start_line: 0,
+            bop_range_start_col: 0,
+            bop_range_end_line: 0,
+            bop_range_end_col: 0,
+            bop_tags: Vec::new(),
+            bop_detail: String::from("test"),
+        };
+        let _ = obj.bop_summary();
+        assert_eq!(obj.bop_symbol_name, "test");
+    }
+
+    #[test]
+    fn test_bop_symbol_kind() {
+        let obj = GotoSymbol {
+            bop_symbol_name: String::from("test"),
+            bop_symbol_kind: 0,
+            bop_container_name: String::from("test"),
+            bop_uri: String::from("test"),
+            bop_range_start_line: 0,
+            bop_range_start_col: 0,
+            bop_range_end_line: 0,
+            bop_range_end_col: 0,
+            bop_tags: Vec::new(),
+            bop_detail: String::from("test"),
+        };
+        let _ = obj.bop_summary();
+        assert_eq!(obj.bop_symbol_kind, 0);
+    }
+
+    #[test]
+    fn test_bop_container_name() {
+        let obj = GotoSymbol {
+            bop_symbol_name: String::from("test"),
+            bop_symbol_kind: 0,
+            bop_container_name: String::from("test"),
+            bop_uri: String::from("test"),
+            bop_range_start_line: 0,
+            bop_range_start_col: 0,
+            bop_range_end_line: 0,
+            bop_range_end_col: 0,
+            bop_tags: Vec::new(),
+            bop_detail: String::from("test"),
+        };
+        let _ = obj.bop_summary();
+        assert_eq!(obj.bop_container_name, "test");
+    }
+
+    #[test]
+    fn test_bop_uri() {
+        let obj = GotoSymbol {
+            bop_symbol_name: String::from("test"),
+            bop_symbol_kind: 0,
+            bop_container_name: String::from("test"),
+            bop_uri: String::from("test"),
+            bop_range_start_line: 0,
+            bop_range_start_col: 0,
+            bop_range_end_line: 0,
+            bop_range_end_col: 0,
+            bop_tags: Vec::new(),
+            bop_detail: String::from("test"),
+        };
+        let _ = obj.bop_summary();
+        assert_eq!(obj.bop_uri, "test");
+    }
+
+    #[test]
+    fn test_bop_range_start_line() {
+        let obj = GotoSymbol {
+            bop_symbol_name: String::from("test"),
+            bop_symbol_kind: 0,
+            bop_container_name: String::from("test"),
+            bop_uri: String::from("test"),
+            bop_range_start_line: 0,
+            bop_range_start_col: 0,
+            bop_range_end_line: 0,
+            bop_range_end_col: 0,
+            bop_tags: Vec::new(),
+            bop_detail: String::from("test"),
+        };
+        let _ = obj.bop_summary();
+        assert_eq!(obj.bop_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_bop_range_start_col() {
+        let obj = GotoSymbol {
+            bop_symbol_name: String::from("test"),
+            bop_symbol_kind: 0,
+            bop_container_name: String::from("test"),
+            bop_uri: String::from("test"),
+            bop_range_start_line: 0,
+            bop_range_start_col: 0,
+            bop_range_end_line: 0,
+            bop_range_end_col: 0,
+            bop_tags: Vec::new(),
+            bop_detail: String::from("test"),
+        };
+        let _ = obj.bop_summary();
+        assert_eq!(obj.bop_range_start_col, 0);
+    }
+
+    #[test]
+    fn test_bop_range_end_line() {
+        let obj = GotoSymbol {
+            bop_symbol_name: String::from("test"),
+            bop_symbol_kind: 0,
+            bop_container_name: String::from("test"),
+            bop_uri: String::from("test"),
+            bop_range_start_line: 0,
+            bop_range_start_col: 0,
+            bop_range_end_line: 0,
+            bop_range_end_col: 0,
+            bop_tags: Vec::new(),
+            bop_detail: String::from("test"),
+        };
+        let _ = obj.bop_summary();
+        assert_eq!(obj.bop_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_bop_range_end_col() {
+        let obj = GotoSymbol {
+            bop_symbol_name: String::from("test"),
+            bop_symbol_kind: 0,
+            bop_container_name: String::from("test"),
+            bop_uri: String::from("test"),
+            bop_range_start_line: 0,
+            bop_range_start_col: 0,
+            bop_range_end_line: 0,
+            bop_range_end_col: 0,
+            bop_tags: Vec::new(),
+            bop_detail: String::from("test"),
+        };
+        let _ = obj.bop_summary();
+        assert_eq!(obj.bop_range_end_col, 0);
+    }
+
+    #[test]
+    fn test_bop_tags() {
+        let obj = GotoSymbol {
+            bop_symbol_name: String::from("test"),
+            bop_symbol_kind: 0,
+            bop_container_name: String::from("test"),
+            bop_uri: String::from("test"),
+            bop_range_start_line: 0,
+            bop_range_start_col: 0,
+            bop_range_end_line: 0,
+            bop_range_end_col: 0,
+            bop_tags: Vec::new(),
+            bop_detail: String::from("test"),
+        };
+        let _ = obj.bop_summary();
+        assert!(obj.bop_tags.is_empty());
+    }
+
+    #[test]
+    fn test_bop_detail() {
+        let obj = GotoSymbol {
+            bop_symbol_name: String::from("test"),
+            bop_symbol_kind: 0,
+            bop_container_name: String::from("test"),
+            bop_uri: String::from("test"),
+            bop_range_start_line: 0,
+            bop_range_start_col: 0,
+            bop_range_end_line: 0,
+            bop_range_end_col: 0,
+            bop_tags: Vec::new(),
+            bop_detail: String::from("test"),
+        };
+        let _ = obj.bop_summary();
+        assert_eq!(obj.bop_detail, "test");
+    }
+
+
+    #[test]
+    fn test_boq_peek_uri() {
+        let obj = PeekView {
+            boq_peek_uri: String::from("test"),
+            boq_peek_line: 0,
+            boq_peek_column: 0,
+            boq_reference_count: 0,
+            boq_is_open: false,
+            boq_view_height: 0,
+            boq_title: String::from("test"),
+            boq_entries: Vec::new(),
+            boq_selected_index: 0,
+            boq_show_header: false,
+        };
+        let _ = obj.boq_summary();
+        assert_eq!(obj.boq_peek_uri, "test");
+    }
+
+    #[test]
+    fn test_boq_peek_line() {
+        let obj = PeekView {
+            boq_peek_uri: String::from("test"),
+            boq_peek_line: 0,
+            boq_peek_column: 0,
+            boq_reference_count: 0,
+            boq_is_open: false,
+            boq_view_height: 0,
+            boq_title: String::from("test"),
+            boq_entries: Vec::new(),
+            boq_selected_index: 0,
+            boq_show_header: false,
+        };
+        let _ = obj.boq_summary();
+        assert_eq!(obj.boq_peek_line, 0);
+    }
+
+    #[test]
+    fn test_boq_peek_column() {
+        let obj = PeekView {
+            boq_peek_uri: String::from("test"),
+            boq_peek_line: 0,
+            boq_peek_column: 0,
+            boq_reference_count: 0,
+            boq_is_open: false,
+            boq_view_height: 0,
+            boq_title: String::from("test"),
+            boq_entries: Vec::new(),
+            boq_selected_index: 0,
+            boq_show_header: false,
+        };
+        let _ = obj.boq_summary();
+        assert_eq!(obj.boq_peek_column, 0);
+    }
+
+    #[test]
+    fn test_boq_reference_count() {
+        let obj = PeekView {
+            boq_peek_uri: String::from("test"),
+            boq_peek_line: 0,
+            boq_peek_column: 0,
+            boq_reference_count: 0,
+            boq_is_open: false,
+            boq_view_height: 0,
+            boq_title: String::from("test"),
+            boq_entries: Vec::new(),
+            boq_selected_index: 0,
+            boq_show_header: false,
+        };
+        let _ = obj.boq_summary();
+        assert_eq!(obj.boq_reference_count, 0);
+    }
+
+    #[test]
+    fn test_boq_is_open() {
+        let obj = PeekView {
+            boq_peek_uri: String::from("test"),
+            boq_peek_line: 0,
+            boq_peek_column: 0,
+            boq_reference_count: 0,
+            boq_is_open: false,
+            boq_view_height: 0,
+            boq_title: String::from("test"),
+            boq_entries: Vec::new(),
+            boq_selected_index: 0,
+            boq_show_header: false,
+        };
+        let _ = obj.boq_summary();
+        assert!(!obj.boq_is_open);
+    }
+
+    #[test]
+    fn test_boq_view_height() {
+        let obj = PeekView {
+            boq_peek_uri: String::from("test"),
+            boq_peek_line: 0,
+            boq_peek_column: 0,
+            boq_reference_count: 0,
+            boq_is_open: false,
+            boq_view_height: 0,
+            boq_title: String::from("test"),
+            boq_entries: Vec::new(),
+            boq_selected_index: 0,
+            boq_show_header: false,
+        };
+        let _ = obj.boq_summary();
+        assert_eq!(obj.boq_view_height, 0);
+    }
+
+    #[test]
+    fn test_boq_title() {
+        let obj = PeekView {
+            boq_peek_uri: String::from("test"),
+            boq_peek_line: 0,
+            boq_peek_column: 0,
+            boq_reference_count: 0,
+            boq_is_open: false,
+            boq_view_height: 0,
+            boq_title: String::from("test"),
+            boq_entries: Vec::new(),
+            boq_selected_index: 0,
+            boq_show_header: false,
+        };
+        let _ = obj.boq_summary();
+        assert_eq!(obj.boq_title, "test");
+    }
+
+    #[test]
+    fn test_boq_entries() {
+        let obj = PeekView {
+            boq_peek_uri: String::from("test"),
+            boq_peek_line: 0,
+            boq_peek_column: 0,
+            boq_reference_count: 0,
+            boq_is_open: false,
+            boq_view_height: 0,
+            boq_title: String::from("test"),
+            boq_entries: Vec::new(),
+            boq_selected_index: 0,
+            boq_show_header: false,
+        };
+        let _ = obj.boq_summary();
+        assert!(obj.boq_entries.is_empty());
+    }
+
+    #[test]
+    fn test_boq_selected_index() {
+        let obj = PeekView {
+            boq_peek_uri: String::from("test"),
+            boq_peek_line: 0,
+            boq_peek_column: 0,
+            boq_reference_count: 0,
+            boq_is_open: false,
+            boq_view_height: 0,
+            boq_title: String::from("test"),
+            boq_entries: Vec::new(),
+            boq_selected_index: 0,
+            boq_show_header: false,
+        };
+        let _ = obj.boq_summary();
+        assert_eq!(obj.boq_selected_index, 0);
+    }
+
+    #[test]
+    fn test_boq_show_header() {
+        let obj = PeekView {
+            boq_peek_uri: String::from("test"),
+            boq_peek_line: 0,
+            boq_peek_column: 0,
+            boq_reference_count: 0,
+            boq_is_open: false,
+            boq_view_height: 0,
+            boq_title: String::from("test"),
+            boq_entries: Vec::new(),
+            boq_selected_index: 0,
+            boq_show_header: false,
+        };
+        let _ = obj.boq_summary();
+        assert!(!obj.boq_show_header);
+    }
+
+
+    #[test]
+    fn test_bor_signature_index() {
+        let obj = ParameterHints {
+            bor_signature_index: 0,
+            bor_parameter_index: 0,
+            bor_signature_count: 0,
+            bor_active_signature_label: String::from("test"),
+            bor_active_parameter_label: String::from("test"),
+            bor_documentation: String::from("test"),
+            bor_is_retrigger: false,
+            bor_trigger_character: String::from("test"),
+            bor_context_is_active: false,
+            bor_trigger_kind: 0,
+        };
+        let _ = obj.bor_summary();
+        assert_eq!(obj.bor_signature_index, 0);
+    }
+
+    #[test]
+    fn test_bor_parameter_index() {
+        let obj = ParameterHints {
+            bor_signature_index: 0,
+            bor_parameter_index: 0,
+            bor_signature_count: 0,
+            bor_active_signature_label: String::from("test"),
+            bor_active_parameter_label: String::from("test"),
+            bor_documentation: String::from("test"),
+            bor_is_retrigger: false,
+            bor_trigger_character: String::from("test"),
+            bor_context_is_active: false,
+            bor_trigger_kind: 0,
+        };
+        let _ = obj.bor_summary();
+        assert_eq!(obj.bor_parameter_index, 0);
+    }
+
+    #[test]
+    fn test_bor_signature_count() {
+        let obj = ParameterHints {
+            bor_signature_index: 0,
+            bor_parameter_index: 0,
+            bor_signature_count: 0,
+            bor_active_signature_label: String::from("test"),
+            bor_active_parameter_label: String::from("test"),
+            bor_documentation: String::from("test"),
+            bor_is_retrigger: false,
+            bor_trigger_character: String::from("test"),
+            bor_context_is_active: false,
+            bor_trigger_kind: 0,
+        };
+        let _ = obj.bor_summary();
+        assert_eq!(obj.bor_signature_count, 0);
+    }
+
+    #[test]
+    fn test_bor_active_signature_label() {
+        let obj = ParameterHints {
+            bor_signature_index: 0,
+            bor_parameter_index: 0,
+            bor_signature_count: 0,
+            bor_active_signature_label: String::from("test"),
+            bor_active_parameter_label: String::from("test"),
+            bor_documentation: String::from("test"),
+            bor_is_retrigger: false,
+            bor_trigger_character: String::from("test"),
+            bor_context_is_active: false,
+            bor_trigger_kind: 0,
+        };
+        let _ = obj.bor_summary();
+        assert_eq!(obj.bor_active_signature_label, "test");
+    }
+
+    #[test]
+    fn test_bor_active_parameter_label() {
+        let obj = ParameterHints {
+            bor_signature_index: 0,
+            bor_parameter_index: 0,
+            bor_signature_count: 0,
+            bor_active_signature_label: String::from("test"),
+            bor_active_parameter_label: String::from("test"),
+            bor_documentation: String::from("test"),
+            bor_is_retrigger: false,
+            bor_trigger_character: String::from("test"),
+            bor_context_is_active: false,
+            bor_trigger_kind: 0,
+        };
+        let _ = obj.bor_summary();
+        assert_eq!(obj.bor_active_parameter_label, "test");
+    }
+
+    #[test]
+    fn test_bor_documentation() {
+        let obj = ParameterHints {
+            bor_signature_index: 0,
+            bor_parameter_index: 0,
+            bor_signature_count: 0,
+            bor_active_signature_label: String::from("test"),
+            bor_active_parameter_label: String::from("test"),
+            bor_documentation: String::from("test"),
+            bor_is_retrigger: false,
+            bor_trigger_character: String::from("test"),
+            bor_context_is_active: false,
+            bor_trigger_kind: 0,
+        };
+        let _ = obj.bor_summary();
+        assert_eq!(obj.bor_documentation, "test");
+    }
+
+    #[test]
+    fn test_bor_is_retrigger() {
+        let obj = ParameterHints {
+            bor_signature_index: 0,
+            bor_parameter_index: 0,
+            bor_signature_count: 0,
+            bor_active_signature_label: String::from("test"),
+            bor_active_parameter_label: String::from("test"),
+            bor_documentation: String::from("test"),
+            bor_is_retrigger: false,
+            bor_trigger_character: String::from("test"),
+            bor_context_is_active: false,
+            bor_trigger_kind: 0,
+        };
+        let _ = obj.bor_summary();
+        assert!(!obj.bor_is_retrigger);
+    }
+
+    #[test]
+    fn test_bor_trigger_character() {
+        let obj = ParameterHints {
+            bor_signature_index: 0,
+            bor_parameter_index: 0,
+            bor_signature_count: 0,
+            bor_active_signature_label: String::from("test"),
+            bor_active_parameter_label: String::from("test"),
+            bor_documentation: String::from("test"),
+            bor_is_retrigger: false,
+            bor_trigger_character: String::from("test"),
+            bor_context_is_active: false,
+            bor_trigger_kind: 0,
+        };
+        let _ = obj.bor_summary();
+        assert_eq!(obj.bor_trigger_character, "test");
+    }
+
+    #[test]
+    fn test_bor_context_is_active() {
+        let obj = ParameterHints {
+            bor_signature_index: 0,
+            bor_parameter_index: 0,
+            bor_signature_count: 0,
+            bor_active_signature_label: String::from("test"),
+            bor_active_parameter_label: String::from("test"),
+            bor_documentation: String::from("test"),
+            bor_is_retrigger: false,
+            bor_trigger_character: String::from("test"),
+            bor_context_is_active: false,
+            bor_trigger_kind: 0,
+        };
+        let _ = obj.bor_summary();
+        assert!(!obj.bor_context_is_active);
+    }
+
+    #[test]
+    fn test_bor_trigger_kind() {
+        let obj = ParameterHints {
+            bor_signature_index: 0,
+            bor_parameter_index: 0,
+            bor_signature_count: 0,
+            bor_active_signature_label: String::from("test"),
+            bor_active_parameter_label: String::from("test"),
+            bor_documentation: String::from("test"),
+            bor_is_retrigger: false,
+            bor_trigger_character: String::from("test"),
+            bor_context_is_active: false,
+            bor_trigger_kind: 0,
+        };
+        let _ = obj.bor_summary();
+        assert_eq!(obj.bor_trigger_kind, 0);
+    }
+
+
+    #[test]
+    fn test_bos_link_text() {
+        let obj = LinkDetector {
+            bos_link_text: String::from("test"),
+            bos_link_uri: String::from("test"),
+            bos_link_start_col: 0,
+            bos_link_end_col: 0,
+            bos_link_line: 0,
+            bos_is_web_link: false,
+            bos_is_file_link: false,
+            bos_tooltip: String::from("test"),
+            bos_provider_id: String::from("test"),
+            bos_is_trusted: false,
+        };
+        let _ = obj.bos_summary();
+        assert_eq!(obj.bos_link_text, "test");
+    }
+
+    #[test]
+    fn test_bos_link_uri() {
+        let obj = LinkDetector {
+            bos_link_text: String::from("test"),
+            bos_link_uri: String::from("test"),
+            bos_link_start_col: 0,
+            bos_link_end_col: 0,
+            bos_link_line: 0,
+            bos_is_web_link: false,
+            bos_is_file_link: false,
+            bos_tooltip: String::from("test"),
+            bos_provider_id: String::from("test"),
+            bos_is_trusted: false,
+        };
+        let _ = obj.bos_summary();
+        assert_eq!(obj.bos_link_uri, "test");
+    }
+
+    #[test]
+    fn test_bos_link_start_col() {
+        let obj = LinkDetector {
+            bos_link_text: String::from("test"),
+            bos_link_uri: String::from("test"),
+            bos_link_start_col: 0,
+            bos_link_end_col: 0,
+            bos_link_line: 0,
+            bos_is_web_link: false,
+            bos_is_file_link: false,
+            bos_tooltip: String::from("test"),
+            bos_provider_id: String::from("test"),
+            bos_is_trusted: false,
+        };
+        let _ = obj.bos_summary();
+        assert_eq!(obj.bos_link_start_col, 0);
+    }
+
+    #[test]
+    fn test_bos_link_end_col() {
+        let obj = LinkDetector {
+            bos_link_text: String::from("test"),
+            bos_link_uri: String::from("test"),
+            bos_link_start_col: 0,
+            bos_link_end_col: 0,
+            bos_link_line: 0,
+            bos_is_web_link: false,
+            bos_is_file_link: false,
+            bos_tooltip: String::from("test"),
+            bos_provider_id: String::from("test"),
+            bos_is_trusted: false,
+        };
+        let _ = obj.bos_summary();
+        assert_eq!(obj.bos_link_end_col, 0);
+    }
+
+    #[test]
+    fn test_bos_link_line() {
+        let obj = LinkDetector {
+            bos_link_text: String::from("test"),
+            bos_link_uri: String::from("test"),
+            bos_link_start_col: 0,
+            bos_link_end_col: 0,
+            bos_link_line: 0,
+            bos_is_web_link: false,
+            bos_is_file_link: false,
+            bos_tooltip: String::from("test"),
+            bos_provider_id: String::from("test"),
+            bos_is_trusted: false,
+        };
+        let _ = obj.bos_summary();
+        assert_eq!(obj.bos_link_line, 0);
+    }
+
+    #[test]
+    fn test_bos_is_web_link() {
+        let obj = LinkDetector {
+            bos_link_text: String::from("test"),
+            bos_link_uri: String::from("test"),
+            bos_link_start_col: 0,
+            bos_link_end_col: 0,
+            bos_link_line: 0,
+            bos_is_web_link: false,
+            bos_is_file_link: false,
+            bos_tooltip: String::from("test"),
+            bos_provider_id: String::from("test"),
+            bos_is_trusted: false,
+        };
+        let _ = obj.bos_summary();
+        assert!(!obj.bos_is_web_link);
+    }
+
+    #[test]
+    fn test_bos_is_file_link() {
+        let obj = LinkDetector {
+            bos_link_text: String::from("test"),
+            bos_link_uri: String::from("test"),
+            bos_link_start_col: 0,
+            bos_link_end_col: 0,
+            bos_link_line: 0,
+            bos_is_web_link: false,
+            bos_is_file_link: false,
+            bos_tooltip: String::from("test"),
+            bos_provider_id: String::from("test"),
+            bos_is_trusted: false,
+        };
+        let _ = obj.bos_summary();
+        assert!(!obj.bos_is_file_link);
+    }
+
+    #[test]
+    fn test_bos_tooltip() {
+        let obj = LinkDetector {
+            bos_link_text: String::from("test"),
+            bos_link_uri: String::from("test"),
+            bos_link_start_col: 0,
+            bos_link_end_col: 0,
+            bos_link_line: 0,
+            bos_is_web_link: false,
+            bos_is_file_link: false,
+            bos_tooltip: String::from("test"),
+            bos_provider_id: String::from("test"),
+            bos_is_trusted: false,
+        };
+        let _ = obj.bos_summary();
+        assert_eq!(obj.bos_tooltip, "test");
+    }
+
+    #[test]
+    fn test_bos_provider_id() {
+        let obj = LinkDetector {
+            bos_link_text: String::from("test"),
+            bos_link_uri: String::from("test"),
+            bos_link_start_col: 0,
+            bos_link_end_col: 0,
+            bos_link_line: 0,
+            bos_is_web_link: false,
+            bos_is_file_link: false,
+            bos_tooltip: String::from("test"),
+            bos_provider_id: String::from("test"),
+            bos_is_trusted: false,
+        };
+        let _ = obj.bos_summary();
+        assert_eq!(obj.bos_provider_id, "test");
+    }
+
+    #[test]
+    fn test_bos_is_trusted() {
+        let obj = LinkDetector {
+            bos_link_text: String::from("test"),
+            bos_link_uri: String::from("test"),
+            bos_link_start_col: 0,
+            bos_link_end_col: 0,
+            bos_link_line: 0,
+            bos_is_web_link: false,
+            bos_is_file_link: false,
+            bos_tooltip: String::from("test"),
+            bos_provider_id: String::from("test"),
+            bos_is_trusted: false,
+        };
+        let _ = obj.bos_summary();
+        assert!(!obj.bos_is_trusted);
+    }
+
+
+    #[test]
+    fn test_bot_red() {
+        let obj = ColorPicker {
+            bot_red: 0.0,
+            bot_green: 0.0,
+            bot_blue: 0.0,
+            bot_alpha: 0.0,
+            bot_color_format: String::from("test"),
+            bot_original_text: String::from("test"),
+            bot_range_start_line: 0,
+            bot_range_start_col: 0,
+            bot_range_end_line: 0,
+            bot_range_end_col: 0,
+        };
+        let _ = obj.bot_summary();
+        assert!((obj.bot_red - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_bot_green() {
+        let obj = ColorPicker {
+            bot_red: 0.0,
+            bot_green: 0.0,
+            bot_blue: 0.0,
+            bot_alpha: 0.0,
+            bot_color_format: String::from("test"),
+            bot_original_text: String::from("test"),
+            bot_range_start_line: 0,
+            bot_range_start_col: 0,
+            bot_range_end_line: 0,
+            bot_range_end_col: 0,
+        };
+        let _ = obj.bot_summary();
+        assert!((obj.bot_green - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_bot_blue() {
+        let obj = ColorPicker {
+            bot_red: 0.0,
+            bot_green: 0.0,
+            bot_blue: 0.0,
+            bot_alpha: 0.0,
+            bot_color_format: String::from("test"),
+            bot_original_text: String::from("test"),
+            bot_range_start_line: 0,
+            bot_range_start_col: 0,
+            bot_range_end_line: 0,
+            bot_range_end_col: 0,
+        };
+        let _ = obj.bot_summary();
+        assert!((obj.bot_blue - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_bot_alpha() {
+        let obj = ColorPicker {
+            bot_red: 0.0,
+            bot_green: 0.0,
+            bot_blue: 0.0,
+            bot_alpha: 0.0,
+            bot_color_format: String::from("test"),
+            bot_original_text: String::from("test"),
+            bot_range_start_line: 0,
+            bot_range_start_col: 0,
+            bot_range_end_line: 0,
+            bot_range_end_col: 0,
+        };
+        let _ = obj.bot_summary();
+        assert!((obj.bot_alpha - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_bot_color_format() {
+        let obj = ColorPicker {
+            bot_red: 0.0,
+            bot_green: 0.0,
+            bot_blue: 0.0,
+            bot_alpha: 0.0,
+            bot_color_format: String::from("test"),
+            bot_original_text: String::from("test"),
+            bot_range_start_line: 0,
+            bot_range_start_col: 0,
+            bot_range_end_line: 0,
+            bot_range_end_col: 0,
+        };
+        let _ = obj.bot_summary();
+        assert_eq!(obj.bot_color_format, "test");
+    }
+
+    #[test]
+    fn test_bot_original_text() {
+        let obj = ColorPicker {
+            bot_red: 0.0,
+            bot_green: 0.0,
+            bot_blue: 0.0,
+            bot_alpha: 0.0,
+            bot_color_format: String::from("test"),
+            bot_original_text: String::from("test"),
+            bot_range_start_line: 0,
+            bot_range_start_col: 0,
+            bot_range_end_line: 0,
+            bot_range_end_col: 0,
+        };
+        let _ = obj.bot_summary();
+        assert_eq!(obj.bot_original_text, "test");
+    }
+
+    #[test]
+    fn test_bot_range_start_line() {
+        let obj = ColorPicker {
+            bot_red: 0.0,
+            bot_green: 0.0,
+            bot_blue: 0.0,
+            bot_alpha: 0.0,
+            bot_color_format: String::from("test"),
+            bot_original_text: String::from("test"),
+            bot_range_start_line: 0,
+            bot_range_start_col: 0,
+            bot_range_end_line: 0,
+            bot_range_end_col: 0,
+        };
+        let _ = obj.bot_summary();
+        assert_eq!(obj.bot_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_bot_range_start_col() {
+        let obj = ColorPicker {
+            bot_red: 0.0,
+            bot_green: 0.0,
+            bot_blue: 0.0,
+            bot_alpha: 0.0,
+            bot_color_format: String::from("test"),
+            bot_original_text: String::from("test"),
+            bot_range_start_line: 0,
+            bot_range_start_col: 0,
+            bot_range_end_line: 0,
+            bot_range_end_col: 0,
+        };
+        let _ = obj.bot_summary();
+        assert_eq!(obj.bot_range_start_col, 0);
+    }
+
+    #[test]
+    fn test_bot_range_end_line() {
+        let obj = ColorPicker {
+            bot_red: 0.0,
+            bot_green: 0.0,
+            bot_blue: 0.0,
+            bot_alpha: 0.0,
+            bot_color_format: String::from("test"),
+            bot_original_text: String::from("test"),
+            bot_range_start_line: 0,
+            bot_range_start_col: 0,
+            bot_range_end_line: 0,
+            bot_range_end_col: 0,
+        };
+        let _ = obj.bot_summary();
+        assert_eq!(obj.bot_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_bot_range_end_col() {
+        let obj = ColorPicker {
+            bot_red: 0.0,
+            bot_green: 0.0,
+            bot_blue: 0.0,
+            bot_alpha: 0.0,
+            bot_color_format: String::from("test"),
+            bot_original_text: String::from("test"),
+            bot_range_start_line: 0,
+            bot_range_start_col: 0,
+            bot_range_end_line: 0,
+            bot_range_end_col: 0,
+        };
+        let _ = obj.bot_summary();
+        assert_eq!(obj.bot_range_end_col, 0);
     }
 
 }
