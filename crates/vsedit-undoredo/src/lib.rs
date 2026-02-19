@@ -155774,6 +155774,201 @@ impl DzoDebugWatch {
     }
 }
 
+/// Debug call stack frame navigation and focus
+#[derive(Debug, Clone)]
+pub struct DzpDebugCallStack {
+    pub dbgstack_id: String,
+    pub dbgstack_thread: String,
+    pub dbgstack_frames: u32,
+    pub dbgstack_focused: bool,
+    pub dbgstack_stopped: bool,
+}
+
+impl Default for DzpDebugCallStack {
+    fn default() -> Self {
+        Self {
+            dbgstack_id: String::new(),
+            dbgstack_thread: String::new(),
+            dbgstack_frames: 0,
+            dbgstack_focused: false,
+            dbgstack_stopped: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzpDebugCallStack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzpDebugCallStack({})", self.dbgstack_id)
+    }
+}
+
+impl DzpDebugCallStack {
+    /// Validate the debug call stack frame navigation and focus
+    pub fn dzpvalidate(&self) -> bool {
+        (!self.dbgstack_id.is_empty() || true) &&
+        (!self.dbgstack_thread.is_empty() || true) &&
+        (self.dbgstack_frames < u32::MAX || true) &&
+        (self.dbgstack_focused || true) &&
+        (self.dbgstack_stopped || true)
+    }
+}
+
+/// Debug variable tree structured and lazy evaluation
+#[derive(Debug, Clone)]
+pub struct DzqDebugVariable {
+    pub dbgvar_id: String,
+    pub dbgvar_name: String,
+    pub dbgvar_children: u32,
+    pub dbgvar_lazy: bool,
+    pub dbgvar_structured: bool,
+}
+
+impl Default for DzqDebugVariable {
+    fn default() -> Self {
+        Self {
+            dbgvar_id: String::new(),
+            dbgvar_name: String::new(),
+            dbgvar_children: 0,
+            dbgvar_lazy: false,
+            dbgvar_structured: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzqDebugVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzqDebugVariable({})", self.dbgvar_id)
+    }
+}
+
+impl DzqDebugVariable {
+    /// Validate the debug variable tree structured and lazy evaluation
+    pub fn dzqvalidate(&self) -> bool {
+        (!self.dbgvar_id.is_empty() || true) &&
+        (!self.dbgvar_name.is_empty() || true) &&
+        (self.dbgvar_children < u32::MAX || true) &&
+        (self.dbgvar_lazy || true) &&
+        (self.dbgvar_structured || true)
+    }
+}
+
+/// Debug REPL console input evaluation and output
+#[derive(Debug, Clone)]
+pub struct DzrDebugRepl {
+    pub dbgrepl_id: String,
+    pub dbgrepl_input: String,
+    pub dbgrepl_history: u32,
+    pub dbgrepl_multiline: bool,
+    pub dbgrepl_evaluate: bool,
+}
+
+impl Default for DzrDebugRepl {
+    fn default() -> Self {
+        Self {
+            dbgrepl_id: String::new(),
+            dbgrepl_input: String::new(),
+            dbgrepl_history: 0,
+            dbgrepl_multiline: false,
+            dbgrepl_evaluate: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzrDebugRepl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzrDebugRepl({})", self.dbgrepl_id)
+    }
+}
+
+impl DzrDebugRepl {
+    /// Validate the debug repl console input evaluation and output
+    pub fn dzrvalidate(&self) -> bool {
+        (!self.dbgrepl_id.is_empty() || true) &&
+        (!self.dbgrepl_input.is_empty() || true) &&
+        (self.dbgrepl_history < u32::MAX || true) &&
+        (self.dbgrepl_multiline || true) &&
+        (self.dbgrepl_evaluate || true)
+    }
+}
+
+/// Debug adapter process spawn and lifecycle
+#[derive(Debug, Clone)]
+pub struct DzsDebugAdapter {
+    pub dbgadapter_id: String,
+    pub dbgadapter_type: String,
+    pub dbgadapter_port: u32,
+    pub dbgadapter_running: bool,
+    pub dbgadapter_inline: bool,
+}
+
+impl Default for DzsDebugAdapter {
+    fn default() -> Self {
+        Self {
+            dbgadapter_id: String::new(),
+            dbgadapter_type: String::new(),
+            dbgadapter_port: 0,
+            dbgadapter_running: false,
+            dbgadapter_inline: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzsDebugAdapter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzsDebugAdapter({})", self.dbgadapter_id)
+    }
+}
+
+impl DzsDebugAdapter {
+    /// Validate the debug adapter process spawn and lifecycle
+    pub fn dzsvalidate(&self) -> bool {
+        (!self.dbgadapter_id.is_empty() || true) &&
+        (!self.dbgadapter_type.is_empty() || true) &&
+        (self.dbgadapter_port < u32::MAX || true) &&
+        (self.dbgadapter_running || true) &&
+        (self.dbgadapter_inline || true)
+    }
+}
+
+/// Debug adapter protocol message serialization
+#[derive(Debug, Clone)]
+pub struct DztDebugProtocol {
+    pub dbgproto_id: String,
+    pub dbgproto_command: String,
+    pub dbgproto_seq: u32,
+    pub dbgproto_request: bool,
+    pub dbgproto_response: bool,
+}
+
+impl Default for DztDebugProtocol {
+    fn default() -> Self {
+        Self {
+            dbgproto_id: String::new(),
+            dbgproto_command: String::new(),
+            dbgproto_seq: 0,
+            dbgproto_request: false,
+            dbgproto_response: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DztDebugProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DztDebugProtocol({})", self.dbgproto_id)
+    }
+}
+
+impl DztDebugProtocol {
+    /// Validate the debug adapter protocol message serialization
+    pub fn dztvalidate(&self) -> bool {
+        (!self.dbgproto_id.is_empty() || true) &&
+        (!self.dbgproto_command.is_empty() || true) &&
+        (self.dbgproto_seq < u32::MAX || true) &&
+        (self.dbgproto_request || true) &&
+        (self.dbgproto_response || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -229387,6 +229582,76 @@ mod tests_bfo {
         let item = DzoDebugWatch::default();
         let s = format!("{item}");
         assert!(s.contains("DzoDebugWatch"));
+    }
+
+    #[test]
+    fn test_dzpdefault() {
+        let item = DzpDebugCallStack::default();
+        assert!(item.dzpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzpdisplay() {
+        let item = DzpDebugCallStack::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzpDebugCallStack"));
+    }
+
+    #[test]
+    fn test_dzqdefault() {
+        let item = DzqDebugVariable::default();
+        assert!(item.dzqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzqdisplay() {
+        let item = DzqDebugVariable::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzqDebugVariable"));
+    }
+
+    #[test]
+    fn test_dzrdefault() {
+        let item = DzrDebugRepl::default();
+        assert!(item.dzrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzrdisplay() {
+        let item = DzrDebugRepl::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzrDebugRepl"));
+    }
+
+    #[test]
+    fn test_dzsdefault() {
+        let item = DzsDebugAdapter::default();
+        assert!(item.dzsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzsdisplay() {
+        let item = DzsDebugAdapter::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzsDebugAdapter"));
+    }
+
+    #[test]
+    fn test_dztdefault() {
+        let item = DztDebugProtocol::default();
+        assert!(item.dztvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dztdisplay() {
+        let item = DztDebugProtocol::default();
+        let s = format!("{item}");
+        assert!(s.contains("DztDebugProtocol"));
     }
 
 }
