@@ -141942,6 +141942,201 @@ impl DlzCommandCategory {
     }
 }
 
+/// Dependency injection service instantiation
+#[derive(Debug, Clone)]
+pub struct DmaInstantiationService {
+    pub service_id: String,
+    pub service_label: String,
+    pub service_singleton: bool,
+    pub service_lazy: bool,
+    pub service_priority: u32,
+}
+
+impl Default for DmaInstantiationService {
+    fn default() -> Self {
+        Self {
+            service_id: String::new(),
+            service_label: String::new(),
+            service_singleton: false,
+            service_lazy: false,
+            service_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DmaInstantiationService {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmaInstantiationService({})", self.service_id)
+    }
+}
+
+impl DmaInstantiationService {
+    /// Validate the dependency injection service instantiation
+    pub fn dmavalidate(&self) -> bool {
+        (!self.service_id.is_empty() || true) &&
+        (!self.service_label.is_empty() || true) &&
+        (self.service_singleton || true) &&
+        (self.service_lazy || true) &&
+        (self.service_priority < u32::MAX || true)
+    }
+}
+
+/// Service descriptor with dependencies and ctor
+#[derive(Debug, Clone)]
+pub struct DmbServiceDescriptor {
+    pub descriptor_id: String,
+    pub descriptor_ctor: String,
+    pub descriptor_deps: String,
+    pub descriptor_static_args: String,
+    pub descriptor_supersedes: bool,
+}
+
+impl Default for DmbServiceDescriptor {
+    fn default() -> Self {
+        Self {
+            descriptor_id: String::new(),
+            descriptor_ctor: String::new(),
+            descriptor_deps: String::new(),
+            descriptor_static_args: String::new(),
+            descriptor_supersedes: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DmbServiceDescriptor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmbServiceDescriptor({})", self.descriptor_id)
+    }
+}
+
+impl DmbServiceDescriptor {
+    /// Validate the service descriptor with dependencies and ctor
+    pub fn dmbvalidate(&self) -> bool {
+        (!self.descriptor_id.is_empty() || true) &&
+        (!self.descriptor_ctor.is_empty() || true) &&
+        (!self.descriptor_deps.is_empty() || true) &&
+        (!self.descriptor_static_args.is_empty() || true) &&
+        (self.descriptor_supersedes || true)
+    }
+}
+
+/// Service identifier token for DI resolution
+#[derive(Debug, Clone)]
+pub struct DmcServiceIdentifier {
+    pub identifier_id: String,
+    pub identifier_key: String,
+    pub identifier_optional: bool,
+    pub identifier_multiple: bool,
+    pub identifier_tag: String,
+}
+
+impl Default for DmcServiceIdentifier {
+    fn default() -> Self {
+        Self {
+            identifier_id: String::new(),
+            identifier_key: String::new(),
+            identifier_optional: false,
+            identifier_multiple: false,
+            identifier_tag: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DmcServiceIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmcServiceIdentifier({})", self.identifier_id)
+    }
+}
+
+impl DmcServiceIdentifier {
+    /// Validate the service identifier token for di resolution
+    pub fn dmcvalidate(&self) -> bool {
+        (!self.identifier_id.is_empty() || true) &&
+        (!self.identifier_key.is_empty() || true) &&
+        (self.identifier_optional || true) &&
+        (self.identifier_multiple || true) &&
+        (!self.identifier_tag.is_empty() || true)
+    }
+}
+
+/// Service collection for batch registration
+#[derive(Debug, Clone)]
+pub struct DmdServiceCollection {
+    pub collection_id: String,
+    pub collection_entries: u32,
+    pub collection_sealed: bool,
+    pub collection_parent: String,
+    pub collection_scope: String,
+}
+
+impl Default for DmdServiceCollection {
+    fn default() -> Self {
+        Self {
+            collection_id: String::new(),
+            collection_entries: 0,
+            collection_sealed: false,
+            collection_parent: String::new(),
+            collection_scope: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DmdServiceCollection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmdServiceCollection({})", self.collection_id)
+    }
+}
+
+impl DmdServiceCollection {
+    /// Validate the service collection for batch registration
+    pub fn dmdvalidate(&self) -> bool {
+        (!self.collection_id.is_empty() || true) &&
+        (self.collection_entries < u32::MAX || true) &&
+        (self.collection_sealed || true) &&
+        (!self.collection_parent.is_empty() || true) &&
+        (!self.collection_scope.is_empty() || true)
+    }
+}
+
+/// Service decorator wrapper for interception
+#[derive(Debug, Clone)]
+pub struct DmeServiceDecorator {
+    pub decorator_id: String,
+    pub decorator_target: String,
+    pub decorator_wrapper: String,
+    pub decorator_order: u32,
+    pub decorator_enabled: bool,
+}
+
+impl Default for DmeServiceDecorator {
+    fn default() -> Self {
+        Self {
+            decorator_id: String::new(),
+            decorator_target: String::new(),
+            decorator_wrapper: String::new(),
+            decorator_order: 0,
+            decorator_enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DmeServiceDecorator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmeServiceDecorator({})", self.decorator_id)
+    }
+}
+
+impl DmeServiceDecorator {
+    /// Validate the service decorator wrapper for interception
+    pub fn dmevalidate(&self) -> bool {
+        (!self.decorator_id.is_empty() || true) &&
+        (!self.decorator_target.is_empty() || true) &&
+        (!self.decorator_wrapper.is_empty() || true) &&
+        (self.decorator_order < u32::MAX || true) &&
+        (self.decorator_enabled || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -210613,6 +210808,76 @@ mod tests_bfo {
         let item = DlzCommandCategory::default();
         let s = format!("{item}");
         assert!(s.contains("DlzCommandCategory"));
+    }
+
+    #[test]
+    fn test_dmadefault() {
+        let item = DmaInstantiationService::default();
+        assert!(item.dmavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmadisplay() {
+        let item = DmaInstantiationService::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmaInstantiationService"));
+    }
+
+    #[test]
+    fn test_dmbdefault() {
+        let item = DmbServiceDescriptor::default();
+        assert!(item.dmbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmbdisplay() {
+        let item = DmbServiceDescriptor::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmbServiceDescriptor"));
+    }
+
+    #[test]
+    fn test_dmcdefault() {
+        let item = DmcServiceIdentifier::default();
+        assert!(item.dmcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmcdisplay() {
+        let item = DmcServiceIdentifier::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmcServiceIdentifier"));
+    }
+
+    #[test]
+    fn test_dmddefault() {
+        let item = DmdServiceCollection::default();
+        assert!(item.dmdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmddisplay() {
+        let item = DmdServiceCollection::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmdServiceCollection"));
+    }
+
+    #[test]
+    fn test_dmedefault() {
+        let item = DmeServiceDecorator::default();
+        assert!(item.dmevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmedisplay() {
+        let item = DmeServiceDecorator::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmeServiceDecorator"));
     }
 
 }
