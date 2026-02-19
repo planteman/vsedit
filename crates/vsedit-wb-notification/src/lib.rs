@@ -84908,6 +84908,242 @@ impl BitConfigResolver {
     pub fn key_count(&self) -> usize { self.values.len() }
 }
 
+
+/// Clipboard entry kind (biu_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BiuClipboardKind {
+    Text(String),
+    FilePaths(Vec<String>),
+}
+
+/// Clipboard entry (biu_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BiuClipboardEntry {
+    pub content: BiuClipboardKind,
+    pub timestamp: u64,
+}
+
+/// Clipboard service (biu_)
+#[derive(Debug, Clone)]
+pub struct BiuClipboardService {
+    pub current: Option<BiuClipboardEntry>,
+    pub history: Vec<BiuClipboardEntry>,
+    pub max_history: usize,
+}
+
+impl BiuClipboardService {
+    pub fn new(max_history: usize) -> Self {
+        Self { current: None, history: Vec::new(), max_history }
+    }
+    pub fn write_text(&mut self, text: String, ts: u64) {
+        let entry = BiuClipboardEntry { content: BiuClipboardKind::Text(text), timestamp: ts };
+        if let Some(old) = self.current.replace(entry.clone()) { self.push_history(old); }
+    }
+    pub fn write_files(&mut self, paths: Vec<String>, ts: u64) {
+        let entry = BiuClipboardEntry { content: BiuClipboardKind::FilePaths(paths), timestamp: ts };
+        if let Some(old) = self.current.replace(entry.clone()) { self.push_history(old); }
+    }
+    fn push_history(&mut self, entry: BiuClipboardEntry) {
+        self.history.insert(0, entry);
+        if self.history.len() > self.max_history { self.history.pop(); }
+    }
+    pub fn read_text(&self) -> Option<&str> {
+        match &self.current { Some(BiuClipboardEntry { content: BiuClipboardKind::Text(t), .. }) => Some(t), _ => None }
+    }
+    pub fn read_files(&self) -> Option<&[String]> {
+        match &self.current { Some(BiuClipboardEntry { content: BiuClipboardKind::FilePaths(p), .. }) => Some(p), _ => None }
+    }
+    pub fn history_len(&self) -> usize { self.history.len() }
+    pub fn clear_history(&mut self) { self.history.clear(); }
+}
+
+
+/// URI handler entry (biv_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BivUriHandler {
+    pub scheme: String,
+    pub authority: Option<String>,
+}
+
+/// URI handler service (biv_)
+#[derive(Debug, Clone)]
+pub struct BivUriService {
+    pub handlers: Vec<BivUriHandler>,
+    pub opened_uris: Vec<String>,
+}
+
+impl BivUriService {
+    pub fn new() -> Self { Self { handlers: Vec::new(), opened_uris: Vec::new() } }
+    pub fn register_handler(&mut self, h: BivUriHandler) {
+        if !self.handlers.iter().any(|x| x.scheme == h.scheme && x.authority == h.authority) {
+            self.handlers.push(h);
+        }
+    }
+    pub fn has_handler(&self, scheme: &str) -> bool {
+        self.handlers.iter().any(|h| h.scheme == scheme)
+    }
+    pub fn open_external(&mut self, uri: String) { self.opened_uris.push(uri); }
+    pub fn resolve(&self, uri: &str) -> Option<&BivUriHandler> {
+        let scheme = uri.split(':').next()?;
+        self.handlers.iter().find(|h| h.scheme == scheme)
+    }
+    pub fn handler_count(&self) -> usize { self.handlers.len() }
+    pub fn opened_count(&self) -> usize { self.opened_uris.len() }
+}
+
+
+/// Auth account (biw_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BiwAuthAccount {
+    pub id: String,
+    pub label: String,
+}
+
+/// Auth session (biw_)
+#[derive(Debug, Clone)]
+pub struct BiwAuthSession {
+    pub id: String,
+    pub provider_id: String,
+    pub account: BiwAuthAccount,
+    pub scopes: Vec<String>,
+    pub access_token: String,
+}
+
+/// Auth service (biw_)
+#[derive(Debug, Clone)]
+pub struct BiwAuthService {
+    pub providers: Vec<String>,
+    pub sessions: Vec<BiwAuthSession>,
+}
+
+impl BiwAuthService {
+    pub fn new() -> Self { Self { providers: Vec::new(), sessions: Vec::new() } }
+    pub fn register_provider(&mut self, id: String) {
+        if !self.providers.contains(&id) { self.providers.push(id); }
+    }
+    pub fn create_session(&mut self, session: BiwAuthSession) { self.sessions.push(session); }
+    pub fn remove_session(&mut self, session_id: &str) { self.sessions.retain(|s| s.id != session_id); }
+    pub fn get_session(&self, provider: &str, scopes: &[String]) -> Option<&BiwAuthSession> {
+        self.sessions.iter().find(|s| s.provider_id == provider && scopes.iter().all(|sc| s.scopes.contains(sc)))
+    }
+    pub fn sessions_for_provider(&self, provider: &str) -> Vec<&BiwAuthSession> {
+        self.sessions.iter().filter(|s| s.provider_id == provider).collect()
+    }
+    pub fn has_provider(&self, id: &str) -> bool { self.providers.contains(&id.to_string()) }
+    pub fn session_count(&self) -> usize { self.sessions.len() }
+}
+
+
+/// Trust state (bix_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BixTrustState {
+    Trusted,
+    Untrusted,
+    Unknown,
+}
+
+/// Trust request (bix_)
+#[derive(Debug, Clone)]
+pub struct BixTrustRequest {
+    pub workspace_uri: String,
+    pub reason: String,
+}
+
+/// Workspace trust service (bix_)
+#[derive(Debug, Clone)]
+pub struct BixWorkspaceTrust {
+    pub state: BixTrustState,
+    pub trusted_uris: Vec<String>,
+    pub pending_requests: Vec<BixTrustRequest>,
+    pub restricted_mode: bool,
+}
+
+impl BixWorkspaceTrust {
+    pub fn new() -> Self {
+        Self { state: BixTrustState::Unknown, trusted_uris: Vec::new(), pending_requests: Vec::new(), restricted_mode: false }
+    }
+    pub fn grant_trust(&mut self, uri: String) {
+        if !self.trusted_uris.contains(&uri) { self.trusted_uris.push(uri); }
+        self.state = BixTrustState::Trusted;
+        self.restricted_mode = false;
+    }
+    pub fn deny_trust(&mut self) {
+        self.state = BixTrustState::Untrusted;
+        self.restricted_mode = true;
+    }
+    pub fn request_trust(&mut self, req: BixTrustRequest) { self.pending_requests.push(req); }
+    pub fn is_trusted(&self) -> bool { self.state == BixTrustState::Trusted }
+    pub fn is_uri_trusted(&self, uri: &str) -> bool { self.trusted_uris.iter().any(|u| u == uri) }
+    pub fn pending_count(&self) -> usize { self.pending_requests.len() }
+    pub fn clear_pending(&mut self) { self.pending_requests.clear(); }
+}
+
+
+/// Layout visibility state (biy_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BiyLayoutState {
+    pub sidebar_visible: bool,
+    pub sidebar_position: String,
+    pub panel_visible: bool,
+    pub panel_position: String,
+    pub activity_bar_visible: bool,
+    pub status_bar_visible: bool,
+    pub minimap_visible: bool,
+    pub breadcrumbs_visible: bool,
+    pub editor_area_visible: bool,
+}
+
+impl BiyLayoutState {
+    pub fn default_layout() -> Self {
+        Self { sidebar_visible: true, sidebar_position: "left".into(), panel_visible: true, panel_position: "bottom".into(), activity_bar_visible: true, status_bar_visible: true, minimap_visible: true, breadcrumbs_visible: true, editor_area_visible: true }
+    }
+    pub fn zen_mode() -> Self {
+        Self { sidebar_visible: false, sidebar_position: "left".into(), panel_visible: false, panel_position: "bottom".into(), activity_bar_visible: false, status_bar_visible: false, minimap_visible: false, breadcrumbs_visible: false, editor_area_visible: true }
+    }
+    pub fn toggle_sidebar(&mut self) { self.sidebar_visible = !self.sidebar_visible; }
+    pub fn toggle_panel(&mut self) { self.panel_visible = !self.panel_visible; }
+    pub fn toggle_minimap(&mut self) { self.minimap_visible = !self.minimap_visible; }
+    pub fn set_sidebar_position(&mut self, pos: String) { self.sidebar_position = pos; }
+    pub fn set_panel_position(&mut self, pos: String) { self.panel_position = pos; }
+    pub fn is_full_editor(&self) -> bool { !self.sidebar_visible && !self.panel_visible }
+}
+
+
+/// Backup entry (biz_)
+#[derive(Debug, Clone)]
+pub struct BizBackupEntry {
+    pub uri: String,
+    pub content: String,
+    pub version: u64,
+    pub timestamp: u64,
+}
+
+/// Backup service (biz_)
+#[derive(Debug, Clone)]
+pub struct BizBackupService {
+    pub entries: Vec<BizBackupEntry>,
+    pub backup_dir: String,
+    pub enabled: bool,
+}
+
+impl BizBackupService {
+    pub fn new(dir: String) -> Self { Self { entries: Vec::new(), backup_dir: dir, enabled: true } }
+    pub fn backup(&mut self, entry: BizBackupEntry) {
+        if !self.enabled { return; }
+        self.entries.retain(|e| e.uri != entry.uri);
+        self.entries.push(entry);
+    }
+    pub fn restore(&self, uri: &str) -> Option<&BizBackupEntry> {
+        self.entries.iter().find(|e| e.uri == uri)
+    }
+    pub fn remove_backup(&mut self, uri: &str) { self.entries.retain(|e| e.uri != uri); }
+    pub fn cleanup(&mut self) { self.entries.clear(); }
+    pub fn set_enabled(&mut self, enabled: bool) { self.enabled = enabled; }
+    pub fn has_backup(&self, uri: &str) -> bool { self.entries.iter().any(|e| e.uri == uri) }
+    pub fn backup_count(&self) -> usize { self.entries.len() }
+    pub fn all_uris(&self) -> Vec<&str> { self.entries.iter().map(|e| e.uri.as_str()).collect() }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -91837,6 +92073,396 @@ mod tests_bfo {
         r.set("k".into(), "old".into(), BitConfigScope::User);
         r.set("k".into(), "new".into(), BitConfigScope::User);
         assert_eq!(r.get_at_scope("k", &BitConfigScope::User), Some("new"));
+    }
+
+
+    #[test]
+    fn test_biu_clipboard_new() {
+        let c = BiuClipboardService::new(10);
+        assert!(c.current.is_none());
+        assert_eq!(c.history_len(), 0);
+    }
+    #[test]
+    fn test_biu_write_read_text() {
+        let mut c = BiuClipboardService::new(10);
+        c.write_text("hello".into(), 100);
+        assert_eq!(c.read_text(), Some("hello"));
+    }
+    #[test]
+    fn test_biu_write_read_files() {
+        let mut c = BiuClipboardService::new(10);
+        c.write_files(vec!["/a.rs".into(), "/b.rs".into()], 100);
+        assert_eq!(c.read_files().unwrap().len(), 2);
+    }
+    #[test]
+    fn test_biu_history() {
+        let mut c = BiuClipboardService::new(10);
+        c.write_text("first".into(), 100);
+        c.write_text("second".into(), 200);
+        assert_eq!(c.history_len(), 1);
+        assert_eq!(c.read_text(), Some("second"));
+    }
+    #[test]
+    fn test_biu_max_history() {
+        let mut c = BiuClipboardService::new(3);
+        for i in 0..5 {
+            c.write_text(format!("t{i}"), i as u64);
+        }
+        assert_eq!(c.history_len(), 3);
+    }
+    #[test]
+    fn test_biu_clear_history() {
+        let mut c = BiuClipboardService::new(10);
+        c.write_text("a".into(), 1);
+        c.write_text("b".into(), 2);
+        c.clear_history();
+        assert_eq!(c.history_len(), 0);
+    }
+    #[test]
+    fn test_biu_read_text_when_files() {
+        let mut c = BiuClipboardService::new(10);
+        c.write_files(vec!["/f".into()], 100);
+        assert!(c.read_text().is_none());
+    }
+    #[test]
+    fn test_biu_read_files_when_text() {
+        let mut c = BiuClipboardService::new(10);
+        c.write_text("t".into(), 100);
+        assert!(c.read_files().is_none());
+    }
+    #[test]
+    fn test_biu_entry_timestamp() {
+        let e = BiuClipboardEntry { content: BiuClipboardKind::Text("x".into()), timestamp: 42 };
+        assert_eq!(e.timestamp, 42);
+    }
+    #[test]
+    fn test_biu_overwrite() {
+        let mut c = BiuClipboardService::new(10);
+        c.write_text("old".into(), 1);
+        c.write_text("new".into(), 2);
+        assert_eq!(c.read_text(), Some("new"));
+    }
+
+
+    #[test]
+    fn test_biv_uri_service_new() {
+        let s = BivUriService::new();
+        assert_eq!(s.handler_count(), 0);
+    }
+    #[test]
+    fn test_biv_register_handler() {
+        let mut s = BivUriService::new();
+        s.register_handler(BivUriHandler { scheme: "vscode".into(), authority: None });
+        assert_eq!(s.handler_count(), 1);
+    }
+    #[test]
+    fn test_biv_has_handler() {
+        let mut s = BivUriService::new();
+        s.register_handler(BivUriHandler { scheme: "http".into(), authority: None });
+        assert!(s.has_handler("http"));
+        assert!(!s.has_handler("ftp"));
+    }
+    #[test]
+    fn test_biv_open_external() {
+        let mut s = BivUriService::new();
+        s.open_external("https://github.com".into());
+        assert_eq!(s.opened_count(), 1);
+    }
+    #[test]
+    fn test_biv_resolve() {
+        let mut s = BivUriService::new();
+        s.register_handler(BivUriHandler { scheme: "vscode".into(), authority: Some("ext".into()) });
+        assert!(s.resolve("vscode://ext/command").is_some());
+    }
+    #[test]
+    fn test_biv_resolve_unknown() {
+        let s = BivUriService::new();
+        assert!(s.resolve("unknown://x").is_none());
+    }
+    #[test]
+    fn test_biv_no_duplicate() {
+        let mut s = BivUriService::new();
+        s.register_handler(BivUriHandler { scheme: "vscode".into(), authority: None });
+        s.register_handler(BivUriHandler { scheme: "vscode".into(), authority: None });
+        assert_eq!(s.handler_count(), 1);
+    }
+    #[test]
+    fn test_biv_different_authority() {
+        let mut s = BivUriService::new();
+        s.register_handler(BivUriHandler { scheme: "vscode".into(), authority: Some("a".into()) });
+        s.register_handler(BivUriHandler { scheme: "vscode".into(), authority: Some("b".into()) });
+        assert_eq!(s.handler_count(), 2);
+    }
+    #[test]
+    fn test_biv_handler_fields() {
+        let h = BivUriHandler { scheme: "file".into(), authority: None };
+        assert_eq!(h.scheme, "file");
+    }
+    #[test]
+    fn test_biv_multiple_opens() {
+        let mut s = BivUriService::new();
+        s.open_external("a".into());
+        s.open_external("b".into());
+        assert_eq!(s.opened_count(), 2);
+    }
+
+
+    #[test]
+    fn test_biw_auth_new() {
+        let a = BiwAuthService::new();
+        assert_eq!(a.session_count(), 0);
+    }
+    #[test]
+    fn test_biw_register_provider() {
+        let mut a = BiwAuthService::new();
+        a.register_provider("github".into());
+        assert!(a.has_provider("github"));
+    }
+    #[test]
+    fn test_biw_create_session() {
+        let mut a = BiwAuthService::new();
+        a.create_session(BiwAuthSession { id: "s1".into(), provider_id: "github".into(), account: BiwAuthAccount { id: "u1".into(), label: "user".into() }, scopes: vec!["repo".into()], access_token: "tok".into() });
+        assert_eq!(a.session_count(), 1);
+    }
+    #[test]
+    fn test_biw_remove_session() {
+        let mut a = BiwAuthService::new();
+        a.create_session(BiwAuthSession { id: "s1".into(), provider_id: "gh".into(), account: BiwAuthAccount { id: "u".into(), label: "u".into() }, scopes: vec![], access_token: "t".into() });
+        a.remove_session("s1");
+        assert_eq!(a.session_count(), 0);
+    }
+    #[test]
+    fn test_biw_get_session_with_scopes() {
+        let mut a = BiwAuthService::new();
+        a.create_session(BiwAuthSession { id: "s1".into(), provider_id: "gh".into(), account: BiwAuthAccount { id: "u".into(), label: "u".into() }, scopes: vec!["repo".into(), "user".into()], access_token: "t".into() });
+        assert!(a.get_session("gh", &["repo".into()]).is_some());
+        assert!(a.get_session("gh", &["admin".into()]).is_none());
+    }
+    #[test]
+    fn test_biw_sessions_for_provider() {
+        let mut a = BiwAuthService::new();
+        a.create_session(BiwAuthSession { id: "s1".into(), provider_id: "gh".into(), account: BiwAuthAccount { id: "u".into(), label: "u".into() }, scopes: vec![], access_token: "t".into() });
+        a.create_session(BiwAuthSession { id: "s2".into(), provider_id: "ms".into(), account: BiwAuthAccount { id: "u".into(), label: "u".into() }, scopes: vec![], access_token: "t".into() });
+        assert_eq!(a.sessions_for_provider("gh").len(), 1);
+    }
+    #[test]
+    fn test_biw_no_dup_provider() {
+        let mut a = BiwAuthService::new();
+        a.register_provider("gh".into());
+        a.register_provider("gh".into());
+        assert_eq!(a.providers.len(), 1);
+    }
+    #[test]
+    fn test_biw_account_label() {
+        let acc = BiwAuthAccount { id: "123".into(), label: "John Doe".into() };
+        assert_eq!(acc.label, "John Doe");
+    }
+    #[test]
+    fn test_biw_no_provider() {
+        let a = BiwAuthService::new();
+        assert!(!a.has_provider("gh"));
+    }
+    #[test]
+    fn test_biw_session_token() {
+        let s = BiwAuthSession { id: "s".into(), provider_id: "p".into(), account: BiwAuthAccount { id: "u".into(), label: "u".into() }, scopes: vec![], access_token: "secret".into() };
+        assert_eq!(s.access_token, "secret");
+    }
+
+
+    #[test]
+    fn test_bix_trust_new() {
+        let t = BixWorkspaceTrust::new();
+        assert_eq!(t.state, BixTrustState::Unknown);
+        assert!(!t.restricted_mode);
+    }
+    #[test]
+    fn test_bix_grant_trust() {
+        let mut t = BixWorkspaceTrust::new();
+        t.grant_trust("/workspace".into());
+        assert!(t.is_trusted());
+        assert!(!t.restricted_mode);
+    }
+    #[test]
+    fn test_bix_deny_trust() {
+        let mut t = BixWorkspaceTrust::new();
+        t.deny_trust();
+        assert!(!t.is_trusted());
+        assert!(t.restricted_mode);
+    }
+    #[test]
+    fn test_bix_is_uri_trusted() {
+        let mut t = BixWorkspaceTrust::new();
+        t.grant_trust("/a".into());
+        assert!(t.is_uri_trusted("/a"));
+        assert!(!t.is_uri_trusted("/b"));
+    }
+    #[test]
+    fn test_bix_request_trust() {
+        let mut t = BixWorkspaceTrust::new();
+        t.request_trust(BixTrustRequest { workspace_uri: "/ws".into(), reason: "ext needs it".into() });
+        assert_eq!(t.pending_count(), 1);
+    }
+    #[test]
+    fn test_bix_clear_pending() {
+        let mut t = BixWorkspaceTrust::new();
+        t.request_trust(BixTrustRequest { workspace_uri: "/ws".into(), reason: "r".into() });
+        t.clear_pending();
+        assert_eq!(t.pending_count(), 0);
+    }
+    #[test]
+    fn test_bix_no_dup_uri() {
+        let mut t = BixWorkspaceTrust::new();
+        t.grant_trust("/a".into());
+        t.grant_trust("/a".into());
+        assert_eq!(t.trusted_uris.len(), 1);
+    }
+    #[test]
+    fn test_bix_unknown_state() {
+        let t = BixWorkspaceTrust::new();
+        assert!(!t.is_trusted());
+    }
+    #[test]
+    fn test_bix_request_reason() {
+        let r = BixTrustRequest { workspace_uri: "/ws".into(), reason: "debug needs filesystem".into() };
+        assert_eq!(r.reason, "debug needs filesystem");
+    }
+    #[test]
+    fn test_bix_multiple_trusted() {
+        let mut t = BixWorkspaceTrust::new();
+        t.grant_trust("/a".into());
+        t.grant_trust("/b".into());
+        assert_eq!(t.trusted_uris.len(), 2);
+    }
+
+
+    #[test]
+    fn test_biy_default_layout() {
+        let l = BiyLayoutState::default_layout();
+        assert!(l.sidebar_visible);
+        assert!(l.panel_visible);
+        assert!(l.minimap_visible);
+    }
+    #[test]
+    fn test_biy_zen_mode() {
+        let l = BiyLayoutState::zen_mode();
+        assert!(!l.sidebar_visible);
+        assert!(!l.panel_visible);
+        assert!(!l.minimap_visible);
+    }
+    #[test]
+    fn test_biy_toggle_sidebar() {
+        let mut l = BiyLayoutState::default_layout();
+        l.toggle_sidebar();
+        assert!(!l.sidebar_visible);
+    }
+    #[test]
+    fn test_biy_toggle_panel() {
+        let mut l = BiyLayoutState::default_layout();
+        l.toggle_panel();
+        assert!(!l.panel_visible);
+    }
+    #[test]
+    fn test_biy_toggle_minimap() {
+        let mut l = BiyLayoutState::default_layout();
+        l.toggle_minimap();
+        assert!(!l.minimap_visible);
+    }
+    #[test]
+    fn test_biy_sidebar_position() {
+        let mut l = BiyLayoutState::default_layout();
+        l.set_sidebar_position("right".into());
+        assert_eq!(l.sidebar_position, "right");
+    }
+    #[test]
+    fn test_biy_panel_position() {
+        let mut l = BiyLayoutState::default_layout();
+        l.set_panel_position("right".into());
+        assert_eq!(l.panel_position, "right");
+    }
+    #[test]
+    fn test_biy_is_full_editor() {
+        let l = BiyLayoutState::zen_mode();
+        assert!(l.is_full_editor());
+    }
+    #[test]
+    fn test_biy_not_full_editor() {
+        let l = BiyLayoutState::default_layout();
+        assert!(!l.is_full_editor());
+    }
+    #[test]
+    fn test_biy_activity_bar() {
+        let l = BiyLayoutState::default_layout();
+        assert!(l.activity_bar_visible);
+    }
+
+
+    #[test]
+    fn test_biz_backup_new() {
+        let s = BizBackupService::new("/tmp/backup".into());
+        assert_eq!(s.backup_count(), 0);
+        assert!(s.enabled);
+    }
+    #[test]
+    fn test_biz_backup_entry() {
+        let mut s = BizBackupService::new("/tmp".into());
+        s.backup(BizBackupEntry { uri: "file.rs".into(), content: "fn main() {}".into(), version: 1, timestamp: 100 });
+        assert_eq!(s.backup_count(), 1);
+    }
+    #[test]
+    fn test_biz_restore() {
+        let mut s = BizBackupService::new("/tmp".into());
+        s.backup(BizBackupEntry { uri: "f.rs".into(), content: "hello".into(), version: 1, timestamp: 100 });
+        assert_eq!(s.restore("f.rs").unwrap().content, "hello");
+    }
+    #[test]
+    fn test_biz_remove() {
+        let mut s = BizBackupService::new("/tmp".into());
+        s.backup(BizBackupEntry { uri: "f.rs".into(), content: "x".into(), version: 1, timestamp: 100 });
+        s.remove_backup("f.rs");
+        assert!(!s.has_backup("f.rs"));
+    }
+    #[test]
+    fn test_biz_cleanup() {
+        let mut s = BizBackupService::new("/tmp".into());
+        s.backup(BizBackupEntry { uri: "a".into(), content: "x".into(), version: 1, timestamp: 100 });
+        s.backup(BizBackupEntry { uri: "b".into(), content: "y".into(), version: 1, timestamp: 200 });
+        s.cleanup();
+        assert_eq!(s.backup_count(), 0);
+    }
+    #[test]
+    fn test_biz_disabled() {
+        let mut s = BizBackupService::new("/tmp".into());
+        s.set_enabled(false);
+        s.backup(BizBackupEntry { uri: "f.rs".into(), content: "x".into(), version: 1, timestamp: 100 });
+        assert_eq!(s.backup_count(), 0);
+    }
+    #[test]
+    fn test_biz_overwrite() {
+        let mut s = BizBackupService::new("/tmp".into());
+        s.backup(BizBackupEntry { uri: "f.rs".into(), content: "old".into(), version: 1, timestamp: 100 });
+        s.backup(BizBackupEntry { uri: "f.rs".into(), content: "new".into(), version: 2, timestamp: 200 });
+        assert_eq!(s.backup_count(), 1);
+        assert_eq!(s.restore("f.rs").unwrap().content, "new");
+    }
+    #[test]
+    fn test_biz_has_backup() {
+        let mut s = BizBackupService::new("/tmp".into());
+        assert!(!s.has_backup("f.rs"));
+        s.backup(BizBackupEntry { uri: "f.rs".into(), content: "x".into(), version: 1, timestamp: 100 });
+        assert!(s.has_backup("f.rs"));
+    }
+    #[test]
+    fn test_biz_all_uris() {
+        let mut s = BizBackupService::new("/tmp".into());
+        s.backup(BizBackupEntry { uri: "a.rs".into(), content: "x".into(), version: 1, timestamp: 100 });
+        s.backup(BizBackupEntry { uri: "b.rs".into(), content: "y".into(), version: 1, timestamp: 200 });
+        let uris = s.all_uris();
+        assert_eq!(uris.len(), 2);
+    }
+    #[test]
+    fn test_biz_restore_nonexistent() {
+        let s = BizBackupService::new("/tmp".into());
+        assert!(s.restore("missing").is_none());
     }
 
 }
