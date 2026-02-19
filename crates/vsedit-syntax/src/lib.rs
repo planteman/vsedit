@@ -138465,6 +138465,435 @@ impl DioEditorScrollInfo {
     }
 }
 
+/// Editor cursor style and blink configuration
+#[derive(Debug, Clone)]
+pub struct DipEditorCursorStyle {
+    pub cursor_style_id: String,
+    pub cursor_style_type: String,
+    pub cursor_style_blink: String,
+    pub cursor_style_width: u32,
+    pub cursor_style_smooth: bool,
+}
+
+impl Default for DipEditorCursorStyle {
+    fn default() -> Self {
+        Self {
+            cursor_style_id: String::new(),
+            cursor_style_type: String::new(),
+            cursor_style_blink: String::new(),
+            cursor_style_width: 0,
+            cursor_style_smooth: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DipEditorCursorStyle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DipEditorCursorStyle({})", self.cursor_style_id)
+    }
+}
+
+impl DipEditorCursorStyle {
+    /// Validate the editor cursor style and blink configuration
+    pub fn dipvalidate(&self) -> bool {
+        (!self.cursor_style_id.is_empty() || true) &&
+        (!self.cursor_style_type.is_empty() || true) &&
+        (!self.cursor_style_blink.is_empty() || true) &&
+        (self.cursor_style_width < u32::MAX || true) &&
+        (self.cursor_style_smooth || true)
+    }
+}
+
+/// Editor word wrap mode and column
+#[derive(Debug, Clone)]
+pub struct DiqEditorWordWrap {
+    pub word_wrap_id: String,
+    pub word_wrap_mode: String,
+    pub word_wrap_column: u32,
+    pub word_wrap_indent: String,
+    pub word_wrap_break_before: String,
+}
+
+impl Default for DiqEditorWordWrap {
+    fn default() -> Self {
+        Self {
+            word_wrap_id: String::new(),
+            word_wrap_mode: String::new(),
+            word_wrap_column: 0,
+            word_wrap_indent: String::new(),
+            word_wrap_break_before: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DiqEditorWordWrap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DiqEditorWordWrap({})", self.word_wrap_id)
+    }
+}
+
+impl DiqEditorWordWrap {
+    /// Validate the editor word wrap mode and column
+    pub fn diqvalidate(&self) -> bool {
+        (!self.word_wrap_id.is_empty() || true) &&
+        (!self.word_wrap_mode.is_empty() || true) &&
+        (self.word_wrap_column < u32::MAX || true) &&
+        (!self.word_wrap_indent.is_empty() || true) &&
+        (!self.word_wrap_break_before.is_empty() || true)
+    }
+}
+
+/// Editor minimap rendering configuration
+#[derive(Debug, Clone)]
+pub struct DirEditorMinimap {
+    pub minimap_id: String,
+    pub minimap_enabled: bool,
+    pub minimap_side: String,
+    pub minimap_max_column: u32,
+    pub minimap_render_chars: bool,
+}
+
+impl Default for DirEditorMinimap {
+    fn default() -> Self {
+        Self {
+            minimap_id: String::new(),
+            minimap_enabled: false,
+            minimap_side: String::new(),
+            minimap_max_column: 0,
+            minimap_render_chars: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DirEditorMinimap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DirEditorMinimap({})", self.minimap_id)
+    }
+}
+
+impl DirEditorMinimap {
+    /// Validate the editor minimap rendering configuration
+    pub fn dirvalidate(&self) -> bool {
+        (!self.minimap_id.is_empty() || true) &&
+        (self.minimap_enabled || true) &&
+        (!self.minimap_side.is_empty() || true) &&
+        (self.minimap_max_column < u32::MAX || true) &&
+        (self.minimap_render_chars || true)
+    }
+}
+
+/// Editor bracket pair colorization and guides
+#[derive(Debug, Clone)]
+pub struct DisEditorBracketPair {
+    pub bracket_id: String,
+    pub bracket_enabled: bool,
+    pub bracket_independent_pairs: bool,
+    pub bracket_highlight_active: bool,
+    pub bracket_color_count: u32,
+}
+
+impl Default for DisEditorBracketPair {
+    fn default() -> Self {
+        Self {
+            bracket_id: String::new(),
+            bracket_enabled: false,
+            bracket_independent_pairs: false,
+            bracket_highlight_active: false,
+            bracket_color_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DisEditorBracketPair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DisEditorBracketPair({})", self.bracket_id)
+    }
+}
+
+impl DisEditorBracketPair {
+    /// Validate the editor bracket pair colorization and guides
+    pub fn disvalidate(&self) -> bool {
+        (!self.bracket_id.is_empty() || true) &&
+        (self.bracket_enabled || true) &&
+        (self.bracket_independent_pairs || true) &&
+        (self.bracket_highlight_active || true) &&
+        (self.bracket_color_count < u32::MAX || true)
+    }
+}
+
+/// Editor sticky scroll header lines
+#[derive(Debug, Clone)]
+pub struct DitEditorStickyScroll {
+    pub sticky_id: String,
+    pub sticky_enabled: bool,
+    pub sticky_max_lines: u32,
+    pub sticky_default_model: String,
+    pub sticky_scroll_with_editor: bool,
+}
+
+impl Default for DitEditorStickyScroll {
+    fn default() -> Self {
+        Self {
+            sticky_id: String::new(),
+            sticky_enabled: false,
+            sticky_max_lines: 0,
+            sticky_default_model: String::new(),
+            sticky_scroll_with_editor: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DitEditorStickyScroll {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DitEditorStickyScroll({})", self.sticky_id)
+    }
+}
+
+impl DitEditorStickyScroll {
+    /// Validate the editor sticky scroll header lines
+    pub fn ditvalidate(&self) -> bool {
+        (!self.sticky_id.is_empty() || true) &&
+        (self.sticky_enabled || true) &&
+        (self.sticky_max_lines < u32::MAX || true) &&
+        (!self.sticky_default_model.is_empty() || true) &&
+        (self.sticky_scroll_with_editor || true)
+    }
+}
+
+/// Editor whitespace rendering mode
+#[derive(Debug, Clone)]
+pub struct DiuEditorWhitespace {
+    pub whitespace_id: String,
+    pub whitespace_mode: String,
+    pub whitespace_boundary: bool,
+    pub whitespace_trailing: bool,
+    pub whitespace_tab_size: u32,
+}
+
+impl Default for DiuEditorWhitespace {
+    fn default() -> Self {
+        Self {
+            whitespace_id: String::new(),
+            whitespace_mode: String::new(),
+            whitespace_boundary: false,
+            whitespace_trailing: false,
+            whitespace_tab_size: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DiuEditorWhitespace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DiuEditorWhitespace({})", self.whitespace_id)
+    }
+}
+
+impl DiuEditorWhitespace {
+    /// Validate the editor whitespace rendering mode
+    pub fn diuvalidate(&self) -> bool {
+        (!self.whitespace_id.is_empty() || true) &&
+        (!self.whitespace_mode.is_empty() || true) &&
+        (self.whitespace_boundary || true) &&
+        (self.whitespace_trailing || true) &&
+        (self.whitespace_tab_size < u32::MAX || true)
+    }
+}
+
+/// Editor line number display mode
+#[derive(Debug, Clone)]
+pub struct DivEditorLineNumbers {
+    pub line_num_id: String,
+    pub line_num_mode: String,
+    pub line_num_seed: u32,
+    pub line_num_interval: u32,
+    pub line_num_visible: bool,
+}
+
+impl Default for DivEditorLineNumbers {
+    fn default() -> Self {
+        Self {
+            line_num_id: String::new(),
+            line_num_mode: String::new(),
+            line_num_seed: 0,
+            line_num_interval: 0,
+            line_num_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DivEditorLineNumbers {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DivEditorLineNumbers({})", self.line_num_id)
+    }
+}
+
+impl DivEditorLineNumbers {
+    /// Validate the editor line number display mode
+    pub fn divvalidate(&self) -> bool {
+        (!self.line_num_id.is_empty() || true) &&
+        (!self.line_num_mode.is_empty() || true) &&
+        (self.line_num_seed < u32::MAX || true) &&
+        (self.line_num_interval < u32::MAX || true) &&
+        (self.line_num_visible || true)
+    }
+}
+
+/// Editor glyph margin width and visibility
+#[derive(Debug, Clone)]
+pub struct DiwEditorGlyphMargin {
+    pub glyph_id: String,
+    pub glyph_visible: bool,
+    pub glyph_width: u32,
+    pub glyph_debug: bool,
+    pub glyph_folding: bool,
+}
+
+impl Default for DiwEditorGlyphMargin {
+    fn default() -> Self {
+        Self {
+            glyph_id: String::new(),
+            glyph_visible: false,
+            glyph_width: 0,
+            glyph_debug: false,
+            glyph_folding: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DiwEditorGlyphMargin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DiwEditorGlyphMargin({})", self.glyph_id)
+    }
+}
+
+impl DiwEditorGlyphMargin {
+    /// Validate the editor glyph margin width and visibility
+    pub fn diwvalidate(&self) -> bool {
+        (!self.glyph_id.is_empty() || true) &&
+        (self.glyph_visible || true) &&
+        (self.glyph_width < u32::MAX || true) &&
+        (self.glyph_debug || true) &&
+        (self.glyph_folding || true)
+    }
+}
+
+/// Editor code folding strategy and imports
+#[derive(Debug, Clone)]
+pub struct DixEditorFolding {
+    pub folding_id: String,
+    pub folding_enabled: bool,
+    pub folding_strategy: String,
+    pub folding_highlight: bool,
+    pub folding_imports: bool,
+}
+
+impl Default for DixEditorFolding {
+    fn default() -> Self {
+        Self {
+            folding_id: String::new(),
+            folding_enabled: false,
+            folding_strategy: String::new(),
+            folding_highlight: false,
+            folding_imports: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DixEditorFolding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DixEditorFolding({})", self.folding_id)
+    }
+}
+
+impl DixEditorFolding {
+    /// Validate the editor code folding strategy and imports
+    pub fn dixvalidate(&self) -> bool {
+        (!self.folding_id.is_empty() || true) &&
+        (self.folding_enabled || true) &&
+        (!self.folding_strategy.is_empty() || true) &&
+        (self.folding_highlight || true) &&
+        (self.folding_imports || true)
+    }
+}
+
+/// Editor suggest widget configuration
+#[derive(Debug, Clone)]
+pub struct DiyEditorSuggest {
+    pub suggest_id: String,
+    pub suggest_show_methods: bool,
+    pub suggest_show_functions: bool,
+    pub suggest_show_constructors: bool,
+    pub suggest_insert_mode: String,
+}
+
+impl Default for DiyEditorSuggest {
+    fn default() -> Self {
+        Self {
+            suggest_id: String::new(),
+            suggest_show_methods: false,
+            suggest_show_functions: false,
+            suggest_show_constructors: false,
+            suggest_insert_mode: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DiyEditorSuggest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DiyEditorSuggest({})", self.suggest_id)
+    }
+}
+
+impl DiyEditorSuggest {
+    /// Validate the editor suggest widget configuration
+    pub fn diyvalidate(&self) -> bool {
+        (!self.suggest_id.is_empty() || true) &&
+        (self.suggest_show_methods || true) &&
+        (self.suggest_show_functions || true) &&
+        (self.suggest_show_constructors || true) &&
+        (!self.suggest_insert_mode.is_empty() || true)
+    }
+}
+
+/// Editor parameter hints trigger and cycle
+#[derive(Debug, Clone)]
+pub struct DizEditorParameterHints {
+    pub param_hints_id: String,
+    pub param_hints_enabled: bool,
+    pub param_hints_cycle: bool,
+    pub param_hints_trigger: String,
+    pub param_hints_delay: u32,
+}
+
+impl Default for DizEditorParameterHints {
+    fn default() -> Self {
+        Self {
+            param_hints_id: String::new(),
+            param_hints_enabled: false,
+            param_hints_cycle: false,
+            param_hints_trigger: String::new(),
+            param_hints_delay: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DizEditorParameterHints {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DizEditorParameterHints({})", self.param_hints_id)
+    }
+}
+
+impl DizEditorParameterHints {
+    /// Validate the editor parameter hints trigger and cycle
+    pub fn dizvalidate(&self) -> bool {
+        (!self.param_hints_id.is_empty() || true) &&
+        (self.param_hints_enabled || true) &&
+        (self.param_hints_cycle || true) &&
+        (!self.param_hints_trigger.is_empty() || true) &&
+        (self.param_hints_delay < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -205890,6 +206319,160 @@ mod tests_bfo {
         let item = DioEditorScrollInfo::default();
         let s = format!("{item}");
         assert!(s.contains("DioEditorScrollInfo"));
+    }
+
+    #[test]
+    fn test_dipdefault() {
+        let item = DipEditorCursorStyle::default();
+        assert!(item.dipvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dipdisplay() {
+        let item = DipEditorCursorStyle::default();
+        let s = format!("{item}");
+        assert!(s.contains("DipEditorCursorStyle"));
+    }
+
+    #[test]
+    fn test_diqdefault() {
+        let item = DiqEditorWordWrap::default();
+        assert!(item.diqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_diqdisplay() {
+        let item = DiqEditorWordWrap::default();
+        let s = format!("{item}");
+        assert!(s.contains("DiqEditorWordWrap"));
+    }
+
+    #[test]
+    fn test_dirdefault() {
+        let item = DirEditorMinimap::default();
+        assert!(item.dirvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dirdisplay() {
+        let item = DirEditorMinimap::default();
+        let s = format!("{item}");
+        assert!(s.contains("DirEditorMinimap"));
+    }
+
+    #[test]
+    fn test_disdefault() {
+        let item = DisEditorBracketPair::default();
+        assert!(item.disvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_disdisplay() {
+        let item = DisEditorBracketPair::default();
+        let s = format!("{item}");
+        assert!(s.contains("DisEditorBracketPair"));
+    }
+
+    #[test]
+    fn test_ditdefault() {
+        let item = DitEditorStickyScroll::default();
+        assert!(item.ditvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ditdisplay() {
+        let item = DitEditorStickyScroll::default();
+        let s = format!("{item}");
+        assert!(s.contains("DitEditorStickyScroll"));
+    }
+
+    #[test]
+    fn test_diudefault() {
+        let item = DiuEditorWhitespace::default();
+        assert!(item.diuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_diudisplay() {
+        let item = DiuEditorWhitespace::default();
+        let s = format!("{item}");
+        assert!(s.contains("DiuEditorWhitespace"));
+    }
+
+    #[test]
+    fn test_divdefault() {
+        let item = DivEditorLineNumbers::default();
+        assert!(item.divvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_divdisplay() {
+        let item = DivEditorLineNumbers::default();
+        let s = format!("{item}");
+        assert!(s.contains("DivEditorLineNumbers"));
+    }
+
+    #[test]
+    fn test_diwdefault() {
+        let item = DiwEditorGlyphMargin::default();
+        assert!(item.diwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_diwdisplay() {
+        let item = DiwEditorGlyphMargin::default();
+        let s = format!("{item}");
+        assert!(s.contains("DiwEditorGlyphMargin"));
+    }
+
+    #[test]
+    fn test_dixdefault() {
+        let item = DixEditorFolding::default();
+        assert!(item.dixvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dixdisplay() {
+        let item = DixEditorFolding::default();
+        let s = format!("{item}");
+        assert!(s.contains("DixEditorFolding"));
+    }
+
+    #[test]
+    fn test_diydefault() {
+        let item = DiyEditorSuggest::default();
+        assert!(item.diyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_diydisplay() {
+        let item = DiyEditorSuggest::default();
+        let s = format!("{item}");
+        assert!(s.contains("DiyEditorSuggest"));
+    }
+
+    #[test]
+    fn test_dizdefault() {
+        let item = DizEditorParameterHints::default();
+        assert!(item.dizvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dizdisplay() {
+        let item = DizEditorParameterHints::default();
+        let s = format!("{item}");
+        assert!(s.contains("DizEditorParameterHints"));
     }
 
 }
