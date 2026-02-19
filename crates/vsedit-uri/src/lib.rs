@@ -68909,3 +68909,172 @@ mod bdm_tests {
         assert!(lines.len() >= 2);
     }
 }
+
+
+// --- bdn_: Editor code action / quick fix model ---
+
+/// Code action kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(PartialOrd, Ord)]
+pub enum BdnActionKind { QuickFix, Refactor, RefactorExtract, RefactorInline, RefactorRewrite, Source, SourceOrganizeImports, SourceFixAll }
+
+/// A code action.
+#[derive(Debug, Clone)]
+pub struct BdnCodeAction {
+    pub title: String,
+    pub kind: BdnActionKind,
+    pub command_id: Option<String>,
+    pub is_preferred: bool,
+    pub diagnostics: Vec<String>,
+    pub disabled_reason: Option<String>,
+}
+
+impl BdnCodeAction {
+    pub fn new(title: &str, kind: BdnActionKind) -> Self {
+        Self { title: title.to_string(), kind, command_id: None, is_preferred: false, diagnostics: Vec::new(), disabled_reason: None }
+    }
+
+    pub fn with_command(mut self, cmd: &str) -> Self { self.command_id = Some(cmd.to_string()); self }
+    pub fn preferred(mut self) -> Self { self.is_preferred = true; self }
+    pub fn disabled(mut self, reason: &str) -> Self { self.disabled_reason = Some(reason.to_string()); self }
+
+    pub fn is_enabled(&self) -> bool { self.disabled_reason.is_none() }
+    pub fn is_quick_fix(&self) -> bool { self.kind == BdnActionKind::QuickFix }
+    pub fn is_refactor(&self) -> bool { matches!(self.kind, BdnActionKind::Refactor | BdnActionKind::RefactorExtract | BdnActionKind::RefactorInline | BdnActionKind::RefactorRewrite) }
+
+    pub fn icon(&self) -> &str {
+        if self.is_quick_fix() { "💡" } else if self.is_refactor() { "🔧" } else { "⚡" }
+    }
+
+    pub fn display(&self) -> String {
+        let pref = if self.is_preferred { "★ " } else { "" };
+        format!("{} {}{}", self.icon(), pref, self.title)
+    }
+}
+
+/// Code action list widget.
+#[derive(Debug)]
+pub struct BdnCodeActionList {
+    actions: Vec<BdnCodeAction>,
+    cursor: usize,
+    visible: bool,
+    auto_apply_preferred: bool,
+}
+
+impl BdnCodeActionList {
+    pub fn new() -> Self { Self { actions: Vec::new(), cursor: 0, visible: false, auto_apply_preferred: false } }
+
+    pub fn show(&mut self, actions: Vec<BdnCodeAction>) {
+        self.actions = actions;
+        self.actions.sort_by(|a, b| b.is_preferred.cmp(&a.is_preferred).then(a.kind.partial_cmp(&b.kind).unwrap_or(std::cmp::Ordering::Equal)));
+        self.cursor = 0;
+        self.visible = !self.actions.is_empty();
+    }
+
+    pub fn hide(&mut self) { self.visible = false; }
+    pub fn is_visible(&self) -> bool { self.visible }
+
+    pub fn current_action(&self) -> Option<&BdnCodeAction> { self.actions.get(self.cursor) }
+    pub fn action_count(&self) -> usize { self.actions.len() }
+
+    pub fn move_cursor(&mut self, delta: i32) {
+        if self.actions.is_empty() { return; }
+        self.cursor = ((self.cursor as i32 + delta).rem_euclid(self.actions.len() as i32)) as usize;
+    }
+
+    pub fn quick_fixes(&self) -> Vec<&BdnCodeAction> { self.actions.iter().filter(|a| a.is_quick_fix()).collect() }
+    pub fn refactors(&self) -> Vec<&BdnCodeAction> { self.actions.iter().filter(|a| a.is_refactor()).collect() }
+    pub fn preferred(&self) -> Option<&BdnCodeAction> { self.actions.iter().find(|a| a.is_preferred) }
+
+    pub fn render(&self) -> Vec<String> {
+        if !self.visible { return Vec::new(); }
+        self.actions.iter().enumerate().map(|(i, a)| {
+            let cursor = if i == self.cursor { "› " } else { "  " };
+            let enabled = if a.is_enabled() { "" } else { " (disabled)" };
+            format!("{}{}{}", cursor, a.display(), enabled)
+        }).collect()
+    }
+}
+
+#[cfg(test)]
+mod bdn_tests {
+    use super::*;
+
+    #[test]
+    fn test_bdn_action() {
+        let a = BdnCodeAction::new("Add import", BdnActionKind::QuickFix).preferred();
+        assert!(a.is_preferred);
+        assert!(a.is_quick_fix());
+    }
+
+    #[test]
+    fn test_bdn_refactor() {
+        let a = BdnCodeAction::new("Extract method", BdnActionKind::RefactorExtract);
+        assert!(a.is_refactor());
+        assert!(!a.is_quick_fix());
+    }
+
+    #[test]
+    fn test_bdn_disabled() {
+        let a = BdnCodeAction::new("X", BdnActionKind::QuickFix).disabled("not applicable");
+        assert!(!a.is_enabled());
+    }
+
+    #[test]
+    fn test_bdn_icon() {
+        assert_eq!(BdnCodeAction::new("x", BdnActionKind::QuickFix).icon(), "💡");
+        assert_eq!(BdnCodeAction::new("x", BdnActionKind::RefactorExtract).icon(), "🔧");
+    }
+
+    #[test]
+    fn test_bdn_list_show() {
+        let mut list = BdnCodeActionList::new();
+        list.show(vec![BdnCodeAction::new("Fix", BdnActionKind::QuickFix)]);
+        assert!(list.is_visible());
+        assert_eq!(list.action_count(), 1);
+    }
+
+    #[test]
+    fn test_bdn_preferred_first() {
+        let mut list = BdnCodeActionList::new();
+        list.show(vec![
+            BdnCodeAction::new("B", BdnActionKind::QuickFix),
+            BdnCodeAction::new("A", BdnActionKind::QuickFix).preferred(),
+        ]);
+        assert!(list.current_action().unwrap().is_preferred);
+    }
+
+    #[test]
+    fn test_bdn_cursor() {
+        let mut list = BdnCodeActionList::new();
+        list.show(vec![BdnCodeAction::new("A", BdnActionKind::QuickFix), BdnCodeAction::new("B", BdnActionKind::QuickFix)]);
+        list.move_cursor(1);
+        assert_eq!(list.current_action().unwrap().title, "B");
+    }
+
+    #[test]
+    fn test_bdn_quick_fixes() {
+        let mut list = BdnCodeActionList::new();
+        list.show(vec![
+            BdnCodeAction::new("Fix", BdnActionKind::QuickFix),
+            BdnCodeAction::new("Extract", BdnActionKind::RefactorExtract),
+        ]);
+        assert_eq!(list.quick_fixes().len(), 1);
+    }
+
+    #[test]
+    fn test_bdn_render() {
+        let mut list = BdnCodeActionList::new();
+        list.show(vec![BdnCodeAction::new("Fix", BdnActionKind::QuickFix).preferred()]);
+        let lines = list.render();
+        assert!(lines[0].contains("★"));
+    }
+
+    #[test]
+    fn test_bdn_hide() {
+        let mut list = BdnCodeActionList::new();
+        list.show(vec![BdnCodeAction::new("X", BdnActionKind::QuickFix)]);
+        list.hide();
+        assert!(!list.is_visible());
+    }
+}
