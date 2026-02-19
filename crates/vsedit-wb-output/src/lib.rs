@@ -66673,3 +66673,191 @@ mod bcz_tests {
         assert_eq!(s.status_label(), "Up to date");
     }
 }
+
+
+// --- bda_: Editor workspace profiles model ---
+
+/// Profile scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BdaProfileScope { Global, Workspace }
+
+/// A workspace profile.
+#[derive(Debug, Clone)]
+pub struct BdaProfile {
+    pub id: String,
+    pub name: String,
+    pub icon: Option<char>,
+    pub is_default: bool,
+    pub extensions: Vec<String>,
+    pub settings_overrides: Vec<(String, String)>,
+    pub scope: BdaProfileScope,
+}
+
+impl BdaProfile {
+    pub fn new(id: &str, name: &str) -> Self {
+        Self { id: id.to_string(), name: name.to_string(), icon: None, is_default: false, extensions: Vec::new(), settings_overrides: Vec::new(), scope: BdaProfileScope::Global }
+    }
+
+    pub fn default_profile() -> Self {
+        let mut p = Self::new("default", "Default");
+        p.is_default = true;
+        p
+    }
+
+    pub fn with_icon(mut self, icon: char) -> Self { self.icon = Some(icon); self }
+
+    pub fn add_extension(&mut self, ext_id: &str) {
+        if !self.extensions.contains(&ext_id.to_string()) { self.extensions.push(ext_id.to_string()); }
+    }
+
+    pub fn remove_extension(&mut self, ext_id: &str) { self.extensions.retain(|e| e != ext_id); }
+
+    pub fn set_setting(&mut self, key: &str, value: &str) {
+        if let Some(s) = self.settings_overrides.iter_mut().find(|(k, _)| k == key) { s.1 = value.to_string(); }
+        else { self.settings_overrides.push((key.to_string(), value.to_string())); }
+    }
+
+    pub fn extension_count(&self) -> usize { self.extensions.len() }
+    pub fn setting_count(&self) -> usize { self.settings_overrides.len() }
+
+    pub fn display(&self) -> String {
+        let icon = self.icon.map(|c| format!("{} ", c)).unwrap_or_default();
+        format!("{}{} ({} exts, {} settings)", icon, self.name, self.extension_count(), self.setting_count())
+    }
+}
+
+/// Manages profiles.
+#[derive(Debug)]
+pub struct BdaProfileManager {
+    profiles: Vec<BdaProfile>,
+    active_id: String,
+}
+
+impl BdaProfileManager {
+    pub fn new() -> Self {
+        Self { profiles: vec![BdaProfile::default_profile()], active_id: "default".to_string() }
+    }
+
+    pub fn create_profile(&mut self, id: &str, name: &str) -> &mut BdaProfile {
+        self.profiles.push(BdaProfile::new(id, name));
+        self.profiles.last_mut().unwrap()
+    }
+
+    pub fn delete_profile(&mut self, id: &str) -> bool {
+        if id == "default" { return false; }
+        let before = self.profiles.len();
+        self.profiles.retain(|p| p.id != id);
+        if self.active_id == id { self.active_id = "default".to_string(); }
+        self.profiles.len() < before
+    }
+
+    pub fn switch_to(&mut self, id: &str) -> bool {
+        if self.profiles.iter().any(|p| p.id == id) { self.active_id = id.to_string(); true }
+        else { false }
+    }
+
+    pub fn active_profile(&self) -> &BdaProfile {
+        self.profiles.iter().find(|p| p.id == self.active_id).unwrap_or(&self.profiles[0])
+    }
+
+    pub fn profile_names(&self) -> Vec<&str> { self.profiles.iter().map(|p| p.name.as_str()).collect() }
+    pub fn profile_count(&self) -> usize { self.profiles.len() }
+
+    pub fn duplicate_profile(&mut self, source_id: &str, new_id: &str, new_name: &str) -> bool {
+        if let Some(src) = self.profiles.iter().find(|p| p.id == source_id).cloned() {
+            let mut dup = src;
+            dup.id = new_id.to_string();
+            dup.name = new_name.to_string();
+            dup.is_default = false;
+            self.profiles.push(dup);
+            true
+        } else { false }
+    }
+
+    pub fn export_profile(&self, id: &str) -> Option<String> {
+        self.profiles.iter().find(|p| p.id == id).map(|p| {
+            format!("{{\"name\":\"{}\",\"extensions\":{},\"settings\":{}}}", p.name, p.extension_count(), p.setting_count())
+        })
+    }
+}
+
+#[cfg(test)]
+mod bda_tests {
+    use super::*;
+
+    #[test]
+    fn test_bda_default() {
+        let mgr = BdaProfileManager::new();
+        assert_eq!(mgr.active_profile().name, "Default");
+        assert!(mgr.active_profile().is_default);
+    }
+
+    #[test]
+    fn test_bda_create() {
+        let mut mgr = BdaProfileManager::new();
+        mgr.create_profile("python", "Python Dev");
+        assert_eq!(mgr.profile_count(), 2);
+    }
+
+    #[test]
+    fn test_bda_switch() {
+        let mut mgr = BdaProfileManager::new();
+        mgr.create_profile("rust", "Rust Dev");
+        assert!(mgr.switch_to("rust"));
+        assert_eq!(mgr.active_profile().name, "Rust Dev");
+    }
+
+    #[test]
+    fn test_bda_delete() {
+        let mut mgr = BdaProfileManager::new();
+        mgr.create_profile("tmp", "Temp");
+        assert!(mgr.delete_profile("tmp"));
+        assert!(!mgr.delete_profile("default")); // can't delete default
+    }
+
+    #[test]
+    fn test_bda_extensions() {
+        let mut p = BdaProfile::new("t", "Test");
+        p.add_extension("ms-python.python");
+        p.add_extension("rust-lang.rust-analyzer");
+        assert_eq!(p.extension_count(), 2);
+    }
+
+    #[test]
+    fn test_bda_settings() {
+        let mut p = BdaProfile::new("t", "Test");
+        p.set_setting("editor.fontSize", "14");
+        p.set_setting("editor.fontSize", "16"); // override
+        assert_eq!(p.setting_count(), 1);
+    }
+
+    #[test]
+    fn test_bda_duplicate() {
+        let mut mgr = BdaProfileManager::new();
+        mgr.create_profile("src", "Source");
+        assert!(mgr.duplicate_profile("src", "dup", "Duplicate"));
+        assert_eq!(mgr.profile_count(), 3);
+    }
+
+    #[test]
+    fn test_bda_export() {
+        let mgr = BdaProfileManager::new();
+        let json = mgr.export_profile("default").unwrap();
+        assert!(json.contains("Default"));
+    }
+
+    #[test]
+    fn test_bda_display() {
+        let p = BdaProfile::new("t", "Test").with_icon('🔧');
+        assert!(p.display().contains("🔧"));
+    }
+
+    #[test]
+    fn test_bda_delete_active() {
+        let mut mgr = BdaProfileManager::new();
+        mgr.create_profile("x", "X");
+        mgr.switch_to("x");
+        mgr.delete_profile("x");
+        assert_eq!(mgr.active_profile().id, "default"); // falls back
+    }
+}
