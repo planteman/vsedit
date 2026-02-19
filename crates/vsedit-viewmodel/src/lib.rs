@@ -69239,3 +69239,182 @@ mod bdo_tests {
         assert_eq!(BdoSymbolKind::Struct.icon(), '◆');
     }
 }
+
+
+// --- bdp_: Editor hover information model ---
+
+/// Hover content type.
+#[derive(Debug, Clone)]
+pub enum BdpHoverContent {
+    PlainText(String),
+    Markdown(String),
+    CodeBlock { language: String, code: String },
+}
+
+impl BdpHoverContent {
+    pub fn plain(text: &str) -> Self { BdpHoverContent::PlainText(text.to_string()) }
+    pub fn markdown(text: &str) -> Self { BdpHoverContent::Markdown(text.to_string()) }
+    pub fn code(lang: &str, code: &str) -> Self { BdpHoverContent::CodeBlock { language: lang.to_string(), code: code.to_string() } }
+
+    pub fn render(&self) -> Vec<String> {
+        match self {
+            BdpHoverContent::PlainText(t) => t.lines().map(String::from).collect(),
+            BdpHoverContent::Markdown(t) => t.lines().map(String::from).collect(),
+            BdpHoverContent::CodeBlock { language, code } => {
+                let mut lines = vec![format!("```{}", language)];
+                lines.extend(code.lines().map(String::from));
+                lines.push("```".to_string());
+                lines
+            }
+        }
+    }
+}
+
+/// A hover result.
+#[derive(Debug)]
+pub struct BdpHover {
+    pub contents: Vec<BdpHoverContent>,
+    pub range_line: u32,
+    pub range_start: u32,
+    pub range_end: u32,
+}
+
+impl BdpHover {
+    pub fn new(line: u32, start: u32, end: u32) -> Self {
+        Self { contents: Vec::new(), range_line: line, range_start: start, range_end: end }
+    }
+
+    pub fn add_content(&mut self, c: BdpHoverContent) { self.contents.push(c); }
+
+    pub fn render(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+        for (i, content) in self.contents.iter().enumerate() {
+            if i > 0 { lines.push("─".repeat(40)); }
+            lines.extend(content.render());
+        }
+        lines
+    }
+
+    pub fn is_empty(&self) -> bool { self.contents.is_empty() }
+}
+
+/// Hover widget state.
+#[derive(Debug)]
+pub struct BdpHoverWidget {
+    hover: Option<BdpHover>,
+    visible: bool,
+    pinned: bool,
+    scroll_offset: usize,
+}
+
+impl BdpHoverWidget {
+    pub fn new() -> Self { Self { hover: None, visible: false, pinned: false, scroll_offset: 0 } }
+
+    pub fn show(&mut self, hover: BdpHover) { self.hover = Some(hover); self.visible = true; self.scroll_offset = 0; }
+    pub fn hide(&mut self) { if !self.pinned { self.visible = false; } }
+    pub fn force_hide(&mut self) { self.visible = false; self.pinned = false; }
+    pub fn is_visible(&self) -> bool { self.visible }
+    pub fn toggle_pin(&mut self) { self.pinned = !self.pinned; }
+    pub fn is_pinned(&self) -> bool { self.pinned }
+
+    pub fn scroll(&mut self, delta: i32) { self.scroll_offset = (self.scroll_offset as i32 + delta).max(0) as usize; }
+
+    pub fn render(&self, max_lines: usize) -> Vec<String> {
+        if !self.visible { return Vec::new(); }
+        match &self.hover {
+            Some(h) => {
+                let all = h.render();
+                let skip = self.scroll_offset.min(all.len().saturating_sub(max_lines));
+                all.into_iter().skip(skip).take(max_lines).collect()
+            }
+            None => Vec::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod bdp_tests {
+    use super::*;
+
+    #[test]
+    fn test_bdp_plain() {
+        let c = BdpHoverContent::plain("hello");
+        assert_eq!(c.render(), vec!["hello"]);
+    }
+
+    #[test]
+    fn test_bdp_code_block() {
+        let c = BdpHoverContent::code("rust", "fn main() {}");
+        let lines = c.render();
+        assert!(lines[0].contains("```rust"));
+    }
+
+    #[test]
+    fn test_bdp_hover() {
+        let mut h = BdpHover::new(5, 0, 10);
+        h.add_content(BdpHoverContent::plain("Type: i32"));
+        assert!(!h.is_empty());
+        assert_eq!(h.render().len(), 1);
+    }
+
+    #[test]
+    fn test_bdp_hover_multi() {
+        let mut h = BdpHover::new(1, 0, 5);
+        h.add_content(BdpHoverContent::plain("docs"));
+        h.add_content(BdpHoverContent::code("rust", "fn x()"));
+        let lines = h.render();
+        assert!(lines.len() >= 3); // docs + separator + code block
+    }
+
+    #[test]
+    fn test_bdp_widget_show() {
+        let mut w = BdpHoverWidget::new();
+        let mut h = BdpHover::new(1, 0, 5);
+        h.add_content(BdpHoverContent::plain("info"));
+        w.show(h);
+        assert!(w.is_visible());
+    }
+
+    #[test]
+    fn test_bdp_widget_hide() {
+        let mut w = BdpHoverWidget::new();
+        w.show(BdpHover::new(1, 0, 5));
+        w.hide();
+        assert!(!w.is_visible());
+    }
+
+    #[test]
+    fn test_bdp_pin() {
+        let mut w = BdpHoverWidget::new();
+        w.show(BdpHover::new(1, 0, 5));
+        w.toggle_pin();
+        assert!(w.is_pinned());
+        w.hide(); // pinned, won't hide
+        assert!(w.is_visible());
+        w.force_hide();
+        assert!(!w.is_visible());
+    }
+
+    #[test]
+    fn test_bdp_scroll() {
+        let mut w = BdpHoverWidget::new();
+        let mut h = BdpHover::new(1, 0, 5);
+        for i in 0..20 { h.add_content(BdpHoverContent::plain(&format!("line {}", i))); }
+        w.show(h);
+        w.scroll(5);
+        let lines = w.render(3);
+        assert_eq!(lines.len(), 3);
+    }
+
+    #[test]
+    fn test_bdp_empty_hover() {
+        let h = BdpHover::new(0, 0, 0);
+        assert!(h.is_empty());
+    }
+
+    #[test]
+    fn test_bdp_widget_empty() {
+        let w = BdpHoverWidget::new();
+        assert!(w.render(10).is_empty());
+    }
+}
