@@ -78567,3 +78567,796 @@ mod tests_bfj {
         assert_ne!(BfjKeybindingSource::User, BfjKeybindingSource::Extension);
     }
 }
+
+// bfk_: Editor snippet variable model — snippet variables, date/time,
+// workspace name, clipboard content, random values, UUID
+
+/// Snippet variable kind
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BfkSnippetVar {
+    Selection, Clipboard, Filename, FilenameBase, Directory,
+    Filepath, WorkspaceName, WorkspaceFolder, LineNumber, LineIndex,
+    CurrentYear, CurrentMonth, CurrentDate, CurrentHour, CurrentMinute,
+    CurrentSecond, Uuid, RandomHex, BlockCommentStart, BlockCommentEnd,
+    LineComment,
+}
+
+impl BfkSnippetVar {
+    pub fn name(&self) -> &str {
+        match self {
+            BfkSnippetVar::Selection => "TM_SELECTED_TEXT",
+            BfkSnippetVar::Clipboard => "CLIPBOARD",
+            BfkSnippetVar::Filename => "TM_FILENAME",
+            BfkSnippetVar::FilenameBase => "TM_FILENAME_BASE",
+            BfkSnippetVar::Directory => "TM_DIRECTORY",
+            BfkSnippetVar::Filepath => "TM_FILEPATH",
+            BfkSnippetVar::WorkspaceName => "WORKSPACE_NAME",
+            BfkSnippetVar::WorkspaceFolder => "WORKSPACE_FOLDER",
+            BfkSnippetVar::LineNumber => "TM_LINE_NUMBER",
+            BfkSnippetVar::LineIndex => "TM_LINE_INDEX",
+            BfkSnippetVar::CurrentYear => "CURRENT_YEAR",
+            BfkSnippetVar::CurrentMonth => "CURRENT_MONTH",
+            BfkSnippetVar::CurrentDate => "CURRENT_DATE",
+            BfkSnippetVar::CurrentHour => "CURRENT_HOUR",
+            BfkSnippetVar::CurrentMinute => "CURRENT_MINUTE",
+            BfkSnippetVar::CurrentSecond => "CURRENT_SECONDS",
+            BfkSnippetVar::Uuid => "UUID",
+            BfkSnippetVar::RandomHex => "RANDOM_HEX",
+            BfkSnippetVar::BlockCommentStart => "BLOCK_COMMENT_START",
+            BfkSnippetVar::BlockCommentEnd => "BLOCK_COMMENT_END",
+            BfkSnippetVar::LineComment => "LINE_COMMENT",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "TM_SELECTED_TEXT" => Some(BfkSnippetVar::Selection),
+            "CLIPBOARD" => Some(BfkSnippetVar::Clipboard),
+            "TM_FILENAME" => Some(BfkSnippetVar::Filename),
+            "TM_FILENAME_BASE" => Some(BfkSnippetVar::FilenameBase),
+            "TM_FILEPATH" => Some(BfkSnippetVar::Filepath),
+            "WORKSPACE_NAME" => Some(BfkSnippetVar::WorkspaceName),
+            "TM_LINE_NUMBER" => Some(BfkSnippetVar::LineNumber),
+            "UUID" => Some(BfkSnippetVar::Uuid),
+            "RANDOM_HEX" => Some(BfkSnippetVar::RandomHex),
+            _ => None,
+        }
+    }
+}
+
+/// Snippet variable context for resolution
+#[derive(Debug, Clone, Default)]
+pub struct BfkSnippetContext {
+    pub values: std::collections::HashMap<String, String>,
+}
+
+impl BfkSnippetContext {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn set(&mut self, var: BfkSnippetVar, value: &str) {
+        self.values.insert(var.name().to_string(), value.to_string());
+    }
+
+    pub fn resolve(&self, var_name: &str) -> Option<&str> {
+        self.values.get(var_name).map(|s| s.as_str())
+    }
+
+    pub fn resolve_or_default(&self, var_name: &str, default: &str) -> String {
+        self.values.get(var_name).cloned().unwrap_or_else(|| default.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests_bfk {
+    use super::*;
+
+    #[test]
+    fn test_bfk_var_names() {
+        assert_eq!(BfkSnippetVar::Filename.name(), "TM_FILENAME");
+        assert_eq!(BfkSnippetVar::Uuid.name(), "UUID");
+    }
+
+    #[test]
+    fn test_bfk_var_from_name() {
+        assert_eq!(BfkSnippetVar::from_name("CLIPBOARD"), Some(BfkSnippetVar::Clipboard));
+        assert_eq!(BfkSnippetVar::from_name("unknown"), None);
+    }
+
+    #[test]
+    fn test_bfk_context_set_resolve() {
+        let mut ctx = BfkSnippetContext::new();
+        ctx.set(BfkSnippetVar::Filename, "main.rs");
+        assert_eq!(ctx.resolve("TM_FILENAME"), Some("main.rs"));
+    }
+
+    #[test]
+    fn test_bfk_context_missing() {
+        let ctx = BfkSnippetContext::new();
+        assert!(ctx.resolve("MISSING").is_none());
+    }
+
+    #[test]
+    fn test_bfk_context_default() {
+        let ctx = BfkSnippetContext::new();
+        assert_eq!(ctx.resolve_or_default("MISSING", "fallback"), "fallback");
+    }
+
+    #[test]
+    fn test_bfk_all_names() {
+        let vars = [BfkSnippetVar::Selection, BfkSnippetVar::Clipboard, BfkSnippetVar::Filename,
+            BfkSnippetVar::CurrentYear, BfkSnippetVar::Uuid, BfkSnippetVar::LineComment];
+        for v in &vars { assert!(!v.name().is_empty()); }
+    }
+
+    #[test]
+    fn test_bfk_context_overwrite() {
+        let mut ctx = BfkSnippetContext::new();
+        ctx.set(BfkSnippetVar::Filename, "a.rs");
+        ctx.set(BfkSnippetVar::Filename, "b.rs");
+        assert_eq!(ctx.resolve("TM_FILENAME"), Some("b.rs"));
+    }
+
+    #[test]
+    fn test_bfk_from_name_uuid() {
+        assert_eq!(BfkSnippetVar::from_name("UUID"), Some(BfkSnippetVar::Uuid));
+    }
+
+    #[test]
+    fn test_bfk_var_equality() {
+        assert_ne!(BfkSnippetVar::Filename, BfkSnippetVar::FilenameBase);
+    }
+
+    #[test]
+    fn test_bfk_context_empty() {
+        let ctx = BfkSnippetContext::new();
+        assert!(ctx.values.is_empty());
+    }
+}
+
+// bfl_: Editor workspace settings model — settings scope, setting value types,
+// setting overrides, language-specific settings, settings merge
+
+/// Settings scope
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BflSettingsScope {
+    Default,
+    User,
+    Workspace,
+    WorkspaceFolder,
+    Language,
+}
+
+/// Setting value type
+#[derive(Debug, Clone, PartialEq)]
+pub enum BflSettingValue {
+    String(String),
+    Number(f64),
+    Bool(bool),
+    Array(Vec<BflSettingValue>),
+    Null,
+}
+
+impl BflSettingValue {
+    pub fn as_str(&self) -> Option<&str> {
+        match self { BflSettingValue::String(s) => Some(s), _ => None }
+    }
+    pub fn as_bool(&self) -> Option<bool> {
+        match self { BflSettingValue::Bool(b) => Some(*b), _ => None }
+    }
+    pub fn as_number(&self) -> Option<f64> {
+        match self { BflSettingValue::Number(n) => Some(*n), _ => None }
+    }
+    pub fn is_null(&self) -> bool { matches!(self, BflSettingValue::Null) }
+}
+
+/// A settings layer
+#[derive(Debug, Clone, Default)]
+pub struct BflSettingsLayer {
+    pub scope: BflSettingsScope,
+    pub values: std::collections::HashMap<String, BflSettingValue>,
+}
+
+impl Default for BflSettingsScope { fn default() -> Self { BflSettingsScope::Default } }
+
+impl BflSettingsLayer {
+    pub fn new(scope: BflSettingsScope) -> Self { Self { scope, values: std::collections::HashMap::new() } }
+
+    pub fn set(&mut self, key: &str, value: BflSettingValue) {
+        self.values.insert(key.to_string(), value);
+    }
+
+    pub fn get(&self, key: &str) -> Option<&BflSettingValue> { self.values.get(key) }
+    pub fn has(&self, key: &str) -> bool { self.values.contains_key(key) }
+    pub fn count(&self) -> usize { self.values.len() }
+}
+
+/// Merged settings with scope priority
+#[derive(Debug, Clone, Default)]
+pub struct BflMergedSettings {
+    pub layers: Vec<BflSettingsLayer>,
+}
+
+impl BflMergedSettings {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn add_layer(&mut self, layer: BflSettingsLayer) {
+        self.layers.push(layer);
+        self.layers.sort_by_key(|l| l.scope);
+    }
+
+    pub fn get(&self, key: &str) -> Option<&BflSettingValue> {
+        self.layers.iter().rev().find_map(|l| l.get(key))
+    }
+
+    pub fn get_string(&self, key: &str) -> Option<&str> {
+        self.get(key).and_then(|v| v.as_str())
+    }
+
+    pub fn get_bool(&self, key: &str) -> Option<bool> {
+        self.get(key).and_then(|v| v.as_bool())
+    }
+
+    pub fn effective_scope(&self, key: &str) -> Option<BflSettingsScope> {
+        self.layers.iter().rev().find(|l| l.has(key)).map(|l| l.scope)
+    }
+}
+
+#[cfg(test)]
+mod tests_bfl {
+    use super::*;
+
+    #[test]
+    fn test_bfl_setting_value() {
+        assert_eq!(BflSettingValue::String("hello".into()).as_str(), Some("hello"));
+        assert_eq!(BflSettingValue::Bool(true).as_bool(), Some(true));
+        assert_eq!(BflSettingValue::Number(42.0).as_number(), Some(42.0));
+        assert!(BflSettingValue::Null.is_null());
+    }
+
+    #[test]
+    fn test_bfl_layer_set_get() {
+        let mut layer = BflSettingsLayer::new(BflSettingsScope::User);
+        layer.set("editor.tabSize", BflSettingValue::Number(4.0));
+        assert_eq!(layer.get("editor.tabSize").unwrap().as_number(), Some(4.0));
+    }
+
+    #[test]
+    fn test_bfl_merged_priority() {
+        let mut merged = BflMergedSettings::new();
+        let mut def = BflSettingsLayer::new(BflSettingsScope::Default);
+        def.set("tabSize", BflSettingValue::Number(4.0));
+        let mut user = BflSettingsLayer::new(BflSettingsScope::User);
+        user.set("tabSize", BflSettingValue::Number(2.0));
+        merged.add_layer(def);
+        merged.add_layer(user);
+        assert_eq!(merged.get("tabSize").unwrap().as_number(), Some(2.0));
+    }
+
+    #[test]
+    fn test_bfl_merged_scope() {
+        let mut merged = BflMergedSettings::new();
+        let mut ws = BflSettingsLayer::new(BflSettingsScope::Workspace);
+        ws.set("key", BflSettingValue::Bool(true));
+        merged.add_layer(ws);
+        assert_eq!(merged.effective_scope("key"), Some(BflSettingsScope::Workspace));
+    }
+
+    #[test]
+    fn test_bfl_merged_missing() {
+        let merged = BflMergedSettings::new();
+        assert!(merged.get("missing").is_none());
+    }
+
+    #[test]
+    fn test_bfl_get_string() {
+        let mut merged = BflMergedSettings::new();
+        let mut l = BflSettingsLayer::new(BflSettingsScope::Default);
+        l.set("theme", BflSettingValue::String("dark".into()));
+        merged.add_layer(l);
+        assert_eq!(merged.get_string("theme"), Some("dark"));
+    }
+
+    #[test]
+    fn test_bfl_get_bool() {
+        let mut merged = BflMergedSettings::new();
+        let mut l = BflSettingsLayer::new(BflSettingsScope::Default);
+        l.set("mini", BflSettingValue::Bool(false));
+        merged.add_layer(l);
+        assert_eq!(merged.get_bool("mini"), Some(false));
+    }
+
+    #[test]
+    fn test_bfl_scope_ordering() {
+        assert!(BflSettingsScope::Workspace > BflSettingsScope::User);
+        assert!(BflSettingsScope::User > BflSettingsScope::Default);
+    }
+
+    #[test]
+    fn test_bfl_layer_count() {
+        let mut l = BflSettingsLayer::new(BflSettingsScope::Default);
+        l.set("a", BflSettingValue::Null);
+        assert_eq!(l.count(), 1);
+    }
+
+    #[test]
+    fn test_bfl_value_array() {
+        let arr = BflSettingValue::Array(vec![BflSettingValue::Number(1.0), BflSettingValue::Number(2.0)]);
+        assert!(arr.as_str().is_none());
+    }
+}
+
+// bfm_: Editor extension marketplace model — extension info, versions,
+// install/uninstall, enable/disable, extension search, ratings
+
+/// Extension state
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfmExtensionState {
+    Installed,
+    Disabled,
+    Uninstalled,
+    Updating,
+}
+
+/// Extension info
+#[derive(Debug, Clone)]
+pub struct BfmExtensionInfo {
+    pub id: String,
+    pub display_name: String,
+    pub publisher: String,
+    pub version: String,
+    pub description: String,
+    pub state: BfmExtensionState,
+    pub install_count: u64,
+    pub rating: f64,
+    pub categories: Vec<String>,
+}
+
+impl BfmExtensionInfo {
+    pub fn new(id: &str, name: &str, publisher: &str, version: &str) -> Self {
+        Self { id: id.to_string(), display_name: name.to_string(), publisher: publisher.to_string(),
+               version: version.to_string(), description: String::new(), state: BfmExtensionState::Uninstalled,
+               install_count: 0, rating: 0.0, categories: Vec::new() }
+    }
+
+    pub fn full_id(&self) -> String { format!("{}.{}", self.publisher, self.id) }
+    pub fn is_installed(&self) -> bool { self.state == BfmExtensionState::Installed }
+    pub fn is_enabled(&self) -> bool { self.state == BfmExtensionState::Installed }
+
+    pub fn install(&mut self) { self.state = BfmExtensionState::Installed; }
+    pub fn disable(&mut self) { self.state = BfmExtensionState::Disabled; }
+    pub fn enable(&mut self) { self.state = BfmExtensionState::Installed; }
+    pub fn uninstall(&mut self) { self.state = BfmExtensionState::Uninstalled; }
+}
+
+/// Extension marketplace
+#[derive(Debug, Clone, Default)]
+pub struct BfmMarketplace {
+    pub extensions: Vec<BfmExtensionInfo>,
+}
+
+impl BfmMarketplace {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn add(&mut self, ext: BfmExtensionInfo) { self.extensions.push(ext); }
+
+    pub fn find(&self, id: &str) -> Option<&BfmExtensionInfo> {
+        self.extensions.iter().find(|e| e.id == id || e.full_id() == id)
+    }
+
+    pub fn find_mut(&mut self, id: &str) -> Option<&mut BfmExtensionInfo> {
+        self.extensions.iter_mut().find(|e| e.id == id || e.full_id() == id)
+    }
+
+    pub fn installed(&self) -> Vec<&BfmExtensionInfo> {
+        self.extensions.iter().filter(|e| e.is_installed()).collect()
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&BfmExtensionInfo> {
+        let q = query.to_lowercase();
+        self.extensions.iter().filter(|e| e.display_name.to_lowercase().contains(&q) || e.id.to_lowercase().contains(&q)).collect()
+    }
+
+    pub fn count(&self) -> usize { self.extensions.len() }
+}
+
+#[cfg(test)]
+mod tests_bfm {
+    use super::*;
+
+    #[test]
+    fn test_bfm_extension_info() {
+        let ext = BfmExtensionInfo::new("rust-analyzer", "Rust Analyzer", "rust-lang", "0.3.0");
+        assert_eq!(ext.full_id(), "rust-lang.rust-analyzer");
+        assert!(!ext.is_installed());
+    }
+
+    #[test]
+    fn test_bfm_extension_lifecycle() {
+        let mut ext = BfmExtensionInfo::new("ext", "Ext", "pub", "1.0");
+        ext.install();
+        assert!(ext.is_installed());
+        ext.disable();
+        assert!(!ext.is_enabled());
+        ext.enable();
+        assert!(ext.is_enabled());
+        ext.uninstall();
+        assert!(!ext.is_installed());
+    }
+
+    #[test]
+    fn test_bfm_marketplace_search() {
+        let mut mp = BfmMarketplace::new();
+        mp.add(BfmExtensionInfo::new("prettier", "Prettier", "esbenp", "10.0"));
+        mp.add(BfmExtensionInfo::new("eslint", "ESLint", "dbaeumer", "2.0"));
+        assert_eq!(mp.search("prettier").len(), 1);
+        assert_eq!(mp.search("xyz").len(), 0);
+    }
+
+    #[test]
+    fn test_bfm_marketplace_installed() {
+        let mut mp = BfmMarketplace::new();
+        let mut ext = BfmExtensionInfo::new("a", "A", "p", "1.0");
+        ext.install();
+        mp.add(ext);
+        mp.add(BfmExtensionInfo::new("b", "B", "p", "1.0"));
+        assert_eq!(mp.installed().len(), 1);
+    }
+
+    #[test]
+    fn test_bfm_marketplace_find() {
+        let mut mp = BfmMarketplace::new();
+        mp.add(BfmExtensionInfo::new("ext", "Ext", "pub", "1.0"));
+        assert!(mp.find("ext").is_some());
+        assert!(mp.find("pub.ext").is_some());
+    }
+
+    #[test]
+    fn test_bfm_marketplace_count() {
+        let mp = BfmMarketplace::new();
+        assert_eq!(mp.count(), 0);
+    }
+
+    #[test]
+    fn test_bfm_extension_states() {
+        assert_ne!(BfmExtensionState::Installed, BfmExtensionState::Disabled);
+    }
+
+    #[test]
+    fn test_bfm_extension_rating() {
+        let mut ext = BfmExtensionInfo::new("a", "A", "p", "1.0");
+        ext.rating = 4.5;
+        assert!((ext.rating - 4.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_bfm_extension_categories() {
+        let mut ext = BfmExtensionInfo::new("a", "A", "p", "1.0");
+        ext.categories.push("Themes".to_string());
+        assert_eq!(ext.categories.len(), 1);
+    }
+
+    #[test]
+    fn test_bfm_marketplace_find_mut() {
+        let mut mp = BfmMarketplace::new();
+        mp.add(BfmExtensionInfo::new("a", "A", "p", "1.0"));
+        mp.find_mut("a").unwrap().install();
+        assert!(mp.find("a").unwrap().is_installed());
+    }
+}
+
+// bfn_: Editor git integration model — git status, staged changes,
+// branch info, commit history summary, merge conflicts
+
+/// Git file status
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfnGitFileStatus {
+    Modified,
+    Added,
+    Deleted,
+    Renamed,
+    Untracked,
+    Conflicted,
+    Ignored,
+}
+
+/// Git file change
+#[derive(Debug, Clone)]
+pub struct BfnGitChange {
+    pub path: String,
+    pub status: BfnGitFileStatus,
+    pub staged: bool,
+}
+
+impl BfnGitChange {
+    pub fn new(path: &str, status: BfnGitFileStatus, staged: bool) -> Self {
+        Self { path: path.to_string(), status, staged }
+    }
+
+    pub fn is_modified(&self) -> bool { self.status == BfnGitFileStatus::Modified }
+    pub fn is_conflict(&self) -> bool { self.status == BfnGitFileStatus::Conflicted }
+
+    pub fn display_icon(&self) -> &str {
+        match self.status {
+            BfnGitFileStatus::Modified => "M",
+            BfnGitFileStatus::Added => "A",
+            BfnGitFileStatus::Deleted => "D",
+            BfnGitFileStatus::Renamed => "R",
+            BfnGitFileStatus::Untracked => "U",
+            BfnGitFileStatus::Conflicted => "C",
+            BfnGitFileStatus::Ignored => "!",
+        }
+    }
+}
+
+/// Git repository state
+#[derive(Debug, Clone)]
+pub struct BfnGitState {
+    pub branch: String,
+    pub ahead: usize,
+    pub behind: usize,
+    pub changes: Vec<BfnGitChange>,
+    pub is_rebasing: bool,
+    pub is_merging: bool,
+}
+
+impl Default for BfnGitState {
+    fn default() -> Self {
+        Self { branch: "main".to_string(), ahead: 0, behind: 0, changes: Vec::new(),
+               is_rebasing: false, is_merging: false }
+    }
+}
+
+impl BfnGitState {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn staged_changes(&self) -> Vec<&BfnGitChange> { self.changes.iter().filter(|c| c.staged).collect() }
+    pub fn unstaged_changes(&self) -> Vec<&BfnGitChange> { self.changes.iter().filter(|c| !c.staged).collect() }
+    pub fn conflict_count(&self) -> usize { self.changes.iter().filter(|c| c.is_conflict()).count() }
+    pub fn has_changes(&self) -> bool { !self.changes.is_empty() }
+    pub fn change_count(&self) -> usize { self.changes.len() }
+
+    pub fn status_text(&self) -> String {
+        let mut parts = vec![self.branch.clone()];
+        if self.ahead > 0 { parts.push(format!("↑{}", self.ahead)); }
+        if self.behind > 0 { parts.push(format!("↓{}", self.behind)); }
+        parts.join(" ")
+    }
+}
+
+#[cfg(test)]
+mod tests_bfn {
+    use super::*;
+
+    #[test]
+    fn test_bfn_change_display() {
+        let c = BfnGitChange::new("src/main.rs", BfnGitFileStatus::Modified, false);
+        assert_eq!(c.display_icon(), "M");
+        assert!(c.is_modified());
+    }
+
+    #[test]
+    fn test_bfn_state_status() {
+        let mut state = BfnGitState::new();
+        state.branch = "feature/x".to_string();
+        state.ahead = 2;
+        assert!(state.status_text().contains("↑2"));
+    }
+
+    #[test]
+    fn test_bfn_staged_unstaged() {
+        let mut state = BfnGitState::new();
+        state.changes.push(BfnGitChange::new("a.rs", BfnGitFileStatus::Modified, true));
+        state.changes.push(BfnGitChange::new("b.rs", BfnGitFileStatus::Added, false));
+        assert_eq!(state.staged_changes().len(), 1);
+        assert_eq!(state.unstaged_changes().len(), 1);
+    }
+
+    #[test]
+    fn test_bfn_conflicts() {
+        let mut state = BfnGitState::new();
+        state.changes.push(BfnGitChange::new("c.rs", BfnGitFileStatus::Conflicted, false));
+        assert_eq!(state.conflict_count(), 1);
+    }
+
+    #[test]
+    fn test_bfn_no_changes() {
+        let state = BfnGitState::new();
+        assert!(!state.has_changes());
+        assert_eq!(state.change_count(), 0);
+    }
+
+    #[test]
+    fn test_bfn_rebase_merge() {
+        let mut state = BfnGitState::new();
+        state.is_rebasing = true;
+        assert!(state.is_rebasing);
+        assert!(!state.is_merging);
+    }
+
+    #[test]
+    fn test_bfn_behind() {
+        let mut state = BfnGitState::new();
+        state.behind = 3;
+        assert!(state.status_text().contains("↓3"));
+    }
+
+    #[test]
+    fn test_bfn_change_conflict() {
+        let c = BfnGitChange::new("x", BfnGitFileStatus::Conflicted, false);
+        assert!(c.is_conflict());
+    }
+
+    #[test]
+    fn test_bfn_file_statuses() {
+        assert_ne!(BfnGitFileStatus::Modified, BfnGitFileStatus::Added);
+        assert_ne!(BfnGitFileStatus::Deleted, BfnGitFileStatus::Renamed);
+    }
+
+    #[test]
+    fn test_bfn_default_branch() {
+        let state = BfnGitState::new();
+        assert_eq!(state.branch, "main");
+    }
+}
+
+// bfo_: Editor testing model — test items, test results, test run,
+// test coverage, test discovery, test explorer tree
+
+/// Test result state
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfoTestState {
+    Queued,
+    Running,
+    Passed,
+    Failed,
+    Skipped,
+    Errored,
+}
+
+impl BfoTestState {
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, BfoTestState::Passed | BfoTestState::Failed | BfoTestState::Skipped | BfoTestState::Errored)
+    }
+
+    pub fn icon(&self) -> &str {
+        match self {
+            BfoTestState::Queued => "○",
+            BfoTestState::Running => "◉",
+            BfoTestState::Passed => "✓",
+            BfoTestState::Failed => "✗",
+            BfoTestState::Skipped => "⊘",
+            BfoTestState::Errored => "⚠",
+        }
+    }
+}
+
+/// A test item
+#[derive(Debug, Clone)]
+pub struct BfoTestItem {
+    pub id: String,
+    pub label: String,
+    pub uri: Option<String>,
+    pub line: Option<usize>,
+    pub state: BfoTestState,
+    pub message: Option<String>,
+    pub duration_ms: Option<u64>,
+    pub children: Vec<BfoTestItem>,
+}
+
+impl BfoTestItem {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), uri: None, line: None,
+               state: BfoTestState::Queued, message: None, duration_ms: None, children: Vec::new() }
+    }
+
+    pub fn pass(&mut self, duration_ms: u64) { self.state = BfoTestState::Passed; self.duration_ms = Some(duration_ms); }
+    pub fn fail(&mut self, msg: &str) { self.state = BfoTestState::Failed; self.message = Some(msg.to_string()); }
+
+    pub fn is_leaf(&self) -> bool { self.children.is_empty() }
+    pub fn child_count(&self) -> usize { self.children.len() }
+
+    pub fn total_count(&self) -> usize {
+        1 + self.children.iter().map(|c| c.total_count()).sum::<usize>()
+    }
+}
+
+/// Test run summary
+#[derive(Debug, Clone, Default)]
+pub struct BfoTestRun {
+    pub items: Vec<BfoTestItem>,
+}
+
+impl BfoTestRun {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn add(&mut self, item: BfoTestItem) { self.items.push(item); }
+
+    pub fn passed_count(&self) -> usize { self.items.iter().filter(|i| i.state == BfoTestState::Passed).count() }
+    pub fn failed_count(&self) -> usize { self.items.iter().filter(|i| i.state == BfoTestState::Failed).count() }
+    pub fn total_count(&self) -> usize { self.items.len() }
+
+    pub fn all_passed(&self) -> bool { self.items.iter().all(|i| i.state == BfoTestState::Passed) }
+}
+
+#[cfg(test)]
+mod tests_bfo {
+    use super::*;
+
+    #[test]
+    fn test_bfo_test_state() {
+        assert!(BfoTestState::Passed.is_terminal());
+        assert!(!BfoTestState::Running.is_terminal());
+        assert_eq!(BfoTestState::Passed.icon(), "✓");
+    }
+
+    #[test]
+    fn test_bfo_test_item_pass() {
+        let mut item = BfoTestItem::new("t1", "test_add");
+        item.pass(15);
+        assert_eq!(item.state, BfoTestState::Passed);
+        assert_eq!(item.duration_ms, Some(15));
+    }
+
+    #[test]
+    fn test_bfo_test_item_fail() {
+        let mut item = BfoTestItem::new("t2", "test_sub");
+        item.fail("assertion failed");
+        assert_eq!(item.state, BfoTestState::Failed);
+    }
+
+    #[test]
+    fn test_bfo_test_item_children() {
+        let mut suite = BfoTestItem::new("s1", "Suite");
+        suite.children.push(BfoTestItem::new("t1", "Test 1"));
+        suite.children.push(BfoTestItem::new("t2", "Test 2"));
+        assert_eq!(suite.child_count(), 2);
+        assert!(!suite.is_leaf());
+        assert_eq!(suite.total_count(), 3);
+    }
+
+    #[test]
+    fn test_bfo_test_run() {
+        let mut run = BfoTestRun::new();
+        let mut t1 = BfoTestItem::new("t1", "T1"); t1.pass(10);
+        let mut t2 = BfoTestItem::new("t2", "T2"); t2.fail("err");
+        run.add(t1); run.add(t2);
+        assert_eq!(run.passed_count(), 1);
+        assert_eq!(run.failed_count(), 1);
+        assert!(!run.all_passed());
+    }
+
+    #[test]
+    fn test_bfo_test_run_all_passed() {
+        let mut run = BfoTestRun::new();
+        let mut t1 = BfoTestItem::new("t1", "T1"); t1.pass(5);
+        run.add(t1);
+        assert!(run.all_passed());
+    }
+
+    #[test]
+    fn test_bfo_test_leaf() {
+        let item = BfoTestItem::new("t", "T");
+        assert!(item.is_leaf());
+    }
+
+    #[test]
+    fn test_bfo_test_run_empty() {
+        let run = BfoTestRun::new();
+        assert_eq!(run.total_count(), 0);
+        assert!(run.all_passed()); // vacuously true
+    }
+
+    #[test]
+    fn test_bfo_test_state_icons() {
+        assert_eq!(BfoTestState::Failed.icon(), "✗");
+        assert_eq!(BfoTestState::Skipped.icon(), "⊘");
+    }
+
+    #[test]
+    fn test_bfo_test_item_location() {
+        let mut item = BfoTestItem::new("t", "T");
+        item.uri = Some("file:///test.rs".to_string());
+        item.line = Some(42);
+        assert_eq!(item.line, Some(42));
+    }
+}
