@@ -53567,3 +53567,389 @@ mod bas_tests {
         assert!(result.range.is_some());
     }
 }
+
+
+// --- bat_: Editor go-to-definition/peek model ---
+
+/// Type of definition target.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BatDefinitionKind {
+    Definition,
+    Declaration,
+    TypeDefinition,
+    Implementation,
+    Reference,
+}
+
+impl BatDefinitionKind {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Definition => "Definition",
+            Self::Declaration => "Declaration",
+            Self::TypeDefinition => "Type Definition",
+            Self::Implementation => "Implementation",
+            Self::Reference => "Reference",
+        }
+    }
+
+    pub fn command_id(&self) -> &'static str {
+        match self {
+            Self::Definition => "editor.action.revealDefinition",
+            Self::Declaration => "editor.action.revealDeclaration",
+            Self::TypeDefinition => "editor.action.goToTypeDefinition",
+            Self::Implementation => "editor.action.goToImplementation",
+            Self::Reference => "editor.action.goToReferences",
+        }
+    }
+}
+
+/// A single definition location.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatLocation {
+    pub file_path: String,
+    pub line: u32,
+    pub column: u32,
+    pub end_line: Option<u32>,
+    pub end_column: Option<u32>,
+    pub preview_text: Option<String>,
+}
+
+impl BatLocation {
+    pub fn new(path: &str, line: u32, col: u32) -> Self {
+        Self {
+            file_path: path.to_string(),
+            line,
+            column: col,
+            end_line: None,
+            end_column: None,
+            preview_text: None,
+        }
+    }
+
+    pub fn with_end(mut self, end_line: u32, end_col: u32) -> Self {
+        self.end_line = Some(end_line);
+        self.end_column = Some(end_col);
+        self
+    }
+
+    pub fn with_preview(mut self, text: &str) -> Self {
+        self.preview_text = Some(text.to_string());
+        self
+    }
+
+    pub fn filename(&self) -> &str {
+        self.file_path.rsplit('/').next().unwrap_or(&self.file_path)
+    }
+
+    pub fn display_location(&self) -> String {
+        format!("{}:{}:{}", self.filename(), self.line + 1, self.column + 1)
+    }
+
+    pub fn is_same_file(&self, other: &Self) -> bool {
+        self.file_path == other.file_path
+    }
+
+    pub fn is_same_position(&self, other: &Self) -> bool {
+        self.file_path == other.file_path && self.line == other.line && self.column == other.column
+    }
+}
+
+/// Result of a go-to-definition request.
+#[derive(Debug, Clone)]
+pub struct BatDefinitionResult {
+    pub kind: BatDefinitionKind,
+    pub locations: Vec<BatLocation>,
+    pub origin_file: String,
+    pub origin_line: u32,
+    pub origin_col: u32,
+    pub symbol_name: Option<String>,
+}
+
+impl BatDefinitionResult {
+    pub fn new(kind: BatDefinitionKind, origin_file: &str, origin_line: u32, origin_col: u32) -> Self {
+        Self {
+            kind,
+            locations: Vec::new(),
+            origin_file: origin_file.to_string(),
+            origin_line,
+            origin_col,
+            symbol_name: None,
+        }
+    }
+
+    pub fn add_location(&mut self, loc: BatLocation) {
+        self.locations.push(loc);
+    }
+
+    pub fn location_count(&self) -> usize {
+        self.locations.len()
+    }
+
+    pub fn is_single(&self) -> bool {
+        self.locations.len() == 1
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.locations.is_empty()
+    }
+
+    pub fn single_location(&self) -> Option<&BatLocation> {
+        if self.is_single() { self.locations.first() } else { None }
+    }
+
+    pub fn files_involved(&self) -> Vec<&str> {
+        let mut files: Vec<&str> = self.locations.iter().map(|l| l.file_path.as_str()).collect();
+        files.sort();
+        files.dedup();
+        files
+    }
+
+    pub fn with_symbol(mut self, name: &str) -> Self {
+        self.symbol_name = Some(name.to_string());
+        self
+    }
+}
+
+/// State of the peek view widget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BatPeekState {
+    Hidden,
+    Loading,
+    Visible,
+}
+
+/// The peek definition widget model.
+#[derive(Debug, Clone)]
+pub struct BatPeekWidget {
+    pub result: Option<BatDefinitionResult>,
+    pub state: BatPeekState,
+    pub selected_index: usize,
+    pub preview_scroll: usize,
+    pub preview_height: usize,
+    pub list_scroll: usize,
+    pub list_height: usize,
+    pub focus_on_list: bool,
+}
+
+impl BatPeekWidget {
+    pub fn new() -> Self {
+        Self {
+            result: None,
+            state: BatPeekState::Hidden,
+            selected_index: 0,
+            preview_scroll: 0,
+            preview_height: 15,
+            list_scroll: 0,
+            list_height: 10,
+            focus_on_list: false,
+        }
+    }
+
+    pub fn show(&mut self, result: BatDefinitionResult) {
+        if result.is_empty() {
+            self.state = BatPeekState::Hidden;
+            return;
+        }
+        self.result = Some(result);
+        self.state = BatPeekState::Visible;
+        self.selected_index = 0;
+        self.preview_scroll = 0;
+        self.list_scroll = 0;
+    }
+
+    pub fn hide(&mut self) {
+        self.state = BatPeekState::Hidden;
+        self.result = None;
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.state == BatPeekState::Visible
+    }
+
+    pub fn selected_location(&self) -> Option<&BatLocation> {
+        self.result.as_ref().and_then(|r| r.locations.get(self.selected_index))
+    }
+
+    pub fn select_next(&mut self) {
+        if let Some(r) = &self.result {
+            if self.selected_index + 1 < r.location_count() {
+                self.selected_index += 1;
+                self.preview_scroll = 0;
+            }
+        }
+    }
+
+    pub fn select_prev(&mut self) {
+        if self.selected_index > 0 {
+            self.selected_index -= 1;
+            self.preview_scroll = 0;
+        }
+    }
+
+    pub fn scroll_preview_down(&mut self, amount: usize) {
+        self.preview_scroll += amount;
+    }
+
+    pub fn scroll_preview_up(&mut self, amount: usize) {
+        self.preview_scroll = self.preview_scroll.saturating_sub(amount);
+    }
+
+    pub fn toggle_focus(&mut self) {
+        self.focus_on_list = !self.focus_on_list;
+    }
+
+    pub fn location_count(&self) -> usize {
+        self.result.as_ref().map(|r| r.location_count()).unwrap_or(0)
+    }
+
+    pub fn title(&self) -> String {
+        match &self.result {
+            Some(r) => {
+                let kind = r.kind.label();
+                let count = r.location_count();
+                let symbol = r.symbol_name.as_deref().unwrap_or("symbol");
+                format!("{} - {} ({} result{})", kind, symbol, count, if count == 1 { "" } else { "s" })
+            }
+            None => String::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod bat_tests {
+    use super::*;
+
+    #[test]
+    fn test_bat_definition_kind() {
+        assert_eq!(BatDefinitionKind::Definition.label(), "Definition");
+        assert!(BatDefinitionKind::Reference.command_id().contains("References"));
+    }
+
+    #[test]
+    fn test_bat_location() {
+        let loc = BatLocation::new("src/main.rs", 10, 5);
+        assert_eq!(loc.filename(), "main.rs");
+        assert_eq!(loc.display_location(), "main.rs:11:6");
+    }
+
+    #[test]
+    fn test_bat_location_with_preview() {
+        let loc = BatLocation::new("test.rs", 5, 0).with_preview("fn main() {");
+        assert_eq!(loc.preview_text.as_deref(), Some("fn main() {"));
+    }
+
+    #[test]
+    fn test_bat_location_comparison() {
+        let a = BatLocation::new("a.rs", 5, 10);
+        let b = BatLocation::new("a.rs", 5, 10);
+        let c = BatLocation::new("b.rs", 5, 10);
+        assert!(a.is_same_position(&b));
+        assert!(a.is_same_file(&b));
+        assert!(!a.is_same_file(&c));
+    }
+
+    #[test]
+    fn test_bat_definition_result() {
+        let mut result = BatDefinitionResult::new(BatDefinitionKind::Definition, "src/main.rs", 10, 5);
+        assert!(result.is_empty());
+
+        result.add_location(BatLocation::new("src/lib.rs", 20, 0));
+        assert!(result.is_single());
+        assert!(result.single_location().is_some());
+
+        result.add_location(BatLocation::new("src/util.rs", 5, 0));
+        assert!(!result.is_single());
+        assert_eq!(result.location_count(), 2);
+    }
+
+    #[test]
+    fn test_bat_files_involved() {
+        let mut result = BatDefinitionResult::new(BatDefinitionKind::Reference, "a.rs", 1, 0);
+        result.add_location(BatLocation::new("b.rs", 5, 0));
+        result.add_location(BatLocation::new("c.rs", 10, 0));
+        result.add_location(BatLocation::new("b.rs", 15, 0));
+        assert_eq!(result.files_involved(), vec!["b.rs", "c.rs"]);
+    }
+
+    #[test]
+    fn test_bat_peek_show_hide() {
+        let mut peek = BatPeekWidget::new();
+        assert!(!peek.is_visible());
+
+        let mut result = BatDefinitionResult::new(BatDefinitionKind::Definition, "a.rs", 1, 0);
+        result.add_location(BatLocation::new("b.rs", 5, 0));
+        peek.show(result);
+        assert!(peek.is_visible());
+        assert_eq!(peek.location_count(), 1);
+
+        peek.hide();
+        assert!(!peek.is_visible());
+    }
+
+    #[test]
+    fn test_bat_peek_empty() {
+        let mut peek = BatPeekWidget::new();
+        let result = BatDefinitionResult::new(BatDefinitionKind::Definition, "a.rs", 1, 0);
+        peek.show(result); // Empty result
+        assert!(!peek.is_visible());
+    }
+
+    #[test]
+    fn test_bat_peek_navigation() {
+        let mut peek = BatPeekWidget::new();
+        let mut result = BatDefinitionResult::new(BatDefinitionKind::Reference, "a.rs", 1, 0);
+        result.add_location(BatLocation::new("b.rs", 5, 0));
+        result.add_location(BatLocation::new("c.rs", 10, 0));
+        result.add_location(BatLocation::new("d.rs", 15, 0));
+        peek.show(result);
+
+        assert_eq!(peek.selected_index, 0);
+        peek.select_next();
+        assert_eq!(peek.selected_index, 1);
+        peek.select_next();
+        assert_eq!(peek.selected_index, 2);
+        peek.select_next();
+        assert_eq!(peek.selected_index, 2); // Can't go past end
+
+        peek.select_prev();
+        assert_eq!(peek.selected_index, 1);
+    }
+
+    #[test]
+    fn test_bat_peek_title() {
+        let mut peek = BatPeekWidget::new();
+        let mut result = BatDefinitionResult::new(BatDefinitionKind::Reference, "a.rs", 1, 0)
+            .with_symbol("MyStruct");
+        result.add_location(BatLocation::new("b.rs", 5, 0));
+        result.add_location(BatLocation::new("c.rs", 10, 0));
+        peek.show(result);
+        let title = peek.title();
+        assert!(title.contains("Reference"));
+        assert!(title.contains("MyStruct"));
+        assert!(title.contains("2 results"));
+    }
+
+    #[test]
+    fn test_bat_peek_scroll() {
+        let mut peek = BatPeekWidget::new();
+        peek.scroll_preview_down(5);
+        assert_eq!(peek.preview_scroll, 5);
+        peek.scroll_preview_up(3);
+        assert_eq!(peek.preview_scroll, 2);
+    }
+
+    #[test]
+    fn test_bat_peek_focus() {
+        let mut peek = BatPeekWidget::new();
+        assert!(!peek.focus_on_list);
+        peek.toggle_focus();
+        assert!(peek.focus_on_list);
+    }
+
+    #[test]
+    fn test_bat_location_with_end() {
+        let loc = BatLocation::new("a.rs", 5, 0).with_end(5, 10);
+        assert_eq!(loc.end_line, Some(5));
+        assert_eq!(loc.end_column, Some(10));
+    }
+}
