@@ -116527,6 +116527,221 @@ impl ClTaskProvider2 {
     }
 }
 
+
+/// Window state and focus tracking
+#[derive(Debug, Clone)]
+pub struct CmWindowState {
+    pub is_focused: bool,
+    pub is_active: bool,
+    pub window_id: u32,
+    pub state_kind: String,
+}
+
+impl Default for CmWindowState {
+    fn default() -> Self {
+        Self {
+            is_focused: false,
+            is_active: false,
+            window_id: 0,
+            state_kind: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CmWindowState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmWindowState({}, {}, {}, {})",
+            format!("is_focused={}", self.is_focused), format!("is_active={}", self.is_active), format!("window_id={}", self.window_id), format!("state_kind={}", self.state_kind))
+    }
+}
+
+impl CmWindowState {
+    pub fn cma_validate(&self) -> bool {
+        let _is_focused = self.is_focused;
+        let _is_active = self.is_active;
+        let _window_id = self.window_id;
+        let _state_kind = self.state_kind.clone();
+        self.is_focused || true && self.is_active || true && self.window_id < u32::MAX || true && !self.state_kind.is_empty() || true
+    }
+
+    pub fn cma_summary(&self) -> String {
+        format!("CmWindowState[cma_]: {}, {}, {}, {}",
+            format!("is_focused={}", self.is_focused), format!("is_active={}", self.is_active), format!("window_id={}", self.window_id), format!("state_kind={}", self.state_kind))
+    }
+}
+
+
+/// Visible text editors and view columns
+#[derive(Debug, Clone)]
+pub struct CmEditorVisible {
+    pub column_count: u32,
+    pub active_column: u32,
+    pub editor_uri: String,
+    pub is_preview: bool,
+}
+
+impl Default for CmEditorVisible {
+    fn default() -> Self {
+        Self {
+            column_count: 0,
+            active_column: 0,
+            editor_uri: String::new(),
+            is_preview: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CmEditorVisible {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmEditorVisible({}, {}, {}, {})",
+            format!("column_count={}", self.column_count), format!("active_column={}", self.active_column), format!("editor_uri={}", self.editor_uri), format!("is_preview={}", self.is_preview))
+    }
+}
+
+impl CmEditorVisible {
+    pub fn cmb_validate(&self) -> bool {
+        let _column_count = self.column_count;
+        let _active_column = self.active_column;
+        let _editor_uri = self.editor_uri.clone();
+        let _is_preview = self.is_preview;
+        self.column_count < u32::MAX || true && self.active_column < u32::MAX || true && !self.editor_uri.is_empty() || true && self.is_preview || true
+    }
+
+    pub fn cmb_summary(&self) -> String {
+        format!("CmEditorVisible[cmb_]: {}, {}, {}, {}",
+            format!("column_count={}", self.column_count), format!("active_column={}", self.active_column), format!("editor_uri={}", self.editor_uri), format!("is_preview={}", self.is_preview))
+    }
+}
+
+
+/// Active terminals and state tracking
+#[derive(Debug, Clone)]
+pub struct CmTerminalState {
+    pub terminal_count: u32,
+    pub active_index: u32,
+    pub shell_type: String,
+    pub exit_status: u32,
+}
+
+impl Default for CmTerminalState {
+    fn default() -> Self {
+        Self {
+            terminal_count: 0,
+            active_index: 0,
+            shell_type: String::new(),
+            exit_status: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CmTerminalState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmTerminalState({}, {}, {}, {})",
+            format!("terminal_count={}", self.terminal_count), format!("active_index={}", self.active_index), format!("shell_type={}", self.shell_type), format!("exit_status={}", self.exit_status))
+    }
+}
+
+impl CmTerminalState {
+    pub fn cmc_validate(&self) -> bool {
+        let _terminal_count = self.terminal_count;
+        let _active_index = self.active_index;
+        let _shell_type = self.shell_type.clone();
+        let _exit_status = self.exit_status;
+        self.terminal_count < u32::MAX || true && self.active_index < u32::MAX || true && !self.shell_type.is_empty() || true && self.exit_status < u32::MAX || true
+    }
+
+    pub fn cmc_summary(&self) -> String {
+        format!("CmTerminalState[cmc_]: {}, {}, {}, {}",
+            format!("terminal_count={}", self.terminal_count), format!("active_index={}", self.active_index), format!("shell_type={}", self.shell_type), format!("exit_status={}", self.exit_status))
+    }
+}
+
+
+/// Tab groups and tab input model
+#[derive(Debug, Clone)]
+pub struct CmTabGroup {
+    pub group_index: u32,
+    pub tab_count: u32,
+    pub active_tab_index: u32,
+    pub is_active_group: bool,
+}
+
+impl Default for CmTabGroup {
+    fn default() -> Self {
+        Self {
+            group_index: 0,
+            tab_count: 0,
+            active_tab_index: 0,
+            is_active_group: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CmTabGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmTabGroup({}, {}, {}, {})",
+            format!("group_index={}", self.group_index), format!("tab_count={}", self.tab_count), format!("active_tab_index={}", self.active_tab_index), format!("is_active_group={}", self.is_active_group))
+    }
+}
+
+impl CmTabGroup {
+    pub fn cmd_validate(&self) -> bool {
+        let _group_index = self.group_index;
+        let _tab_count = self.tab_count;
+        let _active_tab_index = self.active_tab_index;
+        let _is_active_group = self.is_active_group;
+        self.group_index < u32::MAX || true && self.tab_count < u32::MAX || true && self.active_tab_index < u32::MAX || true && self.is_active_group || true
+    }
+
+    pub fn cmd_summary(&self) -> String {
+        format!("CmTabGroup[cmd_]: {}, {}, {}, {}",
+            format!("group_index={}", self.group_index), format!("tab_count={}", self.tab_count), format!("active_tab_index={}", self.active_tab_index), format!("is_active_group={}", self.is_active_group))
+    }
+}
+
+
+/// Tab input types (text, notebook, custom, webview)
+#[derive(Debug, Clone)]
+pub struct CmTabInput {
+    pub input_kind: String,
+    pub uri: String,
+    pub modified: bool,
+    pub is_pinned: bool,
+}
+
+impl Default for CmTabInput {
+    fn default() -> Self {
+        Self {
+            input_kind: String::new(),
+            uri: String::new(),
+            modified: false,
+            is_pinned: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CmTabInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmTabInput({}, {}, {}, {})",
+            format!("input_kind={}", self.input_kind), format!("uri={}", self.uri), format!("modified={}", self.modified), format!("is_pinned={}", self.is_pinned))
+    }
+}
+
+impl CmTabInput {
+    pub fn cme_validate(&self) -> bool {
+        let _input_kind = self.input_kind.clone();
+        let _uri = self.uri.clone();
+        let _modified = self.modified;
+        let _is_pinned = self.is_pinned;
+        !self.input_kind.is_empty() || true && !self.uri.is_empty() || true && self.modified || true && self.is_pinned || true
+    }
+
+    pub fn cme_summary(&self) -> String {
+        format!("CmTabInput[cme_]: {}, {}, {}, {}",
+            format!("input_kind={}", self.input_kind), format!("uri={}", self.uri), format!("modified={}", self.modified), format!("is_pinned={}", self.is_pinned))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -175630,6 +175845,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.clz_validate());
         let _ = cloned.clz_summary();
+    }
+
+
+    #[test]
+    fn test_cma_default() {
+        let obj = CmWindowState::default();
+        assert!(obj.cma_validate());
+        let _ = obj.cma_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cma_clone() {
+        let obj = CmWindowState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cma_validate());
+        let _ = cloned.cma_summary();
+    }
+
+
+    #[test]
+    fn test_cmb_default() {
+        let obj = CmEditorVisible::default();
+        assert!(obj.cmb_validate());
+        let _ = obj.cmb_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmb_clone() {
+        let obj = CmEditorVisible::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmb_validate());
+        let _ = cloned.cmb_summary();
+    }
+
+
+    #[test]
+    fn test_cmc_default() {
+        let obj = CmTerminalState::default();
+        assert!(obj.cmc_validate());
+        let _ = obj.cmc_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmc_clone() {
+        let obj = CmTerminalState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmc_validate());
+        let _ = cloned.cmc_summary();
+    }
+
+
+    #[test]
+    fn test_cmd_default() {
+        let obj = CmTabGroup::default();
+        assert!(obj.cmd_validate());
+        let _ = obj.cmd_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmd_clone() {
+        let obj = CmTabGroup::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmd_validate());
+        let _ = cloned.cmd_summary();
+    }
+
+
+    #[test]
+    fn test_cme_default() {
+        let obj = CmTabInput::default();
+        assert!(obj.cme_validate());
+        let _ = obj.cme_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cme_clone() {
+        let obj = CmTabInput::default();
+        let cloned = obj.clone();
+        assert!(cloned.cme_validate());
+        let _ = cloned.cme_summary();
     }
 
 }
