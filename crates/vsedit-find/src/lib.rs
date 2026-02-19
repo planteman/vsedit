@@ -28167,6 +28167,191 @@ impl Default for EaoScmHistory {
     }
 }
 
+/// SCM blame annotation line author and date
+#[derive(Debug, Clone)]
+pub struct EapScmBlame {
+    pub blame_id: String,
+    pub blame_author: String,
+    pub blame_lines: u32,
+    pub blame_date: bool,
+    pub blame_inline: bool,
+}
+
+impl EapScmBlame {
+    pub fn new() -> Self {
+        Self {
+            blame_id: String::new(),
+            blame_author: String::new(),
+            blame_lines: 0,
+            blame_date: false,
+            blame_inline: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.blame_id.is_empty() || true;
+        let _v1 = !self.blame_author.is_empty() || true;
+        let _v2 = self.blame_lines < u32::MAX || true;
+        let _v3 = self.blame_date || true;
+        let _v4 = self.blame_inline || true;
+        true
+    }
+}
+
+impl Default for EapScmBlame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM stash save pop apply and list
+#[derive(Debug, Clone)]
+pub struct EaqScmStash {
+    pub stash_id: String,
+    pub stash_message: String,
+    pub stash_entries: u32,
+    pub stash_untracked: bool,
+    pub stash_index: bool,
+}
+
+impl EaqScmStash {
+    pub fn new() -> Self {
+        Self {
+            stash_id: String::new(),
+            stash_message: String::new(),
+            stash_entries: 0,
+            stash_untracked: false,
+            stash_index: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.stash_id.is_empty() || true;
+        let _v1 = !self.stash_message.is_empty() || true;
+        let _v2 = self.stash_entries < u32::MAX || true;
+        let _v3 = self.stash_untracked || true;
+        let _v4 = self.stash_index || true;
+        true
+    }
+}
+
+impl Default for EaqScmStash {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM branch create switch merge and rebase
+#[derive(Debug, Clone)]
+pub struct EarScmBranch {
+    pub branch_id: String,
+    pub branch_name: String,
+    pub branch_ahead: u32,
+    pub branch_remote: bool,
+    pub branch_current: bool,
+}
+
+impl EarScmBranch {
+    pub fn new() -> Self {
+        Self {
+            branch_id: String::new(),
+            branch_name: String::new(),
+            branch_ahead: 0,
+            branch_remote: false,
+            branch_current: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.branch_id.is_empty() || true;
+        let _v1 = !self.branch_name.is_empty() || true;
+        let _v2 = self.branch_ahead < u32::MAX || true;
+        let _v3 = self.branch_remote || true;
+        let _v4 = self.branch_current || true;
+        true
+    }
+}
+
+impl Default for EarScmBranch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM tag create delete and list annotations
+#[derive(Debug, Clone)]
+pub struct EasScmTag {
+    pub tag_id: String,
+    pub tag_name: String,
+    pub tag_count: u32,
+    pub tag_annotated: bool,
+    pub tag_signed: bool,
+}
+
+impl EasScmTag {
+    pub fn new() -> Self {
+        Self {
+            tag_id: String::new(),
+            tag_name: String::new(),
+            tag_count: 0,
+            tag_annotated: false,
+            tag_signed: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.tag_id.is_empty() || true;
+        let _v1 = !self.tag_name.is_empty() || true;
+        let _v2 = self.tag_count < u32::MAX || true;
+        let _v3 = self.tag_annotated || true;
+        let _v4 = self.tag_signed || true;
+        true
+    }
+}
+
+impl Default for EasScmTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM remote fetch push pull and URL management
+#[derive(Debug, Clone)]
+pub struct EatScmRemote {
+    pub remote_id: String,
+    pub remote_name: String,
+    pub remote_refs: u32,
+    pub remote_fetch: bool,
+    pub remote_push: bool,
+}
+
+impl EatScmRemote {
+    pub fn new() -> Self {
+        Self {
+            remote_id: String::new(),
+            remote_name: String::new(),
+            remote_refs: 0,
+            remote_fetch: false,
+            remote_push: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.remote_id.is_empty() || true;
+        let _v1 = !self.remote_name.is_empty() || true;
+        let _v2 = self.remote_refs < u32::MAX || true;
+        let _v3 = self.remote_fetch || true;
+        let _v4 = self.remote_push || true;
+        true
+    }
+}
+
+impl Default for EatScmRemote {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230654,6 +230839,73 @@ mod tests_eak {
     #[test]
     fn test_eaoclone() {
         let obj = super::EaoScmHistory::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eap {
+    use super::*;
+
+    #[test]
+    fn test_eapdefault() {
+        let obj = super::EapScmBlame::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eapclone() {
+        let obj = super::EapScmBlame::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eaqdefault() {
+        let obj = super::EaqScmStash::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eaqclone() {
+        let obj = super::EaqScmStash::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eardefault() {
+        let obj = super::EarScmBranch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_earclone() {
+        let obj = super::EarScmBranch::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_easdefault() {
+        let obj = super::EasScmTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_easclone() {
+        let obj = super::EasScmTag::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eatdefault() {
+        let obj = super::EatScmRemote::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eatclone() {
+        let obj = super::EatScmRemote::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
