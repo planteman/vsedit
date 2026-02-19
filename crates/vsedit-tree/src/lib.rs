@@ -81446,6 +81446,431 @@ impl BgjPeekView {
 }
 
 
+
+// bgk_ Editor Code Lens Model
+
+/// A code lens item displayed above a line.
+#[derive(Debug, Clone)]
+pub struct BgkCodeLens {
+    pub line: usize,
+    pub command_id: Option<String>,
+    pub title: Option<String>,
+    pub is_resolved: bool,
+    pub provider_id: String,
+}
+
+/// Code lens model managing all lenses in the editor.
+#[derive(Debug, Clone)]
+pub struct BgkCodeLensModel {
+    lenses: Vec<BgkCodeLens>,
+    is_enabled: bool,
+}
+
+impl BgkCodeLensModel {
+    pub fn new() -> Self {
+        Self { lenses: Vec::new(), is_enabled: true }
+    }
+
+    pub fn set_lenses(&mut self, lenses: Vec<BgkCodeLens>) {
+        self.lenses = lenses;
+    }
+
+    pub fn toggle(&mut self) {
+        self.is_enabled = !self.is_enabled;
+    }
+
+    pub fn lenses_at_line(&self, line: usize) -> Vec<&BgkCodeLens> {
+        if !self.is_enabled { return Vec::new(); }
+        self.lenses.iter().filter(|l| l.line == line).collect()
+    }
+
+    pub fn resolve_lens(&mut self, index: usize, title: &str, command_id: &str) {
+        if let Some(lens) = self.lenses.get_mut(index) {
+            lens.title = Some(title.to_string());
+            lens.command_id = Some(command_id.to_string());
+            lens.is_resolved = true;
+        }
+    }
+
+    pub fn unresolved_count(&self) -> usize {
+        self.lenses.iter().filter(|l| !l.is_resolved).count()
+    }
+
+    pub fn total(&self) -> usize {
+        self.lenses.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.lenses.clear();
+    }
+
+    pub fn lenses_by_provider(&self, provider: &str) -> Vec<&BgkCodeLens> {
+        self.lenses.iter().filter(|l| l.provider_id == provider).collect()
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.is_enabled
+    }
+
+    pub fn lines_with_lenses(&self) -> Vec<usize> {
+        let mut lines: Vec<usize> = self.lenses.iter().map(|l| l.line).collect();
+        lines.sort();
+        lines.dedup();
+        lines
+    }
+}
+
+
+// bgl_ Editor Inlay Hints Model
+
+/// Kind of inlay hint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BglInlayHintKind {
+    Type,
+    Parameter,
+    Enum,
+    Other,
+}
+
+/// An inlay hint displayed inline in the editor.
+#[derive(Debug, Clone)]
+pub struct BglInlayHint {
+    pub line: usize,
+    pub column: usize,
+    pub label: String,
+    pub kind: BglInlayHintKind,
+    pub padding_left: bool,
+    pub padding_right: bool,
+    pub tooltip: Option<String>,
+}
+
+/// Inlay hints model.
+#[derive(Debug, Clone)]
+pub struct BglInlayHintsModel {
+    hints: Vec<BglInlayHint>,
+    is_enabled: bool,
+}
+
+impl BglInlayHintsModel {
+    pub fn new() -> Self {
+        Self { hints: Vec::new(), is_enabled: true }
+    }
+
+    pub fn set_hints(&mut self, hints: Vec<BglInlayHint>) {
+        self.hints = hints;
+    }
+
+    pub fn toggle(&mut self) {
+        self.is_enabled = !self.is_enabled;
+    }
+
+    pub fn hints_at_line(&self, line: usize) -> Vec<&BglInlayHint> {
+        if !self.is_enabled { return Vec::new(); }
+        self.hints.iter().filter(|h| h.line == line).collect()
+    }
+
+    pub fn type_hints(&self) -> Vec<&BglInlayHint> {
+        self.hints.iter().filter(|h| h.kind == BglInlayHintKind::Type).collect()
+    }
+
+    pub fn param_hints(&self) -> Vec<&BglInlayHint> {
+        self.hints.iter().filter(|h| h.kind == BglInlayHintKind::Parameter).collect()
+    }
+
+    pub fn total(&self) -> usize {
+        self.hints.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.hints.clear();
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.is_enabled
+    }
+
+    pub fn lines_with_hints(&self) -> Vec<usize> {
+        let mut lines: Vec<usize> = self.hints.iter().map(|h| h.line).collect();
+        lines.sort();
+        lines.dedup();
+        lines
+    }
+}
+
+
+// bgm_ Editor Go To Line Model
+
+/// Go-to-line dialog state.
+#[derive(Debug, Clone)]
+pub struct BgmGoToLineModel {
+    pub is_visible: bool,
+    pub input: String,
+    pub current_line: usize,
+    pub total_lines: usize,
+    pub preview_line: Option<usize>,
+    pub error_message: Option<String>,
+}
+
+impl BgmGoToLineModel {
+    pub fn new(current_line: usize, total_lines: usize) -> Self {
+        Self {
+            is_visible: true,
+            input: String::new(),
+            current_line,
+            total_lines,
+            preview_line: None,
+            error_message: None,
+        }
+    }
+
+    pub fn set_input(&mut self, input: &str) {
+        self.input = input.to_string();
+        self.error_message = None;
+        self.preview_line = self.parse_target();
+    }
+
+    pub fn parse_target(&self) -> Option<usize> {
+        let trimmed = self.input.trim();
+        if trimmed.is_empty() { return None; }
+        if let Some(rest) = trimmed.strip_prefix(':') {
+            rest.parse::<usize>().ok().map(|n| n.min(self.total_lines).max(1))
+        } else {
+            trimmed.parse::<usize>().ok().map(|n| n.min(self.total_lines).max(1))
+        }
+    }
+
+    pub fn confirm(&mut self) -> Option<usize> {
+        if let Some(line) = self.parse_target() {
+            self.is_visible = false;
+            Some(line)
+        } else {
+            self.error_message = Some("Invalid line number".to_string());
+            None
+        }
+    }
+
+    pub fn cancel(&mut self) {
+        self.is_visible = false;
+    }
+
+    pub fn status_text(&self) -> String {
+        format!("Current line: {}, Total lines: {}", self.current_line, self.total_lines)
+    }
+
+    pub fn is_valid_input(&self) -> bool {
+        self.parse_target().is_some()
+    }
+
+    pub fn placeholder(&self) -> String {
+        format!("Type a line number (1-{})", self.total_lines)
+    }
+}
+
+
+// bgn_ Editor Quick Open Model
+
+/// A quick open result item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BgnQuickOpenItem {
+    pub label: String,
+    pub description: Option<String>,
+    pub detail: Option<String>,
+    pub uri: String,
+    pub icon: Option<String>,
+    pub score: u32,
+}
+
+/// Quick open (file finder) model.
+#[derive(Debug, Clone)]
+pub struct BgnQuickOpenModel {
+    pub is_visible: bool,
+    pub query: String,
+    pub items: Vec<BgnQuickOpenItem>,
+    pub selected_index: usize,
+    pub is_loading: bool,
+    pub total_files: usize,
+}
+
+impl BgnQuickOpenModel {
+    pub fn new() -> Self {
+        Self {
+            is_visible: true, query: String::new(),
+            items: Vec::new(), selected_index: 0,
+            is_loading: false, total_files: 0,
+        }
+    }
+
+    pub fn set_query(&mut self, query: &str) {
+        self.query = query.to_string();
+        self.selected_index = 0;
+        self.is_loading = true;
+    }
+
+    pub fn set_results(&mut self, items: Vec<BgnQuickOpenItem>) {
+        self.items = items;
+        self.selected_index = 0;
+        self.is_loading = false;
+    }
+
+    pub fn select_next(&mut self) {
+        if !self.items.is_empty() {
+            self.selected_index = (self.selected_index + 1) % self.items.len();
+        }
+    }
+
+    pub fn select_prev(&mut self) {
+        if !self.items.is_empty() {
+            self.selected_index = if self.selected_index == 0 {
+                self.items.len() - 1
+            } else {
+                self.selected_index - 1
+            };
+        }
+    }
+
+    pub fn selected(&self) -> Option<&BgnQuickOpenItem> {
+        self.items.get(self.selected_index)
+    }
+
+    pub fn confirm(&mut self) -> Option<String> {
+        let uri = self.selected().map(|i| i.uri.clone());
+        self.is_visible = false;
+        uri
+    }
+
+    pub fn cancel(&mut self) {
+        self.is_visible = false;
+    }
+
+    pub fn result_count(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn placeholder(&self) -> String {
+        if self.total_files > 0 {
+            format!("Search among {} files", self.total_files)
+        } else {
+            "Type to search files...".to_string()
+        }
+    }
+}
+
+
+// bgo_ Editor Find Widget Model
+
+/// Find widget options.
+#[derive(Debug, Clone)]
+pub struct BgoFindOptions {
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub use_regex: bool,
+    pub in_selection: bool,
+    pub preserve_case: bool,
+}
+
+/// A find match in the editor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BgoFindMatch {
+    pub line: usize,
+    pub start_col: usize,
+    pub end_col: usize,
+}
+
+/// Find/replace widget model.
+#[derive(Debug, Clone)]
+pub struct BgoFindWidget {
+    pub is_visible: bool,
+    pub is_replace_visible: bool,
+    pub search_text: String,
+    pub replace_text: String,
+    pub options: BgoFindOptions,
+    pub matches: Vec<BgoFindMatch>,
+    pub current_match: usize,
+}
+
+impl BgoFindWidget {
+    pub fn new() -> Self {
+        Self {
+            is_visible: false, is_replace_visible: false,
+            search_text: String::new(), replace_text: String::new(),
+            options: BgoFindOptions {
+                case_sensitive: false, whole_word: false,
+                use_regex: false, in_selection: false, preserve_case: false,
+            },
+            matches: Vec::new(), current_match: 0,
+        }
+    }
+
+    pub fn open(&mut self) {
+        self.is_visible = true;
+    }
+
+    pub fn open_replace(&mut self) {
+        self.is_visible = true;
+        self.is_replace_visible = true;
+    }
+
+    pub fn close(&mut self) {
+        self.is_visible = false;
+        self.is_replace_visible = false;
+    }
+
+    pub fn set_search(&mut self, text: &str) {
+        self.search_text = text.to_string();
+        self.current_match = 0;
+    }
+
+    pub fn set_matches(&mut self, matches: Vec<BgoFindMatch>) {
+        self.matches = matches;
+        self.current_match = 0;
+    }
+
+    pub fn next_match(&mut self) {
+        if !self.matches.is_empty() {
+            self.current_match = (self.current_match + 1) % self.matches.len();
+        }
+    }
+
+    pub fn prev_match(&mut self) {
+        if !self.matches.is_empty() {
+            self.current_match = if self.current_match == 0 {
+                self.matches.len() - 1
+            } else {
+                self.current_match - 1
+            };
+        }
+    }
+
+    pub fn current(&self) -> Option<&BgoFindMatch> {
+        self.matches.get(self.current_match)
+    }
+
+    pub fn match_count(&self) -> usize {
+        self.matches.len()
+    }
+
+    pub fn toggle_case_sensitive(&mut self) {
+        self.options.case_sensitive = !self.options.case_sensitive;
+    }
+
+    pub fn toggle_whole_word(&mut self) {
+        self.options.whole_word = !self.options.whole_word;
+    }
+
+    pub fn toggle_regex(&mut self) {
+        self.options.use_regex = !self.options.use_regex;
+    }
+
+    pub fn status_text(&self) -> String {
+        if self.matches.is_empty() {
+            "No results".to_string()
+        } else {
+            format!("{} of {}", self.current_match + 1, self.matches.len())
+        }
+    }
+}
+
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -83595,6 +84020,490 @@ mod tests_bfo {
         let p = BgjPeekView::new(BgjPeekKind::TypeDefinition, 42, 15);
         assert_eq!(p.anchor_line, 42);
         assert_eq!(p.anchor_column, 15);
+    }
+
+
+
+    // bgk_ tests
+
+    #[test]
+    fn test_bgk_lens_creation() {
+        let m = BgkCodeLensModel::new();
+        assert!(m.is_enabled());
+        assert_eq!(m.total(), 0);
+    }
+
+    #[test]
+    fn test_bgk_set_lenses() {
+        let mut m = BgkCodeLensModel::new();
+        m.set_lenses(vec![
+            BgkCodeLens { line: 5, command_id: None, title: None, is_resolved: false, provider_id: "git".into() },
+            BgkCodeLens { line: 10, command_id: None, title: None, is_resolved: false, provider_id: "test".into() },
+        ]);
+        assert_eq!(m.total(), 2);
+        assert_eq!(m.unresolved_count(), 2);
+    }
+
+    #[test]
+    fn test_bgk_resolve() {
+        let mut m = BgkCodeLensModel::new();
+        m.set_lenses(vec![
+            BgkCodeLens { line: 1, command_id: None, title: None, is_resolved: false, provider_id: "git".into() },
+        ]);
+        m.resolve_lens(0, "3 references", "editor.showReferences");
+        assert!(m.lenses.first().unwrap().is_resolved);
+        assert_eq!(m.lenses.first().unwrap().title.as_deref(), Some("3 references"));
+    }
+
+    #[test]
+    fn test_bgk_lenses_at_line() {
+        let mut m = BgkCodeLensModel::new();
+        m.set_lenses(vec![
+            BgkCodeLens { line: 5, command_id: None, title: None, is_resolved: false, provider_id: "a".into() },
+            BgkCodeLens { line: 5, command_id: None, title: None, is_resolved: false, provider_id: "b".into() },
+            BgkCodeLens { line: 10, command_id: None, title: None, is_resolved: false, provider_id: "a".into() },
+        ]);
+        assert_eq!(m.lenses_at_line(5).len(), 2);
+        assert_eq!(m.lenses_at_line(10).len(), 1);
+    }
+
+    #[test]
+    fn test_bgk_disabled() {
+        let mut m = BgkCodeLensModel::new();
+        m.set_lenses(vec![
+            BgkCodeLens { line: 1, command_id: None, title: None, is_resolved: false, provider_id: "x".into() },
+        ]);
+        m.toggle();
+        assert!(m.lenses_at_line(1).is_empty());
+    }
+
+    #[test]
+    fn test_bgk_by_provider() {
+        let mut m = BgkCodeLensModel::new();
+        m.set_lenses(vec![
+            BgkCodeLens { line: 1, command_id: None, title: None, is_resolved: false, provider_id: "git".into() },
+            BgkCodeLens { line: 2, command_id: None, title: None, is_resolved: false, provider_id: "test".into() },
+            BgkCodeLens { line: 3, command_id: None, title: None, is_resolved: false, provider_id: "git".into() },
+        ]);
+        assert_eq!(m.lenses_by_provider("git").len(), 2);
+    }
+
+    #[test]
+    fn test_bgk_lines_with_lenses() {
+        let mut m = BgkCodeLensModel::new();
+        m.set_lenses(vec![
+            BgkCodeLens { line: 5, command_id: None, title: None, is_resolved: false, provider_id: "a".into() },
+            BgkCodeLens { line: 5, command_id: None, title: None, is_resolved: false, provider_id: "b".into() },
+            BgkCodeLens { line: 10, command_id: None, title: None, is_resolved: false, provider_id: "a".into() },
+        ]);
+        assert_eq!(m.lines_with_lenses(), vec![5, 10]);
+    }
+
+    #[test]
+    fn test_bgk_clear() {
+        let mut m = BgkCodeLensModel::new();
+        m.set_lenses(vec![
+            BgkCodeLens { line: 1, command_id: None, title: None, is_resolved: false, provider_id: "x".into() },
+        ]);
+        m.clear();
+        assert_eq!(m.total(), 0);
+    }
+
+    #[test]
+    fn test_bgk_unresolved_after_resolve() {
+        let mut m = BgkCodeLensModel::new();
+        m.set_lenses(vec![
+            BgkCodeLens { line: 1, command_id: None, title: None, is_resolved: false, provider_id: "a".into() },
+            BgkCodeLens { line: 2, command_id: None, title: None, is_resolved: false, provider_id: "b".into() },
+        ]);
+        m.resolve_lens(0, "title", "cmd");
+        assert_eq!(m.unresolved_count(), 1);
+    }
+
+    #[test]
+    fn test_bgk_resolve_out_of_bounds() {
+        let mut m = BgkCodeLensModel::new();
+        m.resolve_lens(99, "title", "cmd"); // no-op
+        assert_eq!(m.total(), 0);
+    }
+
+
+    // bgl_ tests
+
+    #[test]
+    fn test_bgl_hints_creation() {
+        let m = BglInlayHintsModel::new();
+        assert!(m.is_enabled());
+        assert_eq!(m.total(), 0);
+    }
+
+    #[test]
+    fn test_bgl_set_hints() {
+        let mut m = BglInlayHintsModel::new();
+        m.set_hints(vec![
+            BglInlayHint { line: 5, column: 10, label: ": i32".into(), kind: BglInlayHintKind::Type, padding_left: true, padding_right: false, tooltip: None },
+            BglInlayHint { line: 8, column: 5, label: "name:".into(), kind: BglInlayHintKind::Parameter, padding_left: false, padding_right: true, tooltip: None },
+        ]);
+        assert_eq!(m.total(), 2);
+    }
+
+    #[test]
+    fn test_bgl_hints_at_line() {
+        let mut m = BglInlayHintsModel::new();
+        m.set_hints(vec![
+            BglInlayHint { line: 5, column: 10, label: ": i32".into(), kind: BglInlayHintKind::Type, padding_left: false, padding_right: false, tooltip: None },
+            BglInlayHint { line: 5, column: 20, label: ": String".into(), kind: BglInlayHintKind::Type, padding_left: false, padding_right: false, tooltip: None },
+        ]);
+        assert_eq!(m.hints_at_line(5).len(), 2);
+        assert_eq!(m.hints_at_line(6).len(), 0);
+    }
+
+    #[test]
+    fn test_bgl_type_and_param() {
+        let mut m = BglInlayHintsModel::new();
+        m.set_hints(vec![
+            BglInlayHint { line: 1, column: 5, label: ": i32".into(), kind: BglInlayHintKind::Type, padding_left: false, padding_right: false, tooltip: None },
+            BglInlayHint { line: 2, column: 0, label: "x:".into(), kind: BglInlayHintKind::Parameter, padding_left: false, padding_right: false, tooltip: None },
+            BglInlayHint { line: 3, column: 0, label: "y:".into(), kind: BglInlayHintKind::Parameter, padding_left: false, padding_right: false, tooltip: None },
+        ]);
+        assert_eq!(m.type_hints().len(), 1);
+        assert_eq!(m.param_hints().len(), 2);
+    }
+
+    #[test]
+    fn test_bgl_disabled() {
+        let mut m = BglInlayHintsModel::new();
+        m.set_hints(vec![
+            BglInlayHint { line: 1, column: 0, label: "x".into(), kind: BglInlayHintKind::Type, padding_left: false, padding_right: false, tooltip: None },
+        ]);
+        m.toggle();
+        assert!(m.hints_at_line(1).is_empty());
+    }
+
+    #[test]
+    fn test_bgl_clear() {
+        let mut m = BglInlayHintsModel::new();
+        m.set_hints(vec![
+            BglInlayHint { line: 1, column: 0, label: "x".into(), kind: BglInlayHintKind::Type, padding_left: false, padding_right: false, tooltip: None },
+        ]);
+        m.clear();
+        assert_eq!(m.total(), 0);
+    }
+
+    #[test]
+    fn test_bgl_lines_with_hints() {
+        let mut m = BglInlayHintsModel::new();
+        m.set_hints(vec![
+            BglInlayHint { line: 3, column: 0, label: "a".into(), kind: BglInlayHintKind::Type, padding_left: false, padding_right: false, tooltip: None },
+            BglInlayHint { line: 3, column: 5, label: "b".into(), kind: BglInlayHintKind::Type, padding_left: false, padding_right: false, tooltip: None },
+            BglInlayHint { line: 7, column: 0, label: "c".into(), kind: BglInlayHintKind::Parameter, padding_left: false, padding_right: false, tooltip: None },
+        ]);
+        assert_eq!(m.lines_with_hints(), vec![3, 7]);
+    }
+
+    #[test]
+    fn test_bgl_hint_kind_variants() {
+        let kinds = [BglInlayHintKind::Type, BglInlayHintKind::Parameter, BglInlayHintKind::Enum, BglInlayHintKind::Other];
+        assert_eq!(kinds.len(), 4);
+    }
+
+    #[test]
+    fn test_bgl_tooltip() {
+        let mut m = BglInlayHintsModel::new();
+        m.set_hints(vec![
+            BglInlayHint { line: 1, column: 0, label: ": Vec<i32>".into(), kind: BglInlayHintKind::Type, padding_left: true, padding_right: false, tooltip: Some("inferred type".into()) },
+        ]);
+        assert_eq!(m.hints_at_line(1)[0].tooltip.as_deref(), Some("inferred type"));
+    }
+
+    #[test]
+    fn test_bgl_padding() {
+        let hint = BglInlayHint { line: 1, column: 0, label: "x".into(), kind: BglInlayHintKind::Parameter, padding_left: true, padding_right: true, tooltip: None };
+        assert!(hint.padding_left);
+        assert!(hint.padding_right);
+    }
+
+    #[test]
+    fn test_bgl_empty_lines() {
+        let m = BglInlayHintsModel::new();
+        assert!(m.lines_with_hints().is_empty());
+    }
+
+
+    // bgm_ tests
+
+    #[test]
+    fn test_bgm_goto_creation() {
+        let m = BgmGoToLineModel::new(10, 100);
+        assert!(m.is_visible);
+        assert_eq!(m.current_line, 10);
+        assert_eq!(m.total_lines, 100);
+    }
+
+    #[test]
+    fn test_bgm_parse_number() {
+        let mut m = BgmGoToLineModel::new(1, 100);
+        m.set_input("50");
+        assert_eq!(m.preview_line, Some(50));
+    }
+
+    #[test]
+    fn test_bgm_parse_colon() {
+        let mut m = BgmGoToLineModel::new(1, 100);
+        m.set_input(":42");
+        assert_eq!(m.preview_line, Some(42));
+    }
+
+    #[test]
+    fn test_bgm_clamp_max() {
+        let mut m = BgmGoToLineModel::new(1, 100);
+        m.set_input("999");
+        assert_eq!(m.preview_line, Some(100));
+    }
+
+    #[test]
+    fn test_bgm_clamp_min() {
+        let mut m = BgmGoToLineModel::new(1, 100);
+        m.set_input("0");
+        assert_eq!(m.preview_line, Some(1));
+    }
+
+    #[test]
+    fn test_bgm_confirm() {
+        let mut m = BgmGoToLineModel::new(1, 100);
+        m.set_input("25");
+        let result = m.confirm();
+        assert_eq!(result, Some(25));
+        assert!(!m.is_visible);
+    }
+
+    #[test]
+    fn test_bgm_confirm_invalid() {
+        let mut m = BgmGoToLineModel::new(1, 100);
+        m.set_input("abc");
+        let result = m.confirm();
+        assert_eq!(result, None);
+        assert!(m.error_message.is_some());
+    }
+
+    #[test]
+    fn test_bgm_cancel() {
+        let mut m = BgmGoToLineModel::new(1, 100);
+        m.cancel();
+        assert!(!m.is_visible);
+    }
+
+    #[test]
+    fn test_bgm_status_text() {
+        let m = BgmGoToLineModel::new(15, 200);
+        assert!(m.status_text().contains("15"));
+        assert!(m.status_text().contains("200"));
+    }
+
+    #[test]
+    fn test_bgm_empty_input() {
+        let m = BgmGoToLineModel::new(1, 100);
+        assert!(!m.is_valid_input());
+        assert!(m.preview_line.is_none());
+    }
+
+
+    // bgn_ tests
+
+    #[test]
+    fn test_bgn_quickopen_creation() {
+        let m = BgnQuickOpenModel::new();
+        assert!(m.is_visible);
+        assert!(m.query.is_empty());
+        assert_eq!(m.result_count(), 0);
+    }
+
+    #[test]
+    fn test_bgn_set_query() {
+        let mut m = BgnQuickOpenModel::new();
+        m.set_query("main.rs");
+        assert_eq!(m.query, "main.rs");
+        assert!(m.is_loading);
+    }
+
+    #[test]
+    fn test_bgn_set_results() {
+        let mut m = BgnQuickOpenModel::new();
+        m.set_results(vec![
+            BgnQuickOpenItem { label: "main.rs".into(), description: Some("src/".into()), detail: None, uri: "src/main.rs".into(), icon: None, score: 100 },
+            BgnQuickOpenItem { label: "main.go".into(), description: Some("cmd/".into()), detail: None, uri: "cmd/main.go".into(), icon: None, score: 80 },
+        ]);
+        assert_eq!(m.result_count(), 2);
+        assert!(!m.is_loading);
+    }
+
+    #[test]
+    fn test_bgn_navigation() {
+        let mut m = BgnQuickOpenModel::new();
+        m.set_results(vec![
+            BgnQuickOpenItem { label: "a".into(), description: None, detail: None, uri: "a".into(), icon: None, score: 0 },
+            BgnQuickOpenItem { label: "b".into(), description: None, detail: None, uri: "b".into(), icon: None, score: 0 },
+        ]);
+        assert_eq!(m.selected().unwrap().label, "a");
+        m.select_next();
+        assert_eq!(m.selected().unwrap().label, "b");
+        m.select_next();
+        assert_eq!(m.selected().unwrap().label, "a"); // wraps
+    }
+
+    #[test]
+    fn test_bgn_confirm() {
+        let mut m = BgnQuickOpenModel::new();
+        m.set_results(vec![
+            BgnQuickOpenItem { label: "x.rs".into(), description: None, detail: None, uri: "src/x.rs".into(), icon: None, score: 0 },
+        ]);
+        let uri = m.confirm();
+        assert_eq!(uri.as_deref(), Some("src/x.rs"));
+        assert!(!m.is_visible);
+    }
+
+    #[test]
+    fn test_bgn_cancel() {
+        let mut m = BgnQuickOpenModel::new();
+        m.cancel();
+        assert!(!m.is_visible);
+    }
+
+    #[test]
+    fn test_bgn_empty_confirm() {
+        let mut m = BgnQuickOpenModel::new();
+        let uri = m.confirm();
+        assert!(uri.is_none());
+    }
+
+    #[test]
+    fn test_bgn_placeholder() {
+        let mut m = BgnQuickOpenModel::new();
+        m.total_files = 1500;
+        assert!(m.placeholder().contains("1500"));
+    }
+
+    #[test]
+    fn test_bgn_prev_wraps() {
+        let mut m = BgnQuickOpenModel::new();
+        m.set_results(vec![
+            BgnQuickOpenItem { label: "a".into(), description: None, detail: None, uri: "a".into(), icon: None, score: 0 },
+            BgnQuickOpenItem { label: "b".into(), description: None, detail: None, uri: "b".into(), icon: None, score: 0 },
+        ]);
+        m.select_prev();
+        assert_eq!(m.selected().unwrap().label, "b");
+    }
+
+    #[test]
+    fn test_bgn_score_ordering() {
+        let item = BgnQuickOpenItem { label: "test".into(), description: None, detail: None, uri: "test".into(), icon: None, score: 95 };
+        assert_eq!(item.score, 95);
+    }
+
+
+    // bgo_ tests
+
+    #[test]
+    fn test_bgo_find_creation() {
+        let w = BgoFindWidget::new();
+        assert!(!w.is_visible);
+        assert_eq!(w.match_count(), 0);
+    }
+
+    #[test]
+    fn test_bgo_open_close() {
+        let mut w = BgoFindWidget::new();
+        w.open();
+        assert!(w.is_visible);
+        w.close();
+        assert!(!w.is_visible);
+    }
+
+    #[test]
+    fn test_bgo_open_replace() {
+        let mut w = BgoFindWidget::new();
+        w.open_replace();
+        assert!(w.is_visible);
+        assert!(w.is_replace_visible);
+    }
+
+    #[test]
+    fn test_bgo_search_matches() {
+        let mut w = BgoFindWidget::new();
+        w.open();
+        w.set_search("hello");
+        w.set_matches(vec![
+            BgoFindMatch { line: 1, start_col: 5, end_col: 10 },
+            BgoFindMatch { line: 3, start_col: 0, end_col: 5 },
+        ]);
+        assert_eq!(w.match_count(), 2);
+        assert_eq!(w.current().unwrap().line, 1);
+    }
+
+    #[test]
+    fn test_bgo_next_prev() {
+        let mut w = BgoFindWidget::new();
+        w.set_matches(vec![
+            BgoFindMatch { line: 1, start_col: 0, end_col: 3 },
+            BgoFindMatch { line: 5, start_col: 0, end_col: 3 },
+        ]);
+        w.next_match();
+        assert_eq!(w.current().unwrap().line, 5);
+        w.next_match();
+        assert_eq!(w.current().unwrap().line, 1); // wraps
+        w.prev_match();
+        assert_eq!(w.current().unwrap().line, 5);
+    }
+
+    #[test]
+    fn test_bgo_toggle_options() {
+        let mut w = BgoFindWidget::new();
+        assert!(!w.options.case_sensitive);
+        w.toggle_case_sensitive();
+        assert!(w.options.case_sensitive);
+        w.toggle_whole_word();
+        assert!(w.options.whole_word);
+        w.toggle_regex();
+        assert!(w.options.use_regex);
+    }
+
+    #[test]
+    fn test_bgo_status_text() {
+        let mut w = BgoFindWidget::new();
+        assert_eq!(w.status_text(), "No results");
+        w.set_matches(vec![
+            BgoFindMatch { line: 1, start_col: 0, end_col: 3 },
+            BgoFindMatch { line: 5, start_col: 0, end_col: 3 },
+        ]);
+        assert_eq!(w.status_text(), "1 of 2");
+        w.next_match();
+        assert_eq!(w.status_text(), "2 of 2");
+    }
+
+    #[test]
+    fn test_bgo_set_search_resets() {
+        let mut w = BgoFindWidget::new();
+        w.set_matches(vec![
+            BgoFindMatch { line: 1, start_col: 0, end_col: 3 },
+        ]);
+        w.next_match();
+        w.set_search("new");
+        assert_eq!(w.current_match, 0);
+    }
+
+    #[test]
+    fn test_bgo_empty_navigation() {
+        let mut w = BgoFindWidget::new();
+        w.next_match(); // no-op
+        w.prev_match(); // no-op
+        assert!(w.current().is_none());
+    }
+
+    #[test]
+    fn test_bgo_preserve_case() {
+        let mut w = BgoFindWidget::new();
+        w.options.preserve_case = true;
+        assert!(w.options.preserve_case);
     }
 
 
