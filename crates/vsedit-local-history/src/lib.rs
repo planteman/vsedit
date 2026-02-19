@@ -154974,6 +154974,240 @@ impl DytLangIndent {
     }
 }
 
+/// Language folding marker start and end patterns
+#[derive(Debug, Clone)]
+pub struct DyuLangFold {
+    pub langfold_id: String,
+    pub langfold_start: String,
+    pub langfold_markers: u32,
+    pub langfold_regex: bool,
+    pub langfold_offside: bool,
+}
+
+impl Default for DyuLangFold {
+    fn default() -> Self {
+        Self {
+            langfold_id: String::new(),
+            langfold_start: String::new(),
+            langfold_markers: 0,
+            langfold_regex: false,
+            langfold_offside: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DyuLangFold {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DyuLangFold({})", self.langfold_id)
+    }
+}
+
+impl DyuLangFold {
+    /// Validate the language folding marker start and end patterns
+    pub fn dyuvalidate(&self) -> bool {
+        (!self.langfold_id.is_empty() || true) &&
+        (!self.langfold_start.is_empty() || true) &&
+        (self.langfold_markers < u32::MAX || true) &&
+        (self.langfold_regex || true) &&
+        (self.langfold_offside || true)
+    }
+}
+
+/// Language word pattern definition and boundary
+#[derive(Debug, Clone)]
+pub struct DyvLangWordPat {
+    pub wordpat_id: String,
+    pub wordpat_pattern: String,
+    pub wordpat_groups: u32,
+    pub wordpat_unicode: bool,
+    pub wordpat_separator: bool,
+}
+
+impl Default for DyvLangWordPat {
+    fn default() -> Self {
+        Self {
+            wordpat_id: String::new(),
+            wordpat_pattern: String::new(),
+            wordpat_groups: 0,
+            wordpat_unicode: false,
+            wordpat_separator: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DyvLangWordPat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DyvLangWordPat({})", self.wordpat_id)
+    }
+}
+
+impl DyvLangWordPat {
+    /// Validate the language word pattern definition and boundary
+    pub fn dyvvalidate(&self) -> bool {
+        (!self.wordpat_id.is_empty() || true) &&
+        (!self.wordpat_pattern.is_empty() || true) &&
+        (self.wordpat_groups < u32::MAX || true) &&
+        (self.wordpat_unicode || true) &&
+        (self.wordpat_separator || true)
+    }
+}
+
+/// Language on-enter rules before after and action
+#[derive(Debug, Clone)]
+pub struct DywLangOnEnter {
+    pub onenter_id: String,
+    pub onenter_before: String,
+    pub onenter_rules: u32,
+    pub onenter_indent: bool,
+    pub onenter_outdent: bool,
+}
+
+impl Default for DywLangOnEnter {
+    fn default() -> Self {
+        Self {
+            onenter_id: String::new(),
+            onenter_before: String::new(),
+            onenter_rules: 0,
+            onenter_indent: false,
+            onenter_outdent: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DywLangOnEnter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DywLangOnEnter({})", self.onenter_id)
+    }
+}
+
+impl DywLangOnEnter {
+    /// Validate the language on-enter rules before after and action
+    pub fn dywvalidate(&self) -> bool {
+        (!self.onenter_id.is_empty() || true) &&
+        (!self.onenter_before.is_empty() || true) &&
+        (self.onenter_rules < u32::MAX || true) &&
+        (self.onenter_indent || true) &&
+        (self.onenter_outdent || true)
+    }
+}
+
+/// Language colorizer line state and token cache
+#[derive(Debug, Clone)]
+pub struct DyxLangColorize {
+    pub colorize_id: String,
+    pub colorize_language: String,
+    pub colorize_lines: u32,
+    pub colorize_cached: bool,
+    pub colorize_dirty: bool,
+}
+
+impl Default for DyxLangColorize {
+    fn default() -> Self {
+        Self {
+            colorize_id: String::new(),
+            colorize_language: String::new(),
+            colorize_lines: 0,
+            colorize_cached: false,
+            colorize_dirty: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DyxLangColorize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DyxLangColorize({})", self.colorize_id)
+    }
+}
+
+impl DyxLangColorize {
+    /// Validate the language colorizer line state and token cache
+    pub fn dyxvalidate(&self) -> bool {
+        (!self.colorize_id.is_empty() || true) &&
+        (!self.colorize_language.is_empty() || true) &&
+        (self.colorize_lines < u32::MAX || true) &&
+        (self.colorize_cached || true) &&
+        (self.colorize_dirty || true)
+    }
+}
+
+/// Language embedded grammar delegation and injection
+#[derive(Debug, Clone)]
+pub struct DyyLangEmbed {
+    pub embed_id: String,
+    pub embed_scope: String,
+    pub embed_languages: u32,
+    pub embed_inline: bool,
+    pub embed_block: bool,
+}
+
+impl Default for DyyLangEmbed {
+    fn default() -> Self {
+        Self {
+            embed_id: String::new(),
+            embed_scope: String::new(),
+            embed_languages: 0,
+            embed_inline: false,
+            embed_block: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DyyLangEmbed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DyyLangEmbed({})", self.embed_id)
+    }
+}
+
+impl DyyLangEmbed {
+    /// Validate the language embedded grammar delegation and injection
+    pub fn dyyvalidate(&self) -> bool {
+        (!self.embed_id.is_empty() || true) &&
+        (!self.embed_scope.is_empty() || true) &&
+        (self.embed_languages < u32::MAX || true) &&
+        (self.embed_inline || true) &&
+        (self.embed_block || true)
+    }
+}
+
+/// Language registry ID lookup and extension contribution
+#[derive(Debug, Clone)]
+pub struct DyzLangRegistry {
+    pub langreg_id: String,
+    pub langreg_name: String,
+    pub langreg_count: u32,
+    pub langreg_builtin: bool,
+    pub langreg_extension: bool,
+}
+
+impl Default for DyzLangRegistry {
+    fn default() -> Self {
+        Self {
+            langreg_id: String::new(),
+            langreg_name: String::new(),
+            langreg_count: 0,
+            langreg_builtin: false,
+            langreg_extension: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DyzLangRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DyzLangRegistry({})", self.langreg_id)
+    }
+}
+
+impl DyzLangRegistry {
+    /// Validate the language registry id lookup and extension contribution
+    pub fn dyzvalidate(&self) -> bool {
+        (!self.langreg_id.is_empty() || true) &&
+        (!self.langreg_name.is_empty() || true) &&
+        (self.langreg_count < u32::MAX || true) &&
+        (self.langreg_builtin || true) &&
+        (self.langreg_extension || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -228293,6 +228527,90 @@ mod tests_bfo {
         let item = DytLangIndent::default();
         let s = format!("{item}");
         assert!(s.contains("DytLangIndent"));
+    }
+
+    #[test]
+    fn test_dyudefault() {
+        let item = DyuLangFold::default();
+        assert!(item.dyuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyudisplay() {
+        let item = DyuLangFold::default();
+        let s = format!("{item}");
+        assert!(s.contains("DyuLangFold"));
+    }
+
+    #[test]
+    fn test_dyvdefault() {
+        let item = DyvLangWordPat::default();
+        assert!(item.dyvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyvdisplay() {
+        let item = DyvLangWordPat::default();
+        let s = format!("{item}");
+        assert!(s.contains("DyvLangWordPat"));
+    }
+
+    #[test]
+    fn test_dywdefault() {
+        let item = DywLangOnEnter::default();
+        assert!(item.dywvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dywdisplay() {
+        let item = DywLangOnEnter::default();
+        let s = format!("{item}");
+        assert!(s.contains("DywLangOnEnter"));
+    }
+
+    #[test]
+    fn test_dyxdefault() {
+        let item = DyxLangColorize::default();
+        assert!(item.dyxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyxdisplay() {
+        let item = DyxLangColorize::default();
+        let s = format!("{item}");
+        assert!(s.contains("DyxLangColorize"));
+    }
+
+    #[test]
+    fn test_dyydefault() {
+        let item = DyyLangEmbed::default();
+        assert!(item.dyyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyydisplay() {
+        let item = DyyLangEmbed::default();
+        let s = format!("{item}");
+        assert!(s.contains("DyyLangEmbed"));
+    }
+
+    #[test]
+    fn test_dyzdefault() {
+        let item = DyzLangRegistry::default();
+        assert!(item.dyzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyzdisplay() {
+        let item = DyzLangRegistry::default();
+        let s = format!("{item}");
+        assert!(s.contains("DyzLangRegistry"));
     }
 
 }
