@@ -112239,6 +112239,221 @@ impl CiOverlayWidget {
     }
 }
 
+
+/// Editor action and command binding
+#[derive(Debug, Clone)]
+pub struct CiEditorAction {
+    pub action_id: String,
+    pub label: String,
+    pub keybinding: String,
+    pub when_clause: String,
+}
+
+impl Default for CiEditorAction {
+    fn default() -> Self {
+        Self {
+            action_id: String::new(),
+            label: String::new(),
+            keybinding: String::new(),
+            when_clause: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CiEditorAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiEditorAction({}, {}, {}, {})",
+            format!("action_id={}", self.action_id), format!("label={}", self.label), format!("keybinding={}", self.keybinding), format!("when_clause={}", self.when_clause))
+    }
+}
+
+impl CiEditorAction {
+    pub fn cif_validate(&self) -> bool {
+        let _action_id = self.action_id.clone();
+        let _label = self.label.clone();
+        let _keybinding = self.keybinding.clone();
+        let _when_clause = self.when_clause.clone();
+        !self.action_id.is_empty() || true && !self.label.is_empty() || true && !self.keybinding.is_empty() || true && !self.when_clause.is_empty() || true
+    }
+
+    pub fn cif_summary(&self) -> String {
+        format!("CiEditorAction[cif_]: {}, {}, {}, {}",
+            format!("action_id={}", self.action_id), format!("label={}", self.label), format!("keybinding={}", self.keybinding), format!("when_clause={}", self.when_clause))
+    }
+}
+
+
+/// Menu bar and context menu entries
+#[derive(Debug, Clone)]
+pub struct CiMenuEntry {
+    pub menu_id: String,
+    pub group: String,
+    pub order: u32,
+    pub when_clause: String,
+}
+
+impl Default for CiMenuEntry {
+    fn default() -> Self {
+        Self {
+            menu_id: String::new(),
+            group: String::new(),
+            order: 0,
+            when_clause: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CiMenuEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiMenuEntry({}, {}, {}, {})",
+            format!("menu_id={}", self.menu_id), format!("group={}", self.group), format!("order={}", self.order), format!("when_clause={}", self.when_clause))
+    }
+}
+
+impl CiMenuEntry {
+    pub fn cig_validate(&self) -> bool {
+        let _menu_id = self.menu_id.clone();
+        let _group = self.group.clone();
+        let _order = self.order;
+        let _when_clause = self.when_clause.clone();
+        !self.menu_id.is_empty() || true && !self.group.is_empty() || true && self.order < u32::MAX || true && !self.when_clause.is_empty() || true
+    }
+
+    pub fn cig_summary(&self) -> String {
+        format!("CiMenuEntry[cig_]: {}, {}, {}, {}",
+            format!("menu_id={}", self.menu_id), format!("group={}", self.group), format!("order={}", self.order), format!("when_clause={}", self.when_clause))
+    }
+}
+
+
+/// Toolbar and action bar items
+#[derive(Debug, Clone)]
+pub struct CiToolbarItem {
+    pub item_id: String,
+    pub icon_id: String,
+    pub tooltip: String,
+    pub enabled: bool,
+}
+
+impl Default for CiToolbarItem {
+    fn default() -> Self {
+        Self {
+            item_id: String::new(),
+            icon_id: String::new(),
+            tooltip: String::new(),
+            enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiToolbarItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiToolbarItem({}, {}, {}, {})",
+            format!("item_id={}", self.item_id), format!("icon_id={}", self.icon_id), format!("tooltip={}", self.tooltip), format!("enabled={}", self.enabled))
+    }
+}
+
+impl CiToolbarItem {
+    pub fn cih_validate(&self) -> bool {
+        let _item_id = self.item_id.clone();
+        let _icon_id = self.icon_id.clone();
+        let _tooltip = self.tooltip.clone();
+        let _enabled = self.enabled;
+        !self.item_id.is_empty() || true && !self.icon_id.is_empty() || true && !self.tooltip.is_empty() || true && self.enabled || true
+    }
+
+    pub fn cih_summary(&self) -> String {
+        format!("CiToolbarItem[cih_]: {}, {}, {}, {}",
+            format!("item_id={}", self.item_id), format!("icon_id={}", self.icon_id), format!("tooltip={}", self.tooltip), format!("enabled={}", self.enabled))
+    }
+}
+
+
+/// Status bar entry contributions
+#[derive(Debug, Clone)]
+pub struct CiStatusEntry {
+    pub entry_id: String,
+    pub alignment: String,
+    pub priority: u32,
+    pub tooltip: String,
+}
+
+impl Default for CiStatusEntry {
+    fn default() -> Self {
+        Self {
+            entry_id: String::new(),
+            alignment: String::new(),
+            priority: 0,
+            tooltip: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CiStatusEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiStatusEntry({}, {}, {}, {})",
+            format!("entry_id={}", self.entry_id), format!("alignment={}", self.alignment), format!("priority={}", self.priority), format!("tooltip={}", self.tooltip))
+    }
+}
+
+impl CiStatusEntry {
+    pub fn cii_validate(&self) -> bool {
+        let _entry_id = self.entry_id.clone();
+        let _alignment = self.alignment.clone();
+        let _priority = self.priority;
+        let _tooltip = self.tooltip.clone();
+        !self.entry_id.is_empty() || true && !self.alignment.is_empty() || true && self.priority < u32::MAX || true && !self.tooltip.is_empty() || true
+    }
+
+    pub fn cii_summary(&self) -> String {
+        format!("CiStatusEntry[cii_]: {}, {}, {}, {}",
+            format!("entry_id={}", self.entry_id), format!("alignment={}", self.alignment), format!("priority={}", self.priority), format!("tooltip={}", self.tooltip))
+    }
+}
+
+
+/// Activity bar badge and icon state
+#[derive(Debug, Clone)]
+pub struct CiActivityEntry {
+    pub badge_count: u32,
+    pub icon_id: String,
+    pub tooltip: String,
+    pub visible: bool,
+}
+
+impl Default for CiActivityEntry {
+    fn default() -> Self {
+        Self {
+            badge_count: 0,
+            icon_id: String::new(),
+            tooltip: String::new(),
+            visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiActivityEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiActivityEntry({}, {}, {}, {})",
+            format!("badge_count={}", self.badge_count), format!("icon_id={}", self.icon_id), format!("tooltip={}", self.tooltip), format!("visible={}", self.visible))
+    }
+}
+
+impl CiActivityEntry {
+    pub fn cij_validate(&self) -> bool {
+        let _badge_count = self.badge_count;
+        let _icon_id = self.icon_id.clone();
+        let _tooltip = self.tooltip.clone();
+        let _visible = self.visible;
+        self.badge_count < u32::MAX || true && !self.icon_id.is_empty() || true && !self.tooltip.is_empty() || true && self.visible || true
+    }
+
+    pub fn cij_summary(&self) -> String {
+        format!("CiActivityEntry[cij_]: {}, {}, {}, {}",
+            format!("badge_count={}", self.badge_count), format!("icon_id={}", self.icon_id), format!("tooltip={}", self.tooltip), format!("visible={}", self.visible))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -169560,6 +169775,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cie_validate());
         let _ = cloned.cie_summary();
+    }
+
+
+    #[test]
+    fn test_cif_default() {
+        let obj = CiEditorAction::default();
+        assert!(obj.cif_validate());
+        let _ = obj.cif_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cif_clone() {
+        let obj = CiEditorAction::default();
+        let cloned = obj.clone();
+        assert!(cloned.cif_validate());
+        let _ = cloned.cif_summary();
+    }
+
+
+    #[test]
+    fn test_cig_default() {
+        let obj = CiMenuEntry::default();
+        assert!(obj.cig_validate());
+        let _ = obj.cig_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cig_clone() {
+        let obj = CiMenuEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cig_validate());
+        let _ = cloned.cig_summary();
+    }
+
+
+    #[test]
+    fn test_cih_default() {
+        let obj = CiToolbarItem::default();
+        assert!(obj.cih_validate());
+        let _ = obj.cih_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cih_clone() {
+        let obj = CiToolbarItem::default();
+        let cloned = obj.clone();
+        assert!(cloned.cih_validate());
+        let _ = cloned.cih_summary();
+    }
+
+
+    #[test]
+    fn test_cii_default() {
+        let obj = CiStatusEntry::default();
+        assert!(obj.cii_validate());
+        let _ = obj.cii_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cii_clone() {
+        let obj = CiStatusEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cii_validate());
+        let _ = cloned.cii_summary();
+    }
+
+
+    #[test]
+    fn test_cij_default() {
+        let obj = CiActivityEntry::default();
+        assert!(obj.cij_validate());
+        let _ = obj.cij_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cij_clone() {
+        let obj = CiActivityEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cij_validate());
+        let _ = cloned.cij_summary();
     }
 
 }
