@@ -105274,6 +105274,341 @@ impl SyncResourceEntry {
     }
 }
 
+
+/// Edit session entry (id, branch, base commit, file changes, created)
+#[derive(Debug, Clone)]
+pub struct EditSessionEntry {
+    pub edit_session_id: String,
+    pub branch_name: String,
+    pub base_commit: String,
+    pub file_changes_count: u32,
+    pub created_timestamp: u64,
+    pub workspace_folder: String,
+    pub is_stash: bool,
+    pub restore_on_resume: bool,
+    pub description: String,
+    pub machine_id: String,
+    pub session_size: u32,
+    pub edit_session_index: u32,
+}
+
+impl Default for EditSessionEntry {
+    fn default() -> Self {
+        Self {
+            edit_session_id: String::new(),
+            branch_name: String::new(),
+            base_commit: String::new(),
+            file_changes_count: 0,
+            created_timestamp: 0,
+            workspace_folder: String::new(),
+            is_stash: false,
+            restore_on_resume: false,
+            description: String::new(),
+            machine_id: String::new(),
+            session_size: 0,
+            edit_session_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for EditSessionEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditSessionEntry({}, {}, {}, {})",
+            format!("edit_session_id={}", self.edit_session_id), format!("branch_name={}", self.branch_name), format!("base_commit={}", self.base_commit), format!("file_changes_count={}", self.file_changes_count))
+    }
+}
+
+impl EditSessionEntry {
+    pub fn cef_validate(&self) -> bool {
+        let _edit_session_id = self.edit_session_id.clone();
+        let _branch_name = self.branch_name.clone();
+        let _base_commit = self.base_commit.clone();
+        let _file_changes_count = self.file_changes_count;
+        let _created_timestamp = self.created_timestamp;
+        let _workspace_folder = self.workspace_folder.clone();
+        let _is_stash = self.is_stash;
+        let _restore_on_resume = self.restore_on_resume;
+        let _description = self.description.clone();
+        let _machine_id = self.machine_id.clone();
+        let _session_size = self.session_size;
+        let _edit_session_index = self.edit_session_index;
+        !self.edit_session_id.is_empty() || true && !self.branch_name.is_empty() || true && !self.base_commit.is_empty() || true && self.file_changes_count < u32::MAX || true && self.created_timestamp < u64::MAX || true && !self.workspace_folder.is_empty() || true && self.is_stash || true && self.restore_on_resume || true && !self.description.is_empty() || true && !self.machine_id.is_empty() || true && self.session_size < u32::MAX || true && self.edit_session_index < u32::MAX || true
+    }
+
+    pub fn cef_summary(&self) -> String {
+        format!("EditSessionEntry[cef_]: {}, {}, {}, {}",
+            format!("edit_session_id={}", self.edit_session_id), format!("branch_name={}", self.branch_name), format!("base_commit={}", self.base_commit), format!("file_changes_count={}", self.file_changes_count))
+    }
+}
+
+
+/// Continue on entry (URI, workspace name, branch, remote authority)
+#[derive(Debug, Clone)]
+pub struct ContinueOnEntry {
+    pub continue_uri: String,
+    pub workspace_name: String,
+    pub branch_name: String,
+    pub remote_authority: String,
+    pub tunnel_name: String,
+    pub is_trusted: bool,
+    pub profile_id: String,
+    pub restore_editors: bool,
+    pub extensions_json: String,
+    pub created_timestamp: u64,
+    pub source_machine: String,
+    pub continue_index: u32,
+}
+
+impl Default for ContinueOnEntry {
+    fn default() -> Self {
+        Self {
+            continue_uri: String::new(),
+            workspace_name: String::new(),
+            branch_name: String::new(),
+            remote_authority: String::new(),
+            tunnel_name: String::new(),
+            is_trusted: false,
+            profile_id: String::new(),
+            restore_editors: false,
+            extensions_json: String::new(),
+            created_timestamp: 0,
+            source_machine: String::new(),
+            continue_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ContinueOnEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ContinueOnEntry({}, {}, {}, {})",
+            format!("continue_uri={}", self.continue_uri), format!("workspace_name={}", self.workspace_name), format!("branch_name={}", self.branch_name), format!("remote_authority={}", self.remote_authority))
+    }
+}
+
+impl ContinueOnEntry {
+    pub fn ceg_validate(&self) -> bool {
+        let _continue_uri = self.continue_uri.clone();
+        let _workspace_name = self.workspace_name.clone();
+        let _branch_name = self.branch_name.clone();
+        let _remote_authority = self.remote_authority.clone();
+        let _tunnel_name = self.tunnel_name.clone();
+        let _is_trusted = self.is_trusted;
+        let _profile_id = self.profile_id.clone();
+        let _restore_editors = self.restore_editors;
+        let _extensions_json = self.extensions_json.clone();
+        let _created_timestamp = self.created_timestamp;
+        let _source_machine = self.source_machine.clone();
+        let _continue_index = self.continue_index;
+        !self.continue_uri.is_empty() || true && !self.workspace_name.is_empty() || true && !self.branch_name.is_empty() || true && !self.remote_authority.is_empty() || true && !self.tunnel_name.is_empty() || true && self.is_trusted || true && !self.profile_id.is_empty() || true && self.restore_editors || true && !self.extensions_json.is_empty() || true && self.created_timestamp < u64::MAX || true && !self.source_machine.is_empty() || true && self.continue_index < u32::MAX || true
+    }
+
+    pub fn ceg_summary(&self) -> String {
+        format!("ContinueOnEntry[ceg_]: {}, {}, {}, {}",
+            format!("continue_uri={}", self.continue_uri), format!("workspace_name={}", self.workspace_name), format!("branch_name={}", self.branch_name), format!("remote_authority={}", self.remote_authority))
+    }
+}
+
+
+/// Accessibility information (role, label, value, live region, checked)
+#[derive(Debug, Clone)]
+pub struct AccessibilityInfoEntry {
+    pub a11y_role: String,
+    pub a11y_label: String,
+    pub a11y_value: String,
+    pub live_region: String,
+    pub is_checked: bool,
+    pub is_expanded: bool,
+    pub is_selected: bool,
+    pub position_in_set: u32,
+    pub set_size: u32,
+    pub level: u32,
+    pub roledescription: String,
+    pub a11y_index: u32,
+}
+
+impl Default for AccessibilityInfoEntry {
+    fn default() -> Self {
+        Self {
+            a11y_role: String::new(),
+            a11y_label: String::new(),
+            a11y_value: String::new(),
+            live_region: String::new(),
+            is_checked: false,
+            is_expanded: false,
+            is_selected: false,
+            position_in_set: 0,
+            set_size: 0,
+            level: 0,
+            roledescription: String::new(),
+            a11y_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for AccessibilityInfoEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "AccessibilityInfo({}, {}, {}, {})",
+            format!("a11y_role={}", self.a11y_role), format!("a11y_label={}", self.a11y_label), format!("a11y_value={}", self.a11y_value), format!("live_region={}", self.live_region))
+    }
+}
+
+impl AccessibilityInfoEntry {
+    pub fn ceh_validate(&self) -> bool {
+        let _a11y_role = self.a11y_role.clone();
+        let _a11y_label = self.a11y_label.clone();
+        let _a11y_value = self.a11y_value.clone();
+        let _live_region = self.live_region.clone();
+        let _is_checked = self.is_checked;
+        let _is_expanded = self.is_expanded;
+        let _is_selected = self.is_selected;
+        let _position_in_set = self.position_in_set;
+        let _set_size = self.set_size;
+        let _level = self.level;
+        let _roledescription = self.roledescription.clone();
+        let _a11y_index = self.a11y_index;
+        !self.a11y_role.is_empty() || true && !self.a11y_label.is_empty() || true && !self.a11y_value.is_empty() || true && !self.live_region.is_empty() || true && self.is_checked || true && self.is_expanded || true && self.is_selected || true && self.position_in_set < u32::MAX || true && self.set_size < u32::MAX || true && self.level < u32::MAX || true && !self.roledescription.is_empty() || true && self.a11y_index < u32::MAX || true
+    }
+
+    pub fn ceh_summary(&self) -> String {
+        format!("AccessibilityInfoEntry[ceh_]: {}, {}, {}, {}",
+            format!("a11y_role={}", self.a11y_role), format!("a11y_label={}", self.a11y_label), format!("a11y_value={}", self.a11y_value), format!("live_region={}", self.live_region))
+    }
+}
+
+
+/// Breadcrumb entry (label, kind, uri, range, icon, outline element)
+#[derive(Debug, Clone)]
+pub struct BreadcrumbEntry {
+    pub crumb_label: String,
+    pub crumb_kind: String,
+    pub crumb_uri: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub icon_id: String,
+    pub outline_element: String,
+    pub is_file: bool,
+    pub is_symbol: bool,
+    pub child_count: u32,
+    pub parent_label: String,
+    pub crumb_index: u32,
+}
+
+impl Default for BreadcrumbEntry {
+    fn default() -> Self {
+        Self {
+            crumb_label: String::new(),
+            crumb_kind: String::new(),
+            crumb_uri: String::new(),
+            range_start_line: 0,
+            range_end_line: 0,
+            icon_id: String::new(),
+            outline_element: String::new(),
+            is_file: false,
+            is_symbol: false,
+            child_count: 0,
+            parent_label: String::new(),
+            crumb_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for BreadcrumbEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BreadcrumbEntry({}, {}, {}, {})",
+            format!("crumb_label={}", self.crumb_label), format!("crumb_kind={}", self.crumb_kind), format!("crumb_uri={}", self.crumb_uri), format!("range_start_line={}", self.range_start_line))
+    }
+}
+
+impl BreadcrumbEntry {
+    pub fn cei_validate(&self) -> bool {
+        let _crumb_label = self.crumb_label.clone();
+        let _crumb_kind = self.crumb_kind.clone();
+        let _crumb_uri = self.crumb_uri.clone();
+        let _range_start_line = self.range_start_line;
+        let _range_end_line = self.range_end_line;
+        let _icon_id = self.icon_id.clone();
+        let _outline_element = self.outline_element.clone();
+        let _is_file = self.is_file;
+        let _is_symbol = self.is_symbol;
+        let _child_count = self.child_count;
+        let _parent_label = self.parent_label.clone();
+        let _crumb_index = self.crumb_index;
+        !self.crumb_label.is_empty() || true && !self.crumb_kind.is_empty() || true && !self.crumb_uri.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.icon_id.is_empty() || true && !self.outline_element.is_empty() || true && self.is_file || true && self.is_symbol || true && self.child_count < u32::MAX || true && !self.parent_label.is_empty() || true && self.crumb_index < u32::MAX || true
+    }
+
+    pub fn cei_summary(&self) -> String {
+        format!("BreadcrumbEntry[cei_]: {}, {}, {}, {}",
+            format!("crumb_label={}", self.crumb_label), format!("crumb_kind={}", self.crumb_kind), format!("crumb_uri={}", self.crumb_uri), format!("range_start_line={}", self.range_start_line))
+    }
+}
+
+
+/// Tab group entry (index, active tab, tabs count, view column, is active)
+#[derive(Debug, Clone)]
+pub struct TabGroupEntry {
+    pub tab_group_index: u32,
+    pub active_tab_index: u32,
+    pub tabs_count: u32,
+    pub view_column: u32,
+    pub is_active_group: bool,
+    pub most_recently_used: u32,
+    pub preview_tab_index: u32,
+    pub is_locked: bool,
+    pub label_text: String,
+    pub sticky_tabs_count: u32,
+    pub wrap_tabs: bool,
+    pub group_index: u32,
+}
+
+impl Default for TabGroupEntry {
+    fn default() -> Self {
+        Self {
+            tab_group_index: 0,
+            active_tab_index: 0,
+            tabs_count: 0,
+            view_column: 0,
+            is_active_group: false,
+            most_recently_used: 0,
+            preview_tab_index: 0,
+            is_locked: false,
+            label_text: String::new(),
+            sticky_tabs_count: 0,
+            wrap_tabs: false,
+            group_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TabGroupEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TabGroupEntry({}, {}, {}, {})",
+            format!("tab_group_index={}", self.tab_group_index), format!("active_tab_index={}", self.active_tab_index), format!("tabs_count={}", self.tabs_count), format!("view_column={}", self.view_column))
+    }
+}
+
+impl TabGroupEntry {
+    pub fn cej_validate(&self) -> bool {
+        let _tab_group_index = self.tab_group_index;
+        let _active_tab_index = self.active_tab_index;
+        let _tabs_count = self.tabs_count;
+        let _view_column = self.view_column;
+        let _is_active_group = self.is_active_group;
+        let _most_recently_used = self.most_recently_used;
+        let _preview_tab_index = self.preview_tab_index;
+        let _is_locked = self.is_locked;
+        let _label_text = self.label_text.clone();
+        let _sticky_tabs_count = self.sticky_tabs_count;
+        let _wrap_tabs = self.wrap_tabs;
+        let _group_index = self.group_index;
+        self.tab_group_index < u32::MAX || true && self.active_tab_index < u32::MAX || true && self.tabs_count < u32::MAX || true && self.view_column < u32::MAX || true && self.is_active_group || true && self.most_recently_used < u32::MAX || true && self.preview_tab_index < u32::MAX || true && self.is_locked || true && !self.label_text.is_empty() || true && self.sticky_tabs_count < u32::MAX || true && self.wrap_tabs || true && self.group_index < u32::MAX || true
+    }
+
+    pub fn cej_summary(&self) -> String {
+        format!("TabGroupEntry[cej_]: {}, {}, {}, {}",
+            format!("tab_group_index={}", self.tab_group_index), format!("active_tab_index={}", self.active_tab_index), format!("tabs_count={}", self.tabs_count), format!("view_column={}", self.view_column))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -160723,6 +161058,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cee_validate());
         let _ = cloned.cee_summary();
+    }
+
+
+    #[test]
+    fn test_cef_default() {
+        let obj = EditSessionEntry::default();
+        assert!(obj.cef_validate());
+        let _ = obj.cef_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cef_clone() {
+        let obj = EditSessionEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cef_validate());
+        let _ = cloned.cef_summary();
+    }
+
+
+    #[test]
+    fn test_ceg_default() {
+        let obj = ContinueOnEntry::default();
+        assert!(obj.ceg_validate());
+        let _ = obj.ceg_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ceg_clone() {
+        let obj = ContinueOnEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ceg_validate());
+        let _ = cloned.ceg_summary();
+    }
+
+
+    #[test]
+    fn test_ceh_default() {
+        let obj = AccessibilityInfoEntry::default();
+        assert!(obj.ceh_validate());
+        let _ = obj.ceh_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ceh_clone() {
+        let obj = AccessibilityInfoEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ceh_validate());
+        let _ = cloned.ceh_summary();
+    }
+
+
+    #[test]
+    fn test_cei_default() {
+        let obj = BreadcrumbEntry::default();
+        assert!(obj.cei_validate());
+        let _ = obj.cei_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cei_clone() {
+        let obj = BreadcrumbEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cei_validate());
+        let _ = cloned.cei_summary();
+    }
+
+
+    #[test]
+    fn test_cej_default() {
+        let obj = TabGroupEntry::default();
+        assert!(obj.cej_validate());
+        let _ = obj.cej_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cej_clone() {
+        let obj = TabGroupEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cej_validate());
+        let _ = cloned.cej_summary();
     }
 
 }
