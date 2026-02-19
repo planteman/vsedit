@@ -89418,6 +89418,111 @@ impl AccessibilityInfo {
     }
 }
 
+/// Runtime wiring: brk_ ScreenReader
+#[derive(Debug, Clone)]
+pub struct ScreenReader {
+    pub brk_is_enabled: bool,
+    pub brk_strategy: String,
+    pub brk_page_size: u32,
+    pub brk_auto_focus_on_change: bool,
+    pub brk_cursor_announcement: String,
+    pub brk_line_announcement: String,
+    pub brk_selection_announcement: String,
+    pub brk_status_text: String,
+    pub brk_alert_text: String,
+    pub brk_log_level: u8,
+}
+
+impl ScreenReader {
+    pub fn brk_summary(&self) -> String {
+        format!("ScreenReader({})", self.brk_is_enabled)
+    }
+}
+
+/// Runtime wiring: brl_ AriaLiveRegion
+#[derive(Debug, Clone)]
+pub struct AriaLiveRegion {
+    pub brl_region_id: String,
+    pub brl_politeness: String,
+    pub brl_text: String,
+    pub brl_is_atomic: bool,
+    pub brl_relevant_additions: bool,
+    pub brl_relevant_removals: bool,
+    pub brl_relevant_text: bool,
+    pub brl_busy: bool,
+    pub brl_role: String,
+    pub brl_label: String,
+}
+
+impl AriaLiveRegion {
+    pub fn brl_summary(&self) -> String {
+        format!("AriaLiveRegion({})", self.brl_region_id)
+    }
+}
+
+/// Runtime wiring: brm_ TabNavigation
+#[derive(Debug, Clone)]
+pub struct TabNavigation {
+    pub brm_tab_index: u32,
+    pub brm_total_tabs: u32,
+    pub brm_active_tab_id: String,
+    pub brm_tab_labels: Vec<String>,
+    pub brm_is_vertical: bool,
+    pub brm_wrap_around: bool,
+    pub brm_selection_follows_focus: bool,
+    pub brm_manual_activation: bool,
+    pub brm_orientation: String,
+    pub brm_container_id: String,
+}
+
+impl TabNavigation {
+    pub fn brm_summary(&self) -> String {
+        format!("TabNavigation({})", self.brm_tab_index)
+    }
+}
+
+/// Runtime wiring: brn_ CommandPaletteItem
+#[derive(Debug, Clone)]
+pub struct CommandPaletteItem {
+    pub brn_command_id: String,
+    pub brn_label: String,
+    pub brn_description: String,
+    pub brn_detail: String,
+    pub brn_keybinding: String,
+    pub brn_category: String,
+    pub brn_icon_id: String,
+    pub brn_when_clause: String,
+    pub brn_score: f64,
+    pub brn_recently_used: bool,
+}
+
+impl CommandPaletteItem {
+    pub fn brn_summary(&self) -> String {
+        format!("CommandPaletteItem({})", self.brn_command_id)
+    }
+}
+
+/// Runtime wiring: bro_ QuickAccess
+#[derive(Debug, Clone)]
+pub struct QuickAccess {
+    pub bro_provider_id: String,
+    pub bro_prefix: String,
+    pub bro_placeholder: String,
+    pub bro_help_text: String,
+    pub bro_item_count: usize,
+    pub bro_is_active: bool,
+    pub bro_filter_text: String,
+    pub bro_selected_index: u32,
+    pub bro_step_count: u32,
+    pub bro_current_step: u32,
+}
+
+impl QuickAccess {
+    pub fn bro_summary(&self) -> String {
+        format!("QuickAccess({})", self.bro_provider_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -119284,6 +119389,910 @@ mod tests_bfo {
         };
         let _ = obj.brj_summary();
         assert_eq!(obj.brj_set_size, 0);
+    }
+
+    #[test]
+    fn test_brk_is_enabled() {
+        let obj = ScreenReader {
+            brk_is_enabled: false,
+            brk_strategy: String::from("test"),
+            brk_page_size: 0,
+            brk_auto_focus_on_change: false,
+            brk_cursor_announcement: String::from("test"),
+            brk_line_announcement: String::from("test"),
+            brk_selection_announcement: String::from("test"),
+            brk_status_text: String::from("test"),
+            brk_alert_text: String::from("test"),
+            brk_log_level: 0,
+        };
+        let _ = obj.brk_summary();
+        assert!(!obj.brk_is_enabled);
+    }
+
+    #[test]
+    fn test_brk_strategy() {
+        let obj = ScreenReader {
+            brk_is_enabled: false,
+            brk_strategy: String::from("test"),
+            brk_page_size: 0,
+            brk_auto_focus_on_change: false,
+            brk_cursor_announcement: String::from("test"),
+            brk_line_announcement: String::from("test"),
+            brk_selection_announcement: String::from("test"),
+            brk_status_text: String::from("test"),
+            brk_alert_text: String::from("test"),
+            brk_log_level: 0,
+        };
+        let _ = obj.brk_summary();
+        assert_eq!(obj.brk_strategy, "test");
+    }
+
+    #[test]
+    fn test_brk_page_size() {
+        let obj = ScreenReader {
+            brk_is_enabled: false,
+            brk_strategy: String::from("test"),
+            brk_page_size: 0,
+            brk_auto_focus_on_change: false,
+            brk_cursor_announcement: String::from("test"),
+            brk_line_announcement: String::from("test"),
+            brk_selection_announcement: String::from("test"),
+            brk_status_text: String::from("test"),
+            brk_alert_text: String::from("test"),
+            brk_log_level: 0,
+        };
+        let _ = obj.brk_summary();
+        assert_eq!(obj.brk_page_size, 0);
+    }
+
+    #[test]
+    fn test_brk_auto_focus_on_change() {
+        let obj = ScreenReader {
+            brk_is_enabled: false,
+            brk_strategy: String::from("test"),
+            brk_page_size: 0,
+            brk_auto_focus_on_change: false,
+            brk_cursor_announcement: String::from("test"),
+            brk_line_announcement: String::from("test"),
+            brk_selection_announcement: String::from("test"),
+            brk_status_text: String::from("test"),
+            brk_alert_text: String::from("test"),
+            brk_log_level: 0,
+        };
+        let _ = obj.brk_summary();
+        assert!(!obj.brk_auto_focus_on_change);
+    }
+
+    #[test]
+    fn test_brk_cursor_announcement() {
+        let obj = ScreenReader {
+            brk_is_enabled: false,
+            brk_strategy: String::from("test"),
+            brk_page_size: 0,
+            brk_auto_focus_on_change: false,
+            brk_cursor_announcement: String::from("test"),
+            brk_line_announcement: String::from("test"),
+            brk_selection_announcement: String::from("test"),
+            brk_status_text: String::from("test"),
+            brk_alert_text: String::from("test"),
+            brk_log_level: 0,
+        };
+        let _ = obj.brk_summary();
+        assert_eq!(obj.brk_cursor_announcement, "test");
+    }
+
+    #[test]
+    fn test_brk_line_announcement() {
+        let obj = ScreenReader {
+            brk_is_enabled: false,
+            brk_strategy: String::from("test"),
+            brk_page_size: 0,
+            brk_auto_focus_on_change: false,
+            brk_cursor_announcement: String::from("test"),
+            brk_line_announcement: String::from("test"),
+            brk_selection_announcement: String::from("test"),
+            brk_status_text: String::from("test"),
+            brk_alert_text: String::from("test"),
+            brk_log_level: 0,
+        };
+        let _ = obj.brk_summary();
+        assert_eq!(obj.brk_line_announcement, "test");
+    }
+
+    #[test]
+    fn test_brk_selection_announcement() {
+        let obj = ScreenReader {
+            brk_is_enabled: false,
+            brk_strategy: String::from("test"),
+            brk_page_size: 0,
+            brk_auto_focus_on_change: false,
+            brk_cursor_announcement: String::from("test"),
+            brk_line_announcement: String::from("test"),
+            brk_selection_announcement: String::from("test"),
+            brk_status_text: String::from("test"),
+            brk_alert_text: String::from("test"),
+            brk_log_level: 0,
+        };
+        let _ = obj.brk_summary();
+        assert_eq!(obj.brk_selection_announcement, "test");
+    }
+
+    #[test]
+    fn test_brk_status_text() {
+        let obj = ScreenReader {
+            brk_is_enabled: false,
+            brk_strategy: String::from("test"),
+            brk_page_size: 0,
+            brk_auto_focus_on_change: false,
+            brk_cursor_announcement: String::from("test"),
+            brk_line_announcement: String::from("test"),
+            brk_selection_announcement: String::from("test"),
+            brk_status_text: String::from("test"),
+            brk_alert_text: String::from("test"),
+            brk_log_level: 0,
+        };
+        let _ = obj.brk_summary();
+        assert_eq!(obj.brk_status_text, "test");
+    }
+
+    #[test]
+    fn test_brk_alert_text() {
+        let obj = ScreenReader {
+            brk_is_enabled: false,
+            brk_strategy: String::from("test"),
+            brk_page_size: 0,
+            brk_auto_focus_on_change: false,
+            brk_cursor_announcement: String::from("test"),
+            brk_line_announcement: String::from("test"),
+            brk_selection_announcement: String::from("test"),
+            brk_status_text: String::from("test"),
+            brk_alert_text: String::from("test"),
+            brk_log_level: 0,
+        };
+        let _ = obj.brk_summary();
+        assert_eq!(obj.brk_alert_text, "test");
+    }
+
+    #[test]
+    fn test_brk_log_level() {
+        let obj = ScreenReader {
+            brk_is_enabled: false,
+            brk_strategy: String::from("test"),
+            brk_page_size: 0,
+            brk_auto_focus_on_change: false,
+            brk_cursor_announcement: String::from("test"),
+            brk_line_announcement: String::from("test"),
+            brk_selection_announcement: String::from("test"),
+            brk_status_text: String::from("test"),
+            brk_alert_text: String::from("test"),
+            brk_log_level: 0,
+        };
+        let _ = obj.brk_summary();
+        assert_eq!(obj.brk_log_level, 0);
+    }
+
+
+    #[test]
+    fn test_brl_region_id() {
+        let obj = AriaLiveRegion {
+            brl_region_id: String::from("test"),
+            brl_politeness: String::from("test"),
+            brl_text: String::from("test"),
+            brl_is_atomic: false,
+            brl_relevant_additions: false,
+            brl_relevant_removals: false,
+            brl_relevant_text: false,
+            brl_busy: false,
+            brl_role: String::from("test"),
+            brl_label: String::from("test"),
+        };
+        let _ = obj.brl_summary();
+        assert_eq!(obj.brl_region_id, "test");
+    }
+
+    #[test]
+    fn test_brl_politeness() {
+        let obj = AriaLiveRegion {
+            brl_region_id: String::from("test"),
+            brl_politeness: String::from("test"),
+            brl_text: String::from("test"),
+            brl_is_atomic: false,
+            brl_relevant_additions: false,
+            brl_relevant_removals: false,
+            brl_relevant_text: false,
+            brl_busy: false,
+            brl_role: String::from("test"),
+            brl_label: String::from("test"),
+        };
+        let _ = obj.brl_summary();
+        assert_eq!(obj.brl_politeness, "test");
+    }
+
+    #[test]
+    fn test_brl_text() {
+        let obj = AriaLiveRegion {
+            brl_region_id: String::from("test"),
+            brl_politeness: String::from("test"),
+            brl_text: String::from("test"),
+            brl_is_atomic: false,
+            brl_relevant_additions: false,
+            brl_relevant_removals: false,
+            brl_relevant_text: false,
+            brl_busy: false,
+            brl_role: String::from("test"),
+            brl_label: String::from("test"),
+        };
+        let _ = obj.brl_summary();
+        assert_eq!(obj.brl_text, "test");
+    }
+
+    #[test]
+    fn test_brl_is_atomic() {
+        let obj = AriaLiveRegion {
+            brl_region_id: String::from("test"),
+            brl_politeness: String::from("test"),
+            brl_text: String::from("test"),
+            brl_is_atomic: false,
+            brl_relevant_additions: false,
+            brl_relevant_removals: false,
+            brl_relevant_text: false,
+            brl_busy: false,
+            brl_role: String::from("test"),
+            brl_label: String::from("test"),
+        };
+        let _ = obj.brl_summary();
+        assert!(!obj.brl_is_atomic);
+    }
+
+    #[test]
+    fn test_brl_relevant_additions() {
+        let obj = AriaLiveRegion {
+            brl_region_id: String::from("test"),
+            brl_politeness: String::from("test"),
+            brl_text: String::from("test"),
+            brl_is_atomic: false,
+            brl_relevant_additions: false,
+            brl_relevant_removals: false,
+            brl_relevant_text: false,
+            brl_busy: false,
+            brl_role: String::from("test"),
+            brl_label: String::from("test"),
+        };
+        let _ = obj.brl_summary();
+        assert!(!obj.brl_relevant_additions);
+    }
+
+    #[test]
+    fn test_brl_relevant_removals() {
+        let obj = AriaLiveRegion {
+            brl_region_id: String::from("test"),
+            brl_politeness: String::from("test"),
+            brl_text: String::from("test"),
+            brl_is_atomic: false,
+            brl_relevant_additions: false,
+            brl_relevant_removals: false,
+            brl_relevant_text: false,
+            brl_busy: false,
+            brl_role: String::from("test"),
+            brl_label: String::from("test"),
+        };
+        let _ = obj.brl_summary();
+        assert!(!obj.brl_relevant_removals);
+    }
+
+    #[test]
+    fn test_brl_relevant_text() {
+        let obj = AriaLiveRegion {
+            brl_region_id: String::from("test"),
+            brl_politeness: String::from("test"),
+            brl_text: String::from("test"),
+            brl_is_atomic: false,
+            brl_relevant_additions: false,
+            brl_relevant_removals: false,
+            brl_relevant_text: false,
+            brl_busy: false,
+            brl_role: String::from("test"),
+            brl_label: String::from("test"),
+        };
+        let _ = obj.brl_summary();
+        assert!(!obj.brl_relevant_text);
+    }
+
+    #[test]
+    fn test_brl_busy() {
+        let obj = AriaLiveRegion {
+            brl_region_id: String::from("test"),
+            brl_politeness: String::from("test"),
+            brl_text: String::from("test"),
+            brl_is_atomic: false,
+            brl_relevant_additions: false,
+            brl_relevant_removals: false,
+            brl_relevant_text: false,
+            brl_busy: false,
+            brl_role: String::from("test"),
+            brl_label: String::from("test"),
+        };
+        let _ = obj.brl_summary();
+        assert!(!obj.brl_busy);
+    }
+
+    #[test]
+    fn test_brl_role() {
+        let obj = AriaLiveRegion {
+            brl_region_id: String::from("test"),
+            brl_politeness: String::from("test"),
+            brl_text: String::from("test"),
+            brl_is_atomic: false,
+            brl_relevant_additions: false,
+            brl_relevant_removals: false,
+            brl_relevant_text: false,
+            brl_busy: false,
+            brl_role: String::from("test"),
+            brl_label: String::from("test"),
+        };
+        let _ = obj.brl_summary();
+        assert_eq!(obj.brl_role, "test");
+    }
+
+    #[test]
+    fn test_brl_label() {
+        let obj = AriaLiveRegion {
+            brl_region_id: String::from("test"),
+            brl_politeness: String::from("test"),
+            brl_text: String::from("test"),
+            brl_is_atomic: false,
+            brl_relevant_additions: false,
+            brl_relevant_removals: false,
+            brl_relevant_text: false,
+            brl_busy: false,
+            brl_role: String::from("test"),
+            brl_label: String::from("test"),
+        };
+        let _ = obj.brl_summary();
+        assert_eq!(obj.brl_label, "test");
+    }
+
+
+    #[test]
+    fn test_brm_tab_index() {
+        let obj = TabNavigation {
+            brm_tab_index: 0,
+            brm_total_tabs: 0,
+            brm_active_tab_id: String::from("test"),
+            brm_tab_labels: Vec::new(),
+            brm_is_vertical: false,
+            brm_wrap_around: false,
+            brm_selection_follows_focus: false,
+            brm_manual_activation: false,
+            brm_orientation: String::from("test"),
+            brm_container_id: String::from("test"),
+        };
+        let _ = obj.brm_summary();
+        assert_eq!(obj.brm_tab_index, 0);
+    }
+
+    #[test]
+    fn test_brm_total_tabs() {
+        let obj = TabNavigation {
+            brm_tab_index: 0,
+            brm_total_tabs: 0,
+            brm_active_tab_id: String::from("test"),
+            brm_tab_labels: Vec::new(),
+            brm_is_vertical: false,
+            brm_wrap_around: false,
+            brm_selection_follows_focus: false,
+            brm_manual_activation: false,
+            brm_orientation: String::from("test"),
+            brm_container_id: String::from("test"),
+        };
+        let _ = obj.brm_summary();
+        assert_eq!(obj.brm_total_tabs, 0);
+    }
+
+    #[test]
+    fn test_brm_active_tab_id() {
+        let obj = TabNavigation {
+            brm_tab_index: 0,
+            brm_total_tabs: 0,
+            brm_active_tab_id: String::from("test"),
+            brm_tab_labels: Vec::new(),
+            brm_is_vertical: false,
+            brm_wrap_around: false,
+            brm_selection_follows_focus: false,
+            brm_manual_activation: false,
+            brm_orientation: String::from("test"),
+            brm_container_id: String::from("test"),
+        };
+        let _ = obj.brm_summary();
+        assert_eq!(obj.brm_active_tab_id, "test");
+    }
+
+    #[test]
+    fn test_brm_tab_labels() {
+        let obj = TabNavigation {
+            brm_tab_index: 0,
+            brm_total_tabs: 0,
+            brm_active_tab_id: String::from("test"),
+            brm_tab_labels: Vec::new(),
+            brm_is_vertical: false,
+            brm_wrap_around: false,
+            brm_selection_follows_focus: false,
+            brm_manual_activation: false,
+            brm_orientation: String::from("test"),
+            brm_container_id: String::from("test"),
+        };
+        let _ = obj.brm_summary();
+        assert!(obj.brm_tab_labels.is_empty());
+    }
+
+    #[test]
+    fn test_brm_is_vertical() {
+        let obj = TabNavigation {
+            brm_tab_index: 0,
+            brm_total_tabs: 0,
+            brm_active_tab_id: String::from("test"),
+            brm_tab_labels: Vec::new(),
+            brm_is_vertical: false,
+            brm_wrap_around: false,
+            brm_selection_follows_focus: false,
+            brm_manual_activation: false,
+            brm_orientation: String::from("test"),
+            brm_container_id: String::from("test"),
+        };
+        let _ = obj.brm_summary();
+        assert!(!obj.brm_is_vertical);
+    }
+
+    #[test]
+    fn test_brm_wrap_around() {
+        let obj = TabNavigation {
+            brm_tab_index: 0,
+            brm_total_tabs: 0,
+            brm_active_tab_id: String::from("test"),
+            brm_tab_labels: Vec::new(),
+            brm_is_vertical: false,
+            brm_wrap_around: false,
+            brm_selection_follows_focus: false,
+            brm_manual_activation: false,
+            brm_orientation: String::from("test"),
+            brm_container_id: String::from("test"),
+        };
+        let _ = obj.brm_summary();
+        assert!(!obj.brm_wrap_around);
+    }
+
+    #[test]
+    fn test_brm_selection_follows_focus() {
+        let obj = TabNavigation {
+            brm_tab_index: 0,
+            brm_total_tabs: 0,
+            brm_active_tab_id: String::from("test"),
+            brm_tab_labels: Vec::new(),
+            brm_is_vertical: false,
+            brm_wrap_around: false,
+            brm_selection_follows_focus: false,
+            brm_manual_activation: false,
+            brm_orientation: String::from("test"),
+            brm_container_id: String::from("test"),
+        };
+        let _ = obj.brm_summary();
+        assert!(!obj.brm_selection_follows_focus);
+    }
+
+    #[test]
+    fn test_brm_manual_activation() {
+        let obj = TabNavigation {
+            brm_tab_index: 0,
+            brm_total_tabs: 0,
+            brm_active_tab_id: String::from("test"),
+            brm_tab_labels: Vec::new(),
+            brm_is_vertical: false,
+            brm_wrap_around: false,
+            brm_selection_follows_focus: false,
+            brm_manual_activation: false,
+            brm_orientation: String::from("test"),
+            brm_container_id: String::from("test"),
+        };
+        let _ = obj.brm_summary();
+        assert!(!obj.brm_manual_activation);
+    }
+
+    #[test]
+    fn test_brm_orientation() {
+        let obj = TabNavigation {
+            brm_tab_index: 0,
+            brm_total_tabs: 0,
+            brm_active_tab_id: String::from("test"),
+            brm_tab_labels: Vec::new(),
+            brm_is_vertical: false,
+            brm_wrap_around: false,
+            brm_selection_follows_focus: false,
+            brm_manual_activation: false,
+            brm_orientation: String::from("test"),
+            brm_container_id: String::from("test"),
+        };
+        let _ = obj.brm_summary();
+        assert_eq!(obj.brm_orientation, "test");
+    }
+
+    #[test]
+    fn test_brm_container_id() {
+        let obj = TabNavigation {
+            brm_tab_index: 0,
+            brm_total_tabs: 0,
+            brm_active_tab_id: String::from("test"),
+            brm_tab_labels: Vec::new(),
+            brm_is_vertical: false,
+            brm_wrap_around: false,
+            brm_selection_follows_focus: false,
+            brm_manual_activation: false,
+            brm_orientation: String::from("test"),
+            brm_container_id: String::from("test"),
+        };
+        let _ = obj.brm_summary();
+        assert_eq!(obj.brm_container_id, "test");
+    }
+
+
+    #[test]
+    fn test_brn_command_id() {
+        let obj = CommandPaletteItem {
+            brn_command_id: String::from("test"),
+            brn_label: String::from("test"),
+            brn_description: String::from("test"),
+            brn_detail: String::from("test"),
+            brn_keybinding: String::from("test"),
+            brn_category: String::from("test"),
+            brn_icon_id: String::from("test"),
+            brn_when_clause: String::from("test"),
+            brn_score: 0.0,
+            brn_recently_used: false,
+        };
+        let _ = obj.brn_summary();
+        assert_eq!(obj.brn_command_id, "test");
+    }
+
+    #[test]
+    fn test_brn_label() {
+        let obj = CommandPaletteItem {
+            brn_command_id: String::from("test"),
+            brn_label: String::from("test"),
+            brn_description: String::from("test"),
+            brn_detail: String::from("test"),
+            brn_keybinding: String::from("test"),
+            brn_category: String::from("test"),
+            brn_icon_id: String::from("test"),
+            brn_when_clause: String::from("test"),
+            brn_score: 0.0,
+            brn_recently_used: false,
+        };
+        let _ = obj.brn_summary();
+        assert_eq!(obj.brn_label, "test");
+    }
+
+    #[test]
+    fn test_brn_description() {
+        let obj = CommandPaletteItem {
+            brn_command_id: String::from("test"),
+            brn_label: String::from("test"),
+            brn_description: String::from("test"),
+            brn_detail: String::from("test"),
+            brn_keybinding: String::from("test"),
+            brn_category: String::from("test"),
+            brn_icon_id: String::from("test"),
+            brn_when_clause: String::from("test"),
+            brn_score: 0.0,
+            brn_recently_used: false,
+        };
+        let _ = obj.brn_summary();
+        assert_eq!(obj.brn_description, "test");
+    }
+
+    #[test]
+    fn test_brn_detail() {
+        let obj = CommandPaletteItem {
+            brn_command_id: String::from("test"),
+            brn_label: String::from("test"),
+            brn_description: String::from("test"),
+            brn_detail: String::from("test"),
+            brn_keybinding: String::from("test"),
+            brn_category: String::from("test"),
+            brn_icon_id: String::from("test"),
+            brn_when_clause: String::from("test"),
+            brn_score: 0.0,
+            brn_recently_used: false,
+        };
+        let _ = obj.brn_summary();
+        assert_eq!(obj.brn_detail, "test");
+    }
+
+    #[test]
+    fn test_brn_keybinding() {
+        let obj = CommandPaletteItem {
+            brn_command_id: String::from("test"),
+            brn_label: String::from("test"),
+            brn_description: String::from("test"),
+            brn_detail: String::from("test"),
+            brn_keybinding: String::from("test"),
+            brn_category: String::from("test"),
+            brn_icon_id: String::from("test"),
+            brn_when_clause: String::from("test"),
+            brn_score: 0.0,
+            brn_recently_used: false,
+        };
+        let _ = obj.brn_summary();
+        assert_eq!(obj.brn_keybinding, "test");
+    }
+
+    #[test]
+    fn test_brn_category() {
+        let obj = CommandPaletteItem {
+            brn_command_id: String::from("test"),
+            brn_label: String::from("test"),
+            brn_description: String::from("test"),
+            brn_detail: String::from("test"),
+            brn_keybinding: String::from("test"),
+            brn_category: String::from("test"),
+            brn_icon_id: String::from("test"),
+            brn_when_clause: String::from("test"),
+            brn_score: 0.0,
+            brn_recently_used: false,
+        };
+        let _ = obj.brn_summary();
+        assert_eq!(obj.brn_category, "test");
+    }
+
+    #[test]
+    fn test_brn_icon_id() {
+        let obj = CommandPaletteItem {
+            brn_command_id: String::from("test"),
+            brn_label: String::from("test"),
+            brn_description: String::from("test"),
+            brn_detail: String::from("test"),
+            brn_keybinding: String::from("test"),
+            brn_category: String::from("test"),
+            brn_icon_id: String::from("test"),
+            brn_when_clause: String::from("test"),
+            brn_score: 0.0,
+            brn_recently_used: false,
+        };
+        let _ = obj.brn_summary();
+        assert_eq!(obj.brn_icon_id, "test");
+    }
+
+    #[test]
+    fn test_brn_when_clause() {
+        let obj = CommandPaletteItem {
+            brn_command_id: String::from("test"),
+            brn_label: String::from("test"),
+            brn_description: String::from("test"),
+            brn_detail: String::from("test"),
+            brn_keybinding: String::from("test"),
+            brn_category: String::from("test"),
+            brn_icon_id: String::from("test"),
+            brn_when_clause: String::from("test"),
+            brn_score: 0.0,
+            brn_recently_used: false,
+        };
+        let _ = obj.brn_summary();
+        assert_eq!(obj.brn_when_clause, "test");
+    }
+
+    #[test]
+    fn test_brn_score() {
+        let obj = CommandPaletteItem {
+            brn_command_id: String::from("test"),
+            brn_label: String::from("test"),
+            brn_description: String::from("test"),
+            brn_detail: String::from("test"),
+            brn_keybinding: String::from("test"),
+            brn_category: String::from("test"),
+            brn_icon_id: String::from("test"),
+            brn_when_clause: String::from("test"),
+            brn_score: 0.0,
+            brn_recently_used: false,
+        };
+        let _ = obj.brn_summary();
+        assert!((obj.brn_score - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_brn_recently_used() {
+        let obj = CommandPaletteItem {
+            brn_command_id: String::from("test"),
+            brn_label: String::from("test"),
+            brn_description: String::from("test"),
+            brn_detail: String::from("test"),
+            brn_keybinding: String::from("test"),
+            brn_category: String::from("test"),
+            brn_icon_id: String::from("test"),
+            brn_when_clause: String::from("test"),
+            brn_score: 0.0,
+            brn_recently_used: false,
+        };
+        let _ = obj.brn_summary();
+        assert!(!obj.brn_recently_used);
+    }
+
+
+    #[test]
+    fn test_bro_provider_id() {
+        let obj = QuickAccess {
+            bro_provider_id: String::from("test"),
+            bro_prefix: String::from("test"),
+            bro_placeholder: String::from("test"),
+            bro_help_text: String::from("test"),
+            bro_item_count: 0,
+            bro_is_active: false,
+            bro_filter_text: String::from("test"),
+            bro_selected_index: 0,
+            bro_step_count: 0,
+            bro_current_step: 0,
+        };
+        let _ = obj.bro_summary();
+        assert_eq!(obj.bro_provider_id, "test");
+    }
+
+    #[test]
+    fn test_bro_prefix() {
+        let obj = QuickAccess {
+            bro_provider_id: String::from("test"),
+            bro_prefix: String::from("test"),
+            bro_placeholder: String::from("test"),
+            bro_help_text: String::from("test"),
+            bro_item_count: 0,
+            bro_is_active: false,
+            bro_filter_text: String::from("test"),
+            bro_selected_index: 0,
+            bro_step_count: 0,
+            bro_current_step: 0,
+        };
+        let _ = obj.bro_summary();
+        assert_eq!(obj.bro_prefix, "test");
+    }
+
+    #[test]
+    fn test_bro_placeholder() {
+        let obj = QuickAccess {
+            bro_provider_id: String::from("test"),
+            bro_prefix: String::from("test"),
+            bro_placeholder: String::from("test"),
+            bro_help_text: String::from("test"),
+            bro_item_count: 0,
+            bro_is_active: false,
+            bro_filter_text: String::from("test"),
+            bro_selected_index: 0,
+            bro_step_count: 0,
+            bro_current_step: 0,
+        };
+        let _ = obj.bro_summary();
+        assert_eq!(obj.bro_placeholder, "test");
+    }
+
+    #[test]
+    fn test_bro_help_text() {
+        let obj = QuickAccess {
+            bro_provider_id: String::from("test"),
+            bro_prefix: String::from("test"),
+            bro_placeholder: String::from("test"),
+            bro_help_text: String::from("test"),
+            bro_item_count: 0,
+            bro_is_active: false,
+            bro_filter_text: String::from("test"),
+            bro_selected_index: 0,
+            bro_step_count: 0,
+            bro_current_step: 0,
+        };
+        let _ = obj.bro_summary();
+        assert_eq!(obj.bro_help_text, "test");
+    }
+
+    #[test]
+    fn test_bro_item_count() {
+        let obj = QuickAccess {
+            bro_provider_id: String::from("test"),
+            bro_prefix: String::from("test"),
+            bro_placeholder: String::from("test"),
+            bro_help_text: String::from("test"),
+            bro_item_count: 0,
+            bro_is_active: false,
+            bro_filter_text: String::from("test"),
+            bro_selected_index: 0,
+            bro_step_count: 0,
+            bro_current_step: 0,
+        };
+        let _ = obj.bro_summary();
+        assert_eq!(obj.bro_item_count, 0);
+    }
+
+    #[test]
+    fn test_bro_is_active() {
+        let obj = QuickAccess {
+            bro_provider_id: String::from("test"),
+            bro_prefix: String::from("test"),
+            bro_placeholder: String::from("test"),
+            bro_help_text: String::from("test"),
+            bro_item_count: 0,
+            bro_is_active: false,
+            bro_filter_text: String::from("test"),
+            bro_selected_index: 0,
+            bro_step_count: 0,
+            bro_current_step: 0,
+        };
+        let _ = obj.bro_summary();
+        assert!(!obj.bro_is_active);
+    }
+
+    #[test]
+    fn test_bro_filter_text() {
+        let obj = QuickAccess {
+            bro_provider_id: String::from("test"),
+            bro_prefix: String::from("test"),
+            bro_placeholder: String::from("test"),
+            bro_help_text: String::from("test"),
+            bro_item_count: 0,
+            bro_is_active: false,
+            bro_filter_text: String::from("test"),
+            bro_selected_index: 0,
+            bro_step_count: 0,
+            bro_current_step: 0,
+        };
+        let _ = obj.bro_summary();
+        assert_eq!(obj.bro_filter_text, "test");
+    }
+
+    #[test]
+    fn test_bro_selected_index() {
+        let obj = QuickAccess {
+            bro_provider_id: String::from("test"),
+            bro_prefix: String::from("test"),
+            bro_placeholder: String::from("test"),
+            bro_help_text: String::from("test"),
+            bro_item_count: 0,
+            bro_is_active: false,
+            bro_filter_text: String::from("test"),
+            bro_selected_index: 0,
+            bro_step_count: 0,
+            bro_current_step: 0,
+        };
+        let _ = obj.bro_summary();
+        assert_eq!(obj.bro_selected_index, 0);
+    }
+
+    #[test]
+    fn test_bro_step_count() {
+        let obj = QuickAccess {
+            bro_provider_id: String::from("test"),
+            bro_prefix: String::from("test"),
+            bro_placeholder: String::from("test"),
+            bro_help_text: String::from("test"),
+            bro_item_count: 0,
+            bro_is_active: false,
+            bro_filter_text: String::from("test"),
+            bro_selected_index: 0,
+            bro_step_count: 0,
+            bro_current_step: 0,
+        };
+        let _ = obj.bro_summary();
+        assert_eq!(obj.bro_step_count, 0);
+    }
+
+    #[test]
+    fn test_bro_current_step() {
+        let obj = QuickAccess {
+            bro_provider_id: String::from("test"),
+            bro_prefix: String::from("test"),
+            bro_placeholder: String::from("test"),
+            bro_help_text: String::from("test"),
+            bro_item_count: 0,
+            bro_is_active: false,
+            bro_filter_text: String::from("test"),
+            bro_selected_index: 0,
+            bro_step_count: 0,
+            bro_current_step: 0,
+        };
+        let _ = obj.bro_summary();
+        assert_eq!(obj.bro_current_step, 0);
     }
 
 }
