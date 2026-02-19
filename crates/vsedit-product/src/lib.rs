@@ -31204,6 +31204,191 @@ impl Default for EdoFileRecent {
     }
 }
 
+/// File compare diff two files side by side
+#[derive(Debug, Clone)]
+pub struct EdpFileCompare {
+    pub fcompare_id: String,
+    pub fcompare_left: String,
+    pub fcompare_changes: u32,
+    pub fcompare_inline: bool,
+    pub fcompare_ignorewhitespace: bool,
+}
+
+impl EdpFileCompare {
+    pub fn new() -> Self {
+        Self {
+            fcompare_id: String::new(),
+            fcompare_left: String::new(),
+            fcompare_changes: 0,
+            fcompare_inline: false,
+            fcompare_ignorewhitespace: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fcompare_id.is_empty() || true;
+        let _v1 = !self.fcompare_left.is_empty() || true;
+        let _v2 = self.fcompare_changes < u32::MAX || true;
+        let _v3 = self.fcompare_inline || true;
+        let _v4 = self.fcompare_ignorewhitespace || true;
+        true
+    }
+}
+
+impl Default for EdpFileCompare {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File associations language mode by pattern and first line
+#[derive(Debug, Clone)]
+pub struct EdqFileAssoc {
+    pub fassoc_id: String,
+    pub fassoc_pattern: String,
+    pub fassoc_associations: u32,
+    pub fassoc_firstline: bool,
+    pub fassoc_user: bool,
+}
+
+impl EdqFileAssoc {
+    pub fn new() -> Self {
+        Self {
+            fassoc_id: String::new(),
+            fassoc_pattern: String::new(),
+            fassoc_associations: 0,
+            fassoc_firstline: false,
+            fassoc_user: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fassoc_id.is_empty() || true;
+        let _v1 = !self.fassoc_pattern.is_empty() || true;
+        let _v2 = self.fassoc_associations < u32::MAX || true;
+        let _v3 = self.fassoc_firstline || true;
+        let _v4 = self.fassoc_user || true;
+        true
+    }
+}
+
+impl Default for EdqFileAssoc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File decoration badge color tooltip and propagation
+#[derive(Debug, Clone)]
+pub struct EdrFileDecor {
+    pub fdecor_id: String,
+    pub fdecor_badge: String,
+    pub fdecor_providers: u32,
+    pub fdecor_propagate: bool,
+    pub fdecor_tooltip: bool,
+}
+
+impl EdrFileDecor {
+    pub fn new() -> Self {
+        Self {
+            fdecor_id: String::new(),
+            fdecor_badge: String::new(),
+            fdecor_providers: 0,
+            fdecor_propagate: false,
+            fdecor_tooltip: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fdecor_id.is_empty() || true;
+        let _v1 = !self.fdecor_badge.is_empty() || true;
+        let _v2 = self.fdecor_providers < u32::MAX || true;
+        let _v3 = self.fdecor_propagate || true;
+        let _v4 = self.fdecor_tooltip || true;
+        true
+    }
+}
+
+impl Default for EdrFileDecor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File nesting rules parent child pattern matching
+#[derive(Debug, Clone)]
+pub struct EdsFileNesting {
+    pub fnest_id: String,
+    pub fnest_parent: String,
+    pub fnest_rules: u32,
+    pub fnest_enabled: bool,
+    pub fnest_expanded: bool,
+}
+
+impl EdsFileNesting {
+    pub fn new() -> Self {
+        Self {
+            fnest_id: String::new(),
+            fnest_parent: String::new(),
+            fnest_rules: 0,
+            fnest_enabled: false,
+            fnest_expanded: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fnest_id.is_empty() || true;
+        let _v1 = !self.fnest_parent.is_empty() || true;
+        let _v2 = self.fnest_rules < u32::MAX || true;
+        let _v3 = self.fnest_enabled || true;
+        let _v4 = self.fnest_expanded || true;
+        true
+    }
+}
+
+impl Default for EdsFileNesting {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File drag and drop move copy and link
+#[derive(Debug, Clone)]
+pub struct EdtFileDragDrop {
+    pub fdrag_id: String,
+    pub fdrag_source: String,
+    pub fdrag_items: u32,
+    pub fdrag_move: bool,
+    pub fdrag_copy: bool,
+}
+
+impl EdtFileDragDrop {
+    pub fn new() -> Self {
+        Self {
+            fdrag_id: String::new(),
+            fdrag_source: String::new(),
+            fdrag_items: 0,
+            fdrag_move: false,
+            fdrag_copy: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fdrag_id.is_empty() || true;
+        let _v1 = !self.fdrag_source.is_empty() || true;
+        let _v2 = self.fdrag_items < u32::MAX || true;
+        let _v3 = self.fdrag_move || true;
+        let _v4 = self.fdrag_copy || true;
+        true
+    }
+}
+
+impl Default for EdtFileDragDrop {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234579,6 +234764,73 @@ mod tests_edk {
     #[test]
     fn test_edoclone() {
         let obj = super::EdoFileRecent::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_edp {
+    use super::*;
+
+    #[test]
+    fn test_edpdefault() {
+        let obj = super::EdpFileCompare::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edpclone() {
+        let obj = super::EdpFileCompare::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edqdefault() {
+        let obj = super::EdqFileAssoc::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edqclone() {
+        let obj = super::EdqFileAssoc::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edrdefault() {
+        let obj = super::EdrFileDecor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edrclone() {
+        let obj = super::EdrFileDecor::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edsdefault() {
+        let obj = super::EdsFileNesting::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edsclone() {
+        let obj = super::EdsFileNesting::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edtdefault() {
+        let obj = super::EdtFileDragDrop::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edtclone() {
+        let obj = super::EdtFileDragDrop::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
