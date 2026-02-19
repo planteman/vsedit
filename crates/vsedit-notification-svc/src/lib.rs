@@ -72954,3 +72954,967 @@ mod tests_bee {
         assert_ne!(BeeFoldSource::Region, BeeFoldSource::Manual);
     }
 }
+
+// bef_: Editor whitespace rendering model — render whitespace chars,
+// boundary/all/selection/trailing modes, Unicode control chars
+
+/// Whitespace render mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BefWhitespaceMode {
+    None,
+    Boundary,
+    Selection,
+    Trailing,
+    All,
+}
+
+/// Unicode control character display
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BefControlCharDisplay {
+    Off,
+    On,
+}
+
+/// Whitespace rendering configuration
+#[derive(Debug, Clone)]
+pub struct BefWhitespaceConfig {
+    pub mode: BefWhitespaceMode,
+    pub render_control_chars: BefControlCharDisplay,
+    pub space_char: char,
+    pub tab_char: char,
+    pub newline_char: char,
+    pub color: String,
+}
+
+impl Default for BefWhitespaceConfig {
+    fn default() -> Self {
+        Self {
+            mode: BefWhitespaceMode::Selection,
+            render_control_chars: BefControlCharDisplay::On,
+            space_char: '·',
+            tab_char: '→',
+            newline_char: '↵',
+            color: "#3b3b3b".to_string(),
+        }
+    }
+}
+
+impl BefWhitespaceConfig {
+    pub fn should_render_space(&self, in_selection: bool, at_boundary: bool, is_trailing: bool) -> bool {
+        match self.mode {
+            BefWhitespaceMode::None => false,
+            BefWhitespaceMode::All => true,
+            BefWhitespaceMode::Selection => in_selection,
+            BefWhitespaceMode::Boundary => at_boundary,
+            BefWhitespaceMode::Trailing => is_trailing,
+        }
+    }
+
+    pub fn render_char(&self, ch: char) -> Option<char> {
+        match ch {
+            ' ' => Some(self.space_char),
+            '\t' => Some(self.tab_char),
+            '\n' => Some(self.newline_char),
+            c if c.is_control() && self.render_control_chars == BefControlCharDisplay::On => {
+                Some('\u{FFFD}')
+            }
+            _ => None,
+        }
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.mode != BefWhitespaceMode::None
+    }
+}
+
+/// Analyze a line for whitespace rendering
+pub fn bef_analyze_line(line: &str) -> (usize, usize, usize) {
+    let leading = line.chars().take_while(|c| c.is_whitespace()).count();
+    let trailing = line.chars().rev().take_while(|c| c.is_whitespace()).count();
+    let total = line.chars().filter(|c| c.is_whitespace()).count();
+    (leading, trailing, total)
+}
+
+#[cfg(test)]
+mod tests_bef {
+    use super::*;
+
+    #[test]
+    fn test_bef_whitespace_mode_all() {
+        let mut cfg = BefWhitespaceConfig::default();
+        cfg.mode = BefWhitespaceMode::All;
+        assert!(cfg.should_render_space(false, false, false));
+    }
+
+    #[test]
+    fn test_bef_whitespace_mode_selection() {
+        let cfg = BefWhitespaceConfig::default();
+        assert!(cfg.should_render_space(true, false, false));
+        assert!(!cfg.should_render_space(false, false, false));
+    }
+
+    #[test]
+    fn test_bef_whitespace_mode_boundary() {
+        let mut cfg = BefWhitespaceConfig::default();
+        cfg.mode = BefWhitespaceMode::Boundary;
+        assert!(cfg.should_render_space(false, true, false));
+        assert!(!cfg.should_render_space(false, false, false));
+    }
+
+    #[test]
+    fn test_bef_whitespace_mode_trailing() {
+        let mut cfg = BefWhitespaceConfig::default();
+        cfg.mode = BefWhitespaceMode::Trailing;
+        assert!(cfg.should_render_space(false, false, true));
+    }
+
+    #[test]
+    fn test_bef_whitespace_mode_none() {
+        let mut cfg = BefWhitespaceConfig::default();
+        cfg.mode = BefWhitespaceMode::None;
+        assert!(!cfg.should_render_space(true, true, true));
+        assert!(!cfg.is_enabled());
+    }
+
+    #[test]
+    fn test_bef_render_char() {
+        let cfg = BefWhitespaceConfig::default();
+        assert_eq!(cfg.render_char(' '), Some('·'));
+        assert_eq!(cfg.render_char('\t'), Some('→'));
+        assert_eq!(cfg.render_char('\n'), Some('↵'));
+        assert_eq!(cfg.render_char('a'), None);
+    }
+
+    #[test]
+    fn test_bef_render_control_char() {
+        let cfg = BefWhitespaceConfig::default();
+        assert_eq!(cfg.render_char('\x01'), Some('\u{FFFD}'));
+    }
+
+    #[test]
+    fn test_bef_render_control_off() {
+        let mut cfg = BefWhitespaceConfig::default();
+        cfg.render_control_chars = BefControlCharDisplay::Off;
+        assert_eq!(cfg.render_char('\x01'), None);
+    }
+
+    #[test]
+    fn test_bef_analyze_line() {
+        assert_eq!(bef_analyze_line("  hello  "), (2, 2, 4));
+        assert_eq!(bef_analyze_line("hello"), (0, 0, 0));
+        assert_eq!(bef_analyze_line(""), (0, 0, 0));
+    }
+
+    #[test]
+    fn test_bef_is_enabled() {
+        assert!(BefWhitespaceConfig::default().is_enabled());
+    }
+}
+
+// beg_: Editor minimap model — minimap rendering, character blocks,
+// minimap slider, hover preview, minimap search highlights
+
+/// Minimap render mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BegMinimapMode {
+    Proportional,
+    Fill,
+    Fit,
+}
+
+/// Minimap side
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BegMinimapSide {
+    Left,
+    Right,
+}
+
+/// Minimap configuration
+#[derive(Debug, Clone)]
+pub struct BegMinimapConfig {
+    pub enabled: bool,
+    pub mode: BegMinimapMode,
+    pub side: BegMinimapSide,
+    pub max_column: usize,
+    pub scale: usize,
+    pub show_slider: bool,
+    pub render_characters: bool,
+    pub auto_hide: bool,
+}
+
+impl Default for BegMinimapConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            mode: BegMinimapMode::Proportional,
+            side: BegMinimapSide::Right,
+            max_column: 120,
+            scale: 1,
+            show_slider: true,
+            render_characters: true,
+            auto_hide: false,
+        }
+    }
+}
+
+/// Minimap slider state
+#[derive(Debug, Clone)]
+pub struct BegMinimapSlider {
+    pub top_line: usize,
+    pub visible_lines: usize,
+    pub total_lines: usize,
+    pub is_dragging: bool,
+    pub hover_line: Option<usize>,
+}
+
+impl BegMinimapSlider {
+    pub fn new(total_lines: usize, visible_lines: usize) -> Self {
+        Self { top_line: 0, visible_lines, total_lines, is_dragging: false, hover_line: None }
+    }
+
+    pub fn slider_height_fraction(&self) -> f64 {
+        if self.total_lines == 0 { return 1.0; }
+        (self.visible_lines as f64 / self.total_lines as f64).min(1.0)
+    }
+
+    pub fn slider_top_fraction(&self) -> f64 {
+        if self.total_lines == 0 { return 0.0; }
+        self.top_line as f64 / self.total_lines as f64
+    }
+
+    pub fn set_top_line(&mut self, line: usize) {
+        self.top_line = line.min(self.total_lines.saturating_sub(self.visible_lines));
+    }
+
+    pub fn start_drag(&mut self) { self.is_dragging = true; }
+    pub fn stop_drag(&mut self) { self.is_dragging = false; }
+
+    pub fn set_hover(&mut self, line: Option<usize>) { self.hover_line = line; }
+}
+
+/// Minimap highlight (e.g., search matches, git changes)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BegMinimapHighlight {
+    pub line: usize,
+    pub color: String,
+}
+
+impl BegMinimapHighlight {
+    pub fn new(line: usize, color: &str) -> Self {
+        Self { line, color: color.to_string() }
+    }
+}
+
+/// Minimap state
+#[derive(Debug, Clone, Default)]
+pub struct BegMinimapState {
+    pub config: BegMinimapConfig,
+    pub highlights: Vec<BegMinimapHighlight>,
+    pub visible: bool,
+}
+
+impl BegMinimapState {
+    pub fn new() -> Self { Self { visible: true, ..Default::default() } }
+
+    pub fn add_highlight(&mut self, h: BegMinimapHighlight) {
+        self.highlights.push(h);
+    }
+
+    pub fn clear_highlights(&mut self) { self.highlights.clear(); }
+
+    pub fn highlights_in_range(&self, start: usize, end: usize) -> Vec<&BegMinimapHighlight> {
+        self.highlights.iter().filter(|h| h.line >= start && h.line <= end).collect()
+    }
+
+    pub fn toggle_visibility(&mut self) { self.visible = !self.visible; }
+
+    pub fn is_visible(&self) -> bool { self.visible && self.config.enabled }
+}
+
+#[cfg(test)]
+mod tests_beg {
+    use super::*;
+
+    #[test]
+    fn test_beg_minimap_config() {
+        let cfg = BegMinimapConfig::default();
+        assert!(cfg.enabled);
+        assert_eq!(cfg.max_column, 120);
+        assert!(cfg.render_characters);
+    }
+
+    #[test]
+    fn test_beg_slider_fractions() {
+        let s = BegMinimapSlider::new(1000, 50);
+        assert!((s.slider_height_fraction() - 0.05).abs() < 0.001);
+        assert_eq!(s.slider_top_fraction(), 0.0);
+    }
+
+    #[test]
+    fn test_beg_slider_set_top() {
+        let mut s = BegMinimapSlider::new(100, 20);
+        s.set_top_line(90);
+        assert_eq!(s.top_line, 80); // clamped to 100-20
+    }
+
+    #[test]
+    fn test_beg_slider_drag() {
+        let mut s = BegMinimapSlider::new(100, 20);
+        s.start_drag();
+        assert!(s.is_dragging);
+        s.stop_drag();
+        assert!(!s.is_dragging);
+    }
+
+    #[test]
+    fn test_beg_slider_hover() {
+        let mut s = BegMinimapSlider::new(100, 20);
+        s.set_hover(Some(50));
+        assert_eq!(s.hover_line, Some(50));
+    }
+
+    #[test]
+    fn test_beg_highlight() {
+        let h = BegMinimapHighlight::new(42, "#ff0000");
+        assert_eq!(h.line, 42);
+        assert_eq!(h.color, "#ff0000");
+    }
+
+    #[test]
+    fn test_beg_state_highlights() {
+        let mut state = BegMinimapState::new();
+        state.add_highlight(BegMinimapHighlight::new(10, "#f00"));
+        state.add_highlight(BegMinimapHighlight::new(20, "#0f0"));
+        state.add_highlight(BegMinimapHighlight::new(30, "#00f"));
+        assert_eq!(state.highlights_in_range(5, 15).len(), 1);
+        assert_eq!(state.highlights_in_range(0, 100).len(), 3);
+        state.clear_highlights();
+        assert_eq!(state.highlights.len(), 0);
+    }
+
+    #[test]
+    fn test_beg_state_visibility() {
+        let mut state = BegMinimapState::new();
+        assert!(state.is_visible());
+        state.toggle_visibility();
+        assert!(!state.is_visible());
+    }
+
+    #[test]
+    fn test_beg_state_disabled() {
+        let mut state = BegMinimapState::new();
+        state.config.enabled = false;
+        assert!(!state.is_visible());
+    }
+
+    #[test]
+    fn test_beg_minimap_modes() {
+        assert_ne!(BegMinimapMode::Proportional, BegMinimapMode::Fill);
+        assert_ne!(BegMinimapSide::Left, BegMinimapSide::Right);
+    }
+}
+
+// beh_: Editor find/replace model — find state, replace state, regex,
+// case sensitivity, whole word, preserve case, find in selection
+
+/// Find match info
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BehFindMatch {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+}
+
+impl BehFindMatch {
+    pub fn new(sl: usize, sc: usize, el: usize, ec: usize) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec }
+    }
+
+    pub fn is_single_line(&self) -> bool { self.start_line == self.end_line }
+}
+
+/// Find/replace options
+#[derive(Debug, Clone)]
+pub struct BehFindOptions {
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub regex: bool,
+    pub preserve_case: bool,
+    pub find_in_selection: bool,
+}
+
+impl Default for BehFindOptions {
+    fn default() -> Self {
+        Self { case_sensitive: false, whole_word: false, regex: false, preserve_case: false, find_in_selection: false }
+    }
+}
+
+impl BehFindOptions {
+    pub fn toggle_case(&mut self) { self.case_sensitive = !self.case_sensitive; }
+    pub fn toggle_word(&mut self) { self.whole_word = !self.whole_word; }
+    pub fn toggle_regex(&mut self) { self.regex = !self.regex; }
+    pub fn toggle_preserve_case(&mut self) { self.preserve_case = !self.preserve_case; }
+}
+
+/// Find/replace widget state
+#[derive(Debug, Clone)]
+pub struct BehFindState {
+    pub search_text: String,
+    pub replace_text: String,
+    pub options: BehFindOptions,
+    pub matches: Vec<BehFindMatch>,
+    pub current_match: Option<usize>,
+    pub is_open: bool,
+    pub replace_visible: bool,
+}
+
+impl Default for BehFindState {
+    fn default() -> Self {
+        Self {
+            search_text: String::new(),
+            replace_text: String::new(),
+            options: BehFindOptions::default(),
+            matches: Vec::new(),
+            current_match: None,
+            is_open: false,
+            replace_visible: false,
+        }
+    }
+}
+
+impl BehFindState {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn open(&mut self) { self.is_open = true; }
+    pub fn close(&mut self) { self.is_open = false; }
+    pub fn show_replace(&mut self) { self.replace_visible = true; }
+    pub fn hide_replace(&mut self) { self.replace_visible = false; }
+
+    pub fn set_search(&mut self, text: &str) {
+        self.search_text = text.to_string();
+        self.current_match = None;
+    }
+
+    pub fn set_replace(&mut self, text: &str) {
+        self.replace_text = text.to_string();
+    }
+
+    pub fn set_matches(&mut self, matches: Vec<BehFindMatch>) {
+        self.matches = matches;
+        self.current_match = if self.matches.is_empty() { None } else { Some(0) };
+    }
+
+    pub fn match_count(&self) -> usize { self.matches.len() }
+
+    pub fn current(&self) -> Option<&BehFindMatch> {
+        self.current_match.and_then(|i| self.matches.get(i))
+    }
+
+    pub fn next_match(&mut self) {
+        if self.matches.is_empty() { return; }
+        self.current_match = Some(
+            self.current_match.map_or(0, |i| (i + 1) % self.matches.len())
+        );
+    }
+
+    pub fn prev_match(&mut self) {
+        if self.matches.is_empty() { return; }
+        self.current_match = Some(
+            self.current_match.map_or(0, |i| {
+                if i == 0 { self.matches.len() - 1 } else { i - 1 }
+            })
+        );
+    }
+
+    pub fn status_text(&self) -> String {
+        if self.matches.is_empty() {
+            "No results".to_string()
+        } else if let Some(idx) = self.current_match {
+            format!("{} of {}", idx + 1, self.matches.len())
+        } else {
+            format!("{} results", self.matches.len())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests_beh {
+    use super::*;
+
+    #[test]
+    fn test_beh_find_match() {
+        let m = BehFindMatch::new(5, 10, 5, 15);
+        assert!(m.is_single_line());
+    }
+
+    #[test]
+    fn test_beh_find_options_toggle() {
+        let mut opt = BehFindOptions::default();
+        assert!(!opt.case_sensitive);
+        opt.toggle_case();
+        assert!(opt.case_sensitive);
+        opt.toggle_word();
+        assert!(opt.whole_word);
+        opt.toggle_regex();
+        assert!(opt.regex);
+    }
+
+    #[test]
+    fn test_beh_find_state_open_close() {
+        let mut state = BehFindState::new();
+        assert!(!state.is_open);
+        state.open();
+        assert!(state.is_open);
+        state.close();
+        assert!(!state.is_open);
+    }
+
+    #[test]
+    fn test_beh_find_state_search() {
+        let mut state = BehFindState::new();
+        state.set_search("hello");
+        assert_eq!(state.search_text, "hello");
+        state.set_replace("world");
+        assert_eq!(state.replace_text, "world");
+    }
+
+    #[test]
+    fn test_beh_find_state_matches() {
+        let mut state = BehFindState::new();
+        state.set_matches(vec![
+            BehFindMatch::new(1, 0, 1, 5),
+            BehFindMatch::new(3, 10, 3, 15),
+            BehFindMatch::new(7, 0, 7, 5),
+        ]);
+        assert_eq!(state.match_count(), 3);
+        assert_eq!(state.current_match, Some(0));
+    }
+
+    #[test]
+    fn test_beh_find_state_navigation() {
+        let mut state = BehFindState::new();
+        state.set_matches(vec![
+            BehFindMatch::new(1, 0, 1, 5),
+            BehFindMatch::new(3, 0, 3, 5),
+        ]);
+        state.next_match();
+        assert_eq!(state.current_match, Some(1));
+        state.next_match();
+        assert_eq!(state.current_match, Some(0)); // wraps
+        state.prev_match();
+        assert_eq!(state.current_match, Some(1)); // wraps back
+    }
+
+    #[test]
+    fn test_beh_find_state_status() {
+        let mut state = BehFindState::new();
+        assert_eq!(state.status_text(), "No results");
+        state.set_matches(vec![BehFindMatch::new(1, 0, 1, 5)]);
+        assert_eq!(state.status_text(), "1 of 1");
+    }
+
+    #[test]
+    fn test_beh_find_state_replace_visible() {
+        let mut state = BehFindState::new();
+        assert!(!state.replace_visible);
+        state.show_replace();
+        assert!(state.replace_visible);
+        state.hide_replace();
+        assert!(!state.replace_visible);
+    }
+
+    #[test]
+    fn test_beh_find_current() {
+        let mut state = BehFindState::new();
+        assert!(state.current().is_none());
+        state.set_matches(vec![BehFindMatch::new(5, 0, 5, 10)]);
+        let cur = state.current().unwrap();
+        assert_eq!(cur.start_line, 5);
+    }
+
+    #[test]
+    fn test_beh_find_empty_nav() {
+        let mut state = BehFindState::new();
+        state.next_match(); // no-op
+        state.prev_match(); // no-op
+        assert!(state.current_match.is_none());
+    }
+}
+
+// bei_: Editor bracket colorization model — bracket pair colors, max nesting,
+// guides, independent color pools, bracket pair matching
+
+/// Bracket pair for colorization
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BeiBracketPair {
+    pub open: String,
+    pub close: String,
+}
+
+impl BeiBracketPair {
+    pub fn new(open: &str, close: &str) -> Self {
+        Self { open: open.to_string(), close: close.to_string() }
+    }
+
+    pub fn is_match(&self, open: &str, close: &str) -> bool {
+        self.open == open && self.close == close
+    }
+}
+
+/// Bracket colorization configuration
+#[derive(Debug, Clone)]
+pub struct BeiBracketColorConfig {
+    pub enabled: bool,
+    pub colors: Vec<String>,
+    pub pairs: Vec<BeiBracketPair>,
+    pub guides_enabled: bool,
+    pub independent_color_pools: bool,
+    pub max_nesting: usize,
+}
+
+impl Default for BeiBracketColorConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            colors: vec![
+                "#ffd700".to_string(),
+                "#da70d6".to_string(),
+                "#179fff".to_string(),
+            ],
+            pairs: vec![
+                BeiBracketPair::new("(", ")"),
+                BeiBracketPair::new("[", "]"),
+                BeiBracketPair::new("{", "}"),
+            ],
+            guides_enabled: true,
+            independent_color_pools: false,
+            max_nesting: 30,
+        }
+    }
+}
+
+impl BeiBracketColorConfig {
+    pub fn color_at_depth(&self, depth: usize) -> &str {
+        if self.colors.is_empty() { return ""; }
+        &self.colors[depth % self.colors.len()]
+    }
+
+    pub fn is_open_bracket(&self, ch: &str) -> bool {
+        self.pairs.iter().any(|p| p.open == ch)
+    }
+
+    pub fn is_close_bracket(&self, ch: &str) -> bool {
+        self.pairs.iter().any(|p| p.close == ch)
+    }
+
+    pub fn find_pair(&self, open: &str) -> Option<&BeiBracketPair> {
+        self.pairs.iter().find(|p| p.open == open)
+    }
+
+    pub fn find_pair_by_close(&self, close: &str) -> Option<&BeiBracketPair> {
+        self.pairs.iter().find(|p| p.close == close)
+    }
+}
+
+/// A colorized bracket occurrence
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BeiBracketOccurrence {
+    pub line: usize,
+    pub col: usize,
+    pub len: usize,
+    pub depth: usize,
+    pub is_open: bool,
+    pub pair_index: usize,
+}
+
+impl BeiBracketOccurrence {
+    pub fn new(line: usize, col: usize, len: usize, depth: usize, is_open: bool) -> Self {
+        Self { line, col, len, depth, is_open, pair_index: 0 }
+    }
+}
+
+/// Bracket colorization state for a document
+#[derive(Debug, Clone, Default)]
+pub struct BeiBracketColorState {
+    pub occurrences: Vec<BeiBracketOccurrence>,
+    pub config: BeiBracketColorConfig,
+}
+
+impl BeiBracketColorState {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn set_occurrences(&mut self, occ: Vec<BeiBracketOccurrence>) {
+        self.occurrences = occ;
+    }
+
+    pub fn occurrences_on_line(&self, line: usize) -> Vec<&BeiBracketOccurrence> {
+        self.occurrences.iter().filter(|o| o.line == line).collect()
+    }
+
+    pub fn max_depth(&self) -> usize {
+        self.occurrences.iter().map(|o| o.depth).max().unwrap_or(0)
+    }
+
+    pub fn count(&self) -> usize { self.occurrences.len() }
+}
+
+#[cfg(test)]
+mod tests_bei {
+    use super::*;
+
+    #[test]
+    fn test_bei_bracket_pair() {
+        let p = BeiBracketPair::new("(", ")");
+        assert!(p.is_match("(", ")"));
+        assert!(!p.is_match("{", "}"));
+    }
+
+    #[test]
+    fn test_bei_config_defaults() {
+        let cfg = BeiBracketColorConfig::default();
+        assert!(cfg.enabled);
+        assert_eq!(cfg.colors.len(), 3);
+        assert_eq!(cfg.pairs.len(), 3);
+        assert!(cfg.guides_enabled);
+    }
+
+    #[test]
+    fn test_bei_color_at_depth() {
+        let cfg = BeiBracketColorConfig::default();
+        assert_eq!(cfg.color_at_depth(0), "#ffd700");
+        assert_eq!(cfg.color_at_depth(3), "#ffd700"); // wraps
+        assert_eq!(cfg.color_at_depth(1), "#da70d6");
+    }
+
+    #[test]
+    fn test_bei_is_bracket() {
+        let cfg = BeiBracketColorConfig::default();
+        assert!(cfg.is_open_bracket("("));
+        assert!(cfg.is_close_bracket("}"));
+        assert!(!cfg.is_open_bracket("x"));
+    }
+
+    #[test]
+    fn test_bei_find_pair() {
+        let cfg = BeiBracketColorConfig::default();
+        let pair = cfg.find_pair("(").unwrap();
+        assert_eq!(pair.close, ")");
+        let pair2 = cfg.find_pair_by_close("]").unwrap();
+        assert_eq!(pair2.open, "[");
+    }
+
+    #[test]
+    fn test_bei_occurrence() {
+        let o = BeiBracketOccurrence::new(5, 10, 1, 2, true);
+        assert_eq!(o.line, 5);
+        assert!(o.is_open);
+        assert_eq!(o.depth, 2);
+    }
+
+    #[test]
+    fn test_bei_state_line_query() {
+        let mut state = BeiBracketColorState::new();
+        state.set_occurrences(vec![
+            BeiBracketOccurrence::new(1, 0, 1, 0, true),
+            BeiBracketOccurrence::new(1, 10, 1, 0, false),
+            BeiBracketOccurrence::new(3, 5, 1, 1, true),
+        ]);
+        assert_eq!(state.occurrences_on_line(1).len(), 2);
+        assert_eq!(state.occurrences_on_line(3).len(), 1);
+    }
+
+    #[test]
+    fn test_bei_state_max_depth() {
+        let mut state = BeiBracketColorState::new();
+        state.set_occurrences(vec![
+            BeiBracketOccurrence::new(1, 0, 1, 0, true),
+            BeiBracketOccurrence::new(2, 0, 1, 3, true),
+        ]);
+        assert_eq!(state.max_depth(), 3);
+    }
+
+    #[test]
+    fn test_bei_state_count() {
+        let state = BeiBracketColorState::new();
+        assert_eq!(state.count(), 0);
+    }
+
+    #[test]
+    fn test_bei_state_empty_max() {
+        let state = BeiBracketColorState::new();
+        assert_eq!(state.max_depth(), 0);
+    }
+}
+
+// bej_: Editor cursor movement model — cursor move commands, word navigation,
+// line start/end, subword movement, smart home/end
+
+/// Cursor movement direction
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BejMoveDirection {
+    Left,
+    Right,
+    Up,
+    Down,
+    WordLeft,
+    WordRight,
+    SubwordLeft,
+    SubwordRight,
+    LineStart,
+    LineEnd,
+    SmartHome,
+    DocumentStart,
+    DocumentEnd,
+    PageUp,
+    PageDown,
+}
+
+/// Word separator category
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BejCharCategory {
+    Whitespace,
+    Word,
+    Separator,
+}
+
+impl BejCharCategory {
+    pub fn of(ch: char) -> Self {
+        if ch.is_whitespace() {
+            BejCharCategory::Whitespace
+        } else if ch.is_alphanumeric() || ch == '_' {
+            BejCharCategory::Word
+        } else {
+            BejCharCategory::Separator
+        }
+    }
+}
+
+/// Find word boundary to the left
+pub fn bej_word_left(line: &str, col: usize) -> usize {
+    if col == 0 { return 0; }
+    let chars: Vec<char> = line.chars().collect();
+    let mut pos = col.min(chars.len());
+    // Skip whitespace
+    while pos > 0 && BejCharCategory::of(chars[pos - 1]) == BejCharCategory::Whitespace {
+        pos -= 1;
+    }
+    if pos == 0 { return 0; }
+    let cat = BejCharCategory::of(chars[pos - 1]);
+    while pos > 0 && BejCharCategory::of(chars[pos - 1]) == cat {
+        pos -= 1;
+    }
+    pos
+}
+
+/// Find word boundary to the right
+pub fn bej_word_right(line: &str, col: usize) -> usize {
+    let chars: Vec<char> = line.chars().collect();
+    let len = chars.len();
+    if col >= len { return len; }
+    let mut pos = col;
+    let cat = BejCharCategory::of(chars[pos]);
+    while pos < len && BejCharCategory::of(chars[pos]) == cat {
+        pos += 1;
+    }
+    // Skip whitespace
+    while pos < len && BejCharCategory::of(chars[pos]) == BejCharCategory::Whitespace {
+        pos += 1;
+    }
+    pos
+}
+
+/// Find smart home position (first non-whitespace or column 0)
+pub fn bej_smart_home(line: &str, current_col: usize) -> usize {
+    let first_non_ws = line.chars().take_while(|c| c.is_whitespace()).count();
+    if current_col == first_non_ws { 0 } else { first_non_ws }
+}
+
+/// Cursor movement result
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BejMoveResult {
+    pub line: usize,
+    pub col: usize,
+    pub wrapped: bool,
+}
+
+impl BejMoveResult {
+    pub fn new(line: usize, col: usize) -> Self {
+        Self { line, col, wrapped: false }
+    }
+
+    pub fn wrapped(line: usize, col: usize) -> Self {
+        Self { line, col, wrapped: true }
+    }
+}
+
+#[cfg(test)]
+mod tests_bej {
+    use super::*;
+
+    #[test]
+    fn test_bej_char_category() {
+        assert_eq!(BejCharCategory::of('a'), BejCharCategory::Word);
+        assert_eq!(BejCharCategory::of('_'), BejCharCategory::Word);
+        assert_eq!(BejCharCategory::of(' '), BejCharCategory::Whitespace);
+        assert_eq!(BejCharCategory::of('+'), BejCharCategory::Separator);
+    }
+
+    #[test]
+    fn test_bej_word_left() {
+        assert_eq!(bej_word_left("hello world", 11), 6);
+        assert_eq!(bej_word_left("hello world", 6), 0);
+        assert_eq!(bej_word_left("hello world", 5), 0);
+        assert_eq!(bej_word_left("hello", 0), 0);
+    }
+
+    #[test]
+    fn test_bej_word_right() {
+        assert_eq!(bej_word_right("hello world", 0), 6);
+        assert_eq!(bej_word_right("hello world", 6), 11);
+    }
+
+    #[test]
+    fn test_bej_word_left_separators() {
+        assert_eq!(bej_word_left("foo.bar", 7), 4);
+        assert_eq!(bej_word_left("foo.bar", 4), 3);
+        assert_eq!(bej_word_left("foo.bar", 3), 0);
+    }
+
+    #[test]
+    fn test_bej_smart_home() {
+        assert_eq!(bej_smart_home("    hello", 0), 4);
+        assert_eq!(bej_smart_home("    hello", 4), 0);
+        assert_eq!(bej_smart_home("    hello", 7), 4);
+        assert_eq!(bej_smart_home("hello", 0), 0);
+    }
+
+    #[test]
+    fn test_bej_move_result() {
+        let r = BejMoveResult::new(5, 10);
+        assert!(!r.wrapped);
+        let w = BejMoveResult::wrapped(0, 0);
+        assert!(w.wrapped);
+    }
+
+    #[test]
+    fn test_bej_directions() {
+        assert_ne!(BejMoveDirection::Left, BejMoveDirection::Right);
+        assert_ne!(BejMoveDirection::WordLeft, BejMoveDirection::SubwordLeft);
+    }
+
+    #[test]
+    fn test_bej_word_right_end() {
+        assert_eq!(bej_word_right("hello", 5), 5);
+    }
+
+    #[test]
+    fn test_bej_word_left_whitespace() {
+        assert_eq!(bej_word_left("   hello", 3), 0);
+    }
+
+    #[test]
+    fn test_bej_smart_home_no_indent() {
+        assert_eq!(bej_smart_home("hello", 3), 0);
+    }
+}
