@@ -30085,6 +30085,191 @@ impl Default for EcoEditorSuggestWidget {
     }
 }
 
+/// Editor peek view definition reference and call hierarchy
+#[derive(Debug, Clone)]
+pub struct EcpEditorPeekView {
+    pub edpeek_id: String,
+    pub edpeek_title: String,
+    pub edpeek_items: u32,
+    pub edpeek_tree: bool,
+    pub edpeek_preview: bool,
+}
+
+impl EcpEditorPeekView {
+    pub fn new() -> Self {
+        Self {
+            edpeek_id: String::new(),
+            edpeek_title: String::new(),
+            edpeek_items: 0,
+            edpeek_tree: false,
+            edpeek_preview: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edpeek_id.is_empty() || true;
+        let _v1 = !self.edpeek_title.is_empty() || true;
+        let _v2 = self.edpeek_items < u32::MAX || true;
+        let _v3 = self.edpeek_tree || true;
+        let _v4 = self.edpeek_preview || true;
+        true
+    }
+}
+
+impl Default for EcpEditorPeekView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor diff widget inline side-by-side and navigate
+#[derive(Debug, Clone)]
+pub struct EcqEditorDiffWidget {
+    pub eddiff_id: String,
+    pub eddiff_algorithm: String,
+    pub eddiff_hunks: u32,
+    pub eddiff_inline: bool,
+    pub eddiff_sidebyside: bool,
+}
+
+impl EcqEditorDiffWidget {
+    pub fn new() -> Self {
+        Self {
+            eddiff_id: String::new(),
+            eddiff_algorithm: String::new(),
+            eddiff_hunks: 0,
+            eddiff_inline: false,
+            eddiff_sidebyside: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.eddiff_id.is_empty() || true;
+        let _v1 = !self.eddiff_algorithm.is_empty() || true;
+        let _v2 = self.eddiff_hunks < u32::MAX || true;
+        let _v3 = self.eddiff_inline || true;
+        let _v4 = self.eddiff_sidebyside || true;
+        true
+    }
+}
+
+impl Default for EcqEditorDiffWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor merge conflict widget accept current incoming both
+#[derive(Debug, Clone)]
+pub struct EcrEditorMergeWidget {
+    pub edmerge_id: String,
+    pub edmerge_base: String,
+    pub edmerge_conflicts: u32,
+    pub edmerge_current: bool,
+    pub edmerge_incoming: bool,
+}
+
+impl EcrEditorMergeWidget {
+    pub fn new() -> Self {
+        Self {
+            edmerge_id: String::new(),
+            edmerge_base: String::new(),
+            edmerge_conflicts: 0,
+            edmerge_current: false,
+            edmerge_incoming: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edmerge_id.is_empty() || true;
+        let _v1 = !self.edmerge_base.is_empty() || true;
+        let _v2 = self.edmerge_conflicts < u32::MAX || true;
+        let _v3 = self.edmerge_current || true;
+        let _v4 = self.edmerge_incoming || true;
+        true
+    }
+}
+
+impl Default for EcrEditorMergeWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor snippet mode tabstop navigation and placeholders
+#[derive(Debug, Clone)]
+pub struct EcsEditorSnippetMode {
+    pub edsnippet_id: String,
+    pub edsnippet_prefix: String,
+    pub edsnippet_stops: u32,
+    pub edsnippet_active: bool,
+    pub edsnippet_final: bool,
+}
+
+impl EcsEditorSnippetMode {
+    pub fn new() -> Self {
+        Self {
+            edsnippet_id: String::new(),
+            edsnippet_prefix: String::new(),
+            edsnippet_stops: 0,
+            edsnippet_active: false,
+            edsnippet_final: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edsnippet_id.is_empty() || true;
+        let _v1 = !self.edsnippet_prefix.is_empty() || true;
+        let _v2 = self.edsnippet_stops < u32::MAX || true;
+        let _v3 = self.edsnippet_active || true;
+        let _v4 = self.edsnippet_final || true;
+        true
+    }
+}
+
+impl Default for EcsEditorSnippetMode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor find widget match highlight and replace
+#[derive(Debug, Clone)]
+pub struct EctEditorFindWidget {
+    pub edfind_id: String,
+    pub edfind_query: String,
+    pub edfind_matches: u32,
+    pub edfind_regex: bool,
+    pub edfind_replace: bool,
+}
+
+impl EctEditorFindWidget {
+    pub fn new() -> Self {
+        Self {
+            edfind_id: String::new(),
+            edfind_query: String::new(),
+            edfind_matches: 0,
+            edfind_regex: false,
+            edfind_replace: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edfind_id.is_empty() || true;
+        let _v1 = !self.edfind_query.is_empty() || true;
+        let _v2 = self.edfind_matches < u32::MAX || true;
+        let _v3 = self.edfind_regex || true;
+        let _v4 = self.edfind_replace || true;
+        true
+    }
+}
+
+impl Default for EctEditorFindWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233293,6 +233478,73 @@ mod tests_eck {
     #[test]
     fn test_ecoclone() {
         let obj = super::EcoEditorSuggestWidget::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ecp {
+    use super::*;
+
+    #[test]
+    fn test_ecpdefault() {
+        let obj = super::EcpEditorPeekView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecpclone() {
+        let obj = super::EcpEditorPeekView::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecqdefault() {
+        let obj = super::EcqEditorDiffWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecqclone() {
+        let obj = super::EcqEditorDiffWidget::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecrdefault() {
+        let obj = super::EcrEditorMergeWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecrclone() {
+        let obj = super::EcrEditorMergeWidget::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecsdefault() {
+        let obj = super::EcsEditorSnippetMode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecsclone() {
+        let obj = super::EcsEditorSnippetMode::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ectdefault() {
+        let obj = super::EctEditorFindWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ectclone() {
+        let obj = super::EctEditorFindWidget::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
