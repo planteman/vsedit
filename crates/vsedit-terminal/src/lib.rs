@@ -75993,3 +75993,1039 @@ mod tests_bet {
         assert_ne!(BetTitleBarStyle::Native, BetTitleBarStyle::Custom);
     }
 }
+
+// beu_: Editor quick input model — input box, quick pick, multi-step input,
+// validation, items with icons, busy state
+
+/// Quick input type
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BeuQuickInputType {
+    InputBox,
+    QuickPick,
+}
+
+/// Quick pick item
+#[derive(Debug, Clone)]
+pub struct BeuQuickPickItem {
+    pub label: String,
+    pub description: Option<String>,
+    pub detail: Option<String>,
+    pub icon: Option<String>,
+    pub picked: bool,
+    pub always_show: bool,
+}
+
+impl BeuQuickPickItem {
+    pub fn new(label: &str) -> Self {
+        Self { label: label.to_string(), description: None, detail: None, icon: None, picked: false, always_show: false }
+    }
+
+    pub fn with_description(mut self, desc: &str) -> Self { self.description = Some(desc.to_string()); self }
+    pub fn with_detail(mut self, detail: &str) -> Self { self.detail = Some(detail.to_string()); self }
+}
+
+/// Quick input state
+#[derive(Debug, Clone)]
+pub struct BeuQuickInput {
+    pub input_type: BeuQuickInputType,
+    pub title: String,
+    pub placeholder: Option<String>,
+    pub value: String,
+    pub items: Vec<BeuQuickPickItem>,
+    pub can_pick_many: bool,
+    pub is_busy: bool,
+    pub validation_message: Option<String>,
+    pub step: Option<(usize, usize)>,
+}
+
+impl BeuQuickInput {
+    pub fn input_box(title: &str) -> Self {
+        Self { input_type: BeuQuickInputType::InputBox, title: title.to_string(), placeholder: None,
+               value: String::new(), items: Vec::new(), can_pick_many: false, is_busy: false,
+               validation_message: None, step: None }
+    }
+
+    pub fn quick_pick(title: &str) -> Self {
+        let mut q = Self::input_box(title); q.input_type = BeuQuickInputType::QuickPick; q
+    }
+
+    pub fn with_placeholder(mut self, ph: &str) -> Self { self.placeholder = Some(ph.to_string()); self }
+    pub fn with_step(mut self, current: usize, total: usize) -> Self { self.step = Some((current, total)); self }
+
+    pub fn set_value(&mut self, v: &str) { self.value = v.to_string(); }
+    pub fn set_busy(&mut self, busy: bool) { self.is_busy = busy; }
+    pub fn set_validation(&mut self, msg: Option<String>) { self.validation_message = msg; }
+
+    pub fn add_item(&mut self, item: BeuQuickPickItem) { self.items.push(item); }
+
+    pub fn filtered_items(&self) -> Vec<&BeuQuickPickItem> {
+        if self.value.is_empty() { return self.items.iter().collect(); }
+        let q = self.value.to_lowercase();
+        self.items.iter().filter(|i| i.label.to_lowercase().contains(&q) || i.always_show).collect()
+    }
+
+    pub fn selected_items(&self) -> Vec<&BeuQuickPickItem> {
+        self.items.iter().filter(|i| i.picked).collect()
+    }
+
+    pub fn has_validation_error(&self) -> bool { self.validation_message.is_some() }
+}
+
+#[cfg(test)]
+mod tests_beu {
+    use super::*;
+
+    #[test]
+    fn test_beu_quick_pick_item() {
+        let item = BeuQuickPickItem::new("hello").with_description("desc");
+        assert_eq!(item.label, "hello");
+        assert_eq!(item.description.as_deref(), Some("desc"));
+    }
+
+    #[test]
+    fn test_beu_input_box() {
+        let mut input = BeuQuickInput::input_box("Enter name").with_placeholder("Type here...");
+        input.set_value("hello");
+        assert_eq!(input.value, "hello");
+        assert_eq!(input.input_type, BeuQuickInputType::InputBox);
+    }
+
+    #[test]
+    fn test_beu_quick_pick() {
+        let mut qp = BeuQuickInput::quick_pick("Select item");
+        qp.add_item(BeuQuickPickItem::new("Alpha"));
+        qp.add_item(BeuQuickPickItem::new("Beta"));
+        qp.add_item(BeuQuickPickItem::new("Gamma"));
+        assert_eq!(qp.items.len(), 3);
+        qp.set_value("al");
+        assert_eq!(qp.filtered_items().len(), 1);
+    }
+
+    #[test]
+    fn test_beu_validation() {
+        let mut input = BeuQuickInput::input_box("Test");
+        assert!(!input.has_validation_error());
+        input.set_validation(Some("Required".to_string()));
+        assert!(input.has_validation_error());
+    }
+
+    #[test]
+    fn test_beu_step() {
+        let input = BeuQuickInput::input_box("Step").with_step(2, 5);
+        assert_eq!(input.step, Some((2, 5)));
+    }
+
+    #[test]
+    fn test_beu_busy() {
+        let mut input = BeuQuickInput::input_box("Test");
+        input.set_busy(true);
+        assert!(input.is_busy);
+    }
+
+    #[test]
+    fn test_beu_selected() {
+        let mut qp = BeuQuickInput::quick_pick("Select");
+        let mut item = BeuQuickPickItem::new("A");
+        item.picked = true;
+        qp.add_item(item);
+        qp.add_item(BeuQuickPickItem::new("B"));
+        assert_eq!(qp.selected_items().len(), 1);
+    }
+
+    #[test]
+    fn test_beu_filter_empty() {
+        let mut qp = BeuQuickInput::quick_pick("Select");
+        qp.add_item(BeuQuickPickItem::new("A"));
+        assert_eq!(qp.filtered_items().len(), 1);
+    }
+
+    #[test]
+    fn test_beu_quick_pick_detail() {
+        let item = BeuQuickPickItem::new("x").with_detail("detail text");
+        assert_eq!(item.detail.as_deref(), Some("detail text"));
+    }
+
+    #[test]
+    fn test_beu_input_types() {
+        assert_ne!(BeuQuickInputType::InputBox, BeuQuickInputType::QuickPick);
+    }
+}
+
+// bev_: Editor output channel model — output channels, append/replace,
+// show/hide, language for syntax, clear, output panel
+
+/// Output channel
+#[derive(Debug, Clone)]
+pub struct BevOutputChannel {
+    pub id: String,
+    pub name: String,
+    pub content: String,
+    pub language_id: Option<String>,
+    pub visible: bool,
+    pub preserve_focus: bool,
+}
+
+impl BevOutputChannel {
+    pub fn new(id: &str, name: &str) -> Self {
+        Self { id: id.to_string(), name: name.to_string(), content: String::new(),
+               language_id: None, visible: false, preserve_focus: true }
+    }
+
+    pub fn with_language(mut self, lang: &str) -> Self { self.language_id = Some(lang.to_string()); self }
+
+    pub fn append(&mut self, text: &str) { self.content.push_str(text); }
+    pub fn append_line(&mut self, text: &str) { self.content.push_str(text); self.content.push('\n'); }
+    pub fn replace(&mut self, text: &str) { self.content = text.to_string(); }
+    pub fn clear(&mut self) { self.content.clear(); }
+
+    pub fn show(&mut self) { self.visible = true; }
+    pub fn hide(&mut self) { self.visible = false; }
+
+    pub fn line_count(&self) -> usize { self.content.lines().count().max(1) }
+    pub fn is_empty(&self) -> bool { self.content.is_empty() }
+}
+
+/// Output channel registry
+#[derive(Debug, Clone, Default)]
+pub struct BevOutputRegistry {
+    pub channels: Vec<BevOutputChannel>,
+    pub active: Option<String>,
+}
+
+impl BevOutputRegistry {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn create(&mut self, id: &str, name: &str) -> &mut BevOutputChannel {
+        self.channels.push(BevOutputChannel::new(id, name));
+        self.channels.last_mut().unwrap()
+    }
+
+    pub fn find(&self, id: &str) -> Option<&BevOutputChannel> {
+        self.channels.iter().find(|c| c.id == id)
+    }
+
+    pub fn find_mut(&mut self, id: &str) -> Option<&mut BevOutputChannel> {
+        self.channels.iter_mut().find(|c| c.id == id)
+    }
+
+    pub fn set_active(&mut self, id: &str) { self.active = Some(id.to_string()); }
+
+    pub fn active_channel(&self) -> Option<&BevOutputChannel> {
+        self.active.as_ref().and_then(|id| self.find(id))
+    }
+
+    pub fn names(&self) -> Vec<&str> { self.channels.iter().map(|c| c.name.as_str()).collect() }
+    pub fn count(&self) -> usize { self.channels.len() }
+
+    pub fn remove(&mut self, id: &str) -> bool {
+        let before = self.channels.len();
+        self.channels.retain(|c| c.id != id);
+        self.channels.len() < before
+    }
+}
+
+#[cfg(test)]
+mod tests_bev {
+    use super::*;
+
+    #[test]
+    fn test_bev_channel_basic() {
+        let mut ch = BevOutputChannel::new("ext", "Extension Output");
+        ch.append_line("Starting...");
+        ch.append_line("Done.");
+        assert_eq!(ch.line_count(), 2);
+        assert!(!ch.is_empty());
+    }
+
+    #[test]
+    fn test_bev_channel_clear() {
+        let mut ch = BevOutputChannel::new("test", "Test");
+        ch.append("data");
+        ch.clear();
+        assert!(ch.is_empty());
+    }
+
+    #[test]
+    fn test_bev_channel_replace() {
+        let mut ch = BevOutputChannel::new("test", "Test");
+        ch.append("old");
+        ch.replace("new");
+        assert_eq!(ch.content, "new");
+    }
+
+    #[test]
+    fn test_bev_channel_visibility() {
+        let mut ch = BevOutputChannel::new("test", "Test");
+        ch.show();
+        assert!(ch.visible);
+        ch.hide();
+        assert!(!ch.visible);
+    }
+
+    #[test]
+    fn test_bev_registry() {
+        let mut reg = BevOutputRegistry::new();
+        reg.create("git", "Git");
+        reg.create("lsp", "Language Server");
+        assert_eq!(reg.count(), 2);
+        assert_eq!(reg.names(), vec!["Git", "Language Server"]);
+    }
+
+    #[test]
+    fn test_bev_registry_active() {
+        let mut reg = BevOutputRegistry::new();
+        reg.create("a", "A");
+        reg.set_active("a");
+        assert!(reg.active_channel().is_some());
+    }
+
+    #[test]
+    fn test_bev_registry_remove() {
+        let mut reg = BevOutputRegistry::new();
+        reg.create("a", "A");
+        assert!(reg.remove("a"));
+        assert_eq!(reg.count(), 0);
+    }
+
+    #[test]
+    fn test_bev_channel_language() {
+        let ch = BevOutputChannel::new("log", "Log").with_language("json");
+        assert_eq!(ch.language_id.as_deref(), Some("json"));
+    }
+
+    #[test]
+    fn test_bev_registry_find_mut() {
+        let mut reg = BevOutputRegistry::new();
+        reg.create("a", "A");
+        reg.find_mut("a").unwrap().append("hello");
+        assert_eq!(reg.find("a").unwrap().content, "hello");
+    }
+
+    #[test]
+    fn test_bev_channel_empty() {
+        let ch = BevOutputChannel::new("test", "Test");
+        assert!(ch.is_empty());
+        assert_eq!(ch.line_count(), 1);
+    }
+}
+
+// bew_: Editor debug console model — debug console input/output, REPL,
+// expression evaluation, console groups, colored output
+
+/// Debug console entry type
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BewConsoleEntryType {
+    Input,
+    Output,
+    Error,
+    Warning,
+    Info,
+    GroupStart,
+    GroupEnd,
+}
+
+/// A debug console entry
+#[derive(Debug, Clone)]
+pub struct BewConsoleEntry {
+    pub entry_type: BewConsoleEntryType,
+    pub text: String,
+    pub source: Option<String>,
+    pub indent_level: usize,
+}
+
+impl BewConsoleEntry {
+    pub fn output(text: &str) -> Self {
+        Self { entry_type: BewConsoleEntryType::Output, text: text.to_string(), source: None, indent_level: 0 }
+    }
+
+    pub fn input(text: &str) -> Self {
+        Self { entry_type: BewConsoleEntryType::Input, text: text.to_string(), source: None, indent_level: 0 }
+    }
+
+    pub fn error(text: &str) -> Self {
+        Self { entry_type: BewConsoleEntryType::Error, text: text.to_string(), source: None, indent_level: 0 }
+    }
+
+    pub fn with_source(mut self, source: &str) -> Self { self.source = Some(source.to_string()); self }
+
+    pub fn is_error(&self) -> bool { self.entry_type == BewConsoleEntryType::Error }
+}
+
+/// Debug console state
+#[derive(Debug, Clone, Default)]
+pub struct BewDebugConsole {
+    pub entries: Vec<BewConsoleEntry>,
+    pub input_history: Vec<String>,
+    pub history_index: Option<usize>,
+    pub current_input: String,
+    pub group_depth: usize,
+}
+
+impl BewDebugConsole {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn add_entry(&mut self, mut entry: BewConsoleEntry) {
+        entry.indent_level = self.group_depth;
+        self.entries.push(entry);
+    }
+
+    pub fn add_input(&mut self, text: &str) {
+        self.add_entry(BewConsoleEntry::input(text));
+        self.input_history.push(text.to_string());
+        self.history_index = None;
+        self.current_input.clear();
+    }
+
+    pub fn start_group(&mut self, label: &str) {
+        self.add_entry(BewConsoleEntry { entry_type: BewConsoleEntryType::GroupStart,
+            text: label.to_string(), source: None, indent_level: self.group_depth });
+        self.group_depth += 1;
+    }
+
+    pub fn end_group(&mut self) {
+        if self.group_depth > 0 { self.group_depth -= 1; }
+        self.add_entry(BewConsoleEntry { entry_type: BewConsoleEntryType::GroupEnd,
+            text: String::new(), source: None, indent_level: self.group_depth });
+    }
+
+    pub fn history_prev(&mut self) {
+        if self.input_history.is_empty() { return; }
+        let idx = match self.history_index {
+            None => self.input_history.len() - 1,
+            Some(i) => if i > 0 { i - 1 } else { 0 },
+        };
+        self.history_index = Some(idx);
+        self.current_input = self.input_history[idx].clone();
+    }
+
+    pub fn history_next(&mut self) {
+        if let Some(idx) = self.history_index {
+            if idx + 1 < self.input_history.len() {
+                self.history_index = Some(idx + 1);
+                self.current_input = self.input_history[idx + 1].clone();
+            } else {
+                self.history_index = None;
+                self.current_input.clear();
+            }
+        }
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); self.group_depth = 0; }
+    pub fn entry_count(&self) -> usize { self.entries.len() }
+}
+
+#[cfg(test)]
+mod tests_bew {
+    use super::*;
+
+    #[test]
+    fn test_bew_entry_output() {
+        let e = BewConsoleEntry::output("hello");
+        assert_eq!(e.entry_type, BewConsoleEntryType::Output);
+        assert!(!e.is_error());
+    }
+
+    #[test]
+    fn test_bew_entry_error() {
+        let e = BewConsoleEntry::error("fail").with_source("debugger");
+        assert!(e.is_error());
+        assert_eq!(e.source.as_deref(), Some("debugger"));
+    }
+
+    #[test]
+    fn test_bew_console_add() {
+        let mut console = BewDebugConsole::new();
+        console.add_entry(BewConsoleEntry::output("line 1"));
+        console.add_entry(BewConsoleEntry::output("line 2"));
+        assert_eq!(console.entry_count(), 2);
+    }
+
+    #[test]
+    fn test_bew_console_input_history() {
+        let mut console = BewDebugConsole::new();
+        console.add_input("expr1");
+        console.add_input("expr2");
+        assert_eq!(console.input_history.len(), 2);
+        console.history_prev();
+        assert_eq!(console.current_input, "expr2");
+        console.history_prev();
+        assert_eq!(console.current_input, "expr1");
+    }
+
+    #[test]
+    fn test_bew_console_history_next() {
+        let mut console = BewDebugConsole::new();
+        console.add_input("a");
+        console.add_input("b");
+        console.history_prev();
+        console.history_prev();
+        console.history_next();
+        assert_eq!(console.current_input, "b");
+    }
+
+    #[test]
+    fn test_bew_console_groups() {
+        let mut console = BewDebugConsole::new();
+        console.start_group("Group1");
+        console.add_entry(BewConsoleEntry::output("inside"));
+        assert_eq!(console.entries.last().unwrap().indent_level, 1);
+        console.end_group();
+        assert_eq!(console.group_depth, 0);
+    }
+
+    #[test]
+    fn test_bew_console_clear() {
+        let mut console = BewDebugConsole::new();
+        console.add_entry(BewConsoleEntry::output("x"));
+        console.start_group("g");
+        console.clear();
+        assert_eq!(console.entry_count(), 0);
+        assert_eq!(console.group_depth, 0);
+    }
+
+    #[test]
+    fn test_bew_console_empty_history() {
+        let mut console = BewDebugConsole::new();
+        console.history_prev(); // no-op
+        console.history_next(); // no-op
+        assert!(console.current_input.is_empty());
+    }
+
+    #[test]
+    fn test_bew_entry_types() {
+        assert_ne!(BewConsoleEntryType::Input, BewConsoleEntryType::Output);
+        assert_ne!(BewConsoleEntryType::Error, BewConsoleEntryType::Warning);
+    }
+
+    #[test]
+    fn test_bew_console_input_clears() {
+        let mut console = BewDebugConsole::new();
+        console.current_input = "pending".to_string();
+        console.add_input("submitted");
+        assert!(console.current_input.is_empty());
+    }
+}
+
+// bex_: Editor accessibility model — screen reader support, aria labels,
+// high contrast theme, focus indicators, accessibility help dialog
+
+/// Accessibility support level
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BexAccessibilitySupport {
+    Auto,
+    On,
+    Off,
+}
+
+/// High contrast theme
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BexHighContrastMode {
+    Off,
+    Dark,
+    Light,
+}
+
+/// Accessibility configuration
+#[derive(Debug, Clone)]
+pub struct BexAccessibilityConfig {
+    pub support: BexAccessibilitySupport,
+    pub high_contrast: BexHighContrastMode,
+    pub screen_reader_optimized: bool,
+    pub dim_unfocused: bool,
+    pub focus_indicator: bool,
+    pub keyboard_navigation: bool,
+    pub page_size: usize,
+}
+
+impl Default for BexAccessibilityConfig {
+    fn default() -> Self {
+        Self { support: BexAccessibilitySupport::Auto, high_contrast: BexHighContrastMode::Off,
+               screen_reader_optimized: false, dim_unfocused: false,
+               focus_indicator: true, keyboard_navigation: true, page_size: 10 }
+    }
+}
+
+impl BexAccessibilityConfig {
+    pub fn is_screen_reader_active(&self) -> bool {
+        self.support == BexAccessibilitySupport::On || self.screen_reader_optimized
+    }
+
+    pub fn is_high_contrast(&self) -> bool {
+        self.high_contrast != BexHighContrastMode::Off
+    }
+}
+
+/// Aria label builder
+pub fn bex_aria_label(role: &str, label: &str, state: &str) -> String {
+    if state.is_empty() {
+        format!("{}: {}", role, label)
+    } else {
+        format!("{}: {}, {}", role, label, state)
+    }
+}
+
+/// Focus trap for dialogs
+#[derive(Debug, Clone, Default)]
+pub struct BexFocusTrap {
+    pub elements: Vec<String>,
+    pub current_index: usize,
+    pub active: bool,
+}
+
+impl BexFocusTrap {
+    pub fn new(elements: Vec<String>) -> Self {
+        Self { elements, current_index: 0, active: true }
+    }
+
+    pub fn current(&self) -> Option<&str> { self.elements.get(self.current_index).map(|s| s.as_str()) }
+
+    pub fn next(&mut self) {
+        if !self.elements.is_empty() { self.current_index = (self.current_index + 1) % self.elements.len(); }
+    }
+
+    pub fn prev(&mut self) {
+        if !self.elements.is_empty() {
+            self.current_index = if self.current_index == 0 { self.elements.len() - 1 } else { self.current_index - 1 };
+        }
+    }
+
+    pub fn count(&self) -> usize { self.elements.len() }
+}
+
+#[cfg(test)]
+mod tests_bex {
+    use super::*;
+
+    #[test]
+    fn test_bex_config_defaults() {
+        let cfg = BexAccessibilityConfig::default();
+        assert!(!cfg.is_screen_reader_active());
+        assert!(!cfg.is_high_contrast());
+        assert!(cfg.focus_indicator);
+    }
+
+    #[test]
+    fn test_bex_screen_reader() {
+        let mut cfg = BexAccessibilityConfig::default();
+        cfg.support = BexAccessibilitySupport::On;
+        assert!(cfg.is_screen_reader_active());
+    }
+
+    #[test]
+    fn test_bex_high_contrast() {
+        let mut cfg = BexAccessibilityConfig::default();
+        cfg.high_contrast = BexHighContrastMode::Dark;
+        assert!(cfg.is_high_contrast());
+    }
+
+    #[test]
+    fn test_bex_aria_label() {
+        assert_eq!(bex_aria_label("button", "Save", ""), "button: Save");
+        assert_eq!(bex_aria_label("button", "Save", "disabled"), "button: Save, disabled");
+    }
+
+    #[test]
+    fn test_bex_focus_trap() {
+        let mut trap = BexFocusTrap::new(vec!["a".into(), "b".into(), "c".into()]);
+        assert_eq!(trap.current(), Some("a"));
+        trap.next();
+        assert_eq!(trap.current(), Some("b"));
+        trap.next();
+        trap.next();
+        assert_eq!(trap.current(), Some("a")); // wraps
+    }
+
+    #[test]
+    fn test_bex_focus_trap_prev() {
+        let mut trap = BexFocusTrap::new(vec!["a".into(), "b".into()]);
+        trap.prev();
+        assert_eq!(trap.current(), Some("b")); // wraps back
+    }
+
+    #[test]
+    fn test_bex_focus_trap_count() {
+        let trap = BexFocusTrap::new(vec!["a".into()]);
+        assert_eq!(trap.count(), 1);
+    }
+
+    #[test]
+    fn test_bex_support_levels() {
+        assert_ne!(BexAccessibilitySupport::Auto, BexAccessibilitySupport::On);
+    }
+
+    #[test]
+    fn test_bex_high_contrast_modes() {
+        assert_ne!(BexHighContrastMode::Dark, BexHighContrastMode::Light);
+    }
+
+    #[test]
+    fn test_bex_focus_trap_empty() {
+        let mut trap = BexFocusTrap::new(vec![]);
+        trap.next(); // no-op
+        assert!(trap.current().is_none());
+    }
+}
+
+// bey_: Editor color picker model — color representation, HSL/RGB/Hex,
+// color swatch, opacity slider, color history, format switching
+
+/// Color format
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BeyColorFormat {
+    Hex,
+    Rgb,
+    Hsl,
+    Hsv,
+}
+
+/// Color value (RGBA)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BeyColor {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: f64,
+}
+
+impl BeyColor {
+    pub fn new(r: u8, g: u8, b: u8, a: f64) -> Self { Self { r, g, b, a: a.clamp(0.0, 1.0) } }
+    pub fn from_rgb(r: u8, g: u8, b: u8) -> Self { Self::new(r, g, b, 1.0) }
+
+    pub fn to_hex(&self) -> String {
+        if (self.a - 1.0).abs() < 0.001 {
+            format!("#{:02x}{:02x}{:02x}", self.r, self.g, self.b)
+        } else {
+            format!("#{:02x}{:02x}{:02x}{:02x}", self.r, self.g, self.b, (self.a * 255.0) as u8)
+        }
+    }
+
+    pub fn to_rgb_string(&self) -> String {
+        if (self.a - 1.0).abs() < 0.001 {
+            format!("rgb({}, {}, {})", self.r, self.g, self.b)
+        } else {
+            format!("rgba({}, {}, {}, {:.2})", self.r, self.g, self.b, self.a)
+        }
+    }
+
+    pub fn luminance(&self) -> f64 {
+        0.299 * self.r as f64 / 255.0 + 0.587 * self.g as f64 / 255.0 + 0.114 * self.b as f64 / 255.0
+    }
+
+    pub fn is_dark(&self) -> bool { self.luminance() < 0.5 }
+    pub fn is_light(&self) -> bool { !self.is_dark() }
+}
+
+/// Color picker state
+#[derive(Debug, Clone)]
+pub struct BeyColorPicker {
+    pub color: BeyColor,
+    pub format: BeyColorFormat,
+    pub history: Vec<BeyColor>,
+    pub max_history: usize,
+    pub visible: bool,
+}
+
+impl Default for BeyColorPicker {
+    fn default() -> Self {
+        Self { color: BeyColor::from_rgb(255, 0, 0), format: BeyColorFormat::Hex,
+               history: Vec::new(), max_history: 10, visible: false }
+    }
+}
+
+impl BeyColorPicker {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn set_color(&mut self, color: BeyColor) {
+        self.history.insert(0, self.color.clone());
+        if self.history.len() > self.max_history { self.history.truncate(self.max_history); }
+        self.color = color;
+    }
+
+    pub fn set_opacity(&mut self, a: f64) { self.color.a = a.clamp(0.0, 1.0); }
+    pub fn cycle_format(&mut self) {
+        self.format = match self.format {
+            BeyColorFormat::Hex => BeyColorFormat::Rgb,
+            BeyColorFormat::Rgb => BeyColorFormat::Hsl,
+            BeyColorFormat::Hsl => BeyColorFormat::Hsv,
+            BeyColorFormat::Hsv => BeyColorFormat::Hex,
+        };
+    }
+
+    pub fn display_value(&self) -> String {
+        match self.format {
+            BeyColorFormat::Hex => self.color.to_hex(),
+            BeyColorFormat::Rgb => self.color.to_rgb_string(),
+            _ => self.color.to_hex(),
+        }
+    }
+
+    pub fn show(&mut self) { self.visible = true; }
+    pub fn hide(&mut self) { self.visible = false; }
+}
+
+#[cfg(test)]
+mod tests_bey {
+    use super::*;
+
+    #[test]
+    fn test_bey_color_hex() {
+        let c = BeyColor::from_rgb(255, 128, 0);
+        assert_eq!(c.to_hex(), "#ff8000");
+    }
+
+    #[test]
+    fn test_bey_color_hex_alpha() {
+        let c = BeyColor::new(255, 0, 0, 0.5);
+        assert!(c.to_hex().len() > 7);
+    }
+
+    #[test]
+    fn test_bey_color_rgb_string() {
+        let c = BeyColor::from_rgb(100, 200, 50);
+        assert_eq!(c.to_rgb_string(), "rgb(100, 200, 50)");
+    }
+
+    #[test]
+    fn test_bey_color_luminance() {
+        let white = BeyColor::from_rgb(255, 255, 255);
+        assert!(white.is_light());
+        let black = BeyColor::from_rgb(0, 0, 0);
+        assert!(black.is_dark());
+    }
+
+    #[test]
+    fn test_bey_picker_set_color() {
+        let mut picker = BeyColorPicker::new();
+        picker.set_color(BeyColor::from_rgb(0, 255, 0));
+        assert_eq!(picker.color.g, 255);
+        assert_eq!(picker.history.len(), 1);
+    }
+
+    #[test]
+    fn test_bey_picker_opacity() {
+        let mut picker = BeyColorPicker::new();
+        picker.set_opacity(0.5);
+        assert!((picker.color.a - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_bey_picker_cycle() {
+        let mut picker = BeyColorPicker::new();
+        assert_eq!(picker.format, BeyColorFormat::Hex);
+        picker.cycle_format();
+        assert_eq!(picker.format, BeyColorFormat::Rgb);
+        picker.cycle_format();
+        assert_eq!(picker.format, BeyColorFormat::Hsl);
+    }
+
+    #[test]
+    fn test_bey_picker_display() {
+        let picker = BeyColorPicker::new();
+        assert!(picker.display_value().starts_with('#'));
+    }
+
+    #[test]
+    fn test_bey_picker_visibility() {
+        let mut picker = BeyColorPicker::new();
+        picker.show();
+        assert!(picker.visible);
+        picker.hide();
+        assert!(!picker.visible);
+    }
+
+    #[test]
+    fn test_bey_color_format_variants() {
+        assert_ne!(BeyColorFormat::Hex, BeyColorFormat::Rgb);
+        assert_ne!(BeyColorFormat::Hsl, BeyColorFormat::Hsv);
+    }
+}
+
+// bez_: Editor timeline model — timeline entries, source control history,
+// file history, timeline providers, date grouping
+
+/// Timeline entry type
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BezTimelineEntryType {
+    GitCommit,
+    FileChange,
+    Reference,
+    Custom,
+}
+
+/// A timeline entry
+#[derive(Debug, Clone)]
+pub struct BezTimelineEntry {
+    pub id: String,
+    pub label: String,
+    pub description: Option<String>,
+    pub entry_type: BezTimelineEntryType,
+    pub timestamp: u64,
+    pub icon: Option<String>,
+    pub detail: Option<String>,
+}
+
+impl BezTimelineEntry {
+    pub fn new(id: &str, label: &str, entry_type: BezTimelineEntryType, timestamp: u64) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), description: None,
+               entry_type, timestamp, icon: None, detail: None }
+    }
+
+    pub fn with_description(mut self, desc: &str) -> Self { self.description = Some(desc.to_string()); self }
+    pub fn with_icon(mut self, icon: &str) -> Self { self.icon = Some(icon.to_string()); self }
+    pub fn with_detail(mut self, detail: &str) -> Self { self.detail = Some(detail.to_string()); self }
+
+    pub fn is_git_commit(&self) -> bool { self.entry_type == BezTimelineEntryType::GitCommit }
+}
+
+/// Timeline provider
+#[derive(Debug, Clone)]
+pub struct BezTimelineProvider {
+    pub id: String,
+    pub label: String,
+    pub entries: Vec<BezTimelineEntry>,
+}
+
+impl BezTimelineProvider {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), entries: Vec::new() }
+    }
+
+    pub fn add_entry(&mut self, entry: BezTimelineEntry) { self.entries.push(entry); }
+
+    pub fn sorted_entries(&self) -> Vec<&BezTimelineEntry> {
+        let mut sorted: Vec<&BezTimelineEntry> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        sorted
+    }
+
+    pub fn count(&self) -> usize { self.entries.len() }
+}
+
+/// Timeline view state
+#[derive(Debug, Clone, Default)]
+pub struct BezTimelineView {
+    pub providers: Vec<BezTimelineProvider>,
+    pub visible: bool,
+    pub filter_text: String,
+}
+
+impl BezTimelineView {
+    pub fn new() -> Self { Self { visible: true, ..Default::default() } }
+
+    pub fn add_provider(&mut self, provider: BezTimelineProvider) { self.providers.push(provider); }
+
+    pub fn all_entries(&self) -> Vec<&BezTimelineEntry> {
+        let mut all: Vec<&BezTimelineEntry> = self.providers.iter().flat_map(|p| p.entries.iter()).collect();
+        all.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        all
+    }
+
+    pub fn filtered_entries(&self) -> Vec<&BezTimelineEntry> {
+        if self.filter_text.is_empty() { return self.all_entries(); }
+        let q = self.filter_text.to_lowercase();
+        self.all_entries().into_iter().filter(|e| e.label.to_lowercase().contains(&q)).collect()
+    }
+
+    pub fn total_entries(&self) -> usize {
+        self.providers.iter().map(|p| p.count()).sum()
+    }
+
+    pub fn provider_count(&self) -> usize { self.providers.len() }
+}
+
+#[cfg(test)]
+mod tests_bez {
+    use super::*;
+
+    #[test]
+    fn test_bez_entry() {
+        let e = BezTimelineEntry::new("c1", "Fix bug", BezTimelineEntryType::GitCommit, 1000)
+            .with_description("Fixed null pointer")
+            .with_icon("git-commit");
+        assert!(e.is_git_commit());
+        assert_eq!(e.icon.as_deref(), Some("git-commit"));
+    }
+
+    #[test]
+    fn test_bez_provider() {
+        let mut p = BezTimelineProvider::new("git", "Git History");
+        p.add_entry(BezTimelineEntry::new("c1", "First", BezTimelineEntryType::GitCommit, 100));
+        p.add_entry(BezTimelineEntry::new("c2", "Second", BezTimelineEntryType::GitCommit, 200));
+        let sorted = p.sorted_entries();
+        assert_eq!(sorted[0].label, "Second"); // newer first
+        assert_eq!(p.count(), 2);
+    }
+
+    #[test]
+    fn test_bez_view_all() {
+        let mut view = BezTimelineView::new();
+        let mut git = BezTimelineProvider::new("git", "Git");
+        git.add_entry(BezTimelineEntry::new("c1", "Commit A", BezTimelineEntryType::GitCommit, 100));
+        let mut local = BezTimelineProvider::new("local", "Local");
+        local.add_entry(BezTimelineEntry::new("f1", "File saved", BezTimelineEntryType::FileChange, 200));
+        view.add_provider(git);
+        view.add_provider(local);
+        assert_eq!(view.total_entries(), 2);
+        let all = view.all_entries();
+        assert_eq!(all[0].label, "File saved"); // newer first
+    }
+
+    #[test]
+    fn test_bez_view_filter() {
+        let mut view = BezTimelineView::new();
+        let mut git = BezTimelineProvider::new("git", "Git");
+        git.add_entry(BezTimelineEntry::new("c1", "Fix bug", BezTimelineEntryType::GitCommit, 100));
+        git.add_entry(BezTimelineEntry::new("c2", "Add feature", BezTimelineEntryType::GitCommit, 200));
+        view.add_provider(git);
+        view.filter_text = "fix".to_string();
+        assert_eq!(view.filtered_entries().len(), 1);
+    }
+
+    #[test]
+    fn test_bez_view_provider_count() {
+        let mut view = BezTimelineView::new();
+        view.add_provider(BezTimelineProvider::new("a", "A"));
+        assert_eq!(view.provider_count(), 1);
+    }
+
+    #[test]
+    fn test_bez_entry_detail() {
+        let e = BezTimelineEntry::new("x", "X", BezTimelineEntryType::Custom, 0).with_detail("info");
+        assert_eq!(e.detail.as_deref(), Some("info"));
+    }
+
+    #[test]
+    fn test_bez_entry_types() {
+        assert_ne!(BezTimelineEntryType::GitCommit, BezTimelineEntryType::FileChange);
+        assert_ne!(BezTimelineEntryType::Reference, BezTimelineEntryType::Custom);
+    }
+
+    #[test]
+    fn test_bez_view_empty() {
+        let view = BezTimelineView::new();
+        assert_eq!(view.total_entries(), 0);
+        assert!(view.visible);
+    }
+
+    #[test]
+    fn test_bez_provider_empty() {
+        let p = BezTimelineProvider::new("test", "Test");
+        assert_eq!(p.count(), 0);
+        assert!(p.sorted_entries().is_empty());
+    }
+
+    #[test]
+    fn test_bez_view_no_filter() {
+        let mut view = BezTimelineView::new();
+        let mut p = BezTimelineProvider::new("a", "A");
+        p.add_entry(BezTimelineEntry::new("1", "One", BezTimelineEntryType::Custom, 1));
+        view.add_provider(p);
+        assert_eq!(view.filtered_entries().len(), 1);
+    }
+
+    #[test]
+    fn test_bez_entry_not_git() {
+        let e = BezTimelineEntry::new("f", "F", BezTimelineEntryType::FileChange, 0);
+        assert!(!e.is_git_commit());
+    }
+}
