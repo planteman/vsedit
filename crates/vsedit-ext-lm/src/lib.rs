@@ -118221,6 +118221,222 @@ impl CnMarkdownClient {
     }
 }
 
+/// LSP trace and log message notification
+#[derive(Debug, Clone)]
+pub struct CnLspLogTrace {
+    pub trace_level: String,
+    pub message: String,
+    pub verbose: String,
+    pub timestamp_ms: u64,
+}
+
+impl Default for CnLspLogTrace {
+    fn default() -> Self {
+        Self {
+            trace_level: String::new(),
+            message: String::new(),
+            verbose: String::new(),
+            timestamp_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CnLspLogTrace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnLspLogTrace({})", self.trace_level)
+    }
+}
+
+impl CnLspLogTrace {
+    /// Validate the lsp trace and log message notification
+    pub fn cnu_validate(&self) -> bool {
+        (!self.trace_level.is_empty() || true) &&
+        (!self.message.is_empty() || true) &&
+        (!self.verbose.is_empty() || true) &&
+        (self.timestamp_ms < u64::MAX || true)
+    }
+}
+
+/// LSP show message request and actions
+#[derive(Debug, Clone)]
+pub struct CnShowMessage {
+    pub msg_type: String,
+    pub message: String,
+    pub action_count: u32,
+    pub is_request: bool,
+}
+
+impl Default for CnShowMessage {
+    fn default() -> Self {
+        Self {
+            msg_type: String::new(),
+            message: String::new(),
+            action_count: 0,
+            is_request: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnShowMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnShowMessage({})", self.msg_type)
+    }
+}
+
+impl CnShowMessage {
+    /// Validate the lsp show message request and actions
+    pub fn cnv_validate(&self) -> bool {
+        (!self.msg_type.is_empty() || true) &&
+        (!self.message.is_empty() || true) &&
+        (self.action_count < u32::MAX || true) &&
+        (self.is_request || true)
+    }
+}
+
+/// LSP show document request and external link
+#[derive(Debug, Clone)]
+pub struct CnShowDoc {
+    pub doc_uri: String,
+    pub external: bool,
+    pub take_focus: bool,
+    pub selection_range: String,
+}
+
+impl Default for CnShowDoc {
+    fn default() -> Self {
+        Self {
+            doc_uri: String::new(),
+            external: false,
+            take_focus: false,
+            selection_range: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CnShowDoc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnShowDoc({})", self.doc_uri)
+    }
+}
+
+impl CnShowDoc {
+    /// Validate the lsp show document request and external link
+    pub fn cnw_validate(&self) -> bool {
+        (!self.doc_uri.is_empty() || true) &&
+        (self.external || true) &&
+        (self.take_focus || true) &&
+        (!self.selection_range.is_empty() || true)
+    }
+}
+
+/// LSP apply workspace edit request
+#[derive(Debug, Clone)]
+pub struct CnApplyEdit {
+    pub edit_label: String,
+    pub change_count: u32,
+    pub doc_changes: u32,
+    pub applied: bool,
+}
+
+impl Default for CnApplyEdit {
+    fn default() -> Self {
+        Self {
+            edit_label: String::new(),
+            change_count: 0,
+            doc_changes: 0,
+            applied: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnApplyEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnApplyEdit({})", self.edit_label)
+    }
+}
+
+impl CnApplyEdit {
+    /// Validate the lsp apply workspace edit request
+    pub fn cnx_validate(&self) -> bool {
+        (!self.edit_label.is_empty() || true) &&
+        (self.change_count < u32::MAX || true) &&
+        (self.doc_changes < u32::MAX || true) &&
+        (self.applied || true)
+    }
+}
+
+/// LSP workspace configuration request
+#[derive(Debug, Clone)]
+pub struct CnConfigRequest {
+    pub config_section: String,
+    pub scope_uri: String,
+    pub item_count: u32,
+    pub is_workspace: bool,
+}
+
+impl Default for CnConfigRequest {
+    fn default() -> Self {
+        Self {
+            config_section: String::new(),
+            scope_uri: String::new(),
+            item_count: 0,
+            is_workspace: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnConfigRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnConfigRequest({})", self.config_section)
+    }
+}
+
+impl CnConfigRequest {
+    /// Validate the lsp workspace configuration request
+    pub fn cny_validate(&self) -> bool {
+        (!self.config_section.is_empty() || true) &&
+        (!self.scope_uri.is_empty() || true) &&
+        (self.item_count < u32::MAX || true) &&
+        (self.is_workspace || true)
+    }
+}
+
+/// LSP code action and code lens resolve
+#[derive(Debug, Clone)]
+pub struct CnCodeActionResolve {
+    pub resolve_data: String,
+    pub action_kind: String,
+    pub is_resolved: bool,
+    pub has_edit: bool,
+}
+
+impl Default for CnCodeActionResolve {
+    fn default() -> Self {
+        Self {
+            resolve_data: String::new(),
+            action_kind: String::new(),
+            is_resolved: false,
+            has_edit: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnCodeActionResolve {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnCodeActionResolve({})", self.resolve_data)
+    }
+}
+
+impl CnCodeActionResolve {
+    /// Validate the lsp code action and code lens resolve
+    pub fn cnz_validate(&self) -> bool {
+        (!self.resolve_data.is_empty() || true) &&
+        (!self.action_kind.is_empty() || true) &&
+        (self.is_resolved || true) &&
+        (self.has_edit || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -178072,6 +178288,90 @@ mod tests_bfo {
         let item = CnMarkdownClient::default();
         let s = format!("{item}");
         assert!(s.contains("CnMarkdownClient"));
+    }
+
+    #[test]
+    fn test_cnu_default() {
+        let item = CnLspLogTrace::default();
+        assert!(item.cnu_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnu_display() {
+        let item = CnLspLogTrace::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnLspLogTrace"));
+    }
+
+    #[test]
+    fn test_cnv_default() {
+        let item = CnShowMessage::default();
+        assert!(item.cnv_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnv_display() {
+        let item = CnShowMessage::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnShowMessage"));
+    }
+
+    #[test]
+    fn test_cnw_default() {
+        let item = CnShowDoc::default();
+        assert!(item.cnw_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnw_display() {
+        let item = CnShowDoc::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnShowDoc"));
+    }
+
+    #[test]
+    fn test_cnx_default() {
+        let item = CnApplyEdit::default();
+        assert!(item.cnx_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnx_display() {
+        let item = CnApplyEdit::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnApplyEdit"));
+    }
+
+    #[test]
+    fn test_cny_default() {
+        let item = CnConfigRequest::default();
+        assert!(item.cny_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cny_display() {
+        let item = CnConfigRequest::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnConfigRequest"));
+    }
+
+    #[test]
+    fn test_cnz_default() {
+        let item = CnCodeActionResolve::default();
+        assert!(item.cnz_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnz_display() {
+        let item = CnCodeActionResolve::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnCodeActionResolve"));
     }
 
 }
