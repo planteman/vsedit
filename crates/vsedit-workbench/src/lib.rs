@@ -88763,6 +88763,111 @@ impl DebugExpression {
     }
 }
 
+/// Runtime wiring: bqf_ DebugSession
+#[derive(Debug, Clone)]
+pub struct DebugSession {
+    pub bqf_session_id: String,
+    pub bqf_session_name: String,
+    pub bqf_debug_type: String,
+    pub bqf_adapter_id: String,
+    pub bqf_state: String,
+    pub bqf_thread_count: u32,
+    pub bqf_breakpoint_count: u32,
+    pub bqf_supports_restart: bool,
+    pub bqf_parent_session_id: String,
+    pub bqf_compact_mode: bool,
+}
+
+impl DebugSession {
+    pub fn bqf_summary(&self) -> String {
+        format!("DebugSession({})", self.bqf_session_id)
+    }
+}
+
+/// Runtime wiring: bqg_ DebugThread
+#[derive(Debug, Clone)]
+pub struct DebugThread {
+    pub bqg_thread_id: u64,
+    pub bqg_thread_name: String,
+    pub bqg_is_stopped: bool,
+    pub bqg_stop_reason: String,
+    pub bqg_frame_count: u32,
+    pub bqg_top_frame_name: String,
+    pub bqg_top_frame_line: u32,
+    pub bqg_top_frame_uri: String,
+    pub bqg_can_continue: bool,
+    pub bqg_can_step: bool,
+}
+
+impl DebugThread {
+    pub fn bqg_summary(&self) -> String {
+        format!("DebugThread({})", self.bqg_thread_id)
+    }
+}
+
+/// Runtime wiring: bqh_ DebugModule
+#[derive(Debug, Clone)]
+pub struct DebugModule {
+    pub bqh_module_id: String,
+    pub bqh_module_name: String,
+    pub bqh_module_path: String,
+    pub bqh_is_optimized: bool,
+    pub bqh_is_user_code: bool,
+    pub bqh_version: String,
+    pub bqh_symbol_status: String,
+    pub bqh_symbol_file_path: String,
+    pub bqh_address_range: String,
+    pub bqh_order: u32,
+}
+
+impl DebugModule {
+    pub fn bqh_summary(&self) -> String {
+        format!("DebugModule({})", self.bqh_module_id)
+    }
+}
+
+/// Runtime wiring: bqi_ DebugSource
+#[derive(Debug, Clone)]
+pub struct DebugSource {
+    pub bqi_source_name: String,
+    pub bqi_source_path: String,
+    pub bqi_source_reference: u64,
+    pub bqi_presentation_hint: String,
+    pub bqi_origin: String,
+    pub bqi_adapter_data: String,
+    pub bqi_checksums_count: u32,
+    pub bqi_mime_type: String,
+    pub bqi_is_deemphasize: bool,
+    pub bqi_is_subtle: bool,
+}
+
+impl DebugSource {
+    pub fn bqi_summary(&self) -> String {
+        format!("DebugSource({})", self.bqi_source_name)
+    }
+}
+
+/// Runtime wiring: bqj_ DebugConsole
+#[derive(Debug, Clone)]
+pub struct DebugConsole {
+    pub bqj_output_category: String,
+    pub bqj_output_text: String,
+    pub bqj_source_name: String,
+    pub bqj_source_line: u32,
+    pub bqj_source_column: u32,
+    pub bqj_variables_reference: u64,
+    pub bqj_group_kind: String,
+    pub bqj_is_important: bool,
+    pub bqj_timestamp: u64,
+    pub bqj_data_value: String,
+}
+
+impl DebugConsole {
+    pub fn bqj_summary(&self) -> String {
+        format!("DebugConsole({})", self.bqj_output_category)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -113024,6 +113129,910 @@ mod tests_bfo {
         };
         let _ = obj.bqe_summary();
         assert_eq!(obj.bqe_presentation_hint, "test");
+    }
+
+    #[test]
+    fn test_bqf_session_id() {
+        let obj = DebugSession {
+            bqf_session_id: String::from("test"),
+            bqf_session_name: String::from("test"),
+            bqf_debug_type: String::from("test"),
+            bqf_adapter_id: String::from("test"),
+            bqf_state: String::from("test"),
+            bqf_thread_count: 0,
+            bqf_breakpoint_count: 0,
+            bqf_supports_restart: false,
+            bqf_parent_session_id: String::from("test"),
+            bqf_compact_mode: false,
+        };
+        let _ = obj.bqf_summary();
+        assert_eq!(obj.bqf_session_id, "test");
+    }
+
+    #[test]
+    fn test_bqf_session_name() {
+        let obj = DebugSession {
+            bqf_session_id: String::from("test"),
+            bqf_session_name: String::from("test"),
+            bqf_debug_type: String::from("test"),
+            bqf_adapter_id: String::from("test"),
+            bqf_state: String::from("test"),
+            bqf_thread_count: 0,
+            bqf_breakpoint_count: 0,
+            bqf_supports_restart: false,
+            bqf_parent_session_id: String::from("test"),
+            bqf_compact_mode: false,
+        };
+        let _ = obj.bqf_summary();
+        assert_eq!(obj.bqf_session_name, "test");
+    }
+
+    #[test]
+    fn test_bqf_debug_type() {
+        let obj = DebugSession {
+            bqf_session_id: String::from("test"),
+            bqf_session_name: String::from("test"),
+            bqf_debug_type: String::from("test"),
+            bqf_adapter_id: String::from("test"),
+            bqf_state: String::from("test"),
+            bqf_thread_count: 0,
+            bqf_breakpoint_count: 0,
+            bqf_supports_restart: false,
+            bqf_parent_session_id: String::from("test"),
+            bqf_compact_mode: false,
+        };
+        let _ = obj.bqf_summary();
+        assert_eq!(obj.bqf_debug_type, "test");
+    }
+
+    #[test]
+    fn test_bqf_adapter_id() {
+        let obj = DebugSession {
+            bqf_session_id: String::from("test"),
+            bqf_session_name: String::from("test"),
+            bqf_debug_type: String::from("test"),
+            bqf_adapter_id: String::from("test"),
+            bqf_state: String::from("test"),
+            bqf_thread_count: 0,
+            bqf_breakpoint_count: 0,
+            bqf_supports_restart: false,
+            bqf_parent_session_id: String::from("test"),
+            bqf_compact_mode: false,
+        };
+        let _ = obj.bqf_summary();
+        assert_eq!(obj.bqf_adapter_id, "test");
+    }
+
+    #[test]
+    fn test_bqf_state() {
+        let obj = DebugSession {
+            bqf_session_id: String::from("test"),
+            bqf_session_name: String::from("test"),
+            bqf_debug_type: String::from("test"),
+            bqf_adapter_id: String::from("test"),
+            bqf_state: String::from("test"),
+            bqf_thread_count: 0,
+            bqf_breakpoint_count: 0,
+            bqf_supports_restart: false,
+            bqf_parent_session_id: String::from("test"),
+            bqf_compact_mode: false,
+        };
+        let _ = obj.bqf_summary();
+        assert_eq!(obj.bqf_state, "test");
+    }
+
+    #[test]
+    fn test_bqf_thread_count() {
+        let obj = DebugSession {
+            bqf_session_id: String::from("test"),
+            bqf_session_name: String::from("test"),
+            bqf_debug_type: String::from("test"),
+            bqf_adapter_id: String::from("test"),
+            bqf_state: String::from("test"),
+            bqf_thread_count: 0,
+            bqf_breakpoint_count: 0,
+            bqf_supports_restart: false,
+            bqf_parent_session_id: String::from("test"),
+            bqf_compact_mode: false,
+        };
+        let _ = obj.bqf_summary();
+        assert_eq!(obj.bqf_thread_count, 0);
+    }
+
+    #[test]
+    fn test_bqf_breakpoint_count() {
+        let obj = DebugSession {
+            bqf_session_id: String::from("test"),
+            bqf_session_name: String::from("test"),
+            bqf_debug_type: String::from("test"),
+            bqf_adapter_id: String::from("test"),
+            bqf_state: String::from("test"),
+            bqf_thread_count: 0,
+            bqf_breakpoint_count: 0,
+            bqf_supports_restart: false,
+            bqf_parent_session_id: String::from("test"),
+            bqf_compact_mode: false,
+        };
+        let _ = obj.bqf_summary();
+        assert_eq!(obj.bqf_breakpoint_count, 0);
+    }
+
+    #[test]
+    fn test_bqf_supports_restart() {
+        let obj = DebugSession {
+            bqf_session_id: String::from("test"),
+            bqf_session_name: String::from("test"),
+            bqf_debug_type: String::from("test"),
+            bqf_adapter_id: String::from("test"),
+            bqf_state: String::from("test"),
+            bqf_thread_count: 0,
+            bqf_breakpoint_count: 0,
+            bqf_supports_restart: false,
+            bqf_parent_session_id: String::from("test"),
+            bqf_compact_mode: false,
+        };
+        let _ = obj.bqf_summary();
+        assert!(!obj.bqf_supports_restart);
+    }
+
+    #[test]
+    fn test_bqf_parent_session_id() {
+        let obj = DebugSession {
+            bqf_session_id: String::from("test"),
+            bqf_session_name: String::from("test"),
+            bqf_debug_type: String::from("test"),
+            bqf_adapter_id: String::from("test"),
+            bqf_state: String::from("test"),
+            bqf_thread_count: 0,
+            bqf_breakpoint_count: 0,
+            bqf_supports_restart: false,
+            bqf_parent_session_id: String::from("test"),
+            bqf_compact_mode: false,
+        };
+        let _ = obj.bqf_summary();
+        assert_eq!(obj.bqf_parent_session_id, "test");
+    }
+
+    #[test]
+    fn test_bqf_compact_mode() {
+        let obj = DebugSession {
+            bqf_session_id: String::from("test"),
+            bqf_session_name: String::from("test"),
+            bqf_debug_type: String::from("test"),
+            bqf_adapter_id: String::from("test"),
+            bqf_state: String::from("test"),
+            bqf_thread_count: 0,
+            bqf_breakpoint_count: 0,
+            bqf_supports_restart: false,
+            bqf_parent_session_id: String::from("test"),
+            bqf_compact_mode: false,
+        };
+        let _ = obj.bqf_summary();
+        assert!(!obj.bqf_compact_mode);
+    }
+
+
+    #[test]
+    fn test_bqg_thread_id() {
+        let obj = DebugThread {
+            bqg_thread_id: 0,
+            bqg_thread_name: String::from("test"),
+            bqg_is_stopped: false,
+            bqg_stop_reason: String::from("test"),
+            bqg_frame_count: 0,
+            bqg_top_frame_name: String::from("test"),
+            bqg_top_frame_line: 0,
+            bqg_top_frame_uri: String::from("test"),
+            bqg_can_continue: false,
+            bqg_can_step: false,
+        };
+        let _ = obj.bqg_summary();
+        assert_eq!(obj.bqg_thread_id, 0);
+    }
+
+    #[test]
+    fn test_bqg_thread_name() {
+        let obj = DebugThread {
+            bqg_thread_id: 0,
+            bqg_thread_name: String::from("test"),
+            bqg_is_stopped: false,
+            bqg_stop_reason: String::from("test"),
+            bqg_frame_count: 0,
+            bqg_top_frame_name: String::from("test"),
+            bqg_top_frame_line: 0,
+            bqg_top_frame_uri: String::from("test"),
+            bqg_can_continue: false,
+            bqg_can_step: false,
+        };
+        let _ = obj.bqg_summary();
+        assert_eq!(obj.bqg_thread_name, "test");
+    }
+
+    #[test]
+    fn test_bqg_is_stopped() {
+        let obj = DebugThread {
+            bqg_thread_id: 0,
+            bqg_thread_name: String::from("test"),
+            bqg_is_stopped: false,
+            bqg_stop_reason: String::from("test"),
+            bqg_frame_count: 0,
+            bqg_top_frame_name: String::from("test"),
+            bqg_top_frame_line: 0,
+            bqg_top_frame_uri: String::from("test"),
+            bqg_can_continue: false,
+            bqg_can_step: false,
+        };
+        let _ = obj.bqg_summary();
+        assert!(!obj.bqg_is_stopped);
+    }
+
+    #[test]
+    fn test_bqg_stop_reason() {
+        let obj = DebugThread {
+            bqg_thread_id: 0,
+            bqg_thread_name: String::from("test"),
+            bqg_is_stopped: false,
+            bqg_stop_reason: String::from("test"),
+            bqg_frame_count: 0,
+            bqg_top_frame_name: String::from("test"),
+            bqg_top_frame_line: 0,
+            bqg_top_frame_uri: String::from("test"),
+            bqg_can_continue: false,
+            bqg_can_step: false,
+        };
+        let _ = obj.bqg_summary();
+        assert_eq!(obj.bqg_stop_reason, "test");
+    }
+
+    #[test]
+    fn test_bqg_frame_count() {
+        let obj = DebugThread {
+            bqg_thread_id: 0,
+            bqg_thread_name: String::from("test"),
+            bqg_is_stopped: false,
+            bqg_stop_reason: String::from("test"),
+            bqg_frame_count: 0,
+            bqg_top_frame_name: String::from("test"),
+            bqg_top_frame_line: 0,
+            bqg_top_frame_uri: String::from("test"),
+            bqg_can_continue: false,
+            bqg_can_step: false,
+        };
+        let _ = obj.bqg_summary();
+        assert_eq!(obj.bqg_frame_count, 0);
+    }
+
+    #[test]
+    fn test_bqg_top_frame_name() {
+        let obj = DebugThread {
+            bqg_thread_id: 0,
+            bqg_thread_name: String::from("test"),
+            bqg_is_stopped: false,
+            bqg_stop_reason: String::from("test"),
+            bqg_frame_count: 0,
+            bqg_top_frame_name: String::from("test"),
+            bqg_top_frame_line: 0,
+            bqg_top_frame_uri: String::from("test"),
+            bqg_can_continue: false,
+            bqg_can_step: false,
+        };
+        let _ = obj.bqg_summary();
+        assert_eq!(obj.bqg_top_frame_name, "test");
+    }
+
+    #[test]
+    fn test_bqg_top_frame_line() {
+        let obj = DebugThread {
+            bqg_thread_id: 0,
+            bqg_thread_name: String::from("test"),
+            bqg_is_stopped: false,
+            bqg_stop_reason: String::from("test"),
+            bqg_frame_count: 0,
+            bqg_top_frame_name: String::from("test"),
+            bqg_top_frame_line: 0,
+            bqg_top_frame_uri: String::from("test"),
+            bqg_can_continue: false,
+            bqg_can_step: false,
+        };
+        let _ = obj.bqg_summary();
+        assert_eq!(obj.bqg_top_frame_line, 0);
+    }
+
+    #[test]
+    fn test_bqg_top_frame_uri() {
+        let obj = DebugThread {
+            bqg_thread_id: 0,
+            bqg_thread_name: String::from("test"),
+            bqg_is_stopped: false,
+            bqg_stop_reason: String::from("test"),
+            bqg_frame_count: 0,
+            bqg_top_frame_name: String::from("test"),
+            bqg_top_frame_line: 0,
+            bqg_top_frame_uri: String::from("test"),
+            bqg_can_continue: false,
+            bqg_can_step: false,
+        };
+        let _ = obj.bqg_summary();
+        assert_eq!(obj.bqg_top_frame_uri, "test");
+    }
+
+    #[test]
+    fn test_bqg_can_continue() {
+        let obj = DebugThread {
+            bqg_thread_id: 0,
+            bqg_thread_name: String::from("test"),
+            bqg_is_stopped: false,
+            bqg_stop_reason: String::from("test"),
+            bqg_frame_count: 0,
+            bqg_top_frame_name: String::from("test"),
+            bqg_top_frame_line: 0,
+            bqg_top_frame_uri: String::from("test"),
+            bqg_can_continue: false,
+            bqg_can_step: false,
+        };
+        let _ = obj.bqg_summary();
+        assert!(!obj.bqg_can_continue);
+    }
+
+    #[test]
+    fn test_bqg_can_step() {
+        let obj = DebugThread {
+            bqg_thread_id: 0,
+            bqg_thread_name: String::from("test"),
+            bqg_is_stopped: false,
+            bqg_stop_reason: String::from("test"),
+            bqg_frame_count: 0,
+            bqg_top_frame_name: String::from("test"),
+            bqg_top_frame_line: 0,
+            bqg_top_frame_uri: String::from("test"),
+            bqg_can_continue: false,
+            bqg_can_step: false,
+        };
+        let _ = obj.bqg_summary();
+        assert!(!obj.bqg_can_step);
+    }
+
+
+    #[test]
+    fn test_bqh_module_id() {
+        let obj = DebugModule {
+            bqh_module_id: String::from("test"),
+            bqh_module_name: String::from("test"),
+            bqh_module_path: String::from("test"),
+            bqh_is_optimized: false,
+            bqh_is_user_code: false,
+            bqh_version: String::from("test"),
+            bqh_symbol_status: String::from("test"),
+            bqh_symbol_file_path: String::from("test"),
+            bqh_address_range: String::from("test"),
+            bqh_order: 0,
+        };
+        let _ = obj.bqh_summary();
+        assert_eq!(obj.bqh_module_id, "test");
+    }
+
+    #[test]
+    fn test_bqh_module_name() {
+        let obj = DebugModule {
+            bqh_module_id: String::from("test"),
+            bqh_module_name: String::from("test"),
+            bqh_module_path: String::from("test"),
+            bqh_is_optimized: false,
+            bqh_is_user_code: false,
+            bqh_version: String::from("test"),
+            bqh_symbol_status: String::from("test"),
+            bqh_symbol_file_path: String::from("test"),
+            bqh_address_range: String::from("test"),
+            bqh_order: 0,
+        };
+        let _ = obj.bqh_summary();
+        assert_eq!(obj.bqh_module_name, "test");
+    }
+
+    #[test]
+    fn test_bqh_module_path() {
+        let obj = DebugModule {
+            bqh_module_id: String::from("test"),
+            bqh_module_name: String::from("test"),
+            bqh_module_path: String::from("test"),
+            bqh_is_optimized: false,
+            bqh_is_user_code: false,
+            bqh_version: String::from("test"),
+            bqh_symbol_status: String::from("test"),
+            bqh_symbol_file_path: String::from("test"),
+            bqh_address_range: String::from("test"),
+            bqh_order: 0,
+        };
+        let _ = obj.bqh_summary();
+        assert_eq!(obj.bqh_module_path, "test");
+    }
+
+    #[test]
+    fn test_bqh_is_optimized() {
+        let obj = DebugModule {
+            bqh_module_id: String::from("test"),
+            bqh_module_name: String::from("test"),
+            bqh_module_path: String::from("test"),
+            bqh_is_optimized: false,
+            bqh_is_user_code: false,
+            bqh_version: String::from("test"),
+            bqh_symbol_status: String::from("test"),
+            bqh_symbol_file_path: String::from("test"),
+            bqh_address_range: String::from("test"),
+            bqh_order: 0,
+        };
+        let _ = obj.bqh_summary();
+        assert!(!obj.bqh_is_optimized);
+    }
+
+    #[test]
+    fn test_bqh_is_user_code() {
+        let obj = DebugModule {
+            bqh_module_id: String::from("test"),
+            bqh_module_name: String::from("test"),
+            bqh_module_path: String::from("test"),
+            bqh_is_optimized: false,
+            bqh_is_user_code: false,
+            bqh_version: String::from("test"),
+            bqh_symbol_status: String::from("test"),
+            bqh_symbol_file_path: String::from("test"),
+            bqh_address_range: String::from("test"),
+            bqh_order: 0,
+        };
+        let _ = obj.bqh_summary();
+        assert!(!obj.bqh_is_user_code);
+    }
+
+    #[test]
+    fn test_bqh_version() {
+        let obj = DebugModule {
+            bqh_module_id: String::from("test"),
+            bqh_module_name: String::from("test"),
+            bqh_module_path: String::from("test"),
+            bqh_is_optimized: false,
+            bqh_is_user_code: false,
+            bqh_version: String::from("test"),
+            bqh_symbol_status: String::from("test"),
+            bqh_symbol_file_path: String::from("test"),
+            bqh_address_range: String::from("test"),
+            bqh_order: 0,
+        };
+        let _ = obj.bqh_summary();
+        assert_eq!(obj.bqh_version, "test");
+    }
+
+    #[test]
+    fn test_bqh_symbol_status() {
+        let obj = DebugModule {
+            bqh_module_id: String::from("test"),
+            bqh_module_name: String::from("test"),
+            bqh_module_path: String::from("test"),
+            bqh_is_optimized: false,
+            bqh_is_user_code: false,
+            bqh_version: String::from("test"),
+            bqh_symbol_status: String::from("test"),
+            bqh_symbol_file_path: String::from("test"),
+            bqh_address_range: String::from("test"),
+            bqh_order: 0,
+        };
+        let _ = obj.bqh_summary();
+        assert_eq!(obj.bqh_symbol_status, "test");
+    }
+
+    #[test]
+    fn test_bqh_symbol_file_path() {
+        let obj = DebugModule {
+            bqh_module_id: String::from("test"),
+            bqh_module_name: String::from("test"),
+            bqh_module_path: String::from("test"),
+            bqh_is_optimized: false,
+            bqh_is_user_code: false,
+            bqh_version: String::from("test"),
+            bqh_symbol_status: String::from("test"),
+            bqh_symbol_file_path: String::from("test"),
+            bqh_address_range: String::from("test"),
+            bqh_order: 0,
+        };
+        let _ = obj.bqh_summary();
+        assert_eq!(obj.bqh_symbol_file_path, "test");
+    }
+
+    #[test]
+    fn test_bqh_address_range() {
+        let obj = DebugModule {
+            bqh_module_id: String::from("test"),
+            bqh_module_name: String::from("test"),
+            bqh_module_path: String::from("test"),
+            bqh_is_optimized: false,
+            bqh_is_user_code: false,
+            bqh_version: String::from("test"),
+            bqh_symbol_status: String::from("test"),
+            bqh_symbol_file_path: String::from("test"),
+            bqh_address_range: String::from("test"),
+            bqh_order: 0,
+        };
+        let _ = obj.bqh_summary();
+        assert_eq!(obj.bqh_address_range, "test");
+    }
+
+    #[test]
+    fn test_bqh_order() {
+        let obj = DebugModule {
+            bqh_module_id: String::from("test"),
+            bqh_module_name: String::from("test"),
+            bqh_module_path: String::from("test"),
+            bqh_is_optimized: false,
+            bqh_is_user_code: false,
+            bqh_version: String::from("test"),
+            bqh_symbol_status: String::from("test"),
+            bqh_symbol_file_path: String::from("test"),
+            bqh_address_range: String::from("test"),
+            bqh_order: 0,
+        };
+        let _ = obj.bqh_summary();
+        assert_eq!(obj.bqh_order, 0);
+    }
+
+
+    #[test]
+    fn test_bqi_source_name() {
+        let obj = DebugSource {
+            bqi_source_name: String::from("test"),
+            bqi_source_path: String::from("test"),
+            bqi_source_reference: 0,
+            bqi_presentation_hint: String::from("test"),
+            bqi_origin: String::from("test"),
+            bqi_adapter_data: String::from("test"),
+            bqi_checksums_count: 0,
+            bqi_mime_type: String::from("test"),
+            bqi_is_deemphasize: false,
+            bqi_is_subtle: false,
+        };
+        let _ = obj.bqi_summary();
+        assert_eq!(obj.bqi_source_name, "test");
+    }
+
+    #[test]
+    fn test_bqi_source_path() {
+        let obj = DebugSource {
+            bqi_source_name: String::from("test"),
+            bqi_source_path: String::from("test"),
+            bqi_source_reference: 0,
+            bqi_presentation_hint: String::from("test"),
+            bqi_origin: String::from("test"),
+            bqi_adapter_data: String::from("test"),
+            bqi_checksums_count: 0,
+            bqi_mime_type: String::from("test"),
+            bqi_is_deemphasize: false,
+            bqi_is_subtle: false,
+        };
+        let _ = obj.bqi_summary();
+        assert_eq!(obj.bqi_source_path, "test");
+    }
+
+    #[test]
+    fn test_bqi_source_reference() {
+        let obj = DebugSource {
+            bqi_source_name: String::from("test"),
+            bqi_source_path: String::from("test"),
+            bqi_source_reference: 0,
+            bqi_presentation_hint: String::from("test"),
+            bqi_origin: String::from("test"),
+            bqi_adapter_data: String::from("test"),
+            bqi_checksums_count: 0,
+            bqi_mime_type: String::from("test"),
+            bqi_is_deemphasize: false,
+            bqi_is_subtle: false,
+        };
+        let _ = obj.bqi_summary();
+        assert_eq!(obj.bqi_source_reference, 0);
+    }
+
+    #[test]
+    fn test_bqi_presentation_hint() {
+        let obj = DebugSource {
+            bqi_source_name: String::from("test"),
+            bqi_source_path: String::from("test"),
+            bqi_source_reference: 0,
+            bqi_presentation_hint: String::from("test"),
+            bqi_origin: String::from("test"),
+            bqi_adapter_data: String::from("test"),
+            bqi_checksums_count: 0,
+            bqi_mime_type: String::from("test"),
+            bqi_is_deemphasize: false,
+            bqi_is_subtle: false,
+        };
+        let _ = obj.bqi_summary();
+        assert_eq!(obj.bqi_presentation_hint, "test");
+    }
+
+    #[test]
+    fn test_bqi_origin() {
+        let obj = DebugSource {
+            bqi_source_name: String::from("test"),
+            bqi_source_path: String::from("test"),
+            bqi_source_reference: 0,
+            bqi_presentation_hint: String::from("test"),
+            bqi_origin: String::from("test"),
+            bqi_adapter_data: String::from("test"),
+            bqi_checksums_count: 0,
+            bqi_mime_type: String::from("test"),
+            bqi_is_deemphasize: false,
+            bqi_is_subtle: false,
+        };
+        let _ = obj.bqi_summary();
+        assert_eq!(obj.bqi_origin, "test");
+    }
+
+    #[test]
+    fn test_bqi_adapter_data() {
+        let obj = DebugSource {
+            bqi_source_name: String::from("test"),
+            bqi_source_path: String::from("test"),
+            bqi_source_reference: 0,
+            bqi_presentation_hint: String::from("test"),
+            bqi_origin: String::from("test"),
+            bqi_adapter_data: String::from("test"),
+            bqi_checksums_count: 0,
+            bqi_mime_type: String::from("test"),
+            bqi_is_deemphasize: false,
+            bqi_is_subtle: false,
+        };
+        let _ = obj.bqi_summary();
+        assert_eq!(obj.bqi_adapter_data, "test");
+    }
+
+    #[test]
+    fn test_bqi_checksums_count() {
+        let obj = DebugSource {
+            bqi_source_name: String::from("test"),
+            bqi_source_path: String::from("test"),
+            bqi_source_reference: 0,
+            bqi_presentation_hint: String::from("test"),
+            bqi_origin: String::from("test"),
+            bqi_adapter_data: String::from("test"),
+            bqi_checksums_count: 0,
+            bqi_mime_type: String::from("test"),
+            bqi_is_deemphasize: false,
+            bqi_is_subtle: false,
+        };
+        let _ = obj.bqi_summary();
+        assert_eq!(obj.bqi_checksums_count, 0);
+    }
+
+    #[test]
+    fn test_bqi_mime_type() {
+        let obj = DebugSource {
+            bqi_source_name: String::from("test"),
+            bqi_source_path: String::from("test"),
+            bqi_source_reference: 0,
+            bqi_presentation_hint: String::from("test"),
+            bqi_origin: String::from("test"),
+            bqi_adapter_data: String::from("test"),
+            bqi_checksums_count: 0,
+            bqi_mime_type: String::from("test"),
+            bqi_is_deemphasize: false,
+            bqi_is_subtle: false,
+        };
+        let _ = obj.bqi_summary();
+        assert_eq!(obj.bqi_mime_type, "test");
+    }
+
+    #[test]
+    fn test_bqi_is_deemphasize() {
+        let obj = DebugSource {
+            bqi_source_name: String::from("test"),
+            bqi_source_path: String::from("test"),
+            bqi_source_reference: 0,
+            bqi_presentation_hint: String::from("test"),
+            bqi_origin: String::from("test"),
+            bqi_adapter_data: String::from("test"),
+            bqi_checksums_count: 0,
+            bqi_mime_type: String::from("test"),
+            bqi_is_deemphasize: false,
+            bqi_is_subtle: false,
+        };
+        let _ = obj.bqi_summary();
+        assert!(!obj.bqi_is_deemphasize);
+    }
+
+    #[test]
+    fn test_bqi_is_subtle() {
+        let obj = DebugSource {
+            bqi_source_name: String::from("test"),
+            bqi_source_path: String::from("test"),
+            bqi_source_reference: 0,
+            bqi_presentation_hint: String::from("test"),
+            bqi_origin: String::from("test"),
+            bqi_adapter_data: String::from("test"),
+            bqi_checksums_count: 0,
+            bqi_mime_type: String::from("test"),
+            bqi_is_deemphasize: false,
+            bqi_is_subtle: false,
+        };
+        let _ = obj.bqi_summary();
+        assert!(!obj.bqi_is_subtle);
+    }
+
+
+    #[test]
+    fn test_bqj_output_category() {
+        let obj = DebugConsole {
+            bqj_output_category: String::from("test"),
+            bqj_output_text: String::from("test"),
+            bqj_source_name: String::from("test"),
+            bqj_source_line: 0,
+            bqj_source_column: 0,
+            bqj_variables_reference: 0,
+            bqj_group_kind: String::from("test"),
+            bqj_is_important: false,
+            bqj_timestamp: 0,
+            bqj_data_value: String::from("test"),
+        };
+        let _ = obj.bqj_summary();
+        assert_eq!(obj.bqj_output_category, "test");
+    }
+
+    #[test]
+    fn test_bqj_output_text() {
+        let obj = DebugConsole {
+            bqj_output_category: String::from("test"),
+            bqj_output_text: String::from("test"),
+            bqj_source_name: String::from("test"),
+            bqj_source_line: 0,
+            bqj_source_column: 0,
+            bqj_variables_reference: 0,
+            bqj_group_kind: String::from("test"),
+            bqj_is_important: false,
+            bqj_timestamp: 0,
+            bqj_data_value: String::from("test"),
+        };
+        let _ = obj.bqj_summary();
+        assert_eq!(obj.bqj_output_text, "test");
+    }
+
+    #[test]
+    fn test_bqj_source_name() {
+        let obj = DebugConsole {
+            bqj_output_category: String::from("test"),
+            bqj_output_text: String::from("test"),
+            bqj_source_name: String::from("test"),
+            bqj_source_line: 0,
+            bqj_source_column: 0,
+            bqj_variables_reference: 0,
+            bqj_group_kind: String::from("test"),
+            bqj_is_important: false,
+            bqj_timestamp: 0,
+            bqj_data_value: String::from("test"),
+        };
+        let _ = obj.bqj_summary();
+        assert_eq!(obj.bqj_source_name, "test");
+    }
+
+    #[test]
+    fn test_bqj_source_line() {
+        let obj = DebugConsole {
+            bqj_output_category: String::from("test"),
+            bqj_output_text: String::from("test"),
+            bqj_source_name: String::from("test"),
+            bqj_source_line: 0,
+            bqj_source_column: 0,
+            bqj_variables_reference: 0,
+            bqj_group_kind: String::from("test"),
+            bqj_is_important: false,
+            bqj_timestamp: 0,
+            bqj_data_value: String::from("test"),
+        };
+        let _ = obj.bqj_summary();
+        assert_eq!(obj.bqj_source_line, 0);
+    }
+
+    #[test]
+    fn test_bqj_source_column() {
+        let obj = DebugConsole {
+            bqj_output_category: String::from("test"),
+            bqj_output_text: String::from("test"),
+            bqj_source_name: String::from("test"),
+            bqj_source_line: 0,
+            bqj_source_column: 0,
+            bqj_variables_reference: 0,
+            bqj_group_kind: String::from("test"),
+            bqj_is_important: false,
+            bqj_timestamp: 0,
+            bqj_data_value: String::from("test"),
+        };
+        let _ = obj.bqj_summary();
+        assert_eq!(obj.bqj_source_column, 0);
+    }
+
+    #[test]
+    fn test_bqj_variables_reference() {
+        let obj = DebugConsole {
+            bqj_output_category: String::from("test"),
+            bqj_output_text: String::from("test"),
+            bqj_source_name: String::from("test"),
+            bqj_source_line: 0,
+            bqj_source_column: 0,
+            bqj_variables_reference: 0,
+            bqj_group_kind: String::from("test"),
+            bqj_is_important: false,
+            bqj_timestamp: 0,
+            bqj_data_value: String::from("test"),
+        };
+        let _ = obj.bqj_summary();
+        assert_eq!(obj.bqj_variables_reference, 0);
+    }
+
+    #[test]
+    fn test_bqj_group_kind() {
+        let obj = DebugConsole {
+            bqj_output_category: String::from("test"),
+            bqj_output_text: String::from("test"),
+            bqj_source_name: String::from("test"),
+            bqj_source_line: 0,
+            bqj_source_column: 0,
+            bqj_variables_reference: 0,
+            bqj_group_kind: String::from("test"),
+            bqj_is_important: false,
+            bqj_timestamp: 0,
+            bqj_data_value: String::from("test"),
+        };
+        let _ = obj.bqj_summary();
+        assert_eq!(obj.bqj_group_kind, "test");
+    }
+
+    #[test]
+    fn test_bqj_is_important() {
+        let obj = DebugConsole {
+            bqj_output_category: String::from("test"),
+            bqj_output_text: String::from("test"),
+            bqj_source_name: String::from("test"),
+            bqj_source_line: 0,
+            bqj_source_column: 0,
+            bqj_variables_reference: 0,
+            bqj_group_kind: String::from("test"),
+            bqj_is_important: false,
+            bqj_timestamp: 0,
+            bqj_data_value: String::from("test"),
+        };
+        let _ = obj.bqj_summary();
+        assert!(!obj.bqj_is_important);
+    }
+
+    #[test]
+    fn test_bqj_timestamp() {
+        let obj = DebugConsole {
+            bqj_output_category: String::from("test"),
+            bqj_output_text: String::from("test"),
+            bqj_source_name: String::from("test"),
+            bqj_source_line: 0,
+            bqj_source_column: 0,
+            bqj_variables_reference: 0,
+            bqj_group_kind: String::from("test"),
+            bqj_is_important: false,
+            bqj_timestamp: 0,
+            bqj_data_value: String::from("test"),
+        };
+        let _ = obj.bqj_summary();
+        assert_eq!(obj.bqj_timestamp, 0);
+    }
+
+    #[test]
+    fn test_bqj_data_value() {
+        let obj = DebugConsole {
+            bqj_output_category: String::from("test"),
+            bqj_output_text: String::from("test"),
+            bqj_source_name: String::from("test"),
+            bqj_source_line: 0,
+            bqj_source_column: 0,
+            bqj_variables_reference: 0,
+            bqj_group_kind: String::from("test"),
+            bqj_is_important: false,
+            bqj_timestamp: 0,
+            bqj_data_value: String::from("test"),
+        };
+        let _ = obj.bqj_summary();
+        assert_eq!(obj.bqj_data_value, "test");
     }
 
 }
