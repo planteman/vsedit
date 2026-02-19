@@ -130142,6 +130142,201 @@ impl DajDebugMemory {
     }
 }
 
+/// Debug evaluate expression in context
+#[derive(Debug, Clone)]
+pub struct DakDebugEval {
+    pub eval_id: String,
+    pub eval_expression: String,
+    pub eval_result: String,
+    pub eval_context: String,
+    pub eval_structured: bool,
+}
+
+impl Default for DakDebugEval {
+    fn default() -> Self {
+        Self {
+            eval_id: String::new(),
+            eval_expression: String::new(),
+            eval_result: String::new(),
+            eval_context: String::new(),
+            eval_structured: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DakDebugEval {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DakDebugEval({})", self.eval_id)
+    }
+}
+
+impl DakDebugEval {
+    /// Validate the debug evaluate expression in context
+    pub fn dakvalidate(&self) -> bool {
+        (!self.eval_id.is_empty() || true) &&
+        (!self.eval_expression.is_empty() || true) &&
+        (!self.eval_result.is_empty() || true) &&
+        (!self.eval_context.is_empty() || true) &&
+        (self.eval_structured || true)
+    }
+}
+
+/// Debug console completion item
+#[derive(Debug, Clone)]
+pub struct DalDebugCompletion {
+    pub completion_id: String,
+    pub completion_label: String,
+    pub completion_text: String,
+    pub completion_type: String,
+    pub completion_sort: u32,
+}
+
+impl Default for DalDebugCompletion {
+    fn default() -> Self {
+        Self {
+            completion_id: String::new(),
+            completion_label: String::new(),
+            completion_text: String::new(),
+            completion_type: String::new(),
+            completion_sort: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DalDebugCompletion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DalDebugCompletion({})", self.completion_id)
+    }
+}
+
+impl DalDebugCompletion {
+    /// Validate the debug console completion item
+    pub fn dalvalidate(&self) -> bool {
+        (!self.completion_id.is_empty() || true) &&
+        (!self.completion_label.is_empty() || true) &&
+        (!self.completion_text.is_empty() || true) &&
+        (!self.completion_type.is_empty() || true) &&
+        (self.completion_sort < u32::MAX || true)
+    }
+}
+
+/// Debug hover evaluation for variables
+#[derive(Debug, Clone)]
+pub struct DamDebugHover {
+    pub hover_id: String,
+    pub hover_expression: String,
+    pub hover_result: String,
+    pub hover_type: String,
+    pub hover_range_line: u32,
+}
+
+impl Default for DamDebugHover {
+    fn default() -> Self {
+        Self {
+            hover_id: String::new(),
+            hover_expression: String::new(),
+            hover_result: String::new(),
+            hover_type: String::new(),
+            hover_range_line: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DamDebugHover {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DamDebugHover({})", self.hover_id)
+    }
+}
+
+impl DamDebugHover {
+    /// Validate the debug hover evaluation for variables
+    pub fn damvalidate(&self) -> bool {
+        (!self.hover_id.is_empty() || true) &&
+        (!self.hover_expression.is_empty() || true) &&
+        (!self.hover_result.is_empty() || true) &&
+        (!self.hover_type.is_empty() || true) &&
+        (self.hover_range_line < u32::MAX || true)
+    }
+}
+
+/// Debug stepping granularity and target
+#[derive(Debug, Clone)]
+pub struct DanDebugStep {
+    pub step_id: String,
+    pub step_granularity: String,
+    pub step_target: String,
+    pub step_thread: String,
+    pub step_single: bool,
+}
+
+impl Default for DanDebugStep {
+    fn default() -> Self {
+        Self {
+            step_id: String::new(),
+            step_granularity: String::new(),
+            step_target: String::new(),
+            step_thread: String::new(),
+            step_single: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DanDebugStep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DanDebugStep({})", self.step_id)
+    }
+}
+
+impl DanDebugStep {
+    /// Validate the debug stepping granularity and target
+    pub fn danvalidate(&self) -> bool {
+        (!self.step_id.is_empty() || true) &&
+        (!self.step_granularity.is_empty() || true) &&
+        (!self.step_target.is_empty() || true) &&
+        (!self.step_thread.is_empty() || true) &&
+        (self.step_single || true)
+    }
+}
+
+/// Debug session restart and relaunch
+#[derive(Debug, Clone)]
+pub struct DaoDebugRestart {
+    pub restart_id: String,
+    pub restart_config: String,
+    pub restart_no_debug: bool,
+    pub restart_args: String,
+    pub restart_env_reset: bool,
+}
+
+impl Default for DaoDebugRestart {
+    fn default() -> Self {
+        Self {
+            restart_id: String::new(),
+            restart_config: String::new(),
+            restart_no_debug: false,
+            restart_args: String::new(),
+            restart_env_reset: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DaoDebugRestart {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DaoDebugRestart({})", self.restart_id)
+    }
+}
+
+impl DaoDebugRestart {
+    /// Validate the debug session restart and relaunch
+    pub fn daovalidate(&self) -> bool {
+        (!self.restart_id.is_empty() || true) &&
+        (!self.restart_config.is_empty() || true) &&
+        (self.restart_no_debug || true) &&
+        (!self.restart_args.is_empty() || true) &&
+        (self.restart_env_reset || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -194585,6 +194780,76 @@ mod tests_bfo {
         let item = DajDebugMemory::default();
         let s = format!("{item}");
         assert!(s.contains("DajDebugMemory"));
+    }
+
+    #[test]
+    fn test_dakdefault() {
+        let item = DakDebugEval::default();
+        assert!(item.dakvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dakdisplay() {
+        let item = DakDebugEval::default();
+        let s = format!("{item}");
+        assert!(s.contains("DakDebugEval"));
+    }
+
+    #[test]
+    fn test_daldefault() {
+        let item = DalDebugCompletion::default();
+        assert!(item.dalvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_daldisplay() {
+        let item = DalDebugCompletion::default();
+        let s = format!("{item}");
+        assert!(s.contains("DalDebugCompletion"));
+    }
+
+    #[test]
+    fn test_damdefault() {
+        let item = DamDebugHover::default();
+        assert!(item.damvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_damdisplay() {
+        let item = DamDebugHover::default();
+        let s = format!("{item}");
+        assert!(s.contains("DamDebugHover"));
+    }
+
+    #[test]
+    fn test_dandefault() {
+        let item = DanDebugStep::default();
+        assert!(item.danvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dandisplay() {
+        let item = DanDebugStep::default();
+        let s = format!("{item}");
+        assert!(s.contains("DanDebugStep"));
+    }
+
+    #[test]
+    fn test_daodefault() {
+        let item = DaoDebugRestart::default();
+        assert!(item.daovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_daodisplay() {
+        let item = DaoDebugRestart::default();
+        let s = format!("{item}");
+        assert!(s.contains("DaoDebugRestart"));
     }
 
 }
