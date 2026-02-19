@@ -81794,6 +81794,350 @@ impl BgoFindWidget {
 }
 
 
+
+// bgp_ Editor Rename Preview Model
+
+/// A rename occurrence in a file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BgpRenameOccurrence {
+    pub file: String,
+    pub line: usize,
+    pub start_col: usize,
+    pub end_col: usize,
+    pub context_text: String,
+    pub is_included: bool,
+}
+
+/// Rename preview model for symbol renaming.
+#[derive(Debug, Clone)]
+pub struct BgpRenamePreview {
+    pub old_name: String,
+    pub new_name: String,
+    pub occurrences: Vec<BgpRenameOccurrence>,
+    pub is_visible: bool,
+    pub selected_index: usize,
+}
+
+impl BgpRenamePreview {
+    pub fn new(old_name: &str) -> Self {
+        Self {
+            old_name: old_name.to_string(), new_name: String::new(),
+            occurrences: Vec::new(), is_visible: true, selected_index: 0,
+        }
+    }
+
+    pub fn set_new_name(&mut self, name: &str) { self.new_name = name.to_string(); }
+
+    pub fn set_occurrences(&mut self, occ: Vec<BgpRenameOccurrence>) {
+        self.occurrences = occ;
+        self.selected_index = 0;
+    }
+
+    pub fn toggle_occurrence(&mut self, index: usize) {
+        if let Some(o) = self.occurrences.get_mut(index) { o.is_included = !o.is_included; }
+    }
+
+    pub fn include_all(&mut self) { for o in &mut self.occurrences { o.is_included = true; } }
+    pub fn exclude_all(&mut self) { for o in &mut self.occurrences { o.is_included = false; } }
+
+    pub fn included_count(&self) -> usize { self.occurrences.iter().filter(|o| o.is_included).count() }
+    pub fn total_count(&self) -> usize { self.occurrences.len() }
+
+    pub fn affected_files(&self) -> Vec<&str> {
+        let mut f: Vec<&str> = self.occurrences.iter().filter(|o| o.is_included).map(|o| o.file.as_str()).collect();
+        f.sort(); f.dedup(); f
+    }
+
+    pub fn confirm(&mut self) -> bool {
+        if self.new_name.is_empty() || self.included_count() == 0 { return false; }
+        self.is_visible = false;
+        true
+    }
+
+    pub fn cancel(&mut self) { self.is_visible = false; }
+
+    pub fn is_valid(&self) -> bool {
+        !self.new_name.is_empty() && self.new_name != self.old_name && self.included_count() > 0
+    }
+}
+
+
+// bgq_ Editor Folding Model
+
+/// Kind of folding range.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgqFoldKind {
+    Comment,
+    Imports,
+    Region,
+    Code,
+}
+
+/// A foldable region.
+#[derive(Debug, Clone)]
+pub struct BgqFoldingRange {
+    pub start_line: usize,
+    pub end_line: usize,
+    pub kind: BgqFoldKind,
+    pub is_collapsed: bool,
+    pub collapsed_text: Option<String>,
+}
+
+/// Folding model for the editor.
+#[derive(Debug, Clone)]
+pub struct BgqFoldingModel {
+    ranges: Vec<BgqFoldingRange>,
+    is_enabled: bool,
+}
+
+impl BgqFoldingModel {
+    pub fn new() -> Self { Self { ranges: Vec::new(), is_enabled: true } }
+
+    pub fn set_ranges(&mut self, ranges: Vec<BgqFoldingRange>) { self.ranges = ranges; }
+
+    pub fn toggle_fold(&mut self, line: usize) {
+        if let Some(r) = self.ranges.iter_mut().find(|r| r.start_line == line) {
+            r.is_collapsed = !r.is_collapsed;
+        }
+    }
+
+    pub fn fold_all(&mut self) { for r in &mut self.ranges { r.is_collapsed = true; } }
+    pub fn unfold_all(&mut self) { for r in &mut self.ranges { r.is_collapsed = false; } }
+
+    pub fn fold_at_level(&mut self, max_level: usize) {
+        let mut depth = Vec::new();
+        for r in &mut self.ranges {
+            while let Some(&last) = depth.last() {
+                if last < r.start_line { depth.pop(); } else { break; }
+            }
+            depth.push(r.end_line);
+            r.is_collapsed = depth.len() > max_level;
+        }
+    }
+
+    pub fn is_line_hidden(&self, line: usize) -> bool {
+        self.ranges.iter().any(|r| r.is_collapsed && line > r.start_line && line <= r.end_line)
+    }
+
+    pub fn collapsed_count(&self) -> usize { self.ranges.iter().filter(|r| r.is_collapsed).count() }
+    pub fn total_ranges(&self) -> usize { self.ranges.len() }
+
+    pub fn range_at_line(&self, line: usize) -> Option<&BgqFoldingRange> {
+        self.ranges.iter().find(|r| r.start_line == line)
+    }
+
+    pub fn hidden_line_count(&self) -> usize {
+        self.ranges.iter().filter(|r| r.is_collapsed).map(|r| r.end_line - r.start_line).sum()
+    }
+
+    pub fn is_enabled(&self) -> bool { self.is_enabled }
+    pub fn toggle_enabled(&mut self) { self.is_enabled = !self.is_enabled; }
+}
+
+
+// bgr_ Editor Glyph Margin Model
+
+/// Kind of glyph margin decoration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgrGlyphKind {
+    Breakpoint,
+    Bookmark,
+    Error,
+    Warning,
+    Info,
+    Hint,
+    FoldingExpanded,
+    FoldingCollapsed,
+    Custom,
+}
+
+/// A glyph margin decoration.
+#[derive(Debug, Clone)]
+pub struct BgrGlyphDecoration {
+    pub line: usize,
+    pub kind: BgrGlyphKind,
+    pub tooltip: Option<String>,
+    pub priority: u32,
+}
+
+/// Glyph margin model.
+#[derive(Debug, Clone)]
+pub struct BgrGlyphMarginModel {
+    decorations: Vec<BgrGlyphDecoration>,
+    is_visible: bool,
+}
+
+impl BgrGlyphMarginModel {
+    pub fn new() -> Self { Self { decorations: Vec::new(), is_visible: true } }
+
+    pub fn set_visible(&mut self, visible: bool) { self.is_visible = visible; }
+
+    pub fn add_decoration(&mut self, line: usize, kind: BgrGlyphKind, priority: u32) {
+        self.decorations.push(BgrGlyphDecoration { line, kind, tooltip: None, priority });
+    }
+
+    pub fn remove_at_line(&mut self, line: usize, kind: BgrGlyphKind) {
+        self.decorations.retain(|d| !(d.line == line && d.kind == kind));
+    }
+
+    pub fn glyph_at_line(&self, line: usize) -> Option<&BgrGlyphDecoration> {
+        if !self.is_visible { return None; }
+        self.decorations.iter().filter(|d| d.line == line).max_by_key(|d| d.priority)
+    }
+
+    pub fn all_at_line(&self, line: usize) -> Vec<&BgrGlyphDecoration> {
+        self.decorations.iter().filter(|d| d.line == line).collect()
+    }
+
+    pub fn clear(&mut self) { self.decorations.clear(); }
+    pub fn total(&self) -> usize { self.decorations.len() }
+
+    pub fn lines_with_glyphs(&self) -> Vec<usize> {
+        let mut lines: Vec<usize> = self.decorations.iter().map(|d| d.line).collect();
+        lines.sort(); lines.dedup(); lines
+    }
+
+    pub fn by_kind(&self, kind: BgrGlyphKind) -> Vec<&BgrGlyphDecoration> {
+        self.decorations.iter().filter(|d| d.kind == kind).collect()
+    }
+
+    pub fn is_visible(&self) -> bool { self.is_visible }
+}
+
+
+// bgs_ Editor Ruler Model
+
+/// A vertical ruler at a column position.
+#[derive(Debug, Clone)]
+pub struct BgsRuler {
+    pub column: usize,
+    pub color: Option<String>,
+}
+
+/// Rulers model for vertical column guidelines.
+#[derive(Debug, Clone)]
+pub struct BgsRulersModel {
+    rulers: Vec<BgsRuler>,
+    is_visible: bool,
+}
+
+impl BgsRulersModel {
+    pub fn new() -> Self { Self { rulers: Vec::new(), is_visible: true } }
+
+    pub fn set_rulers(&mut self, columns: Vec<usize>) {
+        self.rulers = columns.into_iter().map(|c| BgsRuler { column: c, color: None }).collect();
+    }
+
+    pub fn add_ruler(&mut self, column: usize, color: Option<&str>) {
+        self.rulers.push(BgsRuler { column, color: color.map(String::from) });
+    }
+
+    pub fn remove_ruler(&mut self, column: usize) {
+        self.rulers.retain(|r| r.column != column);
+    }
+
+    pub fn has_ruler_at(&self, column: usize) -> bool {
+        self.rulers.iter().any(|r| r.column == column)
+    }
+
+    pub fn columns(&self) -> Vec<usize> {
+        let mut cols: Vec<usize> = self.rulers.iter().map(|r| r.column).collect();
+        cols.sort(); cols
+    }
+
+    pub fn toggle_visibility(&mut self) { self.is_visible = !self.is_visible; }
+    pub fn is_visible(&self) -> bool { self.is_visible }
+    pub fn count(&self) -> usize { self.rulers.len() }
+    pub fn clear(&mut self) { self.rulers.clear(); }
+
+    pub fn rightmost(&self) -> Option<usize> {
+        self.rulers.iter().map(|r| r.column).max()
+    }
+}
+
+
+// bgt_ Editor Whitespace Rendering Model
+
+/// Whitespace rendering mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgtWhitespaceMode {
+    None,
+    Boundary,
+    Selection,
+    Trailing,
+    All,
+}
+
+/// Whitespace character representation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgtWhitespaceChar {
+    Space,
+    Tab,
+    NonBreakingSpace,
+    FullWidthSpace,
+}
+
+/// Whitespace rendering model.
+#[derive(Debug, Clone)]
+pub struct BgtWhitespaceModel {
+    pub mode: BgtWhitespaceMode,
+    pub tab_size: usize,
+    pub use_spaces: bool,
+    pub trim_trailing_on_save: bool,
+    pub insert_final_newline: bool,
+    pub trim_final_newlines: bool,
+}
+
+impl BgtWhitespaceModel {
+    pub fn new() -> Self {
+        Self {
+            mode: BgtWhitespaceMode::Selection,
+            tab_size: 4, use_spaces: true,
+            trim_trailing_on_save: false,
+            insert_final_newline: false,
+            trim_final_newlines: false,
+        }
+    }
+
+    pub fn set_mode(&mut self, mode: BgtWhitespaceMode) { self.mode = mode; }
+    pub fn set_tab_size(&mut self, size: usize) { self.tab_size = size.max(1).min(16); }
+    pub fn toggle_use_spaces(&mut self) { self.use_spaces = !self.use_spaces; }
+
+    pub fn should_render_at(&self, is_boundary: bool, is_selected: bool, is_trailing: bool) -> bool {
+        match self.mode {
+            BgtWhitespaceMode::None => false,
+            BgtWhitespaceMode::All => true,
+            BgtWhitespaceMode::Boundary => is_boundary,
+            BgtWhitespaceMode::Selection => is_selected,
+            BgtWhitespaceMode::Trailing => is_trailing,
+        }
+    }
+
+    pub fn indent_string(&self) -> String {
+        if self.use_spaces {
+            " ".repeat(self.tab_size)
+        } else {
+            "\t".to_string()
+        }
+    }
+
+    pub fn detect_indentation(&self, lines: &[&str]) -> (bool, usize) {
+        let mut space_counts = [0u32; 9];
+        let mut tab_count = 0u32;
+        for line in lines.iter().take(100) {
+            if line.starts_with('\t') { tab_count += 1; }
+            else {
+                let spaces = line.len() - line.trim_start_matches(' ').len();
+                if spaces > 0 && spaces <= 8 { space_counts[spaces] += 1; }
+            }
+        }
+        let max_space = space_counts.iter().enumerate().skip(1).max_by_key(|&(_, &c)| c).map(|(i, _)| i).unwrap_or(4);
+        let total_spaces: u32 = space_counts.iter().sum();
+        (total_spaces >= tab_count, max_space)
+    }
+}
+
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -84427,6 +84771,474 @@ mod tests_bfo {
         let mut w = BgoFindWidget::new();
         w.options.preserve_case = true;
         assert!(w.options.preserve_case);
+    }
+
+
+
+    // bgp_ tests
+
+    #[test]
+    fn test_bgp_rename_creation() {
+        let r = BgpRenamePreview::new("foo");
+        assert_eq!(r.old_name, "foo");
+        assert!(r.is_visible);
+    }
+
+    #[test]
+    fn test_bgp_set_occurrences() {
+        let mut r = BgpRenamePreview::new("foo");
+        r.set_occurrences(vec![
+            BgpRenameOccurrence { file: "a.rs".into(), line: 1, start_col: 0, end_col: 3, context_text: "foo()".into(), is_included: true },
+            BgpRenameOccurrence { file: "b.rs".into(), line: 5, start_col: 10, end_col: 13, context_text: "let foo =".into(), is_included: true },
+        ]);
+        assert_eq!(r.total_count(), 2);
+        assert_eq!(r.included_count(), 2);
+    }
+
+    #[test]
+    fn test_bgp_toggle() {
+        let mut r = BgpRenamePreview::new("x");
+        r.set_occurrences(vec![
+            BgpRenameOccurrence { file: "a.rs".into(), line: 1, start_col: 0, end_col: 1, context_text: "x".into(), is_included: true },
+        ]);
+        r.toggle_occurrence(0);
+        assert_eq!(r.included_count(), 0);
+        r.toggle_occurrence(0);
+        assert_eq!(r.included_count(), 1);
+    }
+
+    #[test]
+    fn test_bgp_include_exclude_all() {
+        let mut r = BgpRenamePreview::new("x");
+        r.set_occurrences(vec![
+            BgpRenameOccurrence { file: "a.rs".into(), line: 1, start_col: 0, end_col: 1, context_text: "x".into(), is_included: true },
+            BgpRenameOccurrence { file: "b.rs".into(), line: 2, start_col: 0, end_col: 1, context_text: "x".into(), is_included: true },
+        ]);
+        r.exclude_all();
+        assert_eq!(r.included_count(), 0);
+        r.include_all();
+        assert_eq!(r.included_count(), 2);
+    }
+
+    #[test]
+    fn test_bgp_affected_files() {
+        let mut r = BgpRenamePreview::new("x");
+        r.set_occurrences(vec![
+            BgpRenameOccurrence { file: "a.rs".into(), line: 1, start_col: 0, end_col: 1, context_text: "".into(), is_included: true },
+            BgpRenameOccurrence { file: "a.rs".into(), line: 5, start_col: 0, end_col: 1, context_text: "".into(), is_included: true },
+            BgpRenameOccurrence { file: "b.rs".into(), line: 1, start_col: 0, end_col: 1, context_text: "".into(), is_included: false },
+        ]);
+        assert_eq!(r.affected_files().len(), 1);
+    }
+
+    #[test]
+    fn test_bgp_confirm() {
+        let mut r = BgpRenamePreview::new("old");
+        r.set_new_name("new");
+        r.set_occurrences(vec![
+            BgpRenameOccurrence { file: "a.rs".into(), line: 1, start_col: 0, end_col: 3, context_text: "".into(), is_included: true },
+        ]);
+        assert!(r.confirm());
+        assert!(!r.is_visible);
+    }
+
+    #[test]
+    fn test_bgp_confirm_empty_name() {
+        let mut r = BgpRenamePreview::new("old");
+        r.set_occurrences(vec![
+            BgpRenameOccurrence { file: "a.rs".into(), line: 1, start_col: 0, end_col: 3, context_text: "".into(), is_included: true },
+        ]);
+        assert!(!r.confirm());
+    }
+
+    #[test]
+    fn test_bgp_is_valid() {
+        let mut r = BgpRenamePreview::new("old");
+        r.set_new_name("new");
+        r.set_occurrences(vec![
+            BgpRenameOccurrence { file: "a.rs".into(), line: 1, start_col: 0, end_col: 3, context_text: "".into(), is_included: true },
+        ]);
+        assert!(r.is_valid());
+    }
+
+    #[test]
+    fn test_bgp_same_name_invalid() {
+        let mut r = BgpRenamePreview::new("same");
+        r.set_new_name("same");
+        r.set_occurrences(vec![
+            BgpRenameOccurrence { file: "a.rs".into(), line: 1, start_col: 0, end_col: 4, context_text: "".into(), is_included: true },
+        ]);
+        assert!(!r.is_valid());
+    }
+
+    #[test]
+    fn test_bgp_cancel() {
+        let mut r = BgpRenamePreview::new("x");
+        r.cancel();
+        assert!(!r.is_visible);
+    }
+
+
+    // bgq_ tests
+
+    #[test]
+    fn test_bgq_folding_creation() {
+        let m = BgqFoldingModel::new();
+        assert!(m.is_enabled());
+        assert_eq!(m.total_ranges(), 0);
+    }
+
+    #[test]
+    fn test_bgq_set_ranges() {
+        let mut m = BgqFoldingModel::new();
+        m.set_ranges(vec![
+            BgqFoldingRange { start_line: 1, end_line: 10, kind: BgqFoldKind::Code, is_collapsed: false, collapsed_text: None },
+            BgqFoldingRange { start_line: 15, end_line: 20, kind: BgqFoldKind::Comment, is_collapsed: false, collapsed_text: None },
+        ]);
+        assert_eq!(m.total_ranges(), 2);
+    }
+
+    #[test]
+    fn test_bgq_toggle_fold() {
+        let mut m = BgqFoldingModel::new();
+        m.set_ranges(vec![
+            BgqFoldingRange { start_line: 5, end_line: 15, kind: BgqFoldKind::Code, is_collapsed: false, collapsed_text: None },
+        ]);
+        m.toggle_fold(5);
+        assert!(m.range_at_line(5).unwrap().is_collapsed);
+        m.toggle_fold(5);
+        assert!(!m.range_at_line(5).unwrap().is_collapsed);
+    }
+
+    #[test]
+    fn test_bgq_fold_unfold_all() {
+        let mut m = BgqFoldingModel::new();
+        m.set_ranges(vec![
+            BgqFoldingRange { start_line: 1, end_line: 5, kind: BgqFoldKind::Code, is_collapsed: false, collapsed_text: None },
+            BgqFoldingRange { start_line: 10, end_line: 20, kind: BgqFoldKind::Code, is_collapsed: false, collapsed_text: None },
+        ]);
+        m.fold_all();
+        assert_eq!(m.collapsed_count(), 2);
+        m.unfold_all();
+        assert_eq!(m.collapsed_count(), 0);
+    }
+
+    #[test]
+    fn test_bgq_is_line_hidden() {
+        let mut m = BgqFoldingModel::new();
+        m.set_ranges(vec![
+            BgqFoldingRange { start_line: 5, end_line: 10, kind: BgqFoldKind::Code, is_collapsed: true, collapsed_text: None },
+        ]);
+        assert!(!m.is_line_hidden(5)); // start line is visible
+        assert!(m.is_line_hidden(6));
+        assert!(m.is_line_hidden(10));
+        assert!(!m.is_line_hidden(11));
+    }
+
+    #[test]
+    fn test_bgq_hidden_line_count() {
+        let mut m = BgqFoldingModel::new();
+        m.set_ranges(vec![
+            BgqFoldingRange { start_line: 1, end_line: 5, kind: BgqFoldKind::Code, is_collapsed: true, collapsed_text: None },
+            BgqFoldingRange { start_line: 10, end_line: 15, kind: BgqFoldKind::Code, is_collapsed: true, collapsed_text: None },
+        ]);
+        assert_eq!(m.hidden_line_count(), 9); // 4 + 5
+    }
+
+    #[test]
+    fn test_bgq_fold_kind_variants() {
+        let kinds = [BgqFoldKind::Comment, BgqFoldKind::Imports, BgqFoldKind::Region, BgqFoldKind::Code];
+        assert_eq!(kinds.len(), 4);
+    }
+
+    #[test]
+    fn test_bgq_range_at_line() {
+        let mut m = BgqFoldingModel::new();
+        m.set_ranges(vec![
+            BgqFoldingRange { start_line: 3, end_line: 8, kind: BgqFoldKind::Region, is_collapsed: false, collapsed_text: Some("...".into()) },
+        ]);
+        assert!(m.range_at_line(3).is_some());
+        assert!(m.range_at_line(4).is_none());
+    }
+
+    #[test]
+    fn test_bgq_toggle_enabled() {
+        let mut m = BgqFoldingModel::new();
+        m.toggle_enabled();
+        assert!(!m.is_enabled());
+    }
+
+    #[test]
+    fn test_bgq_not_hidden_when_unfolded() {
+        let mut m = BgqFoldingModel::new();
+        m.set_ranges(vec![
+            BgqFoldingRange { start_line: 1, end_line: 5, kind: BgqFoldKind::Code, is_collapsed: false, collapsed_text: None },
+        ]);
+        assert!(!m.is_line_hidden(3));
+    }
+
+
+    // bgr_ tests
+
+    #[test]
+    fn test_bgr_glyph_creation() {
+        let m = BgrGlyphMarginModel::new();
+        assert!(m.is_visible());
+        assert_eq!(m.total(), 0);
+    }
+
+    #[test]
+    fn test_bgr_add_decorations() {
+        let mut m = BgrGlyphMarginModel::new();
+        m.add_decoration(5, BgrGlyphKind::Breakpoint, 10);
+        m.add_decoration(5, BgrGlyphKind::Error, 5);
+        m.add_decoration(10, BgrGlyphKind::Bookmark, 1);
+        assert_eq!(m.total(), 3);
+        assert_eq!(m.all_at_line(5).len(), 2);
+    }
+
+    #[test]
+    fn test_bgr_glyph_priority() {
+        let mut m = BgrGlyphMarginModel::new();
+        m.add_decoration(5, BgrGlyphKind::Error, 5);
+        m.add_decoration(5, BgrGlyphKind::Breakpoint, 10);
+        assert_eq!(m.glyph_at_line(5).unwrap().kind, BgrGlyphKind::Breakpoint);
+    }
+
+    #[test]
+    fn test_bgr_remove() {
+        let mut m = BgrGlyphMarginModel::new();
+        m.add_decoration(5, BgrGlyphKind::Breakpoint, 10);
+        m.add_decoration(5, BgrGlyphKind::Error, 5);
+        m.remove_at_line(5, BgrGlyphKind::Breakpoint);
+        assert_eq!(m.total(), 1);
+        assert_eq!(m.glyph_at_line(5).unwrap().kind, BgrGlyphKind::Error);
+    }
+
+    #[test]
+    fn test_bgr_hidden() {
+        let mut m = BgrGlyphMarginModel::new();
+        m.add_decoration(1, BgrGlyphKind::Info, 1);
+        m.set_visible(false);
+        assert!(m.glyph_at_line(1).is_none());
+    }
+
+    #[test]
+    fn test_bgr_by_kind() {
+        let mut m = BgrGlyphMarginModel::new();
+        m.add_decoration(1, BgrGlyphKind::Error, 1);
+        m.add_decoration(5, BgrGlyphKind::Error, 1);
+        m.add_decoration(10, BgrGlyphKind::Warning, 1);
+        assert_eq!(m.by_kind(BgrGlyphKind::Error).len(), 2);
+    }
+
+    #[test]
+    fn test_bgr_lines_with_glyphs() {
+        let mut m = BgrGlyphMarginModel::new();
+        m.add_decoration(3, BgrGlyphKind::Breakpoint, 1);
+        m.add_decoration(3, BgrGlyphKind::Error, 1);
+        m.add_decoration(7, BgrGlyphKind::Info, 1);
+        assert_eq!(m.lines_with_glyphs(), vec![3, 7]);
+    }
+
+    #[test]
+    fn test_bgr_clear() {
+        let mut m = BgrGlyphMarginModel::new();
+        m.add_decoration(1, BgrGlyphKind::Hint, 1);
+        m.clear();
+        assert_eq!(m.total(), 0);
+    }
+
+    #[test]
+    fn test_bgr_kind_variants() {
+        let kinds = [
+            BgrGlyphKind::Breakpoint, BgrGlyphKind::Bookmark, BgrGlyphKind::Error,
+            BgrGlyphKind::Warning, BgrGlyphKind::Info, BgrGlyphKind::Hint,
+            BgrGlyphKind::FoldingExpanded, BgrGlyphKind::FoldingCollapsed, BgrGlyphKind::Custom,
+        ];
+        assert_eq!(kinds.len(), 9);
+    }
+
+    #[test]
+    fn test_bgr_empty_line() {
+        let m = BgrGlyphMarginModel::new();
+        assert!(m.glyph_at_line(1).is_none());
+    }
+
+    #[test]
+    fn test_bgr_tooltip() {
+        let mut m = BgrGlyphMarginModel::new();
+        m.decorations.push(BgrGlyphDecoration { line: 1, kind: BgrGlyphKind::Error, tooltip: Some("compile error".into()), priority: 1 });
+        assert_eq!(m.glyph_at_line(1).unwrap().tooltip.as_deref(), Some("compile error"));
+    }
+
+
+    // bgs_ tests
+
+    #[test]
+    fn test_bgs_rulers_creation() {
+        let m = BgsRulersModel::new();
+        assert!(m.is_visible());
+        assert_eq!(m.count(), 0);
+    }
+
+    #[test]
+    fn test_bgs_set_rulers() {
+        let mut m = BgsRulersModel::new();
+        m.set_rulers(vec![80, 120]);
+        assert_eq!(m.count(), 2);
+        assert_eq!(m.columns(), vec![80, 120]);
+    }
+
+    #[test]
+    fn test_bgs_add_remove() {
+        let mut m = BgsRulersModel::new();
+        m.add_ruler(80, None);
+        m.add_ruler(120, Some("#ff0000"));
+        assert_eq!(m.count(), 2);
+        m.remove_ruler(80);
+        assert_eq!(m.count(), 1);
+        assert!(!m.has_ruler_at(80));
+        assert!(m.has_ruler_at(120));
+    }
+
+    #[test]
+    fn test_bgs_toggle_visibility() {
+        let mut m = BgsRulersModel::new();
+        m.toggle_visibility();
+        assert!(!m.is_visible());
+        m.toggle_visibility();
+        assert!(m.is_visible());
+    }
+
+    #[test]
+    fn test_bgs_rightmost() {
+        let mut m = BgsRulersModel::new();
+        m.set_rulers(vec![80, 120, 100]);
+        assert_eq!(m.rightmost(), Some(120));
+    }
+
+    #[test]
+    fn test_bgs_empty_rightmost() {
+        let m = BgsRulersModel::new();
+        assert_eq!(m.rightmost(), None);
+    }
+
+    #[test]
+    fn test_bgs_clear() {
+        let mut m = BgsRulersModel::new();
+        m.set_rulers(vec![80]);
+        m.clear();
+        assert_eq!(m.count(), 0);
+    }
+
+    #[test]
+    fn test_bgs_ruler_color() {
+        let mut m = BgsRulersModel::new();
+        m.add_ruler(80, Some("#333"));
+        assert_eq!(m.rulers[0].color.as_deref(), Some("#333"));
+    }
+
+    #[test]
+    fn test_bgs_sorted_columns() {
+        let mut m = BgsRulersModel::new();
+        m.add_ruler(120, None);
+        m.add_ruler(80, None);
+        m.add_ruler(100, None);
+        assert_eq!(m.columns(), vec![80, 100, 120]);
+    }
+
+    #[test]
+    fn test_bgs_has_ruler() {
+        let mut m = BgsRulersModel::new();
+        m.set_rulers(vec![80]);
+        assert!(m.has_ruler_at(80));
+        assert!(!m.has_ruler_at(79));
+    }
+
+
+    // bgt_ tests
+
+    #[test]
+    fn test_bgt_whitespace_creation() {
+        let m = BgtWhitespaceModel::new();
+        assert_eq!(m.mode, BgtWhitespaceMode::Selection);
+        assert_eq!(m.tab_size, 4);
+        assert!(m.use_spaces);
+    }
+
+    #[test]
+    fn test_bgt_should_render() {
+        let mut m = BgtWhitespaceModel::new();
+        m.set_mode(BgtWhitespaceMode::All);
+        assert!(m.should_render_at(false, false, false));
+        m.set_mode(BgtWhitespaceMode::None);
+        assert!(!m.should_render_at(true, true, true));
+    }
+
+    #[test]
+    fn test_bgt_boundary_mode() {
+        let mut m = BgtWhitespaceModel::new();
+        m.set_mode(BgtWhitespaceMode::Boundary);
+        assert!(m.should_render_at(true, false, false));
+        assert!(!m.should_render_at(false, true, false));
+    }
+
+    #[test]
+    fn test_bgt_trailing_mode() {
+        let mut m = BgtWhitespaceModel::new();
+        m.set_mode(BgtWhitespaceMode::Trailing);
+        assert!(m.should_render_at(false, false, true));
+        assert!(!m.should_render_at(false, false, false));
+    }
+
+    #[test]
+    fn test_bgt_indent_string_spaces() {
+        let m = BgtWhitespaceModel::new();
+        assert_eq!(m.indent_string(), "    ");
+    }
+
+    #[test]
+    fn test_bgt_indent_string_tabs() {
+        let mut m = BgtWhitespaceModel::new();
+        m.toggle_use_spaces();
+        assert_eq!(m.indent_string(), "\t");
+    }
+
+    #[test]
+    fn test_bgt_tab_size_clamp() {
+        let mut m = BgtWhitespaceModel::new();
+        m.set_tab_size(0);
+        assert_eq!(m.tab_size, 1);
+        m.set_tab_size(100);
+        assert_eq!(m.tab_size, 16);
+    }
+
+    #[test]
+    fn test_bgt_detect_spaces() {
+        let m = BgtWhitespaceModel::new();
+        let lines = vec!["  hello", "  world", "    nested"];
+        let (uses_spaces, size) = m.detect_indentation(&lines);
+        assert!(uses_spaces);
+        assert_eq!(size, 2);
+    }
+
+    #[test]
+    fn test_bgt_detect_tabs() {
+        let m = BgtWhitespaceModel::new();
+        let lines = vec!["\thello", "\tworld", "\t\tnested"];
+        let (uses_spaces, _) = m.detect_indentation(&lines);
+        assert!(!uses_spaces);
+    }
+
+    #[test]
+    fn test_bgt_mode_variants() {
+        let modes = [
+            BgtWhitespaceMode::None, BgtWhitespaceMode::Boundary,
+            BgtWhitespaceMode::Selection, BgtWhitespaceMode::Trailing,
+            BgtWhitespaceMode::All,
+        ];
+        assert_eq!(modes.len(), 5);
     }
 
 
