@@ -60790,3 +60790,266 @@ mod bbu_tests {
         assert!(!i.is_deprecated());
     }
 }
+
+
+// --- bbv_: Editor document symbols/outline model ---
+
+/// Symbol kind for document outline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbvOutlineKind {
+    File, Module, Namespace, Package, Class, Method, Property, Field,
+    Constructor, Enum, Interface, Function, Variable, Constant,
+    String, Number, Boolean, Array, Object, Key, Null, EnumMember,
+    Struct, Event, Operator, TypeParameter,
+}
+
+impl BbvOutlineKind {
+    pub fn icon(&self) -> char {
+        match self {
+            Self::Class | Self::Interface | Self::Struct => '◇',
+            Self::Function | Self::Method | Self::Constructor => 'ƒ',
+            Self::Property | Self::Field | Self::Key => '◉',
+            Self::Variable | Self::Constant => '◆',
+            Self::Enum | Self::EnumMember => '▣',
+            Self::Module | Self::Namespace | Self::Package => '□',
+            Self::Event => '⚡', Self::Operator => '±',
+            Self::TypeParameter => 'T', Self::File => '📄',
+            _ => '○',
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::File => "File", Self::Module => "Module", Self::Namespace => "Namespace",
+            Self::Package => "Package", Self::Class => "Class", Self::Method => "Method",
+            Self::Property => "Property", Self::Field => "Field", Self::Constructor => "Constructor",
+            Self::Enum => "Enum", Self::Interface => "Interface", Self::Function => "Function",
+            Self::Variable => "Variable", Self::Constant => "Constant", Self::String => "String",
+            Self::Number => "Number", Self::Boolean => "Boolean", Self::Array => "Array",
+            Self::Object => "Object", Self::Key => "Key", Self::Null => "Null",
+            Self::EnumMember => "Enum Member", Self::Struct => "Struct", Self::Event => "Event",
+            Self::Operator => "Operator", Self::TypeParameter => "Type Parameter",
+        }
+    }
+}
+
+/// A document symbol/outline entry.
+#[derive(Debug, Clone)]
+pub struct BbvOutlineEntry {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: BbvOutlineKind,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub selection_start: u32,
+    pub selection_end: u32,
+    pub children: Vec<BbvOutlineEntry>,
+    pub deprecated: bool,
+}
+
+impl BbvOutlineEntry {
+    pub fn new(name: &str, kind: BbvOutlineKind, start: u32, end: u32) -> Self {
+        Self {
+            name: name.to_string(), detail: None, kind,
+            range_start: start, range_end: end,
+            selection_start: start, selection_end: start,
+            children: Vec::new(), deprecated: false,
+        }
+    }
+
+    pub fn with_detail(mut self, d: &str) -> Self { self.detail = Some(d.to_string()); self }
+    pub fn with_children(mut self, ch: Vec<BbvOutlineEntry>) -> Self { self.children = ch; self }
+
+    pub fn line_count(&self) -> u32 { self.range_end - self.range_start + 1 }
+    pub fn has_children(&self) -> bool { !self.children.is_empty() }
+    pub fn child_count(&self) -> usize { self.children.len() }
+
+    pub fn contains_line(&self, line: u32) -> bool {
+        line >= self.range_start && line <= self.range_end
+    }
+
+    pub fn display_text(&self) -> String {
+        format!("{} {}", self.kind.icon(), self.name)
+    }
+
+    pub fn flatten(&self, depth: u32) -> Vec<(&BbvOutlineEntry, u32)> {
+        let mut result = vec![(self, depth)];
+        for child in &self.children {
+            result.extend(child.flatten(depth + 1));
+        }
+        result
+    }
+}
+
+/// Sort order for outline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BbvSortOrder { Position, Name, Kind }
+
+/// The outline model.
+#[derive(Debug)]
+pub struct BbvOutlineModel {
+    entries: Vec<BbvOutlineEntry>,
+    sort_order: BbvSortOrder,
+    filter_text: Option<String>,
+    follow_cursor: bool,
+    selected_line: Option<u32>,
+}
+
+impl BbvOutlineModel {
+    pub fn new() -> Self {
+        Self { entries: Vec::new(), sort_order: BbvSortOrder::Position, filter_text: None, follow_cursor: true, selected_line: None }
+    }
+
+    pub fn set_entries(&mut self, entries: Vec<BbvOutlineEntry>) { self.entries = entries; }
+    pub fn entries(&self) -> &[BbvOutlineEntry] { &self.entries }
+    pub fn entry_count(&self) -> usize { self.entries.len() }
+
+    pub fn total_symbols(&self) -> usize {
+        fn count(entries: &[BbvOutlineEntry]) -> usize {
+            entries.iter().map(|e| 1 + count(&e.children)).sum()
+        }
+        count(&self.entries)
+    }
+
+    pub fn find_at_line(&self, line: u32) -> Option<&BbvOutlineEntry> {
+        fn find_in(entries: &[BbvOutlineEntry], line: u32) -> Option<&BbvOutlineEntry> {
+            for e in entries.iter().rev() {
+                if e.contains_line(line) {
+                    if let Some(child) = find_in(&e.children, line) { return Some(child); }
+                    return Some(e);
+                }
+            }
+            None
+        }
+        find_in(&self.entries, line)
+    }
+
+    pub fn set_sort_order(&mut self, order: BbvSortOrder) { self.sort_order = order; }
+    pub fn set_filter(&mut self, text: Option<String>) { self.filter_text = text; }
+    pub fn set_follow_cursor(&mut self, v: bool) { self.follow_cursor = v; }
+
+    pub fn set_cursor_line(&mut self, line: u32) {
+        if self.follow_cursor { self.selected_line = Some(line); }
+    }
+
+    pub fn selected_entry(&self) -> Option<&BbvOutlineEntry> {
+        self.selected_line.and_then(|l| self.find_at_line(l))
+    }
+
+    pub fn flattened(&self) -> Vec<(&BbvOutlineEntry, u32)> {
+        let mut result = Vec::new();
+        for e in &self.entries { result.extend(e.flatten(0)); }
+        result
+    }
+
+    pub fn filtered(&self) -> Vec<(&BbvOutlineEntry, u32)> {
+        let all = self.flattened();
+        match &self.filter_text {
+            None => all,
+            Some(f) => {
+                let fl = f.to_lowercase();
+                all.into_iter().filter(|(e, _)| e.name.to_lowercase().contains(&fl)).collect()
+            }
+        }
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); self.selected_line = None; }
+}
+
+#[cfg(test)]
+mod bbv_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbv_kind_icon() {
+        assert_eq!(BbvOutlineKind::Function.icon(), 'ƒ');
+        assert_eq!(BbvOutlineKind::Class.icon(), '◇');
+    }
+
+    #[test]
+    fn test_bbv_entry_basic() {
+        let e = BbvOutlineEntry::new("main", BbvOutlineKind::Function, 1, 20);
+        assert_eq!(e.line_count(), 20);
+        assert!(e.contains_line(10));
+        assert!(!e.contains_line(21));
+    }
+
+    #[test]
+    fn test_bbv_entry_children() {
+        let e = BbvOutlineEntry::new("MyClass", BbvOutlineKind::Class, 1, 50)
+            .with_children(vec![
+                BbvOutlineEntry::new("foo", BbvOutlineKind::Method, 5, 15),
+                BbvOutlineEntry::new("bar", BbvOutlineKind::Method, 20, 30),
+            ]);
+        assert!(e.has_children());
+        assert_eq!(e.child_count(), 2);
+    }
+
+    #[test]
+    fn test_bbv_entry_flatten() {
+        let e = BbvOutlineEntry::new("Root", BbvOutlineKind::Class, 1, 50)
+            .with_children(vec![BbvOutlineEntry::new("child", BbvOutlineKind::Method, 5, 10)]);
+        let flat = e.flatten(0);
+        assert_eq!(flat.len(), 2);
+        assert_eq!(flat[1].1, 1); // depth 1
+    }
+
+    #[test]
+    fn test_bbv_model_find() {
+        let mut m = BbvOutlineModel::new();
+        m.set_entries(vec![
+            BbvOutlineEntry::new("fn_a", BbvOutlineKind::Function, 1, 10),
+            BbvOutlineEntry::new("fn_b", BbvOutlineKind::Function, 15, 30)
+                .with_children(vec![BbvOutlineEntry::new("inner", BbvOutlineKind::Function, 20, 25)]),
+        ]);
+        assert_eq!(m.find_at_line(5).unwrap().name, "fn_a");
+        assert_eq!(m.find_at_line(22).unwrap().name, "inner"); // deepest match
+    }
+
+    #[test]
+    fn test_bbv_model_total() {
+        let mut m = BbvOutlineModel::new();
+        m.set_entries(vec![
+            BbvOutlineEntry::new("a", BbvOutlineKind::Function, 1, 10),
+            BbvOutlineEntry::new("b", BbvOutlineKind::Class, 15, 30)
+                .with_children(vec![BbvOutlineEntry::new("c", BbvOutlineKind::Method, 20, 25)]),
+        ]);
+        assert_eq!(m.total_symbols(), 3);
+    }
+
+    #[test]
+    fn test_bbv_model_filter() {
+        let mut m = BbvOutlineModel::new();
+        m.set_entries(vec![
+            BbvOutlineEntry::new("handleClick", BbvOutlineKind::Function, 1, 10),
+            BbvOutlineEntry::new("render", BbvOutlineKind::Function, 15, 30),
+        ]);
+        m.set_filter(Some("click".to_string()));
+        assert_eq!(m.filtered().len(), 1);
+    }
+
+    #[test]
+    fn test_bbv_model_cursor_follow() {
+        let mut m = BbvOutlineModel::new();
+        m.set_entries(vec![
+            BbvOutlineEntry::new("a", BbvOutlineKind::Function, 1, 10),
+            BbvOutlineEntry::new("b", BbvOutlineKind::Function, 15, 30),
+        ]);
+        m.set_cursor_line(20);
+        assert_eq!(m.selected_entry().unwrap().name, "b");
+    }
+
+    #[test]
+    fn test_bbv_model_clear() {
+        let mut m = BbvOutlineModel::new();
+        m.set_entries(vec![BbvOutlineEntry::new("x", BbvOutlineKind::Function, 1, 10)]);
+        m.clear();
+        assert_eq!(m.entry_count(), 0);
+    }
+
+    #[test]
+    fn test_bbv_display_text() {
+        let e = BbvOutlineEntry::new("foo", BbvOutlineKind::Function, 1, 10);
+        assert!(e.display_text().contains("ƒ"));
+    }
+}
