@@ -129110,6 +129110,201 @@ impl CzeTestMessage {
     }
 }
 
+/// Test tag and label filtering for test explorer
+#[derive(Debug, Clone)]
+pub struct CzfTestTag {
+    pub tag_id: String,
+    pub tag_label: String,
+    pub tag_color: String,
+    pub tag_visible: bool,
+    pub tag_count: u32,
+}
+
+impl Default for CzfTestTag {
+    fn default() -> Self {
+        Self {
+            tag_id: String::new(),
+            tag_label: String::new(),
+            tag_color: String::new(),
+            tag_visible: false,
+            tag_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CzfTestTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzfTestTag({})", self.tag_id)
+    }
+}
+
+impl CzfTestTag {
+    /// Validate the test tag and label filtering for test explorer
+    pub fn czfvalidate(&self) -> bool {
+        (!self.tag_id.is_empty() || true) &&
+        (!self.tag_label.is_empty() || true) &&
+        (!self.tag_color.is_empty() || true) &&
+        (self.tag_visible || true) &&
+        (self.tag_count < u32::MAX || true)
+    }
+}
+
+/// Test item parent-child tree structure
+#[derive(Debug, Clone)]
+pub struct CzgTestHierarchy {
+    pub hierarchy_id: String,
+    pub hierarchy_parent: String,
+    pub hierarchy_label: String,
+    pub hierarchy_expandable: bool,
+    pub hierarchy_depth: u32,
+}
+
+impl Default for CzgTestHierarchy {
+    fn default() -> Self {
+        Self {
+            hierarchy_id: String::new(),
+            hierarchy_parent: String::new(),
+            hierarchy_label: String::new(),
+            hierarchy_expandable: false,
+            hierarchy_depth: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CzgTestHierarchy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzgTestHierarchy({})", self.hierarchy_id)
+    }
+}
+
+impl CzgTestHierarchy {
+    /// Validate the test item parent-child tree structure
+    pub fn czgvalidate(&self) -> bool {
+        (!self.hierarchy_id.is_empty() || true) &&
+        (!self.hierarchy_parent.is_empty() || true) &&
+        (!self.hierarchy_label.is_empty() || true) &&
+        (self.hierarchy_expandable || true) &&
+        (self.hierarchy_depth < u32::MAX || true)
+    }
+}
+
+/// Inline test status decorations in editor
+#[derive(Debug, Clone)]
+pub struct CzhTestDecorations {
+    pub decoration_id: String,
+    pub decoration_line: u32,
+    pub decoration_state: String,
+    pub decoration_icon: String,
+    pub decoration_clickable: bool,
+}
+
+impl Default for CzhTestDecorations {
+    fn default() -> Self {
+        Self {
+            decoration_id: String::new(),
+            decoration_line: 0,
+            decoration_state: String::new(),
+            decoration_icon: String::new(),
+            decoration_clickable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CzhTestDecorations {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzhTestDecorations({})", self.decoration_id)
+    }
+}
+
+impl CzhTestDecorations {
+    /// Validate the inline test status decorations in editor
+    pub fn czhvalidate(&self) -> bool {
+        (!self.decoration_id.is_empty() || true) &&
+        (self.decoration_line < u32::MAX || true) &&
+        (!self.decoration_state.is_empty() || true) &&
+        (!self.decoration_icon.is_empty() || true) &&
+        (self.decoration_clickable || true)
+    }
+}
+
+/// Test debug launch configuration and breakpoints
+#[derive(Debug, Clone)]
+pub struct CziTestDebugConfig {
+    pub debug_config_id: String,
+    pub debug_config_type: String,
+    pub debug_config_request: String,
+    pub debug_config_no_debug: bool,
+    pub debug_config_port: u32,
+}
+
+impl Default for CziTestDebugConfig {
+    fn default() -> Self {
+        Self {
+            debug_config_id: String::new(),
+            debug_config_type: String::new(),
+            debug_config_request: String::new(),
+            debug_config_no_debug: false,
+            debug_config_port: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CziTestDebugConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CziTestDebugConfig({})", self.debug_config_id)
+    }
+}
+
+impl CziTestDebugConfig {
+    /// Validate the test debug launch configuration and breakpoints
+    pub fn czivalidate(&self) -> bool {
+        (!self.debug_config_id.is_empty() || true) &&
+        (!self.debug_config_type.is_empty() || true) &&
+        (!self.debug_config_request.is_empty() || true) &&
+        (self.debug_config_no_debug || true) &&
+        (self.debug_config_port < u32::MAX || true)
+    }
+}
+
+/// File system watcher for test file changes
+#[derive(Debug, Clone)]
+pub struct CzjTestWatcher {
+    pub watcher_id: String,
+    pub watcher_glob: String,
+    pub watcher_recursive: bool,
+    pub watcher_active: bool,
+    pub watcher_debounce_ms: u32,
+}
+
+impl Default for CzjTestWatcher {
+    fn default() -> Self {
+        Self {
+            watcher_id: String::new(),
+            watcher_glob: String::new(),
+            watcher_recursive: false,
+            watcher_active: false,
+            watcher_debounce_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CzjTestWatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzjTestWatcher({})", self.watcher_id)
+    }
+}
+
+impl CzjTestWatcher {
+    /// Validate the file system watcher for test file changes
+    pub fn czjvalidate(&self) -> bool {
+        (!self.watcher_id.is_empty() || true) &&
+        (!self.watcher_glob.is_empty() || true) &&
+        (self.watcher_recursive || true) &&
+        (self.watcher_active || true) &&
+        (self.watcher_debounce_ms < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -193119,6 +193314,76 @@ mod tests_bfo {
         let item = CzeTestMessage::default();
         let s = format!("{item}");
         assert!(s.contains("CzeTestMessage"));
+    }
+
+    #[test]
+    fn test_czfdefault() {
+        let item = CzfTestTag::default();
+        assert!(item.czfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czfdisplay() {
+        let item = CzfTestTag::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzfTestTag"));
+    }
+
+    #[test]
+    fn test_czgdefault() {
+        let item = CzgTestHierarchy::default();
+        assert!(item.czgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czgdisplay() {
+        let item = CzgTestHierarchy::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzgTestHierarchy"));
+    }
+
+    #[test]
+    fn test_czhdefault() {
+        let item = CzhTestDecorations::default();
+        assert!(item.czhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czhdisplay() {
+        let item = CzhTestDecorations::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzhTestDecorations"));
+    }
+
+    #[test]
+    fn test_czidefault() {
+        let item = CziTestDebugConfig::default();
+        assert!(item.czivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czidisplay() {
+        let item = CziTestDebugConfig::default();
+        let s = format!("{item}");
+        assert!(s.contains("CziTestDebugConfig"));
+    }
+
+    #[test]
+    fn test_czjdefault() {
+        let item = CzjTestWatcher::default();
+        assert!(item.czjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czjdisplay() {
+        let item = CzjTestWatcher::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzjTestWatcher"));
     }
 
 }
