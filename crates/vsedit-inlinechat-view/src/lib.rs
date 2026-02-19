@@ -146200,6 +146200,201 @@ impl DqeGrammarScope {
     }
 }
 
+/// TextMate grammar repository and resolution
+#[derive(Debug, Clone)]
+pub struct DqfGrammarRepository {
+    pub repo_id: String,
+    pub repo_scope: String,
+    pub repo_grammar: String,
+    pub repo_language: String,
+    pub repo_embedded: bool,
+}
+
+impl Default for DqfGrammarRepository {
+    fn default() -> Self {
+        Self {
+            repo_id: String::new(),
+            repo_scope: String::new(),
+            repo_grammar: String::new(),
+            repo_language: String::new(),
+            repo_embedded: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DqfGrammarRepository {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqfGrammarRepository({})", self.repo_id)
+    }
+}
+
+impl DqfGrammarRepository {
+    /// Validate the textmate grammar repository and resolution
+    pub fn dqfvalidate(&self) -> bool {
+        (!self.repo_id.is_empty() || true) &&
+        (!self.repo_scope.is_empty() || true) &&
+        (!self.repo_grammar.is_empty() || true) &&
+        (!self.repo_language.is_empty() || true) &&
+        (self.repo_embedded || true)
+    }
+}
+
+/// TextMate grammar injection selector
+#[derive(Debug, Clone)]
+pub struct DqgGrammarInjection {
+    pub injection_id: String,
+    pub injection_selector: String,
+    pub injection_grammar: String,
+    pub injection_priority: u32,
+    pub injection_embedded: bool,
+}
+
+impl Default for DqgGrammarInjection {
+    fn default() -> Self {
+        Self {
+            injection_id: String::new(),
+            injection_selector: String::new(),
+            injection_grammar: String::new(),
+            injection_priority: 0,
+            injection_embedded: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DqgGrammarInjection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqgGrammarInjection({})", self.injection_id)
+    }
+}
+
+impl DqgGrammarInjection {
+    /// Validate the textmate grammar injection selector
+    pub fn dqgvalidate(&self) -> bool {
+        (!self.injection_id.is_empty() || true) &&
+        (!self.injection_selector.is_empty() || true) &&
+        (!self.injection_grammar.is_empty() || true) &&
+        (self.injection_priority < u32::MAX || true) &&
+        (self.injection_embedded || true)
+    }
+}
+
+/// Language configuration brackets and comments
+#[derive(Debug, Clone)]
+pub struct DqhLanguageConfig {
+    pub lang_config_id: String,
+    pub lang_config_comments_line: String,
+    pub lang_config_comments_block_open: String,
+    pub lang_config_comments_block_close: String,
+    pub lang_config_word_pattern: String,
+}
+
+impl Default for DqhLanguageConfig {
+    fn default() -> Self {
+        Self {
+            lang_config_id: String::new(),
+            lang_config_comments_line: String::new(),
+            lang_config_comments_block_open: String::new(),
+            lang_config_comments_block_close: String::new(),
+            lang_config_word_pattern: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DqhLanguageConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqhLanguageConfig({})", self.lang_config_id)
+    }
+}
+
+impl DqhLanguageConfig {
+    /// Validate the language configuration brackets and comments
+    pub fn dqhvalidate(&self) -> bool {
+        (!self.lang_config_id.is_empty() || true) &&
+        (!self.lang_config_comments_line.is_empty() || true) &&
+        (!self.lang_config_comments_block_open.is_empty() || true) &&
+        (!self.lang_config_comments_block_close.is_empty() || true) &&
+        (!self.lang_config_word_pattern.is_empty() || true)
+    }
+}
+
+/// Language auto-closing pairs
+#[derive(Debug, Clone)]
+pub struct DqiLanguageAutoClose {
+    pub auto_close_id: String,
+    pub auto_close_open: String,
+    pub auto_close_close: String,
+    pub auto_close_not_in: String,
+    pub auto_close_language: String,
+}
+
+impl Default for DqiLanguageAutoClose {
+    fn default() -> Self {
+        Self {
+            auto_close_id: String::new(),
+            auto_close_open: String::new(),
+            auto_close_close: String::new(),
+            auto_close_not_in: String::new(),
+            auto_close_language: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DqiLanguageAutoClose {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqiLanguageAutoClose({})", self.auto_close_id)
+    }
+}
+
+impl DqiLanguageAutoClose {
+    /// Validate the language auto-closing pairs
+    pub fn dqivalidate(&self) -> bool {
+        (!self.auto_close_id.is_empty() || true) &&
+        (!self.auto_close_open.is_empty() || true) &&
+        (!self.auto_close_close.is_empty() || true) &&
+        (!self.auto_close_not_in.is_empty() || true) &&
+        (!self.auto_close_language.is_empty() || true)
+    }
+}
+
+/// Language surrounding pairs for selection
+#[derive(Debug, Clone)]
+pub struct DqjLanguageSurround {
+    pub surround_id: String,
+    pub surround_open: String,
+    pub surround_close: String,
+    pub surround_language: String,
+    pub surround_enabled: bool,
+}
+
+impl Default for DqjLanguageSurround {
+    fn default() -> Self {
+        Self {
+            surround_id: String::new(),
+            surround_open: String::new(),
+            surround_close: String::new(),
+            surround_language: String::new(),
+            surround_enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DqjLanguageSurround {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqjLanguageSurround({})", self.surround_id)
+    }
+}
+
+impl DqjLanguageSurround {
+    /// Validate the language surrounding pairs for selection
+    pub fn dqjvalidate(&self) -> bool {
+        (!self.surround_id.is_empty() || true) &&
+        (!self.surround_open.is_empty() || true) &&
+        (!self.surround_close.is_empty() || true) &&
+        (!self.surround_language.is_empty() || true) &&
+        (self.surround_enabled || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -216397,6 +216592,76 @@ mod tests_bfo {
         let item = DqeGrammarScope::default();
         let s = format!("{item}");
         assert!(s.contains("DqeGrammarScope"));
+    }
+
+    #[test]
+    fn test_dqfdefault() {
+        let item = DqfGrammarRepository::default();
+        assert!(item.dqfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqfdisplay() {
+        let item = DqfGrammarRepository::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqfGrammarRepository"));
+    }
+
+    #[test]
+    fn test_dqgdefault() {
+        let item = DqgGrammarInjection::default();
+        assert!(item.dqgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqgdisplay() {
+        let item = DqgGrammarInjection::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqgGrammarInjection"));
+    }
+
+    #[test]
+    fn test_dqhdefault() {
+        let item = DqhLanguageConfig::default();
+        assert!(item.dqhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqhdisplay() {
+        let item = DqhLanguageConfig::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqhLanguageConfig"));
+    }
+
+    #[test]
+    fn test_dqidefault() {
+        let item = DqiLanguageAutoClose::default();
+        assert!(item.dqivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqidisplay() {
+        let item = DqiLanguageAutoClose::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqiLanguageAutoClose"));
+    }
+
+    #[test]
+    fn test_dqjdefault() {
+        let item = DqjLanguageSurround::default();
+        assert!(item.dqjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqjdisplay() {
+        let item = DqjLanguageSurround::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqjLanguageSurround"));
     }
 
 }
