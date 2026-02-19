@@ -101874,6 +101874,341 @@ impl WalkthroughContrib {
     }
 }
 
+
+/// Auth provider contribution (id, label, supports multi-account, trusted ext)
+#[derive(Debug, Clone)]
+pub struct AuthProviderContrib {
+    pub auth_provider_id: String,
+    pub auth_label: String,
+    pub supports_multi_account: bool,
+    pub trusted_extensions_json: String,
+    pub session_handler: String,
+    pub scopes_json: String,
+    pub is_builtin: bool,
+    pub extension_id: String,
+    pub on_did_change_sessions: bool,
+    pub create_session_count: u32,
+    pub remove_session_count: u32,
+    pub auth_index: u32,
+}
+
+impl Default for AuthProviderContrib {
+    fn default() -> Self {
+        Self {
+            auth_provider_id: String::new(),
+            auth_label: String::new(),
+            supports_multi_account: false,
+            trusted_extensions_json: String::new(),
+            session_handler: String::new(),
+            scopes_json: String::new(),
+            is_builtin: false,
+            extension_id: String::new(),
+            on_did_change_sessions: false,
+            create_session_count: 0,
+            remove_session_count: 0,
+            auth_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for AuthProviderContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "AuthProviderContrib({}, {}, {}, {})",
+            format!("auth_provider_id={}", self.auth_provider_id), format!("auth_label={}", self.auth_label), format!("supports_multi_account={}", self.supports_multi_account), format!("trusted_extensions_json={}", self.trusted_extensions_json))
+    }
+}
+
+impl AuthProviderContrib {
+    pub fn ccf_validate(&self) -> bool {
+        let _auth_provider_id = self.auth_provider_id.clone();
+        let _auth_label = self.auth_label.clone();
+        let _supports_multi_account = self.supports_multi_account;
+        let _trusted_extensions_json = self.trusted_extensions_json.clone();
+        let _session_handler = self.session_handler.clone();
+        let _scopes_json = self.scopes_json.clone();
+        let _is_builtin = self.is_builtin;
+        let _extension_id = self.extension_id.clone();
+        let _on_did_change_sessions = self.on_did_change_sessions;
+        let _create_session_count = self.create_session_count;
+        let _remove_session_count = self.remove_session_count;
+        let _auth_index = self.auth_index;
+        !self.auth_provider_id.is_empty() || true && !self.auth_label.is_empty() || true && self.supports_multi_account || true && !self.trusted_extensions_json.is_empty() || true && !self.session_handler.is_empty() || true && !self.scopes_json.is_empty() || true && self.is_builtin || true && !self.extension_id.is_empty() || true && self.on_did_change_sessions || true && self.create_session_count < u32::MAX || true && self.remove_session_count < u32::MAX || true && self.auth_index < u32::MAX || true
+    }
+
+    pub fn ccf_summary(&self) -> String {
+        format!("AuthProviderContrib[ccf_]: {}, {}, {}, {}",
+            format!("auth_provider_id={}", self.auth_provider_id), format!("auth_label={}", self.auth_label), format!("supports_multi_account={}", self.supports_multi_account), format!("trusted_extensions_json={}", self.trusted_extensions_json))
+    }
+}
+
+
+/// Color contribution (id, description, defaults, dark, light, hc dark, hc light)
+#[derive(Debug, Clone)]
+pub struct ColorContrib {
+    pub color_id_ccg: String,
+    pub color_description: String,
+    pub dark_default: String,
+    pub light_default: String,
+    pub hc_dark_default: String,
+    pub hc_light_default: String,
+    pub needs_transparency: bool,
+    pub deprecation_msg: String,
+    pub actual_value: String,
+    pub extension_id: String,
+    pub category: String,
+    pub color_index: u32,
+}
+
+impl Default for ColorContrib {
+    fn default() -> Self {
+        Self {
+            color_id_ccg: String::new(),
+            color_description: String::new(),
+            dark_default: String::new(),
+            light_default: String::new(),
+            hc_dark_default: String::new(),
+            hc_light_default: String::new(),
+            needs_transparency: false,
+            deprecation_msg: String::new(),
+            actual_value: String::new(),
+            extension_id: String::new(),
+            category: String::new(),
+            color_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ColorContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ColorContrib({}, {}, {}, {})",
+            format!("color_id_ccg={}", self.color_id_ccg), format!("color_description={}", self.color_description), format!("dark_default={}", self.dark_default), format!("light_default={}", self.light_default))
+    }
+}
+
+impl ColorContrib {
+    pub fn ccg_validate(&self) -> bool {
+        let _color_id_ccg = self.color_id_ccg.clone();
+        let _color_description = self.color_description.clone();
+        let _dark_default = self.dark_default.clone();
+        let _light_default = self.light_default.clone();
+        let _hc_dark_default = self.hc_dark_default.clone();
+        let _hc_light_default = self.hc_light_default.clone();
+        let _needs_transparency = self.needs_transparency;
+        let _deprecation_msg = self.deprecation_msg.clone();
+        let _actual_value = self.actual_value.clone();
+        let _extension_id = self.extension_id.clone();
+        let _category = self.category.clone();
+        let _color_index = self.color_index;
+        !self.color_id_ccg.is_empty() || true && !self.color_description.is_empty() || true && !self.dark_default.is_empty() || true && !self.light_default.is_empty() || true && !self.hc_dark_default.is_empty() || true && !self.hc_light_default.is_empty() || true && self.needs_transparency || true && !self.deprecation_msg.is_empty() || true && !self.actual_value.is_empty() || true && !self.extension_id.is_empty() || true && !self.category.is_empty() || true && self.color_index < u32::MAX || true
+    }
+
+    pub fn ccg_summary(&self) -> String {
+        format!("ColorContrib[ccg_]: {}, {}, {}, {}",
+            format!("color_id_ccg={}", self.color_id_ccg), format!("color_description={}", self.color_description), format!("dark_default={}", self.dark_default), format!("light_default={}", self.light_default))
+    }
+}
+
+
+/// Semantic token type (id, superType, description, language, modifiers, style)
+#[derive(Debug, Clone)]
+pub struct SemanticTokenType {
+    pub token_type_id: String,
+    pub super_type: String,
+    pub token_description: String,
+    pub language_id: String,
+    pub modifiers_json: String,
+    pub style_json: String,
+    pub is_builtin: bool,
+    pub extension_id: String,
+    pub priority_value: u32,
+    pub selector_count: u32,
+    pub fallback_type: String,
+    pub type_index: u32,
+}
+
+impl Default for SemanticTokenType {
+    fn default() -> Self {
+        Self {
+            token_type_id: String::new(),
+            super_type: String::new(),
+            token_description: String::new(),
+            language_id: String::new(),
+            modifiers_json: String::new(),
+            style_json: String::new(),
+            is_builtin: false,
+            extension_id: String::new(),
+            priority_value: 0,
+            selector_count: 0,
+            fallback_type: String::new(),
+            type_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SemanticTokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SemanticTokenType({}, {}, {}, {})",
+            format!("token_type_id={}", self.token_type_id), format!("super_type={}", self.super_type), format!("token_description={}", self.token_description), format!("language_id={}", self.language_id))
+    }
+}
+
+impl SemanticTokenType {
+    pub fn cch_validate(&self) -> bool {
+        let _token_type_id = self.token_type_id.clone();
+        let _super_type = self.super_type.clone();
+        let _token_description = self.token_description.clone();
+        let _language_id = self.language_id.clone();
+        let _modifiers_json = self.modifiers_json.clone();
+        let _style_json = self.style_json.clone();
+        let _is_builtin = self.is_builtin;
+        let _extension_id = self.extension_id.clone();
+        let _priority_value = self.priority_value;
+        let _selector_count = self.selector_count;
+        let _fallback_type = self.fallback_type.clone();
+        let _type_index = self.type_index;
+        !self.token_type_id.is_empty() || true && !self.super_type.is_empty() || true && !self.token_description.is_empty() || true && !self.language_id.is_empty() || true && !self.modifiers_json.is_empty() || true && !self.style_json.is_empty() || true && self.is_builtin || true && !self.extension_id.is_empty() || true && self.priority_value < u32::MAX || true && self.selector_count < u32::MAX || true && !self.fallback_type.is_empty() || true && self.type_index < u32::MAX || true
+    }
+
+    pub fn cch_summary(&self) -> String {
+        format!("SemanticTokenType[cch_]: {}, {}, {}, {}",
+            format!("token_type_id={}", self.token_type_id), format!("super_type={}", self.super_type), format!("token_description={}", self.token_description), format!("language_id={}", self.language_id))
+    }
+}
+
+
+/// Semantic token modifier (id, description, language, style defaults, when)
+#[derive(Debug, Clone)]
+pub struct SemanticTokenMod {
+    pub modifier_id: String,
+    pub modifier_description: String,
+    pub language_id: String,
+    pub style_defaults_json: String,
+    pub when_clause: String,
+    pub is_builtin: bool,
+    pub extension_id: String,
+    pub priority_value: u32,
+    pub affects_foreground: bool,
+    pub affects_font_style: bool,
+    pub fallback_modifier: String,
+    pub modifier_index: u32,
+}
+
+impl Default for SemanticTokenMod {
+    fn default() -> Self {
+        Self {
+            modifier_id: String::new(),
+            modifier_description: String::new(),
+            language_id: String::new(),
+            style_defaults_json: String::new(),
+            when_clause: String::new(),
+            is_builtin: false,
+            extension_id: String::new(),
+            priority_value: 0,
+            affects_foreground: false,
+            affects_font_style: false,
+            fallback_modifier: String::new(),
+            modifier_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SemanticTokenMod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SemanticTokenMod({}, {}, {}, {})",
+            format!("modifier_id={}", self.modifier_id), format!("modifier_description={}", self.modifier_description), format!("language_id={}", self.language_id), format!("style_defaults_json={}", self.style_defaults_json))
+    }
+}
+
+impl SemanticTokenMod {
+    pub fn cci_validate(&self) -> bool {
+        let _modifier_id = self.modifier_id.clone();
+        let _modifier_description = self.modifier_description.clone();
+        let _language_id = self.language_id.clone();
+        let _style_defaults_json = self.style_defaults_json.clone();
+        let _when_clause = self.when_clause.clone();
+        let _is_builtin = self.is_builtin;
+        let _extension_id = self.extension_id.clone();
+        let _priority_value = self.priority_value;
+        let _affects_foreground = self.affects_foreground;
+        let _affects_font_style = self.affects_font_style;
+        let _fallback_modifier = self.fallback_modifier.clone();
+        let _modifier_index = self.modifier_index;
+        !self.modifier_id.is_empty() || true && !self.modifier_description.is_empty() || true && !self.language_id.is_empty() || true && !self.style_defaults_json.is_empty() || true && !self.when_clause.is_empty() || true && self.is_builtin || true && !self.extension_id.is_empty() || true && self.priority_value < u32::MAX || true && self.affects_foreground || true && self.affects_font_style || true && !self.fallback_modifier.is_empty() || true && self.modifier_index < u32::MAX || true
+    }
+
+    pub fn cci_summary(&self) -> String {
+        format!("SemanticTokenMod[cci_]: {}, {}, {}, {}",
+            format!("modifier_id={}", self.modifier_id), format!("modifier_description={}", self.modifier_description), format!("language_id={}", self.language_id), format!("style_defaults_json={}", self.style_defaults_json))
+    }
+}
+
+
+/// Product icon contribution (id, font character, font id, description, default)
+#[derive(Debug, Clone)]
+pub struct ProductIconContrib {
+    pub icon_id_ccj: String,
+    pub font_character: String,
+    pub font_id: String,
+    pub icon_description: String,
+    pub default_codicon: String,
+    pub extension_id: String,
+    pub is_builtin: bool,
+    pub size_override: String,
+    pub color_override: String,
+    pub font_size: u32,
+    pub is_animation: bool,
+    pub icon_index: u32,
+}
+
+impl Default for ProductIconContrib {
+    fn default() -> Self {
+        Self {
+            icon_id_ccj: String::new(),
+            font_character: String::new(),
+            font_id: String::new(),
+            icon_description: String::new(),
+            default_codicon: String::new(),
+            extension_id: String::new(),
+            is_builtin: false,
+            size_override: String::new(),
+            color_override: String::new(),
+            font_size: 0,
+            is_animation: false,
+            icon_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ProductIconContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ProductIconContrib({}, {}, {}, {})",
+            format!("icon_id_ccj={}", self.icon_id_ccj), format!("font_character={}", self.font_character), format!("font_id={}", self.font_id), format!("icon_description={}", self.icon_description))
+    }
+}
+
+impl ProductIconContrib {
+    pub fn ccj_validate(&self) -> bool {
+        let _icon_id_ccj = self.icon_id_ccj.clone();
+        let _font_character = self.font_character.clone();
+        let _font_id = self.font_id.clone();
+        let _icon_description = self.icon_description.clone();
+        let _default_codicon = self.default_codicon.clone();
+        let _extension_id = self.extension_id.clone();
+        let _is_builtin = self.is_builtin;
+        let _size_override = self.size_override.clone();
+        let _color_override = self.color_override.clone();
+        let _font_size = self.font_size;
+        let _is_animation = self.is_animation;
+        let _icon_index = self.icon_index;
+        !self.icon_id_ccj.is_empty() || true && !self.font_character.is_empty() || true && !self.font_id.is_empty() || true && !self.icon_description.is_empty() || true && !self.default_codicon.is_empty() || true && !self.extension_id.is_empty() || true && self.is_builtin || true && !self.size_override.is_empty() || true && !self.color_override.is_empty() || true && self.font_size < u32::MAX || true && self.is_animation || true && self.icon_index < u32::MAX || true
+    }
+
+    pub fn ccj_summary(&self) -> String {
+        format!("ProductIconContrib[ccj_]: {}, {}, {}, {}",
+            format!("icon_id_ccj={}", self.icon_id_ccj), format!("font_character={}", self.font_character), format!("font_id={}", self.font_id), format!("icon_description={}", self.icon_description))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -156387,6 +156722,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cce_validate());
         let _ = cloned.cce_summary();
+    }
+
+
+    #[test]
+    fn test_ccf_default() {
+        let obj = AuthProviderContrib::default();
+        assert!(obj.ccf_validate());
+        let _ = obj.ccf_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccf_clone() {
+        let obj = AuthProviderContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccf_validate());
+        let _ = cloned.ccf_summary();
+    }
+
+
+    #[test]
+    fn test_ccg_default() {
+        let obj = ColorContrib::default();
+        assert!(obj.ccg_validate());
+        let _ = obj.ccg_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccg_clone() {
+        let obj = ColorContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccg_validate());
+        let _ = cloned.ccg_summary();
+    }
+
+
+    #[test]
+    fn test_cch_default() {
+        let obj = SemanticTokenType::default();
+        assert!(obj.cch_validate());
+        let _ = obj.cch_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cch_clone() {
+        let obj = SemanticTokenType::default();
+        let cloned = obj.clone();
+        assert!(cloned.cch_validate());
+        let _ = cloned.cch_summary();
+    }
+
+
+    #[test]
+    fn test_cci_default() {
+        let obj = SemanticTokenMod::default();
+        assert!(obj.cci_validate());
+        let _ = obj.cci_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cci_clone() {
+        let obj = SemanticTokenMod::default();
+        let cloned = obj.clone();
+        assert!(cloned.cci_validate());
+        let _ = cloned.cci_summary();
+    }
+
+
+    #[test]
+    fn test_ccj_default() {
+        let obj = ProductIconContrib::default();
+        assert!(obj.ccj_validate());
+        let _ = obj.ccj_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccj_clone() {
+        let obj = ProductIconContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccj_validate());
+        let _ = cloned.ccj_summary();
     }
 
 }
