@@ -86451,6 +86451,67 @@ pub struct BkzContribRegistration { pub extension_id: String, pub point_id: Stri
 #[derive(Debug, Clone)]
 pub struct BkzPluginState { pub id: String, pub active: bool, pub load_time_ms: u64, pub error: Option<String> }
 
+
+// Editor layout grid — editor group grid, split directions, group sizes, layout persistence
+#[derive(Debug, Clone)]
+pub struct BlaGridCell { pub group_id: String, pub row: usize, pub col: usize, pub width_fraction: f64, pub height_fraction: f64 }
+#[derive(Debug, Clone)]
+pub struct BlaGridLayout { pub cells: Vec<BlaGridCell>, pub rows: usize, pub cols: usize }
+#[derive(Debug, Clone)]
+pub struct BlaSplitDirection { pub horizontal: bool, pub before: bool }
+#[derive(Debug, Clone)]
+pub struct BlaLayoutChange { pub from_layout: Vec<BlaGridCell>, pub to_layout: Vec<BlaGridCell> }
+#[derive(Debug, Clone)]
+pub struct BlaLayoutPersistence { pub layout_json: String, pub version: u32, pub timestamp: u64 }
+
+// Panel resize — sash positions, resize constraints, minimum sizes, resize events
+#[derive(Debug, Clone)]
+pub struct BlbSashPosition { pub x: usize, pub y: usize, pub orientation: u8 }
+#[derive(Debug, Clone)]
+pub struct BlbResizeConstraint { pub min_size: usize, pub max_size: Option<usize>, pub snap_to: Option<usize> }
+#[derive(Debug, Clone)]
+pub struct BlbResizeEvent { pub sash_index: usize, pub delta: i32, pub final_size: usize }
+#[derive(Debug, Clone)]
+pub struct BlbPanelSize { pub width: usize, pub height: usize, pub is_minimized: bool }
+#[derive(Debug, Clone)]
+pub struct BlbSashState { pub positions: Vec<BlbSashPosition>, pub dragging_index: Option<usize> }
+
+// Activity bar model — activity bar items, badges, drag reorder, composite bar
+#[derive(Debug, Clone)]
+pub struct BlcActivityBarItem { pub id: String, pub name: String, pub icon: String, pub order: i32, pub visible: bool }
+#[derive(Debug, Clone)]
+pub struct BlcBadge { pub text: Option<String>, pub number: Option<u32>, pub background_color: u32 }
+#[derive(Debug, Clone)]
+pub struct BlcActivityBarState { pub items: Vec<BlcActivityBarItem>, pub active_id: Option<String>, pub badges: Vec<BlcBadge> }
+#[derive(Debug, Clone)]
+pub struct BlcDragReorder { pub from_index: usize, pub to_index: usize }
+#[derive(Debug, Clone)]
+pub struct BlcCompositeBar { pub items: Vec<BlcActivityBarItem>, pub overflow_items: Vec<BlcActivityBarItem> }
+
+// Sidebar sections — view containers, collapsible sections, section visibility, drag reorder
+#[derive(Debug, Clone)]
+pub struct BldViewContainer { pub id: String, pub title: String, pub icon: String, pub order: i32 }
+#[derive(Debug, Clone)]
+pub struct BldSection { pub id: String, pub title: String, pub collapsed: bool, pub visible: bool, pub order: i32 }
+#[derive(Debug, Clone)]
+pub struct BldSidebarState { pub container_id: String, pub sections: Vec<BldSection>, pub width: usize }
+#[derive(Debug, Clone)]
+pub struct BldSectionToggle { pub section_id: String, pub collapsed: bool }
+#[derive(Debug, Clone)]
+pub struct BldViewContainerVisibility { pub container_id: String, pub visible: bool, pub when_clause: Option<String> }
+
+// Status bar items — status bar entries, alignment, priority, click commands, colors
+#[derive(Debug, Clone)]
+pub struct BleStatusBarItem { pub id: String, pub text: String, pub tooltip: Option<String>, pub command: Option<String>, pub alignment: u8, pub priority: i32 }
+#[derive(Debug, Clone)]
+pub struct BleStatusBarColor { pub foreground: Option<u32>, pub background: Option<u32> }
+#[derive(Debug, Clone)]
+pub struct BleStatusBarEntry { pub item: BleStatusBarItem, pub color: BleStatusBarColor, pub visible: bool }
+#[derive(Debug, Clone)]
+pub struct BleStatusBarClick { pub item_id: String, pub button: u8 }
+#[derive(Debug, Clone)]
+pub struct BleStatusBarState { pub left_items: Vec<BleStatusBarEntry>, pub right_items: Vec<BleStatusBarEntry> }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -95471,4 +95532,104 @@ mod tests_bfo {
     fn test_bkz_plugin_error() { let s = BkzPluginState { id: "ext.broken".into(), active: false, load_time_ms: 0, error: Some("load failed".into()) }; assert!(s.error.is_some()); }
     #[test]
     fn test_bkz_fast_load() { let s = BkzPluginState { id: "ext.fast".into(), active: true, load_time_ms: 5, error: None }; assert!(s.load_time_ms < 100); }
+    #[test]
+    fn test_bla_single_cell() { let c = BlaGridCell { group_id: "g1".into(), row: 0, col: 0, width_fraction: 1.0, height_fraction: 1.0 }; assert_eq!(c.width_fraction, 1.0); }
+    #[test]
+    fn test_bla_split_cell() { let c = BlaGridCell { group_id: "g2".into(), row: 0, col: 1, width_fraction: 0.5, height_fraction: 1.0 }; assert_eq!(c.width_fraction, 0.5); }
+    #[test]
+    fn test_bla_grid_1x1() { let c = BlaGridCell { group_id: "g1".into(), row: 0, col: 0, width_fraction: 1.0, height_fraction: 1.0 }; let g = BlaGridLayout { cells: vec![c], rows: 1, cols: 1 }; assert_eq!(g.cells.len(), 1); }
+    #[test]
+    fn test_bla_grid_1x2() { let c1 = BlaGridCell { group_id: "g1".into(), row: 0, col: 0, width_fraction: 0.5, height_fraction: 1.0 }; let c2 = BlaGridCell { group_id: "g2".into(), row: 0, col: 1, width_fraction: 0.5, height_fraction: 1.0 }; let g = BlaGridLayout { cells: vec![c1, c2], rows: 1, cols: 2 }; assert_eq!(g.cols, 2); }
+    #[test]
+    fn test_bla_split_horizontal() { let d = BlaSplitDirection { horizontal: true, before: false }; assert!(d.horizontal); }
+    #[test]
+    fn test_bla_split_vertical() { let d = BlaSplitDirection { horizontal: false, before: true }; assert!(d.before); }
+    #[test]
+    fn test_bla_layout_change() { let from = vec![BlaGridCell { group_id: "g1".into(), row: 0, col: 0, width_fraction: 1.0, height_fraction: 1.0 }]; let to = vec![BlaGridCell { group_id: "g1".into(), row: 0, col: 0, width_fraction: 0.5, height_fraction: 1.0 }]; let ch = BlaLayoutChange { from_layout: from, to_layout: to }; assert_eq!(ch.to_layout[0].width_fraction, 0.5); }
+    #[test]
+    fn test_bla_persistence() { let p = BlaLayoutPersistence { layout_json: "{}".into(), version: 1, timestamp: 1000 }; assert_eq!(p.version, 1); }
+    #[test]
+    fn test_bla_three_column() { let cells: Vec<BlaGridCell> = (0..3).map(|i| BlaGridCell { group_id: format!("g{i}"), row: 0, col: i, width_fraction: 0.333, height_fraction: 1.0 }).collect(); let g = BlaGridLayout { cells, rows: 1, cols: 3 }; assert_eq!(g.cols, 3); }
+    #[test]
+    fn test_bla_empty_layout() { let g = BlaGridLayout { cells: vec![], rows: 0, cols: 0 }; assert!(g.cells.is_empty()); }
+    #[test]
+    fn test_blb_sash_horizontal() { let s = BlbSashPosition { x: 200, y: 0, orientation: 0 }; assert_eq!(s.orientation, 0); }
+    #[test]
+    fn test_blb_sash_vertical() { let s = BlbSashPosition { x: 0, y: 300, orientation: 1 }; assert_eq!(s.orientation, 1); }
+    #[test]
+    fn test_blb_constraint_basic() { let c = BlbResizeConstraint { min_size: 100, max_size: Some(500), snap_to: None }; assert_eq!(c.min_size, 100); }
+    #[test]
+    fn test_blb_constraint_no_max() { let c = BlbResizeConstraint { min_size: 50, max_size: None, snap_to: None }; assert!(c.max_size.is_none()); }
+    #[test]
+    fn test_blb_resize_event_grow() { let e = BlbResizeEvent { sash_index: 0, delta: 50, final_size: 250 }; assert!(e.delta > 0); }
+    #[test]
+    fn test_blb_resize_event_shrink() { let e = BlbResizeEvent { sash_index: 1, delta: -30, final_size: 170 }; assert!(e.delta < 0); }
+    #[test]
+    fn test_blb_panel_normal() { let p = BlbPanelSize { width: 300, height: 200, is_minimized: false }; assert!(!p.is_minimized); }
+    #[test]
+    fn test_blb_panel_minimized() { let p = BlbPanelSize { width: 0, height: 0, is_minimized: true }; assert!(p.is_minimized); }
+    #[test]
+    fn test_blb_sash_state_idle() { let s = BlbSashState { positions: vec![], dragging_index: None }; assert!(s.dragging_index.is_none()); }
+    #[test]
+    fn test_blb_sash_state_dragging() { let pos = BlbSashPosition { x: 100, y: 0, orientation: 0 }; let s = BlbSashState { positions: vec![pos], dragging_index: Some(0) }; assert_eq!(s.dragging_index, Some(0)); }
+    #[test]
+    fn test_blc_item_basic() { let i = BlcActivityBarItem { id: "explorer".into(), name: "Explorer".into(), icon: "files".into(), order: 0, visible: true }; assert!(i.visible); }
+    #[test]
+    fn test_blc_item_hidden() { let i = BlcActivityBarItem { id: "debug".into(), name: "Debug".into(), icon: "bug".into(), order: 3, visible: false }; assert!(!i.visible); }
+    #[test]
+    fn test_blc_badge_text() { let b = BlcBadge { text: Some("!".into()), number: None, background_color: 0xFF0000 }; assert!(b.text.is_some()); }
+    #[test]
+    fn test_blc_badge_number() { let b = BlcBadge { text: None, number: Some(42), background_color: 0x0000FF }; assert_eq!(b.number, Some(42)); }
+    #[test]
+    fn test_blc_state_with_active() { let i = BlcActivityBarItem { id: "search".into(), name: "Search".into(), icon: "search".into(), order: 1, visible: true }; let s = BlcActivityBarState { items: vec![i], active_id: Some("search".into()), badges: vec![] }; assert!(s.active_id.is_some()); }
+    #[test]
+    fn test_blc_state_no_active() { let s = BlcActivityBarState { items: vec![], active_id: None, badges: vec![] }; assert!(s.active_id.is_none()); }
+    #[test]
+    fn test_blc_drag_reorder() { let d = BlcDragReorder { from_index: 2, to_index: 0 }; assert!(d.to_index < d.from_index); }
+    #[test]
+    fn test_blc_composite_no_overflow() { let i = BlcActivityBarItem { id: "x".into(), name: "X".into(), icon: "x".into(), order: 0, visible: true }; let c = BlcCompositeBar { items: vec![i], overflow_items: vec![] }; assert!(c.overflow_items.is_empty()); }
+    #[test]
+    fn test_blc_composite_with_overflow() { let o = BlcActivityBarItem { id: "extra".into(), name: "Extra".into(), icon: "e".into(), order: 10, visible: true }; let c = BlcCompositeBar { items: vec![], overflow_items: vec![o] }; assert_eq!(c.overflow_items.len(), 1); }
+    #[test]
+    fn test_blc_badge_zero() { let b = BlcBadge { text: None, number: Some(0), background_color: 0 }; assert_eq!(b.number, Some(0)); }
+    #[test]
+    fn test_bld_container() { let c = BldViewContainer { id: "explorer".into(), title: "Explorer".into(), icon: "files".into(), order: 0 }; assert_eq!(c.id, "explorer"); }
+    #[test]
+    fn test_bld_section_expanded() { let s = BldSection { id: "openEditors".into(), title: "Open Editors".into(), collapsed: false, visible: true, order: 0 }; assert!(!s.collapsed); }
+    #[test]
+    fn test_bld_section_collapsed() { let s = BldSection { id: "outline".into(), title: "Outline".into(), collapsed: true, visible: true, order: 2 }; assert!(s.collapsed); }
+    #[test]
+    fn test_bld_section_hidden() { let s = BldSection { id: "timeline".into(), title: "Timeline".into(), collapsed: false, visible: false, order: 3 }; assert!(!s.visible); }
+    #[test]
+    fn test_bld_sidebar_state() { let sec = BldSection { id: "s1".into(), title: "S".into(), collapsed: false, visible: true, order: 0 }; let st = BldSidebarState { container_id: "explorer".into(), sections: vec![sec], width: 250 }; assert_eq!(st.width, 250); }
+    #[test]
+    fn test_bld_toggle_collapse() { let t = BldSectionToggle { section_id: "outline".into(), collapsed: true }; assert!(t.collapsed); }
+    #[test]
+    fn test_bld_toggle_expand() { let t = BldSectionToggle { section_id: "outline".into(), collapsed: false }; assert!(!t.collapsed); }
+    #[test]
+    fn test_bld_visibility_shown() { let v = BldViewContainerVisibility { container_id: "scm".into(), visible: true, when_clause: Some("scmProvider".into()) }; assert!(v.visible); }
+    #[test]
+    fn test_bld_visibility_hidden() { let v = BldViewContainerVisibility { container_id: "testing".into(), visible: false, when_clause: None }; assert!(!v.visible); }
+    #[test]
+    fn test_bld_empty_sidebar() { let st = BldSidebarState { container_id: "empty".into(), sections: vec![], width: 200 }; assert!(st.sections.is_empty()); }
+    #[test]
+    fn test_ble_item_basic() { let i = BleStatusBarItem { id: "line".into(), text: "Ln 5, Col 10".into(), tooltip: Some("Go to Line".into()), command: Some("workbench.action.gotoLine".into()), alignment: 0, priority: 100 }; assert_eq!(i.alignment, 0); }
+    #[test]
+    fn test_ble_item_no_command() { let i = BleStatusBarItem { id: "mode".into(), text: "UTF-8".into(), tooltip: None, command: None, alignment: 1, priority: 50 }; assert!(i.command.is_none()); }
+    #[test]
+    fn test_ble_color_both() { let c = BleStatusBarColor { foreground: Some(0xFFFFFF), background: Some(0x007ACC) }; assert!(c.foreground.is_some()); }
+    #[test]
+    fn test_ble_color_none() { let c = BleStatusBarColor { foreground: None, background: None }; assert!(c.foreground.is_none()); }
+    #[test]
+    fn test_ble_entry_visible() { let i = BleStatusBarItem { id: "x".into(), text: "X".into(), tooltip: None, command: None, alignment: 0, priority: 0 }; let c = BleStatusBarColor { foreground: None, background: None }; let e = BleStatusBarEntry { item: i, color: c, visible: true }; assert!(e.visible); }
+    #[test]
+    fn test_ble_entry_hidden() { let i = BleStatusBarItem { id: "y".into(), text: "Y".into(), tooltip: None, command: None, alignment: 0, priority: 0 }; let c = BleStatusBarColor { foreground: None, background: None }; let e = BleStatusBarEntry { item: i, color: c, visible: false }; assert!(!e.visible); }
+    #[test]
+    fn test_ble_click_left() { let cl = BleStatusBarClick { item_id: "line".into(), button: 0 }; assert_eq!(cl.button, 0); }
+    #[test]
+    fn test_ble_click_right() { let cl = BleStatusBarClick { item_id: "encoding".into(), button: 2 }; assert_eq!(cl.button, 2); }
+    #[test]
+    fn test_ble_state_empty() { let s = BleStatusBarState { left_items: vec![], right_items: vec![] }; assert!(s.left_items.is_empty()); }
+    #[test]
+    fn test_ble_state_balanced() { let mk = |id: &str, align: u8| { let i = BleStatusBarItem { id: id.into(), text: id.into(), tooltip: None, command: None, alignment: align, priority: 0 }; let c = BleStatusBarColor { foreground: None, background: None }; BleStatusBarEntry { item: i, color: c, visible: true } }; let s = BleStatusBarState { left_items: vec![mk("a", 0)], right_items: vec![mk("b", 1)] }; assert_eq!(s.left_items.len(), 1); }
 }
