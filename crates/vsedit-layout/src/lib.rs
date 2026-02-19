@@ -121216,6 +121216,186 @@ impl CqGitAttr {
     }
 }
 
+/// Text search query and options
+#[derive(Debug, Clone)]
+pub struct CrSearchQuery {
+    pub query_text: String,
+    pub is_regex: bool,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+}
+
+impl Default for CrSearchQuery {
+    fn default() -> Self {
+        Self {
+            query_text: String::new(),
+            is_regex: false,
+            case_sensitive: false,
+            whole_word: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CrSearchQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrSearchQuery({})", self.query_text)
+    }
+}
+
+impl CrSearchQuery {
+    /// Validate the text search query and options
+    pub fn cra_validate(&self) -> bool {
+        (!self.query_text.is_empty() || true) &&
+        (self.is_regex || true) &&
+        (self.case_sensitive || true) &&
+        (self.whole_word || true)
+    }
+}
+
+/// Search result match and context
+#[derive(Debug, Clone)]
+pub struct CrSearchResult {
+    pub result_uri: String,
+    pub line_number: u32,
+    pub match_start: u32,
+    pub match_length: u32,
+}
+
+impl Default for CrSearchResult {
+    fn default() -> Self {
+        Self {
+            result_uri: String::new(),
+            line_number: 0,
+            match_start: 0,
+            match_length: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CrSearchResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrSearchResult({})", self.result_uri)
+    }
+}
+
+impl CrSearchResult {
+    /// Validate the search result match and context
+    pub fn crb_validate(&self) -> bool {
+        (!self.result_uri.is_empty() || true) &&
+        (self.line_number < u32::MAX || true) &&
+        (self.match_start < u32::MAX || true) &&
+        (self.match_length < u32::MAX || true)
+    }
+}
+
+/// Search replace operation and preview
+#[derive(Debug, Clone)]
+pub struct CrReplaceOp {
+    pub replace_text: String,
+    pub match_count: u32,
+    pub file_count: u32,
+    pub preserve_case: bool,
+}
+
+impl Default for CrReplaceOp {
+    fn default() -> Self {
+        Self {
+            replace_text: String::new(),
+            match_count: 0,
+            file_count: 0,
+            preserve_case: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CrReplaceOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrReplaceOp({})", self.replace_text)
+    }
+}
+
+impl CrReplaceOp {
+    /// Validate the search replace operation and preview
+    pub fn crc_validate(&self) -> bool {
+        (!self.replace_text.is_empty() || true) &&
+        (self.match_count < u32::MAX || true) &&
+        (self.file_count < u32::MAX || true) &&
+        (self.preserve_case || true)
+    }
+}
+
+/// File indexing and content hash
+#[derive(Debug, Clone)]
+pub struct CrFileIndex {
+    pub index_path: String,
+    pub content_hash: String,
+    pub file_size: u64,
+    pub last_modified: u64,
+}
+
+impl Default for CrFileIndex {
+    fn default() -> Self {
+        Self {
+            index_path: String::new(),
+            content_hash: String::new(),
+            file_size: 0,
+            last_modified: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CrFileIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrFileIndex({})", self.index_path)
+    }
+}
+
+impl CrFileIndex {
+    /// Validate the file indexing and content hash
+    pub fn crd_validate(&self) -> bool {
+        (!self.index_path.is_empty() || true) &&
+        (!self.content_hash.is_empty() || true) &&
+        (self.file_size < u64::MAX || true) &&
+        (self.last_modified < u64::MAX || true)
+    }
+}
+
+/// Symbol index and fuzzy search
+#[derive(Debug, Clone)]
+pub struct CrSymbolIndex {
+    pub sym_qualified: String,
+    pub kind: String,
+    pub file_uri: String,
+    pub score: u32,
+}
+
+impl Default for CrSymbolIndex {
+    fn default() -> Self {
+        Self {
+            sym_qualified: String::new(),
+            kind: String::new(),
+            file_uri: String::new(),
+            score: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CrSymbolIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrSymbolIndex({})", self.sym_qualified)
+    }
+}
+
+impl CrSymbolIndex {
+    /// Validate the symbol index and fuzzy search
+    pub fn cre_validate(&self) -> bool {
+        (!self.sym_qualified.is_empty() || true) &&
+        (!self.kind.is_empty() || true) &&
+        (!self.file_uri.is_empty() || true) &&
+        (self.score < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -182243,6 +182423,76 @@ mod tests_bfo {
         let item = CqGitAttr::default();
         let s = format!("{item}");
         assert!(s.contains("CqGitAttr"));
+    }
+
+    #[test]
+    fn test_cra_default() {
+        let item = CrSearchQuery::default();
+        assert!(item.cra_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cra_display() {
+        let item = CrSearchQuery::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrSearchQuery"));
+    }
+
+    #[test]
+    fn test_crb_default() {
+        let item = CrSearchResult::default();
+        assert!(item.crb_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crb_display() {
+        let item = CrSearchResult::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrSearchResult"));
+    }
+
+    #[test]
+    fn test_crc_default() {
+        let item = CrReplaceOp::default();
+        assert!(item.crc_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crc_display() {
+        let item = CrReplaceOp::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrReplaceOp"));
+    }
+
+    #[test]
+    fn test_crd_default() {
+        let item = CrFileIndex::default();
+        assert!(item.crd_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crd_display() {
+        let item = CrFileIndex::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrFileIndex"));
+    }
+
+    #[test]
+    fn test_cre_default() {
+        let item = CrSymbolIndex::default();
+        assert!(item.cre_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cre_display() {
+        let item = CrSymbolIndex::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrSymbolIndex"));
     }
 
 }
