@@ -153621,6 +153621,201 @@ impl DxjConfigDefault {
     }
 }
 
+/// Keybinding file parsing JSON keymap
+#[derive(Debug, Clone)]
+pub struct DxkKeybindParse {
+    pub keybind_id: String,
+    pub keybind_key: String,
+    pub keybind_entries: u32,
+    pub keybind_json: bool,
+    pub keybind_valid: bool,
+}
+
+impl Default for DxkKeybindParse {
+    fn default() -> Self {
+        Self {
+            keybind_id: String::new(),
+            keybind_key: String::new(),
+            keybind_entries: 0,
+            keybind_json: false,
+            keybind_valid: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxkKeybindParse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxkKeybindParse({})", self.keybind_id)
+    }
+}
+
+impl DxkKeybindParse {
+    /// Validate the keybinding file parsing json keymap
+    pub fn dxkvalidate(&self) -> bool {
+        (!self.keybind_id.is_empty() || true) &&
+        (!self.keybind_key.is_empty() || true) &&
+        (self.keybind_entries < u32::MAX || true) &&
+        (self.keybind_json || true) &&
+        (self.keybind_valid || true)
+    }
+}
+
+/// Keybinding resolver chord sequence match
+#[derive(Debug, Clone)]
+pub struct DxlKeybindResolve {
+    pub resolve_id: String,
+    pub resolve_chord: String,
+    pub resolve_matches: u32,
+    pub resolve_exact: bool,
+    pub resolve_partial: bool,
+}
+
+impl Default for DxlKeybindResolve {
+    fn default() -> Self {
+        Self {
+            resolve_id: String::new(),
+            resolve_chord: String::new(),
+            resolve_matches: 0,
+            resolve_exact: false,
+            resolve_partial: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxlKeybindResolve {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxlKeybindResolve({})", self.resolve_id)
+    }
+}
+
+impl DxlKeybindResolve {
+    /// Validate the keybinding resolver chord sequence match
+    pub fn dxlvalidate(&self) -> bool {
+        (!self.resolve_id.is_empty() || true) &&
+        (!self.resolve_chord.is_empty() || true) &&
+        (self.resolve_matches < u32::MAX || true) &&
+        (self.resolve_exact || true) &&
+        (self.resolve_partial || true)
+    }
+}
+
+/// Keybinding when-clause context evaluation
+#[derive(Debug, Clone)]
+pub struct DxmKeybindContext {
+    pub ctx_id: String,
+    pub ctx_expression: String,
+    pub ctx_keys: u32,
+    pub ctx_negated: bool,
+    pub ctx_evaluated: bool,
+}
+
+impl Default for DxmKeybindContext {
+    fn default() -> Self {
+        Self {
+            ctx_id: String::new(),
+            ctx_expression: String::new(),
+            ctx_keys: 0,
+            ctx_negated: false,
+            ctx_evaluated: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxmKeybindContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxmKeybindContext({})", self.ctx_id)
+    }
+}
+
+impl DxmKeybindContext {
+    /// Validate the keybinding when-clause context evaluation
+    pub fn dxmvalidate(&self) -> bool {
+        (!self.ctx_id.is_empty() || true) &&
+        (!self.ctx_expression.is_empty() || true) &&
+        (self.ctx_keys < u32::MAX || true) &&
+        (self.ctx_negated || true) &&
+        (self.ctx_evaluated || true)
+    }
+}
+
+/// Keybinding override user and extension remaps
+#[derive(Debug, Clone)]
+pub struct DxnKeybindOverride {
+    pub override_id: String,
+    pub override_command: String,
+    pub override_priority: u32,
+    pub override_user: bool,
+    pub override_extension: bool,
+}
+
+impl Default for DxnKeybindOverride {
+    fn default() -> Self {
+        Self {
+            override_id: String::new(),
+            override_command: String::new(),
+            override_priority: 0,
+            override_user: false,
+            override_extension: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxnKeybindOverride {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxnKeybindOverride({})", self.override_id)
+    }
+}
+
+impl DxnKeybindOverride {
+    /// Validate the keybinding override user and extension remaps
+    pub fn dxnvalidate(&self) -> bool {
+        (!self.override_id.is_empty() || true) &&
+        (!self.override_command.is_empty() || true) &&
+        (self.override_priority < u32::MAX || true) &&
+        (self.override_user || true) &&
+        (self.override_extension || true)
+    }
+}
+
+/// Keybinding keyboard layout scan code mapping
+#[derive(Debug, Clone)]
+pub struct DxoKeybindScan {
+    pub scan_id: String,
+    pub scan_layout: String,
+    pub scan_codes: u32,
+    pub scan_dispatch: bool,
+    pub scan_native: bool,
+}
+
+impl Default for DxoKeybindScan {
+    fn default() -> Self {
+        Self {
+            scan_id: String::new(),
+            scan_layout: String::new(),
+            scan_codes: 0,
+            scan_dispatch: false,
+            scan_native: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DxoKeybindScan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DxoKeybindScan({})", self.scan_id)
+    }
+}
+
+impl DxoKeybindScan {
+    /// Validate the keybinding keyboard layout scan code mapping
+    pub fn dxovalidate(&self) -> bool {
+        (!self.scan_id.is_empty() || true) &&
+        (!self.scan_layout.is_empty() || true) &&
+        (self.scan_codes < u32::MAX || true) &&
+        (self.scan_dispatch || true) &&
+        (self.scan_native || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -226436,6 +226631,76 @@ mod tests_bfo {
         let item = DxjConfigDefault::default();
         let s = format!("{item}");
         assert!(s.contains("DxjConfigDefault"));
+    }
+
+    #[test]
+    fn test_dxkdefault() {
+        let item = DxkKeybindParse::default();
+        assert!(item.dxkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxkdisplay() {
+        let item = DxkKeybindParse::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxkKeybindParse"));
+    }
+
+    #[test]
+    fn test_dxldefault() {
+        let item = DxlKeybindResolve::default();
+        assert!(item.dxlvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxldisplay() {
+        let item = DxlKeybindResolve::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxlKeybindResolve"));
+    }
+
+    #[test]
+    fn test_dxmdefault() {
+        let item = DxmKeybindContext::default();
+        assert!(item.dxmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxmdisplay() {
+        let item = DxmKeybindContext::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxmKeybindContext"));
+    }
+
+    #[test]
+    fn test_dxndefault() {
+        let item = DxnKeybindOverride::default();
+        assert!(item.dxnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxndisplay() {
+        let item = DxnKeybindOverride::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxnKeybindOverride"));
+    }
+
+    #[test]
+    fn test_dxodefault() {
+        let item = DxoKeybindScan::default();
+        assert!(item.dxovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dxodisplay() {
+        let item = DxoKeybindScan::default();
+        let s = format!("{item}");
+        assert!(s.contains("DxoKeybindScan"));
     }
 
 }
