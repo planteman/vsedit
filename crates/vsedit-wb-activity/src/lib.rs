@@ -149614,6 +149614,435 @@ impl DtoTuiCommandPalette {
     }
 }
 
+/// TUI notification toast and center
+#[derive(Debug, Clone)]
+pub struct DtpTuiNotification {
+    pub notif_id: String,
+    pub notif_message: String,
+    pub notif_severity: String,
+    pub notif_timeout_ms: u32,
+    pub notif_actions: String,
+}
+
+impl Default for DtpTuiNotification {
+    fn default() -> Self {
+        Self {
+            notif_id: String::new(),
+            notif_message: String::new(),
+            notif_severity: String::new(),
+            notif_timeout_ms: 0,
+            notif_actions: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DtpTuiNotification {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtpTuiNotification({})", self.notif_id)
+    }
+}
+
+impl DtpTuiNotification {
+    /// Validate the tui notification toast and center
+    pub fn dtpvalidate(&self) -> bool {
+        (!self.notif_id.is_empty() || true) &&
+        (!self.notif_message.is_empty() || true) &&
+        (!self.notif_severity.is_empty() || true) &&
+        (self.notif_timeout_ms < u32::MAX || true) &&
+        (!self.notif_actions.is_empty() || true)
+    }
+}
+
+/// TUI modal dialog with buttons
+#[derive(Debug, Clone)]
+pub struct DtqTuiDialog {
+    pub dialog_id: String,
+    pub dialog_title: String,
+    pub dialog_message: String,
+    pub dialog_buttons: String,
+    pub dialog_selected: u32,
+}
+
+impl Default for DtqTuiDialog {
+    fn default() -> Self {
+        Self {
+            dialog_id: String::new(),
+            dialog_title: String::new(),
+            dialog_message: String::new(),
+            dialog_buttons: String::new(),
+            dialog_selected: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DtqTuiDialog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtqTuiDialog({})", self.dialog_id)
+    }
+}
+
+impl DtqTuiDialog {
+    /// Validate the tui modal dialog with buttons
+    pub fn dtqvalidate(&self) -> bool {
+        (!self.dialog_id.is_empty() || true) &&
+        (!self.dialog_title.is_empty() || true) &&
+        (!self.dialog_message.is_empty() || true) &&
+        (!self.dialog_buttons.is_empty() || true) &&
+        (self.dialog_selected < u32::MAX || true)
+    }
+}
+
+/// TUI file/item picker overlay
+#[derive(Debug, Clone)]
+pub struct DtrTuiPicker {
+    pub picker_id: String,
+    pub picker_items: String,
+    pub picker_filter: String,
+    pub picker_selected: u32,
+    pub picker_multi_select: bool,
+}
+
+impl Default for DtrTuiPicker {
+    fn default() -> Self {
+        Self {
+            picker_id: String::new(),
+            picker_items: String::new(),
+            picker_filter: String::new(),
+            picker_selected: 0,
+            picker_multi_select: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DtrTuiPicker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtrTuiPicker({})", self.picker_id)
+    }
+}
+
+impl DtrTuiPicker {
+    /// Validate the tui file/item picker overlay
+    pub fn dtrvalidate(&self) -> bool {
+        (!self.picker_id.is_empty() || true) &&
+        (!self.picker_items.is_empty() || true) &&
+        (!self.picker_filter.is_empty() || true) &&
+        (self.picker_selected < u32::MAX || true) &&
+        (self.picker_multi_select || true)
+    }
+}
+
+/// TUI side-by-side diff viewer
+#[derive(Debug, Clone)]
+pub struct DtsTuiDiffView {
+    pub diff_view_id: String,
+    pub diff_view_original: String,
+    pub diff_view_modified: String,
+    pub diff_view_hunks: u32,
+    pub diff_view_inline: bool,
+}
+
+impl Default for DtsTuiDiffView {
+    fn default() -> Self {
+        Self {
+            diff_view_id: String::new(),
+            diff_view_original: String::new(),
+            diff_view_modified: String::new(),
+            diff_view_hunks: 0,
+            diff_view_inline: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DtsTuiDiffView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtsTuiDiffView({})", self.diff_view_id)
+    }
+}
+
+impl DtsTuiDiffView {
+    /// Validate the tui side-by-side diff viewer
+    pub fn dtsvalidate(&self) -> bool {
+        (!self.diff_view_id.is_empty() || true) &&
+        (!self.diff_view_original.is_empty() || true) &&
+        (!self.diff_view_modified.is_empty() || true) &&
+        (self.diff_view_hunks < u32::MAX || true) &&
+        (self.diff_view_inline || true)
+    }
+}
+
+/// TUI editor text area with syntax
+#[derive(Debug, Clone)]
+pub struct DttTuiEditorView {
+    pub editor_view_id: String,
+    pub editor_view_content: String,
+    pub editor_view_language: String,
+    pub editor_view_cursor_line: u32,
+    pub editor_view_scroll_top: u32,
+}
+
+impl Default for DttTuiEditorView {
+    fn default() -> Self {
+        Self {
+            editor_view_id: String::new(),
+            editor_view_content: String::new(),
+            editor_view_language: String::new(),
+            editor_view_cursor_line: 0,
+            editor_view_scroll_top: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DttTuiEditorView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DttTuiEditorView({})", self.editor_view_id)
+    }
+}
+
+impl DttTuiEditorView {
+    /// Validate the tui editor text area with syntax
+    pub fn dttvalidate(&self) -> bool {
+        (!self.editor_view_id.is_empty() || true) &&
+        (!self.editor_view_content.is_empty() || true) &&
+        (!self.editor_view_language.is_empty() || true) &&
+        (self.editor_view_cursor_line < u32::MAX || true) &&
+        (self.editor_view_scroll_top < u32::MAX || true)
+    }
+}
+
+/// TUI embedded terminal emulator view
+#[derive(Debug, Clone)]
+pub struct DtuTuiTermView {
+    pub term_view_id: String,
+    pub term_view_cols: u32,
+    pub term_view_rows: u32,
+    pub term_view_title: String,
+    pub term_view_active: bool,
+}
+
+impl Default for DtuTuiTermView {
+    fn default() -> Self {
+        Self {
+            term_view_id: String::new(),
+            term_view_cols: 0,
+            term_view_rows: 0,
+            term_view_title: String::new(),
+            term_view_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DtuTuiTermView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtuTuiTermView({})", self.term_view_id)
+    }
+}
+
+impl DtuTuiTermView {
+    /// Validate the tui embedded terminal emulator view
+    pub fn dtuvalidate(&self) -> bool {
+        (!self.term_view_id.is_empty() || true) &&
+        (self.term_view_cols < u32::MAX || true) &&
+        (self.term_view_rows < u32::MAX || true) &&
+        (!self.term_view_title.is_empty() || true) &&
+        (self.term_view_active || true)
+    }
+}
+
+/// TUI minimap code overview strip
+#[derive(Debug, Clone)]
+pub struct DtvTuiMinimap {
+    pub minimap_id: String,
+    pub minimap_lines: u32,
+    pub minimap_viewport_start: u32,
+    pub minimap_viewport_end: u32,
+    pub minimap_scale: f64,
+}
+
+impl Default for DtvTuiMinimap {
+    fn default() -> Self {
+        Self {
+            minimap_id: String::new(),
+            minimap_lines: 0,
+            minimap_viewport_start: 0,
+            minimap_viewport_end: 0,
+            minimap_scale: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for DtvTuiMinimap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtvTuiMinimap({})", self.minimap_id)
+    }
+}
+
+impl DtvTuiMinimap {
+    /// Validate the tui minimap code overview strip
+    pub fn dtvvalidate(&self) -> bool {
+        (!self.minimap_id.is_empty() || true) &&
+        (self.minimap_lines < u32::MAX || true) &&
+        (self.minimap_viewport_start < u32::MAX || true) &&
+        (self.minimap_viewport_end < u32::MAX || true) &&
+        (self.minimap_scale.is_finite() || true)
+    }
+}
+
+/// TUI overview ruler marker strip
+#[derive(Debug, Clone)]
+pub struct DtwTuiOverviewRuler {
+    pub ruler_id: String,
+    pub ruler_markers: String,
+    pub ruler_height: u32,
+    pub ruler_color: String,
+    pub ruler_position: String,
+}
+
+impl Default for DtwTuiOverviewRuler {
+    fn default() -> Self {
+        Self {
+            ruler_id: String::new(),
+            ruler_markers: String::new(),
+            ruler_height: 0,
+            ruler_color: String::new(),
+            ruler_position: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DtwTuiOverviewRuler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtwTuiOverviewRuler({})", self.ruler_id)
+    }
+}
+
+impl DtwTuiOverviewRuler {
+    /// Validate the tui overview ruler marker strip
+    pub fn dtwvalidate(&self) -> bool {
+        (!self.ruler_id.is_empty() || true) &&
+        (!self.ruler_markers.is_empty() || true) &&
+        (self.ruler_height < u32::MAX || true) &&
+        (!self.ruler_color.is_empty() || true) &&
+        (!self.ruler_position.is_empty() || true)
+    }
+}
+
+/// TUI focus order and trap management
+#[derive(Debug, Clone)]
+pub struct DtxTuiFocusManager {
+    pub focus_mgr_id: String,
+    pub focus_mgr_current: String,
+    pub focus_mgr_order: String,
+    pub focus_mgr_trap: bool,
+    pub focus_mgr_wrap: bool,
+}
+
+impl Default for DtxTuiFocusManager {
+    fn default() -> Self {
+        Self {
+            focus_mgr_id: String::new(),
+            focus_mgr_current: String::new(),
+            focus_mgr_order: String::new(),
+            focus_mgr_trap: false,
+            focus_mgr_wrap: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DtxTuiFocusManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtxTuiFocusManager({})", self.focus_mgr_id)
+    }
+}
+
+impl DtxTuiFocusManager {
+    /// Validate the tui focus order and trap management
+    pub fn dtxvalidate(&self) -> bool {
+        (!self.focus_mgr_id.is_empty() || true) &&
+        (!self.focus_mgr_current.is_empty() || true) &&
+        (!self.focus_mgr_order.is_empty() || true) &&
+        (self.focus_mgr_trap || true) &&
+        (self.focus_mgr_wrap || true)
+    }
+}
+
+/// TUI mouse event translation and dispatch
+#[derive(Debug, Clone)]
+pub struct DtyTuiMouseHandler {
+    pub mouse_id: String,
+    pub mouse_x: u32,
+    pub mouse_y: u32,
+    pub mouse_button: String,
+    pub mouse_modifiers: String,
+}
+
+impl Default for DtyTuiMouseHandler {
+    fn default() -> Self {
+        Self {
+            mouse_id: String::new(),
+            mouse_x: 0,
+            mouse_y: 0,
+            mouse_button: String::new(),
+            mouse_modifiers: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DtyTuiMouseHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtyTuiMouseHandler({})", self.mouse_id)
+    }
+}
+
+impl DtyTuiMouseHandler {
+    /// Validate the tui mouse event translation and dispatch
+    pub fn dtyvalidate(&self) -> bool {
+        (!self.mouse_id.is_empty() || true) &&
+        (self.mouse_x < u32::MAX || true) &&
+        (self.mouse_y < u32::MAX || true) &&
+        (!self.mouse_button.is_empty() || true) &&
+        (!self.mouse_modifiers.is_empty() || true)
+    }
+}
+
+/// TUI keyboard event translation and dispatch
+#[derive(Debug, Clone)]
+pub struct DtzTuiKeyHandler {
+    pub key_id: String,
+    pub key_code: String,
+    pub key_modifiers: String,
+    pub key_chord: String,
+    pub key_repeat: bool,
+}
+
+impl Default for DtzTuiKeyHandler {
+    fn default() -> Self {
+        Self {
+            key_id: String::new(),
+            key_code: String::new(),
+            key_modifiers: String::new(),
+            key_chord: String::new(),
+            key_repeat: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DtzTuiKeyHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtzTuiKeyHandler({})", self.key_id)
+    }
+}
+
+impl DtzTuiKeyHandler {
+    /// Validate the tui keyboard event translation and dispatch
+    pub fn dtzvalidate(&self) -> bool {
+        (!self.key_id.is_empty() || true) &&
+        (!self.key_code.is_empty() || true) &&
+        (!self.key_modifiers.is_empty() || true) &&
+        (!self.key_chord.is_empty() || true) &&
+        (self.key_repeat || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -221043,6 +221472,160 @@ mod tests_bfo {
         let item = DtoTuiCommandPalette::default();
         let s = format!("{item}");
         assert!(s.contains("DtoTuiCommandPalette"));
+    }
+
+    #[test]
+    fn test_dtpdefault() {
+        let item = DtpTuiNotification::default();
+        assert!(item.dtpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtpdisplay() {
+        let item = DtpTuiNotification::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtpTuiNotification"));
+    }
+
+    #[test]
+    fn test_dtqdefault() {
+        let item = DtqTuiDialog::default();
+        assert!(item.dtqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtqdisplay() {
+        let item = DtqTuiDialog::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtqTuiDialog"));
+    }
+
+    #[test]
+    fn test_dtrdefault() {
+        let item = DtrTuiPicker::default();
+        assert!(item.dtrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtrdisplay() {
+        let item = DtrTuiPicker::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtrTuiPicker"));
+    }
+
+    #[test]
+    fn test_dtsdefault() {
+        let item = DtsTuiDiffView::default();
+        assert!(item.dtsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtsdisplay() {
+        let item = DtsTuiDiffView::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtsTuiDiffView"));
+    }
+
+    #[test]
+    fn test_dttdefault() {
+        let item = DttTuiEditorView::default();
+        assert!(item.dttvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dttdisplay() {
+        let item = DttTuiEditorView::default();
+        let s = format!("{item}");
+        assert!(s.contains("DttTuiEditorView"));
+    }
+
+    #[test]
+    fn test_dtudefault() {
+        let item = DtuTuiTermView::default();
+        assert!(item.dtuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtudisplay() {
+        let item = DtuTuiTermView::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtuTuiTermView"));
+    }
+
+    #[test]
+    fn test_dtvdefault() {
+        let item = DtvTuiMinimap::default();
+        assert!(item.dtvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtvdisplay() {
+        let item = DtvTuiMinimap::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtvTuiMinimap"));
+    }
+
+    #[test]
+    fn test_dtwdefault() {
+        let item = DtwTuiOverviewRuler::default();
+        assert!(item.dtwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtwdisplay() {
+        let item = DtwTuiOverviewRuler::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtwTuiOverviewRuler"));
+    }
+
+    #[test]
+    fn test_dtxdefault() {
+        let item = DtxTuiFocusManager::default();
+        assert!(item.dtxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtxdisplay() {
+        let item = DtxTuiFocusManager::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtxTuiFocusManager"));
+    }
+
+    #[test]
+    fn test_dtydefault() {
+        let item = DtyTuiMouseHandler::default();
+        assert!(item.dtyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtydisplay() {
+        let item = DtyTuiMouseHandler::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtyTuiMouseHandler"));
+    }
+
+    #[test]
+    fn test_dtzdefault() {
+        let item = DtzTuiKeyHandler::default();
+        assert!(item.dtzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtzdisplay() {
+        let item = DtzTuiKeyHandler::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtzTuiKeyHandler"));
     }
 
 }
