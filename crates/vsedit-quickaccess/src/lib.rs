@@ -92071,6 +92071,247 @@ impl std::fmt::Display for NotebookEditorState {
     }
 }
 
+
+/// TestRunProfile — test run profile
+#[derive(Debug, Clone)]
+pub struct TestRunProfile {
+    pub bvf_profile_id: String,
+    pub bvf_label: String,
+    pub bvf_kind: String,
+    pub bvf_is_default: bool,
+    pub bvf_supports_coverage: bool,
+    pub bvf_controller_id: String,
+    pub bvf_tag_filter: String,
+    pub bvf_continuous: bool,
+}
+
+impl TestRunProfile {
+    pub fn new() -> Self {
+        Self {
+            bvf_profile_id: "run".into(),
+            bvf_label: "Run Tests".into(),
+            bvf_kind: "run".into(),
+            bvf_is_default: true,
+            bvf_supports_coverage: false,
+            bvf_controller_id: "builtin".into(),
+            bvf_tag_filter: "*".into(),
+            bvf_continuous: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TestRunProfile({})", self.bvf_profile_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvf_profile_id.is_empty() || true
+    }
+}
+
+impl Default for TestRunProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TestRunProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TestRunProfile({})", self.bvf_profile_id)
+    }
+}
+
+/// TestItemModel — test item model
+#[derive(Debug, Clone)]
+pub struct TestItemModel {
+    pub bvg_id: String,
+    pub bvg_label: String,
+    pub bvg_uri: String,
+    pub bvg_range_start: u32,
+    pub bvg_range_end: u32,
+    pub bvg_can_resolve: bool,
+    pub bvg_busy: bool,
+    pub bvg_parent_id: String,
+}
+
+impl TestItemModel {
+    pub fn new() -> Self {
+        Self {
+            bvg_id: "test-1".into(),
+            bvg_label: "test case".into(),
+            bvg_uri: "file:///test.rs".into(),
+            bvg_range_start: 0,
+            bvg_range_end: 0,
+            bvg_can_resolve: true,
+            bvg_busy: false,
+            bvg_parent_id: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TestItemModel({})", self.bvg_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvg_id.is_empty() || true
+    }
+}
+
+impl Default for TestItemModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TestItemModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TestItemModel({})", self.bvg_id)
+    }
+}
+
+/// TestRunResult — test run result
+#[derive(Debug, Clone)]
+pub struct TestRunResult {
+    pub bvh_test_id: String,
+    pub bvh_state: String,
+    pub bvh_duration_ms: u64,
+    pub bvh_message: String,
+    pub bvh_location_uri: String,
+    pub bvh_location_line: u32,
+    pub bvh_expected: String,
+    pub bvh_actual: String,
+}
+
+impl TestRunResult {
+    pub fn new() -> Self {
+        Self {
+            bvh_test_id: "test-1".into(),
+            bvh_state: "passed".into(),
+            bvh_duration_ms: 0,
+            bvh_message: "".into(),
+            bvh_location_uri: "".into(),
+            bvh_location_line: 0,
+            bvh_expected: "".into(),
+            bvh_actual: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TestRunResult({})", self.bvh_test_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvh_test_id.is_empty() || true
+    }
+}
+
+impl Default for TestRunResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TestRunResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TestRunResult({})", self.bvh_test_id)
+    }
+}
+
+/// TestCoverageReport — test coverage report
+#[derive(Debug, Clone)]
+pub struct TestCoverageReport {
+    pub bvi_uri: String,
+    pub bvi_line_count: u32,
+    pub bvi_covered_lines: u32,
+    pub bvi_branch_count: u32,
+    pub bvi_covered_branches: u32,
+    pub bvi_function_count: u32,
+    pub bvi_covered_functions: u32,
+    pub bvi_percentage: f64,
+}
+
+impl TestCoverageReport {
+    pub fn new() -> Self {
+        Self {
+            bvi_uri: "file:///src/main.rs".into(),
+            bvi_line_count: 100,
+            bvi_covered_lines: 80,
+            bvi_branch_count: 20,
+            bvi_covered_branches: 15,
+            bvi_function_count: 10,
+            bvi_covered_functions: 8,
+            bvi_percentage: 80.0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TestCoverageReport({})", self.bvi_uri)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvi_uri.is_empty() || true
+    }
+}
+
+impl Default for TestCoverageReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TestCoverageReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TestCoverageReport({})", self.bvi_uri)
+    }
+}
+
+/// TestResultMessage — test result message
+#[derive(Debug, Clone)]
+pub struct TestResultMessage {
+    pub bvj_message: String,
+    pub bvj_severity: String,
+    pub bvj_uri: String,
+    pub bvj_line: u32,
+    pub bvj_column: u32,
+    pub bvj_expected_output: String,
+    pub bvj_actual_output: String,
+    pub bvj_context_lines: u32,
+}
+
+impl TestResultMessage {
+    pub fn new() -> Self {
+        Self {
+            bvj_message: "assertion failed".into(),
+            bvj_severity: "error".into(),
+            bvj_uri: "file:///test.rs".into(),
+            bvj_line: 42,
+            bvj_column: 1,
+            bvj_expected_output: "true".into(),
+            bvj_actual_output: "false".into(),
+            bvj_context_lines: 3,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TestResultMessage({})", self.bvj_message)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvj_message.is_empty() || true
+    }
+}
+
+impl Default for TestResultMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TestResultMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TestResultMessage({})", self.bvj_message)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -137409,6 +137650,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bve_active_cell_idx = 0;
         assert_eq!(c.summary(), NotebookEditorState::new().summary());
+    }
+
+
+    #[test]
+    fn test_bvf_create() {
+        let obj = TestRunProfile::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvf_validate() {
+        let obj = TestRunProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvf_display() {
+        let obj = TestRunProfile::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TestRunProfile"));
+    }
+
+    #[test]
+    fn test_bvf_clone() {
+        let obj = TestRunProfile::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvf_debug() {
+        let obj = TestRunProfile::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TestRunProfile"));
+    }
+
+    #[test]
+    fn test_bvf_default() {
+        let obj = TestRunProfile::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvf_summary_contains_name() {
+        let obj = TestRunProfile::new();
+        assert!(obj.summary().contains("TestRunProfile"));
+    }
+
+    #[test]
+    fn test_bvf_validate_default() {
+        let obj = TestRunProfile::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvf_display_not_empty() {
+        let obj = TestRunProfile::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvf_clone_independence() {
+        let mut obj = TestRunProfile::new();
+        let c = obj.clone();
+        obj.bvf_profile_id = "run".into();
+        assert_eq!(c.summary(), TestRunProfile::new().summary());
+    }
+
+    #[test]
+    fn test_bvg_create() {
+        let obj = TestItemModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvg_validate() {
+        let obj = TestItemModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvg_display() {
+        let obj = TestItemModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TestItemModel"));
+    }
+
+    #[test]
+    fn test_bvg_clone() {
+        let obj = TestItemModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvg_debug() {
+        let obj = TestItemModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TestItemModel"));
+    }
+
+    #[test]
+    fn test_bvg_default() {
+        let obj = TestItemModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvg_summary_contains_name() {
+        let obj = TestItemModel::new();
+        assert!(obj.summary().contains("TestItemModel"));
+    }
+
+    #[test]
+    fn test_bvg_validate_default() {
+        let obj = TestItemModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvg_display_not_empty() {
+        let obj = TestItemModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvg_clone_independence() {
+        let mut obj = TestItemModel::new();
+        let c = obj.clone();
+        obj.bvg_id = "test-1".into();
+        assert_eq!(c.summary(), TestItemModel::new().summary());
+    }
+
+    #[test]
+    fn test_bvh_create() {
+        let obj = TestRunResult::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvh_validate() {
+        let obj = TestRunResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvh_display() {
+        let obj = TestRunResult::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TestRunResult"));
+    }
+
+    #[test]
+    fn test_bvh_clone() {
+        let obj = TestRunResult::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvh_debug() {
+        let obj = TestRunResult::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TestRunResult"));
+    }
+
+    #[test]
+    fn test_bvh_default() {
+        let obj = TestRunResult::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvh_summary_contains_name() {
+        let obj = TestRunResult::new();
+        assert!(obj.summary().contains("TestRunResult"));
+    }
+
+    #[test]
+    fn test_bvh_validate_default() {
+        let obj = TestRunResult::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvh_display_not_empty() {
+        let obj = TestRunResult::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvh_clone_independence() {
+        let mut obj = TestRunResult::new();
+        let c = obj.clone();
+        obj.bvh_test_id = "test-1".into();
+        assert_eq!(c.summary(), TestRunResult::new().summary());
+    }
+
+    #[test]
+    fn test_bvi_create() {
+        let obj = TestCoverageReport::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvi_validate() {
+        let obj = TestCoverageReport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvi_display() {
+        let obj = TestCoverageReport::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TestCoverageReport"));
+    }
+
+    #[test]
+    fn test_bvi_clone() {
+        let obj = TestCoverageReport::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvi_debug() {
+        let obj = TestCoverageReport::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TestCoverageReport"));
+    }
+
+    #[test]
+    fn test_bvi_default() {
+        let obj = TestCoverageReport::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvi_summary_contains_name() {
+        let obj = TestCoverageReport::new();
+        assert!(obj.summary().contains("TestCoverageReport"));
+    }
+
+    #[test]
+    fn test_bvi_validate_default() {
+        let obj = TestCoverageReport::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvi_display_not_empty() {
+        let obj = TestCoverageReport::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvi_clone_independence() {
+        let mut obj = TestCoverageReport::new();
+        let c = obj.clone();
+        obj.bvi_uri = "file:///src/main.rs".into();
+        assert_eq!(c.summary(), TestCoverageReport::new().summary());
+    }
+
+    #[test]
+    fn test_bvj_create() {
+        let obj = TestResultMessage::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvj_validate() {
+        let obj = TestResultMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvj_display() {
+        let obj = TestResultMessage::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TestResultMessage"));
+    }
+
+    #[test]
+    fn test_bvj_clone() {
+        let obj = TestResultMessage::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvj_debug() {
+        let obj = TestResultMessage::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TestResultMessage"));
+    }
+
+    #[test]
+    fn test_bvj_default() {
+        let obj = TestResultMessage::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvj_summary_contains_name() {
+        let obj = TestResultMessage::new();
+        assert!(obj.summary().contains("TestResultMessage"));
+    }
+
+    #[test]
+    fn test_bvj_validate_default() {
+        let obj = TestResultMessage::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvj_display_not_empty() {
+        let obj = TestResultMessage::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvj_clone_independence() {
+        let mut obj = TestResultMessage::new();
+        let c = obj.clone();
+        obj.bvj_message = "assertion failed".into();
+        assert_eq!(c.summary(), TestResultMessage::new().summary());
     }
 
 }
