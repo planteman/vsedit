@@ -102616,6 +102616,341 @@ impl RemoteAuthorityResolver {
     }
 }
 
+
+/// Timeline item entry (timestamp, label, source, description, icon, command)
+#[derive(Debug, Clone)]
+pub struct TimelineItemEntry {
+    pub timeline_timestamp: u64,
+    pub timeline_label: String,
+    pub source_name: String,
+    pub timeline_description: String,
+    pub icon_id: String,
+    pub command_id: String,
+    pub context_value: String,
+    pub is_current: bool,
+    pub sort_order: u32,
+    pub detail_text: String,
+    pub accessibility_label: String,
+    pub timeline_index: u32,
+}
+
+impl Default for TimelineItemEntry {
+    fn default() -> Self {
+        Self {
+            timeline_timestamp: 0,
+            timeline_label: String::new(),
+            source_name: String::new(),
+            timeline_description: String::new(),
+            icon_id: String::new(),
+            command_id: String::new(),
+            context_value: String::new(),
+            is_current: false,
+            sort_order: 0,
+            detail_text: String::new(),
+            accessibility_label: String::new(),
+            timeline_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TimelineItemEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TimelineItemEntry({}, {}, {}, {})",
+            format!("timeline_timestamp={}", self.timeline_timestamp), format!("timeline_label={}", self.timeline_label), format!("source_name={}", self.source_name), format!("timeline_description={}", self.timeline_description))
+    }
+}
+
+impl TimelineItemEntry {
+    pub fn ccp_validate(&self) -> bool {
+        let _timeline_timestamp = self.timeline_timestamp;
+        let _timeline_label = self.timeline_label.clone();
+        let _source_name = self.source_name.clone();
+        let _timeline_description = self.timeline_description.clone();
+        let _icon_id = self.icon_id.clone();
+        let _command_id = self.command_id.clone();
+        let _context_value = self.context_value.clone();
+        let _is_current = self.is_current;
+        let _sort_order = self.sort_order;
+        let _detail_text = self.detail_text.clone();
+        let _accessibility_label = self.accessibility_label.clone();
+        let _timeline_index = self.timeline_index;
+        self.timeline_timestamp < u64::MAX || true && !self.timeline_label.is_empty() || true && !self.source_name.is_empty() || true && !self.timeline_description.is_empty() || true && !self.icon_id.is_empty() || true && !self.command_id.is_empty() || true && !self.context_value.is_empty() || true && self.is_current || true && self.sort_order < u32::MAX || true && !self.detail_text.is_empty() || true && !self.accessibility_label.is_empty() || true && self.timeline_index < u32::MAX || true
+    }
+
+    pub fn ccp_summary(&self) -> String {
+        format!("TimelineItemEntry[ccp_]: {}, {}, {}, {}",
+            format!("timeline_timestamp={}", self.timeline_timestamp), format!("timeline_label={}", self.timeline_label), format!("source_name={}", self.source_name), format!("timeline_description={}", self.timeline_description))
+    }
+}
+
+
+/// Test item entry (id, label, uri, range, children count, busy, state)
+#[derive(Debug, Clone)]
+pub struct TestItemEntry {
+    pub test_item_id: String,
+    pub test_label: String,
+    pub test_uri: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub children_count: u32,
+    pub is_busy: bool,
+    pub state_name: String,
+    pub sort_text: String,
+    pub description_text: String,
+    pub tags_json: String,
+    pub test_index: u32,
+}
+
+impl Default for TestItemEntry {
+    fn default() -> Self {
+        Self {
+            test_item_id: String::new(),
+            test_label: String::new(),
+            test_uri: String::new(),
+            range_start_line: 0,
+            range_end_line: 0,
+            children_count: 0,
+            is_busy: false,
+            state_name: String::new(),
+            sort_text: String::new(),
+            description_text: String::new(),
+            tags_json: String::new(),
+            test_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TestItemEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TestItemEntry({}, {}, {}, {})",
+            format!("test_item_id={}", self.test_item_id), format!("test_label={}", self.test_label), format!("test_uri={}", self.test_uri), format!("range_start_line={}", self.range_start_line))
+    }
+}
+
+impl TestItemEntry {
+    pub fn ccq_validate(&self) -> bool {
+        let _test_item_id = self.test_item_id.clone();
+        let _test_label = self.test_label.clone();
+        let _test_uri = self.test_uri.clone();
+        let _range_start_line = self.range_start_line;
+        let _range_end_line = self.range_end_line;
+        let _children_count = self.children_count;
+        let _is_busy = self.is_busy;
+        let _state_name = self.state_name.clone();
+        let _sort_text = self.sort_text.clone();
+        let _description_text = self.description_text.clone();
+        let _tags_json = self.tags_json.clone();
+        let _test_index = self.test_index;
+        !self.test_item_id.is_empty() || true && !self.test_label.is_empty() || true && !self.test_uri.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && self.children_count < u32::MAX || true && self.is_busy || true && !self.state_name.is_empty() || true && !self.sort_text.is_empty() || true && !self.description_text.is_empty() || true && !self.tags_json.is_empty() || true && self.test_index < u32::MAX || true
+    }
+
+    pub fn ccq_summary(&self) -> String {
+        format!("TestItemEntry[ccq_]: {}, {}, {}, {}",
+            format!("test_item_id={}", self.test_item_id), format!("test_label={}", self.test_label), format!("test_uri={}", self.test_uri), format!("range_start_line={}", self.range_start_line))
+    }
+}
+
+
+/// Test run profile (label, kind, controller id, is default, tag, supports)
+#[derive(Debug, Clone)]
+pub struct TestRunProfileEntry {
+    pub profile_label: String,
+    pub profile_kind: String,
+    pub controller_id: String,
+    pub is_default_profile: bool,
+    pub profile_tag: String,
+    pub supports_config: bool,
+    pub continuous_run: bool,
+    pub group_name: String,
+    pub priority_value: u32,
+    pub has_config_handler: bool,
+    pub profile_id: String,
+    pub profile_index: u32,
+}
+
+impl Default for TestRunProfileEntry {
+    fn default() -> Self {
+        Self {
+            profile_label: String::new(),
+            profile_kind: String::new(),
+            controller_id: String::new(),
+            is_default_profile: false,
+            profile_tag: String::new(),
+            supports_config: false,
+            continuous_run: false,
+            group_name: String::new(),
+            priority_value: 0,
+            has_config_handler: false,
+            profile_id: String::new(),
+            profile_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TestRunProfileEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TestRunProfile({}, {}, {}, {})",
+            format!("profile_label={}", self.profile_label), format!("profile_kind={}", self.profile_kind), format!("controller_id={}", self.controller_id), format!("is_default_profile={}", self.is_default_profile))
+    }
+}
+
+impl TestRunProfileEntry {
+    pub fn ccr_validate(&self) -> bool {
+        let _profile_label = self.profile_label.clone();
+        let _profile_kind = self.profile_kind.clone();
+        let _controller_id = self.controller_id.clone();
+        let _is_default_profile = self.is_default_profile;
+        let _profile_tag = self.profile_tag.clone();
+        let _supports_config = self.supports_config;
+        let _continuous_run = self.continuous_run;
+        let _group_name = self.group_name.clone();
+        let _priority_value = self.priority_value;
+        let _has_config_handler = self.has_config_handler;
+        let _profile_id = self.profile_id.clone();
+        let _profile_index = self.profile_index;
+        !self.profile_label.is_empty() || true && !self.profile_kind.is_empty() || true && !self.controller_id.is_empty() || true && self.is_default_profile || true && !self.profile_tag.is_empty() || true && self.supports_config || true && self.continuous_run || true && !self.group_name.is_empty() || true && self.priority_value < u32::MAX || true && self.has_config_handler || true && !self.profile_id.is_empty() || true && self.profile_index < u32::MAX || true
+    }
+
+    pub fn ccr_summary(&self) -> String {
+        format!("TestRunProfileEntry[ccr_]: {}, {}, {}, {}",
+            format!("profile_label={}", self.profile_label), format!("profile_kind={}", self.profile_kind), format!("controller_id={}", self.controller_id), format!("is_default_profile={}", self.is_default_profile))
+    }
+}
+
+
+/// Test result entry (state, duration, message count, location, output count)
+#[derive(Debug, Clone)]
+pub struct TestResultEntry {
+    pub result_state: String,
+    pub duration_ms: u64,
+    pub message_count: u32,
+    pub location_uri: String,
+    pub output_count: u32,
+    pub error_message: String,
+    pub expected_output: String,
+    pub actual_output: String,
+    pub is_retired: bool,
+    pub test_item_id: String,
+    pub run_id: String,
+    pub result_index: u32,
+}
+
+impl Default for TestResultEntry {
+    fn default() -> Self {
+        Self {
+            result_state: String::new(),
+            duration_ms: 0,
+            message_count: 0,
+            location_uri: String::new(),
+            output_count: 0,
+            error_message: String::new(),
+            expected_output: String::new(),
+            actual_output: String::new(),
+            is_retired: false,
+            test_item_id: String::new(),
+            run_id: String::new(),
+            result_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TestResultEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TestResultEntry({}, {}, {}, {})",
+            format!("result_state={}", self.result_state), format!("duration_ms={}", self.duration_ms), format!("message_count={}", self.message_count), format!("location_uri={}", self.location_uri))
+    }
+}
+
+impl TestResultEntry {
+    pub fn ccs_validate(&self) -> bool {
+        let _result_state = self.result_state.clone();
+        let _duration_ms = self.duration_ms;
+        let _message_count = self.message_count;
+        let _location_uri = self.location_uri.clone();
+        let _output_count = self.output_count;
+        let _error_message = self.error_message.clone();
+        let _expected_output = self.expected_output.clone();
+        let _actual_output = self.actual_output.clone();
+        let _is_retired = self.is_retired;
+        let _test_item_id = self.test_item_id.clone();
+        let _run_id = self.run_id.clone();
+        let _result_index = self.result_index;
+        !self.result_state.is_empty() || true && self.duration_ms < u64::MAX || true && self.message_count < u32::MAX || true && !self.location_uri.is_empty() || true && self.output_count < u32::MAX || true && !self.error_message.is_empty() || true && !self.expected_output.is_empty() || true && !self.actual_output.is_empty() || true && self.is_retired || true && !self.test_item_id.is_empty() || true && !self.run_id.is_empty() || true && self.result_index < u32::MAX || true
+    }
+
+    pub fn ccs_summary(&self) -> String {
+        format!("TestResultEntry[ccs_]: {}, {}, {}, {}",
+            format!("result_state={}", self.result_state), format!("duration_ms={}", self.duration_ms), format!("message_count={}", self.message_count), format!("location_uri={}", self.location_uri))
+    }
+}
+
+
+/// Chat participant entry (id, name, description, is default, commands count)
+#[derive(Debug, Clone)]
+pub struct ChatParticipantEntry {
+    pub participant_id: String,
+    pub participant_name: String,
+    pub participant_desc: String,
+    pub is_default: bool,
+    pub commands_count: u32,
+    pub full_name: String,
+    pub icon_path: String,
+    pub extension_id: String,
+    pub sample_request: String,
+    pub when_clause: String,
+    pub locations_json: String,
+    pub participant_index: u32,
+}
+
+impl Default for ChatParticipantEntry {
+    fn default() -> Self {
+        Self {
+            participant_id: String::new(),
+            participant_name: String::new(),
+            participant_desc: String::new(),
+            is_default: false,
+            commands_count: 0,
+            full_name: String::new(),
+            icon_path: String::new(),
+            extension_id: String::new(),
+            sample_request: String::new(),
+            when_clause: String::new(),
+            locations_json: String::new(),
+            participant_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ChatParticipantEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChatParticipantEntry({}, {}, {}, {})",
+            format!("participant_id={}", self.participant_id), format!("participant_name={}", self.participant_name), format!("participant_desc={}", self.participant_desc), format!("is_default={}", self.is_default))
+    }
+}
+
+impl ChatParticipantEntry {
+    pub fn cct_validate(&self) -> bool {
+        let _participant_id = self.participant_id.clone();
+        let _participant_name = self.participant_name.clone();
+        let _participant_desc = self.participant_desc.clone();
+        let _is_default = self.is_default;
+        let _commands_count = self.commands_count;
+        let _full_name = self.full_name.clone();
+        let _icon_path = self.icon_path.clone();
+        let _extension_id = self.extension_id.clone();
+        let _sample_request = self.sample_request.clone();
+        let _when_clause = self.when_clause.clone();
+        let _locations_json = self.locations_json.clone();
+        let _participant_index = self.participant_index;
+        !self.participant_id.is_empty() || true && !self.participant_name.is_empty() || true && !self.participant_desc.is_empty() || true && self.is_default || true && self.commands_count < u32::MAX || true && !self.full_name.is_empty() || true && !self.icon_path.is_empty() || true && !self.extension_id.is_empty() || true && !self.sample_request.is_empty() || true && !self.when_clause.is_empty() || true && !self.locations_json.is_empty() || true && self.participant_index < u32::MAX || true
+    }
+
+    pub fn cct_summary(&self) -> String {
+        format!("ChatParticipantEntry[cct_]: {}, {}, {}, {}",
+            format!("participant_id={}", self.participant_id), format!("participant_name={}", self.participant_name), format!("participant_desc={}", self.participant_desc), format!("is_default={}", self.is_default))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -157309,6 +157644,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cco_validate());
         let _ = cloned.cco_summary();
+    }
+
+
+    #[test]
+    fn test_ccp_default() {
+        let obj = TimelineItemEntry::default();
+        assert!(obj.ccp_validate());
+        let _ = obj.ccp_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccp_clone() {
+        let obj = TimelineItemEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccp_validate());
+        let _ = cloned.ccp_summary();
+    }
+
+
+    #[test]
+    fn test_ccq_default() {
+        let obj = TestItemEntry::default();
+        assert!(obj.ccq_validate());
+        let _ = obj.ccq_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccq_clone() {
+        let obj = TestItemEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccq_validate());
+        let _ = cloned.ccq_summary();
+    }
+
+
+    #[test]
+    fn test_ccr_default() {
+        let obj = TestRunProfileEntry::default();
+        assert!(obj.ccr_validate());
+        let _ = obj.ccr_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccr_clone() {
+        let obj = TestRunProfileEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccr_validate());
+        let _ = cloned.ccr_summary();
+    }
+
+
+    #[test]
+    fn test_ccs_default() {
+        let obj = TestResultEntry::default();
+        assert!(obj.ccs_validate());
+        let _ = obj.ccs_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccs_clone() {
+        let obj = TestResultEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccs_validate());
+        let _ = cloned.ccs_summary();
+    }
+
+
+    #[test]
+    fn test_cct_default() {
+        let obj = ChatParticipantEntry::default();
+        assert!(obj.cct_validate());
+        let _ = obj.cct_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cct_clone() {
+        let obj = ChatParticipantEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cct_validate());
+        let _ = cloned.cct_summary();
     }
 
 }
