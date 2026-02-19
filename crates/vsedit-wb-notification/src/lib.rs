@@ -70722,3 +70722,1196 @@ mod tests_bdu {
         assert_eq!(state.paste_mode(), BduBlockPasteMode::Normal);
     }
 }
+
+// bdv_: Workspace folder model — multi-root workspace, folder add/remove,
+// folder ordering, workspace file, trust per folder
+
+/// Workspace folder entry
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BdvWorkspaceFolder {
+    pub uri: String,
+    pub name: String,
+    pub index: usize,
+    pub trusted: bool,
+}
+
+impl BdvWorkspaceFolder {
+    pub fn new(uri: &str, name: &str, index: usize) -> Self {
+        Self { uri: uri.to_string(), name: name.to_string(), index, trusted: true }
+    }
+
+    pub fn untrusted(mut self) -> Self {
+        self.trusted = false;
+        self
+    }
+
+    pub fn display_name(&self) -> &str {
+        if self.name.is_empty() {
+            self.uri.rsplit('/').next().unwrap_or(&self.uri)
+        } else {
+            &self.name
+        }
+    }
+
+    pub fn is_file_scheme(&self) -> bool {
+        self.uri.starts_with("file://")
+    }
+
+    pub fn path(&self) -> &str {
+        self.uri.strip_prefix("file://").unwrap_or(&self.uri)
+    }
+}
+
+/// Workspace configuration
+#[derive(Debug, Clone)]
+pub struct BdvWorkspaceConfig {
+    pub folders: Vec<BdvWorkspaceFolder>,
+    pub settings: std::collections::HashMap<String, String>,
+    pub extensions_disabled: Vec<String>,
+    pub workspace_file: Option<String>,
+}
+
+impl Default for BdvWorkspaceConfig {
+    fn default() -> Self {
+        Self {
+            folders: Vec::new(),
+            settings: std::collections::HashMap::new(),
+            extensions_disabled: Vec::new(),
+            workspace_file: None,
+        }
+    }
+}
+
+impl BdvWorkspaceConfig {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn add_folder(&mut self, uri: &str, name: &str) {
+        let idx = self.folders.len();
+        self.folders.push(BdvWorkspaceFolder::new(uri, name, idx));
+    }
+
+    pub fn remove_folder(&mut self, uri: &str) -> bool {
+        let before = self.folders.len();
+        self.folders.retain(|f| f.uri != uri);
+        if self.folders.len() < before {
+            for (i, f) in self.folders.iter_mut().enumerate() {
+                f.index = i;
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn move_folder(&mut self, from: usize, to: usize) -> bool {
+        if from >= self.folders.len() || to >= self.folders.len() { return false; }
+        let folder = self.folders.remove(from);
+        self.folders.insert(to, folder);
+        for (i, f) in self.folders.iter_mut().enumerate() {
+            f.index = i;
+        }
+        true
+    }
+
+    pub fn find_folder(&self, uri: &str) -> Option<&BdvWorkspaceFolder> {
+        self.folders.iter().find(|f| f.uri == uri)
+    }
+
+    pub fn folder_count(&self) -> usize { self.folders.len() }
+
+    pub fn is_multi_root(&self) -> bool { self.folders.len() > 1 }
+
+    pub fn all_trusted(&self) -> bool {
+        self.folders.iter().all(|f| f.trusted)
+    }
+
+    pub fn set_setting(&mut self, key: &str, value: &str) {
+        self.settings.insert(key.to_string(), value.to_string());
+    }
+
+    pub fn get_setting(&self, key: &str) -> Option<&String> {
+        self.settings.get(key)
+    }
+
+    pub fn folder_names(&self) -> Vec<&str> {
+        self.folders.iter().map(|f| f.display_name()).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests_bdv {
+    use super::*;
+
+    #[test]
+    fn test_bdv_folder_basic() {
+        let f = BdvWorkspaceFolder::new("file:///home/user/proj", "My Project", 0);
+        assert_eq!(f.display_name(), "My Project");
+        assert!(f.trusted);
+        assert!(f.is_file_scheme());
+        assert_eq!(f.path(), "/home/user/proj");
+    }
+
+    #[test]
+    fn test_bdv_folder_untrusted() {
+        let f = BdvWorkspaceFolder::new("file:///tmp/x", "", 0).untrusted();
+        assert!(!f.trusted);
+        assert_eq!(f.display_name(), "x");
+    }
+
+    #[test]
+    fn test_bdv_config_add_remove() {
+        let mut cfg = BdvWorkspaceConfig::new();
+        cfg.add_folder("file:///a", "A");
+        cfg.add_folder("file:///b", "B");
+        assert_eq!(cfg.folder_count(), 2);
+        assert!(cfg.is_multi_root());
+        assert!(cfg.remove_folder("file:///a"));
+        assert_eq!(cfg.folder_count(), 1);
+        assert_eq!(cfg.folders[0].index, 0);
+    }
+
+    #[test]
+    fn test_bdv_config_move() {
+        let mut cfg = BdvWorkspaceConfig::new();
+        cfg.add_folder("file:///a", "A");
+        cfg.add_folder("file:///b", "B");
+        cfg.add_folder("file:///c", "C");
+        assert!(cfg.move_folder(2, 0));
+        assert_eq!(cfg.folders[0].name, "C");
+        assert_eq!(cfg.folders[0].index, 0);
+        assert_eq!(cfg.folders[2].name, "B");
+    }
+
+    #[test]
+    fn test_bdv_config_find() {
+        let mut cfg = BdvWorkspaceConfig::new();
+        cfg.add_folder("file:///proj", "Project");
+        assert!(cfg.find_folder("file:///proj").is_some());
+        assert!(cfg.find_folder("file:///other").is_none());
+    }
+
+    #[test]
+    fn test_bdv_config_settings() {
+        let mut cfg = BdvWorkspaceConfig::new();
+        cfg.set_setting("editor.tabSize", "4");
+        assert_eq!(cfg.get_setting("editor.tabSize").unwrap(), "4");
+        assert!(cfg.get_setting("missing").is_none());
+    }
+
+    #[test]
+    fn test_bdv_config_trust() {
+        let mut cfg = BdvWorkspaceConfig::new();
+        cfg.add_folder("file:///a", "A");
+        assert!(cfg.all_trusted());
+        cfg.folders[0].trusted = false;
+        assert!(!cfg.all_trusted());
+    }
+
+    #[test]
+    fn test_bdv_config_names() {
+        let mut cfg = BdvWorkspaceConfig::new();
+        cfg.add_folder("file:///a", "Alpha");
+        cfg.add_folder("file:///b", "Beta");
+        assert_eq!(cfg.folder_names(), vec!["Alpha", "Beta"]);
+    }
+
+    #[test]
+    fn test_bdv_config_single_root() {
+        let mut cfg = BdvWorkspaceConfig::new();
+        cfg.add_folder("file:///proj", "P");
+        assert!(!cfg.is_multi_root());
+    }
+
+    #[test]
+    fn test_bdv_config_workspace_file() {
+        let mut cfg = BdvWorkspaceConfig::new();
+        cfg.workspace_file = Some("/home/user/my.code-workspace".to_string());
+        assert!(cfg.workspace_file.is_some());
+    }
+}
+
+// bdw_: Task runner and build model — task definitions, problem matchers,
+// task groups, run/watch/test task types, task execution state
+
+/// Task group kind
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BdwTaskGroup {
+    Build,
+    Test,
+    Clean,
+    Rebuild,
+    None,
+}
+
+/// Task source origin
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BdwTaskSource {
+    Workspace,
+    Extension,
+    User,
+    Auto,
+}
+
+/// Task execution state
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BdwTaskState {
+    Idle,
+    Running,
+    Succeeded,
+    Failed,
+    Cancelled,
+}
+
+impl BdwTaskState {
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, BdwTaskState::Succeeded | BdwTaskState::Failed | BdwTaskState::Cancelled)
+    }
+
+    pub fn is_running(&self) -> bool {
+        *self == BdwTaskState::Running
+    }
+}
+
+/// Problem match severity
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BdwProblemSeverity {
+    Error,
+    Warning,
+    Info,
+}
+
+/// A problem found by a problem matcher
+#[derive(Debug, Clone)]
+pub struct BdwProblem {
+    pub file: String,
+    pub line: usize,
+    pub col: usize,
+    pub message: String,
+    pub severity: BdwProblemSeverity,
+}
+
+impl BdwProblem {
+    pub fn error(file: &str, line: usize, col: usize, msg: &str) -> Self {
+        Self { file: file.to_string(), line, col, message: msg.to_string(), severity: BdwProblemSeverity::Error }
+    }
+
+    pub fn warning(file: &str, line: usize, col: usize, msg: &str) -> Self {
+        Self { file: file.to_string(), line, col, message: msg.to_string(), severity: BdwProblemSeverity::Warning }
+    }
+
+    pub fn is_error(&self) -> bool { self.severity == BdwProblemSeverity::Error }
+}
+
+/// A task definition
+#[derive(Debug, Clone)]
+pub struct BdwTask {
+    pub label: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub group: BdwTaskGroup,
+    pub source: BdwTaskSource,
+    pub state: BdwTaskState,
+    pub problems: Vec<BdwProblem>,
+    pub is_background: bool,
+    pub exit_code: Option<i32>,
+}
+
+impl BdwTask {
+    pub fn new(label: &str, command: &str) -> Self {
+        Self {
+            label: label.to_string(),
+            command: command.to_string(),
+            args: Vec::new(),
+            group: BdwTaskGroup::None,
+            source: BdwTaskSource::Workspace,
+            state: BdwTaskState::Idle,
+            problems: Vec::new(),
+            is_background: false,
+            exit_code: None,
+        }
+    }
+
+    pub fn with_args(mut self, args: &[&str]) -> Self {
+        self.args = args.iter().map(|s| s.to_string()).collect();
+        self
+    }
+
+    pub fn with_group(mut self, group: BdwTaskGroup) -> Self {
+        self.group = group;
+        self
+    }
+
+    pub fn start(&mut self) {
+        self.state = BdwTaskState::Running;
+        self.problems.clear();
+        self.exit_code = None;
+    }
+
+    pub fn complete(&mut self, exit_code: i32) {
+        self.exit_code = Some(exit_code);
+        self.state = if exit_code == 0 { BdwTaskState::Succeeded } else { BdwTaskState::Failed };
+    }
+
+    pub fn cancel(&mut self) {
+        self.state = BdwTaskState::Cancelled;
+    }
+
+    pub fn add_problem(&mut self, problem: BdwProblem) {
+        self.problems.push(problem);
+    }
+
+    pub fn error_count(&self) -> usize {
+        self.problems.iter().filter(|p| p.is_error()).count()
+    }
+
+    pub fn command_line(&self) -> String {
+        if self.args.is_empty() {
+            self.command.clone()
+        } else {
+            format!("{} {}", self.command, self.args.join(" "))
+        }
+    }
+}
+
+/// Task registry
+#[derive(Debug, Clone, Default)]
+pub struct BdwTaskRegistry {
+    pub tasks: Vec<BdwTask>,
+}
+
+impl BdwTaskRegistry {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn add(&mut self, task: BdwTask) { self.tasks.push(task); }
+
+    pub fn find(&self, label: &str) -> Option<&BdwTask> {
+        self.tasks.iter().find(|t| t.label == label)
+    }
+
+    pub fn find_mut(&mut self, label: &str) -> Option<&mut BdwTask> {
+        self.tasks.iter_mut().find(|t| t.label == label)
+    }
+
+    pub fn by_group(&self, group: BdwTaskGroup) -> Vec<&BdwTask> {
+        self.tasks.iter().filter(|t| t.group == group).collect()
+    }
+
+    pub fn running_tasks(&self) -> Vec<&BdwTask> {
+        self.tasks.iter().filter(|t| t.state.is_running()).collect()
+    }
+
+    pub fn count(&self) -> usize { self.tasks.len() }
+}
+
+#[cfg(test)]
+mod tests_bdw {
+    use super::*;
+
+    #[test]
+    fn test_bdw_task_state() {
+        assert!(BdwTaskState::Succeeded.is_terminal());
+        assert!(BdwTaskState::Failed.is_terminal());
+        assert!(!BdwTaskState::Running.is_terminal());
+        assert!(BdwTaskState::Running.is_running());
+    }
+
+    #[test]
+    fn test_bdw_problem() {
+        let p = BdwProblem::error("src/main.rs", 10, 5, "undefined variable");
+        assert!(p.is_error());
+        let w = BdwProblem::warning("src/lib.rs", 20, 1, "unused import");
+        assert!(!w.is_error());
+    }
+
+    #[test]
+    fn test_bdw_task_lifecycle() {
+        let mut task = BdwTask::new("build", "cargo").with_args(&["build"]).with_group(BdwTaskGroup::Build);
+        assert_eq!(task.state, BdwTaskState::Idle);
+        task.start();
+        assert!(task.state.is_running());
+        task.add_problem(BdwProblem::error("a.rs", 1, 1, "err"));
+        task.complete(1);
+        assert_eq!(task.state, BdwTaskState::Failed);
+        assert_eq!(task.error_count(), 1);
+        assert_eq!(task.exit_code, Some(1));
+    }
+
+    #[test]
+    fn test_bdw_task_success() {
+        let mut task = BdwTask::new("test", "cargo").with_args(&["test"]);
+        task.start();
+        task.complete(0);
+        assert_eq!(task.state, BdwTaskState::Succeeded);
+    }
+
+    #[test]
+    fn test_bdw_task_cancel() {
+        let mut task = BdwTask::new("watch", "npm").with_args(&["run", "watch"]);
+        task.is_background = true;
+        task.start();
+        task.cancel();
+        assert_eq!(task.state, BdwTaskState::Cancelled);
+    }
+
+    #[test]
+    fn test_bdw_task_command_line() {
+        let task = BdwTask::new("build", "cargo").with_args(&["build", "--release"]);
+        assert_eq!(task.command_line(), "cargo build --release");
+    }
+
+    #[test]
+    fn test_bdw_task_command_line_no_args() {
+        let task = BdwTask::new("make", "make");
+        assert_eq!(task.command_line(), "make");
+    }
+
+    #[test]
+    fn test_bdw_registry() {
+        let mut reg = BdwTaskRegistry::new();
+        reg.add(BdwTask::new("build", "cargo").with_group(BdwTaskGroup::Build));
+        reg.add(BdwTask::new("test", "cargo").with_group(BdwTaskGroup::Test));
+        assert_eq!(reg.count(), 2);
+        assert!(reg.find("build").is_some());
+        assert_eq!(reg.by_group(BdwTaskGroup::Build).len(), 1);
+    }
+
+    #[test]
+    fn test_bdw_registry_running() {
+        let mut reg = BdwTaskRegistry::new();
+        reg.add(BdwTask::new("build", "cargo"));
+        reg.find_mut("build").unwrap().start();
+        assert_eq!(reg.running_tasks().len(), 1);
+    }
+
+    #[test]
+    fn test_bdw_task_source() {
+        let task = BdwTask::new("lint", "eslint");
+        assert_eq!(task.source, BdwTaskSource::Workspace);
+    }
+}
+
+// bdx_: Terminal profile model — shell profiles, default shell,
+// terminal appearance, environment, icon, terminal tab title
+
+/// Terminal profile shell type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BdxShellType {
+    Bash,
+    Zsh,
+    Fish,
+    PowerShell,
+    Cmd,
+    GitBash,
+    Tmux,
+    Custom,
+}
+
+impl BdxShellType {
+    pub fn default_path(&self) -> &str {
+        match self {
+            BdxShellType::Bash => "/bin/bash",
+            BdxShellType::Zsh => "/bin/zsh",
+            BdxShellType::Fish => "/usr/bin/fish",
+            BdxShellType::PowerShell => "pwsh",
+            BdxShellType::Cmd => "cmd.exe",
+            BdxShellType::GitBash => "C:\\Program Files\\Git\\bin\\bash.exe",
+            BdxShellType::Tmux => "/usr/bin/tmux",
+            BdxShellType::Custom => "",
+        }
+    }
+
+    pub fn display_name(&self) -> &str {
+        match self {
+            BdxShellType::Bash => "bash",
+            BdxShellType::Zsh => "zsh",
+            BdxShellType::Fish => "fish",
+            BdxShellType::PowerShell => "PowerShell",
+            BdxShellType::Cmd => "Command Prompt",
+            BdxShellType::GitBash => "Git Bash",
+            BdxShellType::Tmux => "tmux",
+            BdxShellType::Custom => "Custom",
+        }
+    }
+}
+
+/// Terminal profile
+#[derive(Debug, Clone)]
+pub struct BdxTerminalProfile {
+    pub name: String,
+    pub shell_type: BdxShellType,
+    pub path: String,
+    pub args: Vec<String>,
+    pub env: std::collections::HashMap<String, String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
+    pub is_default: bool,
+    pub cwd: Option<String>,
+}
+
+impl BdxTerminalProfile {
+    pub fn new(name: &str, shell: BdxShellType) -> Self {
+        Self {
+            name: name.to_string(),
+            shell_type: shell,
+            path: shell.default_path().to_string(),
+            args: Vec::new(),
+            env: std::collections::HashMap::new(),
+            icon: None,
+            color: None,
+            is_default: false,
+            cwd: None,
+        }
+    }
+
+    pub fn with_path(mut self, path: &str) -> Self {
+        self.path = path.to_string();
+        self
+    }
+
+    pub fn with_arg(mut self, arg: &str) -> Self {
+        self.args.push(arg.to_string());
+        self
+    }
+
+    pub fn with_env(mut self, key: &str, val: &str) -> Self {
+        self.env.insert(key.to_string(), val.to_string());
+        self
+    }
+
+    pub fn with_icon(mut self, icon: &str) -> Self {
+        self.icon = Some(icon.to_string());
+        self
+    }
+
+    pub fn set_default(&mut self) { self.is_default = true; }
+
+    pub fn command_line(&self) -> String {
+        if self.args.is_empty() {
+            self.path.clone()
+        } else {
+            format!("{} {}", self.path, self.args.join(" "))
+        }
+    }
+}
+
+/// Terminal profile registry
+#[derive(Debug, Clone, Default)]
+pub struct BdxProfileRegistry {
+    pub profiles: Vec<BdxTerminalProfile>,
+}
+
+impl BdxProfileRegistry {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn add(&mut self, profile: BdxTerminalProfile) {
+        self.profiles.push(profile);
+    }
+
+    pub fn default_profile(&self) -> Option<&BdxTerminalProfile> {
+        self.profiles.iter().find(|p| p.is_default).or(self.profiles.first())
+    }
+
+    pub fn find(&self, name: &str) -> Option<&BdxTerminalProfile> {
+        self.profiles.iter().find(|p| p.name == name)
+    }
+
+    pub fn names(&self) -> Vec<&str> {
+        self.profiles.iter().map(|p| p.name.as_str()).collect()
+    }
+
+    pub fn count(&self) -> usize { self.profiles.len() }
+
+    pub fn remove(&mut self, name: &str) -> bool {
+        let before = self.profiles.len();
+        self.profiles.retain(|p| p.name != name);
+        self.profiles.len() < before
+    }
+}
+
+#[cfg(test)]
+mod tests_bdx {
+    use super::*;
+
+    #[test]
+    fn test_bdx_shell_type() {
+        assert_eq!(BdxShellType::Bash.default_path(), "/bin/bash");
+        assert_eq!(BdxShellType::Zsh.display_name(), "zsh");
+        assert_eq!(BdxShellType::PowerShell.display_name(), "PowerShell");
+    }
+
+    #[test]
+    fn test_bdx_profile_basic() {
+        let p = BdxTerminalProfile::new("My Bash", BdxShellType::Bash);
+        assert_eq!(p.name, "My Bash");
+        assert_eq!(p.path, "/bin/bash");
+        assert!(!p.is_default);
+    }
+
+    #[test]
+    fn test_bdx_profile_custom() {
+        let p = BdxTerminalProfile::new("Custom", BdxShellType::Custom)
+            .with_path("/usr/local/bin/mysh")
+            .with_arg("--login")
+            .with_env("TERM", "xterm-256color")
+            .with_icon("terminal");
+        assert_eq!(p.command_line(), "/usr/local/bin/mysh --login");
+        assert_eq!(p.env.get("TERM").unwrap(), "xterm-256color");
+        assert_eq!(p.icon.as_deref(), Some("terminal"));
+    }
+
+    #[test]
+    fn test_bdx_profile_default() {
+        let mut p = BdxTerminalProfile::new("zsh", BdxShellType::Zsh);
+        p.set_default();
+        assert!(p.is_default);
+    }
+
+    #[test]
+    fn test_bdx_registry_add_find() {
+        let mut reg = BdxProfileRegistry::new();
+        reg.add(BdxTerminalProfile::new("bash", BdxShellType::Bash));
+        reg.add(BdxTerminalProfile::new("zsh", BdxShellType::Zsh));
+        assert_eq!(reg.count(), 2);
+        assert!(reg.find("bash").is_some());
+        assert!(reg.find("fish").is_none());
+    }
+
+    #[test]
+    fn test_bdx_registry_default() {
+        let mut reg = BdxProfileRegistry::new();
+        reg.add(BdxTerminalProfile::new("bash", BdxShellType::Bash));
+        let mut zsh = BdxTerminalProfile::new("zsh", BdxShellType::Zsh);
+        zsh.set_default();
+        reg.add(zsh);
+        assert_eq!(reg.default_profile().unwrap().name, "zsh");
+    }
+
+    #[test]
+    fn test_bdx_registry_default_fallback() {
+        let mut reg = BdxProfileRegistry::new();
+        reg.add(BdxTerminalProfile::new("bash", BdxShellType::Bash));
+        assert_eq!(reg.default_profile().unwrap().name, "bash");
+    }
+
+    #[test]
+    fn test_bdx_registry_names() {
+        let mut reg = BdxProfileRegistry::new();
+        reg.add(BdxTerminalProfile::new("a", BdxShellType::Bash));
+        reg.add(BdxTerminalProfile::new("b", BdxShellType::Zsh));
+        assert_eq!(reg.names(), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn test_bdx_registry_remove() {
+        let mut reg = BdxProfileRegistry::new();
+        reg.add(BdxTerminalProfile::new("bash", BdxShellType::Bash));
+        assert!(reg.remove("bash"));
+        assert_eq!(reg.count(), 0);
+        assert!(!reg.remove("bash"));
+    }
+
+    #[test]
+    fn test_bdx_profile_no_args_command() {
+        let p = BdxTerminalProfile::new("bash", BdxShellType::Bash);
+        assert_eq!(p.command_line(), "/bin/bash");
+    }
+}
+
+// bdy_: Editor decoration model — inline decorations, gutter decorations,
+// overview ruler, decoration ranges, decoration types, render options
+
+/// Decoration position in editor
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BdyDecorationPosition {
+    InlineText,
+    InlineAfter,
+    InlineBefore,
+    Gutter,
+    OverviewRuler,
+    Minimap,
+    Margin,
+}
+
+/// Overview ruler lane
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BdyRulerLane {
+    Left,
+    Center,
+    Right,
+    Full,
+}
+
+/// A decoration type definition
+#[derive(Debug, Clone)]
+pub struct BdyDecorationType {
+    pub id: String,
+    pub background_color: Option<String>,
+    pub border_color: Option<String>,
+    pub foreground_color: Option<String>,
+    pub font_weight: Option<String>,
+    pub font_style: Option<String>,
+    pub text_decoration: Option<String>,
+    pub gutter_icon: Option<String>,
+    pub ruler_color: Option<String>,
+    pub ruler_lane: BdyRulerLane,
+    pub is_whole_line: bool,
+}
+
+impl BdyDecorationType {
+    pub fn new(id: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            background_color: None,
+            border_color: None,
+            foreground_color: None,
+            font_weight: None,
+            font_style: None,
+            text_decoration: None,
+            gutter_icon: None,
+            ruler_color: None,
+            ruler_lane: BdyRulerLane::Center,
+            is_whole_line: false,
+        }
+    }
+
+    pub fn with_background(mut self, color: &str) -> Self {
+        self.background_color = Some(color.to_string()); self
+    }
+
+    pub fn with_border(mut self, color: &str) -> Self {
+        self.border_color = Some(color.to_string()); self
+    }
+
+    pub fn with_foreground(mut self, color: &str) -> Self {
+        self.foreground_color = Some(color.to_string()); self
+    }
+
+    pub fn with_gutter_icon(mut self, icon: &str) -> Self {
+        self.gutter_icon = Some(icon.to_string()); self
+    }
+
+    pub fn with_ruler(mut self, color: &str, lane: BdyRulerLane) -> Self {
+        self.ruler_color = Some(color.to_string());
+        self.ruler_lane = lane;
+        self
+    }
+
+    pub fn whole_line(mut self) -> Self {
+        self.is_whole_line = true; self
+    }
+
+    pub fn has_ruler(&self) -> bool { self.ruler_color.is_some() }
+    pub fn has_gutter(&self) -> bool { self.gutter_icon.is_some() }
+}
+
+/// A decoration range (instance of a type applied to text)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BdyDecorationRange {
+    pub type_id: String,
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub hover_message: Option<String>,
+}
+
+impl BdyDecorationRange {
+    pub fn new(type_id: &str, sl: usize, sc: usize, el: usize, ec: usize) -> Self {
+        Self {
+            type_id: type_id.to_string(),
+            start_line: sl, start_col: sc,
+            end_line: el, end_col: ec,
+            hover_message: None,
+        }
+    }
+
+    pub fn with_hover(mut self, msg: &str) -> Self {
+        self.hover_message = Some(msg.to_string()); self
+    }
+
+    pub fn on_line(&self, line: usize) -> bool {
+        line >= self.start_line && line <= self.end_line
+    }
+
+    pub fn is_single_line(&self) -> bool {
+        self.start_line == self.end_line
+    }
+}
+
+/// Decoration set for an editor
+#[derive(Debug, Clone, Default)]
+pub struct BdyDecorationSet {
+    pub types: Vec<BdyDecorationType>,
+    pub ranges: Vec<BdyDecorationRange>,
+}
+
+impl BdyDecorationSet {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn register_type(&mut self, dt: BdyDecorationType) {
+        self.types.push(dt);
+    }
+
+    pub fn set_ranges(&mut self, type_id: &str, ranges: Vec<BdyDecorationRange>) {
+        self.ranges.retain(|r| r.type_id != type_id);
+        self.ranges.extend(ranges);
+    }
+
+    pub fn ranges_for_line(&self, line: usize) -> Vec<&BdyDecorationRange> {
+        self.ranges.iter().filter(|r| r.on_line(line)).collect()
+    }
+
+    pub fn dispose_type(&mut self, type_id: &str) {
+        self.types.retain(|t| t.id != type_id);
+        self.ranges.retain(|r| r.type_id != type_id);
+    }
+
+    pub fn type_count(&self) -> usize { self.types.len() }
+    pub fn range_count(&self) -> usize { self.ranges.len() }
+}
+
+#[cfg(test)]
+mod tests_bdy {
+    use super::*;
+
+    #[test]
+    fn test_bdy_decoration_type() {
+        let dt = BdyDecorationType::new("error")
+            .with_background("#ff0000")
+            .with_border("#cc0000")
+            .with_foreground("#ffffff")
+            .with_gutter_icon("error-icon")
+            .with_ruler("#ff0000", BdyRulerLane::Right)
+            .whole_line();
+        assert!(dt.has_ruler());
+        assert!(dt.has_gutter());
+        assert!(dt.is_whole_line);
+    }
+
+    #[test]
+    fn test_bdy_decoration_type_minimal() {
+        let dt = BdyDecorationType::new("highlight");
+        assert!(!dt.has_ruler());
+        assert!(!dt.has_gutter());
+        assert!(!dt.is_whole_line);
+    }
+
+    #[test]
+    fn test_bdy_decoration_range() {
+        let r = BdyDecorationRange::new("error", 5, 0, 5, 20).with_hover("Error here");
+        assert!(r.on_line(5));
+        assert!(!r.on_line(6));
+        assert!(r.is_single_line());
+        assert_eq!(r.hover_message.as_deref(), Some("Error here"));
+    }
+
+    #[test]
+    fn test_bdy_decoration_range_multiline() {
+        let r = BdyDecorationRange::new("warning", 3, 0, 7, 10);
+        assert!(r.on_line(5));
+        assert!(!r.is_single_line());
+    }
+
+    #[test]
+    fn test_bdy_decoration_set_register() {
+        let mut set = BdyDecorationSet::new();
+        set.register_type(BdyDecorationType::new("error").with_background("#f00"));
+        set.register_type(BdyDecorationType::new("warn").with_background("#ff0"));
+        assert_eq!(set.type_count(), 2);
+    }
+
+    #[test]
+    fn test_bdy_decoration_set_ranges() {
+        let mut set = BdyDecorationSet::new();
+        set.set_ranges("error", vec![
+            BdyDecorationRange::new("error", 1, 0, 1, 10),
+            BdyDecorationRange::new("error", 5, 0, 5, 15),
+        ]);
+        assert_eq!(set.range_count(), 2);
+        assert_eq!(set.ranges_for_line(1).len(), 1);
+        assert_eq!(set.ranges_for_line(5).len(), 1);
+        assert_eq!(set.ranges_for_line(3).len(), 0);
+    }
+
+    #[test]
+    fn test_bdy_decoration_set_replace_ranges() {
+        let mut set = BdyDecorationSet::new();
+        set.set_ranges("err", vec![BdyDecorationRange::new("err", 1, 0, 1, 5)]);
+        assert_eq!(set.range_count(), 1);
+        set.set_ranges("err", vec![BdyDecorationRange::new("err", 2, 0, 2, 5)]);
+        assert_eq!(set.range_count(), 1);
+        assert_eq!(set.ranges_for_line(2).len(), 1);
+    }
+
+    #[test]
+    fn test_bdy_decoration_set_dispose() {
+        let mut set = BdyDecorationSet::new();
+        set.register_type(BdyDecorationType::new("error"));
+        set.set_ranges("error", vec![BdyDecorationRange::new("error", 1, 0, 1, 5)]);
+        set.dispose_type("error");
+        assert_eq!(set.type_count(), 0);
+        assert_eq!(set.range_count(), 0);
+    }
+
+    #[test]
+    fn test_bdy_ruler_lanes() {
+        assert_eq!(BdyRulerLane::Left, BdyRulerLane::Left);
+        assert_ne!(BdyRulerLane::Left, BdyRulerLane::Right);
+    }
+
+    #[test]
+    fn test_bdy_decoration_positions() {
+        assert_ne!(BdyDecorationPosition::InlineText, BdyDecorationPosition::Gutter);
+        assert_eq!(BdyDecorationPosition::OverviewRuler, BdyDecorationPosition::OverviewRuler);
+    }
+}
+
+// bdz_: Command registry model — command IDs, command handler, keybinding
+// resolution, when-clause context, command palette entries
+
+/// Command execution result
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BdzCommandResult {
+    Success,
+    NotFound,
+    Disabled,
+    Error(String),
+}
+
+impl BdzCommandResult {
+    pub fn is_success(&self) -> bool { *self == BdzCommandResult::Success }
+    pub fn is_error(&self) -> bool { matches!(self, BdzCommandResult::Error(_)) }
+}
+
+/// A when-clause condition for command enablement
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BdzWhenClause {
+    True,
+    False,
+    Key(String),
+    Not(Box<BdzWhenClause>),
+    And(Vec<BdzWhenClause>),
+    Or(Vec<BdzWhenClause>),
+    Equals(String, String),
+}
+
+impl BdzWhenClause {
+    pub fn key(k: &str) -> Self { BdzWhenClause::Key(k.to_string()) }
+    pub fn not(clause: BdzWhenClause) -> Self { BdzWhenClause::Not(Box::new(clause)) }
+    pub fn equals(k: &str, v: &str) -> Self { BdzWhenClause::Equals(k.to_string(), v.to_string()) }
+
+    pub fn evaluate(&self, ctx: &std::collections::HashMap<String, String>) -> bool {
+        match self {
+            BdzWhenClause::True => true,
+            BdzWhenClause::False => false,
+            BdzWhenClause::Key(k) => ctx.get(k).map_or(false, |v| v != "false" && !v.is_empty()),
+            BdzWhenClause::Not(inner) => !inner.evaluate(ctx),
+            BdzWhenClause::And(clauses) => clauses.iter().all(|c| c.evaluate(ctx)),
+            BdzWhenClause::Or(clauses) => clauses.iter().any(|c| c.evaluate(ctx)),
+            BdzWhenClause::Equals(k, v) => ctx.get(k).map_or(false, |cv| cv == v),
+        }
+    }
+}
+
+/// A registered command
+#[derive(Debug, Clone)]
+pub struct BdzCommand {
+    pub id: String,
+    pub title: String,
+    pub category: Option<String>,
+    pub icon: Option<String>,
+    pub when: Option<BdzWhenClause>,
+    pub keybinding: Option<String>,
+}
+
+impl BdzCommand {
+    pub fn new(id: &str, title: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            title: title.to_string(),
+            category: None,
+            icon: None,
+            when: None,
+            keybinding: None,
+        }
+    }
+
+    pub fn with_category(mut self, cat: &str) -> Self {
+        self.category = Some(cat.to_string()); self
+    }
+
+    pub fn with_icon(mut self, icon: &str) -> Self {
+        self.icon = Some(icon.to_string()); self
+    }
+
+    pub fn with_when(mut self, when: BdzWhenClause) -> Self {
+        self.when = Some(when); self
+    }
+
+    pub fn with_keybinding(mut self, kb: &str) -> Self {
+        self.keybinding = Some(kb.to_string()); self
+    }
+
+    pub fn display_label(&self) -> String {
+        if let Some(cat) = &self.category {
+            format!("{}: {}", cat, self.title)
+        } else {
+            self.title.clone()
+        }
+    }
+
+    pub fn is_enabled(&self, ctx: &std::collections::HashMap<String, String>) -> bool {
+        self.when.as_ref().map_or(true, |w| w.evaluate(ctx))
+    }
+}
+
+/// Command registry
+#[derive(Debug, Clone, Default)]
+pub struct BdzCommandRegistry {
+    pub commands: Vec<BdzCommand>,
+}
+
+impl BdzCommandRegistry {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn register(&mut self, cmd: BdzCommand) {
+        self.commands.push(cmd);
+    }
+
+    pub fn find(&self, id: &str) -> Option<&BdzCommand> {
+        self.commands.iter().find(|c| c.id == id)
+    }
+
+    pub fn execute(&self, id: &str, ctx: &std::collections::HashMap<String, String>) -> BdzCommandResult {
+        match self.find(id) {
+            None => BdzCommandResult::NotFound,
+            Some(cmd) => {
+                if !cmd.is_enabled(ctx) {
+                    BdzCommandResult::Disabled
+                } else {
+                    BdzCommandResult::Success
+                }
+            }
+        }
+    }
+
+    pub fn palette_entries(&self, ctx: &std::collections::HashMap<String, String>) -> Vec<&BdzCommand> {
+        self.commands.iter().filter(|c| c.is_enabled(ctx)).collect()
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&BdzCommand> {
+        let q = query.to_lowercase();
+        self.commands.iter().filter(|c| {
+            c.title.to_lowercase().contains(&q)
+                || c.id.to_lowercase().contains(&q)
+                || c.category.as_ref().map_or(false, |cat| cat.to_lowercase().contains(&q))
+        }).collect()
+    }
+
+    pub fn by_keybinding(&self, kb: &str) -> Vec<&BdzCommand> {
+        self.commands.iter().filter(|c| c.keybinding.as_deref() == Some(kb)).collect()
+    }
+
+    pub fn count(&self) -> usize { self.commands.len() }
+}
+
+#[cfg(test)]
+mod tests_bdz {
+    use super::*;
+
+    #[test]
+    fn test_bdz_command_result() {
+        assert!(BdzCommandResult::Success.is_success());
+        assert!(!BdzCommandResult::NotFound.is_success());
+        assert!(BdzCommandResult::Error("oops".into()).is_error());
+    }
+
+    #[test]
+    fn test_bdz_when_clause_key() {
+        let mut ctx = std::collections::HashMap::new();
+        ctx.insert("editorFocus".to_string(), "true".to_string());
+        assert!(BdzWhenClause::key("editorFocus").evaluate(&ctx));
+        assert!(!BdzWhenClause::key("terminalFocus").evaluate(&ctx));
+    }
+
+    #[test]
+    fn test_bdz_when_clause_not() {
+        let ctx = std::collections::HashMap::new();
+        assert!(BdzWhenClause::not(BdzWhenClause::key("missing")).evaluate(&ctx));
+    }
+
+    #[test]
+    fn test_bdz_when_clause_and_or() {
+        let mut ctx = std::collections::HashMap::new();
+        ctx.insert("a".to_string(), "true".to_string());
+        let and = BdzWhenClause::And(vec![BdzWhenClause::key("a"), BdzWhenClause::key("b")]);
+        assert!(!and.evaluate(&ctx));
+        let or = BdzWhenClause::Or(vec![BdzWhenClause::key("a"), BdzWhenClause::key("b")]);
+        assert!(or.evaluate(&ctx));
+    }
+
+    #[test]
+    fn test_bdz_when_clause_equals() {
+        let mut ctx = std::collections::HashMap::new();
+        ctx.insert("lang".to_string(), "rust".to_string());
+        assert!(BdzWhenClause::equals("lang", "rust").evaluate(&ctx));
+        assert!(!BdzWhenClause::equals("lang", "python").evaluate(&ctx));
+    }
+
+    #[test]
+    fn test_bdz_command_display() {
+        let cmd = BdzCommand::new("editor.action.format", "Format Document")
+            .with_category("Editor");
+        assert_eq!(cmd.display_label(), "Editor: Format Document");
+        let cmd2 = BdzCommand::new("workbench.action.quit", "Quit");
+        assert_eq!(cmd2.display_label(), "Quit");
+    }
+
+    #[test]
+    fn test_bdz_command_enabled() {
+        let mut ctx = std::collections::HashMap::new();
+        ctx.insert("editorFocus".to_string(), "true".to_string());
+        let cmd = BdzCommand::new("test", "Test")
+            .with_when(BdzWhenClause::key("editorFocus"));
+        assert!(cmd.is_enabled(&ctx));
+    }
+
+    #[test]
+    fn test_bdz_registry_register_find() {
+        let mut reg = BdzCommandRegistry::new();
+        reg.register(BdzCommand::new("editor.format", "Format").with_keybinding("Ctrl+Shift+F"));
+        reg.register(BdzCommand::new("editor.save", "Save").with_keybinding("Ctrl+S"));
+        assert_eq!(reg.count(), 2);
+        assert!(reg.find("editor.format").is_some());
+        assert!(reg.find("missing").is_none());
+    }
+
+    #[test]
+    fn test_bdz_registry_execute() {
+        let mut reg = BdzCommandRegistry::new();
+        reg.register(BdzCommand::new("cmd1", "Cmd1"));
+        let ctx = std::collections::HashMap::new();
+        assert!(reg.execute("cmd1", &ctx).is_success());
+        assert_eq!(reg.execute("missing", &ctx), BdzCommandResult::NotFound);
+    }
+
+    #[test]
+    fn test_bdz_registry_search() {
+        let mut reg = BdzCommandRegistry::new();
+        reg.register(BdzCommand::new("editor.format", "Format Document").with_category("Editor"));
+        reg.register(BdzCommand::new("editor.save", "Save File"));
+        let results = reg.search("format");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "editor.format");
+    }
+
+    #[test]
+    fn test_bdz_registry_keybinding() {
+        let mut reg = BdzCommandRegistry::new();
+        reg.register(BdzCommand::new("save", "Save").with_keybinding("Ctrl+S"));
+        reg.register(BdzCommand::new("copy", "Copy").with_keybinding("Ctrl+C"));
+        let bound = reg.by_keybinding("Ctrl+S");
+        assert_eq!(bound.len(), 1);
+        assert_eq!(bound[0].id, "save");
+    }
+}
