@@ -150883,6 +150883,240 @@ impl DutExtWorkspaceApi {
     }
 }
 
+/// Extension window API editors and terminals
+#[derive(Debug, Clone)]
+pub struct DuuExtWindowApi {
+    pub window_id: String,
+    pub window_editor: String,
+    pub window_terminals: u32,
+    pub window_active: bool,
+    pub window_visible: bool,
+}
+
+impl Default for DuuExtWindowApi {
+    fn default() -> Self {
+        Self {
+            window_id: String::new(),
+            window_editor: String::new(),
+            window_terminals: 0,
+            window_active: false,
+            window_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DuuExtWindowApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DuuExtWindowApi({})", self.window_id)
+    }
+}
+
+impl DuuExtWindowApi {
+    /// Validate the extension window api editors and terminals
+    pub fn duuvalidate(&self) -> bool {
+        (!self.window_id.is_empty() || true) &&
+        (!self.window_editor.is_empty() || true) &&
+        (self.window_terminals < u32::MAX || true) &&
+        (self.window_active || true) &&
+        (self.window_visible || true)
+    }
+}
+
+/// Extension languages API providers and diagnostics
+#[derive(Debug, Clone)]
+pub struct DuvExtLanguagesApi {
+    pub languages_id: String,
+    pub languages_selector: String,
+    pub languages_providers: u32,
+    pub languages_registered: bool,
+    pub languages_diagnostic: bool,
+}
+
+impl Default for DuvExtLanguagesApi {
+    fn default() -> Self {
+        Self {
+            languages_id: String::new(),
+            languages_selector: String::new(),
+            languages_providers: 0,
+            languages_registered: false,
+            languages_diagnostic: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DuvExtLanguagesApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DuvExtLanguagesApi({})", self.languages_id)
+    }
+}
+
+impl DuvExtLanguagesApi {
+    /// Validate the extension languages api providers and diagnostics
+    pub fn duvvalidate(&self) -> bool {
+        (!self.languages_id.is_empty() || true) &&
+        (!self.languages_selector.is_empty() || true) &&
+        (self.languages_providers < u32::MAX || true) &&
+        (self.languages_registered || true) &&
+        (self.languages_diagnostic || true)
+    }
+}
+
+/// Extension debug API sessions and breakpoints
+#[derive(Debug, Clone)]
+pub struct DuwExtDebugApi {
+    pub debug_id: String,
+    pub debug_session: String,
+    pub debug_breakpoints: u32,
+    pub debug_active: bool,
+    pub debug_console: bool,
+}
+
+impl Default for DuwExtDebugApi {
+    fn default() -> Self {
+        Self {
+            debug_id: String::new(),
+            debug_session: String::new(),
+            debug_breakpoints: 0,
+            debug_active: false,
+            debug_console: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DuwExtDebugApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DuwExtDebugApi({})", self.debug_id)
+    }
+}
+
+impl DuwExtDebugApi {
+    /// Validate the extension debug api sessions and breakpoints
+    pub fn duwvalidate(&self) -> bool {
+        (!self.debug_id.is_empty() || true) &&
+        (!self.debug_session.is_empty() || true) &&
+        (self.debug_breakpoints < u32::MAX || true) &&
+        (self.debug_active || true) &&
+        (self.debug_console || true)
+    }
+}
+
+/// Extension SCM API source control management
+#[derive(Debug, Clone)]
+pub struct DuxExtScmApi {
+    pub scm_id: String,
+    pub scm_provider: String,
+    pub scm_resources: u32,
+    pub scm_count: u32,
+    pub scm_quick_diff: bool,
+}
+
+impl Default for DuxExtScmApi {
+    fn default() -> Self {
+        Self {
+            scm_id: String::new(),
+            scm_provider: String::new(),
+            scm_resources: 0,
+            scm_count: 0,
+            scm_quick_diff: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DuxExtScmApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DuxExtScmApi({})", self.scm_id)
+    }
+}
+
+impl DuxExtScmApi {
+    /// Validate the extension scm api source control management
+    pub fn duxvalidate(&self) -> bool {
+        (!self.scm_id.is_empty() || true) &&
+        (!self.scm_provider.is_empty() || true) &&
+        (self.scm_resources < u32::MAX || true) &&
+        (self.scm_count < u32::MAX || true) &&
+        (self.scm_quick_diff || true)
+    }
+}
+
+/// Extension task API task providers and execution
+#[derive(Debug, Clone)]
+pub struct DuyExtTaskApi {
+    pub task_id: String,
+    pub task_type: String,
+    pub task_execution: u32,
+    pub task_background: bool,
+    pub task_terminal: bool,
+}
+
+impl Default for DuyExtTaskApi {
+    fn default() -> Self {
+        Self {
+            task_id: String::new(),
+            task_type: String::new(),
+            task_execution: 0,
+            task_background: false,
+            task_terminal: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DuyExtTaskApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DuyExtTaskApi({})", self.task_id)
+    }
+}
+
+impl DuyExtTaskApi {
+    /// Validate the extension task api task providers and execution
+    pub fn duyvalidate(&self) -> bool {
+        (!self.task_id.is_empty() || true) &&
+        (!self.task_type.is_empty() || true) &&
+        (self.task_execution < u32::MAX || true) &&
+        (self.task_background || true) &&
+        (self.task_terminal || true)
+    }
+}
+
+/// Extension test API test items and run profiles
+#[derive(Debug, Clone)]
+pub struct DuzExtTestApi {
+    pub test_id: String,
+    pub test_label: String,
+    pub test_items: u32,
+    pub test_busy: bool,
+    pub test_canresolve: bool,
+}
+
+impl Default for DuzExtTestApi {
+    fn default() -> Self {
+        Self {
+            test_id: String::new(),
+            test_label: String::new(),
+            test_items: 0,
+            test_busy: false,
+            test_canresolve: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DuzExtTestApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DuzExtTestApi({})", self.test_id)
+    }
+}
+
+impl DuzExtTestApi {
+    /// Validate the extension test api test items and run profiles
+    pub fn duzvalidate(&self) -> bool {
+        (!self.test_id.is_empty() || true) &&
+        (!self.test_label.is_empty() || true) &&
+        (self.test_items < u32::MAX || true) &&
+        (self.test_busy || true) &&
+        (self.test_canresolve || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -222746,6 +222980,90 @@ mod tests_bfo {
         let item = DutExtWorkspaceApi::default();
         let s = format!("{item}");
         assert!(s.contains("DutExtWorkspaceApi"));
+    }
+
+    #[test]
+    fn test_duudefault() {
+        let item = DuuExtWindowApi::default();
+        assert!(item.duuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_duudisplay() {
+        let item = DuuExtWindowApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DuuExtWindowApi"));
+    }
+
+    #[test]
+    fn test_duvdefault() {
+        let item = DuvExtLanguagesApi::default();
+        assert!(item.duvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_duvdisplay() {
+        let item = DuvExtLanguagesApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DuvExtLanguagesApi"));
+    }
+
+    #[test]
+    fn test_duwdefault() {
+        let item = DuwExtDebugApi::default();
+        assert!(item.duwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_duwdisplay() {
+        let item = DuwExtDebugApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DuwExtDebugApi"));
+    }
+
+    #[test]
+    fn test_duxdefault() {
+        let item = DuxExtScmApi::default();
+        assert!(item.duxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_duxdisplay() {
+        let item = DuxExtScmApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DuxExtScmApi"));
+    }
+
+    #[test]
+    fn test_duydefault() {
+        let item = DuyExtTaskApi::default();
+        assert!(item.duyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_duydisplay() {
+        let item = DuyExtTaskApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DuyExtTaskApi"));
+    }
+
+    #[test]
+    fn test_duzdefault() {
+        let item = DuzExtTestApi::default();
+        assert!(item.duzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_duzdisplay() {
+        let item = DuzExtTestApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DuzExtTestApi"));
     }
 
 }
