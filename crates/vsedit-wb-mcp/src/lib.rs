@@ -53191,3 +53191,358 @@ mod bar_tests {
         assert_eq!(files, vec!["a.rs", "b.rs"]);
     }
 }
+
+
+// --- bas_: Editor hover provider model ---
+
+/// Content type for hover content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BasHoverContentKind {
+    PlainText,
+    Markdown,
+    Code { language: String },
+}
+
+/// A single piece of hover content.
+#[derive(Debug, Clone)]
+pub struct BasHoverContent {
+    pub kind: BasHoverContentKind,
+    pub value: String,
+}
+
+impl BasHoverContent {
+    pub fn plain(text: &str) -> Self {
+        Self { kind: BasHoverContentKind::PlainText, value: text.to_string() }
+    }
+
+    pub fn markdown(md: &str) -> Self {
+        Self { kind: BasHoverContentKind::Markdown, value: md.to_string() }
+    }
+
+    pub fn code(language: &str, code: &str) -> Self {
+        Self {
+            kind: BasHoverContentKind::Code { language: language.to_string() },
+            value: code.to_string(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.value.is_empty()
+    }
+
+    pub fn render_for_terminal(&self) -> String {
+        match &self.kind {
+            BasHoverContentKind::PlainText => self.value.clone(),
+            BasHoverContentKind::Markdown => self.value.clone(), // Simplified
+            BasHoverContentKind::Code { language } => {
+                format!("```{}\n{}\n```", language, self.value)
+            }
+        }
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.value.lines().count().max(1)
+    }
+}
+
+/// Range in the editor that the hover applies to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BasHoverRange {
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+}
+
+impl BasHoverRange {
+    pub fn new(start_line: u32, start_col: u32, end_line: u32, end_col: u32) -> Self {
+        Self { start_line, start_col, end_line, end_col }
+    }
+
+    pub fn single_line(line: u32, start: u32, end: u32) -> Self {
+        Self { start_line: line, start_col: start, end_line: line, end_col: end }
+    }
+
+    pub fn contains(&self, line: u32, col: u32) -> bool {
+        if line < self.start_line || line > self.end_line {
+            return false;
+        }
+        if line == self.start_line && col < self.start_col {
+            return false;
+        }
+        if line == self.end_line && col >= self.end_col {
+            return false;
+        }
+        true
+    }
+}
+
+/// A complete hover result from one or more providers.
+#[derive(Debug, Clone)]
+pub struct BasHoverResult {
+    pub contents: Vec<BasHoverContent>,
+    pub range: Option<BasHoverRange>,
+    pub provider_id: String,
+}
+
+impl BasHoverResult {
+    pub fn new(provider_id: &str) -> Self {
+        Self {
+            contents: Vec::new(),
+            range: None,
+            provider_id: provider_id.to_string(),
+        }
+    }
+
+    pub fn add_content(&mut self, content: BasHoverContent) {
+        self.contents.push(content);
+    }
+
+    pub fn with_range(mut self, range: BasHoverRange) -> Self {
+        self.range = Some(range);
+        self
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.contents.is_empty() || self.contents.iter().all(|c| c.is_empty())
+    }
+
+    pub fn total_lines(&self) -> usize {
+        self.contents.iter().map(|c| c.line_count()).sum()
+    }
+
+    pub fn render(&self) -> String {
+        self.contents.iter()
+            .map(|c| c.render_for_terminal())
+            .collect::<Vec<_>>()
+            .join("\n---\n")
+    }
+}
+
+/// State of the hover widget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BasHoverState {
+    Hidden,
+    Loading,
+    Visible,
+    Sticky,
+}
+
+/// The hover widget model.
+#[derive(Debug, Clone)]
+pub struct BasHoverWidget {
+    pub results: Vec<BasHoverResult>,
+    pub state: BasHoverState,
+    pub line: u32,
+    pub column: u32,
+    pub scroll_offset: usize,
+    pub max_height: usize,
+    pub is_above: bool,
+}
+
+impl BasHoverWidget {
+    pub fn new() -> Self {
+        Self {
+            results: Vec::new(),
+            state: BasHoverState::Hidden,
+            line: 0,
+            column: 0,
+            scroll_offset: 0,
+            max_height: 20,
+            is_above: false,
+        }
+    }
+
+    pub fn show(&mut self, results: Vec<BasHoverResult>, line: u32, col: u32) {
+        self.results = results.into_iter().filter(|r| !r.is_empty()).collect();
+        if self.results.is_empty() {
+            self.state = BasHoverState::Hidden;
+        } else {
+            self.state = BasHoverState::Visible;
+            self.line = line;
+            self.column = col;
+            self.scroll_offset = 0;
+        }
+    }
+
+    pub fn hide(&mut self) {
+        self.state = BasHoverState::Hidden;
+        self.results.clear();
+    }
+
+    pub fn is_visible(&self) -> bool {
+        matches!(self.state, BasHoverState::Visible | BasHoverState::Sticky)
+    }
+
+    pub fn make_sticky(&mut self) {
+        if self.state == BasHoverState::Visible {
+            self.state = BasHoverState::Sticky;
+        }
+    }
+
+    pub fn is_sticky(&self) -> bool {
+        self.state == BasHoverState::Sticky
+    }
+
+    pub fn total_content_lines(&self) -> usize {
+        self.results.iter().map(|r| r.total_lines()).sum()
+    }
+
+    pub fn scroll_down(&mut self, amount: usize) {
+        let max = self.total_content_lines().saturating_sub(self.max_height);
+        self.scroll_offset = (self.scroll_offset + amount).min(max);
+    }
+
+    pub fn scroll_up(&mut self, amount: usize) {
+        self.scroll_offset = self.scroll_offset.saturating_sub(amount);
+    }
+
+    pub fn can_scroll(&self) -> bool {
+        self.total_content_lines() > self.max_height
+    }
+
+    pub fn render_all(&self) -> String {
+        self.results.iter().map(|r| r.render()).collect::<Vec<_>>().join("\n\n")
+    }
+
+    pub fn result_count(&self) -> usize {
+        self.results.len()
+    }
+
+    pub fn position(&self) -> (u32, u32) {
+        (self.line, self.column)
+    }
+}
+
+#[cfg(test)]
+mod bas_tests {
+    use super::*;
+
+    #[test]
+    fn test_bas_hover_content_plain() {
+        let c = BasHoverContent::plain("hello world");
+        assert_eq!(c.render_for_terminal(), "hello world");
+        assert!(!c.is_empty());
+        assert_eq!(c.line_count(), 1);
+    }
+
+    #[test]
+    fn test_bas_hover_content_code() {
+        let c = BasHoverContent::code("rust", "fn main() {}");
+        let rendered = c.render_for_terminal();
+        assert!(rendered.contains("```rust"));
+        assert!(rendered.contains("fn main()"));
+    }
+
+    #[test]
+    fn test_bas_hover_content_multiline() {
+        let c = BasHoverContent::plain("line1\nline2\nline3");
+        assert_eq!(c.line_count(), 3);
+    }
+
+    #[test]
+    fn test_bas_hover_range() {
+        let r = BasHoverRange::single_line(5, 10, 20);
+        assert!(r.contains(5, 10));
+        assert!(r.contains(5, 15));
+        assert!(!r.contains(5, 20));
+        assert!(!r.contains(4, 15));
+    }
+
+    #[test]
+    fn test_bas_hover_range_multiline() {
+        let r = BasHoverRange::new(5, 10, 8, 5);
+        assert!(r.contains(6, 0));
+        assert!(r.contains(5, 10));
+        assert!(!r.contains(5, 9));
+        assert!(!r.contains(8, 5));
+    }
+
+    #[test]
+    fn test_bas_hover_result() {
+        let mut result = BasHoverResult::new("typescript");
+        result.add_content(BasHoverContent::code("ts", "const x: number"));
+        result.add_content(BasHoverContent::markdown("A numeric variable"));
+        assert!(!result.is_empty());
+        assert_eq!(result.total_lines(), 2);
+    }
+
+    #[test]
+    fn test_bas_hover_result_empty() {
+        let result = BasHoverResult::new("test");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_bas_widget_show_hide() {
+        let mut widget = BasHoverWidget::new();
+        assert!(!widget.is_visible());
+
+        let mut result = BasHoverResult::new("test");
+        result.add_content(BasHoverContent::plain("info"));
+        widget.show(vec![result], 10, 5);
+        assert!(widget.is_visible());
+        assert_eq!(widget.position(), (10, 5));
+
+        widget.hide();
+        assert!(!widget.is_visible());
+    }
+
+    #[test]
+    fn test_bas_widget_empty_results() {
+        let mut widget = BasHoverWidget::new();
+        widget.show(vec![], 1, 1);
+        assert!(!widget.is_visible());
+    }
+
+    #[test]
+    fn test_bas_widget_sticky() {
+        let mut widget = BasHoverWidget::new();
+        let mut result = BasHoverResult::new("test");
+        result.add_content(BasHoverContent::plain("info"));
+        widget.show(vec![result], 1, 1);
+        widget.make_sticky();
+        assert!(widget.is_sticky());
+    }
+
+    #[test]
+    fn test_bas_widget_scroll() {
+        let mut widget = BasHoverWidget::new();
+        widget.max_height = 5;
+        let mut result = BasHoverResult::new("test");
+        result.add_content(BasHoverContent::plain("1\n2\n3\n4\n5\n6\n7\n8\n9\n10"));
+        widget.show(vec![result], 1, 1);
+        assert!(widget.can_scroll());
+
+        widget.scroll_down(3);
+        assert_eq!(widget.scroll_offset, 3);
+        widget.scroll_up(1);
+        assert_eq!(widget.scroll_offset, 2);
+    }
+
+    #[test]
+    fn test_bas_widget_render() {
+        let mut widget = BasHoverWidget::new();
+        let mut r1 = BasHoverResult::new("a");
+        r1.add_content(BasHoverContent::plain("hello"));
+        let mut r2 = BasHoverResult::new("b");
+        r2.add_content(BasHoverContent::code("rs", "fn foo()"));
+        widget.show(vec![r1, r2], 1, 1);
+        let output = widget.render_all();
+        assert!(output.contains("hello"));
+        assert!(output.contains("fn foo()"));
+    }
+
+    #[test]
+    fn test_bas_hover_content_markdown() {
+        let c = BasHoverContent::markdown("**bold** text");
+        assert_eq!(c.kind, BasHoverContentKind::Markdown);
+    }
+
+    #[test]
+    fn test_bas_result_with_range() {
+        let result = BasHoverResult::new("test")
+            .with_range(BasHoverRange::single_line(5, 0, 10));
+        assert!(result.range.is_some());
+    }
+}
