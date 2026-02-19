@@ -64258,3 +64258,198 @@ mod bcm_tests {
         assert!(!pm.all_tasks()[0].cancelled); // not cancellable
     }
 }
+
+
+// --- bcn_: Editor tree view widget model ---
+
+/// A tree node.
+#[derive(Debug, Clone)]
+pub struct BcnTreeNode {
+    pub id: String,
+    pub label: String,
+    pub icon: Option<char>,
+    pub collapsible: bool,
+    pub expanded: bool,
+    pub children: Vec<BcnTreeNode>,
+    pub context_value: Option<String>,
+    pub tooltip: Option<String>,
+}
+
+impl BcnTreeNode {
+    pub fn leaf(id: &str, label: &str) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), icon: None, collapsible: false, expanded: false, children: Vec::new(), context_value: None, tooltip: None }
+    }
+
+    pub fn branch(id: &str, label: &str, children: Vec<BcnTreeNode>) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), icon: None, collapsible: true, expanded: false, children, context_value: None, tooltip: None }
+    }
+
+    pub fn with_icon(mut self, icon: char) -> Self { self.icon = Some(icon); self }
+
+    pub fn toggle(&mut self) { if self.collapsible { self.expanded = !self.expanded; } }
+
+    pub fn flatten(&self, depth: usize) -> Vec<(usize, &BcnTreeNode)> {
+        let mut result = vec![(depth, self)];
+        if self.expanded {
+            for child in &self.children {
+                result.extend(child.flatten(depth + 1));
+            }
+        }
+        result
+    }
+
+    pub fn find(&self, id: &str) -> Option<&BcnTreeNode> {
+        if self.id == id { return Some(self); }
+        for child in &self.children {
+            if let Some(found) = child.find(id) { return Some(found); }
+        }
+        None
+    }
+
+    pub fn find_mut(&mut self, id: &str) -> Option<&mut BcnTreeNode> {
+        if self.id == id { return Some(self); }
+        for child in &mut self.children {
+            if let Some(found) = child.find_mut(id) { return Some(found); }
+        }
+        None
+    }
+
+    pub fn total_count(&self) -> usize {
+        1 + self.children.iter().map(|c| c.total_count()).sum::<usize>()
+    }
+}
+
+/// A tree view with cursor and selection.
+#[derive(Debug)]
+pub struct BcnTreeView {
+    roots: Vec<BcnTreeNode>,
+    cursor: usize,
+    filter: String,
+    view_id: String,
+}
+
+impl BcnTreeView {
+    pub fn new(view_id: &str) -> Self {
+        Self { roots: Vec::new(), cursor: 0, filter: String::new(), view_id: view_id.to_string() }
+    }
+
+    pub fn set_roots(&mut self, roots: Vec<BcnTreeNode>) { self.roots = roots; self.cursor = 0; }
+
+    pub fn visible_nodes(&self) -> Vec<(usize, &BcnTreeNode)> {
+        let mut nodes = Vec::new();
+        for root in &self.roots { nodes.extend(root.flatten(0)); }
+        if self.filter.is_empty() { nodes }
+        else { let f = self.filter.to_lowercase(); nodes.into_iter().filter(|(_, n)| n.label.to_lowercase().contains(&f)).collect() }
+    }
+
+    pub fn cursor_node(&self) -> Option<&BcnTreeNode> { self.visible_nodes().get(self.cursor).map(|(_, n)| *n) }
+
+    pub fn move_cursor(&mut self, delta: i32) {
+        let count = self.visible_nodes().len();
+        if count == 0 { return; }
+        self.cursor = ((self.cursor as i32 + delta).rem_euclid(count as i32)) as usize;
+    }
+
+    pub fn toggle_at_cursor(&mut self) {
+        if let Some(id) = self.cursor_node().map(|n| n.id.clone()) {
+            for root in &mut self.roots {
+                if let Some(node) = root.find_mut(&id) { node.toggle(); break; }
+            }
+        }
+    }
+
+    pub fn set_filter(&mut self, f: &str) { self.filter = f.to_string(); self.cursor = 0; }
+    pub fn view_id(&self) -> &str { &self.view_id }
+    pub fn total_nodes(&self) -> usize { self.roots.iter().map(|r| r.total_count()).sum() }
+
+    pub fn render_lines(&self) -> Vec<String> {
+        self.visible_nodes().iter().enumerate().map(|(i, (depth, node))| {
+            let indent = "  ".repeat(*depth);
+            let arrow = if node.collapsible { if node.expanded { "▾ " } else { "▸ " } } else { "  " };
+            let icon = node.icon.map(|c| format!("{} ", c)).unwrap_or_default();
+            let cursor = if i == self.cursor { "› " } else { "  " };
+            format!("{}{}{}{}{}", cursor, indent, arrow, icon, node.label)
+        }).collect()
+    }
+}
+
+#[cfg(test)]
+mod bcn_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcn_leaf() {
+        let n = BcnTreeNode::leaf("f1", "file.rs");
+        assert!(!n.collapsible);
+        assert_eq!(n.total_count(), 1);
+    }
+
+    #[test]
+    fn test_bcn_branch() {
+        let n = BcnTreeNode::branch("d1", "src", vec![BcnTreeNode::leaf("f1", "main.rs")]);
+        assert!(n.collapsible);
+        assert_eq!(n.total_count(), 2);
+    }
+
+    #[test]
+    fn test_bcn_flatten() {
+        let mut n = BcnTreeNode::branch("d", "dir", vec![BcnTreeNode::leaf("f", "file")]);
+        n.expanded = true;
+        let flat = n.flatten(0);
+        assert_eq!(flat.len(), 2);
+        assert_eq!(flat[1].0, 1); // child at depth 1
+    }
+
+    #[test]
+    fn test_bcn_find() {
+        let n = BcnTreeNode::branch("d", "dir", vec![BcnTreeNode::leaf("f", "file")]);
+        assert!(n.find("f").is_some());
+        assert!(n.find("missing").is_none());
+    }
+
+    #[test]
+    fn test_bcn_toggle() {
+        let mut n = BcnTreeNode::branch("d", "dir", vec![]);
+        assert!(!n.expanded);
+        n.toggle();
+        assert!(n.expanded);
+    }
+
+    #[test]
+    fn test_bcn_tree_view() {
+        let mut tv = BcnTreeView::new("fileExplorer");
+        tv.set_roots(vec![BcnTreeNode::leaf("f", "main.rs")]);
+        assert_eq!(tv.visible_nodes().len(), 1);
+    }
+
+    #[test]
+    fn test_bcn_cursor_move() {
+        let mut tv = BcnTreeView::new("test");
+        tv.set_roots(vec![BcnTreeNode::leaf("a", "A"), BcnTreeNode::leaf("b", "B")]);
+        tv.move_cursor(1);
+        assert_eq!(tv.cursor_node().unwrap().id, "b");
+    }
+
+    #[test]
+    fn test_bcn_filter() {
+        let mut tv = BcnTreeView::new("test");
+        tv.set_roots(vec![BcnTreeNode::leaf("a", "Alpha"), BcnTreeNode::leaf("b", "Beta")]);
+        tv.set_filter("alpha");
+        assert_eq!(tv.visible_nodes().len(), 1);
+    }
+
+    #[test]
+    fn test_bcn_render() {
+        let mut tv = BcnTreeView::new("test");
+        tv.set_roots(vec![BcnTreeNode::leaf("f", "file.rs").with_icon('📄')]);
+        let lines = tv.render_lines();
+        assert!(lines[0].contains("📄"));
+    }
+
+    #[test]
+    fn test_bcn_total_nodes() {
+        let mut tv = BcnTreeView::new("test");
+        tv.set_roots(vec![BcnTreeNode::branch("d", "dir", vec![BcnTreeNode::leaf("f", "f")])]);
+        assert_eq!(tv.total_nodes(), 2);
+    }
+}
