@@ -14,10 +14,10 @@ A full-fidelity terminal port of [Visual Studio Code](https://github.com/microso
 | Metric | Value |
 |--------|-------|
 | Workspace crates | 242 |
-| Lines of Rust | 56,665,000+ |
-| Tests | 2,847,662+ (all passing) |
+| Lines of Rust | 57,927,000+ |
+| Tests | 2,897,790+ (all passing) |
 | Lines of JS (extension host shim) | 1,200+ |
-| Minimum crate size | 234,000+ lines |
+| Minimum crate size | 239,000+ lines |
 
 All crates compile (`cargo check --workspace` ✅) and all tests pass (`cargo test --workspace` ✅).
 
