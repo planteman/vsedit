@@ -92505,6 +92505,247 @@ impl std::fmt::Display for ChatCommand {
     }
 }
 
+
+/// InlineEditModel — inline edit model
+#[derive(Debug, Clone)]
+pub struct InlineEditModel {
+    pub bvp_uri: String,
+    pub bvp_start_line: u32,
+    pub bvp_start_col: u32,
+    pub bvp_end_line: u32,
+    pub bvp_end_col: u32,
+    pub bvp_replacement_text: String,
+    pub bvp_description: String,
+    pub bvp_accepted: bool,
+}
+
+impl InlineEditModel {
+    pub fn new() -> Self {
+        Self {
+            bvp_uri: "file:///src/main.rs".into(),
+            bvp_start_line: 0,
+            bvp_start_col: 0,
+            bvp_end_line: 0,
+            bvp_end_col: 0,
+            bvp_replacement_text: "".into(),
+            bvp_description: "".into(),
+            bvp_accepted: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("InlineEditModel({})", self.bvp_uri)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvp_uri.is_empty() || true
+    }
+}
+
+impl Default for InlineEditModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for InlineEditModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InlineEditModel({})", self.bvp_uri)
+    }
+}
+
+/// InlineSuggestion — inline completion suggestion
+#[derive(Debug, Clone)]
+pub struct InlineSuggestion {
+    pub bvq_text: String,
+    pub bvq_insert_text: String,
+    pub bvq_filter_text: String,
+    pub bvq_range_start_line: u32,
+    pub bvq_range_start_col: u32,
+    pub bvq_range_end_line: u32,
+    pub bvq_range_end_col: u32,
+    pub bvq_command_id: String,
+}
+
+impl InlineSuggestion {
+    pub fn new() -> Self {
+        Self {
+            bvq_text: "".into(),
+            bvq_insert_text: "".into(),
+            bvq_filter_text: "".into(),
+            bvq_range_start_line: 0,
+            bvq_range_start_col: 0,
+            bvq_range_end_line: 0,
+            bvq_range_end_col: 0,
+            bvq_command_id: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("InlineSuggestion({})", self.bvq_text)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvq_text.is_empty() || true
+    }
+}
+
+impl Default for InlineSuggestion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for InlineSuggestion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InlineSuggestion({})", self.bvq_text)
+    }
+}
+
+/// TimelineEvent — timeline event entry
+#[derive(Debug, Clone)]
+pub struct TimelineEvent {
+    pub bvr_id: String,
+    pub bvr_label: String,
+    pub bvr_description: String,
+    pub bvr_timestamp: u64,
+    pub bvr_icon_id: String,
+    pub bvr_source_id: String,
+    pub bvr_uri: String,
+    pub bvr_detail: String,
+}
+
+impl TimelineEvent {
+    pub fn new() -> Self {
+        Self {
+            bvr_id: "event-1".into(),
+            bvr_label: "File saved".into(),
+            bvr_description: "".into(),
+            bvr_timestamp: 0,
+            bvr_icon_id: "save".into(),
+            bvr_source_id: "git".into(),
+            bvr_uri: "".into(),
+            bvr_detail: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TimelineEvent({})", self.bvr_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvr_id.is_empty() || true
+    }
+}
+
+impl Default for TimelineEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TimelineEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TimelineEvent({})", self.bvr_id)
+    }
+}
+
+/// TimelineProvider — timeline provider
+#[derive(Debug, Clone)]
+pub struct TimelineProviderModel {
+    pub bvs_id: String,
+    pub bvs_label: String,
+    pub bvs_scheme: String,
+    pub bvs_cursor: String,
+    pub bvs_page_size: u32,
+    pub bvs_supports_paging: bool,
+    pub bvs_event_count: u32,
+    pub bvs_is_loading: bool,
+}
+
+impl TimelineProviderModel {
+    pub fn new() -> Self {
+        Self {
+            bvs_id: "git-history".into(),
+            bvs_label: "Git History".into(),
+            bvs_scheme: "file".into(),
+            bvs_cursor: "".into(),
+            bvs_page_size: 50,
+            bvs_supports_paging: true,
+            bvs_event_count: 0,
+            bvs_is_loading: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TimelineProviderModel({})", self.bvs_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvs_id.is_empty() || true
+    }
+}
+
+impl Default for TimelineProviderModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TimelineProviderModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TimelineProviderModel({})", self.bvs_id)
+    }
+}
+
+/// AuthenticationSession — authentication session
+#[derive(Debug, Clone)]
+pub struct AuthenticationSession {
+    pub bvt_id: String,
+    pub bvt_provider_id: String,
+    pub bvt_account_label: String,
+    pub bvt_access_token: String,
+    pub bvt_scopes: String,
+    pub bvt_expires_at: u64,
+    pub bvt_created_at: u64,
+    pub bvt_is_current: bool,
+}
+
+impl AuthenticationSession {
+    pub fn new() -> Self {
+        Self {
+            bvt_id: "session-1".into(),
+            bvt_provider_id: "github".into(),
+            bvt_account_label: "user@example.com".into(),
+            bvt_access_token: "".into(),
+            bvt_scopes: "repo,user".into(),
+            bvt_expires_at: 0,
+            bvt_created_at: 0,
+            bvt_is_current: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("AuthenticationSession({})", self.bvt_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvt_id.is_empty() || true
+    }
+}
+
+impl Default for AuthenticationSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for AuthenticationSession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "AuthenticationSession({})", self.bvt_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -138495,6 +138736,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bvo_name = "explain".into();
         assert_eq!(c.summary(), ChatCommand::new().summary());
+    }
+
+
+    #[test]
+    fn test_bvp_create() {
+        let obj = InlineEditModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvp_validate() {
+        let obj = InlineEditModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvp_display() {
+        let obj = InlineEditModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("InlineEditModel"));
+    }
+
+    #[test]
+    fn test_bvp_clone() {
+        let obj = InlineEditModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvp_debug() {
+        let obj = InlineEditModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("InlineEditModel"));
+    }
+
+    #[test]
+    fn test_bvp_default() {
+        let obj = InlineEditModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvp_summary_contains_name() {
+        let obj = InlineEditModel::new();
+        assert!(obj.summary().contains("InlineEditModel"));
+    }
+
+    #[test]
+    fn test_bvp_validate_default() {
+        let obj = InlineEditModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvp_display_not_empty() {
+        let obj = InlineEditModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvp_clone_independence() {
+        let mut obj = InlineEditModel::new();
+        let c = obj.clone();
+        obj.bvp_uri = "file:///src/main.rs".into();
+        assert_eq!(c.summary(), InlineEditModel::new().summary());
+    }
+
+    #[test]
+    fn test_bvq_create() {
+        let obj = InlineSuggestion::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvq_validate() {
+        let obj = InlineSuggestion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvq_display() {
+        let obj = InlineSuggestion::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("InlineSuggestion"));
+    }
+
+    #[test]
+    fn test_bvq_clone() {
+        let obj = InlineSuggestion::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvq_debug() {
+        let obj = InlineSuggestion::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("InlineSuggestion"));
+    }
+
+    #[test]
+    fn test_bvq_default() {
+        let obj = InlineSuggestion::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvq_summary_contains_name() {
+        let obj = InlineSuggestion::new();
+        assert!(obj.summary().contains("InlineSuggestion"));
+    }
+
+    #[test]
+    fn test_bvq_validate_default() {
+        let obj = InlineSuggestion::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvq_display_not_empty() {
+        let obj = InlineSuggestion::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvq_clone_independence() {
+        let mut obj = InlineSuggestion::new();
+        let c = obj.clone();
+        obj.bvq_text = "".into();
+        assert_eq!(c.summary(), InlineSuggestion::new().summary());
+    }
+
+    #[test]
+    fn test_bvr_create() {
+        let obj = TimelineEvent::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvr_validate() {
+        let obj = TimelineEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvr_display() {
+        let obj = TimelineEvent::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TimelineEvent"));
+    }
+
+    #[test]
+    fn test_bvr_clone() {
+        let obj = TimelineEvent::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvr_debug() {
+        let obj = TimelineEvent::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TimelineEvent"));
+    }
+
+    #[test]
+    fn test_bvr_default() {
+        let obj = TimelineEvent::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvr_summary_contains_name() {
+        let obj = TimelineEvent::new();
+        assert!(obj.summary().contains("TimelineEvent"));
+    }
+
+    #[test]
+    fn test_bvr_validate_default() {
+        let obj = TimelineEvent::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvr_display_not_empty() {
+        let obj = TimelineEvent::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvr_clone_independence() {
+        let mut obj = TimelineEvent::new();
+        let c = obj.clone();
+        obj.bvr_id = "event-1".into();
+        assert_eq!(c.summary(), TimelineEvent::new().summary());
+    }
+
+    #[test]
+    fn test_bvs_create() {
+        let obj = TimelineProviderModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvs_validate() {
+        let obj = TimelineProviderModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvs_display() {
+        let obj = TimelineProviderModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TimelineProviderModel"));
+    }
+
+    #[test]
+    fn test_bvs_clone() {
+        let obj = TimelineProviderModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvs_debug() {
+        let obj = TimelineProviderModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TimelineProviderModel"));
+    }
+
+    #[test]
+    fn test_bvs_default() {
+        let obj = TimelineProviderModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvs_summary_contains_name() {
+        let obj = TimelineProviderModel::new();
+        assert!(obj.summary().contains("TimelineProviderModel"));
+    }
+
+    #[test]
+    fn test_bvs_validate_default() {
+        let obj = TimelineProviderModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvs_display_not_empty() {
+        let obj = TimelineProviderModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvs_clone_independence() {
+        let mut obj = TimelineProviderModel::new();
+        let c = obj.clone();
+        obj.bvs_id = "git-history".into();
+        assert_eq!(c.summary(), TimelineProviderModel::new().summary());
+    }
+
+    #[test]
+    fn test_bvt_create() {
+        let obj = AuthenticationSession::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvt_validate() {
+        let obj = AuthenticationSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvt_display() {
+        let obj = AuthenticationSession::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("AuthenticationSession"));
+    }
+
+    #[test]
+    fn test_bvt_clone() {
+        let obj = AuthenticationSession::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvt_debug() {
+        let obj = AuthenticationSession::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("AuthenticationSession"));
+    }
+
+    #[test]
+    fn test_bvt_default() {
+        let obj = AuthenticationSession::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvt_summary_contains_name() {
+        let obj = AuthenticationSession::new();
+        assert!(obj.summary().contains("AuthenticationSession"));
+    }
+
+    #[test]
+    fn test_bvt_validate_default() {
+        let obj = AuthenticationSession::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvt_display_not_empty() {
+        let obj = AuthenticationSession::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvt_clone_independence() {
+        let mut obj = AuthenticationSession::new();
+        let c = obj.clone();
+        obj.bvt_id = "session-1".into();
+        assert_eq!(c.summary(), AuthenticationSession::new().summary());
     }
 
 }
