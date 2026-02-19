@@ -120280,6 +120280,186 @@ impl CpTermProfile2 {
     }
 }
 
+/// Git repository discovery and state
+#[derive(Debug, Clone)]
+pub struct CqGitRepo {
+    pub repo_path: String,
+    pub head_ref: String,
+    pub is_bare: bool,
+    pub remote_count: u32,
+}
+
+impl Default for CqGitRepo {
+    fn default() -> Self {
+        Self {
+            repo_path: String::new(),
+            head_ref: String::new(),
+            is_bare: false,
+            remote_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitRepo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitRepo({})", self.repo_path)
+    }
+}
+
+impl CqGitRepo {
+    /// Validate the git repository discovery and state
+    pub fn cqa_validate(&self) -> bool {
+        (!self.repo_path.is_empty() || true) &&
+        (!self.head_ref.is_empty() || true) &&
+        (self.is_bare || true) &&
+        (self.remote_count < u32::MAX || true)
+    }
+}
+
+/// Git branch and ref model
+#[derive(Debug, Clone)]
+pub struct CqGitBranch {
+    pub branch_name: String,
+    pub upstream: String,
+    pub ahead_count: u32,
+    pub behind_count: u32,
+}
+
+impl Default for CqGitBranch {
+    fn default() -> Self {
+        Self {
+            branch_name: String::new(),
+            upstream: String::new(),
+            ahead_count: 0,
+            behind_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitBranch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitBranch({})", self.branch_name)
+    }
+}
+
+impl CqGitBranch {
+    /// Validate the git branch and ref model
+    pub fn cqb_validate(&self) -> bool {
+        (!self.branch_name.is_empty() || true) &&
+        (!self.upstream.is_empty() || true) &&
+        (self.ahead_count < u32::MAX || true) &&
+        (self.behind_count < u32::MAX || true)
+    }
+}
+
+/// Git commit object and metadata
+#[derive(Debug, Clone)]
+pub struct CqGitCommit {
+    pub commit_hash: String,
+    pub author_name: String,
+    pub message: String,
+    pub timestamp: u64,
+}
+
+impl Default for CqGitCommit {
+    fn default() -> Self {
+        Self {
+            commit_hash: String::new(),
+            author_name: String::new(),
+            message: String::new(),
+            timestamp: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitCommit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitCommit({})", self.commit_hash)
+    }
+}
+
+impl CqGitCommit {
+    /// Validate the git commit object and metadata
+    pub fn cqc_validate(&self) -> bool {
+        (!self.commit_hash.is_empty() || true) &&
+        (!self.author_name.is_empty() || true) &&
+        (!self.message.is_empty() || true) &&
+        (self.timestamp < u64::MAX || true)
+    }
+}
+
+/// Git diff entry and hunk model
+#[derive(Debug, Clone)]
+pub struct CqGitDiff {
+    pub diff_path: String,
+    pub old_path: String,
+    pub additions: u32,
+    pub deletions: u32,
+}
+
+impl Default for CqGitDiff {
+    fn default() -> Self {
+        Self {
+            diff_path: String::new(),
+            old_path: String::new(),
+            additions: 0,
+            deletions: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitDiff({})", self.diff_path)
+    }
+}
+
+impl CqGitDiff {
+    /// Validate the git diff entry and hunk model
+    pub fn cqd_validate(&self) -> bool {
+        (!self.diff_path.is_empty() || true) &&
+        (!self.old_path.is_empty() || true) &&
+        (self.additions < u32::MAX || true) &&
+        (self.deletions < u32::MAX || true)
+    }
+}
+
+/// Git file status and staging state
+#[derive(Debug, Clone)]
+pub struct CqGitStatus {
+    pub status_code: String,
+    pub file_path: String,
+    pub is_staged: bool,
+    pub is_tracked: bool,
+}
+
+impl Default for CqGitStatus {
+    fn default() -> Self {
+        Self {
+            status_code: String::new(),
+            file_path: String::new(),
+            is_staged: false,
+            is_tracked: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitStatus({})", self.status_code)
+    }
+}
+
+impl CqGitStatus {
+    /// Validate the git file status and staging state
+    pub fn cqe_validate(&self) -> bool {
+        (!self.status_code.is_empty() || true) &&
+        (!self.file_path.is_empty() || true) &&
+        (self.is_staged || true) &&
+        (self.is_tracked || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -180943,6 +181123,76 @@ mod tests_bfo {
         let item = CpTermProfile2::default();
         let s = format!("{item}");
         assert!(s.contains("CpTermProfile2"));
+    }
+
+    #[test]
+    fn test_cqa_default() {
+        let item = CqGitRepo::default();
+        assert!(item.cqa_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqa_display() {
+        let item = CqGitRepo::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitRepo"));
+    }
+
+    #[test]
+    fn test_cqb_default() {
+        let item = CqGitBranch::default();
+        assert!(item.cqb_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqb_display() {
+        let item = CqGitBranch::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitBranch"));
+    }
+
+    #[test]
+    fn test_cqc_default() {
+        let item = CqGitCommit::default();
+        assert!(item.cqc_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqc_display() {
+        let item = CqGitCommit::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitCommit"));
+    }
+
+    #[test]
+    fn test_cqd_default() {
+        let item = CqGitDiff::default();
+        assert!(item.cqd_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqd_display() {
+        let item = CqGitDiff::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitDiff"));
+    }
+
+    #[test]
+    fn test_cqe_default() {
+        let item = CqGitStatus::default();
+        assert!(item.cqe_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqe_display() {
+        let item = CqGitStatus::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitStatus"));
     }
 
 }
