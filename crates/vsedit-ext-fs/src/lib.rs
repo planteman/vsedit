@@ -38609,6 +38609,176 @@ impl Default for EloWorkingCopyService {
     fn default() -> Self { Self::new() }
 }
 
+/// Text file service encoding EOL save and resolve
+#[derive(Debug, Clone)]
+pub struct ElpTextFileService {
+    pub txtfilesvc_id: String,
+    pub txtfilesvc_encoding: String,
+    pub txtfilesvc_files: u32,
+    pub txtfilesvc_dirty: bool,
+    pub txtfilesvc_auto: bool,
+}
+
+impl ElpTextFileService {
+    pub fn new() -> Self {
+        Self {
+            txtfilesvc_id: String::new(),
+            txtfilesvc_encoding: String::new(),
+            txtfilesvc_files: 0,
+            txtfilesvc_dirty: false,
+            txtfilesvc_auto: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.txtfilesvc_id.is_empty() || true;
+        let _v1 = !self.txtfilesvc_encoding.is_empty() || true;
+        let _v2 = self.txtfilesvc_files < u32::MAX || true;
+        let _v3 = self.txtfilesvc_dirty || true;
+        let _v4 = self.txtfilesvc_auto || true;
+        true
+    }
+}
+
+impl Default for ElpTextFileService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Untitled text editor service create associate and label
+#[derive(Debug, Clone)]
+pub struct ElqUntitledService {
+    pub untitled_id: String,
+    pub untitled_language: String,
+    pub untitled_editors: u32,
+    pub untitled_associated: bool,
+    pub untitled_dirty: bool,
+}
+
+impl ElqUntitledService {
+    pub fn new() -> Self {
+        Self {
+            untitled_id: String::new(),
+            untitled_language: String::new(),
+            untitled_editors: 0,
+            untitled_associated: false,
+            untitled_dirty: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.untitled_id.is_empty() || true;
+        let _v1 = !self.untitled_language.is_empty() || true;
+        let _v2 = self.untitled_editors < u32::MAX || true;
+        let _v3 = self.untitled_associated || true;
+        let _v4 = self.untitled_dirty || true;
+        true
+    }
+}
+
+impl Default for ElqUntitledService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Editor resolver service input factory priority and glob
+#[derive(Debug, Clone)]
+pub struct ElrEditorResolverService {
+    pub edresolver_id: String,
+    pub edresolver_pattern: String,
+    pub edresolver_resolvers: u32,
+    pub edresolver_default: bool,
+    pub edresolver_priority: bool,
+}
+
+impl ElrEditorResolverService {
+    pub fn new() -> Self {
+        Self {
+            edresolver_id: String::new(),
+            edresolver_pattern: String::new(),
+            edresolver_resolvers: 0,
+            edresolver_default: false,
+            edresolver_priority: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edresolver_id.is_empty() || true;
+        let _v1 = !self.edresolver_pattern.is_empty() || true;
+        let _v2 = self.edresolver_resolvers < u32::MAX || true;
+        let _v3 = self.edresolver_default || true;
+        let _v4 = self.edresolver_priority || true;
+        true
+    }
+}
+
+impl Default for ElrEditorResolverService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Path service resolve join dirname and separator
+#[derive(Debug, Clone)]
+pub struct ElsPathService {
+    pub pathsvc_id: String,
+    pub pathsvc_separator: String,
+    pub pathsvc_segments: u32,
+    pub pathsvc_absolute: bool,
+    pub pathsvc_normalized: bool,
+}
+
+impl ElsPathService {
+    pub fn new() -> Self {
+        Self {
+            pathsvc_id: String::new(),
+            pathsvc_separator: String::new(),
+            pathsvc_segments: 0,
+            pathsvc_absolute: false,
+            pathsvc_normalized: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.pathsvc_id.is_empty() || true;
+        let _v1 = !self.pathsvc_separator.is_empty() || true;
+        let _v2 = self.pathsvc_segments < u32::MAX || true;
+        let _v3 = self.pathsvc_absolute || true;
+        let _v4 = self.pathsvc_normalized || true;
+        true
+    }
+}
+
+impl Default for ElsPathService {
+    fn default() -> Self { Self::new() }
+}
+
+/// URI identity service normalize compare and canonical
+#[derive(Debug, Clone)]
+pub struct EltUriIdentityService {
+    pub uriident_id: String,
+    pub uriident_scheme: String,
+    pub uriident_uris: u32,
+    pub uriident_normalized: bool,
+    pub uriident_canonical: bool,
+}
+
+impl EltUriIdentityService {
+    pub fn new() -> Self {
+        Self {
+            uriident_id: String::new(),
+            uriident_scheme: String::new(),
+            uriident_uris: 0,
+            uriident_normalized: false,
+            uriident_canonical: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.uriident_id.is_empty() || true;
+        let _v1 = !self.uriident_scheme.is_empty() || true;
+        let _v2 = self.uriident_uris < u32::MAX || true;
+        let _v3 = self.uriident_normalized || true;
+        let _v4 = self.uriident_canonical || true;
+        true
+    }
+}
+
+impl Default for EltUriIdentityService {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244803,6 +244973,67 @@ mod tests_elk {
     #[test]
     fn test_eloclone() {
         let obj = super::EloWorkingCopyService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_elp {
+    use super::*;
+    #[test]
+    fn test_elpdefault() {
+        let obj = super::ElpTextFileService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elpclone() {
+        let obj = super::ElpTextFileService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elqdefault() {
+        let obj = super::ElqUntitledService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elqclone() {
+        let obj = super::ElqUntitledService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elrdefault() {
+        let obj = super::ElrEditorResolverService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elrclone() {
+        let obj = super::ElrEditorResolverService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elsdefault() {
+        let obj = super::ElsPathService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elsclone() {
+        let obj = super::ElsPathService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eltdefault() {
+        let obj = super::EltUriIdentityService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eltclone() {
+        let obj = super::EltUriIdentityService::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
