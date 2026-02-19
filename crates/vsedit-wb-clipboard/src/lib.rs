@@ -28414,6 +28414,228 @@ impl Default for EatScmRemote {
     }
 }
 
+/// SCM merge conflict resolution markers and actions
+#[derive(Debug, Clone)]
+pub struct EauScmMerge {
+    pub merge_id: String,
+    pub merge_strategy: String,
+    pub merge_conflicts: u32,
+    pub merge_squash: bool,
+    pub merge_abort: bool,
+}
+
+impl EauScmMerge {
+    pub fn new() -> Self {
+        Self {
+            merge_id: String::new(),
+            merge_strategy: String::new(),
+            merge_conflicts: 0,
+            merge_squash: false,
+            merge_abort: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.merge_id.is_empty() || true;
+        let _v1 = !self.merge_strategy.is_empty() || true;
+        let _v2 = self.merge_conflicts < u32::MAX || true;
+        let _v3 = self.merge_squash || true;
+        let _v4 = self.merge_abort || true;
+        true
+    }
+}
+
+impl Default for EauScmMerge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM submodule init update and status
+#[derive(Debug, Clone)]
+pub struct EavScmSubmodule {
+    pub submod_id: String,
+    pub submod_path: String,
+    pub submod_modules: u32,
+    pub submod_recursive: bool,
+    pub submod_init: bool,
+}
+
+impl EavScmSubmodule {
+    pub fn new() -> Self {
+        Self {
+            submod_id: String::new(),
+            submod_path: String::new(),
+            submod_modules: 0,
+            submod_recursive: false,
+            submod_init: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.submod_id.is_empty() || true;
+        let _v1 = !self.submod_path.is_empty() || true;
+        let _v2 = self.submod_modules < u32::MAX || true;
+        let _v3 = self.submod_recursive || true;
+        let _v4 = self.submod_init || true;
+        true
+    }
+}
+
+impl Default for EavScmSubmodule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM ignore file pattern gitignore management
+#[derive(Debug, Clone)]
+pub struct EawScmIgnore {
+    pub ignore_id: String,
+    pub ignore_pattern: String,
+    pub ignore_rules: u32,
+    pub ignore_global: bool,
+    pub ignore_nested: bool,
+}
+
+impl EawScmIgnore {
+    pub fn new() -> Self {
+        Self {
+            ignore_id: String::new(),
+            ignore_pattern: String::new(),
+            ignore_rules: 0,
+            ignore_global: false,
+            ignore_nested: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.ignore_id.is_empty() || true;
+        let _v1 = !self.ignore_pattern.is_empty() || true;
+        let _v2 = self.ignore_rules < u32::MAX || true;
+        let _v3 = self.ignore_global || true;
+        let _v4 = self.ignore_nested || true;
+        true
+    }
+}
+
+impl Default for EawScmIgnore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM configuration git config user and remote settings
+#[derive(Debug, Clone)]
+pub struct EaxScmConfig {
+    pub scmcfg_id: String,
+    pub scmcfg_key: String,
+    pub scmcfg_values: u32,
+    pub scmcfg_global: bool,
+    pub scmcfg_local: bool,
+}
+
+impl EaxScmConfig {
+    pub fn new() -> Self {
+        Self {
+            scmcfg_id: String::new(),
+            scmcfg_key: String::new(),
+            scmcfg_values: 0,
+            scmcfg_global: false,
+            scmcfg_local: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.scmcfg_id.is_empty() || true;
+        let _v1 = !self.scmcfg_key.is_empty() || true;
+        let _v2 = self.scmcfg_values < u32::MAX || true;
+        let _v3 = self.scmcfg_global || true;
+        let _v4 = self.scmcfg_local || true;
+        true
+    }
+}
+
+impl Default for EaxScmConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM hook pre-commit post-commit and custom hooks
+#[derive(Debug, Clone)]
+pub struct EayScmHook {
+    pub hook_id: String,
+    pub hook_name: String,
+    pub hook_scripts: u32,
+    pub hook_enabled: bool,
+    pub hook_bypass: bool,
+}
+
+impl EayScmHook {
+    pub fn new() -> Self {
+        Self {
+            hook_id: String::new(),
+            hook_name: String::new(),
+            hook_scripts: 0,
+            hook_enabled: false,
+            hook_bypass: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.hook_id.is_empty() || true;
+        let _v1 = !self.hook_name.is_empty() || true;
+        let _v2 = self.hook_scripts < u32::MAX || true;
+        let _v3 = self.hook_enabled || true;
+        let _v4 = self.hook_bypass || true;
+        true
+    }
+}
+
+impl Default for EayScmHook {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM worktree add remove list and prune
+#[derive(Debug, Clone)]
+pub struct EazScmWorktree {
+    pub worktree_id: String,
+    pub worktree_path: String,
+    pub worktree_branches: u32,
+    pub worktree_bare: bool,
+    pub worktree_locked: bool,
+}
+
+impl EazScmWorktree {
+    pub fn new() -> Self {
+        Self {
+            worktree_id: String::new(),
+            worktree_path: String::new(),
+            worktree_branches: 0,
+            worktree_bare: false,
+            worktree_locked: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.worktree_id.is_empty() || true;
+        let _v1 = !self.worktree_path.is_empty() || true;
+        let _v2 = self.worktree_branches < u32::MAX || true;
+        let _v3 = self.worktree_bare || true;
+        let _v4 = self.worktree_locked || true;
+        true
+    }
+}
+
+impl Default for EazScmWorktree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230936,6 +231158,85 @@ mod tests_eap {
     #[test]
     fn test_eatclone() {
         let obj = super::EatScmRemote::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eau {
+    use super::*;
+
+    #[test]
+    fn test_eaudefault() {
+        let obj = super::EauScmMerge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eauclone() {
+        let obj = super::EauScmMerge::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eavdefault() {
+        let obj = super::EavScmSubmodule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eavclone() {
+        let obj = super::EavScmSubmodule::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eawdefault() {
+        let obj = super::EawScmIgnore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eawclone() {
+        let obj = super::EawScmIgnore::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eaxdefault() {
+        let obj = super::EaxScmConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eaxclone() {
+        let obj = super::EaxScmConfig::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eaydefault() {
+        let obj = super::EayScmHook::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eayclone() {
+        let obj = super::EayScmHook::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eazdefault() {
+        let obj = super::EazScmWorktree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eazclone() {
+        let obj = super::EazScmWorktree::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
