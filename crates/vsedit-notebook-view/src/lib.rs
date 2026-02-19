@@ -77814,3 +77814,807 @@ mod tests_bfe {
         assert_ne!(BfeGroupDirection::Horizontal, BfeGroupDirection::Vertical);
     }
 }
+
+// bff_: Editor suggestion widget model — autocomplete widget, suggestion list,
+// suggestion details, inline suggestions, ghost text
+
+/// Suggestion kind (from LSP CompletionItemKind)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BffSuggestionKind {
+    Text, Method, Function, Constructor, Field, Variable, Class,
+    Interface, Module, Property, Unit, Value, Enum, Keyword,
+    Snippet, Color, File, Reference, Folder, EnumMember,
+    Constant, Struct, Event, Operator, TypeParameter,
+}
+
+impl BffSuggestionKind {
+    pub fn icon(&self) -> &str {
+        match self {
+            BffSuggestionKind::Method | BffSuggestionKind::Function => "ƒ",
+            BffSuggestionKind::Variable | BffSuggestionKind::Field => "𝑥",
+            BffSuggestionKind::Class | BffSuggestionKind::Struct => "◆",
+            BffSuggestionKind::Keyword => "⌘",
+            BffSuggestionKind::Snippet => "✂",
+            _ => "○",
+        }
+    }
+}
+
+/// A completion suggestion
+#[derive(Debug, Clone)]
+pub struct BffSuggestion {
+    pub label: String,
+    pub kind: BffSuggestionKind,
+    pub detail: Option<String>,
+    pub documentation: Option<String>,
+    pub insert_text: String,
+    pub sort_text: Option<String>,
+    pub filter_text: Option<String>,
+    pub preselect: bool,
+}
+
+impl BffSuggestion {
+    pub fn new(label: &str, kind: BffSuggestionKind) -> Self {
+        Self { label: label.to_string(), kind, detail: None, documentation: None,
+               insert_text: label.to_string(), sort_text: None, filter_text: None, preselect: false }
+    }
+
+    pub fn with_detail(mut self, d: &str) -> Self { self.detail = Some(d.to_string()); self }
+    pub fn with_insert(mut self, text: &str) -> Self { self.insert_text = text.to_string(); self }
+
+    pub fn filter_label(&self) -> &str {
+        self.filter_text.as_deref().unwrap_or(&self.label)
+    }
+
+    pub fn matches_prefix(&self, prefix: &str) -> bool {
+        self.filter_label().to_lowercase().starts_with(&prefix.to_lowercase())
+    }
+}
+
+/// Suggestion widget state
+#[derive(Debug, Clone, Default)]
+pub struct BffSuggestionWidget {
+    pub items: Vec<BffSuggestion>,
+    pub selected: Option<usize>,
+    pub visible: bool,
+    pub prefix: String,
+    pub show_details: bool,
+}
+
+impl BffSuggestionWidget {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn show(&mut self, items: Vec<BffSuggestion>, prefix: &str) {
+        self.items = items; self.prefix = prefix.to_string();
+        self.selected = if self.items.is_empty() { None } else { Some(0) };
+        self.visible = true;
+    }
+
+    pub fn hide(&mut self) { self.visible = false; self.items.clear(); self.selected = None; }
+
+    pub fn filtered(&self) -> Vec<&BffSuggestion> {
+        self.items.iter().filter(|s| s.matches_prefix(&self.prefix)).collect()
+    }
+
+    pub fn select_next(&mut self) {
+        if let Some(i) = self.selected { self.selected = Some((i + 1).min(self.items.len().saturating_sub(1))); }
+    }
+
+    pub fn select_prev(&mut self) {
+        if let Some(i) = self.selected { self.selected = Some(i.saturating_sub(1)); }
+    }
+
+    pub fn selected_item(&self) -> Option<&BffSuggestion> {
+        self.selected.and_then(|i| self.items.get(i))
+    }
+
+    pub fn count(&self) -> usize { self.items.len() }
+}
+
+#[cfg(test)]
+mod tests_bff {
+    use super::*;
+
+    #[test]
+    fn test_bff_suggestion_kind_icon() {
+        assert_eq!(BffSuggestionKind::Function.icon(), "ƒ");
+        assert_eq!(BffSuggestionKind::Keyword.icon(), "⌘");
+    }
+
+    #[test]
+    fn test_bff_suggestion_basic() {
+        let s = BffSuggestion::new("println", BffSuggestionKind::Function).with_detail("macro");
+        assert!(s.matches_prefix("pri"));
+        assert!(!s.matches_prefix("xyz"));
+    }
+
+    #[test]
+    fn test_bff_widget_show_hide() {
+        let mut w = BffSuggestionWidget::new();
+        w.show(vec![BffSuggestion::new("hello", BffSuggestionKind::Variable)], "he");
+        assert!(w.visible);
+        assert_eq!(w.count(), 1);
+        w.hide();
+        assert!(!w.visible);
+    }
+
+    #[test]
+    fn test_bff_widget_navigation() {
+        let mut w = BffSuggestionWidget::new();
+        w.show(vec![
+            BffSuggestion::new("a", BffSuggestionKind::Variable),
+            BffSuggestion::new("b", BffSuggestionKind::Variable),
+        ], "");
+        assert_eq!(w.selected, Some(0));
+        w.select_next();
+        assert_eq!(w.selected, Some(1));
+        w.select_prev();
+        assert_eq!(w.selected, Some(0));
+    }
+
+    #[test]
+    fn test_bff_widget_selected() {
+        let mut w = BffSuggestionWidget::new();
+        w.show(vec![BffSuggestion::new("foo", BffSuggestionKind::Function)], "");
+        assert_eq!(w.selected_item().unwrap().label, "foo");
+    }
+
+    #[test]
+    fn test_bff_widget_filtered() {
+        let mut w = BffSuggestionWidget::new();
+        w.show(vec![
+            BffSuggestion::new("apple", BffSuggestionKind::Variable),
+            BffSuggestion::new("banana", BffSuggestionKind::Variable),
+        ], "app");
+        assert_eq!(w.filtered().len(), 1);
+    }
+
+    #[test]
+    fn test_bff_suggestion_insert_text() {
+        let s = BffSuggestion::new("fn", BffSuggestionKind::Snippet).with_insert("fn ${1:name}() {}");
+        assert_eq!(s.insert_text, "fn ${1:name}() {}");
+    }
+
+    #[test]
+    fn test_bff_widget_empty() {
+        let w = BffSuggestionWidget::new();
+        assert!(!w.visible);
+        assert!(w.selected_item().is_none());
+    }
+
+    #[test]
+    fn test_bff_suggestion_preselect() {
+        let mut s = BffSuggestion::new("x", BffSuggestionKind::Text);
+        s.preselect = true;
+        assert!(s.preselect);
+    }
+
+    #[test]
+    fn test_bff_kinds_diverse() {
+        assert_ne!(BffSuggestionKind::Method, BffSuggestionKind::Function);
+        assert_ne!(BffSuggestionKind::Class, BffSuggestionKind::Struct);
+    }
+}
+
+// bfg_: Editor workspace trust model — trust state, restricted mode,
+// trust request, trusted folders, trust banner
+
+/// Workspace trust state
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfgTrustState {
+    Trusted,
+    Untrusted,
+    Unknown,
+}
+
+/// Trust request result
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfgTrustResult {
+    Granted,
+    Denied,
+    Dismissed,
+}
+
+/// Workspace trust configuration
+#[derive(Debug, Clone)]
+pub struct BfgWorkspaceTrust {
+    pub state: BfgTrustState,
+    pub trusted_folders: Vec<String>,
+    pub show_banner: bool,
+    pub restricted_mode: bool,
+    pub startup_prompt: bool,
+}
+
+impl Default for BfgWorkspaceTrust {
+    fn default() -> Self {
+        Self { state: BfgTrustState::Unknown, trusted_folders: Vec::new(),
+               show_banner: true, restricted_mode: true, startup_prompt: true }
+    }
+}
+
+impl BfgWorkspaceTrust {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn grant_trust(&mut self, folder: &str) {
+        self.state = BfgTrustState::Trusted;
+        self.restricted_mode = false;
+        if !self.trusted_folders.contains(&folder.to_string()) {
+            self.trusted_folders.push(folder.to_string());
+        }
+    }
+
+    pub fn deny_trust(&mut self) {
+        self.state = BfgTrustState::Untrusted;
+        self.restricted_mode = true;
+    }
+
+    pub fn is_trusted(&self) -> bool { self.state == BfgTrustState::Trusted }
+
+    pub fn is_folder_trusted(&self, folder: &str) -> bool {
+        self.trusted_folders.iter().any(|f| folder.starts_with(f))
+    }
+
+    pub fn remove_trusted_folder(&mut self, folder: &str) {
+        self.trusted_folders.retain(|f| f != folder);
+    }
+
+    pub fn trusted_folder_count(&self) -> usize { self.trusted_folders.len() }
+}
+
+#[cfg(test)]
+mod tests_bfg {
+    use super::*;
+
+    #[test]
+    fn test_bfg_trust_defaults() {
+        let t = BfgWorkspaceTrust::new();
+        assert_eq!(t.state, BfgTrustState::Unknown);
+        assert!(t.restricted_mode);
+    }
+
+    #[test]
+    fn test_bfg_grant_trust() {
+        let mut t = BfgWorkspaceTrust::new();
+        t.grant_trust("/home/user/project");
+        assert!(t.is_trusted());
+        assert!(!t.restricted_mode);
+        assert!(t.is_folder_trusted("/home/user/project/src"));
+    }
+
+    #[test]
+    fn test_bfg_deny_trust() {
+        let mut t = BfgWorkspaceTrust::new();
+        t.deny_trust();
+        assert!(!t.is_trusted());
+        assert!(t.restricted_mode);
+    }
+
+    #[test]
+    fn test_bfg_trusted_folders() {
+        let mut t = BfgWorkspaceTrust::new();
+        t.grant_trust("/a");
+        t.grant_trust("/b");
+        assert_eq!(t.trusted_folder_count(), 2);
+        t.remove_trusted_folder("/a");
+        assert_eq!(t.trusted_folder_count(), 1);
+    }
+
+    #[test]
+    fn test_bfg_folder_not_trusted() {
+        let t = BfgWorkspaceTrust::new();
+        assert!(!t.is_folder_trusted("/tmp"));
+    }
+
+    #[test]
+    fn test_bfg_grant_dedup() {
+        let mut t = BfgWorkspaceTrust::new();
+        t.grant_trust("/a");
+        t.grant_trust("/a");
+        assert_eq!(t.trusted_folder_count(), 1);
+    }
+
+    #[test]
+    fn test_bfg_trust_results() {
+        assert_ne!(BfgTrustResult::Granted, BfgTrustResult::Denied);
+        assert_ne!(BfgTrustResult::Denied, BfgTrustResult::Dismissed);
+    }
+
+    #[test]
+    fn test_bfg_trust_states() {
+        assert_ne!(BfgTrustState::Trusted, BfgTrustState::Untrusted);
+    }
+
+    #[test]
+    fn test_bfg_banner() {
+        let t = BfgWorkspaceTrust::new();
+        assert!(t.show_banner);
+    }
+
+    #[test]
+    fn test_bfg_startup_prompt() {
+        let t = BfgWorkspaceTrust::new();
+        assert!(t.startup_prompt);
+    }
+}
+
+// bfh_: Editor layout persistence model — save/restore layout state,
+// editor group positions, panel sizes, sidebar state, activity bar
+
+/// Sidebar state
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfhSidebarState {
+    Visible,
+    Hidden,
+}
+
+/// Panel position
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfhPanelPosition {
+    Bottom,
+    Left,
+    Right,
+}
+
+/// Activity bar position
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfhActivityBarPosition {
+    Default,
+    Top,
+    Bottom,
+    Hidden,
+}
+
+/// Layout state
+#[derive(Debug, Clone)]
+pub struct BfhLayoutState {
+    pub sidebar: BfhSidebarState,
+    pub sidebar_width: usize,
+    pub panel_visible: bool,
+    pub panel_position: BfhPanelPosition,
+    pub panel_height: usize,
+    pub activity_bar: BfhActivityBarPosition,
+    pub statusbar_visible: bool,
+    pub editor_area_width: usize,
+    pub editor_area_height: usize,
+}
+
+impl Default for BfhLayoutState {
+    fn default() -> Self {
+        Self { sidebar: BfhSidebarState::Visible, sidebar_width: 30, panel_visible: false,
+               panel_position: BfhPanelPosition::Bottom, panel_height: 15,
+               activity_bar: BfhActivityBarPosition::Default, statusbar_visible: true,
+               editor_area_width: 80, editor_area_height: 40 }
+    }
+}
+
+impl BfhLayoutState {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn toggle_sidebar(&mut self) {
+        self.sidebar = match self.sidebar {
+            BfhSidebarState::Visible => BfhSidebarState::Hidden,
+            BfhSidebarState::Hidden => BfhSidebarState::Visible,
+        };
+    }
+
+    pub fn toggle_panel(&mut self) { self.panel_visible = !self.panel_visible; }
+
+    pub fn is_sidebar_visible(&self) -> bool { self.sidebar == BfhSidebarState::Visible }
+
+    pub fn set_panel_position(&mut self, pos: BfhPanelPosition) { self.panel_position = pos; }
+
+    pub fn available_editor_width(&self) -> usize {
+        if self.is_sidebar_visible() {
+            self.editor_area_width.saturating_sub(self.sidebar_width)
+        } else {
+            self.editor_area_width
+        }
+    }
+
+    pub fn available_editor_height(&self) -> usize {
+        let mut h = self.editor_area_height;
+        if self.panel_visible && self.panel_position == BfhPanelPosition::Bottom {
+            h = h.saturating_sub(self.panel_height);
+        }
+        if self.statusbar_visible { h = h.saturating_sub(1); }
+        h
+    }
+}
+
+#[cfg(test)]
+mod tests_bfh {
+    use super::*;
+
+    #[test]
+    fn test_bfh_layout_defaults() {
+        let l = BfhLayoutState::new();
+        assert!(l.is_sidebar_visible());
+        assert!(!l.panel_visible);
+        assert!(l.statusbar_visible);
+    }
+
+    #[test]
+    fn test_bfh_toggle_sidebar() {
+        let mut l = BfhLayoutState::new();
+        l.toggle_sidebar();
+        assert!(!l.is_sidebar_visible());
+        l.toggle_sidebar();
+        assert!(l.is_sidebar_visible());
+    }
+
+    #[test]
+    fn test_bfh_toggle_panel() {
+        let mut l = BfhLayoutState::new();
+        l.toggle_panel();
+        assert!(l.panel_visible);
+    }
+
+    #[test]
+    fn test_bfh_editor_width() {
+        let l = BfhLayoutState::new();
+        assert_eq!(l.available_editor_width(), 50); // 80 - 30
+    }
+
+    #[test]
+    fn test_bfh_editor_width_no_sidebar() {
+        let mut l = BfhLayoutState::new();
+        l.toggle_sidebar();
+        assert_eq!(l.available_editor_width(), 80);
+    }
+
+    #[test]
+    fn test_bfh_editor_height() {
+        let l = BfhLayoutState::new();
+        assert_eq!(l.available_editor_height(), 39); // 40 - 1 (statusbar)
+    }
+
+    #[test]
+    fn test_bfh_editor_height_with_panel() {
+        let mut l = BfhLayoutState::new();
+        l.toggle_panel();
+        assert_eq!(l.available_editor_height(), 24); // 40 - 15 - 1
+    }
+
+    #[test]
+    fn test_bfh_panel_position() {
+        let mut l = BfhLayoutState::new();
+        l.set_panel_position(BfhPanelPosition::Right);
+        assert_eq!(l.panel_position, BfhPanelPosition::Right);
+    }
+
+    #[test]
+    fn test_bfh_positions() {
+        assert_ne!(BfhPanelPosition::Bottom, BfhPanelPosition::Left);
+        assert_ne!(BfhActivityBarPosition::Default, BfhActivityBarPosition::Hidden);
+    }
+
+    #[test]
+    fn test_bfh_sidebar_states() {
+        assert_ne!(BfhSidebarState::Visible, BfhSidebarState::Hidden);
+    }
+}
+
+// bfi_: Editor font model — font family, font size, font weight, line height,
+// letter spacing, font ligatures, font feature settings
+
+/// Font weight
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BfiFontWeight {
+    Thin,
+    Light,
+    Normal,
+    Medium,
+    Bold,
+    Black,
+}
+
+impl BfiFontWeight {
+    pub fn numeric(&self) -> u32 {
+        match self {
+            BfiFontWeight::Thin => 100,
+            BfiFontWeight::Light => 300,
+            BfiFontWeight::Normal => 400,
+            BfiFontWeight::Medium => 500,
+            BfiFontWeight::Bold => 700,
+            BfiFontWeight::Black => 900,
+        }
+    }
+}
+
+/// Font configuration
+#[derive(Debug, Clone)]
+pub struct BfiFontConfig {
+    pub family: Vec<String>,
+    pub size: f64,
+    pub weight: BfiFontWeight,
+    pub line_height: f64,
+    pub letter_spacing: f64,
+    pub ligatures: bool,
+    pub features: Vec<String>,
+}
+
+impl Default for BfiFontConfig {
+    fn default() -> Self {
+        Self { family: vec!["Consolas".to_string(), "monospace".to_string()],
+               size: 14.0, weight: BfiFontWeight::Normal, line_height: 1.5,
+               letter_spacing: 0.0, ligatures: true, features: Vec::new() }
+    }
+}
+
+impl BfiFontConfig {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn primary_family(&self) -> &str {
+        self.family.first().map(|s| s.as_str()).unwrap_or("monospace")
+    }
+
+    pub fn computed_line_height(&self) -> f64 { self.size * self.line_height }
+
+    pub fn set_size(&mut self, size: f64) { self.size = size.clamp(6.0, 100.0); }
+
+    pub fn css_family(&self) -> String { self.family.join(", ") }
+
+    pub fn with_feature(mut self, feature: &str) -> Self {
+        self.features.push(feature.to_string()); self
+    }
+
+    pub fn is_monospace(&self) -> bool {
+        self.family.iter().any(|f| {
+            let lower = f.to_lowercase();
+            lower.contains("mono") || lower.contains("consolas") || lower.contains("courier")
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests_bfi {
+    use super::*;
+
+    #[test]
+    fn test_bfi_font_weight() {
+        assert_eq!(BfiFontWeight::Normal.numeric(), 400);
+        assert_eq!(BfiFontWeight::Bold.numeric(), 700);
+        assert!(BfiFontWeight::Bold > BfiFontWeight::Normal);
+    }
+
+    #[test]
+    fn test_bfi_font_defaults() {
+        let f = BfiFontConfig::new();
+        assert_eq!(f.primary_family(), "Consolas");
+        assert_eq!(f.size, 14.0);
+        assert!(f.ligatures);
+    }
+
+    #[test]
+    fn test_bfi_computed_line_height() {
+        let f = BfiFontConfig::new();
+        assert!((f.computed_line_height() - 21.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_bfi_set_size() {
+        let mut f = BfiFontConfig::new();
+        f.set_size(20.0);
+        assert_eq!(f.size, 20.0);
+        f.set_size(1.0);
+        assert_eq!(f.size, 6.0);
+        f.set_size(200.0);
+        assert_eq!(f.size, 100.0);
+    }
+
+    #[test]
+    fn test_bfi_css_family() {
+        let f = BfiFontConfig::new();
+        assert!(f.css_family().contains("Consolas"));
+        assert!(f.css_family().contains("monospace"));
+    }
+
+    #[test]
+    fn test_bfi_is_monospace() {
+        let f = BfiFontConfig::new();
+        assert!(f.is_monospace());
+    }
+
+    #[test]
+    fn test_bfi_features() {
+        let f = BfiFontConfig::new().with_feature("liga").with_feature("calt");
+        assert_eq!(f.features.len(), 2);
+    }
+
+    #[test]
+    fn test_bfi_custom_family() {
+        let mut f = BfiFontConfig::new();
+        f.family = vec!["Arial".to_string()];
+        assert!(!f.is_monospace());
+    }
+
+    #[test]
+    fn test_bfi_letter_spacing() {
+        let f = BfiFontConfig::new();
+        assert_eq!(f.letter_spacing, 0.0);
+    }
+
+    #[test]
+    fn test_bfi_weight_thin() {
+        assert_eq!(BfiFontWeight::Thin.numeric(), 100);
+    }
+}
+
+// bfj_: Editor keymap model — keybinding entries, key chord parsing,
+// keymap source, keybinding conflict detection, when-clause dispatch
+
+/// Key modifier flags
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BfjModifiers {
+    pub ctrl: bool,
+    pub shift: bool,
+    pub alt: bool,
+    pub meta: bool,
+}
+
+impl BfjModifiers {
+    pub fn none() -> Self { Self { ctrl: false, shift: false, alt: false, meta: false } }
+    pub fn ctrl() -> Self { Self { ctrl: true, shift: false, alt: false, meta: false } }
+    pub fn ctrl_shift() -> Self { Self { ctrl: true, shift: true, alt: false, meta: false } }
+
+    pub fn to_string_prefix(&self) -> String {
+        let mut parts = Vec::new();
+        if self.ctrl { parts.push("Ctrl"); }
+        if self.shift { parts.push("Shift"); }
+        if self.alt { parts.push("Alt"); }
+        if self.meta { parts.push("Meta"); }
+        if parts.is_empty() { String::new() } else { format!("{}+", parts.join("+")) }
+    }
+}
+
+/// A key chord (modifier + key)
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BfjKeyChord {
+    pub modifiers: BfjModifiers,
+    pub key: String,
+}
+
+impl BfjKeyChord {
+    pub fn new(modifiers: BfjModifiers, key: &str) -> Self {
+        Self { modifiers, key: key.to_string() }
+    }
+
+    pub fn display(&self) -> String {
+        format!("{}{}", self.modifiers.to_string_prefix(), self.key)
+    }
+}
+
+/// Keybinding source
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfjKeybindingSource {
+    Default,
+    User,
+    Extension,
+}
+
+/// A keybinding entry
+#[derive(Debug, Clone)]
+pub struct BfjKeybinding {
+    pub chords: Vec<BfjKeyChord>,
+    pub command: String,
+    pub when: Option<String>,
+    pub source: BfjKeybindingSource,
+}
+
+impl BfjKeybinding {
+    pub fn new(chord: BfjKeyChord, command: &str) -> Self {
+        Self { chords: vec![chord], command: command.to_string(), when: None, source: BfjKeybindingSource::Default }
+    }
+
+    pub fn with_when(mut self, when: &str) -> Self { self.when = Some(when.to_string()); self }
+
+    pub fn display(&self) -> String {
+        self.chords.iter().map(|c| c.display()).collect::<Vec<_>>().join(" ")
+    }
+
+    pub fn is_chord_binding(&self) -> bool { self.chords.len() > 1 }
+}
+
+/// Keymap registry
+#[derive(Debug, Clone, Default)]
+pub struct BfjKeymapRegistry {
+    pub bindings: Vec<BfjKeybinding>,
+}
+
+impl BfjKeymapRegistry {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn add(&mut self, binding: BfjKeybinding) { self.bindings.push(binding); }
+
+    pub fn find_by_command(&self, command: &str) -> Vec<&BfjKeybinding> {
+        self.bindings.iter().filter(|b| b.command == command).collect()
+    }
+
+    pub fn find_by_chord(&self, chord: &BfjKeyChord) -> Vec<&BfjKeybinding> {
+        self.bindings.iter().filter(|b| b.chords.first() == Some(chord)).collect()
+    }
+
+    pub fn has_conflict(&self, chord: &BfjKeyChord) -> bool {
+        self.find_by_chord(chord).len() > 1
+    }
+
+    pub fn count(&self) -> usize { self.bindings.len() }
+}
+
+#[cfg(test)]
+mod tests_bfj {
+    use super::*;
+
+    #[test]
+    fn test_bfj_modifiers() {
+        assert_eq!(BfjModifiers::ctrl().to_string_prefix(), "Ctrl+");
+        assert_eq!(BfjModifiers::ctrl_shift().to_string_prefix(), "Ctrl+Shift+");
+        assert_eq!(BfjModifiers::none().to_string_prefix(), "");
+    }
+
+    #[test]
+    fn test_bfj_key_chord() {
+        let chord = BfjKeyChord::new(BfjModifiers::ctrl(), "S");
+        assert_eq!(chord.display(), "Ctrl+S");
+    }
+
+    #[test]
+    fn test_bfj_keybinding() {
+        let kb = BfjKeybinding::new(BfjKeyChord::new(BfjModifiers::ctrl(), "S"), "editor.save");
+        assert_eq!(kb.display(), "Ctrl+S");
+        assert!(!kb.is_chord_binding());
+    }
+
+    #[test]
+    fn test_bfj_keybinding_chord() {
+        let mut kb = BfjKeybinding::new(BfjKeyChord::new(BfjModifiers::ctrl(), "K"), "editor.fold");
+        kb.chords.push(BfjKeyChord::new(BfjModifiers::ctrl(), "0"));
+        assert!(kb.is_chord_binding());
+        assert_eq!(kb.display(), "Ctrl+K Ctrl+0");
+    }
+
+    #[test]
+    fn test_bfj_keybinding_when() {
+        let kb = BfjKeybinding::new(BfjKeyChord::new(BfjModifiers::ctrl(), "B"), "toggle.sidebar")
+            .with_when("editorFocus");
+        assert_eq!(kb.when.as_deref(), Some("editorFocus"));
+    }
+
+    #[test]
+    fn test_bfj_registry_find_command() {
+        let mut reg = BfjKeymapRegistry::new();
+        reg.add(BfjKeybinding::new(BfjKeyChord::new(BfjModifiers::ctrl(), "S"), "save"));
+        reg.add(BfjKeybinding::new(BfjKeyChord::new(BfjModifiers::ctrl(), "C"), "copy"));
+        assert_eq!(reg.find_by_command("save").len(), 1);
+    }
+
+    #[test]
+    fn test_bfj_registry_find_chord() {
+        let mut reg = BfjKeymapRegistry::new();
+        let chord = BfjKeyChord::new(BfjModifiers::ctrl(), "S");
+        reg.add(BfjKeybinding::new(chord.clone(), "save"));
+        assert_eq!(reg.find_by_chord(&chord).len(), 1);
+    }
+
+    #[test]
+    fn test_bfj_registry_conflict() {
+        let mut reg = BfjKeymapRegistry::new();
+        let chord = BfjKeyChord::new(BfjModifiers::ctrl(), "P");
+        reg.add(BfjKeybinding::new(chord.clone(), "command1"));
+        reg.add(BfjKeybinding::new(chord.clone(), "command2"));
+        assert!(reg.has_conflict(&chord));
+    }
+
+    #[test]
+    fn test_bfj_registry_count() {
+        let mut reg = BfjKeymapRegistry::new();
+        reg.add(BfjKeybinding::new(BfjKeyChord::new(BfjModifiers::ctrl(), "A"), "selectAll"));
+        assert_eq!(reg.count(), 1);
+    }
+
+    #[test]
+    fn test_bfj_sources() {
+        assert_ne!(BfjKeybindingSource::Default, BfjKeybindingSource::User);
+        assert_ne!(BfjKeybindingSource::User, BfjKeybindingSource::Extension);
+    }
+}
