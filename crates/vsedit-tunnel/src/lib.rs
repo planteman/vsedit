@@ -90809,6 +90809,111 @@ impl WorkspaceConfig {
     }
 }
 
+/// Runtime wiring: bua_ TreeDataProvider
+#[derive(Debug, Clone)]
+pub struct TreeDataProvider {
+    pub bua_provider_id: String,
+    pub bua_view_id: String,
+    pub bua_root_count: usize,
+    pub bua_total_items: usize,
+    pub bua_supports_drag: bool,
+    pub bua_supports_drop: bool,
+    pub bua_can_select_many: bool,
+    pub bua_show_collapse_all: bool,
+    pub bua_message: String,
+    pub bua_title: String,
+}
+
+impl TreeDataProvider {
+    pub fn bua_summary(&self) -> String {
+        format!("TreeDataProvider({})", self.bua_provider_id)
+    }
+}
+
+/// Runtime wiring: bub_ TreeItemModel
+#[derive(Debug, Clone)]
+pub struct TreeItemModel {
+    pub bub_item_id: String,
+    pub bub_label: String,
+    pub bub_description: String,
+    pub bub_tooltip: String,
+    pub bub_icon_path: String,
+    pub bub_collapsible_state: u8,
+    pub bub_context_value: String,
+    pub bub_command_id: String,
+    pub bub_resource_uri: String,
+    pub bub_accessibility_info: String,
+}
+
+impl TreeItemModel {
+    pub fn bub_summary(&self) -> String {
+        format!("TreeItemModel({})", self.bub_item_id)
+    }
+}
+
+/// Runtime wiring: buc_ TreeViewOptions
+#[derive(Debug, Clone)]
+pub struct TreeViewOptions {
+    pub buc_view_id: String,
+    pub buc_show_collapse_all: bool,
+    pub buc_can_select_many: bool,
+    pub buc_drag_and_drop_controller: bool,
+    pub buc_manage_checkbox_state: bool,
+    pub buc_badge_value: u32,
+    pub buc_badge_tooltip: String,
+    pub buc_title: String,
+    pub buc_description: String,
+    pub buc_visibility: bool,
+}
+
+impl TreeViewOptions {
+    pub fn buc_summary(&self) -> String {
+        format!("TreeViewOptions({})", self.buc_view_id)
+    }
+}
+
+/// Runtime wiring: bud_ TreeDragSource
+#[derive(Debug, Clone)]
+pub struct TreeDragSource {
+    pub bud_drag_mime_types: Vec<String>,
+    pub bud_source_item_ids: Vec<String>,
+    pub bud_data_transfer_value: String,
+    pub bud_is_copy: bool,
+    pub bud_is_move: bool,
+    pub bud_source_view_id: String,
+    pub bud_drag_label: String,
+    pub bud_item_count: usize,
+    pub bud_can_cancel: bool,
+    pub bud_drag_effect: String,
+}
+
+impl TreeDragSource {
+    pub fn bud_summary(&self) -> String {
+        format!("TreeDragSource({})", self.bud_drag_mime_types.len())
+    }
+}
+
+/// Runtime wiring: bue_ TreeDropTarget
+#[derive(Debug, Clone)]
+pub struct TreeDropTarget {
+    pub bue_drop_mime_types: Vec<String>,
+    pub bue_target_item_id: String,
+    pub bue_data_transfer_value: String,
+    pub bue_target_view_id: String,
+    pub bue_drop_position: String,
+    pub bue_is_supported: bool,
+    pub bue_handle_drop_edit: bool,
+    pub bue_item_count: usize,
+    pub bue_feedback_icon: String,
+    pub bue_drop_effect: String,
+}
+
+impl TreeDropTarget {
+    pub fn bue_summary(&self) -> String {
+        format!("TreeDropTarget({})", self.bue_drop_mime_types.len())
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -132970,6 +133075,910 @@ mod tests_bfo {
         };
         let _ = obj.btz_summary();
         assert_eq!(obj.btz_inspection_default, "test");
+    }
+
+    #[test]
+    fn test_bua_provider_id() {
+        let obj = TreeDataProvider {
+            bua_provider_id: String::from("test"),
+            bua_view_id: String::from("test"),
+            bua_root_count: 0,
+            bua_total_items: 0,
+            bua_supports_drag: false,
+            bua_supports_drop: false,
+            bua_can_select_many: false,
+            bua_show_collapse_all: false,
+            bua_message: String::from("test"),
+            bua_title: String::from("test"),
+        };
+        let _ = obj.bua_summary();
+        assert_eq!(obj.bua_provider_id, "test");
+    }
+
+    #[test]
+    fn test_bua_view_id() {
+        let obj = TreeDataProvider {
+            bua_provider_id: String::from("test"),
+            bua_view_id: String::from("test"),
+            bua_root_count: 0,
+            bua_total_items: 0,
+            bua_supports_drag: false,
+            bua_supports_drop: false,
+            bua_can_select_many: false,
+            bua_show_collapse_all: false,
+            bua_message: String::from("test"),
+            bua_title: String::from("test"),
+        };
+        let _ = obj.bua_summary();
+        assert_eq!(obj.bua_view_id, "test");
+    }
+
+    #[test]
+    fn test_bua_root_count() {
+        let obj = TreeDataProvider {
+            bua_provider_id: String::from("test"),
+            bua_view_id: String::from("test"),
+            bua_root_count: 0,
+            bua_total_items: 0,
+            bua_supports_drag: false,
+            bua_supports_drop: false,
+            bua_can_select_many: false,
+            bua_show_collapse_all: false,
+            bua_message: String::from("test"),
+            bua_title: String::from("test"),
+        };
+        let _ = obj.bua_summary();
+        assert_eq!(obj.bua_root_count, 0);
+    }
+
+    #[test]
+    fn test_bua_total_items() {
+        let obj = TreeDataProvider {
+            bua_provider_id: String::from("test"),
+            bua_view_id: String::from("test"),
+            bua_root_count: 0,
+            bua_total_items: 0,
+            bua_supports_drag: false,
+            bua_supports_drop: false,
+            bua_can_select_many: false,
+            bua_show_collapse_all: false,
+            bua_message: String::from("test"),
+            bua_title: String::from("test"),
+        };
+        let _ = obj.bua_summary();
+        assert_eq!(obj.bua_total_items, 0);
+    }
+
+    #[test]
+    fn test_bua_supports_drag() {
+        let obj = TreeDataProvider {
+            bua_provider_id: String::from("test"),
+            bua_view_id: String::from("test"),
+            bua_root_count: 0,
+            bua_total_items: 0,
+            bua_supports_drag: false,
+            bua_supports_drop: false,
+            bua_can_select_many: false,
+            bua_show_collapse_all: false,
+            bua_message: String::from("test"),
+            bua_title: String::from("test"),
+        };
+        let _ = obj.bua_summary();
+        assert!(!obj.bua_supports_drag);
+    }
+
+    #[test]
+    fn test_bua_supports_drop() {
+        let obj = TreeDataProvider {
+            bua_provider_id: String::from("test"),
+            bua_view_id: String::from("test"),
+            bua_root_count: 0,
+            bua_total_items: 0,
+            bua_supports_drag: false,
+            bua_supports_drop: false,
+            bua_can_select_many: false,
+            bua_show_collapse_all: false,
+            bua_message: String::from("test"),
+            bua_title: String::from("test"),
+        };
+        let _ = obj.bua_summary();
+        assert!(!obj.bua_supports_drop);
+    }
+
+    #[test]
+    fn test_bua_can_select_many() {
+        let obj = TreeDataProvider {
+            bua_provider_id: String::from("test"),
+            bua_view_id: String::from("test"),
+            bua_root_count: 0,
+            bua_total_items: 0,
+            bua_supports_drag: false,
+            bua_supports_drop: false,
+            bua_can_select_many: false,
+            bua_show_collapse_all: false,
+            bua_message: String::from("test"),
+            bua_title: String::from("test"),
+        };
+        let _ = obj.bua_summary();
+        assert!(!obj.bua_can_select_many);
+    }
+
+    #[test]
+    fn test_bua_show_collapse_all() {
+        let obj = TreeDataProvider {
+            bua_provider_id: String::from("test"),
+            bua_view_id: String::from("test"),
+            bua_root_count: 0,
+            bua_total_items: 0,
+            bua_supports_drag: false,
+            bua_supports_drop: false,
+            bua_can_select_many: false,
+            bua_show_collapse_all: false,
+            bua_message: String::from("test"),
+            bua_title: String::from("test"),
+        };
+        let _ = obj.bua_summary();
+        assert!(!obj.bua_show_collapse_all);
+    }
+
+    #[test]
+    fn test_bua_message() {
+        let obj = TreeDataProvider {
+            bua_provider_id: String::from("test"),
+            bua_view_id: String::from("test"),
+            bua_root_count: 0,
+            bua_total_items: 0,
+            bua_supports_drag: false,
+            bua_supports_drop: false,
+            bua_can_select_many: false,
+            bua_show_collapse_all: false,
+            bua_message: String::from("test"),
+            bua_title: String::from("test"),
+        };
+        let _ = obj.bua_summary();
+        assert_eq!(obj.bua_message, "test");
+    }
+
+    #[test]
+    fn test_bua_title() {
+        let obj = TreeDataProvider {
+            bua_provider_id: String::from("test"),
+            bua_view_id: String::from("test"),
+            bua_root_count: 0,
+            bua_total_items: 0,
+            bua_supports_drag: false,
+            bua_supports_drop: false,
+            bua_can_select_many: false,
+            bua_show_collapse_all: false,
+            bua_message: String::from("test"),
+            bua_title: String::from("test"),
+        };
+        let _ = obj.bua_summary();
+        assert_eq!(obj.bua_title, "test");
+    }
+
+
+    #[test]
+    fn test_bub_item_id() {
+        let obj = TreeItemModel {
+            bub_item_id: String::from("test"),
+            bub_label: String::from("test"),
+            bub_description: String::from("test"),
+            bub_tooltip: String::from("test"),
+            bub_icon_path: String::from("test"),
+            bub_collapsible_state: 0,
+            bub_context_value: String::from("test"),
+            bub_command_id: String::from("test"),
+            bub_resource_uri: String::from("test"),
+            bub_accessibility_info: String::from("test"),
+        };
+        let _ = obj.bub_summary();
+        assert_eq!(obj.bub_item_id, "test");
+    }
+
+    #[test]
+    fn test_bub_label() {
+        let obj = TreeItemModel {
+            bub_item_id: String::from("test"),
+            bub_label: String::from("test"),
+            bub_description: String::from("test"),
+            bub_tooltip: String::from("test"),
+            bub_icon_path: String::from("test"),
+            bub_collapsible_state: 0,
+            bub_context_value: String::from("test"),
+            bub_command_id: String::from("test"),
+            bub_resource_uri: String::from("test"),
+            bub_accessibility_info: String::from("test"),
+        };
+        let _ = obj.bub_summary();
+        assert_eq!(obj.bub_label, "test");
+    }
+
+    #[test]
+    fn test_bub_description() {
+        let obj = TreeItemModel {
+            bub_item_id: String::from("test"),
+            bub_label: String::from("test"),
+            bub_description: String::from("test"),
+            bub_tooltip: String::from("test"),
+            bub_icon_path: String::from("test"),
+            bub_collapsible_state: 0,
+            bub_context_value: String::from("test"),
+            bub_command_id: String::from("test"),
+            bub_resource_uri: String::from("test"),
+            bub_accessibility_info: String::from("test"),
+        };
+        let _ = obj.bub_summary();
+        assert_eq!(obj.bub_description, "test");
+    }
+
+    #[test]
+    fn test_bub_tooltip() {
+        let obj = TreeItemModel {
+            bub_item_id: String::from("test"),
+            bub_label: String::from("test"),
+            bub_description: String::from("test"),
+            bub_tooltip: String::from("test"),
+            bub_icon_path: String::from("test"),
+            bub_collapsible_state: 0,
+            bub_context_value: String::from("test"),
+            bub_command_id: String::from("test"),
+            bub_resource_uri: String::from("test"),
+            bub_accessibility_info: String::from("test"),
+        };
+        let _ = obj.bub_summary();
+        assert_eq!(obj.bub_tooltip, "test");
+    }
+
+    #[test]
+    fn test_bub_icon_path() {
+        let obj = TreeItemModel {
+            bub_item_id: String::from("test"),
+            bub_label: String::from("test"),
+            bub_description: String::from("test"),
+            bub_tooltip: String::from("test"),
+            bub_icon_path: String::from("test"),
+            bub_collapsible_state: 0,
+            bub_context_value: String::from("test"),
+            bub_command_id: String::from("test"),
+            bub_resource_uri: String::from("test"),
+            bub_accessibility_info: String::from("test"),
+        };
+        let _ = obj.bub_summary();
+        assert_eq!(obj.bub_icon_path, "test");
+    }
+
+    #[test]
+    fn test_bub_collapsible_state() {
+        let obj = TreeItemModel {
+            bub_item_id: String::from("test"),
+            bub_label: String::from("test"),
+            bub_description: String::from("test"),
+            bub_tooltip: String::from("test"),
+            bub_icon_path: String::from("test"),
+            bub_collapsible_state: 0,
+            bub_context_value: String::from("test"),
+            bub_command_id: String::from("test"),
+            bub_resource_uri: String::from("test"),
+            bub_accessibility_info: String::from("test"),
+        };
+        let _ = obj.bub_summary();
+        assert_eq!(obj.bub_collapsible_state, 0);
+    }
+
+    #[test]
+    fn test_bub_context_value() {
+        let obj = TreeItemModel {
+            bub_item_id: String::from("test"),
+            bub_label: String::from("test"),
+            bub_description: String::from("test"),
+            bub_tooltip: String::from("test"),
+            bub_icon_path: String::from("test"),
+            bub_collapsible_state: 0,
+            bub_context_value: String::from("test"),
+            bub_command_id: String::from("test"),
+            bub_resource_uri: String::from("test"),
+            bub_accessibility_info: String::from("test"),
+        };
+        let _ = obj.bub_summary();
+        assert_eq!(obj.bub_context_value, "test");
+    }
+
+    #[test]
+    fn test_bub_command_id() {
+        let obj = TreeItemModel {
+            bub_item_id: String::from("test"),
+            bub_label: String::from("test"),
+            bub_description: String::from("test"),
+            bub_tooltip: String::from("test"),
+            bub_icon_path: String::from("test"),
+            bub_collapsible_state: 0,
+            bub_context_value: String::from("test"),
+            bub_command_id: String::from("test"),
+            bub_resource_uri: String::from("test"),
+            bub_accessibility_info: String::from("test"),
+        };
+        let _ = obj.bub_summary();
+        assert_eq!(obj.bub_command_id, "test");
+    }
+
+    #[test]
+    fn test_bub_resource_uri() {
+        let obj = TreeItemModel {
+            bub_item_id: String::from("test"),
+            bub_label: String::from("test"),
+            bub_description: String::from("test"),
+            bub_tooltip: String::from("test"),
+            bub_icon_path: String::from("test"),
+            bub_collapsible_state: 0,
+            bub_context_value: String::from("test"),
+            bub_command_id: String::from("test"),
+            bub_resource_uri: String::from("test"),
+            bub_accessibility_info: String::from("test"),
+        };
+        let _ = obj.bub_summary();
+        assert_eq!(obj.bub_resource_uri, "test");
+    }
+
+    #[test]
+    fn test_bub_accessibility_info() {
+        let obj = TreeItemModel {
+            bub_item_id: String::from("test"),
+            bub_label: String::from("test"),
+            bub_description: String::from("test"),
+            bub_tooltip: String::from("test"),
+            bub_icon_path: String::from("test"),
+            bub_collapsible_state: 0,
+            bub_context_value: String::from("test"),
+            bub_command_id: String::from("test"),
+            bub_resource_uri: String::from("test"),
+            bub_accessibility_info: String::from("test"),
+        };
+        let _ = obj.bub_summary();
+        assert_eq!(obj.bub_accessibility_info, "test");
+    }
+
+
+    #[test]
+    fn test_buc_view_id() {
+        let obj = TreeViewOptions {
+            buc_view_id: String::from("test"),
+            buc_show_collapse_all: false,
+            buc_can_select_many: false,
+            buc_drag_and_drop_controller: false,
+            buc_manage_checkbox_state: false,
+            buc_badge_value: 0,
+            buc_badge_tooltip: String::from("test"),
+            buc_title: String::from("test"),
+            buc_description: String::from("test"),
+            buc_visibility: false,
+        };
+        let _ = obj.buc_summary();
+        assert_eq!(obj.buc_view_id, "test");
+    }
+
+    #[test]
+    fn test_buc_show_collapse_all() {
+        let obj = TreeViewOptions {
+            buc_view_id: String::from("test"),
+            buc_show_collapse_all: false,
+            buc_can_select_many: false,
+            buc_drag_and_drop_controller: false,
+            buc_manage_checkbox_state: false,
+            buc_badge_value: 0,
+            buc_badge_tooltip: String::from("test"),
+            buc_title: String::from("test"),
+            buc_description: String::from("test"),
+            buc_visibility: false,
+        };
+        let _ = obj.buc_summary();
+        assert!(!obj.buc_show_collapse_all);
+    }
+
+    #[test]
+    fn test_buc_can_select_many() {
+        let obj = TreeViewOptions {
+            buc_view_id: String::from("test"),
+            buc_show_collapse_all: false,
+            buc_can_select_many: false,
+            buc_drag_and_drop_controller: false,
+            buc_manage_checkbox_state: false,
+            buc_badge_value: 0,
+            buc_badge_tooltip: String::from("test"),
+            buc_title: String::from("test"),
+            buc_description: String::from("test"),
+            buc_visibility: false,
+        };
+        let _ = obj.buc_summary();
+        assert!(!obj.buc_can_select_many);
+    }
+
+    #[test]
+    fn test_buc_drag_and_drop_controller() {
+        let obj = TreeViewOptions {
+            buc_view_id: String::from("test"),
+            buc_show_collapse_all: false,
+            buc_can_select_many: false,
+            buc_drag_and_drop_controller: false,
+            buc_manage_checkbox_state: false,
+            buc_badge_value: 0,
+            buc_badge_tooltip: String::from("test"),
+            buc_title: String::from("test"),
+            buc_description: String::from("test"),
+            buc_visibility: false,
+        };
+        let _ = obj.buc_summary();
+        assert!(!obj.buc_drag_and_drop_controller);
+    }
+
+    #[test]
+    fn test_buc_manage_checkbox_state() {
+        let obj = TreeViewOptions {
+            buc_view_id: String::from("test"),
+            buc_show_collapse_all: false,
+            buc_can_select_many: false,
+            buc_drag_and_drop_controller: false,
+            buc_manage_checkbox_state: false,
+            buc_badge_value: 0,
+            buc_badge_tooltip: String::from("test"),
+            buc_title: String::from("test"),
+            buc_description: String::from("test"),
+            buc_visibility: false,
+        };
+        let _ = obj.buc_summary();
+        assert!(!obj.buc_manage_checkbox_state);
+    }
+
+    #[test]
+    fn test_buc_badge_value() {
+        let obj = TreeViewOptions {
+            buc_view_id: String::from("test"),
+            buc_show_collapse_all: false,
+            buc_can_select_many: false,
+            buc_drag_and_drop_controller: false,
+            buc_manage_checkbox_state: false,
+            buc_badge_value: 0,
+            buc_badge_tooltip: String::from("test"),
+            buc_title: String::from("test"),
+            buc_description: String::from("test"),
+            buc_visibility: false,
+        };
+        let _ = obj.buc_summary();
+        assert_eq!(obj.buc_badge_value, 0);
+    }
+
+    #[test]
+    fn test_buc_badge_tooltip() {
+        let obj = TreeViewOptions {
+            buc_view_id: String::from("test"),
+            buc_show_collapse_all: false,
+            buc_can_select_many: false,
+            buc_drag_and_drop_controller: false,
+            buc_manage_checkbox_state: false,
+            buc_badge_value: 0,
+            buc_badge_tooltip: String::from("test"),
+            buc_title: String::from("test"),
+            buc_description: String::from("test"),
+            buc_visibility: false,
+        };
+        let _ = obj.buc_summary();
+        assert_eq!(obj.buc_badge_tooltip, "test");
+    }
+
+    #[test]
+    fn test_buc_title() {
+        let obj = TreeViewOptions {
+            buc_view_id: String::from("test"),
+            buc_show_collapse_all: false,
+            buc_can_select_many: false,
+            buc_drag_and_drop_controller: false,
+            buc_manage_checkbox_state: false,
+            buc_badge_value: 0,
+            buc_badge_tooltip: String::from("test"),
+            buc_title: String::from("test"),
+            buc_description: String::from("test"),
+            buc_visibility: false,
+        };
+        let _ = obj.buc_summary();
+        assert_eq!(obj.buc_title, "test");
+    }
+
+    #[test]
+    fn test_buc_description() {
+        let obj = TreeViewOptions {
+            buc_view_id: String::from("test"),
+            buc_show_collapse_all: false,
+            buc_can_select_many: false,
+            buc_drag_and_drop_controller: false,
+            buc_manage_checkbox_state: false,
+            buc_badge_value: 0,
+            buc_badge_tooltip: String::from("test"),
+            buc_title: String::from("test"),
+            buc_description: String::from("test"),
+            buc_visibility: false,
+        };
+        let _ = obj.buc_summary();
+        assert_eq!(obj.buc_description, "test");
+    }
+
+    #[test]
+    fn test_buc_visibility() {
+        let obj = TreeViewOptions {
+            buc_view_id: String::from("test"),
+            buc_show_collapse_all: false,
+            buc_can_select_many: false,
+            buc_drag_and_drop_controller: false,
+            buc_manage_checkbox_state: false,
+            buc_badge_value: 0,
+            buc_badge_tooltip: String::from("test"),
+            buc_title: String::from("test"),
+            buc_description: String::from("test"),
+            buc_visibility: false,
+        };
+        let _ = obj.buc_summary();
+        assert!(!obj.buc_visibility);
+    }
+
+
+    #[test]
+    fn test_bud_drag_mime_types() {
+        let obj = TreeDragSource {
+            bud_drag_mime_types: Vec::new(),
+            bud_source_item_ids: Vec::new(),
+            bud_data_transfer_value: String::from("test"),
+            bud_is_copy: false,
+            bud_is_move: false,
+            bud_source_view_id: String::from("test"),
+            bud_drag_label: String::from("test"),
+            bud_item_count: 0,
+            bud_can_cancel: false,
+            bud_drag_effect: String::from("test"),
+        };
+        let _ = obj.bud_summary();
+        assert!(obj.bud_drag_mime_types.is_empty());
+    }
+
+    #[test]
+    fn test_bud_source_item_ids() {
+        let obj = TreeDragSource {
+            bud_drag_mime_types: Vec::new(),
+            bud_source_item_ids: Vec::new(),
+            bud_data_transfer_value: String::from("test"),
+            bud_is_copy: false,
+            bud_is_move: false,
+            bud_source_view_id: String::from("test"),
+            bud_drag_label: String::from("test"),
+            bud_item_count: 0,
+            bud_can_cancel: false,
+            bud_drag_effect: String::from("test"),
+        };
+        let _ = obj.bud_summary();
+        assert!(obj.bud_source_item_ids.is_empty());
+    }
+
+    #[test]
+    fn test_bud_data_transfer_value() {
+        let obj = TreeDragSource {
+            bud_drag_mime_types: Vec::new(),
+            bud_source_item_ids: Vec::new(),
+            bud_data_transfer_value: String::from("test"),
+            bud_is_copy: false,
+            bud_is_move: false,
+            bud_source_view_id: String::from("test"),
+            bud_drag_label: String::from("test"),
+            bud_item_count: 0,
+            bud_can_cancel: false,
+            bud_drag_effect: String::from("test"),
+        };
+        let _ = obj.bud_summary();
+        assert_eq!(obj.bud_data_transfer_value, "test");
+    }
+
+    #[test]
+    fn test_bud_is_copy() {
+        let obj = TreeDragSource {
+            bud_drag_mime_types: Vec::new(),
+            bud_source_item_ids: Vec::new(),
+            bud_data_transfer_value: String::from("test"),
+            bud_is_copy: false,
+            bud_is_move: false,
+            bud_source_view_id: String::from("test"),
+            bud_drag_label: String::from("test"),
+            bud_item_count: 0,
+            bud_can_cancel: false,
+            bud_drag_effect: String::from("test"),
+        };
+        let _ = obj.bud_summary();
+        assert!(!obj.bud_is_copy);
+    }
+
+    #[test]
+    fn test_bud_is_move() {
+        let obj = TreeDragSource {
+            bud_drag_mime_types: Vec::new(),
+            bud_source_item_ids: Vec::new(),
+            bud_data_transfer_value: String::from("test"),
+            bud_is_copy: false,
+            bud_is_move: false,
+            bud_source_view_id: String::from("test"),
+            bud_drag_label: String::from("test"),
+            bud_item_count: 0,
+            bud_can_cancel: false,
+            bud_drag_effect: String::from("test"),
+        };
+        let _ = obj.bud_summary();
+        assert!(!obj.bud_is_move);
+    }
+
+    #[test]
+    fn test_bud_source_view_id() {
+        let obj = TreeDragSource {
+            bud_drag_mime_types: Vec::new(),
+            bud_source_item_ids: Vec::new(),
+            bud_data_transfer_value: String::from("test"),
+            bud_is_copy: false,
+            bud_is_move: false,
+            bud_source_view_id: String::from("test"),
+            bud_drag_label: String::from("test"),
+            bud_item_count: 0,
+            bud_can_cancel: false,
+            bud_drag_effect: String::from("test"),
+        };
+        let _ = obj.bud_summary();
+        assert_eq!(obj.bud_source_view_id, "test");
+    }
+
+    #[test]
+    fn test_bud_drag_label() {
+        let obj = TreeDragSource {
+            bud_drag_mime_types: Vec::new(),
+            bud_source_item_ids: Vec::new(),
+            bud_data_transfer_value: String::from("test"),
+            bud_is_copy: false,
+            bud_is_move: false,
+            bud_source_view_id: String::from("test"),
+            bud_drag_label: String::from("test"),
+            bud_item_count: 0,
+            bud_can_cancel: false,
+            bud_drag_effect: String::from("test"),
+        };
+        let _ = obj.bud_summary();
+        assert_eq!(obj.bud_drag_label, "test");
+    }
+
+    #[test]
+    fn test_bud_item_count() {
+        let obj = TreeDragSource {
+            bud_drag_mime_types: Vec::new(),
+            bud_source_item_ids: Vec::new(),
+            bud_data_transfer_value: String::from("test"),
+            bud_is_copy: false,
+            bud_is_move: false,
+            bud_source_view_id: String::from("test"),
+            bud_drag_label: String::from("test"),
+            bud_item_count: 0,
+            bud_can_cancel: false,
+            bud_drag_effect: String::from("test"),
+        };
+        let _ = obj.bud_summary();
+        assert_eq!(obj.bud_item_count, 0);
+    }
+
+    #[test]
+    fn test_bud_can_cancel() {
+        let obj = TreeDragSource {
+            bud_drag_mime_types: Vec::new(),
+            bud_source_item_ids: Vec::new(),
+            bud_data_transfer_value: String::from("test"),
+            bud_is_copy: false,
+            bud_is_move: false,
+            bud_source_view_id: String::from("test"),
+            bud_drag_label: String::from("test"),
+            bud_item_count: 0,
+            bud_can_cancel: false,
+            bud_drag_effect: String::from("test"),
+        };
+        let _ = obj.bud_summary();
+        assert!(!obj.bud_can_cancel);
+    }
+
+    #[test]
+    fn test_bud_drag_effect() {
+        let obj = TreeDragSource {
+            bud_drag_mime_types: Vec::new(),
+            bud_source_item_ids: Vec::new(),
+            bud_data_transfer_value: String::from("test"),
+            bud_is_copy: false,
+            bud_is_move: false,
+            bud_source_view_id: String::from("test"),
+            bud_drag_label: String::from("test"),
+            bud_item_count: 0,
+            bud_can_cancel: false,
+            bud_drag_effect: String::from("test"),
+        };
+        let _ = obj.bud_summary();
+        assert_eq!(obj.bud_drag_effect, "test");
+    }
+
+
+    #[test]
+    fn test_bue_drop_mime_types() {
+        let obj = TreeDropTarget {
+            bue_drop_mime_types: Vec::new(),
+            bue_target_item_id: String::from("test"),
+            bue_data_transfer_value: String::from("test"),
+            bue_target_view_id: String::from("test"),
+            bue_drop_position: String::from("test"),
+            bue_is_supported: false,
+            bue_handle_drop_edit: false,
+            bue_item_count: 0,
+            bue_feedback_icon: String::from("test"),
+            bue_drop_effect: String::from("test"),
+        };
+        let _ = obj.bue_summary();
+        assert!(obj.bue_drop_mime_types.is_empty());
+    }
+
+    #[test]
+    fn test_bue_target_item_id() {
+        let obj = TreeDropTarget {
+            bue_drop_mime_types: Vec::new(),
+            bue_target_item_id: String::from("test"),
+            bue_data_transfer_value: String::from("test"),
+            bue_target_view_id: String::from("test"),
+            bue_drop_position: String::from("test"),
+            bue_is_supported: false,
+            bue_handle_drop_edit: false,
+            bue_item_count: 0,
+            bue_feedback_icon: String::from("test"),
+            bue_drop_effect: String::from("test"),
+        };
+        let _ = obj.bue_summary();
+        assert_eq!(obj.bue_target_item_id, "test");
+    }
+
+    #[test]
+    fn test_bue_data_transfer_value() {
+        let obj = TreeDropTarget {
+            bue_drop_mime_types: Vec::new(),
+            bue_target_item_id: String::from("test"),
+            bue_data_transfer_value: String::from("test"),
+            bue_target_view_id: String::from("test"),
+            bue_drop_position: String::from("test"),
+            bue_is_supported: false,
+            bue_handle_drop_edit: false,
+            bue_item_count: 0,
+            bue_feedback_icon: String::from("test"),
+            bue_drop_effect: String::from("test"),
+        };
+        let _ = obj.bue_summary();
+        assert_eq!(obj.bue_data_transfer_value, "test");
+    }
+
+    #[test]
+    fn test_bue_target_view_id() {
+        let obj = TreeDropTarget {
+            bue_drop_mime_types: Vec::new(),
+            bue_target_item_id: String::from("test"),
+            bue_data_transfer_value: String::from("test"),
+            bue_target_view_id: String::from("test"),
+            bue_drop_position: String::from("test"),
+            bue_is_supported: false,
+            bue_handle_drop_edit: false,
+            bue_item_count: 0,
+            bue_feedback_icon: String::from("test"),
+            bue_drop_effect: String::from("test"),
+        };
+        let _ = obj.bue_summary();
+        assert_eq!(obj.bue_target_view_id, "test");
+    }
+
+    #[test]
+    fn test_bue_drop_position() {
+        let obj = TreeDropTarget {
+            bue_drop_mime_types: Vec::new(),
+            bue_target_item_id: String::from("test"),
+            bue_data_transfer_value: String::from("test"),
+            bue_target_view_id: String::from("test"),
+            bue_drop_position: String::from("test"),
+            bue_is_supported: false,
+            bue_handle_drop_edit: false,
+            bue_item_count: 0,
+            bue_feedback_icon: String::from("test"),
+            bue_drop_effect: String::from("test"),
+        };
+        let _ = obj.bue_summary();
+        assert_eq!(obj.bue_drop_position, "test");
+    }
+
+    #[test]
+    fn test_bue_is_supported() {
+        let obj = TreeDropTarget {
+            bue_drop_mime_types: Vec::new(),
+            bue_target_item_id: String::from("test"),
+            bue_data_transfer_value: String::from("test"),
+            bue_target_view_id: String::from("test"),
+            bue_drop_position: String::from("test"),
+            bue_is_supported: false,
+            bue_handle_drop_edit: false,
+            bue_item_count: 0,
+            bue_feedback_icon: String::from("test"),
+            bue_drop_effect: String::from("test"),
+        };
+        let _ = obj.bue_summary();
+        assert!(!obj.bue_is_supported);
+    }
+
+    #[test]
+    fn test_bue_handle_drop_edit() {
+        let obj = TreeDropTarget {
+            bue_drop_mime_types: Vec::new(),
+            bue_target_item_id: String::from("test"),
+            bue_data_transfer_value: String::from("test"),
+            bue_target_view_id: String::from("test"),
+            bue_drop_position: String::from("test"),
+            bue_is_supported: false,
+            bue_handle_drop_edit: false,
+            bue_item_count: 0,
+            bue_feedback_icon: String::from("test"),
+            bue_drop_effect: String::from("test"),
+        };
+        let _ = obj.bue_summary();
+        assert!(!obj.bue_handle_drop_edit);
+    }
+
+    #[test]
+    fn test_bue_item_count() {
+        let obj = TreeDropTarget {
+            bue_drop_mime_types: Vec::new(),
+            bue_target_item_id: String::from("test"),
+            bue_data_transfer_value: String::from("test"),
+            bue_target_view_id: String::from("test"),
+            bue_drop_position: String::from("test"),
+            bue_is_supported: false,
+            bue_handle_drop_edit: false,
+            bue_item_count: 0,
+            bue_feedback_icon: String::from("test"),
+            bue_drop_effect: String::from("test"),
+        };
+        let _ = obj.bue_summary();
+        assert_eq!(obj.bue_item_count, 0);
+    }
+
+    #[test]
+    fn test_bue_feedback_icon() {
+        let obj = TreeDropTarget {
+            bue_drop_mime_types: Vec::new(),
+            bue_target_item_id: String::from("test"),
+            bue_data_transfer_value: String::from("test"),
+            bue_target_view_id: String::from("test"),
+            bue_drop_position: String::from("test"),
+            bue_is_supported: false,
+            bue_handle_drop_edit: false,
+            bue_item_count: 0,
+            bue_feedback_icon: String::from("test"),
+            bue_drop_effect: String::from("test"),
+        };
+        let _ = obj.bue_summary();
+        assert_eq!(obj.bue_feedback_icon, "test");
+    }
+
+    #[test]
+    fn test_bue_drop_effect() {
+        let obj = TreeDropTarget {
+            bue_drop_mime_types: Vec::new(),
+            bue_target_item_id: String::from("test"),
+            bue_data_transfer_value: String::from("test"),
+            bue_target_view_id: String::from("test"),
+            bue_drop_position: String::from("test"),
+            bue_is_supported: false,
+            bue_handle_drop_edit: false,
+            bue_item_count: 0,
+            bue_feedback_icon: String::from("test"),
+            bue_drop_effect: String::from("test"),
+        };
+        let _ = obj.bue_summary();
+        assert_eq!(obj.bue_drop_effect, "test");
     }
 
 }
