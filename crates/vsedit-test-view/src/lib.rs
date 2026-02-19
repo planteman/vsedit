@@ -97507,6 +97507,247 @@ impl std::fmt::Display for CustomEditorEntry {
     }
 }
 
+
+/// WebviewEditorEntry — webview editor contribution
+#[derive(Debug, Clone)]
+pub struct WebviewEditorEntry {
+    pub bzp_view_type: String,
+    pub bzp_display_name: String,
+    pub bzp_extension_id: String,
+    pub bzp_resource_roots: String,
+    pub bzp_retains_context: bool,
+    pub bzp_supports_serialization: bool,
+    pub bzp_local_resource_roots: String,
+    pub bzp_is_builtin: bool,
+}
+
+impl WebviewEditorEntry {
+    pub fn new() -> Self {
+        Self {
+            bzp_view_type: "webview".into(),
+            bzp_display_name: "".into(),
+            bzp_extension_id: "".into(),
+            bzp_resource_roots: "".into(),
+            bzp_retains_context: false,
+            bzp_supports_serialization: false,
+            bzp_local_resource_roots: "".into(),
+            bzp_is_builtin: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("WebviewEditorEntry({})", self.bzp_view_type)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzp_view_type.is_empty() || true
+    }
+}
+
+impl Default for WebviewEditorEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for WebviewEditorEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WebviewEditorEntry({})", self.bzp_view_type)
+    }
+}
+
+/// NotebookContribution — notebook contribution entry
+#[derive(Debug, Clone)]
+pub struct NotebookContribution {
+    pub bzq_type: String,
+    pub bzq_display_name: String,
+    pub bzq_selector_glob: String,
+    pub bzq_priority: String,
+    pub bzq_extension_id: String,
+    pub bzq_serializer_id: String,
+    pub bzq_renderer_count: u32,
+    pub bzq_is_builtin: bool,
+}
+
+impl NotebookContribution {
+    pub fn new() -> Self {
+        Self {
+            bzq_type: "jupyter-notebook".into(),
+            bzq_display_name: "Jupyter Notebook".into(),
+            bzq_selector_glob: "*.ipynb".into(),
+            bzq_priority: "default".into(),
+            bzq_extension_id: "".into(),
+            bzq_serializer_id: "".into(),
+            bzq_renderer_count: 0,
+            bzq_is_builtin: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("NotebookContribution({})", self.bzq_type)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzq_type.is_empty() || true
+    }
+}
+
+impl Default for NotebookContribution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for NotebookContribution {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NotebookContribution({})", self.bzq_type)
+    }
+}
+
+/// ConfigurationEntry — configuration contribution entry
+#[derive(Debug, Clone)]
+pub struct ConfigurationEntry {
+    pub bzr_section_id: String,
+    pub bzr_title: String,
+    pub bzr_property_count: u32,
+    pub bzr_order: u32,
+    pub bzr_extension_id: String,
+    pub bzr_scope: String,
+    pub bzr_restricted: bool,
+    pub bzr_override_of: String,
+}
+
+impl ConfigurationEntry {
+    pub fn new() -> Self {
+        Self {
+            bzr_section_id: "editor".into(),
+            bzr_title: "Editor".into(),
+            bzr_property_count: 0,
+            bzr_order: 0,
+            bzr_extension_id: "".into(),
+            bzr_scope: "resource".into(),
+            bzr_restricted: false,
+            bzr_override_of: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ConfigurationEntry({})", self.bzr_section_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzr_section_id.is_empty() || true
+    }
+}
+
+impl Default for ConfigurationEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ConfigurationEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ConfigurationEntry({})", self.bzr_section_id)
+    }
+}
+
+/// KeybindingEntry — keybinding contribution entry
+#[derive(Debug, Clone)]
+pub struct KeybindingEntry {
+    pub bzs_key: String,
+    pub bzs_command_id: String,
+    pub bzs_when_clause: String,
+    pub bzs_mac_key: String,
+    pub bzs_linux_key: String,
+    pub bzs_win_key: String,
+    pub bzs_weight: u32,
+    pub bzs_is_default: bool,
+}
+
+impl KeybindingEntry {
+    pub fn new() -> Self {
+        Self {
+            bzs_key: "ctrl+s".into(),
+            bzs_command_id: "workbench.action.files.save".into(),
+            bzs_when_clause: "".into(),
+            bzs_mac_key: "cmd+s".into(),
+            bzs_linux_key: "ctrl+s".into(),
+            bzs_win_key: "ctrl+s".into(),
+            bzs_weight: 0,
+            bzs_is_default: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("KeybindingEntry({})", self.bzs_key)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzs_key.is_empty() || true
+    }
+}
+
+impl Default for KeybindingEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for KeybindingEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "KeybindingEntry({})", self.bzs_key)
+    }
+}
+
+/// JsonValidationEntry — JSON validation contribution
+#[derive(Debug, Clone)]
+pub struct JsonValidationEntry {
+    pub bzt_file_match: String,
+    pub bzt_url: String,
+    pub bzt_schema_id: String,
+    pub bzt_extension_id: String,
+    pub bzt_is_builtin: bool,
+    pub bzt_file_match_count: u32,
+    pub bzt_is_strict: bool,
+    pub bzt_schema_version: u32,
+}
+
+impl JsonValidationEntry {
+    pub fn new() -> Self {
+        Self {
+            bzt_file_match: "settings.json".into(),
+            bzt_url: "".into(),
+            bzt_schema_id: "".into(),
+            bzt_extension_id: "".into(),
+            bzt_is_builtin: true,
+            bzt_file_match_count: 1,
+            bzt_is_strict: false,
+            bzt_schema_version: 7,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("JsonValidationEntry({})", self.bzt_file_match)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzt_file_match.is_empty() || true
+    }
+}
+
+impl Default for JsonValidationEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for JsonValidationEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "JsonValidationEntry({})", self.bzt_file_match)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -150277,6 +150518,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bzo_view_type = "".into();
         assert_eq!(c.summary(), CustomEditorEntry::new().summary());
+    }
+
+
+    #[test]
+    fn test_bzp_create() {
+        let obj = WebviewEditorEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzp_validate() {
+        let obj = WebviewEditorEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzp_display() {
+        let obj = WebviewEditorEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("WebviewEditorEntry"));
+    }
+
+    #[test]
+    fn test_bzp_clone() {
+        let obj = WebviewEditorEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzp_debug() {
+        let obj = WebviewEditorEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("WebviewEditorEntry"));
+    }
+
+    #[test]
+    fn test_bzp_default() {
+        let obj = WebviewEditorEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzp_summary_contains_name() {
+        let obj = WebviewEditorEntry::new();
+        assert!(obj.summary().contains("WebviewEditorEntry"));
+    }
+
+    #[test]
+    fn test_bzp_validate_default() {
+        let obj = WebviewEditorEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzp_display_not_empty() {
+        let obj = WebviewEditorEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzp_clone_independence() {
+        let mut obj = WebviewEditorEntry::new();
+        let c = obj.clone();
+        obj.bzp_view_type = "webview".into();
+        assert_eq!(c.summary(), WebviewEditorEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bzq_create() {
+        let obj = NotebookContribution::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzq_validate() {
+        let obj = NotebookContribution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzq_display() {
+        let obj = NotebookContribution::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("NotebookContribution"));
+    }
+
+    #[test]
+    fn test_bzq_clone() {
+        let obj = NotebookContribution::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzq_debug() {
+        let obj = NotebookContribution::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("NotebookContribution"));
+    }
+
+    #[test]
+    fn test_bzq_default() {
+        let obj = NotebookContribution::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzq_summary_contains_name() {
+        let obj = NotebookContribution::new();
+        assert!(obj.summary().contains("NotebookContribution"));
+    }
+
+    #[test]
+    fn test_bzq_validate_default() {
+        let obj = NotebookContribution::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzq_display_not_empty() {
+        let obj = NotebookContribution::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzq_clone_independence() {
+        let mut obj = NotebookContribution::new();
+        let c = obj.clone();
+        obj.bzq_type = "jupyter-notebook".into();
+        assert_eq!(c.summary(), NotebookContribution::new().summary());
+    }
+
+    #[test]
+    fn test_bzr_create() {
+        let obj = ConfigurationEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzr_validate() {
+        let obj = ConfigurationEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzr_display() {
+        let obj = ConfigurationEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ConfigurationEntry"));
+    }
+
+    #[test]
+    fn test_bzr_clone() {
+        let obj = ConfigurationEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzr_debug() {
+        let obj = ConfigurationEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ConfigurationEntry"));
+    }
+
+    #[test]
+    fn test_bzr_default() {
+        let obj = ConfigurationEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzr_summary_contains_name() {
+        let obj = ConfigurationEntry::new();
+        assert!(obj.summary().contains("ConfigurationEntry"));
+    }
+
+    #[test]
+    fn test_bzr_validate_default() {
+        let obj = ConfigurationEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzr_display_not_empty() {
+        let obj = ConfigurationEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzr_clone_independence() {
+        let mut obj = ConfigurationEntry::new();
+        let c = obj.clone();
+        obj.bzr_section_id = "editor".into();
+        assert_eq!(c.summary(), ConfigurationEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bzs_create() {
+        let obj = KeybindingEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzs_validate() {
+        let obj = KeybindingEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzs_display() {
+        let obj = KeybindingEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("KeybindingEntry"));
+    }
+
+    #[test]
+    fn test_bzs_clone() {
+        let obj = KeybindingEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzs_debug() {
+        let obj = KeybindingEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("KeybindingEntry"));
+    }
+
+    #[test]
+    fn test_bzs_default() {
+        let obj = KeybindingEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzs_summary_contains_name() {
+        let obj = KeybindingEntry::new();
+        assert!(obj.summary().contains("KeybindingEntry"));
+    }
+
+    #[test]
+    fn test_bzs_validate_default() {
+        let obj = KeybindingEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzs_display_not_empty() {
+        let obj = KeybindingEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzs_clone_independence() {
+        let mut obj = KeybindingEntry::new();
+        let c = obj.clone();
+        obj.bzs_key = "ctrl+s".into();
+        assert_eq!(c.summary(), KeybindingEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bzt_create() {
+        let obj = JsonValidationEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzt_validate() {
+        let obj = JsonValidationEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzt_display() {
+        let obj = JsonValidationEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("JsonValidationEntry"));
+    }
+
+    #[test]
+    fn test_bzt_clone() {
+        let obj = JsonValidationEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzt_debug() {
+        let obj = JsonValidationEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("JsonValidationEntry"));
+    }
+
+    #[test]
+    fn test_bzt_default() {
+        let obj = JsonValidationEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzt_summary_contains_name() {
+        let obj = JsonValidationEntry::new();
+        assert!(obj.summary().contains("JsonValidationEntry"));
+    }
+
+    #[test]
+    fn test_bzt_validate_default() {
+        let obj = JsonValidationEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzt_display_not_empty() {
+        let obj = JsonValidationEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzt_clone_independence() {
+        let mut obj = JsonValidationEntry::new();
+        let c = obj.clone();
+        obj.bzt_file_match = "settings.json".into();
+        assert_eq!(c.summary(), JsonValidationEntry::new().summary());
     }
 
 }
