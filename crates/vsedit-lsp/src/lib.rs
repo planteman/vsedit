@@ -54442,3 +54442,412 @@ mod bau_tests {
         assert!(item.is_expanded);
     }
 }
+
+
+// --- bav_: Editor settings model ---
+
+/// Scope of a setting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum BavSettingScope {
+    Default,
+    User,
+    Workspace,
+    WorkspaceFolder,
+    Override,
+}
+
+impl BavSettingScope {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Default => "Default",
+            Self::User => "User",
+            Self::Workspace => "Workspace",
+            Self::WorkspaceFolder => "Workspace Folder",
+            Self::Override => "Override",
+        }
+    }
+
+    pub fn priority(&self) -> u8 {
+        match self {
+            Self::Default => 0,
+            Self::User => 1,
+            Self::Workspace => 2,
+            Self::WorkspaceFolder => 3,
+            Self::Override => 4,
+        }
+    }
+}
+
+/// Type of a setting value.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BavSettingValue {
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    Str(String),
+    Array(Vec<BavSettingValue>),
+    Null,
+}
+
+impl BavSettingValue {
+    pub fn as_bool(&self) -> Option<bool> {
+        match self { Self::Bool(b) => Some(*b), _ => None }
+    }
+
+    pub fn as_int(&self) -> Option<i64> {
+        match self { Self::Int(i) => Some(*i), _ => None }
+    }
+
+    pub fn as_float(&self) -> Option<f64> {
+        match self { Self::Float(f) => Some(*f), _ => None }
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        match self { Self::Str(s) => Some(s), _ => None }
+    }
+
+    pub fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
+    }
+
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Self::Bool(_) => "boolean",
+            Self::Int(_) => "integer",
+            Self::Float(_) => "number",
+            Self::Str(_) => "string",
+            Self::Array(_) => "array",
+            Self::Null => "null",
+        }
+    }
+
+    pub fn display(&self) -> String {
+        match self {
+            Self::Bool(b) => b.to_string(),
+            Self::Int(i) => i.to_string(),
+            Self::Float(f) => format!("{:.2}", f),
+            Self::Str(s) => format!("\"{}\"", s),
+            Self::Array(a) => format!("[{} items]", a.len()),
+            Self::Null => "null".to_string(),
+        }
+    }
+}
+
+/// A setting definition (schema).
+#[derive(Debug, Clone)]
+pub struct BavSettingDef {
+    pub key: String,
+    pub description: String,
+    pub default_value: BavSettingValue,
+    pub scope: BavSettingScope,
+    pub category: Option<String>,
+    pub enum_values: Option<Vec<String>>,
+    pub minimum: Option<f64>,
+    pub maximum: Option<f64>,
+    pub deprecation_message: Option<String>,
+}
+
+impl BavSettingDef {
+    pub fn new(key: &str, description: &str, default: BavSettingValue) -> Self {
+        Self {
+            key: key.to_string(),
+            description: description.to_string(),
+            default_value: default,
+            scope: BavSettingScope::User,
+            category: None,
+            enum_values: None,
+            minimum: None,
+            maximum: None,
+            deprecation_message: None,
+        }
+    }
+
+    pub fn with_category(mut self, cat: &str) -> Self {
+        self.category = Some(cat.to_string());
+        self
+    }
+
+    pub fn with_enum(mut self, values: Vec<&str>) -> Self {
+        self.enum_values = Some(values.into_iter().map(|s| s.to_string()).collect());
+        self
+    }
+
+    pub fn with_range(mut self, min: f64, max: f64) -> Self {
+        self.minimum = Some(min);
+        self.maximum = Some(max);
+        self
+    }
+
+    pub fn is_deprecated(&self) -> bool {
+        self.deprecation_message.is_some()
+    }
+
+    pub fn validate(&self, value: &BavSettingValue) -> bool {
+        if let Some(enums) = &self.enum_values {
+            if let Some(s) = value.as_str() {
+                return enums.iter().any(|e| e == s);
+            }
+            return false;
+        }
+        if let (Some(min), Some(max)) = (self.minimum, self.maximum) {
+            if let Some(i) = value.as_int() {
+                return (i as f64) >= min && (i as f64) <= max;
+            }
+            if let Some(f) = value.as_float() {
+                return f >= min && f <= max;
+            }
+        }
+        true
+    }
+}
+
+/// A setting override (value set by user/workspace/etc).
+#[derive(Debug, Clone)]
+pub struct BavSettingOverride {
+    pub key: String,
+    pub value: BavSettingValue,
+    pub scope: BavSettingScope,
+}
+
+impl BavSettingOverride {
+    pub fn new(key: &str, value: BavSettingValue, scope: BavSettingScope) -> Self {
+        Self { key: key.to_string(), value, scope }
+    }
+}
+
+/// The settings model.
+#[derive(Debug, Clone)]
+pub struct BavSettingsModel {
+    definitions: Vec<BavSettingDef>,
+    overrides: Vec<BavSettingOverride>,
+    filter_text: Option<String>,
+    show_modified_only: bool,
+}
+
+impl BavSettingsModel {
+    pub fn new() -> Self {
+        Self {
+            definitions: Vec::new(),
+            overrides: Vec::new(),
+            filter_text: None,
+            show_modified_only: false,
+        }
+    }
+
+    pub fn register(&mut self, def: BavSettingDef) {
+        self.definitions.push(def);
+    }
+
+    pub fn set_value(&mut self, key: &str, value: BavSettingValue, scope: BavSettingScope) {
+        // Remove existing override at this scope
+        self.overrides.retain(|o| !(o.key == key && o.scope == scope));
+        self.overrides.push(BavSettingOverride::new(key, value, scope));
+    }
+
+    pub fn get_value(&self, key: &str) -> Option<&BavSettingValue> {
+        // Find highest priority override
+        let mut best: Option<&BavSettingOverride> = None;
+        for ovr in &self.overrides {
+            if ovr.key == key {
+                if best.is_none() || ovr.scope.priority() > best.unwrap().scope.priority() {
+                    best = Some(ovr);
+                }
+            }
+        }
+        if let Some(b) = best {
+            return Some(&b.value);
+        }
+        // Fall back to default
+        self.definitions.iter().find(|d| d.key == key).map(|d| &d.default_value)
+    }
+
+    pub fn get_bool(&self, key: &str) -> Option<bool> {
+        self.get_value(key).and_then(|v| v.as_bool())
+    }
+
+    pub fn get_int(&self, key: &str) -> Option<i64> {
+        self.get_value(key).and_then(|v| v.as_int())
+    }
+
+    pub fn get_str(&self, key: &str) -> Option<&str> {
+        self.get_value(key).and_then(|v| v.as_str())
+    }
+
+    pub fn is_modified(&self, key: &str) -> bool {
+        self.overrides.iter().any(|o| o.key == key)
+    }
+
+    pub fn reset(&mut self, key: &str) {
+        self.overrides.retain(|o| o.key != key);
+    }
+
+    pub fn definition_count(&self) -> usize {
+        self.definitions.len()
+    }
+
+    pub fn modified_count(&self) -> usize {
+        let mut keys: Vec<&str> = self.overrides.iter().map(|o| o.key.as_str()).collect();
+        keys.sort();
+        keys.dedup();
+        keys.len()
+    }
+
+    pub fn set_filter(&mut self, text: Option<String>) {
+        self.filter_text = text;
+    }
+
+    pub fn filtered_definitions(&self) -> Vec<&BavSettingDef> {
+        self.definitions.iter().filter(|d| {
+            if self.show_modified_only && !self.is_modified(&d.key) {
+                return false;
+            }
+            if let Some(f) = &self.filter_text {
+                let fl = f.to_lowercase();
+                d.key.to_lowercase().contains(&fl) || d.description.to_lowercase().contains(&fl)
+            } else {
+                true
+            }
+        }).collect()
+    }
+
+    pub fn categories(&self) -> Vec<&str> {
+        let mut cats: Vec<&str> = self.definitions.iter()
+            .filter_map(|d| d.category.as_deref())
+            .collect();
+        cats.sort();
+        cats.dedup();
+        cats
+    }
+
+    pub fn set_show_modified_only(&mut self, show: bool) {
+        self.show_modified_only = show;
+    }
+}
+
+#[cfg(test)]
+mod bav_tests {
+    use super::*;
+
+    #[test]
+    fn test_bav_scope_priority() {
+        assert!(BavSettingScope::Workspace.priority() > BavSettingScope::User.priority());
+        assert!(BavSettingScope::Override.priority() > BavSettingScope::Workspace.priority());
+    }
+
+    #[test]
+    fn test_bav_value_types() {
+        assert_eq!(BavSettingValue::Bool(true).as_bool(), Some(true));
+        assert_eq!(BavSettingValue::Int(42).as_int(), Some(42));
+        assert_eq!(BavSettingValue::Str("hello".to_string()).as_str(), Some("hello"));
+        assert!(BavSettingValue::Null.is_null());
+    }
+
+    #[test]
+    fn test_bav_value_display() {
+        assert_eq!(BavSettingValue::Bool(true).display(), "true");
+        assert_eq!(BavSettingValue::Int(42).display(), "42");
+        assert_eq!(BavSettingValue::Str("hi".to_string()).display(), "\"hi\"");
+    }
+
+    #[test]
+    fn test_bav_setting_def() {
+        let def = BavSettingDef::new("editor.fontSize", "Font size", BavSettingValue::Int(14))
+            .with_category("Editor")
+            .with_range(8.0, 72.0);
+        assert!(def.validate(&BavSettingValue::Int(14)));
+        assert!(!def.validate(&BavSettingValue::Int(100)));
+    }
+
+    #[test]
+    fn test_bav_enum_validation() {
+        let def = BavSettingDef::new("editor.wordWrap", "Word wrap", BavSettingValue::Str("off".to_string()))
+            .with_enum(vec!["off", "on", "wordWrapColumn", "bounded"]);
+        assert!(def.validate(&BavSettingValue::Str("on".to_string())));
+        assert!(!def.validate(&BavSettingValue::Str("invalid".to_string())));
+    }
+
+    #[test]
+    fn test_bav_model_get_set() {
+        let mut model = BavSettingsModel::new();
+        model.register(BavSettingDef::new("editor.tabSize", "Tab size", BavSettingValue::Int(4)));
+
+        // Get default
+        assert_eq!(model.get_int("editor.tabSize"), Some(4));
+
+        // Override
+        model.set_value("editor.tabSize", BavSettingValue::Int(2), BavSettingScope::User);
+        assert_eq!(model.get_int("editor.tabSize"), Some(2));
+        assert!(model.is_modified("editor.tabSize"));
+    }
+
+    #[test]
+    fn test_bav_model_scope_precedence() {
+        let mut model = BavSettingsModel::new();
+        model.register(BavSettingDef::new("x", "test", BavSettingValue::Int(1)));
+        model.set_value("x", BavSettingValue::Int(2), BavSettingScope::User);
+        model.set_value("x", BavSettingValue::Int(3), BavSettingScope::Workspace);
+        assert_eq!(model.get_int("x"), Some(3)); // Workspace wins
+    }
+
+    #[test]
+    fn test_bav_model_reset() {
+        let mut model = BavSettingsModel::new();
+        model.register(BavSettingDef::new("x", "test", BavSettingValue::Int(1)));
+        model.set_value("x", BavSettingValue::Int(99), BavSettingScope::User);
+        model.reset("x");
+        assert_eq!(model.get_int("x"), Some(1)); // Back to default
+        assert!(!model.is_modified("x"));
+    }
+
+    #[test]
+    fn test_bav_model_filter() {
+        let mut model = BavSettingsModel::new();
+        model.register(BavSettingDef::new("editor.fontSize", "Font size", BavSettingValue::Int(14)));
+        model.register(BavSettingDef::new("editor.tabSize", "Tab size", BavSettingValue::Int(4)));
+        model.register(BavSettingDef::new("files.autoSave", "Auto save", BavSettingValue::Str("off".to_string())));
+
+        model.set_filter(Some("editor".to_string()));
+        assert_eq!(model.filtered_definitions().len(), 2);
+    }
+
+    #[test]
+    fn test_bav_model_modified_only() {
+        let mut model = BavSettingsModel::new();
+        model.register(BavSettingDef::new("a", "test", BavSettingValue::Int(1)));
+        model.register(BavSettingDef::new("b", "test", BavSettingValue::Int(2)));
+        model.set_value("a", BavSettingValue::Int(99), BavSettingScope::User);
+        model.set_show_modified_only(true);
+        assert_eq!(model.filtered_definitions().len(), 1);
+    }
+
+    #[test]
+    fn test_bav_categories() {
+        let mut model = BavSettingsModel::new();
+        model.register(BavSettingDef::new("a", "test", BavSettingValue::Int(1)).with_category("Editor"));
+        model.register(BavSettingDef::new("b", "test", BavSettingValue::Int(2)).with_category("Files"));
+        model.register(BavSettingDef::new("c", "test", BavSettingValue::Int(3)).with_category("Editor"));
+        assert_eq!(model.categories(), vec!["Editor", "Files"]);
+    }
+
+    #[test]
+    fn test_bav_modified_count() {
+        let mut model = BavSettingsModel::new();
+        model.set_value("a", BavSettingValue::Int(1), BavSettingScope::User);
+        model.set_value("b", BavSettingValue::Int(2), BavSettingScope::User);
+        model.set_value("a", BavSettingValue::Int(3), BavSettingScope::Workspace);
+        assert_eq!(model.modified_count(), 2); // a and b
+    }
+
+    #[test]
+    fn test_bav_scope_labels() {
+        assert_eq!(BavSettingScope::User.label(), "User");
+        assert_eq!(BavSettingScope::Workspace.label(), "Workspace");
+    }
+
+    #[test]
+    fn test_bav_value_type_name() {
+        assert_eq!(BavSettingValue::Bool(true).type_name(), "boolean");
+        assert_eq!(BavSettingValue::Int(0).type_name(), "integer");
+        assert_eq!(BavSettingValue::Str(String::new()).type_name(), "string");
+    }
+}
