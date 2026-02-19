@@ -50819,3 +50819,298 @@ mod bak_tests {
         assert!(display.contains("vec![]"));
     }
 }
+
+
+// --- bal_: Editor code lens model ---
+
+/// A code lens action command.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BalCodeLensCommand {
+    pub title: String,
+    pub command_id: String,
+    pub arguments: Vec<String>,
+    pub tooltip: Option<String>,
+}
+
+impl BalCodeLensCommand {
+    pub fn new(title: &str, command_id: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            command_id: command_id.to_string(),
+            arguments: Vec::new(),
+            tooltip: None,
+        }
+    }
+
+    pub fn with_arg(mut self, arg: &str) -> Self {
+        self.arguments.push(arg.to_string());
+        self
+    }
+
+    pub fn with_tooltip(mut self, tooltip: &str) -> Self {
+        self.tooltip = Some(tooltip.to_string());
+        self
+    }
+}
+
+/// A code lens displayed above a line of code.
+#[derive(Debug, Clone)]
+pub struct BalCodeLens {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub command: Option<BalCodeLensCommand>,
+    pub provider_id: String,
+    pub is_resolved: bool,
+}
+
+impl BalCodeLens {
+    pub fn new(line: u32, provider_id: &str) -> Self {
+        Self {
+            line,
+            start_col: 0,
+            end_col: 0,
+            command: None,
+            provider_id: provider_id.to_string(),
+            is_resolved: false,
+        }
+    }
+
+    pub fn with_range(mut self, start: u32, end: u32) -> Self {
+        self.start_col = start;
+        self.end_col = end;
+        self
+    }
+
+    pub fn resolve(&mut self, command: BalCodeLensCommand) {
+        self.command = Some(command);
+        self.is_resolved = true;
+    }
+
+    pub fn display_text(&self) -> &str {
+        self.command.as_ref().map(|c| c.title.as_str()).unwrap_or("...")
+    }
+
+    pub fn is_clickable(&self) -> bool {
+        self.command.is_some()
+    }
+}
+
+/// Manages code lenses for a document.
+#[derive(Debug, Clone)]
+pub struct BalCodeLensModel {
+    lenses: Vec<BalCodeLens>,
+    is_enabled: bool,
+    is_loading: bool,
+}
+
+impl BalCodeLensModel {
+    pub fn new() -> Self {
+        Self {
+            lenses: Vec::new(),
+            is_enabled: true,
+            is_loading: false,
+        }
+    }
+
+    pub fn set_lenses(&mut self, lenses: Vec<BalCodeLens>) {
+        self.lenses = lenses;
+        self.lenses.sort_by_key(|l| l.line);
+        self.is_loading = false;
+    }
+
+    pub fn start_loading(&mut self) {
+        self.is_loading = true;
+    }
+
+    pub fn is_loading(&self) -> bool {
+        self.is_loading
+    }
+
+    pub fn lenses_at_line(&self, line: u32) -> Vec<&BalCodeLens> {
+        self.lenses.iter().filter(|l| l.line == line).collect()
+    }
+
+    pub fn all_lenses(&self) -> &[BalCodeLens] {
+        &self.lenses
+    }
+
+    pub fn lens_count(&self) -> usize {
+        self.lenses.len()
+    }
+
+    pub fn unresolved_count(&self) -> usize {
+        self.lenses.iter().filter(|l| !l.is_resolved).count()
+    }
+
+    pub fn lines_with_lenses(&self) -> Vec<u32> {
+        let mut lines: Vec<u32> = self.lenses.iter().map(|l| l.line).collect();
+        lines.dedup();
+        lines
+    }
+
+    pub fn resolve_lens(&mut self, index: usize, command: BalCodeLensCommand) -> bool {
+        if let Some(lens) = self.lenses.get_mut(index) {
+            lens.resolve(command);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.lenses.clear();
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.is_enabled = enabled;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.is_enabled
+    }
+
+    pub fn shift_lines(&mut self, after_line: u32, delta: i32) {
+        for lens in &mut self.lenses {
+            if lens.line > after_line {
+                lens.line = (lens.line as i64 + delta as i64).max(0) as u32;
+            }
+        }
+    }
+
+    pub fn lenses_in_range(&self, start_line: u32, end_line: u32) -> Vec<&BalCodeLens> {
+        self.lenses.iter().filter(|l| l.line >= start_line && l.line <= end_line).collect()
+    }
+}
+
+#[cfg(test)]
+mod bal_tests {
+    use super::*;
+
+    #[test]
+    fn test_bal_command_creation() {
+        let cmd = BalCodeLensCommand::new("Run Test", "test.run")
+            .with_arg("test_name")
+            .with_tooltip("Click to run");
+        assert_eq!(cmd.title, "Run Test");
+        assert_eq!(cmd.arguments.len(), 1);
+        assert_eq!(cmd.tooltip.as_deref(), Some("Click to run"));
+    }
+
+    #[test]
+    fn test_bal_code_lens_creation() {
+        let lens = BalCodeLens::new(10, "test-provider").with_range(0, 20);
+        assert_eq!(lens.line, 10);
+        assert!(!lens.is_resolved);
+        assert!(!lens.is_clickable());
+        assert_eq!(lens.display_text(), "...");
+    }
+
+    #[test]
+    fn test_bal_code_lens_resolve() {
+        let mut lens = BalCodeLens::new(10, "refs");
+        lens.resolve(BalCodeLensCommand::new("3 references", "editor.showReferences"));
+        assert!(lens.is_resolved);
+        assert!(lens.is_clickable());
+        assert_eq!(lens.display_text(), "3 references");
+    }
+
+    #[test]
+    fn test_bal_model_basic() {
+        let mut model = BalCodeLensModel::new();
+        assert!(model.is_enabled());
+        assert_eq!(model.lens_count(), 0);
+
+        let lenses = vec![
+            BalCodeLens::new(5, "refs"),
+            BalCodeLens::new(10, "test"),
+            BalCodeLens::new(10, "debug"),
+        ];
+        model.set_lenses(lenses);
+        assert_eq!(model.lens_count(), 3);
+    }
+
+    #[test]
+    fn test_bal_model_at_line() {
+        let mut model = BalCodeLensModel::new();
+        model.set_lenses(vec![
+            BalCodeLens::new(5, "a"),
+            BalCodeLens::new(10, "b"),
+            BalCodeLens::new(10, "c"),
+        ]);
+        assert_eq!(model.lenses_at_line(10).len(), 2);
+        assert_eq!(model.lenses_at_line(5).len(), 1);
+        assert_eq!(model.lenses_at_line(20).len(), 0);
+    }
+
+    #[test]
+    fn test_bal_model_unresolved() {
+        let mut model = BalCodeLensModel::new();
+        model.set_lenses(vec![
+            BalCodeLens::new(5, "a"),
+            BalCodeLens::new(10, "b"),
+        ]);
+        assert_eq!(model.unresolved_count(), 2);
+        model.resolve_lens(0, BalCodeLensCommand::new("Resolved", "cmd"));
+        assert_eq!(model.unresolved_count(), 1);
+    }
+
+    #[test]
+    fn test_bal_model_lines() {
+        let mut model = BalCodeLensModel::new();
+        model.set_lenses(vec![
+            BalCodeLens::new(5, "a"),
+            BalCodeLens::new(5, "b"),
+            BalCodeLens::new(15, "c"),
+        ]);
+        let lines = model.lines_with_lenses();
+        assert_eq!(lines, vec![5, 15]);
+    }
+
+    #[test]
+    fn test_bal_model_shift() {
+        let mut model = BalCodeLensModel::new();
+        model.set_lenses(vec![
+            BalCodeLens::new(5, "a"),
+            BalCodeLens::new(10, "b"),
+        ]);
+        model.shift_lines(7, 3);
+        assert_eq!(model.all_lenses()[0].line, 5);
+        assert_eq!(model.all_lenses()[1].line, 13);
+    }
+
+    #[test]
+    fn test_bal_model_range() {
+        let mut model = BalCodeLensModel::new();
+        model.set_lenses(vec![
+            BalCodeLens::new(5, "a"),
+            BalCodeLens::new(10, "b"),
+            BalCodeLens::new(20, "c"),
+        ]);
+        assert_eq!(model.lenses_in_range(5, 15).len(), 2);
+    }
+
+    #[test]
+    fn test_bal_model_loading() {
+        let mut model = BalCodeLensModel::new();
+        model.start_loading();
+        assert!(model.is_loading());
+        model.set_lenses(vec![]);
+        assert!(!model.is_loading());
+    }
+
+    #[test]
+    fn test_bal_model_clear() {
+        let mut model = BalCodeLensModel::new();
+        model.set_lenses(vec![BalCodeLens::new(1, "a")]);
+        model.clear();
+        assert_eq!(model.lens_count(), 0);
+    }
+
+    #[test]
+    fn test_bal_model_disable() {
+        let mut model = BalCodeLensModel::new();
+        model.set_enabled(false);
+        assert!(!model.is_enabled());
+    }
+}
