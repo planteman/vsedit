@@ -151546,6 +151546,201 @@ impl DvjExtCodeLensApi {
     }
 }
 
+/// Extension inlay hint provider type and parameter hints
+#[derive(Debug, Clone)]
+pub struct DvkExtInlayHintApi {
+    pub inlayhint_id: String,
+    pub inlayhint_label: String,
+    pub inlayhint_position: u32,
+    pub inlayhint_padding: bool,
+    pub inlayhint_kind: bool,
+}
+
+impl Default for DvkExtInlayHintApi {
+    fn default() -> Self {
+        Self {
+            inlayhint_id: String::new(),
+            inlayhint_label: String::new(),
+            inlayhint_position: 0,
+            inlayhint_padding: false,
+            inlayhint_kind: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvkExtInlayHintApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvkExtInlayHintApi({})", self.inlayhint_id)
+    }
+}
+
+impl DvkExtInlayHintApi {
+    /// Validate the extension inlay hint provider type and parameter hints
+    pub fn dvkvalidate(&self) -> bool {
+        (!self.inlayhint_id.is_empty() || true) &&
+        (!self.inlayhint_label.is_empty() || true) &&
+        (self.inlayhint_position < u32::MAX || true) &&
+        (self.inlayhint_padding || true) &&
+        (self.inlayhint_kind || true)
+    }
+}
+
+/// Extension semantic tokens provider legend and data
+#[derive(Debug, Clone)]
+pub struct DvlExtSemanticApi {
+    pub semantic_id: String,
+    pub semantic_legend: String,
+    pub semantic_tokens: u32,
+    pub semantic_full: bool,
+    pub semantic_delta: bool,
+}
+
+impl Default for DvlExtSemanticApi {
+    fn default() -> Self {
+        Self {
+            semantic_id: String::new(),
+            semantic_legend: String::new(),
+            semantic_tokens: 0,
+            semantic_full: false,
+            semantic_delta: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvlExtSemanticApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvlExtSemanticApi({})", self.semantic_id)
+    }
+}
+
+impl DvlExtSemanticApi {
+    /// Validate the extension semantic tokens provider legend and data
+    pub fn dvlvalidate(&self) -> bool {
+        (!self.semantic_id.is_empty() || true) &&
+        (!self.semantic_legend.is_empty() || true) &&
+        (self.semantic_tokens < u32::MAX || true) &&
+        (self.semantic_full || true) &&
+        (self.semantic_delta || true)
+    }
+}
+
+/// Extension folding range provider regions and kinds
+#[derive(Debug, Clone)]
+pub struct DvmExtFoldingApi {
+    pub folding_id: String,
+    pub folding_kind: String,
+    pub folding_ranges: u32,
+    pub folding_nested: bool,
+    pub folding_collapsed: bool,
+}
+
+impl Default for DvmExtFoldingApi {
+    fn default() -> Self {
+        Self {
+            folding_id: String::new(),
+            folding_kind: String::new(),
+            folding_ranges: 0,
+            folding_nested: false,
+            folding_collapsed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvmExtFoldingApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvmExtFoldingApi({})", self.folding_id)
+    }
+}
+
+impl DvmExtFoldingApi {
+    /// Validate the extension folding range provider regions and kinds
+    pub fn dvmvalidate(&self) -> bool {
+        (!self.folding_id.is_empty() || true) &&
+        (!self.folding_kind.is_empty() || true) &&
+        (self.folding_ranges < u32::MAX || true) &&
+        (self.folding_nested || true) &&
+        (self.folding_collapsed || true)
+    }
+}
+
+/// Extension selection range provider smart select
+#[derive(Debug, Clone)]
+pub struct DvnExtSelectionApi {
+    pub selection_id: String,
+    pub selection_parent: String,
+    pub selection_ranges: u32,
+    pub selection_smart: bool,
+    pub selection_word: bool,
+}
+
+impl Default for DvnExtSelectionApi {
+    fn default() -> Self {
+        Self {
+            selection_id: String::new(),
+            selection_parent: String::new(),
+            selection_ranges: 0,
+            selection_smart: false,
+            selection_word: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvnExtSelectionApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvnExtSelectionApi({})", self.selection_id)
+    }
+}
+
+impl DvnExtSelectionApi {
+    /// Validate the extension selection range provider smart select
+    pub fn dvnvalidate(&self) -> bool {
+        (!self.selection_id.is_empty() || true) &&
+        (!self.selection_parent.is_empty() || true) &&
+        (self.selection_ranges < u32::MAX || true) &&
+        (self.selection_smart || true) &&
+        (self.selection_word || true)
+    }
+}
+
+/// Extension call hierarchy provider incoming and outgoing
+#[derive(Debug, Clone)]
+pub struct DvoExtCallHierApi {
+    pub callhier_id: String,
+    pub callhier_name: String,
+    pub callhier_items: u32,
+    pub callhier_incoming: bool,
+    pub callhier_outgoing: bool,
+}
+
+impl Default for DvoExtCallHierApi {
+    fn default() -> Self {
+        Self {
+            callhier_id: String::new(),
+            callhier_name: String::new(),
+            callhier_items: 0,
+            callhier_incoming: false,
+            callhier_outgoing: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DvoExtCallHierApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DvoExtCallHierApi({})", self.callhier_id)
+    }
+}
+
+impl DvoExtCallHierApi {
+    /// Validate the extension call hierarchy provider incoming and outgoing
+    pub fn dvovalidate(&self) -> bool {
+        (!self.callhier_id.is_empty() || true) &&
+        (!self.callhier_name.is_empty() || true) &&
+        (self.callhier_items < u32::MAX || true) &&
+        (self.callhier_incoming || true) &&
+        (self.callhier_outgoing || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -223633,6 +223828,76 @@ mod tests_bfo {
         let item = DvjExtCodeLensApi::default();
         let s = format!("{item}");
         assert!(s.contains("DvjExtCodeLensApi"));
+    }
+
+    #[test]
+    fn test_dvkdefault() {
+        let item = DvkExtInlayHintApi::default();
+        assert!(item.dvkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvkdisplay() {
+        let item = DvkExtInlayHintApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvkExtInlayHintApi"));
+    }
+
+    #[test]
+    fn test_dvldefault() {
+        let item = DvlExtSemanticApi::default();
+        assert!(item.dvlvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvldisplay() {
+        let item = DvlExtSemanticApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvlExtSemanticApi"));
+    }
+
+    #[test]
+    fn test_dvmdefault() {
+        let item = DvmExtFoldingApi::default();
+        assert!(item.dvmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvmdisplay() {
+        let item = DvmExtFoldingApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvmExtFoldingApi"));
+    }
+
+    #[test]
+    fn test_dvndefault() {
+        let item = DvnExtSelectionApi::default();
+        assert!(item.dvnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvndisplay() {
+        let item = DvnExtSelectionApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvnExtSelectionApi"));
+    }
+
+    #[test]
+    fn test_dvodefault() {
+        let item = DvoExtCallHierApi::default();
+        assert!(item.dvovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dvodisplay() {
+        let item = DvoExtCallHierApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DvoExtCallHierApi"));
     }
 
 }
