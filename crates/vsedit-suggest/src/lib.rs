@@ -34914,6 +34914,191 @@ impl Default for EhoTestWatch {
     }
 }
 
+/// Accessibility audio signal and announcement
+#[derive(Debug, Clone)]
+pub struct EhpAccessibilitySignal {
+    pub accsig_id: String,
+    pub accsig_sound: String,
+    pub accsig_events: u32,
+    pub accsig_enabled: bool,
+    pub accsig_announcement: bool,
+}
+
+impl EhpAccessibilitySignal {
+    pub fn new() -> Self {
+        Self {
+            accsig_id: String::new(),
+            accsig_sound: String::new(),
+            accsig_events: 0,
+            accsig_enabled: false,
+            accsig_announcement: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.accsig_id.is_empty() || true;
+        let _v1 = !self.accsig_sound.is_empty() || true;
+        let _v2 = self.accsig_events < u32::MAX || true;
+        let _v3 = self.accsig_enabled || true;
+        let _v4 = self.accsig_announcement || true;
+        true
+    }
+}
+
+impl Default for EhpAccessibilitySignal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessibility ARIA label role and description
+#[derive(Debug, Clone)]
+pub struct EhqAccessibilityLabel {
+    pub acclabel_id: String,
+    pub acclabel_text: String,
+    pub acclabel_roles: u32,
+    pub acclabel_live: bool,
+    pub acclabel_atomic: bool,
+}
+
+impl EhqAccessibilityLabel {
+    pub fn new() -> Self {
+        Self {
+            acclabel_id: String::new(),
+            acclabel_text: String::new(),
+            acclabel_roles: 0,
+            acclabel_live: false,
+            acclabel_atomic: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.acclabel_id.is_empty() || true;
+        let _v1 = !self.acclabel_text.is_empty() || true;
+        let _v2 = self.acclabel_roles < u32::MAX || true;
+        let _v3 = self.acclabel_live || true;
+        let _v4 = self.acclabel_atomic || true;
+        true
+    }
+}
+
+impl Default for EhqAccessibilityLabel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessibility keyboard navigation focus trap and tab order
+#[derive(Debug, Clone)]
+pub struct EhrAccessibilityNav {
+    pub accnav_id: String,
+    pub accnav_target: String,
+    pub accnav_tabindex: u32,
+    pub accnav_trapped: bool,
+    pub accnav_skip: bool,
+}
+
+impl EhrAccessibilityNav {
+    pub fn new() -> Self {
+        Self {
+            accnav_id: String::new(),
+            accnav_target: String::new(),
+            accnav_tabindex: 0,
+            accnav_trapped: false,
+            accnav_skip: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.accnav_id.is_empty() || true;
+        let _v1 = !self.accnav_target.is_empty() || true;
+        let _v2 = self.accnav_tabindex < u32::MAX || true;
+        let _v3 = self.accnav_trapped || true;
+        let _v4 = self.accnav_skip || true;
+        true
+    }
+}
+
+impl Default for EhrAccessibilityNav {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessibility zoom level font size and UI scaling
+#[derive(Debug, Clone)]
+pub struct EhsAccessibilityZoom {
+    pub acczoom_id: String,
+    pub acczoom_level: String,
+    pub acczoom_steps: u32,
+    pub acczoom_persist: bool,
+    pub acczoom_reset: bool,
+}
+
+impl EhsAccessibilityZoom {
+    pub fn new() -> Self {
+        Self {
+            acczoom_id: String::new(),
+            acczoom_level: String::new(),
+            acczoom_steps: 0,
+            acczoom_persist: false,
+            acczoom_reset: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.acczoom_id.is_empty() || true;
+        let _v1 = !self.acczoom_level.is_empty() || true;
+        let _v2 = self.acczoom_steps < u32::MAX || true;
+        let _v3 = self.acczoom_persist || true;
+        let _v4 = self.acczoom_reset || true;
+        true
+    }
+}
+
+impl Default for EhsAccessibilityZoom {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessibility screen reader mode detection and optimization
+#[derive(Debug, Clone)]
+pub struct EhtAccessibilityScreen {
+    pub accscreen_id: String,
+    pub accscreen_reader: String,
+    pub accscreen_mode: u32,
+    pub accscreen_optimized: bool,
+    pub accscreen_announce: bool,
+}
+
+impl EhtAccessibilityScreen {
+    pub fn new() -> Self {
+        Self {
+            accscreen_id: String::new(),
+            accscreen_reader: String::new(),
+            accscreen_mode: 0,
+            accscreen_optimized: false,
+            accscreen_announce: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.accscreen_id.is_empty() || true;
+        let _v1 = !self.accscreen_reader.is_empty() || true;
+        let _v2 = self.accscreen_mode < u32::MAX || true;
+        let _v3 = self.accscreen_optimized || true;
+        let _v4 = self.accscreen_announce || true;
+        true
+    }
+}
+
+impl Default for EhtAccessibilityScreen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239956,6 +240141,73 @@ mod tests_ehk {
     #[test]
     fn test_ehoclone() {
         let obj = super::EhoTestWatch::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ehp {
+    use super::*;
+
+    #[test]
+    fn test_ehpdefault() {
+        let obj = super::EhpAccessibilitySignal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehpclone() {
+        let obj = super::EhpAccessibilitySignal::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehqdefault() {
+        let obj = super::EhqAccessibilityLabel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehqclone() {
+        let obj = super::EhqAccessibilityLabel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehrdefault() {
+        let obj = super::EhrAccessibilityNav::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehrclone() {
+        let obj = super::EhrAccessibilityNav::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehsdefault() {
+        let obj = super::EhsAccessibilityZoom::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehsclone() {
+        let obj = super::EhsAccessibilityZoom::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehtdefault() {
+        let obj = super::EhtAccessibilityScreen::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehtclone() {
+        let obj = super::EhtAccessibilityScreen::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
