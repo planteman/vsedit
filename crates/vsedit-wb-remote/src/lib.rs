@@ -62661,3 +62661,196 @@ mod bcd_tests {
         assert!(l.group_count() >= 2);
     }
 }
+
+
+// --- bce_: Editor context menu model ---
+
+/// A context menu item.
+#[derive(Debug, Clone)]
+pub enum BceMenuItem {
+    Action { id: String, label: String, keybinding: Option<String>, enabled: bool, group: String },
+    Separator,
+    Submenu { label: String, items: Vec<BceMenuItem> },
+}
+
+impl BceMenuItem {
+    pub fn action(id: &str, label: &str) -> Self {
+        BceMenuItem::Action { id: id.to_string(), label: label.to_string(), keybinding: None, enabled: true, group: String::new() }
+    }
+
+    pub fn with_keybinding(mut self, kb: &str) -> Self {
+        if let BceMenuItem::Action { ref mut keybinding, .. } = self { *keybinding = Some(kb.to_string()); }
+        self
+    }
+
+    pub fn with_group(mut self, g: &str) -> Self {
+        if let BceMenuItem::Action { ref mut group, .. } = self { *group = g.to_string(); }
+        self
+    }
+
+    pub fn separator() -> Self { BceMenuItem::Separator }
+
+    pub fn submenu(label: &str, items: Vec<BceMenuItem>) -> Self {
+        BceMenuItem::Submenu { label: label.to_string(), items }
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        match self {
+            BceMenuItem::Action { enabled, .. } => *enabled,
+            BceMenuItem::Separator => false,
+            BceMenuItem::Submenu { items, .. } => items.iter().any(|i| i.is_enabled()),
+        }
+    }
+
+    pub fn label(&self) -> Option<&str> {
+        match self {
+            BceMenuItem::Action { label, .. } | BceMenuItem::Submenu { label, .. } => Some(label),
+            BceMenuItem::Separator => None,
+        }
+    }
+}
+
+/// A context menu built from contributions.
+#[derive(Debug)]
+pub struct BceContextMenu {
+    items: Vec<BceMenuItem>,
+    context_key: String,
+}
+
+impl BceContextMenu {
+    pub fn new(context_key: &str) -> Self {
+        Self { items: Vec::new(), context_key: context_key.to_string() }
+    }
+
+    pub fn add_item(&mut self, item: BceMenuItem) { self.items.push(item); }
+
+    pub fn items(&self) -> &[BceMenuItem] { &self.items }
+    pub fn context_key(&self) -> &str { &self.context_key }
+
+    pub fn with_separators_between_groups(mut self) -> Self {
+        let mut grouped: Vec<BceMenuItem> = Vec::new();
+        let mut last_group = String::new();
+        for item in self.items.drain(..) {
+            if let BceMenuItem::Action { ref group, .. } = item {
+                if !group.is_empty() && group != &last_group && !grouped.is_empty() {
+                    grouped.push(BceMenuItem::Separator);
+                }
+                last_group = group.clone();
+            }
+            grouped.push(item);
+        }
+        self.items = grouped;
+        self
+    }
+
+    pub fn item_count(&self) -> usize { self.items.len() }
+
+    pub fn enabled_items(&self) -> Vec<&BceMenuItem> {
+        self.items.iter().filter(|i| i.is_enabled()).collect()
+    }
+
+    pub fn find_action(&self, id: &str) -> Option<&BceMenuItem> {
+        self.items.iter().find(|i| matches!(i, BceMenuItem::Action { id: aid, .. } if aid == id))
+    }
+
+    pub fn render_lines(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+        for item in &self.items {
+            match item {
+                BceMenuItem::Action { label, keybinding, enabled, .. } => {
+                    let kb = keybinding.as_deref().unwrap_or("");
+                    let prefix = if *enabled { "  " } else { "× " };
+                    lines.push(format!("{}{:<30} {}", prefix, label, kb));
+                }
+                BceMenuItem::Separator => lines.push("─".repeat(40)),
+                BceMenuItem::Submenu { label, items } => {
+                    lines.push(format!("  {} ▸ ({} items)", label, items.len()));
+                }
+            }
+        }
+        lines
+    }
+}
+
+#[cfg(test)]
+mod bce_tests {
+    use super::*;
+
+    #[test]
+    fn test_bce_action() {
+        let item = BceMenuItem::action("cut", "Cut").with_keybinding("Ctrl+X");
+        assert!(item.is_enabled());
+        assert_eq!(item.label(), Some("Cut"));
+    }
+
+    #[test]
+    fn test_bce_separator() {
+        let s = BceMenuItem::separator();
+        assert!(!s.is_enabled());
+        assert_eq!(s.label(), None);
+    }
+
+    #[test]
+    fn test_bce_submenu() {
+        let sub = BceMenuItem::submenu("Refactor", vec![BceMenuItem::action("rename", "Rename")]);
+        assert!(sub.is_enabled());
+    }
+
+    #[test]
+    fn test_bce_menu_build() {
+        let mut m = BceContextMenu::new("editor/context");
+        m.add_item(BceMenuItem::action("cut", "Cut"));
+        m.add_item(BceMenuItem::action("copy", "Copy"));
+        assert_eq!(m.item_count(), 2);
+    }
+
+    #[test]
+    fn test_bce_menu_find() {
+        let mut m = BceContextMenu::new("editor/context");
+        m.add_item(BceMenuItem::action("paste", "Paste"));
+        assert!(m.find_action("paste").is_some());
+        assert!(m.find_action("cut").is_none());
+    }
+
+    #[test]
+    fn test_bce_group_separators() {
+        let mut m = BceContextMenu::new("editor/context");
+        m.add_item(BceMenuItem::action("cut", "Cut").with_group("1_edit"));
+        m.add_item(BceMenuItem::action("copy", "Copy").with_group("1_edit"));
+        m.add_item(BceMenuItem::action("rename", "Rename").with_group("2_refactor"));
+        let m = m.with_separators_between_groups();
+        assert_eq!(m.item_count(), 4); // cut, copy, sep, rename
+    }
+
+    #[test]
+    fn test_bce_render_lines() {
+        let mut m = BceContextMenu::new("test");
+        m.add_item(BceMenuItem::action("a", "Action A").with_keybinding("Ctrl+A"));
+        m.add_item(BceMenuItem::separator());
+        let lines = m.render_lines();
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].contains("Ctrl+A"));
+    }
+
+    #[test]
+    fn test_bce_enabled_items() {
+        let mut m = BceContextMenu::new("test");
+        m.add_item(BceMenuItem::action("a", "A"));
+        m.add_item(BceMenuItem::separator());
+        assert_eq!(m.enabled_items().len(), 1);
+    }
+
+    #[test]
+    fn test_bce_context_key() {
+        let m = BceContextMenu::new("editor/title");
+        assert_eq!(m.context_key(), "editor/title");
+    }
+
+    #[test]
+    fn test_bce_submenu_render() {
+        let mut m = BceContextMenu::new("test");
+        m.add_item(BceMenuItem::submenu("More", vec![BceMenuItem::action("x", "X")]));
+        let lines = m.render_lines();
+        assert!(lines[0].contains("▸"));
+    }
+}
