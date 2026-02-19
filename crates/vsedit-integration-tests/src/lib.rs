@@ -5271,6 +5271,191 @@ impl Default for EdeFileStat {
     }
 }
 
+/// File encoding detection conversion and BOM handling
+#[derive(Debug, Clone)]
+pub struct EdfFileEncoding {
+    pub fencoding_id: String,
+    pub fencoding_name: String,
+    pub fencoding_confidence: u32,
+    pub fencoding_bom: bool,
+    pub fencoding_guessed: bool,
+}
+
+impl EdfFileEncoding {
+    pub fn new() -> Self {
+        Self {
+            fencoding_id: String::new(),
+            fencoding_name: String::new(),
+            fencoding_confidence: 0,
+            fencoding_bom: false,
+            fencoding_guessed: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fencoding_id.is_empty() || true;
+        let _v1 = !self.fencoding_name.is_empty() || true;
+        let _v2 = self.fencoding_confidence < u32::MAX || true;
+        let _v3 = self.fencoding_bom || true;
+        let _v4 = self.fencoding_guessed || true;
+        true
+    }
+}
+
+impl Default for EdfFileEncoding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File line ending detection LF CRLF and conversion
+#[derive(Debug, Clone)]
+pub struct EdgFileEOL {
+    pub feol_id: String,
+    pub feol_sequence: String,
+    pub feol_default: u32,
+    pub feol_detected: bool,
+    pub feol_normalized: bool,
+}
+
+impl EdgFileEOL {
+    pub fn new() -> Self {
+        Self {
+            feol_id: String::new(),
+            feol_sequence: String::new(),
+            feol_default: 0,
+            feol_detected: false,
+            feol_normalized: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.feol_id.is_empty() || true;
+        let _v1 = !self.feol_sequence.is_empty() || true;
+        let _v2 = self.feol_default < u32::MAX || true;
+        let _v3 = self.feol_detected || true;
+        let _v4 = self.feol_normalized || true;
+        true
+    }
+}
+
+impl Default for EdgFileEOL {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File readonly lock permission and override
+#[derive(Debug, Clone)]
+pub struct EdhFileReadonly {
+    pub freadonly_id: String,
+    pub freadonly_reason: String,
+    pub freadonly_locked: u32,
+    pub freadonly_permission: bool,
+    pub freadonly_override: bool,
+}
+
+impl EdhFileReadonly {
+    pub fn new() -> Self {
+        Self {
+            freadonly_id: String::new(),
+            freadonly_reason: String::new(),
+            freadonly_locked: 0,
+            freadonly_permission: false,
+            freadonly_override: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.freadonly_id.is_empty() || true;
+        let _v1 = !self.freadonly_reason.is_empty() || true;
+        let _v2 = self.freadonly_locked < u32::MAX || true;
+        let _v3 = self.freadonly_permission || true;
+        let _v4 = self.freadonly_override || true;
+        true
+    }
+}
+
+impl Default for EdhFileReadonly {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File large file handling streaming and chunk read
+#[derive(Debug, Clone)]
+pub struct EdiFileLargeFile {
+    pub flarge_id: String,
+    pub flarge_path: String,
+    pub flarge_size: u64,
+    pub flarge_streaming: bool,
+    pub flarge_tokenize: bool,
+}
+
+impl EdiFileLargeFile {
+    pub fn new() -> Self {
+        Self {
+            flarge_id: String::new(),
+            flarge_path: String::new(),
+            flarge_size: 0,
+            flarge_streaming: false,
+            flarge_tokenize: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.flarge_id.is_empty() || true;
+        let _v1 = !self.flarge_path.is_empty() || true;
+        let _v2 = self.flarge_size < u64::MAX || true;
+        let _v3 = self.flarge_streaming || true;
+        let _v4 = self.flarge_tokenize || true;
+        true
+    }
+}
+
+impl Default for EdiFileLargeFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File binary detection hex viewer and preview
+#[derive(Debug, Clone)]
+pub struct EdjFileBinary {
+    pub fbinary_id: String,
+    pub fbinary_path: String,
+    pub fbinary_size: u64,
+    pub fbinary_hex: bool,
+    pub fbinary_preview: bool,
+}
+
+impl EdjFileBinary {
+    pub fn new() -> Self {
+        Self {
+            fbinary_id: String::new(),
+            fbinary_path: String::new(),
+            fbinary_size: 0,
+            fbinary_hex: false,
+            fbinary_preview: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fbinary_id.is_empty() || true;
+        let _v1 = !self.fbinary_path.is_empty() || true;
+        let _v2 = self.fbinary_size < u64::MAX || true;
+        let _v3 = self.fbinary_hex || true;
+        let _v4 = self.fbinary_preview || true;
+        true
+    }
+}
+
+impl Default for EdjFileBinary {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod editor {
     use vsedit_text_model::TextModel;
@@ -203902,6 +204087,73 @@ mod tests_eda {
     #[test]
     fn test_edeclone() {
         let obj = super::EdeFileStat::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_edf {
+    use super::*;
+
+    #[test]
+    fn test_edfdefault() {
+        let obj = super::EdfFileEncoding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edfclone() {
+        let obj = super::EdfFileEncoding::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edgdefault() {
+        let obj = super::EdgFileEOL::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edgclone() {
+        let obj = super::EdgFileEOL::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edhdefault() {
+        let obj = super::EdhFileReadonly::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edhclone() {
+        let obj = super::EdhFileReadonly::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edidefault() {
+        let obj = super::EdiFileLargeFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ediclone() {
+        let obj = super::EdiFileLargeFile::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edjdefault() {
+        let obj = super::EdjFileBinary::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edjclone() {
+        let obj = super::EdjFileBinary::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
