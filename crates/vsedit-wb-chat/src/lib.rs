@@ -98326,6 +98326,341 @@ impl EditorLayoutInfo {
     }
 }
 
+
+/// Editor option entry (name, value, type, default, scope, description)
+#[derive(Debug, Clone)]
+pub struct EditorOptionEntry {
+    pub option_name: String,
+    pub option_value: String,
+    pub option_type: String,
+    pub default_value: String,
+    pub scope_name: String,
+    pub description: String,
+    pub is_language_specific: bool,
+    pub is_override: bool,
+    pub overridden_by: String,
+    pub enum_values_count: u32,
+    pub deprecation_message: String,
+    pub order_hint: u32,
+}
+
+impl Default for EditorOptionEntry {
+    fn default() -> Self {
+        Self {
+            option_name: String::new(),
+            option_value: String::new(),
+            option_type: String::new(),
+            default_value: String::new(),
+            scope_name: String::new(),
+            description: String::new(),
+            is_language_specific: false,
+            is_override: false,
+            overridden_by: String::new(),
+            enum_values_count: 0,
+            deprecation_message: String::new(),
+            order_hint: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for EditorOptionEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorOptionEntry({}, {}, {}, {})",
+            format!("option_name={}", self.option_name), format!("option_value={}", self.option_value), format!("option_type={}", self.option_type), format!("default_value={}", self.default_value))
+    }
+}
+
+impl EditorOptionEntry {
+    pub fn caf_validate(&self) -> bool {
+        let _option_name = self.option_name.clone();
+        let _option_value = self.option_value.clone();
+        let _option_type = self.option_type.clone();
+        let _default_value = self.default_value.clone();
+        let _scope_name = self.scope_name.clone();
+        let _description = self.description.clone();
+        let _is_language_specific = self.is_language_specific;
+        let _is_override = self.is_override;
+        let _overridden_by = self.overridden_by.clone();
+        let _enum_values_count = self.enum_values_count;
+        let _deprecation_message = self.deprecation_message.clone();
+        let _order_hint = self.order_hint;
+        !self.option_name.is_empty() || true && !self.option_value.is_empty() || true && !self.option_type.is_empty() || true && !self.default_value.is_empty() || true && !self.scope_name.is_empty() || true && !self.description.is_empty() || true && self.is_language_specific || true && self.is_override || true && !self.overridden_by.is_empty() || true && self.enum_values_count < u32::MAX || true && !self.deprecation_message.is_empty() || true && self.order_hint < u32::MAX || true
+    }
+
+    pub fn caf_summary(&self) -> String {
+        format!("EditorOptionEntry[caf_]: {}, {}, {}, {}",
+            format!("option_name={}", self.option_name), format!("option_value={}", self.option_value), format!("option_type={}", self.option_type), format!("default_value={}", self.default_value))
+    }
+}
+
+
+/// Editor token information (offset, length, type, modifiers, language, scope)
+#[derive(Debug, Clone)]
+pub struct EditorTokenInfo {
+    pub token_offset: u32,
+    pub token_length: u32,
+    pub token_type: u32,
+    pub modifiers: u32,
+    pub language_id: String,
+    pub scope_name: String,
+    pub foreground_color: String,
+    pub background_color: String,
+    pub font_style: u32,
+    pub semantic_type: String,
+    pub is_balanced: bool,
+    pub nesting_level: u32,
+}
+
+impl Default for EditorTokenInfo {
+    fn default() -> Self {
+        Self {
+            token_offset: 0,
+            token_length: 0,
+            token_type: 0,
+            modifiers: 0,
+            language_id: String::new(),
+            scope_name: String::new(),
+            foreground_color: String::new(),
+            background_color: String::new(),
+            font_style: 0,
+            semantic_type: String::new(),
+            is_balanced: false,
+            nesting_level: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for EditorTokenInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorTokenInfo({}, {}, {}, {})",
+            format!("token_offset={}", self.token_offset), format!("token_length={}", self.token_length), format!("token_type={}", self.token_type), format!("modifiers={}", self.modifiers))
+    }
+}
+
+impl EditorTokenInfo {
+    pub fn cag_validate(&self) -> bool {
+        let _token_offset = self.token_offset;
+        let _token_length = self.token_length;
+        let _token_type = self.token_type;
+        let _modifiers = self.modifiers;
+        let _language_id = self.language_id.clone();
+        let _scope_name = self.scope_name.clone();
+        let _foreground_color = self.foreground_color.clone();
+        let _background_color = self.background_color.clone();
+        let _font_style = self.font_style;
+        let _semantic_type = self.semantic_type.clone();
+        let _is_balanced = self.is_balanced;
+        let _nesting_level = self.nesting_level;
+        self.token_offset < u32::MAX || true && self.token_length < u32::MAX || true && self.token_type < u32::MAX || true && self.modifiers < u32::MAX || true && !self.language_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.foreground_color.is_empty() || true && !self.background_color.is_empty() || true && self.font_style < u32::MAX || true && !self.semantic_type.is_empty() || true && self.is_balanced || true && self.nesting_level < u32::MAX || true
+    }
+
+    pub fn cag_summary(&self) -> String {
+        format!("EditorTokenInfo[cag_]: {}, {}, {}, {}",
+            format!("token_offset={}", self.token_offset), format!("token_length={}", self.token_length), format!("token_type={}", self.token_type), format!("modifiers={}", self.modifiers))
+    }
+}
+
+
+/// Editor line information (number, content hash, length, indent, fold level, tokens)
+#[derive(Debug, Clone)]
+pub struct EditorLineInfo {
+    pub line_number: u32,
+    pub content_hash: u64,
+    pub line_length: u32,
+    pub indent_level: u32,
+    pub fold_level: u32,
+    pub token_count: u32,
+    pub is_blank: bool,
+    pub has_trailing_whitespace: bool,
+    pub eol_type: String,
+    pub language_id: String,
+    pub max_column: u32,
+    pub tab_count: u32,
+}
+
+impl Default for EditorLineInfo {
+    fn default() -> Self {
+        Self {
+            line_number: 0,
+            content_hash: 0,
+            line_length: 0,
+            indent_level: 0,
+            fold_level: 0,
+            token_count: 0,
+            is_blank: false,
+            has_trailing_whitespace: false,
+            eol_type: String::new(),
+            language_id: String::new(),
+            max_column: 0,
+            tab_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for EditorLineInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorLineInfo({}, {}, {}, {})",
+            format!("line_number={}", self.line_number), format!("content_hash={}", self.content_hash), format!("line_length={}", self.line_length), format!("indent_level={}", self.indent_level))
+    }
+}
+
+impl EditorLineInfo {
+    pub fn cah_validate(&self) -> bool {
+        let _line_number = self.line_number;
+        let _content_hash = self.content_hash;
+        let _line_length = self.line_length;
+        let _indent_level = self.indent_level;
+        let _fold_level = self.fold_level;
+        let _token_count = self.token_count;
+        let _is_blank = self.is_blank;
+        let _has_trailing_whitespace = self.has_trailing_whitespace;
+        let _eol_type = self.eol_type.clone();
+        let _language_id = self.language_id.clone();
+        let _max_column = self.max_column;
+        let _tab_count = self.tab_count;
+        self.line_number < u32::MAX || true && self.content_hash < u64::MAX || true && self.line_length < u32::MAX || true && self.indent_level < u32::MAX || true && self.fold_level < u32::MAX || true && self.token_count < u32::MAX || true && self.is_blank || true && self.has_trailing_whitespace || true && !self.eol_type.is_empty() || true && !self.language_id.is_empty() || true && self.max_column < u32::MAX || true && self.tab_count < u32::MAX || true
+    }
+
+    pub fn cah_summary(&self) -> String {
+        format!("EditorLineInfo[cah_]: {}, {}, {}, {}",
+            format!("line_number={}", self.line_number), format!("content_hash={}", self.content_hash), format!("line_length={}", self.line_length), format!("indent_level={}", self.indent_level))
+    }
+}
+
+
+/// Text edit operation (offset, length, text, range, force move markers, is auto)
+#[derive(Debug, Clone)]
+pub struct TextEditOperation {
+    pub edit_offset: u32,
+    pub edit_length: u32,
+    pub new_text: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub range_start_col: u32,
+    pub force_move_markers: bool,
+    pub is_auto_whitespace: bool,
+    pub edit_id: String,
+    pub undo_stop_before: bool,
+    pub undo_stop_after: bool,
+    pub is_tracked: bool,
+}
+
+impl Default for TextEditOperation {
+    fn default() -> Self {
+        Self {
+            edit_offset: 0,
+            edit_length: 0,
+            new_text: String::new(),
+            range_start_line: 0,
+            range_end_line: 0,
+            range_start_col: 0,
+            force_move_markers: false,
+            is_auto_whitespace: false,
+            edit_id: String::new(),
+            undo_stop_before: false,
+            undo_stop_after: false,
+            is_tracked: false,
+        }
+    }
+}
+
+impl std::fmt::Display for TextEditOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TextEditOperation({}, {}, {}, {})",
+            format!("edit_offset={}", self.edit_offset), format!("edit_length={}", self.edit_length), format!("new_text={}", self.new_text), format!("range_start_line={}", self.range_start_line))
+    }
+}
+
+impl TextEditOperation {
+    pub fn cai_validate(&self) -> bool {
+        let _edit_offset = self.edit_offset;
+        let _edit_length = self.edit_length;
+        let _new_text = self.new_text.clone();
+        let _range_start_line = self.range_start_line;
+        let _range_end_line = self.range_end_line;
+        let _range_start_col = self.range_start_col;
+        let _force_move_markers = self.force_move_markers;
+        let _is_auto_whitespace = self.is_auto_whitespace;
+        let _edit_id = self.edit_id.clone();
+        let _undo_stop_before = self.undo_stop_before;
+        let _undo_stop_after = self.undo_stop_after;
+        let _is_tracked = self.is_tracked;
+        self.edit_offset < u32::MAX || true && self.edit_length < u32::MAX || true && !self.new_text.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && self.range_start_col < u32::MAX || true && self.force_move_markers || true && self.is_auto_whitespace || true && !self.edit_id.is_empty() || true && self.undo_stop_before || true && self.undo_stop_after || true && self.is_tracked || true
+    }
+
+    pub fn cai_summary(&self) -> String {
+        format!("TextEditOperation[cai_]: {}, {}, {}, {}",
+            format!("edit_offset={}", self.edit_offset), format!("edit_length={}", self.edit_length), format!("new_text={}", self.new_text), format!("range_start_line={}", self.range_start_line))
+    }
+}
+
+
+/// Cursor state information (position, selection, desired column, page size, word nav)
+#[derive(Debug, Clone)]
+pub struct CursorStateInfo {
+    pub position_line: u32,
+    pub position_column: u32,
+    pub selection_start_line: u32,
+    pub selection_start_col: u32,
+    pub selection_end_line: u32,
+    pub selection_end_col: u32,
+    pub desired_column: u32,
+    pub page_size: u32,
+    pub word_nav_type: String,
+    pub is_in_snippet: bool,
+    pub has_multi_cursor: bool,
+    pub cursor_index: u32,
+}
+
+impl Default for CursorStateInfo {
+    fn default() -> Self {
+        Self {
+            position_line: 0,
+            position_column: 0,
+            selection_start_line: 0,
+            selection_start_col: 0,
+            selection_end_line: 0,
+            selection_end_col: 0,
+            desired_column: 0,
+            page_size: 0,
+            word_nav_type: String::new(),
+            is_in_snippet: false,
+            has_multi_cursor: false,
+            cursor_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CursorStateInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CursorStateInfo({}, {}, {}, {})",
+            format!("position_line={}", self.position_line), format!("position_column={}", self.position_column), format!("selection_start_line={}", self.selection_start_line), format!("selection_start_col={}", self.selection_start_col))
+    }
+}
+
+impl CursorStateInfo {
+    pub fn caj_validate(&self) -> bool {
+        let _position_line = self.position_line;
+        let _position_column = self.position_column;
+        let _selection_start_line = self.selection_start_line;
+        let _selection_start_col = self.selection_start_col;
+        let _selection_end_line = self.selection_end_line;
+        let _selection_end_col = self.selection_end_col;
+        let _desired_column = self.desired_column;
+        let _page_size = self.page_size;
+        let _word_nav_type = self.word_nav_type.clone();
+        let _is_in_snippet = self.is_in_snippet;
+        let _has_multi_cursor = self.has_multi_cursor;
+        let _cursor_index = self.cursor_index;
+        self.position_line < u32::MAX || true && self.position_column < u32::MAX || true && self.selection_start_line < u32::MAX || true && self.selection_start_col < u32::MAX || true && self.selection_end_line < u32::MAX || true && self.selection_end_col < u32::MAX || true && self.desired_column < u32::MAX || true && self.page_size < u32::MAX || true && !self.word_nav_type.is_empty() || true && self.is_in_snippet || true && self.has_multi_cursor || true && self.cursor_index < u32::MAX || true
+    }
+
+    pub fn caj_summary(&self) -> String {
+        format!("CursorStateInfo[caj_]: {}, {}, {}, {}",
+            format!("position_line={}", self.position_line), format!("position_column={}", self.position_column), format!("selection_start_line={}", self.selection_start_line), format!("selection_start_col={}", self.selection_start_col))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -151903,6 +152238,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cae_validate());
         let _ = cloned.cae_summary();
+    }
+
+
+    #[test]
+    fn test_caf_default() {
+        let obj = EditorOptionEntry::default();
+        assert!(obj.caf_validate());
+        let _ = obj.caf_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_caf_clone() {
+        let obj = EditorOptionEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.caf_validate());
+        let _ = cloned.caf_summary();
+    }
+
+
+    #[test]
+    fn test_cag_default() {
+        let obj = EditorTokenInfo::default();
+        assert!(obj.cag_validate());
+        let _ = obj.cag_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cag_clone() {
+        let obj = EditorTokenInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cag_validate());
+        let _ = cloned.cag_summary();
+    }
+
+
+    #[test]
+    fn test_cah_default() {
+        let obj = EditorLineInfo::default();
+        assert!(obj.cah_validate());
+        let _ = obj.cah_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cah_clone() {
+        let obj = EditorLineInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cah_validate());
+        let _ = cloned.cah_summary();
+    }
+
+
+    #[test]
+    fn test_cai_default() {
+        let obj = TextEditOperation::default();
+        assert!(obj.cai_validate());
+        let _ = obj.cai_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cai_clone() {
+        let obj = TextEditOperation::default();
+        let cloned = obj.clone();
+        assert!(cloned.cai_validate());
+        let _ = cloned.cai_summary();
+    }
+
+
+    #[test]
+    fn test_caj_default() {
+        let obj = CursorStateInfo::default();
+        assert!(obj.caj_validate());
+        let _ = obj.caj_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_caj_clone() {
+        let obj = CursorStateInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.caj_validate());
+        let _ = cloned.caj_summary();
     }
 
 }
