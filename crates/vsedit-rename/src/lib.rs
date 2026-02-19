@@ -66920,3 +66920,186 @@ mod bda_tests {
         assert_eq!(mgr.active_profile().id, "default"); // falls back
     }
 }
+
+
+// --- bdb_: Editor remote / SSH connection model ---
+
+/// Remote connection type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BdbRemoteKind { Ssh, Container, Wsl, Tunnel, Codespace }
+
+/// Connection state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BdbConnectionState { Disconnected, Connecting, Connected, Reconnecting, Error }
+
+/// A remote connection.
+#[derive(Debug, Clone)]
+pub struct BdbRemoteConnection {
+    pub id: String,
+    pub kind: BdbRemoteKind,
+    pub label: String,
+    pub host: String,
+    pub port: u16,
+    pub user: Option<String>,
+    pub state: BdbConnectionState,
+    pub error_message: Option<String>,
+}
+
+impl BdbRemoteConnection {
+    pub fn ssh(host: &str, user: &str, port: u16) -> Self {
+        Self { id: format!("ssh-{}-{}", host, port), kind: BdbRemoteKind::Ssh, label: format!("{}@{}", user, host), host: host.to_string(), port, user: Some(user.to_string()), state: BdbConnectionState::Disconnected, error_message: None }
+    }
+
+    pub fn container(name: &str) -> Self {
+        Self { id: format!("container-{}", name), kind: BdbRemoteKind::Container, label: name.to_string(), host: name.to_string(), port: 0, user: None, state: BdbConnectionState::Disconnected, error_message: None }
+    }
+
+    pub fn wsl(distro: &str) -> Self {
+        Self { id: format!("wsl-{}", distro), kind: BdbRemoteKind::Wsl, label: format!("WSL: {}", distro), host: distro.to_string(), port: 0, user: None, state: BdbConnectionState::Disconnected, error_message: None }
+    }
+
+    pub fn connect(&mut self) { self.state = BdbConnectionState::Connecting; self.error_message = None; }
+    pub fn connected(&mut self) { self.state = BdbConnectionState::Connected; }
+    pub fn disconnect(&mut self) { self.state = BdbConnectionState::Disconnected; }
+    pub fn set_error(&mut self, msg: &str) { self.state = BdbConnectionState::Error; self.error_message = Some(msg.to_string()); }
+
+    pub fn is_connected(&self) -> bool { self.state == BdbConnectionState::Connected }
+
+    pub fn status_icon(&self) -> &str {
+        match self.state {
+            BdbConnectionState::Connected => "🟢",
+            BdbConnectionState::Connecting | BdbConnectionState::Reconnecting => "🟡",
+            BdbConnectionState::Error => "🔴",
+            BdbConnectionState::Disconnected => "⚪",
+        }
+    }
+
+    pub fn display(&self) -> String { format!("{} {} ({})", self.status_icon(), self.label, format!("{:?}", self.kind).to_lowercase()) }
+}
+
+/// Manages remote connections.
+#[derive(Debug)]
+pub struct BdbRemoteManager {
+    connections: Vec<BdbRemoteConnection>,
+    recent: Vec<String>,
+}
+
+impl BdbRemoteManager {
+    pub fn new() -> Self { Self { connections: Vec::new(), recent: Vec::new() } }
+
+    pub fn add_connection(&mut self, conn: BdbRemoteConnection) {
+        self.connections.push(conn);
+    }
+
+    pub fn connect(&mut self, id: &str) -> bool {
+        if let Some(c) = self.connections.iter_mut().find(|c| c.id == id) {
+            c.connect();
+            if !self.recent.contains(&id.to_string()) { self.recent.push(id.to_string()); }
+            true
+        } else { false }
+    }
+
+    pub fn disconnect(&mut self, id: &str) {
+        if let Some(c) = self.connections.iter_mut().find(|c| c.id == id) { c.disconnect(); }
+    }
+
+    pub fn active_connections(&self) -> Vec<&BdbRemoteConnection> {
+        self.connections.iter().filter(|c| c.is_connected() || c.state == BdbConnectionState::Connecting).collect()
+    }
+
+    pub fn all_connections(&self) -> &[BdbRemoteConnection] { &self.connections }
+    pub fn recent_ids(&self) -> &[String] { &self.recent }
+    pub fn connection_count(&self) -> usize { self.connections.len() }
+
+    pub fn remove_connection(&mut self, id: &str) {
+        self.connections.retain(|c| c.id != id);
+        self.recent.retain(|r| r != id);
+    }
+}
+
+#[cfg(test)]
+mod bdb_tests {
+    use super::*;
+
+    #[test]
+    fn test_bdb_ssh() {
+        let c = BdbRemoteConnection::ssh("server.com", "user", 22);
+        assert_eq!(c.kind, BdbRemoteKind::Ssh);
+        assert!(c.label.contains("user@server"));
+    }
+
+    #[test]
+    fn test_bdb_container() {
+        let c = BdbRemoteConnection::container("my-dev");
+        assert_eq!(c.kind, BdbRemoteKind::Container);
+    }
+
+    #[test]
+    fn test_bdb_wsl() {
+        let c = BdbRemoteConnection::wsl("Ubuntu");
+        assert!(c.label.contains("WSL"));
+    }
+
+    #[test]
+    fn test_bdb_lifecycle() {
+        let mut c = BdbRemoteConnection::ssh("h", "u", 22);
+        assert!(!c.is_connected());
+        c.connect();
+        assert_eq!(c.state, BdbConnectionState::Connecting);
+        c.connected();
+        assert!(c.is_connected());
+        c.disconnect();
+        assert!(!c.is_connected());
+    }
+
+    #[test]
+    fn test_bdb_error() {
+        let mut c = BdbRemoteConnection::ssh("h", "u", 22);
+        c.set_error("timeout");
+        assert_eq!(c.state, BdbConnectionState::Error);
+        assert!(c.status_icon().contains("🔴"));
+    }
+
+    #[test]
+    fn test_bdb_manager() {
+        let mut mgr = BdbRemoteManager::new();
+        mgr.add_connection(BdbRemoteConnection::ssh("h", "u", 22));
+        assert_eq!(mgr.connection_count(), 1);
+    }
+
+    #[test]
+    fn test_bdb_manager_connect() {
+        let mut mgr = BdbRemoteManager::new();
+        let c = BdbRemoteConnection::ssh("h", "u", 22);
+        let id = c.id.clone();
+        mgr.add_connection(c);
+        assert!(mgr.connect(&id));
+        assert_eq!(mgr.active_connections().len(), 1);
+    }
+
+    #[test]
+    fn test_bdb_recent() {
+        let mut mgr = BdbRemoteManager::new();
+        let c = BdbRemoteConnection::ssh("h", "u", 22);
+        let id = c.id.clone();
+        mgr.add_connection(c);
+        mgr.connect(&id);
+        assert_eq!(mgr.recent_ids().len(), 1);
+    }
+
+    #[test]
+    fn test_bdb_remove() {
+        let mut mgr = BdbRemoteManager::new();
+        let c = BdbRemoteConnection::ssh("h", "u", 22);
+        let id = c.id.clone();
+        mgr.add_connection(c);
+        mgr.remove_connection(&id);
+        assert_eq!(mgr.connection_count(), 0);
+    }
+
+    #[test]
+    fn test_bdb_display() {
+        let c = BdbRemoteConnection::ssh("h", "u", 22);
+        assert!(c.display().contains("⚪")); // disconnected
+    }
+}
