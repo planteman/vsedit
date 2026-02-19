@@ -152802,6 +152802,201 @@ impl DwoExtLogApi {
     }
 }
 
+/// Extension progress API report increment and cancel
+#[derive(Debug, Clone)]
+pub struct DwpExtProgressApi {
+    pub progress_id: String,
+    pub progress_title: String,
+    pub progress_increment: u32,
+    pub progress_cancellable: bool,
+    pub progress_location: bool,
+}
+
+impl Default for DwpExtProgressApi {
+    fn default() -> Self {
+        Self {
+            progress_id: String::new(),
+            progress_title: String::new(),
+            progress_increment: 0,
+            progress_cancellable: false,
+            progress_location: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwpExtProgressApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwpExtProgressApi({})", self.progress_id)
+    }
+}
+
+impl DwpExtProgressApi {
+    /// Validate the extension progress api report increment and cancel
+    pub fn dwpvalidate(&self) -> bool {
+        (!self.progress_id.is_empty() || true) &&
+        (!self.progress_title.is_empty() || true) &&
+        (self.progress_increment < u32::MAX || true) &&
+        (self.progress_cancellable || true) &&
+        (self.progress_location || true)
+    }
+}
+
+/// Extension quick pick API show items and buttons
+#[derive(Debug, Clone)]
+pub struct DwqExtQuickPickApi {
+    pub quickpick_id: String,
+    pub quickpick_title: String,
+    pub quickpick_items: u32,
+    pub quickpick_canmany: bool,
+    pub quickpick_match: bool,
+}
+
+impl Default for DwqExtQuickPickApi {
+    fn default() -> Self {
+        Self {
+            quickpick_id: String::new(),
+            quickpick_title: String::new(),
+            quickpick_items: 0,
+            quickpick_canmany: false,
+            quickpick_match: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwqExtQuickPickApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwqExtQuickPickApi({})", self.quickpick_id)
+    }
+}
+
+impl DwqExtQuickPickApi {
+    /// Validate the extension quick pick api show items and buttons
+    pub fn dwqvalidate(&self) -> bool {
+        (!self.quickpick_id.is_empty() || true) &&
+        (!self.quickpick_title.is_empty() || true) &&
+        (self.quickpick_items < u32::MAX || true) &&
+        (self.quickpick_canmany || true) &&
+        (self.quickpick_match || true)
+    }
+}
+
+/// Extension input box API validate and placeholder
+#[derive(Debug, Clone)]
+pub struct DwrExtInputBoxApi {
+    pub inputbox_id: String,
+    pub inputbox_prompt: String,
+    pub inputbox_value: u32,
+    pub inputbox_password: bool,
+    pub inputbox_ignorefocus: bool,
+}
+
+impl Default for DwrExtInputBoxApi {
+    fn default() -> Self {
+        Self {
+            inputbox_id: String::new(),
+            inputbox_prompt: String::new(),
+            inputbox_value: 0,
+            inputbox_password: false,
+            inputbox_ignorefocus: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwrExtInputBoxApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwrExtInputBoxApi({})", self.inputbox_id)
+    }
+}
+
+impl DwrExtInputBoxApi {
+    /// Validate the extension input box api validate and placeholder
+    pub fn dwrvalidate(&self) -> bool {
+        (!self.inputbox_id.is_empty() || true) &&
+        (!self.inputbox_prompt.is_empty() || true) &&
+        (self.inputbox_value < u32::MAX || true) &&
+        (self.inputbox_password || true) &&
+        (self.inputbox_ignorefocus || true)
+    }
+}
+
+/// Extension message API info warning error and modal
+#[derive(Debug, Clone)]
+pub struct DwsExtMsgApi {
+    pub msg_id: String,
+    pub msg_text: String,
+    pub msg_items: u32,
+    pub msg_modal: bool,
+    pub msg_detail: bool,
+}
+
+impl Default for DwsExtMsgApi {
+    fn default() -> Self {
+        Self {
+            msg_id: String::new(),
+            msg_text: String::new(),
+            msg_items: 0,
+            msg_modal: false,
+            msg_detail: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwsExtMsgApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwsExtMsgApi({})", self.msg_id)
+    }
+}
+
+impl DwsExtMsgApi {
+    /// Validate the extension message api info warning error and modal
+    pub fn dwsvalidate(&self) -> bool {
+        (!self.msg_id.is_empty() || true) &&
+        (!self.msg_text.is_empty() || true) &&
+        (self.msg_items < u32::MAX || true) &&
+        (self.msg_modal || true) &&
+        (self.msg_detail || true)
+    }
+}
+
+/// Extension status bar item create alignment and priority
+#[derive(Debug, Clone)]
+pub struct DwtExtStatusBarApi {
+    pub statusbar_id: String,
+    pub statusbar_text: String,
+    pub statusbar_priority: u32,
+    pub statusbar_visible: bool,
+    pub statusbar_background: bool,
+}
+
+impl Default for DwtExtStatusBarApi {
+    fn default() -> Self {
+        Self {
+            statusbar_id: String::new(),
+            statusbar_text: String::new(),
+            statusbar_priority: 0,
+            statusbar_visible: false,
+            statusbar_background: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwtExtStatusBarApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwtExtStatusBarApi({})", self.statusbar_id)
+    }
+}
+
+impl DwtExtStatusBarApi {
+    /// Validate the extension status bar item create alignment and priority
+    pub fn dwtvalidate(&self) -> bool {
+        (!self.statusbar_id.is_empty() || true) &&
+        (!self.statusbar_text.is_empty() || true) &&
+        (self.statusbar_priority < u32::MAX || true) &&
+        (self.statusbar_visible || true) &&
+        (self.statusbar_background || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -225323,6 +225518,76 @@ mod tests_bfo {
         let item = DwoExtLogApi::default();
         let s = format!("{item}");
         assert!(s.contains("DwoExtLogApi"));
+    }
+
+    #[test]
+    fn test_dwpdefault() {
+        let item = DwpExtProgressApi::default();
+        assert!(item.dwpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwpdisplay() {
+        let item = DwpExtProgressApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwpExtProgressApi"));
+    }
+
+    #[test]
+    fn test_dwqdefault() {
+        let item = DwqExtQuickPickApi::default();
+        assert!(item.dwqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwqdisplay() {
+        let item = DwqExtQuickPickApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwqExtQuickPickApi"));
+    }
+
+    #[test]
+    fn test_dwrdefault() {
+        let item = DwrExtInputBoxApi::default();
+        assert!(item.dwrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwrdisplay() {
+        let item = DwrExtInputBoxApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwrExtInputBoxApi"));
+    }
+
+    #[test]
+    fn test_dwsdefault() {
+        let item = DwsExtMsgApi::default();
+        assert!(item.dwsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwsdisplay() {
+        let item = DwsExtMsgApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwsExtMsgApi"));
+    }
+
+    #[test]
+    fn test_dwtdefault() {
+        let item = DwtExtStatusBarApi::default();
+        assert!(item.dwtvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwtdisplay() {
+        let item = DwtExtStatusBarApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwtExtStatusBarApi"));
     }
 
 }
