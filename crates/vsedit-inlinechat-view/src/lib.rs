@@ -69412,3 +69412,1291 @@ mod bdp_tests {
         assert!(w.render(10).is_empty());
     }
 }
+
+// bdq_: Document formatting model — format document, format selection,
+// format on type, format on paste, formatter provider priority
+
+/// Formatter kind (document vs range vs on-type)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BdqFormatterKind {
+    Document,
+    Range,
+    OnType,
+    OnPaste,
+}
+
+/// A single text edit from a formatter
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BdqFormatEdit {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub new_text: String,
+}
+
+impl BdqFormatEdit {
+    pub fn new(sl: usize, sc: usize, el: usize, ec: usize, text: &str) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec, new_text: text.to_string() }
+    }
+
+    pub fn is_insert(&self) -> bool {
+        self.start_line == self.end_line && self.start_col == self.end_col
+    }
+
+    pub fn is_delete(&self) -> bool {
+        self.new_text.is_empty()
+    }
+
+    pub fn span_lines(&self) -> usize {
+        self.end_line.saturating_sub(self.start_line) + 1
+    }
+}
+
+/// Formatter provider with priority
+#[derive(Debug, Clone)]
+pub struct BdqFormatterProvider {
+    pub id: String,
+    pub display_name: String,
+    pub kind: BdqFormatterKind,
+    pub priority: i32,
+    pub language_ids: Vec<String>,
+}
+
+impl BdqFormatterProvider {
+    pub fn new(id: &str, name: &str, kind: BdqFormatterKind, priority: i32) -> Self {
+        Self {
+            id: id.to_string(),
+            display_name: name.to_string(),
+            kind,
+            priority,
+            language_ids: Vec::new(),
+        }
+    }
+
+    pub fn with_language(mut self, lang: &str) -> Self {
+        self.language_ids.push(lang.to_string());
+        self
+    }
+
+    pub fn supports_language(&self, lang: &str) -> bool {
+        self.language_ids.is_empty() || self.language_ids.iter().any(|l| l == lang)
+    }
+}
+
+/// Format request targeting whole document or a range
+#[derive(Debug, Clone)]
+pub struct BdqFormatRequest {
+    pub kind: BdqFormatterKind,
+    pub range_start: Option<(usize, usize)>,
+    pub range_end: Option<(usize, usize)>,
+    pub trigger_char: Option<char>,
+    pub tab_size: usize,
+    pub insert_spaces: bool,
+}
+
+impl BdqFormatRequest {
+    pub fn document(tab_size: usize, insert_spaces: bool) -> Self {
+        Self {
+            kind: BdqFormatterKind::Document,
+            range_start: None,
+            range_end: None,
+            trigger_char: None,
+            tab_size,
+            insert_spaces,
+        }
+    }
+
+    pub fn range(sl: usize, sc: usize, el: usize, ec: usize, tab_size: usize, insert_spaces: bool) -> Self {
+        Self {
+            kind: BdqFormatterKind::Range,
+            range_start: Some((sl, sc)),
+            range_end: Some((el, ec)),
+            trigger_char: None,
+            tab_size,
+            insert_spaces,
+        }
+    }
+
+    pub fn on_type(ch: char, tab_size: usize, insert_spaces: bool) -> Self {
+        Self {
+            kind: BdqFormatterKind::OnType,
+            range_start: None,
+            range_end: None,
+            trigger_char: Some(ch),
+            tab_size,
+            insert_spaces,
+        }
+    }
+
+    pub fn on_paste(sl: usize, sc: usize, el: usize, ec: usize, tab_size: usize, insert_spaces: bool) -> Self {
+        Self {
+            kind: BdqFormatterKind::OnPaste,
+            range_start: Some((sl, sc)),
+            range_end: Some((el, ec)),
+            trigger_char: None,
+            tab_size,
+            insert_spaces,
+        }
+    }
+
+    pub fn is_whole_document(&self) -> bool {
+        self.range_start.is_none() && self.range_end.is_none()
+    }
+
+    pub fn indent_string(&self) -> String {
+        if self.insert_spaces {
+            " ".repeat(self.tab_size)
+        } else {
+            "\t".to_string()
+        }
+    }
+}
+
+/// Format result containing edits
+#[derive(Debug, Clone)]
+pub struct BdqFormatResult {
+    pub edits: Vec<BdqFormatEdit>,
+    pub provider_id: String,
+    pub elapsed_ms: u64,
+}
+
+impl BdqFormatResult {
+    pub fn new(provider_id: &str) -> Self {
+        Self { edits: Vec::new(), provider_id: provider_id.to_string(), elapsed_ms: 0 }
+    }
+
+    pub fn with_edit(mut self, edit: BdqFormatEdit) -> Self {
+        self.edits.push(edit);
+        self
+    }
+
+    pub fn edit_count(&self) -> usize {
+        self.edits.len()
+    }
+
+    pub fn has_edits(&self) -> bool {
+        !self.edits.is_empty()
+    }
+
+    pub fn lines_affected(&self) -> usize {
+        let mut lines = std::collections::HashSet::new();
+        for e in &self.edits {
+            for l in e.start_line..=e.end_line {
+                lines.insert(l);
+            }
+        }
+        lines.len()
+    }
+
+    pub fn sorted_edits(&self) -> Vec<&BdqFormatEdit> {
+        let mut sorted: Vec<&BdqFormatEdit> = self.edits.iter().collect();
+        sorted.sort_by(|a, b| {
+            a.start_line.cmp(&b.start_line).then(a.start_col.cmp(&b.start_col))
+        });
+        sorted
+    }
+}
+
+/// Registry of formatter providers
+#[derive(Debug, Clone, Default)]
+pub struct BdqFormatterRegistry {
+    pub providers: Vec<BdqFormatterProvider>,
+}
+
+impl BdqFormatterRegistry {
+    pub fn new() -> Self {
+        Self { providers: Vec::new() }
+    }
+
+    pub fn register(&mut self, provider: BdqFormatterProvider) {
+        self.providers.push(provider);
+    }
+
+    pub fn unregister(&mut self, id: &str) -> bool {
+        let before = self.providers.len();
+        self.providers.retain(|p| p.id != id);
+        self.providers.len() < before
+    }
+
+    pub fn find_for_language(&self, lang: &str, kind: BdqFormatterKind) -> Vec<&BdqFormatterProvider> {
+        let mut matching: Vec<&BdqFormatterProvider> = self.providers.iter()
+            .filter(|p| p.kind == kind && p.supports_language(lang))
+            .collect();
+        matching.sort_by(|a, b| b.priority.cmp(&a.priority));
+        matching
+    }
+
+    pub fn best_for_language(&self, lang: &str, kind: BdqFormatterKind) -> Option<&BdqFormatterProvider> {
+        self.find_for_language(lang, kind).into_iter().next()
+    }
+
+    pub fn provider_count(&self) -> usize {
+        self.providers.len()
+    }
+}
+
+#[cfg(test)]
+mod tests_bdq {
+    use super::*;
+
+    #[test]
+    fn test_bdq_format_edit_insert() {
+        let edit = BdqFormatEdit::new(0, 0, 0, 0, "hello");
+        assert!(edit.is_insert());
+        assert!(!edit.is_delete());
+        assert_eq!(edit.span_lines(), 1);
+    }
+
+    #[test]
+    fn test_bdq_format_edit_delete() {
+        let edit = BdqFormatEdit::new(1, 0, 3, 10, "");
+        assert!(!edit.is_insert());
+        assert!(edit.is_delete());
+        assert_eq!(edit.span_lines(), 3);
+    }
+
+    #[test]
+    fn test_bdq_formatter_provider() {
+        let p = BdqFormatterProvider::new("prettier", "Prettier", BdqFormatterKind::Document, 10)
+            .with_language("javascript")
+            .with_language("typescript");
+        assert!(p.supports_language("javascript"));
+        assert!(!p.supports_language("rust"));
+    }
+
+    #[test]
+    fn test_bdq_format_request_document() {
+        let req = BdqFormatRequest::document(4, true);
+        assert!(req.is_whole_document());
+        assert_eq!(req.indent_string(), "    ");
+    }
+
+    #[test]
+    fn test_bdq_format_request_range() {
+        let req = BdqFormatRequest::range(5, 0, 10, 20, 2, false);
+        assert!(!req.is_whole_document());
+        assert_eq!(req.indent_string(), "\t");
+    }
+
+    #[test]
+    fn test_bdq_format_request_on_type() {
+        let req = BdqFormatRequest::on_type(';', 4, true);
+        assert_eq!(req.trigger_char, Some(';'));
+    }
+
+    #[test]
+    fn test_bdq_format_request_on_paste() {
+        let req = BdqFormatRequest::on_paste(0, 0, 5, 0, 4, true);
+        assert!(!req.is_whole_document());
+        assert_eq!(req.kind, BdqFormatterKind::OnPaste);
+    }
+
+    #[test]
+    fn test_bdq_format_result() {
+        let result = BdqFormatResult::new("prettier")
+            .with_edit(BdqFormatEdit::new(1, 0, 1, 10, "  formatted"))
+            .with_edit(BdqFormatEdit::new(3, 0, 4, 5, "  also"));
+        assert_eq!(result.edit_count(), 2);
+        assert!(result.has_edits());
+        assert_eq!(result.lines_affected(), 3);
+    }
+
+    #[test]
+    fn test_bdq_format_result_sorted() {
+        let result = BdqFormatResult::new("test")
+            .with_edit(BdqFormatEdit::new(5, 0, 5, 10, "b"))
+            .with_edit(BdqFormatEdit::new(1, 0, 1, 10, "a"));
+        let sorted = result.sorted_edits();
+        assert_eq!(sorted[0].start_line, 1);
+        assert_eq!(sorted[1].start_line, 5);
+    }
+
+    #[test]
+    fn test_bdq_registry() {
+        let mut reg = BdqFormatterRegistry::new();
+        reg.register(BdqFormatterProvider::new("prettier", "Prettier", BdqFormatterKind::Document, 10)
+            .with_language("javascript"));
+        reg.register(BdqFormatterProvider::new("biome", "Biome", BdqFormatterKind::Document, 20)
+            .with_language("javascript"));
+        reg.register(BdqFormatterProvider::new("rustfmt", "Rustfmt", BdqFormatterKind::Document, 10)
+            .with_language("rust"));
+        assert_eq!(reg.provider_count(), 3);
+        let js = reg.find_for_language("javascript", BdqFormatterKind::Document);
+        assert_eq!(js.len(), 2);
+        assert_eq!(js[0].id, "biome"); // higher priority
+        let best = reg.best_for_language("rust", BdqFormatterKind::Document).unwrap();
+        assert_eq!(best.id, "rustfmt");
+        assert!(reg.unregister("prettier"));
+        assert_eq!(reg.provider_count(), 2);
+    }
+}
+
+// bdr_: Selection highlight model — highlight occurrences of selection,
+// word highlight, text selection ranges, highlight decorations
+
+/// Kind of selection highlight
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BdrHighlightKind {
+    Selection,
+    WordUnderCursor,
+    FindMatch,
+    BracketMatch,
+    LineHighlight,
+    ColumnHighlight,
+}
+
+/// A highlighted range in the editor
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BdrHighlightRange {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub kind: BdrHighlightKind,
+    pub whole_line: bool,
+}
+
+impl BdrHighlightRange {
+    pub fn new(sl: usize, sc: usize, el: usize, ec: usize, kind: BdrHighlightKind) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec, kind, whole_line: false }
+    }
+
+    pub fn line(line: usize, kind: BdrHighlightKind) -> Self {
+        Self { start_line: line, start_col: 0, end_line: line, end_col: usize::MAX, kind, whole_line: true }
+    }
+
+    pub fn is_single_line(&self) -> bool {
+        self.start_line == self.end_line
+    }
+
+    pub fn contains_position(&self, line: usize, col: usize) -> bool {
+        if line < self.start_line || line > self.end_line { return false; }
+        if line == self.start_line && col < self.start_col { return false; }
+        if line == self.end_line && col > self.end_col { return false; }
+        true
+    }
+
+    pub fn overlaps(&self, other: &BdrHighlightRange) -> bool {
+        !(self.end_line < other.start_line
+            || other.end_line < self.start_line
+            || (self.end_line == other.start_line && self.end_col < other.start_col)
+            || (other.end_line == self.start_line && other.end_col < self.start_col))
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.end_line - self.start_line + 1
+    }
+}
+
+/// Selection highlight configuration
+#[derive(Debug, Clone)]
+pub struct BdrHighlightConfig {
+    pub highlight_selections: bool,
+    pub highlight_word: bool,
+    pub highlight_find_matches: bool,
+    pub highlight_brackets: bool,
+    pub highlight_current_line: bool,
+    pub selection_highlight_color: String,
+    pub word_highlight_color: String,
+    pub find_match_color: String,
+    pub min_selection_length: usize,
+    pub max_highlights: usize,
+}
+
+impl Default for BdrHighlightConfig {
+    fn default() -> Self {
+        Self {
+            highlight_selections: true,
+            highlight_word: true,
+            highlight_find_matches: true,
+            highlight_brackets: true,
+            highlight_current_line: true,
+            selection_highlight_color: "#add6ff26".to_string(),
+            word_highlight_color: "#57575740".to_string(),
+            find_match_color: "#ea5c0055".to_string(),
+            min_selection_length: 1,
+            max_highlights: 500,
+        }
+    }
+}
+
+impl BdrHighlightConfig {
+    pub fn color_for_kind(&self, kind: BdrHighlightKind) -> &str {
+        match kind {
+            BdrHighlightKind::Selection => &self.selection_highlight_color,
+            BdrHighlightKind::WordUnderCursor => &self.word_highlight_color,
+            BdrHighlightKind::FindMatch => &self.find_match_color,
+            _ => &self.word_highlight_color,
+        }
+    }
+
+    pub fn is_kind_enabled(&self, kind: BdrHighlightKind) -> bool {
+        match kind {
+            BdrHighlightKind::Selection => self.highlight_selections,
+            BdrHighlightKind::WordUnderCursor => self.highlight_word,
+            BdrHighlightKind::FindMatch => self.highlight_find_matches,
+            BdrHighlightKind::BracketMatch => self.highlight_brackets,
+            BdrHighlightKind::LineHighlight => self.highlight_current_line,
+            BdrHighlightKind::ColumnHighlight => true,
+        }
+    }
+}
+
+/// Manager for highlight ranges
+#[derive(Debug, Clone, Default)]
+pub struct BdrHighlightManager {
+    pub ranges: Vec<BdrHighlightRange>,
+    pub config: BdrHighlightConfig,
+    pub selected_text: Option<String>,
+}
+
+impl BdrHighlightManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set_selected_text(&mut self, text: Option<String>) {
+        self.selected_text = text;
+    }
+
+    pub fn add_range(&mut self, range: BdrHighlightRange) {
+        if self.ranges.len() < self.config.max_highlights && self.config.is_kind_enabled(range.kind) {
+            self.ranges.push(range);
+        }
+    }
+
+    pub fn clear_kind(&mut self, kind: BdrHighlightKind) {
+        self.ranges.retain(|r| r.kind != kind);
+    }
+
+    pub fn clear_all(&mut self) {
+        self.ranges.clear();
+        self.selected_text = None;
+    }
+
+    pub fn ranges_for_line(&self, line: usize) -> Vec<&BdrHighlightRange> {
+        self.ranges.iter().filter(|r| line >= r.start_line && line <= r.end_line).collect()
+    }
+
+    pub fn ranges_of_kind(&self, kind: BdrHighlightKind) -> Vec<&BdrHighlightRange> {
+        self.ranges.iter().filter(|r| r.kind == kind).collect()
+    }
+
+    pub fn count(&self) -> usize {
+        self.ranges.len()
+    }
+
+    pub fn count_kind(&self, kind: BdrHighlightKind) -> usize {
+        self.ranges.iter().filter(|r| r.kind == kind).count()
+    }
+
+    pub fn has_highlights_on_line(&self, line: usize) -> bool {
+        self.ranges.iter().any(|r| line >= r.start_line && line <= r.end_line)
+    }
+}
+
+#[cfg(test)]
+mod tests_bdr {
+    use super::*;
+
+    #[test]
+    fn test_bdr_highlight_range_basic() {
+        let r = BdrHighlightRange::new(1, 5, 1, 10, BdrHighlightKind::Selection);
+        assert!(r.is_single_line());
+        assert_eq!(r.line_count(), 1);
+        assert!(r.contains_position(1, 7));
+        assert!(!r.contains_position(1, 11));
+    }
+
+    #[test]
+    fn test_bdr_highlight_range_multiline() {
+        let r = BdrHighlightRange::new(1, 0, 5, 20, BdrHighlightKind::FindMatch);
+        assert!(!r.is_single_line());
+        assert_eq!(r.line_count(), 5);
+        assert!(r.contains_position(3, 0));
+    }
+
+    #[test]
+    fn test_bdr_highlight_range_line() {
+        let r = BdrHighlightRange::line(10, BdrHighlightKind::LineHighlight);
+        assert!(r.whole_line);
+        assert!(r.is_single_line());
+    }
+
+    #[test]
+    fn test_bdr_highlight_range_overlaps() {
+        let a = BdrHighlightRange::new(1, 0, 3, 10, BdrHighlightKind::Selection);
+        let b = BdrHighlightRange::new(2, 5, 5, 0, BdrHighlightKind::FindMatch);
+        let c = BdrHighlightRange::new(5, 0, 7, 0, BdrHighlightKind::Selection);
+        assert!(a.overlaps(&b));
+        assert!(!a.overlaps(&c));
+    }
+
+    #[test]
+    fn test_bdr_config_defaults() {
+        let cfg = BdrHighlightConfig::default();
+        assert!(cfg.highlight_selections);
+        assert!(cfg.highlight_word);
+        assert_eq!(cfg.max_highlights, 500);
+        assert!(cfg.is_kind_enabled(BdrHighlightKind::Selection));
+    }
+
+    #[test]
+    fn test_bdr_config_color() {
+        let cfg = BdrHighlightConfig::default();
+        assert_eq!(cfg.color_for_kind(BdrHighlightKind::Selection), "#add6ff26");
+        assert_eq!(cfg.color_for_kind(BdrHighlightKind::FindMatch), "#ea5c0055");
+    }
+
+    #[test]
+    fn test_bdr_manager_add_clear() {
+        let mut mgr = BdrHighlightManager::new();
+        mgr.add_range(BdrHighlightRange::new(1, 0, 1, 5, BdrHighlightKind::Selection));
+        mgr.add_range(BdrHighlightRange::new(3, 0, 3, 5, BdrHighlightKind::WordUnderCursor));
+        assert_eq!(mgr.count(), 2);
+        mgr.clear_kind(BdrHighlightKind::Selection);
+        assert_eq!(mgr.count(), 1);
+        assert_eq!(mgr.count_kind(BdrHighlightKind::WordUnderCursor), 1);
+    }
+
+    #[test]
+    fn test_bdr_manager_line_query() {
+        let mut mgr = BdrHighlightManager::new();
+        mgr.add_range(BdrHighlightRange::new(5, 0, 5, 10, BdrHighlightKind::Selection));
+        mgr.add_range(BdrHighlightRange::new(5, 15, 5, 20, BdrHighlightKind::FindMatch));
+        assert_eq!(mgr.ranges_for_line(5).len(), 2);
+        assert!(mgr.has_highlights_on_line(5));
+        assert!(!mgr.has_highlights_on_line(6));
+    }
+
+    #[test]
+    fn test_bdr_manager_selected_text() {
+        let mut mgr = BdrHighlightManager::new();
+        mgr.set_selected_text(Some("hello".to_string()));
+        assert_eq!(mgr.selected_text.as_deref(), Some("hello"));
+        mgr.clear_all();
+        assert!(mgr.selected_text.is_none());
+    }
+
+    #[test]
+    fn test_bdr_manager_max_highlights() {
+        let mut mgr = BdrHighlightManager::new();
+        mgr.config.max_highlights = 3;
+        for i in 0..5 {
+            mgr.add_range(BdrHighlightRange::new(i, 0, i, 5, BdrHighlightKind::Selection));
+        }
+        assert_eq!(mgr.count(), 3);
+    }
+}
+
+// bds_: Document highlight model — word highlight, symbol references,
+// read/write access highlighting, semantic highlighting triggers
+
+/// Document highlight access kind
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BdsHighlightAccess {
+    Read,
+    Write,
+    Text,
+}
+
+/// A document highlight occurrence
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BdsDocumentHighlight {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub access: BdsHighlightAccess,
+}
+
+impl BdsDocumentHighlight {
+    pub fn new(sl: usize, sc: usize, el: usize, ec: usize, access: BdsHighlightAccess) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec, access }
+    }
+
+    pub fn read(sl: usize, sc: usize, el: usize, ec: usize) -> Self {
+        Self::new(sl, sc, el, ec, BdsHighlightAccess::Read)
+    }
+
+    pub fn write(sl: usize, sc: usize, el: usize, ec: usize) -> Self {
+        Self::new(sl, sc, el, ec, BdsHighlightAccess::Write)
+    }
+
+    pub fn text(sl: usize, sc: usize, el: usize, ec: usize) -> Self {
+        Self::new(sl, sc, el, ec, BdsHighlightAccess::Text)
+    }
+
+    pub fn is_read(&self) -> bool { self.access == BdsHighlightAccess::Read }
+    pub fn is_write(&self) -> bool { self.access == BdsHighlightAccess::Write }
+
+    pub fn contains_position(&self, line: usize, col: usize) -> bool {
+        if line < self.start_line || line > self.end_line { return false; }
+        if line == self.start_line && col < self.start_col { return false; }
+        if line == self.end_line && col > self.end_col { return false; }
+        true
+    }
+}
+
+/// Trigger for document highlights
+#[derive(Debug, Clone)]
+pub struct BdsHighlightTrigger {
+    pub word: String,
+    pub line: usize,
+    pub col: usize,
+    pub is_symbol: bool,
+}
+
+impl BdsHighlightTrigger {
+    pub fn new(word: &str, line: usize, col: usize) -> Self {
+        Self { word: word.to_string(), line, col, is_symbol: false }
+    }
+
+    pub fn symbol(word: &str, line: usize, col: usize) -> Self {
+        Self { word: word.to_string(), line, col, is_symbol: true }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.word.is_empty()
+    }
+}
+
+/// Result of a document highlight request
+#[derive(Debug, Clone, Default)]
+pub struct BdsHighlightResult {
+    pub highlights: Vec<BdsDocumentHighlight>,
+    pub trigger: Option<BdsHighlightTrigger>,
+}
+
+impl BdsHighlightResult {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn with_highlight(mut self, h: BdsDocumentHighlight) -> Self {
+        self.highlights.push(h);
+        self
+    }
+
+    pub fn with_trigger(mut self, t: BdsHighlightTrigger) -> Self {
+        self.trigger = Some(t);
+        self
+    }
+
+    pub fn count(&self) -> usize { self.highlights.len() }
+    pub fn is_empty(&self) -> bool { self.highlights.is_empty() }
+
+    pub fn read_count(&self) -> usize {
+        self.highlights.iter().filter(|h| h.is_read()).count()
+    }
+
+    pub fn write_count(&self) -> usize {
+        self.highlights.iter().filter(|h| h.is_write()).count()
+    }
+
+    pub fn highlights_on_line(&self, line: usize) -> Vec<&BdsDocumentHighlight> {
+        self.highlights.iter().filter(|h| line >= h.start_line && line <= h.end_line).collect()
+    }
+
+    pub fn next_from(&self, line: usize, col: usize) -> Option<&BdsDocumentHighlight> {
+        self.highlights.iter().find(|h| {
+            h.start_line > line || (h.start_line == line && h.start_col > col)
+        })
+    }
+
+    pub fn prev_from(&self, line: usize, col: usize) -> Option<&BdsDocumentHighlight> {
+        self.highlights.iter().rev().find(|h| {
+            h.start_line < line || (h.start_line == line && h.start_col < col)
+        })
+    }
+}
+
+/// Word highlight configuration
+#[derive(Debug, Clone)]
+pub struct BdsWordHighlightConfig {
+    pub enabled: bool,
+    pub delay_ms: u64,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub max_occurrences: usize,
+}
+
+impl Default for BdsWordHighlightConfig {
+    fn default() -> Self {
+        Self { enabled: true, delay_ms: 250, case_sensitive: true, whole_word: true, max_occurrences: 100 }
+    }
+}
+
+#[cfg(test)]
+mod tests_bds {
+    use super::*;
+
+    #[test]
+    fn test_bds_highlight_read_write() {
+        let r = BdsDocumentHighlight::read(1, 5, 1, 10);
+        assert!(r.is_read());
+        assert!(!r.is_write());
+        let w = BdsDocumentHighlight::write(2, 0, 2, 5);
+        assert!(w.is_write());
+    }
+
+    #[test]
+    fn test_bds_highlight_contains() {
+        let h = BdsDocumentHighlight::text(1, 5, 3, 10);
+        assert!(h.contains_position(2, 0));
+        assert!(!h.contains_position(0, 0));
+        assert!(!h.contains_position(1, 3));
+    }
+
+    #[test]
+    fn test_bds_trigger() {
+        let t = BdsHighlightTrigger::new("hello", 1, 5);
+        assert!(!t.is_empty());
+        assert!(!t.is_symbol);
+        let s = BdsHighlightTrigger::symbol("MyClass", 3, 10);
+        assert!(s.is_symbol);
+    }
+
+    #[test]
+    fn test_bds_result_counts() {
+        let result = BdsHighlightResult::new()
+            .with_highlight(BdsDocumentHighlight::read(1, 0, 1, 5))
+            .with_highlight(BdsDocumentHighlight::write(3, 0, 3, 5))
+            .with_highlight(BdsDocumentHighlight::read(5, 0, 5, 5));
+        assert_eq!(result.count(), 3);
+        assert_eq!(result.read_count(), 2);
+        assert_eq!(result.write_count(), 1);
+    }
+
+    #[test]
+    fn test_bds_result_line_query() {
+        let result = BdsHighlightResult::new()
+            .with_highlight(BdsDocumentHighlight::read(1, 0, 1, 5))
+            .with_highlight(BdsDocumentHighlight::read(1, 10, 1, 15))
+            .with_highlight(BdsDocumentHighlight::write(3, 0, 3, 5));
+        assert_eq!(result.highlights_on_line(1).len(), 2);
+        assert_eq!(result.highlights_on_line(3).len(), 1);
+    }
+
+    #[test]
+    fn test_bds_result_navigation() {
+        let result = BdsHighlightResult::new()
+            .with_highlight(BdsDocumentHighlight::read(1, 0, 1, 5))
+            .with_highlight(BdsDocumentHighlight::read(5, 0, 5, 5))
+            .with_highlight(BdsDocumentHighlight::read(10, 0, 10, 5));
+        let next = result.next_from(3, 0).unwrap();
+        assert_eq!(next.start_line, 5);
+        let prev = result.prev_from(7, 0).unwrap();
+        assert_eq!(prev.start_line, 5);
+    }
+
+    #[test]
+    fn test_bds_word_highlight_config() {
+        let cfg = BdsWordHighlightConfig::default();
+        assert!(cfg.enabled);
+        assert_eq!(cfg.delay_ms, 250);
+        assert!(cfg.case_sensitive);
+        assert!(cfg.whole_word);
+        assert_eq!(cfg.max_occurrences, 100);
+    }
+
+    #[test]
+    fn test_bds_result_with_trigger() {
+        let result = BdsHighlightResult::new()
+            .with_trigger(BdsHighlightTrigger::new("hello", 1, 0))
+            .with_highlight(BdsDocumentHighlight::text(1, 0, 1, 5));
+        assert!(result.trigger.is_some());
+        assert_eq!(result.trigger.unwrap().word, "hello");
+    }
+
+    #[test]
+    fn test_bds_result_empty() {
+        let result = BdsHighlightResult::new();
+        assert!(result.is_empty());
+        assert_eq!(result.count(), 0);
+    }
+
+    #[test]
+    fn test_bds_highlight_access_variants() {
+        let h = BdsDocumentHighlight::new(0, 0, 0, 5, BdsHighlightAccess::Text);
+        assert!(!h.is_read());
+        assert!(!h.is_write());
+    }
+}
+
+// bdt_: Auto-close and auto-surround model — bracket pairs, quote pairs,
+// surround selection, auto-closing before characters, language-specific
+
+/// A character pair for auto-close behavior
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BdtCharPair {
+    pub open: char,
+    pub close: char,
+}
+
+impl BdtCharPair {
+    pub fn new(open: char, close: char) -> Self {
+        Self { open, close }
+    }
+
+    pub fn is_symmetric(&self) -> bool {
+        self.open == self.close
+    }
+
+    pub fn matches_open(&self, ch: char) -> bool {
+        self.open == ch
+    }
+
+    pub fn matches_close(&self, ch: char) -> bool {
+        self.close == ch
+    }
+}
+
+/// Auto-close setting level
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BdtAutoCloseSetting {
+    Always,
+    LanguageDefined,
+    BeforeWhitespace,
+    Never,
+}
+
+impl BdtAutoCloseSetting {
+    pub fn is_enabled(&self) -> bool {
+        *self != BdtAutoCloseSetting::Never
+    }
+}
+
+/// Auto-surround setting level
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BdtAutoSurroundSetting {
+    LanguageDefined,
+    Quotes,
+    Brackets,
+    Never,
+}
+
+impl BdtAutoSurroundSetting {
+    pub fn allows_quotes(&self) -> bool {
+        matches!(self, BdtAutoSurroundSetting::LanguageDefined | BdtAutoSurroundSetting::Quotes)
+    }
+
+    pub fn allows_brackets(&self) -> bool {
+        matches!(self, BdtAutoSurroundSetting::LanguageDefined | BdtAutoSurroundSetting::Brackets)
+    }
+}
+
+/// Configuration for auto-close behavior
+#[derive(Debug, Clone)]
+pub struct BdtAutoCloseConfig {
+    pub bracket_pairs: Vec<BdtCharPair>,
+    pub quote_pairs: Vec<BdtCharPair>,
+    pub auto_close: BdtAutoCloseSetting,
+    pub auto_surround: BdtAutoSurroundSetting,
+    pub close_before_chars: Vec<char>,
+}
+
+impl Default for BdtAutoCloseConfig {
+    fn default() -> Self {
+        Self {
+            bracket_pairs: vec![
+                BdtCharPair::new('(', ')'),
+                BdtCharPair::new('[', ']'),
+                BdtCharPair::new('{', '}'),
+            ],
+            quote_pairs: vec![
+                BdtCharPair::new('"', '"'),
+                BdtCharPair::new('\'', '\''),
+                BdtCharPair::new('`', '`'),
+            ],
+            auto_close: BdtAutoCloseSetting::LanguageDefined,
+            auto_surround: BdtAutoSurroundSetting::LanguageDefined,
+            close_before_chars: vec![' ', '\t', '}', ']', ')', '"', '\'', '`', ';', ',', '.'],
+        }
+    }
+}
+
+impl BdtAutoCloseConfig {
+    pub fn find_bracket_pair(&self, ch: char) -> Option<&BdtCharPair> {
+        self.bracket_pairs.iter().find(|p| p.matches_open(ch))
+    }
+
+    pub fn find_quote_pair(&self, ch: char) -> Option<&BdtCharPair> {
+        self.quote_pairs.iter().find(|p| p.matches_open(ch))
+    }
+
+    pub fn find_close_pair(&self, ch: char) -> Option<&BdtCharPair> {
+        self.bracket_pairs.iter().chain(self.quote_pairs.iter())
+            .find(|p| p.matches_close(ch))
+    }
+
+    pub fn should_auto_close(&self, ch: char, next_char: Option<char>) -> bool {
+        if !self.auto_close.is_enabled() { return false; }
+        let is_pair = self.find_bracket_pair(ch).is_some() || self.find_quote_pair(ch).is_some();
+        if !is_pair { return false; }
+        match self.auto_close {
+            BdtAutoCloseSetting::Always => true,
+            BdtAutoCloseSetting::BeforeWhitespace => {
+                next_char.is_none() || next_char.map_or(false, |c| c.is_whitespace())
+            }
+            BdtAutoCloseSetting::LanguageDefined => {
+                next_char.is_none() || next_char.map_or(false, |c| self.close_before_chars.contains(&c))
+            }
+            BdtAutoCloseSetting::Never => false,
+        }
+    }
+
+    pub fn should_auto_surround(&self, ch: char, has_selection: bool) -> bool {
+        if !has_selection { return false; }
+        match self.auto_surround {
+            BdtAutoSurroundSetting::LanguageDefined => {
+                self.find_bracket_pair(ch).is_some() || self.find_quote_pair(ch).is_some()
+            }
+            BdtAutoSurroundSetting::Brackets => self.find_bracket_pair(ch).is_some(),
+            BdtAutoSurroundSetting::Quotes => self.find_quote_pair(ch).is_some(),
+            BdtAutoSurroundSetting::Never => false,
+        }
+    }
+
+    pub fn should_overtype(&self, ch: char) -> bool {
+        self.bracket_pairs.iter().any(|p| p.matches_close(ch))
+            || self.quote_pairs.iter().any(|p| p.matches_close(ch))
+    }
+
+    pub fn all_pairs(&self) -> Vec<&BdtCharPair> {
+        self.bracket_pairs.iter().chain(self.quote_pairs.iter()).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests_bdt {
+    use super::*;
+
+    #[test]
+    fn test_bdt_char_pair() {
+        let p = BdtCharPair::new('(', ')');
+        assert!(!p.is_symmetric());
+        assert!(p.matches_open('('));
+        assert!(p.matches_close(')'));
+        let q = BdtCharPair::new('"', '"');
+        assert!(q.is_symmetric());
+    }
+
+    #[test]
+    fn test_bdt_auto_close_setting() {
+        assert!(BdtAutoCloseSetting::Always.is_enabled());
+        assert!(BdtAutoCloseSetting::LanguageDefined.is_enabled());
+        assert!(!BdtAutoCloseSetting::Never.is_enabled());
+    }
+
+    #[test]
+    fn test_bdt_auto_surround_setting() {
+        assert!(BdtAutoSurroundSetting::LanguageDefined.allows_quotes());
+        assert!(BdtAutoSurroundSetting::LanguageDefined.allows_brackets());
+        assert!(BdtAutoSurroundSetting::Quotes.allows_quotes());
+        assert!(!BdtAutoSurroundSetting::Quotes.allows_brackets());
+        assert!(!BdtAutoSurroundSetting::Brackets.allows_quotes());
+        assert!(BdtAutoSurroundSetting::Brackets.allows_brackets());
+    }
+
+    #[test]
+    fn test_bdt_config_find_pairs() {
+        let cfg = BdtAutoCloseConfig::default();
+        assert!(cfg.find_bracket_pair('(').is_some());
+        assert!(cfg.find_bracket_pair('x').is_none());
+        assert!(cfg.find_quote_pair('"').is_some());
+        assert!(cfg.find_close_pair(')').is_some());
+    }
+
+    #[test]
+    fn test_bdt_should_auto_close() {
+        let cfg = BdtAutoCloseConfig::default();
+        assert!(cfg.should_auto_close('(', Some(' ')));
+        assert!(cfg.should_auto_close('{', Some('}')));
+        assert!(cfg.should_auto_close('"', None));
+        assert!(!cfg.should_auto_close('x', Some(' ')));
+    }
+
+    #[test]
+    fn test_bdt_should_auto_close_never() {
+        let mut cfg = BdtAutoCloseConfig::default();
+        cfg.auto_close = BdtAutoCloseSetting::Never;
+        assert!(!cfg.should_auto_close('(', Some(' ')));
+    }
+
+    #[test]
+    fn test_bdt_should_auto_close_always() {
+        let mut cfg = BdtAutoCloseConfig::default();
+        cfg.auto_close = BdtAutoCloseSetting::Always;
+        assert!(cfg.should_auto_close('(', Some('a')));
+    }
+
+    #[test]
+    fn test_bdt_should_auto_surround() {
+        let cfg = BdtAutoCloseConfig::default();
+        assert!(cfg.should_auto_surround('(', true));
+        assert!(!cfg.should_auto_surround('(', false));
+        assert!(cfg.should_auto_surround('"', true));
+    }
+
+    #[test]
+    fn test_bdt_should_overtype() {
+        let cfg = BdtAutoCloseConfig::default();
+        assert!(cfg.should_overtype(')'));
+        assert!(cfg.should_overtype('"'));
+        assert!(!cfg.should_overtype('a'));
+    }
+
+    #[test]
+    fn test_bdt_all_pairs() {
+        let cfg = BdtAutoCloseConfig::default();
+        assert_eq!(cfg.all_pairs().len(), 6);
+    }
+}
+
+// bdu_: Column/block selection model — rectangular selections,
+// column editing, multi-line insert, block paste
+
+/// A rectangular (column) selection
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BduColumnSelection {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+}
+
+impl BduColumnSelection {
+    pub fn new(sl: usize, sc: usize, el: usize, ec: usize) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec }
+    }
+
+    pub fn top_line(&self) -> usize { self.start_line.min(self.end_line) }
+    pub fn bottom_line(&self) -> usize { self.start_line.max(self.end_line) }
+    pub fn left_col(&self) -> usize { self.start_col.min(self.end_col) }
+    pub fn right_col(&self) -> usize { self.start_col.max(self.end_col) }
+
+    pub fn line_count(&self) -> usize {
+        self.bottom_line() - self.top_line() + 1
+    }
+
+    pub fn col_width(&self) -> usize {
+        self.right_col() - self.left_col()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.col_width() == 0
+    }
+
+    pub fn is_reversed(&self) -> bool {
+        self.end_line < self.start_line || (self.end_line == self.start_line && self.end_col < self.start_col)
+    }
+
+    pub fn contains_position(&self, line: usize, col: usize) -> bool {
+        line >= self.top_line() && line <= self.bottom_line()
+            && col >= self.left_col() && col < self.right_col()
+    }
+
+    pub fn line_ranges(&self) -> Vec<(usize, usize, usize)> {
+        let left = self.left_col();
+        let right = self.right_col();
+        (self.top_line()..=self.bottom_line())
+            .map(|line| (line, left, right))
+            .collect()
+    }
+
+    pub fn expand_down(&mut self) {
+        if self.end_line >= self.start_line {
+            self.end_line += 1;
+        } else {
+            self.start_line += 1;
+        }
+    }
+
+    pub fn expand_up(&mut self) {
+        if self.end_line <= self.start_line {
+            if self.end_line > 0 { self.end_line -= 1; }
+        } else {
+            if self.start_line > 0 { self.start_line -= 1; }
+        }
+    }
+
+    pub fn expand_right(&mut self) {
+        self.end_col += 1;
+    }
+
+    pub fn expand_left(&mut self) {
+        if self.end_col > 0 { self.end_col -= 1; }
+    }
+
+    pub fn normalized(&self) -> Self {
+        Self {
+            start_line: self.top_line(),
+            start_col: self.left_col(),
+            end_line: self.bottom_line(),
+            end_col: self.right_col(),
+        }
+    }
+}
+
+/// Block paste mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BduBlockPasteMode {
+    /// Paste each line on a separate editor line
+    Spread,
+    /// Paste as column block at cursor
+    Column,
+    /// Paste as single text (normal)
+    Normal,
+}
+
+/// Column selection state
+#[derive(Debug, Clone, Default)]
+pub struct BduColumnSelectionState {
+    pub selection: Option<BduColumnSelection>,
+    pub active: bool,
+    pub clipboard: Vec<String>,
+}
+
+impl BduColumnSelectionState {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn start(&mut self, line: usize, col: usize) {
+        self.selection = Some(BduColumnSelection::new(line, col, line, col));
+        self.active = true;
+    }
+
+    pub fn extend_to(&mut self, line: usize, col: usize) {
+        if let Some(sel) = &mut self.selection {
+            sel.end_line = line;
+            sel.end_col = col;
+        }
+    }
+
+    pub fn cancel(&mut self) {
+        self.selection = None;
+        self.active = false;
+    }
+
+    pub fn copy_lines(&mut self, lines: Vec<String>) {
+        self.clipboard = lines;
+    }
+
+    pub fn has_clipboard(&self) -> bool {
+        !self.clipboard.is_empty()
+    }
+
+    pub fn paste_mode(&self) -> BduBlockPasteMode {
+        if self.clipboard.len() > 1 {
+            BduBlockPasteMode::Column
+        } else {
+            BduBlockPasteMode::Normal
+        }
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.active && self.selection.is_some()
+    }
+}
+
+#[cfg(test)]
+mod tests_bdu {
+    use super::*;
+
+    #[test]
+    fn test_bdu_column_selection_basic() {
+        let sel = BduColumnSelection::new(2, 5, 6, 10);
+        assert_eq!(sel.top_line(), 2);
+        assert_eq!(sel.bottom_line(), 6);
+        assert_eq!(sel.left_col(), 5);
+        assert_eq!(sel.right_col(), 10);
+        assert_eq!(sel.line_count(), 5);
+        assert_eq!(sel.col_width(), 5);
+        assert!(!sel.is_empty());
+        assert!(!sel.is_reversed());
+    }
+
+    #[test]
+    fn test_bdu_column_selection_reversed() {
+        let sel = BduColumnSelection::new(6, 10, 2, 5);
+        assert!(sel.is_reversed());
+        assert_eq!(sel.top_line(), 2);
+        assert_eq!(sel.right_col(), 10);
+    }
+
+    #[test]
+    fn test_bdu_column_selection_contains() {
+        let sel = BduColumnSelection::new(2, 5, 6, 10);
+        assert!(sel.contains_position(3, 7));
+        assert!(!sel.contains_position(1, 7));
+        assert!(!sel.contains_position(3, 3));
+        assert!(!sel.contains_position(3, 10));
+    }
+
+    #[test]
+    fn test_bdu_column_line_ranges() {
+        let sel = BduColumnSelection::new(3, 5, 5, 15);
+        let ranges = sel.line_ranges();
+        assert_eq!(ranges.len(), 3);
+        assert_eq!(ranges[0], (3, 5, 15));
+        assert_eq!(ranges[2], (5, 5, 15));
+    }
+
+    #[test]
+    fn test_bdu_column_expand() {
+        let mut sel = BduColumnSelection::new(3, 5, 5, 10);
+        sel.expand_down();
+        assert_eq!(sel.end_line, 6);
+        sel.expand_up();
+        assert_eq!(sel.start_line, 2);
+        sel.expand_right();
+        assert_eq!(sel.end_col, 11);
+        sel.expand_left();
+        assert_eq!(sel.end_col, 10);
+    }
+
+    #[test]
+    fn test_bdu_column_normalized() {
+        let sel = BduColumnSelection::new(6, 10, 2, 5);
+        let norm = sel.normalized();
+        assert_eq!(norm.start_line, 2);
+        assert_eq!(norm.start_col, 5);
+        assert_eq!(norm.end_line, 6);
+        assert_eq!(norm.end_col, 10);
+    }
+
+    #[test]
+    fn test_bdu_state_start_extend() {
+        let mut state = BduColumnSelectionState::new();
+        state.start(3, 5);
+        assert!(state.is_active());
+        state.extend_to(7, 15);
+        let sel = state.selection.as_ref().unwrap();
+        assert_eq!(sel.end_line, 7);
+        assert_eq!(sel.end_col, 15);
+    }
+
+    #[test]
+    fn test_bdu_state_cancel() {
+        let mut state = BduColumnSelectionState::new();
+        state.start(0, 0);
+        state.cancel();
+        assert!(!state.is_active());
+        assert!(state.selection.is_none());
+    }
+
+    #[test]
+    fn test_bdu_state_clipboard() {
+        let mut state = BduColumnSelectionState::new();
+        assert!(!state.has_clipboard());
+        state.copy_lines(vec!["abc".to_string(), "def".to_string()]);
+        assert!(state.has_clipboard());
+        assert_eq!(state.paste_mode(), BduBlockPasteMode::Column);
+    }
+
+    #[test]
+    fn test_bdu_state_single_paste() {
+        let mut state = BduColumnSelectionState::new();
+        state.copy_lines(vec!["single".to_string()]);
+        assert_eq!(state.paste_mode(), BduBlockPasteMode::Normal);
+    }
+}
