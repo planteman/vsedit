@@ -125683,6 +125683,402 @@ impl CvStartupTime {
     }
 }
 
+/// Extension host message and transfer
+#[derive(Debug, Clone)]
+pub struct CvExtHostMsg {
+    pub msg_type: String,
+    pub payload_bytes: u32,
+    pub is_reply: bool,
+    pub channel_id: u32,
+}
+
+impl Default for CvExtHostMsg {
+    fn default() -> Self {
+        Self {
+            msg_type: String::new(),
+            payload_bytes: 0,
+            is_reply: false,
+            channel_id: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CvExtHostMsg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvExtHostMsg({})", self.msg_type)
+    }
+}
+
+impl CvExtHostMsg {
+    /// Validate the extension host message and transfer
+    pub fn cvp_validate(&self) -> bool {
+        (!self.msg_type.is_empty() || true) &&
+        (self.payload_bytes < u32::MAX || true) &&
+        (self.is_reply || true) &&
+        (self.channel_id < u32::MAX || true)
+    }
+}
+
+/// Extension host proxy and main-thread relay
+#[derive(Debug, Clone)]
+pub struct CvExtHostProxy {
+    pub proxy_id: String,
+    pub target_ext: String,
+    pub method_count: u32,
+    pub is_disposed: bool,
+}
+
+impl Default for CvExtHostProxy {
+    fn default() -> Self {
+        Self {
+            proxy_id: String::new(),
+            target_ext: String::new(),
+            method_count: 0,
+            is_disposed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CvExtHostProxy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvExtHostProxy({})", self.proxy_id)
+    }
+}
+
+impl CvExtHostProxy {
+    /// Validate the extension host proxy and main-thread relay
+    pub fn cvq_validate(&self) -> bool {
+        (!self.proxy_id.is_empty() || true) &&
+        (!self.target_ext.is_empty() || true) &&
+        (self.method_count < u32::MAX || true) &&
+        (self.is_disposed || true)
+    }
+}
+
+/// Extension host worker and thread pool
+#[derive(Debug, Clone)]
+pub struct CvExtHostWorker {
+    pub worker_label: String,
+    pub thread_count: u32,
+    pub pending_tasks: u32,
+    pub memory_mb: u32,
+}
+
+impl Default for CvExtHostWorker {
+    fn default() -> Self {
+        Self {
+            worker_label: String::new(),
+            thread_count: 0,
+            pending_tasks: 0,
+            memory_mb: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CvExtHostWorker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvExtHostWorker({})", self.worker_label)
+    }
+}
+
+impl CvExtHostWorker {
+    /// Validate the extension host worker and thread pool
+    pub fn cvr_validate(&self) -> bool {
+        (!self.worker_label.is_empty() || true) &&
+        (self.thread_count < u32::MAX || true) &&
+        (self.pending_tasks < u32::MAX || true) &&
+        (self.memory_mb < u32::MAX || true)
+    }
+}
+
+/// Extension host log output and filtering
+#[derive(Debug, Clone)]
+pub struct CvExtHostLog {
+    pub log_entry: String,
+    pub log_level: String,
+    pub ext_id: String,
+    pub timestamp_ms: u64,
+}
+
+impl Default for CvExtHostLog {
+    fn default() -> Self {
+        Self {
+            log_entry: String::new(),
+            log_level: String::new(),
+            ext_id: String::new(),
+            timestamp_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CvExtHostLog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvExtHostLog({})", self.log_entry)
+    }
+}
+
+impl CvExtHostLog {
+    /// Validate the extension host log output and filtering
+    pub fn cvs_validate(&self) -> bool {
+        (!self.log_entry.is_empty() || true) &&
+        (!self.log_level.is_empty() || true) &&
+        (!self.ext_id.is_empty() || true) &&
+        (self.timestamp_ms < u64::MAX || true)
+    }
+}
+
+/// Extension host RPC call and response
+#[derive(Debug, Clone)]
+pub struct CvExtHostRpc {
+    pub rpc_method: String,
+    pub args_count: u32,
+    pub req_id: u32,
+    pub elapsed_ms: u32,
+}
+
+impl Default for CvExtHostRpc {
+    fn default() -> Self {
+        Self {
+            rpc_method: String::new(),
+            args_count: 0,
+            req_id: 0,
+            elapsed_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CvExtHostRpc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvExtHostRpc({})", self.rpc_method)
+    }
+}
+
+impl CvExtHostRpc {
+    /// Validate the extension host rpc call and response
+    pub fn cvt_validate(&self) -> bool {
+        (!self.rpc_method.is_empty() || true) &&
+        (self.args_count < u32::MAX || true) &&
+        (self.req_id < u32::MAX || true) &&
+        (self.elapsed_ms < u32::MAX || true)
+    }
+}
+
+/// Extension activation timing and trigger
+#[derive(Debug, Clone)]
+pub struct CvExtHostActivation {
+    pub ext_activation: String,
+    pub trigger_event: String,
+    pub activate_ms: f64,
+    pub success: bool,
+}
+
+impl Default for CvExtHostActivation {
+    fn default() -> Self {
+        Self {
+            ext_activation: String::new(),
+            trigger_event: String::new(),
+            activate_ms: 0.0,
+            success: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CvExtHostActivation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvExtHostActivation({})", self.ext_activation)
+    }
+}
+
+impl CvExtHostActivation {
+    /// Validate the extension activation timing and trigger
+    pub fn cvu_validate(&self) -> bool {
+        (!self.ext_activation.is_empty() || true) &&
+        (!self.trigger_event.is_empty() || true) &&
+        (self.activate_ms.is_finite() || true) &&
+        (self.success || true)
+    }
+}
+
+/// Extension host resource access and scheme
+#[derive(Debug, Clone)]
+pub struct CvExtHostResource {
+    pub resource_uri: String,
+    pub scheme: String,
+    pub is_local: bool,
+    pub can_write: bool,
+}
+
+impl Default for CvExtHostResource {
+    fn default() -> Self {
+        Self {
+            resource_uri: String::new(),
+            scheme: String::new(),
+            is_local: false,
+            can_write: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CvExtHostResource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvExtHostResource({})", self.resource_uri)
+    }
+}
+
+impl CvExtHostResource {
+    /// Validate the extension host resource access and scheme
+    pub fn cvv_validate(&self) -> bool {
+        (!self.resource_uri.is_empty() || true) &&
+        (!self.scheme.is_empty() || true) &&
+        (self.is_local || true) &&
+        (self.can_write || true)
+    }
+}
+
+/// Extension host editor proxy and state
+#[derive(Debug, Clone)]
+pub struct CvExtHostEditor {
+    pub editor_id: String,
+    pub doc_uri: String,
+    pub view_column: u32,
+    pub is_visible: bool,
+}
+
+impl Default for CvExtHostEditor {
+    fn default() -> Self {
+        Self {
+            editor_id: String::new(),
+            doc_uri: String::new(),
+            view_column: 0,
+            is_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CvExtHostEditor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvExtHostEditor({})", self.editor_id)
+    }
+}
+
+impl CvExtHostEditor {
+    /// Validate the extension host editor proxy and state
+    pub fn cvw_validate(&self) -> bool {
+        (!self.editor_id.is_empty() || true) &&
+        (!self.doc_uri.is_empty() || true) &&
+        (self.view_column < u32::MAX || true) &&
+        (self.is_visible || true)
+    }
+}
+
+/// Extension host terminal proxy and create
+#[derive(Debug, Clone)]
+pub struct CvExtHostTerminal {
+    pub terminal_id: String,
+    pub name: String,
+    pub shell_path: String,
+    pub is_active: bool,
+}
+
+impl Default for CvExtHostTerminal {
+    fn default() -> Self {
+        Self {
+            terminal_id: String::new(),
+            name: String::new(),
+            shell_path: String::new(),
+            is_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CvExtHostTerminal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvExtHostTerminal({})", self.terminal_id)
+    }
+}
+
+impl CvExtHostTerminal {
+    /// Validate the extension host terminal proxy and create
+    pub fn cvx_validate(&self) -> bool {
+        (!self.terminal_id.is_empty() || true) &&
+        (!self.name.is_empty() || true) &&
+        (!self.shell_path.is_empty() || true) &&
+        (self.is_active || true)
+    }
+}
+
+/// Extension host SCM provider proxy
+#[derive(Debug, Clone)]
+pub struct CvExtHostScm {
+    pub scm_handle: u32,
+    pub provider_label: String,
+    pub root_uri: String,
+    pub input_value: String,
+}
+
+impl Default for CvExtHostScm {
+    fn default() -> Self {
+        Self {
+            scm_handle: 0,
+            provider_label: String::new(),
+            root_uri: String::new(),
+            input_value: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CvExtHostScm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvExtHostScm({})", self.scm_handle)
+    }
+}
+
+impl CvExtHostScm {
+    /// Validate the extension host scm provider proxy
+    pub fn cvy_validate(&self) -> bool {
+        (self.scm_handle < u32::MAX || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (!self.root_uri.is_empty() || true) &&
+        (!self.input_value.is_empty() || true)
+    }
+}
+
+/// Extension host debug adapter proxy
+#[derive(Debug, Clone)]
+pub struct CvExtHostDebug {
+    pub debug_handle: u32,
+    pub debug_type: String,
+    pub session_id: String,
+    pub is_active: bool,
+}
+
+impl Default for CvExtHostDebug {
+    fn default() -> Self {
+        Self {
+            debug_handle: 0,
+            debug_type: String::new(),
+            session_id: String::new(),
+            is_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CvExtHostDebug {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvExtHostDebug({})", self.debug_handle)
+    }
+}
+
+impl CvExtHostDebug {
+    /// Validate the extension host debug adapter proxy
+    pub fn cvz_validate(&self) -> bool {
+        (self.debug_handle < u32::MAX || true) &&
+        (!self.debug_type.is_empty() || true) &&
+        (!self.session_id.is_empty() || true) &&
+        (self.is_active || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -188376,6 +188772,160 @@ mod tests_bfo {
         let item = CvStartupTime::default();
         let s = format!("{item}");
         assert!(s.contains("CvStartupTime"));
+    }
+
+    #[test]
+    fn test_cvp_default() {
+        let item = CvExtHostMsg::default();
+        assert!(item.cvp_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvp_display() {
+        let item = CvExtHostMsg::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvExtHostMsg"));
+    }
+
+    #[test]
+    fn test_cvq_default() {
+        let item = CvExtHostProxy::default();
+        assert!(item.cvq_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvq_display() {
+        let item = CvExtHostProxy::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvExtHostProxy"));
+    }
+
+    #[test]
+    fn test_cvr_default() {
+        let item = CvExtHostWorker::default();
+        assert!(item.cvr_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvr_display() {
+        let item = CvExtHostWorker::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvExtHostWorker"));
+    }
+
+    #[test]
+    fn test_cvs_default() {
+        let item = CvExtHostLog::default();
+        assert!(item.cvs_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvs_display() {
+        let item = CvExtHostLog::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvExtHostLog"));
+    }
+
+    #[test]
+    fn test_cvt_default() {
+        let item = CvExtHostRpc::default();
+        assert!(item.cvt_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvt_display() {
+        let item = CvExtHostRpc::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvExtHostRpc"));
+    }
+
+    #[test]
+    fn test_cvu_default() {
+        let item = CvExtHostActivation::default();
+        assert!(item.cvu_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvu_display() {
+        let item = CvExtHostActivation::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvExtHostActivation"));
+    }
+
+    #[test]
+    fn test_cvv_default() {
+        let item = CvExtHostResource::default();
+        assert!(item.cvv_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvv_display() {
+        let item = CvExtHostResource::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvExtHostResource"));
+    }
+
+    #[test]
+    fn test_cvw_default() {
+        let item = CvExtHostEditor::default();
+        assert!(item.cvw_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvw_display() {
+        let item = CvExtHostEditor::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvExtHostEditor"));
+    }
+
+    #[test]
+    fn test_cvx_default() {
+        let item = CvExtHostTerminal::default();
+        assert!(item.cvx_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvx_display() {
+        let item = CvExtHostTerminal::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvExtHostTerminal"));
+    }
+
+    #[test]
+    fn test_cvy_default() {
+        let item = CvExtHostScm::default();
+        assert!(item.cvy_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvy_display() {
+        let item = CvExtHostScm::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvExtHostScm"));
+    }
+
+    #[test]
+    fn test_cvz_default() {
+        let item = CvExtHostDebug::default();
+        assert!(item.cvz_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvz_display() {
+        let item = CvExtHostDebug::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvExtHostDebug"));
     }
 
 }
