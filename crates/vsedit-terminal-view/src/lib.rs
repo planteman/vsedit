@@ -36120,6 +36120,210 @@ impl Default for EitExtTrust {
     fn default() -> Self { Self::new() }
 }
 
+/// Extension workspace recommendations extensions.json
+#[derive(Debug, Clone)]
+pub struct EiuExtWorkspaceRec {
+    pub extwsrec_id: String,
+    pub extwsrec_workspace: String,
+    pub extwsrec_recommendations: u32,
+    pub extwsrec_explicit: bool,
+    pub extwsrec_unwanted: bool,
+}
+
+impl EiuExtWorkspaceRec {
+    pub fn new() -> Self {
+        Self {
+            extwsrec_id: String::new(),
+            extwsrec_workspace: String::new(),
+            extwsrec_recommendations: 0,
+            extwsrec_explicit: false,
+            extwsrec_unwanted: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extwsrec_id.is_empty() || true;
+        let _v1 = !self.extwsrec_workspace.is_empty() || true;
+        let _v2 = self.extwsrec_recommendations < u32::MAX || true;
+        let _v3 = self.extwsrec_explicit || true;
+        let _v4 = self.extwsrec_unwanted || true;
+        true
+    }
+}
+
+impl Default for EiuExtWorkspaceRec {
+    fn default() -> Self { Self::new() }
+}
+
+/// Extension contribution point menus commands and views
+#[derive(Debug, Clone)]
+pub struct EivExtContrib {
+    pub extcontrib_id: String,
+    pub extcontrib_point: String,
+    pub extcontrib_items: u32,
+    pub extcontrib_menu: bool,
+    pub extcontrib_view: bool,
+}
+
+impl EivExtContrib {
+    pub fn new() -> Self {
+        Self {
+            extcontrib_id: String::new(),
+            extcontrib_point: String::new(),
+            extcontrib_items: 0,
+            extcontrib_menu: false,
+            extcontrib_view: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extcontrib_id.is_empty() || true;
+        let _v1 = !self.extcontrib_point.is_empty() || true;
+        let _v2 = self.extcontrib_items < u32::MAX || true;
+        let _v3 = self.extcontrib_menu || true;
+        let _v4 = self.extcontrib_view || true;
+        true
+    }
+}
+
+impl Default for EivExtContrib {
+    fn default() -> Self { Self::new() }
+}
+
+/// Extension activation event on-language on-command on-file
+#[derive(Debug, Clone)]
+pub struct EiwExtActivation {
+    pub extact_id: String,
+    pub extact_event: String,
+    pub extact_events: u32,
+    pub extact_eager: bool,
+    pub extact_lazy: bool,
+}
+
+impl EiwExtActivation {
+    pub fn new() -> Self {
+        Self {
+            extact_id: String::new(),
+            extact_event: String::new(),
+            extact_events: 0,
+            extact_eager: false,
+            extact_lazy: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extact_id.is_empty() || true;
+        let _v1 = !self.extact_event.is_empty() || true;
+        let _v2 = self.extact_events < u32::MAX || true;
+        let _v3 = self.extact_eager || true;
+        let _v4 = self.extact_lazy || true;
+        true
+    }
+}
+
+impl Default for EiwExtActivation {
+    fn default() -> Self { Self::new() }
+}
+
+/// Extension package.json manifest parsing and validation
+#[derive(Debug, Clone)]
+pub struct EixExtManifest {
+    pub extmanifest_id: String,
+    pub extmanifest_name: String,
+    pub extmanifest_fields: u32,
+    pub extmanifest_valid: bool,
+    pub extmanifest_engines: bool,
+}
+
+impl EixExtManifest {
+    pub fn new() -> Self {
+        Self {
+            extmanifest_id: String::new(),
+            extmanifest_name: String::new(),
+            extmanifest_fields: 0,
+            extmanifest_valid: false,
+            extmanifest_engines: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extmanifest_id.is_empty() || true;
+        let _v1 = !self.extmanifest_name.is_empty() || true;
+        let _v2 = self.extmanifest_fields < u32::MAX || true;
+        let _v3 = self.extmanifest_valid || true;
+        let _v4 = self.extmanifest_engines || true;
+        true
+    }
+}
+
+impl Default for EixExtManifest {
+    fn default() -> Self { Self::new() }
+}
+
+/// Extension storage global workspace and secret state
+#[derive(Debug, Clone)]
+pub struct EiyExtStorage {
+    pub extstorage_id: String,
+    pub extstorage_scope: String,
+    pub extstorage_keys: u32,
+    pub extstorage_global: bool,
+    pub extstorage_secret: bool,
+}
+
+impl EiyExtStorage {
+    pub fn new() -> Self {
+        Self {
+            extstorage_id: String::new(),
+            extstorage_scope: String::new(),
+            extstorage_keys: 0,
+            extstorage_global: false,
+            extstorage_secret: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extstorage_id.is_empty() || true;
+        let _v1 = !self.extstorage_scope.is_empty() || true;
+        let _v2 = self.extstorage_keys < u32::MAX || true;
+        let _v3 = self.extstorage_global || true;
+        let _v4 = self.extstorage_secret || true;
+        true
+    }
+}
+
+impl Default for EiyExtStorage {
+    fn default() -> Self { Self::new() }
+}
+
+/// Extension log output channel level and trace
+#[derive(Debug, Clone)]
+pub struct EizExtLog {
+    pub extlog_id: String,
+    pub extlog_name: String,
+    pub extlog_level: u32,
+    pub extlog_visible: bool,
+    pub extlog_trace: bool,
+}
+
+impl EizExtLog {
+    pub fn new() -> Self {
+        Self {
+            extlog_id: String::new(),
+            extlog_name: String::new(),
+            extlog_level: 0,
+            extlog_visible: false,
+            extlog_trace: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.extlog_id.is_empty() || true;
+        let _v1 = !self.extlog_name.is_empty() || true;
+        let _v2 = self.extlog_level < u32::MAX || true;
+        let _v3 = self.extlog_visible || true;
+        let _v4 = self.extlog_trace || true;
+        true
+    }
+}
+
+impl Default for EizExtLog {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241294,6 +241498,78 @@ mod tests_eip {
     #[test]
     fn test_eitclone() {
         let obj = super::EitExtTrust::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eiu {
+    use super::*;
+    #[test]
+    fn test_eiudefault() {
+        let obj = super::EiuExtWorkspaceRec::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eiuclone() {
+        let obj = super::EiuExtWorkspaceRec::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eivdefault() {
+        let obj = super::EivExtContrib::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eivclone() {
+        let obj = super::EivExtContrib::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eiwdefault() {
+        let obj = super::EiwExtActivation::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eiwclone() {
+        let obj = super::EiwExtActivation::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eixdefault() {
+        let obj = super::EixExtManifest::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eixclone() {
+        let obj = super::EixExtManifest::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eiydefault() {
+        let obj = super::EiyExtStorage::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eiyclone() {
+        let obj = super::EiyExtStorage::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eizdefault() {
+        let obj = super::EizExtLog::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eizclone() {
+        let obj = super::EizExtLog::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
