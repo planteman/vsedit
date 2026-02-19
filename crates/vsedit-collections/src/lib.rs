@@ -67982,3 +67982,173 @@ mod bdg_tests {
         assert!(!m.has_active());
     }
 }
+
+
+// --- bdh_: Editor sticky scroll model ---
+
+/// A scope entry for sticky scroll.
+#[derive(Debug, Clone)]
+pub struct BdhStickyEntry {
+    pub line: u32,
+    pub text: String,
+    pub depth: usize,
+    pub kind: BdhScopeKind,
+}
+
+/// Kind of scope for sticky scroll.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BdhScopeKind { Function, Class, Module, Block, If, Loop, Match }
+
+impl BdhStickyEntry {
+    pub fn new(line: u32, text: &str, depth: usize, kind: BdhScopeKind) -> Self {
+        Self { line, text: text.to_string(), depth, kind }
+    }
+
+    pub fn render(&self) -> String {
+        let indent = "  ".repeat(self.depth);
+        format!("{}{}", indent, self.text)
+    }
+}
+
+/// Sticky scroll state.
+#[derive(Debug)]
+pub struct BdhStickyScroll {
+    entries: Vec<BdhStickyEntry>,
+    max_lines: usize,
+    enabled: bool,
+    current_line: u32,
+}
+
+impl BdhStickyScroll {
+    pub fn new() -> Self { Self { entries: Vec::new(), max_lines: 5, enabled: true, current_line: 0 } }
+
+    pub fn set_enabled(&mut self, e: bool) { self.enabled = e; }
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn set_max_lines(&mut self, n: usize) { self.max_lines = n; }
+
+    pub fn update(&mut self, current_line: u32, scopes: Vec<BdhStickyEntry>) {
+        self.current_line = current_line;
+        self.entries = scopes.into_iter().filter(|e| e.line < current_line).collect();
+        self.entries.sort_by_key(|e| e.line);
+        if self.entries.len() > self.max_lines {
+            let skip = self.entries.len() - self.max_lines;
+            self.entries = self.entries.split_off(skip);
+        }
+    }
+
+    pub fn visible_entries(&self) -> &[BdhStickyEntry] {
+        if self.enabled { &self.entries } else { &[] }
+    }
+
+    pub fn visible_count(&self) -> usize {
+        if self.enabled { self.entries.len() } else { 0 }
+    }
+
+    pub fn height(&self) -> usize { self.visible_count() }
+
+    pub fn render_lines(&self) -> Vec<String> {
+        self.visible_entries().iter().map(|e| e.render()).collect()
+    }
+
+    pub fn entry_at_offset(&self, offset: usize) -> Option<&BdhStickyEntry> {
+        self.entries.get(offset)
+    }
+
+    pub fn clear(&mut self) { self.entries.clear(); }
+}
+
+#[cfg(test)]
+mod bdh_tests {
+    use super::*;
+
+    #[test]
+    fn test_bdh_entry() {
+        let e = BdhStickyEntry::new(5, "fn main()", 0, BdhScopeKind::Function);
+        assert_eq!(e.line, 5);
+        assert!(e.render().contains("fn main()"));
+    }
+
+    #[test]
+    fn test_bdh_entry_indent() {
+        let e = BdhStickyEntry::new(10, "if x > 0", 2, BdhScopeKind::If);
+        assert!(e.render().starts_with("    "));
+    }
+
+    #[test]
+    fn test_bdh_new() {
+        let ss = BdhStickyScroll::new();
+        assert!(ss.is_enabled());
+        assert_eq!(ss.visible_count(), 0);
+    }
+
+    #[test]
+    fn test_bdh_update() {
+        let mut ss = BdhStickyScroll::new();
+        ss.update(20, vec![
+            BdhStickyEntry::new(1, "mod foo", 0, BdhScopeKind::Module),
+            BdhStickyEntry::new(5, "fn bar()", 1, BdhScopeKind::Function),
+        ]);
+        assert_eq!(ss.visible_count(), 2);
+    }
+
+    #[test]
+    fn test_bdh_max_lines() {
+        let mut ss = BdhStickyScroll::new();
+        ss.set_max_lines(2);
+        ss.update(100, vec![
+            BdhStickyEntry::new(1, "a", 0, BdhScopeKind::Module),
+            BdhStickyEntry::new(5, "b", 1, BdhScopeKind::Class),
+            BdhStickyEntry::new(10, "c", 2, BdhScopeKind::Function),
+        ]);
+        assert_eq!(ss.visible_count(), 2);
+    }
+
+    #[test]
+    fn test_bdh_disabled() {
+        let mut ss = BdhStickyScroll::new();
+        ss.set_enabled(false);
+        ss.update(20, vec![BdhStickyEntry::new(1, "x", 0, BdhScopeKind::Function)]);
+        assert_eq!(ss.visible_count(), 0);
+    }
+
+    #[test]
+    fn test_bdh_render() {
+        let mut ss = BdhStickyScroll::new();
+        ss.update(20, vec![BdhStickyEntry::new(1, "fn main()", 0, BdhScopeKind::Function)]);
+        let lines = ss.render_lines();
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("fn main()"));
+    }
+
+    #[test]
+    fn test_bdh_clear() {
+        let mut ss = BdhStickyScroll::new();
+        ss.update(20, vec![BdhStickyEntry::new(1, "x", 0, BdhScopeKind::Block)]);
+        ss.clear();
+        assert_eq!(ss.visible_count(), 0);
+    }
+
+    #[test]
+    fn test_bdh_entry_at() {
+        let mut ss = BdhStickyScroll::new();
+        ss.update(20, vec![BdhStickyEntry::new(1, "first", 0, BdhScopeKind::Function)]);
+        assert_eq!(ss.entry_at_offset(0).unwrap().text, "first");
+    }
+
+    #[test]
+    fn test_bdh_height() {
+        let mut ss = BdhStickyScroll::new();
+        ss.update(20, vec![BdhStickyEntry::new(1, "a", 0, BdhScopeKind::Module), BdhStickyEntry::new(5, "b", 1, BdhScopeKind::Function)]);
+        assert_eq!(ss.height(), 2);
+    }
+
+    #[test]
+    fn test_bdh_filters_future() {
+        let mut ss = BdhStickyScroll::new();
+        ss.update(10, vec![
+            BdhStickyEntry::new(5, "before", 0, BdhScopeKind::Function),
+            BdhStickyEntry::new(15, "after", 0, BdhScopeKind::Function), // should be filtered
+        ]);
+        assert_eq!(ss.visible_count(), 1);
+    }
+}
