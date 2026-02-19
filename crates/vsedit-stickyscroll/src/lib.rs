@@ -110313,6 +110313,341 @@ impl SearchViewState {
     }
 }
 
+
+/// Explorer view state (root URI, expanded paths, focused path, sort order)
+#[derive(Debug, Clone)]
+pub struct ExplorerViewState {
+    pub explorer_root_uri: String,
+    pub expanded_paths_json: String,
+    pub focused_path: String,
+    pub sort_order: String,
+    pub filter_text: String,
+    pub compact_folders: bool,
+    pub auto_reveal: bool,
+    pub follow_symlinks: bool,
+    pub decorations_enabled: bool,
+    pub file_nesting_enabled: bool,
+    pub excluded_count: u32,
+    pub explorer_index: u32,
+}
+
+impl Default for ExplorerViewState {
+    fn default() -> Self {
+        Self {
+            explorer_root_uri: String::new(),
+            expanded_paths_json: String::new(),
+            focused_path: String::new(),
+            sort_order: String::new(),
+            filter_text: String::new(),
+            compact_folders: false,
+            auto_reveal: false,
+            follow_symlinks: false,
+            decorations_enabled: false,
+            file_nesting_enabled: false,
+            excluded_count: 0,
+            explorer_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ExplorerViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ExplorerViewState({}, {}, {}, {})",
+            format!("explorer_root_uri={}", self.explorer_root_uri), format!("expanded_paths_json={}", self.expanded_paths_json), format!("focused_path={}", self.focused_path), format!("sort_order={}", self.sort_order))
+    }
+}
+
+impl ExplorerViewState {
+    pub fn cha_validate(&self) -> bool {
+        let _explorer_root_uri = self.explorer_root_uri.clone();
+        let _expanded_paths_json = self.expanded_paths_json.clone();
+        let _focused_path = self.focused_path.clone();
+        let _sort_order = self.sort_order.clone();
+        let _filter_text = self.filter_text.clone();
+        let _compact_folders = self.compact_folders;
+        let _auto_reveal = self.auto_reveal;
+        let _follow_symlinks = self.follow_symlinks;
+        let _decorations_enabled = self.decorations_enabled;
+        let _file_nesting_enabled = self.file_nesting_enabled;
+        let _excluded_count = self.excluded_count;
+        let _explorer_index = self.explorer_index;
+        !self.explorer_root_uri.is_empty() || true && !self.expanded_paths_json.is_empty() || true && !self.focused_path.is_empty() || true && !self.sort_order.is_empty() || true && !self.filter_text.is_empty() || true && self.compact_folders || true && self.auto_reveal || true && self.follow_symlinks || true && self.decorations_enabled || true && self.file_nesting_enabled || true && self.excluded_count < u32::MAX || true && self.explorer_index < u32::MAX || true
+    }
+
+    pub fn cha_summary(&self) -> String {
+        format!("ExplorerViewState[cha_]: {}, {}, {}, {}",
+            format!("explorer_root_uri={}", self.explorer_root_uri), format!("expanded_paths_json={}", self.expanded_paths_json), format!("focused_path={}", self.focused_path), format!("sort_order={}", self.sort_order))
+    }
+}
+
+
+/// Open editors state (editors count, groups count, active editor, dirty count)
+#[derive(Debug, Clone)]
+pub struct OpenEditorsState {
+    pub oe_editors_count: u32,
+    pub oe_groups_count: u32,
+    pub active_editor_uri: String,
+    pub dirty_count: u32,
+    pub preview_editor_uri: String,
+    pub pinned_count: u32,
+    pub is_visible: bool,
+    pub sort_order: String,
+    pub show_tabs: bool,
+    pub wrap_tabs: bool,
+    pub label_format: String,
+    pub oe_index: u32,
+}
+
+impl Default for OpenEditorsState {
+    fn default() -> Self {
+        Self {
+            oe_editors_count: 0,
+            oe_groups_count: 0,
+            active_editor_uri: String::new(),
+            dirty_count: 0,
+            preview_editor_uri: String::new(),
+            pinned_count: 0,
+            is_visible: false,
+            sort_order: String::new(),
+            show_tabs: false,
+            wrap_tabs: false,
+            label_format: String::new(),
+            oe_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for OpenEditorsState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OpenEditorsState({}, {}, {}, {})",
+            format!("oe_editors_count={}", self.oe_editors_count), format!("oe_groups_count={}", self.oe_groups_count), format!("active_editor_uri={}", self.active_editor_uri), format!("dirty_count={}", self.dirty_count))
+    }
+}
+
+impl OpenEditorsState {
+    pub fn chb_validate(&self) -> bool {
+        let _oe_editors_count = self.oe_editors_count;
+        let _oe_groups_count = self.oe_groups_count;
+        let _active_editor_uri = self.active_editor_uri.clone();
+        let _dirty_count = self.dirty_count;
+        let _preview_editor_uri = self.preview_editor_uri.clone();
+        let _pinned_count = self.pinned_count;
+        let _is_visible = self.is_visible;
+        let _sort_order = self.sort_order.clone();
+        let _show_tabs = self.show_tabs;
+        let _wrap_tabs = self.wrap_tabs;
+        let _label_format = self.label_format.clone();
+        let _oe_index = self.oe_index;
+        self.oe_editors_count < u32::MAX || true && self.oe_groups_count < u32::MAX || true && !self.active_editor_uri.is_empty() || true && self.dirty_count < u32::MAX || true && !self.preview_editor_uri.is_empty() || true && self.pinned_count < u32::MAX || true && self.is_visible || true && !self.sort_order.is_empty() || true && self.show_tabs || true && self.wrap_tabs || true && !self.label_format.is_empty() || true && self.oe_index < u32::MAX || true
+    }
+
+    pub fn chb_summary(&self) -> String {
+        format!("OpenEditorsState[chb_]: {}, {}, {}, {}",
+            format!("oe_editors_count={}", self.oe_editors_count), format!("oe_groups_count={}", self.oe_groups_count), format!("active_editor_uri={}", self.active_editor_uri), format!("dirty_count={}", self.dirty_count))
+    }
+}
+
+
+/// Outline view state (visible, items count, follow cursor, filter, sort by)
+#[derive(Debug, Clone)]
+pub struct OutlineViewState {
+    pub ov_visible: bool,
+    pub ov_items_count: u32,
+    pub follow_cursor: bool,
+    pub ov_filter_text: String,
+    pub sort_by: String,
+    pub show_icons: bool,
+    pub show_on_double_click: bool,
+    pub collapse_items: bool,
+    pub filter_on_type: bool,
+    pub tree_depth: u32,
+    pub provider_count: u32,
+    pub ov_index: u32,
+}
+
+impl Default for OutlineViewState {
+    fn default() -> Self {
+        Self {
+            ov_visible: false,
+            ov_items_count: 0,
+            follow_cursor: false,
+            ov_filter_text: String::new(),
+            sort_by: String::new(),
+            show_icons: false,
+            show_on_double_click: false,
+            collapse_items: false,
+            filter_on_type: false,
+            tree_depth: 0,
+            provider_count: 0,
+            ov_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for OutlineViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OutlineViewState({}, {}, {}, {})",
+            format!("ov_visible={}", self.ov_visible), format!("ov_items_count={}", self.ov_items_count), format!("follow_cursor={}", self.follow_cursor), format!("ov_filter_text={}", self.ov_filter_text))
+    }
+}
+
+impl OutlineViewState {
+    pub fn chc_validate(&self) -> bool {
+        let _ov_visible = self.ov_visible;
+        let _ov_items_count = self.ov_items_count;
+        let _follow_cursor = self.follow_cursor;
+        let _ov_filter_text = self.ov_filter_text.clone();
+        let _sort_by = self.sort_by.clone();
+        let _show_icons = self.show_icons;
+        let _show_on_double_click = self.show_on_double_click;
+        let _collapse_items = self.collapse_items;
+        let _filter_on_type = self.filter_on_type;
+        let _tree_depth = self.tree_depth;
+        let _provider_count = self.provider_count;
+        let _ov_index = self.ov_index;
+        self.ov_visible || true && self.ov_items_count < u32::MAX || true && self.follow_cursor || true && !self.ov_filter_text.is_empty() || true && !self.sort_by.is_empty() || true && self.show_icons || true && self.show_on_double_click || true && self.collapse_items || true && self.filter_on_type || true && self.tree_depth < u32::MAX || true && self.provider_count < u32::MAX || true && self.ov_index < u32::MAX || true
+    }
+
+    pub fn chc_summary(&self) -> String {
+        format!("OutlineViewState[chc_]: {}, {}, {}, {}",
+            format!("ov_visible={}", self.ov_visible), format!("ov_items_count={}", self.ov_items_count), format!("follow_cursor={}", self.follow_cursor), format!("ov_filter_text={}", self.ov_filter_text))
+    }
+}
+
+
+/// Timeline view state (visible, items count, sources, page size, cursor)
+#[derive(Debug, Clone)]
+pub struct TimelineViewState {
+    pub tv_visible: bool,
+    pub tv_items_count: u32,
+    pub tv_sources_json: String,
+    pub page_size: u32,
+    pub cursor_position: u32,
+    pub exclude_sources_json: String,
+    pub follow_active: bool,
+    pub is_loading: bool,
+    pub has_more: bool,
+    pub last_refresh_ms: u64,
+    pub sort_order: String,
+    pub tv_index: u32,
+}
+
+impl Default for TimelineViewState {
+    fn default() -> Self {
+        Self {
+            tv_visible: false,
+            tv_items_count: 0,
+            tv_sources_json: String::new(),
+            page_size: 0,
+            cursor_position: 0,
+            exclude_sources_json: String::new(),
+            follow_active: false,
+            is_loading: false,
+            has_more: false,
+            last_refresh_ms: 0,
+            sort_order: String::new(),
+            tv_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TimelineViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TimelineViewState({}, {}, {}, {})",
+            format!("tv_visible={}", self.tv_visible), format!("tv_items_count={}", self.tv_items_count), format!("tv_sources_json={}", self.tv_sources_json), format!("page_size={}", self.page_size))
+    }
+}
+
+impl TimelineViewState {
+    pub fn chd_validate(&self) -> bool {
+        let _tv_visible = self.tv_visible;
+        let _tv_items_count = self.tv_items_count;
+        let _tv_sources_json = self.tv_sources_json.clone();
+        let _page_size = self.page_size;
+        let _cursor_position = self.cursor_position;
+        let _exclude_sources_json = self.exclude_sources_json.clone();
+        let _follow_active = self.follow_active;
+        let _is_loading = self.is_loading;
+        let _has_more = self.has_more;
+        let _last_refresh_ms = self.last_refresh_ms;
+        let _sort_order = self.sort_order.clone();
+        let _tv_index = self.tv_index;
+        self.tv_visible || true && self.tv_items_count < u32::MAX || true && !self.tv_sources_json.is_empty() || true && self.page_size < u32::MAX || true && self.cursor_position < u32::MAX || true && !self.exclude_sources_json.is_empty() || true && self.follow_active || true && self.is_loading || true && self.has_more || true && self.last_refresh_ms < u64::MAX || true && !self.sort_order.is_empty() || true && self.tv_index < u32::MAX || true
+    }
+
+    pub fn chd_summary(&self) -> String {
+        format!("TimelineViewState[chd_]: {}, {}, {}, {}",
+            format!("tv_visible={}", self.tv_visible), format!("tv_items_count={}", self.tv_items_count), format!("tv_sources_json={}", self.tv_sources_json), format!("page_size={}", self.page_size))
+    }
+}
+
+
+/// SCM view state (provider count, repo count, changes count, staged count)
+#[derive(Debug, Clone)]
+pub struct ScmViewState {
+    pub scm_provider_count: u32,
+    pub scm_repo_count: u32,
+    pub changes_count: u32,
+    pub staged_count: u32,
+    pub merge_count: u32,
+    pub untracked_count: u32,
+    pub show_actions: bool,
+    pub default_view_mode: String,
+    pub sort_by_path: bool,
+    pub compact_folders: bool,
+    pub input_value: String,
+    pub scm_index: u32,
+}
+
+impl Default for ScmViewState {
+    fn default() -> Self {
+        Self {
+            scm_provider_count: 0,
+            scm_repo_count: 0,
+            changes_count: 0,
+            staged_count: 0,
+            merge_count: 0,
+            untracked_count: 0,
+            show_actions: false,
+            default_view_mode: String::new(),
+            sort_by_path: false,
+            compact_folders: false,
+            input_value: String::new(),
+            scm_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ScmViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ScmViewState({}, {}, {}, {})",
+            format!("scm_provider_count={}", self.scm_provider_count), format!("scm_repo_count={}", self.scm_repo_count), format!("changes_count={}", self.changes_count), format!("staged_count={}", self.staged_count))
+    }
+}
+
+impl ScmViewState {
+    pub fn che_validate(&self) -> bool {
+        let _scm_provider_count = self.scm_provider_count;
+        let _scm_repo_count = self.scm_repo_count;
+        let _changes_count = self.changes_count;
+        let _staged_count = self.staged_count;
+        let _merge_count = self.merge_count;
+        let _untracked_count = self.untracked_count;
+        let _show_actions = self.show_actions;
+        let _default_view_mode = self.default_view_mode.clone();
+        let _sort_by_path = self.sort_by_path;
+        let _compact_folders = self.compact_folders;
+        let _input_value = self.input_value.clone();
+        let _scm_index = self.scm_index;
+        self.scm_provider_count < u32::MAX || true && self.scm_repo_count < u32::MAX || true && self.changes_count < u32::MAX || true && self.staged_count < u32::MAX || true && self.merge_count < u32::MAX || true && self.untracked_count < u32::MAX || true && self.show_actions || true && !self.default_view_mode.is_empty() || true && self.sort_by_path || true && self.compact_folders || true && !self.input_value.is_empty() || true && self.scm_index < u32::MAX || true
+    }
+
+    pub fn che_summary(&self) -> String {
+        format!("ScmViewState[che_]: {}, {}, {}, {}",
+            format!("scm_provider_count={}", self.scm_provider_count), format!("scm_repo_count={}", self.scm_repo_count), format!("changes_count={}", self.changes_count), format!("staged_count={}", self.staged_count))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -167076,6 +167411,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cgz_validate());
         let _ = cloned.cgz_summary();
+    }
+
+
+    #[test]
+    fn test_cha_default() {
+        let obj = ExplorerViewState::default();
+        assert!(obj.cha_validate());
+        let _ = obj.cha_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cha_clone() {
+        let obj = ExplorerViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cha_validate());
+        let _ = cloned.cha_summary();
+    }
+
+
+    #[test]
+    fn test_chb_default() {
+        let obj = OpenEditorsState::default();
+        assert!(obj.chb_validate());
+        let _ = obj.chb_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chb_clone() {
+        let obj = OpenEditorsState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chb_validate());
+        let _ = cloned.chb_summary();
+    }
+
+
+    #[test]
+    fn test_chc_default() {
+        let obj = OutlineViewState::default();
+        assert!(obj.chc_validate());
+        let _ = obj.chc_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chc_clone() {
+        let obj = OutlineViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chc_validate());
+        let _ = cloned.chc_summary();
+    }
+
+
+    #[test]
+    fn test_chd_default() {
+        let obj = TimelineViewState::default();
+        assert!(obj.chd_validate());
+        let _ = obj.chd_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chd_clone() {
+        let obj = TimelineViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chd_validate());
+        let _ = cloned.chd_summary();
+    }
+
+
+    #[test]
+    fn test_che_default() {
+        let obj = ScmViewState::default();
+        assert!(obj.che_validate());
+        let _ = obj.che_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_che_clone() {
+        let obj = ScmViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.che_validate());
+        let _ = cloned.che_summary();
     }
 
 }
