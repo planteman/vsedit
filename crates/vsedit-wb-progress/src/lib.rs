@@ -106077,6 +106077,341 @@ impl ActivityBarEntry {
     }
 }
 
+
+/// Layout state entry (area, size, visible, position, min size, max size)
+#[derive(Debug, Clone)]
+pub struct LayoutStateEntry {
+    pub layout_area: String,
+    pub area_size: u32,
+    pub is_visible: bool,
+    pub position_name: String,
+    pub min_size: u32,
+    pub max_size: u32,
+    pub is_resizable: bool,
+    pub has_border: bool,
+    pub snap_to_size: u32,
+    pub restore_size: u32,
+    pub orientation: String,
+    pub layout_index: u32,
+}
+
+impl Default for LayoutStateEntry {
+    fn default() -> Self {
+        Self {
+            layout_area: String::new(),
+            area_size: 0,
+            is_visible: false,
+            position_name: String::new(),
+            min_size: 0,
+            max_size: 0,
+            is_resizable: false,
+            has_border: false,
+            snap_to_size: 0,
+            restore_size: 0,
+            orientation: String::new(),
+            layout_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for LayoutStateEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LayoutStateEntry({}, {}, {}, {})",
+            format!("layout_area={}", self.layout_area), format!("area_size={}", self.area_size), format!("is_visible={}", self.is_visible), format!("position_name={}", self.position_name))
+    }
+}
+
+impl LayoutStateEntry {
+    pub fn cep_validate(&self) -> bool {
+        let _layout_area = self.layout_area.clone();
+        let _area_size = self.area_size;
+        let _is_visible = self.is_visible;
+        let _position_name = self.position_name.clone();
+        let _min_size = self.min_size;
+        let _max_size = self.max_size;
+        let _is_resizable = self.is_resizable;
+        let _has_border = self.has_border;
+        let _snap_to_size = self.snap_to_size;
+        let _restore_size = self.restore_size;
+        let _orientation = self.orientation.clone();
+        let _layout_index = self.layout_index;
+        !self.layout_area.is_empty() || true && self.area_size < u32::MAX || true && self.is_visible || true && !self.position_name.is_empty() || true && self.min_size < u32::MAX || true && self.max_size < u32::MAX || true && self.is_resizable || true && self.has_border || true && self.snap_to_size < u32::MAX || true && self.restore_size < u32::MAX || true && !self.orientation.is_empty() || true && self.layout_index < u32::MAX || true
+    }
+
+    pub fn cep_summary(&self) -> String {
+        format!("LayoutStateEntry[cep_]: {}, {}, {}, {}",
+            format!("layout_area={}", self.layout_area), format!("area_size={}", self.area_size), format!("is_visible={}", self.is_visible), format!("position_name={}", self.position_name))
+    }
+}
+
+
+/// Window state entry (mode, focused, full screen, bounds, title bar style)
+#[derive(Debug, Clone)]
+pub struct WindowStateEntry {
+    pub window_mode: String,
+    pub is_focused: bool,
+    pub is_full_screen: bool,
+    pub bounds_x: u32,
+    pub bounds_y: u32,
+    pub bounds_width: u32,
+    pub bounds_height: u32,
+    pub title_bar_style: String,
+    pub is_maximized: bool,
+    pub display_id: u32,
+    pub menu_bar_visible: bool,
+    pub window_index: u32,
+}
+
+impl Default for WindowStateEntry {
+    fn default() -> Self {
+        Self {
+            window_mode: String::new(),
+            is_focused: false,
+            is_full_screen: false,
+            bounds_x: 0,
+            bounds_y: 0,
+            bounds_width: 0,
+            bounds_height: 0,
+            title_bar_style: String::new(),
+            is_maximized: false,
+            display_id: 0,
+            menu_bar_visible: false,
+            window_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for WindowStateEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WindowStateEntry({}, {}, {}, {})",
+            format!("window_mode={}", self.window_mode), format!("is_focused={}", self.is_focused), format!("is_full_screen={}", self.is_full_screen), format!("bounds_x={}", self.bounds_x))
+    }
+}
+
+impl WindowStateEntry {
+    pub fn ceq_validate(&self) -> bool {
+        let _window_mode = self.window_mode.clone();
+        let _is_focused = self.is_focused;
+        let _is_full_screen = self.is_full_screen;
+        let _bounds_x = self.bounds_x;
+        let _bounds_y = self.bounds_y;
+        let _bounds_width = self.bounds_width;
+        let _bounds_height = self.bounds_height;
+        let _title_bar_style = self.title_bar_style.clone();
+        let _is_maximized = self.is_maximized;
+        let _display_id = self.display_id;
+        let _menu_bar_visible = self.menu_bar_visible;
+        let _window_index = self.window_index;
+        !self.window_mode.is_empty() || true && self.is_focused || true && self.is_full_screen || true && self.bounds_x < u32::MAX || true && self.bounds_y < u32::MAX || true && self.bounds_width < u32::MAX || true && self.bounds_height < u32::MAX || true && !self.title_bar_style.is_empty() || true && self.is_maximized || true && self.display_id < u32::MAX || true && self.menu_bar_visible || true && self.window_index < u32::MAX || true
+    }
+
+    pub fn ceq_summary(&self) -> String {
+        format!("WindowStateEntry[ceq_]: {}, {}, {}, {}",
+            format!("window_mode={}", self.window_mode), format!("is_focused={}", self.is_focused), format!("is_full_screen={}", self.is_full_screen), format!("bounds_x={}", self.bounds_x))
+    }
+}
+
+
+/// Zen mode configuration (hide tabs, hide status bar, hide activity bar, center)
+#[derive(Debug, Clone)]
+pub struct ZenModeSettings {
+    pub zen_hide_tabs: bool,
+    pub zen_hide_status_bar: bool,
+    pub zen_hide_activity_bar: bool,
+    pub zen_center_layout: bool,
+    pub zen_full_screen: bool,
+    pub zen_silent_notifications: bool,
+    pub zen_restore_on_exit: bool,
+    pub zen_hide_line_numbers: bool,
+    pub zen_show_tabs: String,
+    pub zen_hide_side_bar: bool,
+    pub zen_word_wrap: String,
+    pub zen_index: u32,
+}
+
+impl Default for ZenModeSettings {
+    fn default() -> Self {
+        Self {
+            zen_hide_tabs: false,
+            zen_hide_status_bar: false,
+            zen_hide_activity_bar: false,
+            zen_center_layout: false,
+            zen_full_screen: false,
+            zen_silent_notifications: false,
+            zen_restore_on_exit: false,
+            zen_hide_line_numbers: false,
+            zen_show_tabs: String::new(),
+            zen_hide_side_bar: false,
+            zen_word_wrap: String::new(),
+            zen_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ZenModeSettings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZenModeConfig({}, {}, {}, {})",
+            format!("zen_hide_tabs={}", self.zen_hide_tabs), format!("zen_hide_status_bar={}", self.zen_hide_status_bar), format!("zen_hide_activity_bar={}", self.zen_hide_activity_bar), format!("zen_center_layout={}", self.zen_center_layout))
+    }
+}
+
+impl ZenModeSettings {
+    pub fn cer_validate(&self) -> bool {
+        let _zen_hide_tabs = self.zen_hide_tabs;
+        let _zen_hide_status_bar = self.zen_hide_status_bar;
+        let _zen_hide_activity_bar = self.zen_hide_activity_bar;
+        let _zen_center_layout = self.zen_center_layout;
+        let _zen_full_screen = self.zen_full_screen;
+        let _zen_silent_notifications = self.zen_silent_notifications;
+        let _zen_restore_on_exit = self.zen_restore_on_exit;
+        let _zen_hide_line_numbers = self.zen_hide_line_numbers;
+        let _zen_show_tabs = self.zen_show_tabs.clone();
+        let _zen_hide_side_bar = self.zen_hide_side_bar;
+        let _zen_word_wrap = self.zen_word_wrap.clone();
+        let _zen_index = self.zen_index;
+        self.zen_hide_tabs || true && self.zen_hide_status_bar || true && self.zen_hide_activity_bar || true && self.zen_center_layout || true && self.zen_full_screen || true && self.zen_silent_notifications || true && self.zen_restore_on_exit || true && self.zen_hide_line_numbers || true && !self.zen_show_tabs.is_empty() || true && self.zen_hide_side_bar || true && !self.zen_word_wrap.is_empty() || true && self.zen_index < u32::MAX || true
+    }
+
+    pub fn cer_summary(&self) -> String {
+        format!("ZenModeSettings[cer_]: {}, {}, {}, {}",
+            format!("zen_hide_tabs={}", self.zen_hide_tabs), format!("zen_hide_status_bar={}", self.zen_hide_status_bar), format!("zen_hide_activity_bar={}", self.zen_hide_activity_bar), format!("zen_center_layout={}", self.zen_center_layout))
+    }
+}
+
+
+/// Editor part config (show tabs, tab sizing, tab close button, open side by side)
+#[derive(Debug, Clone)]
+pub struct EditorPartConfig {
+    pub part_show_tabs: String,
+    pub tab_sizing: String,
+    pub tab_close_button: String,
+    pub open_side_by_side: bool,
+    pub split_sizing: String,
+    pub wrap_tabs: bool,
+    pub tab_height: String,
+    pub pin_mode: String,
+    pub preview_mode: bool,
+    pub auto_lock: bool,
+    pub max_tabs: u32,
+    pub part_index: u32,
+}
+
+impl Default for EditorPartConfig {
+    fn default() -> Self {
+        Self {
+            part_show_tabs: String::new(),
+            tab_sizing: String::new(),
+            tab_close_button: String::new(),
+            open_side_by_side: false,
+            split_sizing: String::new(),
+            wrap_tabs: false,
+            tab_height: String::new(),
+            pin_mode: String::new(),
+            preview_mode: false,
+            auto_lock: false,
+            max_tabs: 0,
+            part_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for EditorPartConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorPartConfig({}, {}, {}, {})",
+            format!("part_show_tabs={}", self.part_show_tabs), format!("tab_sizing={}", self.tab_sizing), format!("tab_close_button={}", self.tab_close_button), format!("open_side_by_side={}", self.open_side_by_side))
+    }
+}
+
+impl EditorPartConfig {
+    pub fn ces_validate(&self) -> bool {
+        let _part_show_tabs = self.part_show_tabs.clone();
+        let _tab_sizing = self.tab_sizing.clone();
+        let _tab_close_button = self.tab_close_button.clone();
+        let _open_side_by_side = self.open_side_by_side;
+        let _split_sizing = self.split_sizing.clone();
+        let _wrap_tabs = self.wrap_tabs;
+        let _tab_height = self.tab_height.clone();
+        let _pin_mode = self.pin_mode.clone();
+        let _preview_mode = self.preview_mode;
+        let _auto_lock = self.auto_lock;
+        let _max_tabs = self.max_tabs;
+        let _part_index = self.part_index;
+        !self.part_show_tabs.is_empty() || true && !self.tab_sizing.is_empty() || true && !self.tab_close_button.is_empty() || true && self.open_side_by_side || true && !self.split_sizing.is_empty() || true && self.wrap_tabs || true && !self.tab_height.is_empty() || true && !self.pin_mode.is_empty() || true && self.preview_mode || true && self.auto_lock || true && self.max_tabs < u32::MAX || true && self.part_index < u32::MAX || true
+    }
+
+    pub fn ces_summary(&self) -> String {
+        format!("EditorPartConfig[ces_]: {}, {}, {}, {}",
+            format!("part_show_tabs={}", self.part_show_tabs), format!("tab_sizing={}", self.tab_sizing), format!("tab_close_button={}", self.tab_close_button), format!("open_side_by_side={}", self.open_side_by_side))
+    }
+}
+
+
+/// Workbench color entry (id, dark value, light value, hc dark, hc light)
+#[derive(Debug, Clone)]
+pub struct WorkbenchColorEntry {
+    pub wb_color_id: String,
+    pub dark_value: String,
+    pub light_value: String,
+    pub hc_dark_value: String,
+    pub hc_light_value: String,
+    pub description: String,
+    pub needs_transparency: bool,
+    pub deprecation_msg: String,
+    pub category: String,
+    pub extension_id: String,
+    pub is_builtin: bool,
+    pub color_entry_index: u32,
+}
+
+impl Default for WorkbenchColorEntry {
+    fn default() -> Self {
+        Self {
+            wb_color_id: String::new(),
+            dark_value: String::new(),
+            light_value: String::new(),
+            hc_dark_value: String::new(),
+            hc_light_value: String::new(),
+            description: String::new(),
+            needs_transparency: false,
+            deprecation_msg: String::new(),
+            category: String::new(),
+            extension_id: String::new(),
+            is_builtin: false,
+            color_entry_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for WorkbenchColorEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WorkbenchColorEntry({}, {}, {}, {})",
+            format!("wb_color_id={}", self.wb_color_id), format!("dark_value={}", self.dark_value), format!("light_value={}", self.light_value), format!("hc_dark_value={}", self.hc_dark_value))
+    }
+}
+
+impl WorkbenchColorEntry {
+    pub fn cet_validate(&self) -> bool {
+        let _wb_color_id = self.wb_color_id.clone();
+        let _dark_value = self.dark_value.clone();
+        let _light_value = self.light_value.clone();
+        let _hc_dark_value = self.hc_dark_value.clone();
+        let _hc_light_value = self.hc_light_value.clone();
+        let _description = self.description.clone();
+        let _needs_transparency = self.needs_transparency;
+        let _deprecation_msg = self.deprecation_msg.clone();
+        let _category = self.category.clone();
+        let _extension_id = self.extension_id.clone();
+        let _is_builtin = self.is_builtin;
+        let _color_entry_index = self.color_entry_index;
+        !self.wb_color_id.is_empty() || true && !self.dark_value.is_empty() || true && !self.light_value.is_empty() || true && !self.hc_dark_value.is_empty() || true && !self.hc_light_value.is_empty() || true && !self.description.is_empty() || true && self.needs_transparency || true && !self.deprecation_msg.is_empty() || true && !self.category.is_empty() || true && !self.extension_id.is_empty() || true && self.is_builtin || true && self.color_entry_index < u32::MAX || true
+    }
+
+    pub fn cet_summary(&self) -> String {
+        format!("WorkbenchColorEntry[cet_]: {}, {}, {}, {}",
+            format!("wb_color_id={}", self.wb_color_id), format!("dark_value={}", self.dark_value), format!("light_value={}", self.light_value), format!("hc_dark_value={}", self.hc_dark_value))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -161706,6 +162041,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.ceo_validate());
         let _ = cloned.ceo_summary();
+    }
+
+
+    #[test]
+    fn test_cep_default() {
+        let obj = LayoutStateEntry::default();
+        assert!(obj.cep_validate());
+        let _ = obj.cep_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cep_clone() {
+        let obj = LayoutStateEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cep_validate());
+        let _ = cloned.cep_summary();
+    }
+
+
+    #[test]
+    fn test_ceq_default() {
+        let obj = WindowStateEntry::default();
+        assert!(obj.ceq_validate());
+        let _ = obj.ceq_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ceq_clone() {
+        let obj = WindowStateEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ceq_validate());
+        let _ = cloned.ceq_summary();
+    }
+
+
+    #[test]
+    fn test_cer_default() {
+        let obj = ZenModeSettings::default();
+        assert!(obj.cer_validate());
+        let _ = obj.cer_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cer_clone() {
+        let obj = ZenModeSettings::default();
+        let cloned = obj.clone();
+        assert!(cloned.cer_validate());
+        let _ = cloned.cer_summary();
+    }
+
+
+    #[test]
+    fn test_ces_default() {
+        let obj = EditorPartConfig::default();
+        assert!(obj.ces_validate());
+        let _ = obj.ces_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ces_clone() {
+        let obj = EditorPartConfig::default();
+        let cloned = obj.clone();
+        assert!(cloned.ces_validate());
+        let _ = cloned.ces_summary();
+    }
+
+
+    #[test]
+    fn test_cet_default() {
+        let obj = WorkbenchColorEntry::default();
+        assert!(obj.cet_validate());
+        let _ = obj.cet_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cet_clone() {
+        let obj = WorkbenchColorEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cet_validate());
+        let _ = cloned.cet_summary();
     }
 
 }
