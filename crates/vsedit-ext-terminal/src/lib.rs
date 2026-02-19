@@ -63192,3 +63192,186 @@ mod bcg_tests {
         assert_eq!(a.tooltip, "Minimize");
     }
 }
+
+
+// --- bch_: Editor notification center model ---
+
+/// Notification severity level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BchNotifSeverity { Info, Warning, Error }
+
+/// Notification action button.
+#[derive(Debug, Clone)]
+pub struct BchNotifAction {
+    pub id: String,
+    pub label: String,
+}
+
+impl BchNotifAction {
+    pub fn new(id: &str, label: &str) -> Self { Self { id: id.to_string(), label: label.to_string() } }
+}
+
+/// A single notification.
+#[derive(Debug, Clone)]
+pub struct BchNotification {
+    pub id: u64,
+    pub severity: BchNotifSeverity,
+    pub message: String,
+    pub source: Option<String>,
+    pub actions: Vec<BchNotifAction>,
+    pub sticky: bool,
+    pub read: bool,
+    pub timestamp: u64,
+}
+
+impl BchNotification {
+    pub fn new(id: u64, severity: BchNotifSeverity, message: &str) -> Self {
+        Self { id, severity, message: message.to_string(), source: None, actions: Vec::new(), sticky: false, read: false, timestamp: 0 }
+    }
+
+    pub fn with_source(mut self, s: &str) -> Self { self.source = Some(s.to_string()); self }
+    pub fn with_action(mut self, a: BchNotifAction) -> Self { self.actions.push(a); self }
+    pub fn with_sticky(mut self) -> Self { self.sticky = true; self }
+
+    pub fn display(&self) -> String {
+        let icon = match self.severity { BchNotifSeverity::Info => "ℹ", BchNotifSeverity::Warning => "⚠", BchNotifSeverity::Error => "✗" };
+        let src = self.source.as_deref().unwrap_or("");
+        format!("{} [{}] {}", icon, src, self.message)
+    }
+}
+
+/// Manages all notifications.
+#[derive(Debug)]
+pub struct BchNotificationCenter {
+    notifications: Vec<BchNotification>,
+    next_id: u64,
+    max_visible: usize,
+    do_not_disturb: bool,
+}
+
+impl BchNotificationCenter {
+    pub fn new() -> Self { Self { notifications: Vec::new(), next_id: 1, max_visible: 5, do_not_disturb: false } }
+
+    pub fn notify(&mut self, severity: BchNotifSeverity, message: &str) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.notifications.push(BchNotification::new(id, severity, message));
+        id
+    }
+
+    pub fn notify_full(&mut self, mut notif: BchNotification) -> u64 {
+        notif.id = self.next_id;
+        self.next_id += 1;
+        let id = notif.id;
+        self.notifications.push(notif);
+        id
+    }
+
+    pub fn dismiss(&mut self, id: u64) { self.notifications.retain(|n| n.id != id || n.sticky); }
+    pub fn dismiss_all(&mut self) { self.notifications.retain(|n| n.sticky); }
+
+    pub fn mark_read(&mut self, id: u64) {
+        if let Some(n) = self.notifications.iter_mut().find(|n| n.id == id) { n.read = true; }
+    }
+
+    pub fn unread_count(&self) -> usize { self.notifications.iter().filter(|n| !n.read).count() }
+    pub fn total_count(&self) -> usize { self.notifications.len() }
+
+    pub fn visible(&self) -> Vec<&BchNotification> {
+        if self.do_not_disturb { return Vec::new(); }
+        self.notifications.iter().filter(|n| !n.read).take(self.max_visible).collect()
+    }
+
+    pub fn all(&self) -> &[BchNotification] { &self.notifications }
+
+    pub fn by_severity(&self, sev: BchNotifSeverity) -> Vec<&BchNotification> {
+        self.notifications.iter().filter(|n| n.severity == sev).collect()
+    }
+
+    pub fn set_do_not_disturb(&mut self, dnd: bool) { self.do_not_disturb = dnd; }
+    pub fn is_do_not_disturb(&self) -> bool { self.do_not_disturb }
+}
+
+#[cfg(test)]
+mod bch_tests {
+    use super::*;
+
+    #[test]
+    fn test_bch_notify() {
+        let mut nc = BchNotificationCenter::new();
+        let id = nc.notify(BchNotifSeverity::Info, "Hello");
+        assert_eq!(id, 1);
+        assert_eq!(nc.total_count(), 1);
+    }
+
+    #[test]
+    fn test_bch_dismiss() {
+        let mut nc = BchNotificationCenter::new();
+        let id = nc.notify(BchNotifSeverity::Warning, "Test");
+        nc.dismiss(id);
+        assert_eq!(nc.total_count(), 0);
+    }
+
+    #[test]
+    fn test_bch_sticky() {
+        let mut nc = BchNotificationCenter::new();
+        nc.notify_full(BchNotification::new(0, BchNotifSeverity::Error, "Sticky").with_sticky());
+        nc.dismiss_all();
+        assert_eq!(nc.total_count(), 1);
+    }
+
+    #[test]
+    fn test_bch_unread() {
+        let mut nc = BchNotificationCenter::new();
+        let id = nc.notify(BchNotifSeverity::Info, "Msg");
+        assert_eq!(nc.unread_count(), 1);
+        nc.mark_read(id);
+        assert_eq!(nc.unread_count(), 0);
+    }
+
+    #[test]
+    fn test_bch_visible() {
+        let mut nc = BchNotificationCenter::new();
+        for i in 0..10 { nc.notify(BchNotifSeverity::Info, &format!("Msg {}", i)); }
+        assert_eq!(nc.visible().len(), 5); // max_visible = 5
+    }
+
+    #[test]
+    fn test_bch_dnd() {
+        let mut nc = BchNotificationCenter::new();
+        nc.notify(BchNotifSeverity::Info, "X");
+        nc.set_do_not_disturb(true);
+        assert!(nc.visible().is_empty());
+    }
+
+    #[test]
+    fn test_bch_by_severity() {
+        let mut nc = BchNotificationCenter::new();
+        nc.notify(BchNotifSeverity::Error, "Err");
+        nc.notify(BchNotifSeverity::Info, "Info");
+        assert_eq!(nc.by_severity(BchNotifSeverity::Error).len(), 1);
+    }
+
+    #[test]
+    fn test_bch_display() {
+        let n = BchNotification::new(1, BchNotifSeverity::Warning, "Watch out").with_source("Git");
+        assert!(n.display().contains("⚠"));
+        assert!(n.display().contains("Git"));
+    }
+
+    #[test]
+    fn test_bch_action() {
+        let n = BchNotification::new(1, BchNotifSeverity::Info, "Update?")
+            .with_action(BchNotifAction::new("update", "Update Now"));
+        assert_eq!(n.actions.len(), 1);
+    }
+
+    #[test]
+    fn test_bch_dismiss_all() {
+        let mut nc = BchNotificationCenter::new();
+        nc.notify(BchNotifSeverity::Info, "A");
+        nc.notify(BchNotifSeverity::Info, "B");
+        nc.dismiss_all();
+        assert_eq!(nc.total_count(), 0);
+    }
+}
