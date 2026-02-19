@@ -89572,6 +89572,132 @@ impl WalkthroughStep {
     }
 }
 
+/// Runtime wiring: bru_ TerminalProfile
+#[derive(Debug, Clone)]
+pub struct TerminalProfile {
+    pub bru_profile_id: String,
+    pub bru_title: String,
+    pub bru_shell_path: String,
+    pub bru_shell_args: Vec<String>,
+    pub bru_icon_id: String,
+    pub bru_color: String,
+    pub bru_env_vars: Vec<String>,
+    pub bru_override_name: bool,
+    pub bru_is_default: bool,
+    pub bru_is_auto_detected: bool,
+}
+
+impl TerminalProfile {
+    pub fn bru_summary(&self) -> String {
+        format!("TerminalProfile({})", self.bru_profile_id)
+    }
+}
+
+/// Runtime wiring: brv_ TerminalLink
+#[derive(Debug, Clone)]
+pub struct TerminalLink {
+    pub brv_link_text: String,
+    pub brv_start_index: u32,
+    pub brv_length: u32,
+    pub brv_tooltip: String,
+    pub brv_uri: String,
+    pub brv_line_number: Option<u32>,
+    pub brv_column_number: Option<u32>,
+    pub brv_is_trusted: bool,
+    pub brv_link_type: String,
+    pub brv_provider_id: String,
+}
+
+impl TerminalLink {
+    pub fn brv_summary(&self) -> String {
+        format!("TerminalLink({})", self.brv_link_text)
+    }
+}
+
+/// Runtime wiring: brw_ TerminalEnv
+#[derive(Debug, Clone)]
+pub struct TerminalEnv {
+    pub brw_variable_name: String,
+    pub brw_variable_value: String,
+    pub brw_mutator_type: String,
+    pub brw_mutator_id: String,
+    pub brw_is_prepend: bool,
+    pub brw_is_append: bool,
+    pub brw_is_replace: bool,
+    pub brw_separator: String,
+    pub brw_scope: String,
+    pub brw_collection_id: String,
+}
+
+impl TerminalEnv {
+    pub fn brw_summary(&self) -> String {
+        format!("TerminalEnv({})", self.brw_variable_name)
+    }
+}
+
+/// Runtime wiring: brx_ PortForward
+#[derive(Debug, Clone)]
+pub struct PortForward {
+    pub brx_local_port: u16,
+    pub brx_remote_port: u16,
+    pub brx_remote_host: String,
+    pub brx_label: String,
+    pub brx_protocol: String,
+    pub brx_privacy: String,
+    pub brx_source: String,
+    pub brx_is_auto_forwarded: bool,
+    pub brx_has_process: bool,
+    pub brx_pid: u32,
+}
+
+impl PortForward {
+    pub fn brx_summary(&self) -> String {
+        format!("PortForward({})", self.brx_local_port)
+    }
+}
+
+/// Runtime wiring: bry_ TunnelAuth
+#[derive(Debug, Clone)]
+pub struct TunnelAuth {
+    pub bry_tunnel_id: String,
+    pub bry_tunnel_name: String,
+    pub bry_cluster_id: String,
+    pub bry_domain: String,
+    pub bry_token: String,
+    pub bry_is_authenticated: bool,
+    pub bry_expires_at: u64,
+    pub bry_tunnel_type: String,
+    pub bry_host_name: String,
+    pub bry_connection_mode: String,
+}
+
+impl TunnelAuth {
+    pub fn bry_summary(&self) -> String {
+        format!("TunnelAuth({})", self.bry_tunnel_id)
+    }
+}
+
+/// Runtime wiring: brz_ StorageValue
+#[derive(Debug, Clone)]
+pub struct StorageValue {
+    pub brz_storage_key: String,
+    pub brz_storage_value: String,
+    pub brz_scope: String,
+    pub brz_target: String,
+    pub brz_is_global: bool,
+    pub brz_is_workspace: bool,
+    pub brz_extension_id: String,
+    pub brz_last_modified: u64,
+    pub brz_size_bytes: usize,
+    pub brz_is_synced: bool,
+}
+
+impl StorageValue {
+    pub fn brz_summary(&self) -> String {
+        format!("StorageValue({})", self.brz_storage_key)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -121246,6 +121372,1091 @@ mod tests_bfo {
         };
         let _ = obj.brt_summary();
         assert_eq!(obj.brt_when_clause, "test");
+    }
+
+    #[test]
+    fn test_bru_profile_id() {
+        let obj = TerminalProfile {
+            bru_profile_id: String::from("test"),
+            bru_title: String::from("test"),
+            bru_shell_path: String::from("test"),
+            bru_shell_args: Vec::new(),
+            bru_icon_id: String::from("test"),
+            bru_color: String::from("test"),
+            bru_env_vars: Vec::new(),
+            bru_override_name: false,
+            bru_is_default: false,
+            bru_is_auto_detected: false,
+        };
+        let _ = obj.bru_summary();
+        assert_eq!(obj.bru_profile_id, "test");
+    }
+
+    #[test]
+    fn test_bru_title() {
+        let obj = TerminalProfile {
+            bru_profile_id: String::from("test"),
+            bru_title: String::from("test"),
+            bru_shell_path: String::from("test"),
+            bru_shell_args: Vec::new(),
+            bru_icon_id: String::from("test"),
+            bru_color: String::from("test"),
+            bru_env_vars: Vec::new(),
+            bru_override_name: false,
+            bru_is_default: false,
+            bru_is_auto_detected: false,
+        };
+        let _ = obj.bru_summary();
+        assert_eq!(obj.bru_title, "test");
+    }
+
+    #[test]
+    fn test_bru_shell_path() {
+        let obj = TerminalProfile {
+            bru_profile_id: String::from("test"),
+            bru_title: String::from("test"),
+            bru_shell_path: String::from("test"),
+            bru_shell_args: Vec::new(),
+            bru_icon_id: String::from("test"),
+            bru_color: String::from("test"),
+            bru_env_vars: Vec::new(),
+            bru_override_name: false,
+            bru_is_default: false,
+            bru_is_auto_detected: false,
+        };
+        let _ = obj.bru_summary();
+        assert_eq!(obj.bru_shell_path, "test");
+    }
+
+    #[test]
+    fn test_bru_shell_args() {
+        let obj = TerminalProfile {
+            bru_profile_id: String::from("test"),
+            bru_title: String::from("test"),
+            bru_shell_path: String::from("test"),
+            bru_shell_args: Vec::new(),
+            bru_icon_id: String::from("test"),
+            bru_color: String::from("test"),
+            bru_env_vars: Vec::new(),
+            bru_override_name: false,
+            bru_is_default: false,
+            bru_is_auto_detected: false,
+        };
+        let _ = obj.bru_summary();
+        assert!(obj.bru_shell_args.is_empty());
+    }
+
+    #[test]
+    fn test_bru_icon_id() {
+        let obj = TerminalProfile {
+            bru_profile_id: String::from("test"),
+            bru_title: String::from("test"),
+            bru_shell_path: String::from("test"),
+            bru_shell_args: Vec::new(),
+            bru_icon_id: String::from("test"),
+            bru_color: String::from("test"),
+            bru_env_vars: Vec::new(),
+            bru_override_name: false,
+            bru_is_default: false,
+            bru_is_auto_detected: false,
+        };
+        let _ = obj.bru_summary();
+        assert_eq!(obj.bru_icon_id, "test");
+    }
+
+    #[test]
+    fn test_bru_color() {
+        let obj = TerminalProfile {
+            bru_profile_id: String::from("test"),
+            bru_title: String::from("test"),
+            bru_shell_path: String::from("test"),
+            bru_shell_args: Vec::new(),
+            bru_icon_id: String::from("test"),
+            bru_color: String::from("test"),
+            bru_env_vars: Vec::new(),
+            bru_override_name: false,
+            bru_is_default: false,
+            bru_is_auto_detected: false,
+        };
+        let _ = obj.bru_summary();
+        assert_eq!(obj.bru_color, "test");
+    }
+
+    #[test]
+    fn test_bru_env_vars() {
+        let obj = TerminalProfile {
+            bru_profile_id: String::from("test"),
+            bru_title: String::from("test"),
+            bru_shell_path: String::from("test"),
+            bru_shell_args: Vec::new(),
+            bru_icon_id: String::from("test"),
+            bru_color: String::from("test"),
+            bru_env_vars: Vec::new(),
+            bru_override_name: false,
+            bru_is_default: false,
+            bru_is_auto_detected: false,
+        };
+        let _ = obj.bru_summary();
+        assert!(obj.bru_env_vars.is_empty());
+    }
+
+    #[test]
+    fn test_bru_override_name() {
+        let obj = TerminalProfile {
+            bru_profile_id: String::from("test"),
+            bru_title: String::from("test"),
+            bru_shell_path: String::from("test"),
+            bru_shell_args: Vec::new(),
+            bru_icon_id: String::from("test"),
+            bru_color: String::from("test"),
+            bru_env_vars: Vec::new(),
+            bru_override_name: false,
+            bru_is_default: false,
+            bru_is_auto_detected: false,
+        };
+        let _ = obj.bru_summary();
+        assert!(!obj.bru_override_name);
+    }
+
+    #[test]
+    fn test_bru_is_default() {
+        let obj = TerminalProfile {
+            bru_profile_id: String::from("test"),
+            bru_title: String::from("test"),
+            bru_shell_path: String::from("test"),
+            bru_shell_args: Vec::new(),
+            bru_icon_id: String::from("test"),
+            bru_color: String::from("test"),
+            bru_env_vars: Vec::new(),
+            bru_override_name: false,
+            bru_is_default: false,
+            bru_is_auto_detected: false,
+        };
+        let _ = obj.bru_summary();
+        assert!(!obj.bru_is_default);
+    }
+
+    #[test]
+    fn test_bru_is_auto_detected() {
+        let obj = TerminalProfile {
+            bru_profile_id: String::from("test"),
+            bru_title: String::from("test"),
+            bru_shell_path: String::from("test"),
+            bru_shell_args: Vec::new(),
+            bru_icon_id: String::from("test"),
+            bru_color: String::from("test"),
+            bru_env_vars: Vec::new(),
+            bru_override_name: false,
+            bru_is_default: false,
+            bru_is_auto_detected: false,
+        };
+        let _ = obj.bru_summary();
+        assert!(!obj.bru_is_auto_detected);
+    }
+
+
+    #[test]
+    fn test_brv_link_text() {
+        let obj = TerminalLink {
+            brv_link_text: String::from("test"),
+            brv_start_index: 0,
+            brv_length: 0,
+            brv_tooltip: String::from("test"),
+            brv_uri: String::from("test"),
+            brv_line_number: None,
+            brv_column_number: None,
+            brv_is_trusted: false,
+            brv_link_type: String::from("test"),
+            brv_provider_id: String::from("test"),
+        };
+        let _ = obj.brv_summary();
+        assert_eq!(obj.brv_link_text, "test");
+    }
+
+    #[test]
+    fn test_brv_start_index() {
+        let obj = TerminalLink {
+            brv_link_text: String::from("test"),
+            brv_start_index: 0,
+            brv_length: 0,
+            brv_tooltip: String::from("test"),
+            brv_uri: String::from("test"),
+            brv_line_number: None,
+            brv_column_number: None,
+            brv_is_trusted: false,
+            brv_link_type: String::from("test"),
+            brv_provider_id: String::from("test"),
+        };
+        let _ = obj.brv_summary();
+        assert_eq!(obj.brv_start_index, 0);
+    }
+
+    #[test]
+    fn test_brv_length() {
+        let obj = TerminalLink {
+            brv_link_text: String::from("test"),
+            brv_start_index: 0,
+            brv_length: 0,
+            brv_tooltip: String::from("test"),
+            brv_uri: String::from("test"),
+            brv_line_number: None,
+            brv_column_number: None,
+            brv_is_trusted: false,
+            brv_link_type: String::from("test"),
+            brv_provider_id: String::from("test"),
+        };
+        let _ = obj.brv_summary();
+        assert_eq!(obj.brv_length, 0);
+    }
+
+    #[test]
+    fn test_brv_tooltip() {
+        let obj = TerminalLink {
+            brv_link_text: String::from("test"),
+            brv_start_index: 0,
+            brv_length: 0,
+            brv_tooltip: String::from("test"),
+            brv_uri: String::from("test"),
+            brv_line_number: None,
+            brv_column_number: None,
+            brv_is_trusted: false,
+            brv_link_type: String::from("test"),
+            brv_provider_id: String::from("test"),
+        };
+        let _ = obj.brv_summary();
+        assert_eq!(obj.brv_tooltip, "test");
+    }
+
+    #[test]
+    fn test_brv_uri() {
+        let obj = TerminalLink {
+            brv_link_text: String::from("test"),
+            brv_start_index: 0,
+            brv_length: 0,
+            brv_tooltip: String::from("test"),
+            brv_uri: String::from("test"),
+            brv_line_number: None,
+            brv_column_number: None,
+            brv_is_trusted: false,
+            brv_link_type: String::from("test"),
+            brv_provider_id: String::from("test"),
+        };
+        let _ = obj.brv_summary();
+        assert_eq!(obj.brv_uri, "test");
+    }
+
+    #[test]
+    fn test_brv_line_number() {
+        let obj = TerminalLink {
+            brv_link_text: String::from("test"),
+            brv_start_index: 0,
+            brv_length: 0,
+            brv_tooltip: String::from("test"),
+            brv_uri: String::from("test"),
+            brv_line_number: None,
+            brv_column_number: None,
+            brv_is_trusted: false,
+            brv_link_type: String::from("test"),
+            brv_provider_id: String::from("test"),
+        };
+        let _ = obj.brv_summary();
+        assert!(obj.brv_line_number.is_none());
+    }
+
+    #[test]
+    fn test_brv_column_number() {
+        let obj = TerminalLink {
+            brv_link_text: String::from("test"),
+            brv_start_index: 0,
+            brv_length: 0,
+            brv_tooltip: String::from("test"),
+            brv_uri: String::from("test"),
+            brv_line_number: None,
+            brv_column_number: None,
+            brv_is_trusted: false,
+            brv_link_type: String::from("test"),
+            brv_provider_id: String::from("test"),
+        };
+        let _ = obj.brv_summary();
+        assert!(obj.brv_column_number.is_none());
+    }
+
+    #[test]
+    fn test_brv_is_trusted() {
+        let obj = TerminalLink {
+            brv_link_text: String::from("test"),
+            brv_start_index: 0,
+            brv_length: 0,
+            brv_tooltip: String::from("test"),
+            brv_uri: String::from("test"),
+            brv_line_number: None,
+            brv_column_number: None,
+            brv_is_trusted: false,
+            brv_link_type: String::from("test"),
+            brv_provider_id: String::from("test"),
+        };
+        let _ = obj.brv_summary();
+        assert!(!obj.brv_is_trusted);
+    }
+
+    #[test]
+    fn test_brv_link_type() {
+        let obj = TerminalLink {
+            brv_link_text: String::from("test"),
+            brv_start_index: 0,
+            brv_length: 0,
+            brv_tooltip: String::from("test"),
+            brv_uri: String::from("test"),
+            brv_line_number: None,
+            brv_column_number: None,
+            brv_is_trusted: false,
+            brv_link_type: String::from("test"),
+            brv_provider_id: String::from("test"),
+        };
+        let _ = obj.brv_summary();
+        assert_eq!(obj.brv_link_type, "test");
+    }
+
+    #[test]
+    fn test_brv_provider_id() {
+        let obj = TerminalLink {
+            brv_link_text: String::from("test"),
+            brv_start_index: 0,
+            brv_length: 0,
+            brv_tooltip: String::from("test"),
+            brv_uri: String::from("test"),
+            brv_line_number: None,
+            brv_column_number: None,
+            brv_is_trusted: false,
+            brv_link_type: String::from("test"),
+            brv_provider_id: String::from("test"),
+        };
+        let _ = obj.brv_summary();
+        assert_eq!(obj.brv_provider_id, "test");
+    }
+
+
+    #[test]
+    fn test_brw_variable_name() {
+        let obj = TerminalEnv {
+            brw_variable_name: String::from("test"),
+            brw_variable_value: String::from("test"),
+            brw_mutator_type: String::from("test"),
+            brw_mutator_id: String::from("test"),
+            brw_is_prepend: false,
+            brw_is_append: false,
+            brw_is_replace: false,
+            brw_separator: String::from("test"),
+            brw_scope: String::from("test"),
+            brw_collection_id: String::from("test"),
+        };
+        let _ = obj.brw_summary();
+        assert_eq!(obj.brw_variable_name, "test");
+    }
+
+    #[test]
+    fn test_brw_variable_value() {
+        let obj = TerminalEnv {
+            brw_variable_name: String::from("test"),
+            brw_variable_value: String::from("test"),
+            brw_mutator_type: String::from("test"),
+            brw_mutator_id: String::from("test"),
+            brw_is_prepend: false,
+            brw_is_append: false,
+            brw_is_replace: false,
+            brw_separator: String::from("test"),
+            brw_scope: String::from("test"),
+            brw_collection_id: String::from("test"),
+        };
+        let _ = obj.brw_summary();
+        assert_eq!(obj.brw_variable_value, "test");
+    }
+
+    #[test]
+    fn test_brw_mutator_type() {
+        let obj = TerminalEnv {
+            brw_variable_name: String::from("test"),
+            brw_variable_value: String::from("test"),
+            brw_mutator_type: String::from("test"),
+            brw_mutator_id: String::from("test"),
+            brw_is_prepend: false,
+            brw_is_append: false,
+            brw_is_replace: false,
+            brw_separator: String::from("test"),
+            brw_scope: String::from("test"),
+            brw_collection_id: String::from("test"),
+        };
+        let _ = obj.brw_summary();
+        assert_eq!(obj.brw_mutator_type, "test");
+    }
+
+    #[test]
+    fn test_brw_mutator_id() {
+        let obj = TerminalEnv {
+            brw_variable_name: String::from("test"),
+            brw_variable_value: String::from("test"),
+            brw_mutator_type: String::from("test"),
+            brw_mutator_id: String::from("test"),
+            brw_is_prepend: false,
+            brw_is_append: false,
+            brw_is_replace: false,
+            brw_separator: String::from("test"),
+            brw_scope: String::from("test"),
+            brw_collection_id: String::from("test"),
+        };
+        let _ = obj.brw_summary();
+        assert_eq!(obj.brw_mutator_id, "test");
+    }
+
+    #[test]
+    fn test_brw_is_prepend() {
+        let obj = TerminalEnv {
+            brw_variable_name: String::from("test"),
+            brw_variable_value: String::from("test"),
+            brw_mutator_type: String::from("test"),
+            brw_mutator_id: String::from("test"),
+            brw_is_prepend: false,
+            brw_is_append: false,
+            brw_is_replace: false,
+            brw_separator: String::from("test"),
+            brw_scope: String::from("test"),
+            brw_collection_id: String::from("test"),
+        };
+        let _ = obj.brw_summary();
+        assert!(!obj.brw_is_prepend);
+    }
+
+    #[test]
+    fn test_brw_is_append() {
+        let obj = TerminalEnv {
+            brw_variable_name: String::from("test"),
+            brw_variable_value: String::from("test"),
+            brw_mutator_type: String::from("test"),
+            brw_mutator_id: String::from("test"),
+            brw_is_prepend: false,
+            brw_is_append: false,
+            brw_is_replace: false,
+            brw_separator: String::from("test"),
+            brw_scope: String::from("test"),
+            brw_collection_id: String::from("test"),
+        };
+        let _ = obj.brw_summary();
+        assert!(!obj.brw_is_append);
+    }
+
+    #[test]
+    fn test_brw_is_replace() {
+        let obj = TerminalEnv {
+            brw_variable_name: String::from("test"),
+            brw_variable_value: String::from("test"),
+            brw_mutator_type: String::from("test"),
+            brw_mutator_id: String::from("test"),
+            brw_is_prepend: false,
+            brw_is_append: false,
+            brw_is_replace: false,
+            brw_separator: String::from("test"),
+            brw_scope: String::from("test"),
+            brw_collection_id: String::from("test"),
+        };
+        let _ = obj.brw_summary();
+        assert!(!obj.brw_is_replace);
+    }
+
+    #[test]
+    fn test_brw_separator() {
+        let obj = TerminalEnv {
+            brw_variable_name: String::from("test"),
+            brw_variable_value: String::from("test"),
+            brw_mutator_type: String::from("test"),
+            brw_mutator_id: String::from("test"),
+            brw_is_prepend: false,
+            brw_is_append: false,
+            brw_is_replace: false,
+            brw_separator: String::from("test"),
+            brw_scope: String::from("test"),
+            brw_collection_id: String::from("test"),
+        };
+        let _ = obj.brw_summary();
+        assert_eq!(obj.brw_separator, "test");
+    }
+
+    #[test]
+    fn test_brw_scope() {
+        let obj = TerminalEnv {
+            brw_variable_name: String::from("test"),
+            brw_variable_value: String::from("test"),
+            brw_mutator_type: String::from("test"),
+            brw_mutator_id: String::from("test"),
+            brw_is_prepend: false,
+            brw_is_append: false,
+            brw_is_replace: false,
+            brw_separator: String::from("test"),
+            brw_scope: String::from("test"),
+            brw_collection_id: String::from("test"),
+        };
+        let _ = obj.brw_summary();
+        assert_eq!(obj.brw_scope, "test");
+    }
+
+    #[test]
+    fn test_brw_collection_id() {
+        let obj = TerminalEnv {
+            brw_variable_name: String::from("test"),
+            brw_variable_value: String::from("test"),
+            brw_mutator_type: String::from("test"),
+            brw_mutator_id: String::from("test"),
+            brw_is_prepend: false,
+            brw_is_append: false,
+            brw_is_replace: false,
+            brw_separator: String::from("test"),
+            brw_scope: String::from("test"),
+            brw_collection_id: String::from("test"),
+        };
+        let _ = obj.brw_summary();
+        assert_eq!(obj.brw_collection_id, "test");
+    }
+
+
+    #[test]
+    fn test_brx_local_port() {
+        let obj = PortForward {
+            brx_local_port: 0,
+            brx_remote_port: 0,
+            brx_remote_host: String::from("test"),
+            brx_label: String::from("test"),
+            brx_protocol: String::from("test"),
+            brx_privacy: String::from("test"),
+            brx_source: String::from("test"),
+            brx_is_auto_forwarded: false,
+            brx_has_process: false,
+            brx_pid: 0,
+        };
+        let _ = obj.brx_summary();
+        assert_eq!(obj.brx_local_port, 0);
+    }
+
+    #[test]
+    fn test_brx_remote_port() {
+        let obj = PortForward {
+            brx_local_port: 0,
+            brx_remote_port: 0,
+            brx_remote_host: String::from("test"),
+            brx_label: String::from("test"),
+            brx_protocol: String::from("test"),
+            brx_privacy: String::from("test"),
+            brx_source: String::from("test"),
+            brx_is_auto_forwarded: false,
+            brx_has_process: false,
+            brx_pid: 0,
+        };
+        let _ = obj.brx_summary();
+        assert_eq!(obj.brx_remote_port, 0);
+    }
+
+    #[test]
+    fn test_brx_remote_host() {
+        let obj = PortForward {
+            brx_local_port: 0,
+            brx_remote_port: 0,
+            brx_remote_host: String::from("test"),
+            brx_label: String::from("test"),
+            brx_protocol: String::from("test"),
+            brx_privacy: String::from("test"),
+            brx_source: String::from("test"),
+            brx_is_auto_forwarded: false,
+            brx_has_process: false,
+            brx_pid: 0,
+        };
+        let _ = obj.brx_summary();
+        assert_eq!(obj.brx_remote_host, "test");
+    }
+
+    #[test]
+    fn test_brx_label() {
+        let obj = PortForward {
+            brx_local_port: 0,
+            brx_remote_port: 0,
+            brx_remote_host: String::from("test"),
+            brx_label: String::from("test"),
+            brx_protocol: String::from("test"),
+            brx_privacy: String::from("test"),
+            brx_source: String::from("test"),
+            brx_is_auto_forwarded: false,
+            brx_has_process: false,
+            brx_pid: 0,
+        };
+        let _ = obj.brx_summary();
+        assert_eq!(obj.brx_label, "test");
+    }
+
+    #[test]
+    fn test_brx_protocol() {
+        let obj = PortForward {
+            brx_local_port: 0,
+            brx_remote_port: 0,
+            brx_remote_host: String::from("test"),
+            brx_label: String::from("test"),
+            brx_protocol: String::from("test"),
+            brx_privacy: String::from("test"),
+            brx_source: String::from("test"),
+            brx_is_auto_forwarded: false,
+            brx_has_process: false,
+            brx_pid: 0,
+        };
+        let _ = obj.brx_summary();
+        assert_eq!(obj.brx_protocol, "test");
+    }
+
+    #[test]
+    fn test_brx_privacy() {
+        let obj = PortForward {
+            brx_local_port: 0,
+            brx_remote_port: 0,
+            brx_remote_host: String::from("test"),
+            brx_label: String::from("test"),
+            brx_protocol: String::from("test"),
+            brx_privacy: String::from("test"),
+            brx_source: String::from("test"),
+            brx_is_auto_forwarded: false,
+            brx_has_process: false,
+            brx_pid: 0,
+        };
+        let _ = obj.brx_summary();
+        assert_eq!(obj.brx_privacy, "test");
+    }
+
+    #[test]
+    fn test_brx_source() {
+        let obj = PortForward {
+            brx_local_port: 0,
+            brx_remote_port: 0,
+            brx_remote_host: String::from("test"),
+            brx_label: String::from("test"),
+            brx_protocol: String::from("test"),
+            brx_privacy: String::from("test"),
+            brx_source: String::from("test"),
+            brx_is_auto_forwarded: false,
+            brx_has_process: false,
+            brx_pid: 0,
+        };
+        let _ = obj.brx_summary();
+        assert_eq!(obj.brx_source, "test");
+    }
+
+    #[test]
+    fn test_brx_is_auto_forwarded() {
+        let obj = PortForward {
+            brx_local_port: 0,
+            brx_remote_port: 0,
+            brx_remote_host: String::from("test"),
+            brx_label: String::from("test"),
+            brx_protocol: String::from("test"),
+            brx_privacy: String::from("test"),
+            brx_source: String::from("test"),
+            brx_is_auto_forwarded: false,
+            brx_has_process: false,
+            brx_pid: 0,
+        };
+        let _ = obj.brx_summary();
+        assert!(!obj.brx_is_auto_forwarded);
+    }
+
+    #[test]
+    fn test_brx_has_process() {
+        let obj = PortForward {
+            brx_local_port: 0,
+            brx_remote_port: 0,
+            brx_remote_host: String::from("test"),
+            brx_label: String::from("test"),
+            brx_protocol: String::from("test"),
+            brx_privacy: String::from("test"),
+            brx_source: String::from("test"),
+            brx_is_auto_forwarded: false,
+            brx_has_process: false,
+            brx_pid: 0,
+        };
+        let _ = obj.brx_summary();
+        assert!(!obj.brx_has_process);
+    }
+
+    #[test]
+    fn test_brx_pid() {
+        let obj = PortForward {
+            brx_local_port: 0,
+            brx_remote_port: 0,
+            brx_remote_host: String::from("test"),
+            brx_label: String::from("test"),
+            brx_protocol: String::from("test"),
+            brx_privacy: String::from("test"),
+            brx_source: String::from("test"),
+            brx_is_auto_forwarded: false,
+            brx_has_process: false,
+            brx_pid: 0,
+        };
+        let _ = obj.brx_summary();
+        assert_eq!(obj.brx_pid, 0);
+    }
+
+
+    #[test]
+    fn test_bry_tunnel_id() {
+        let obj = TunnelAuth {
+            bry_tunnel_id: String::from("test"),
+            bry_tunnel_name: String::from("test"),
+            bry_cluster_id: String::from("test"),
+            bry_domain: String::from("test"),
+            bry_token: String::from("test"),
+            bry_is_authenticated: false,
+            bry_expires_at: 0,
+            bry_tunnel_type: String::from("test"),
+            bry_host_name: String::from("test"),
+            bry_connection_mode: String::from("test"),
+        };
+        let _ = obj.bry_summary();
+        assert_eq!(obj.bry_tunnel_id, "test");
+    }
+
+    #[test]
+    fn test_bry_tunnel_name() {
+        let obj = TunnelAuth {
+            bry_tunnel_id: String::from("test"),
+            bry_tunnel_name: String::from("test"),
+            bry_cluster_id: String::from("test"),
+            bry_domain: String::from("test"),
+            bry_token: String::from("test"),
+            bry_is_authenticated: false,
+            bry_expires_at: 0,
+            bry_tunnel_type: String::from("test"),
+            bry_host_name: String::from("test"),
+            bry_connection_mode: String::from("test"),
+        };
+        let _ = obj.bry_summary();
+        assert_eq!(obj.bry_tunnel_name, "test");
+    }
+
+    #[test]
+    fn test_bry_cluster_id() {
+        let obj = TunnelAuth {
+            bry_tunnel_id: String::from("test"),
+            bry_tunnel_name: String::from("test"),
+            bry_cluster_id: String::from("test"),
+            bry_domain: String::from("test"),
+            bry_token: String::from("test"),
+            bry_is_authenticated: false,
+            bry_expires_at: 0,
+            bry_tunnel_type: String::from("test"),
+            bry_host_name: String::from("test"),
+            bry_connection_mode: String::from("test"),
+        };
+        let _ = obj.bry_summary();
+        assert_eq!(obj.bry_cluster_id, "test");
+    }
+
+    #[test]
+    fn test_bry_domain() {
+        let obj = TunnelAuth {
+            bry_tunnel_id: String::from("test"),
+            bry_tunnel_name: String::from("test"),
+            bry_cluster_id: String::from("test"),
+            bry_domain: String::from("test"),
+            bry_token: String::from("test"),
+            bry_is_authenticated: false,
+            bry_expires_at: 0,
+            bry_tunnel_type: String::from("test"),
+            bry_host_name: String::from("test"),
+            bry_connection_mode: String::from("test"),
+        };
+        let _ = obj.bry_summary();
+        assert_eq!(obj.bry_domain, "test");
+    }
+
+    #[test]
+    fn test_bry_token() {
+        let obj = TunnelAuth {
+            bry_tunnel_id: String::from("test"),
+            bry_tunnel_name: String::from("test"),
+            bry_cluster_id: String::from("test"),
+            bry_domain: String::from("test"),
+            bry_token: String::from("test"),
+            bry_is_authenticated: false,
+            bry_expires_at: 0,
+            bry_tunnel_type: String::from("test"),
+            bry_host_name: String::from("test"),
+            bry_connection_mode: String::from("test"),
+        };
+        let _ = obj.bry_summary();
+        assert_eq!(obj.bry_token, "test");
+    }
+
+    #[test]
+    fn test_bry_is_authenticated() {
+        let obj = TunnelAuth {
+            bry_tunnel_id: String::from("test"),
+            bry_tunnel_name: String::from("test"),
+            bry_cluster_id: String::from("test"),
+            bry_domain: String::from("test"),
+            bry_token: String::from("test"),
+            bry_is_authenticated: false,
+            bry_expires_at: 0,
+            bry_tunnel_type: String::from("test"),
+            bry_host_name: String::from("test"),
+            bry_connection_mode: String::from("test"),
+        };
+        let _ = obj.bry_summary();
+        assert!(!obj.bry_is_authenticated);
+    }
+
+    #[test]
+    fn test_bry_expires_at() {
+        let obj = TunnelAuth {
+            bry_tunnel_id: String::from("test"),
+            bry_tunnel_name: String::from("test"),
+            bry_cluster_id: String::from("test"),
+            bry_domain: String::from("test"),
+            bry_token: String::from("test"),
+            bry_is_authenticated: false,
+            bry_expires_at: 0,
+            bry_tunnel_type: String::from("test"),
+            bry_host_name: String::from("test"),
+            bry_connection_mode: String::from("test"),
+        };
+        let _ = obj.bry_summary();
+        assert_eq!(obj.bry_expires_at, 0);
+    }
+
+    #[test]
+    fn test_bry_tunnel_type() {
+        let obj = TunnelAuth {
+            bry_tunnel_id: String::from("test"),
+            bry_tunnel_name: String::from("test"),
+            bry_cluster_id: String::from("test"),
+            bry_domain: String::from("test"),
+            bry_token: String::from("test"),
+            bry_is_authenticated: false,
+            bry_expires_at: 0,
+            bry_tunnel_type: String::from("test"),
+            bry_host_name: String::from("test"),
+            bry_connection_mode: String::from("test"),
+        };
+        let _ = obj.bry_summary();
+        assert_eq!(obj.bry_tunnel_type, "test");
+    }
+
+    #[test]
+    fn test_bry_host_name() {
+        let obj = TunnelAuth {
+            bry_tunnel_id: String::from("test"),
+            bry_tunnel_name: String::from("test"),
+            bry_cluster_id: String::from("test"),
+            bry_domain: String::from("test"),
+            bry_token: String::from("test"),
+            bry_is_authenticated: false,
+            bry_expires_at: 0,
+            bry_tunnel_type: String::from("test"),
+            bry_host_name: String::from("test"),
+            bry_connection_mode: String::from("test"),
+        };
+        let _ = obj.bry_summary();
+        assert_eq!(obj.bry_host_name, "test");
+    }
+
+    #[test]
+    fn test_bry_connection_mode() {
+        let obj = TunnelAuth {
+            bry_tunnel_id: String::from("test"),
+            bry_tunnel_name: String::from("test"),
+            bry_cluster_id: String::from("test"),
+            bry_domain: String::from("test"),
+            bry_token: String::from("test"),
+            bry_is_authenticated: false,
+            bry_expires_at: 0,
+            bry_tunnel_type: String::from("test"),
+            bry_host_name: String::from("test"),
+            bry_connection_mode: String::from("test"),
+        };
+        let _ = obj.bry_summary();
+        assert_eq!(obj.bry_connection_mode, "test");
+    }
+
+
+    #[test]
+    fn test_brz_storage_key() {
+        let obj = StorageValue {
+            brz_storage_key: String::from("test"),
+            brz_storage_value: String::from("test"),
+            brz_scope: String::from("test"),
+            brz_target: String::from("test"),
+            brz_is_global: false,
+            brz_is_workspace: false,
+            brz_extension_id: String::from("test"),
+            brz_last_modified: 0,
+            brz_size_bytes: 0,
+            brz_is_synced: false,
+        };
+        let _ = obj.brz_summary();
+        assert_eq!(obj.brz_storage_key, "test");
+    }
+
+    #[test]
+    fn test_brz_storage_value() {
+        let obj = StorageValue {
+            brz_storage_key: String::from("test"),
+            brz_storage_value: String::from("test"),
+            brz_scope: String::from("test"),
+            brz_target: String::from("test"),
+            brz_is_global: false,
+            brz_is_workspace: false,
+            brz_extension_id: String::from("test"),
+            brz_last_modified: 0,
+            brz_size_bytes: 0,
+            brz_is_synced: false,
+        };
+        let _ = obj.brz_summary();
+        assert_eq!(obj.brz_storage_value, "test");
+    }
+
+    #[test]
+    fn test_brz_scope() {
+        let obj = StorageValue {
+            brz_storage_key: String::from("test"),
+            brz_storage_value: String::from("test"),
+            brz_scope: String::from("test"),
+            brz_target: String::from("test"),
+            brz_is_global: false,
+            brz_is_workspace: false,
+            brz_extension_id: String::from("test"),
+            brz_last_modified: 0,
+            brz_size_bytes: 0,
+            brz_is_synced: false,
+        };
+        let _ = obj.brz_summary();
+        assert_eq!(obj.brz_scope, "test");
+    }
+
+    #[test]
+    fn test_brz_target() {
+        let obj = StorageValue {
+            brz_storage_key: String::from("test"),
+            brz_storage_value: String::from("test"),
+            brz_scope: String::from("test"),
+            brz_target: String::from("test"),
+            brz_is_global: false,
+            brz_is_workspace: false,
+            brz_extension_id: String::from("test"),
+            brz_last_modified: 0,
+            brz_size_bytes: 0,
+            brz_is_synced: false,
+        };
+        let _ = obj.brz_summary();
+        assert_eq!(obj.brz_target, "test");
+    }
+
+    #[test]
+    fn test_brz_is_global() {
+        let obj = StorageValue {
+            brz_storage_key: String::from("test"),
+            brz_storage_value: String::from("test"),
+            brz_scope: String::from("test"),
+            brz_target: String::from("test"),
+            brz_is_global: false,
+            brz_is_workspace: false,
+            brz_extension_id: String::from("test"),
+            brz_last_modified: 0,
+            brz_size_bytes: 0,
+            brz_is_synced: false,
+        };
+        let _ = obj.brz_summary();
+        assert!(!obj.brz_is_global);
+    }
+
+    #[test]
+    fn test_brz_is_workspace() {
+        let obj = StorageValue {
+            brz_storage_key: String::from("test"),
+            brz_storage_value: String::from("test"),
+            brz_scope: String::from("test"),
+            brz_target: String::from("test"),
+            brz_is_global: false,
+            brz_is_workspace: false,
+            brz_extension_id: String::from("test"),
+            brz_last_modified: 0,
+            brz_size_bytes: 0,
+            brz_is_synced: false,
+        };
+        let _ = obj.brz_summary();
+        assert!(!obj.brz_is_workspace);
+    }
+
+    #[test]
+    fn test_brz_extension_id() {
+        let obj = StorageValue {
+            brz_storage_key: String::from("test"),
+            brz_storage_value: String::from("test"),
+            brz_scope: String::from("test"),
+            brz_target: String::from("test"),
+            brz_is_global: false,
+            brz_is_workspace: false,
+            brz_extension_id: String::from("test"),
+            brz_last_modified: 0,
+            brz_size_bytes: 0,
+            brz_is_synced: false,
+        };
+        let _ = obj.brz_summary();
+        assert_eq!(obj.brz_extension_id, "test");
+    }
+
+    #[test]
+    fn test_brz_last_modified() {
+        let obj = StorageValue {
+            brz_storage_key: String::from("test"),
+            brz_storage_value: String::from("test"),
+            brz_scope: String::from("test"),
+            brz_target: String::from("test"),
+            brz_is_global: false,
+            brz_is_workspace: false,
+            brz_extension_id: String::from("test"),
+            brz_last_modified: 0,
+            brz_size_bytes: 0,
+            brz_is_synced: false,
+        };
+        let _ = obj.brz_summary();
+        assert_eq!(obj.brz_last_modified, 0);
+    }
+
+    #[test]
+    fn test_brz_size_bytes() {
+        let obj = StorageValue {
+            brz_storage_key: String::from("test"),
+            brz_storage_value: String::from("test"),
+            brz_scope: String::from("test"),
+            brz_target: String::from("test"),
+            brz_is_global: false,
+            brz_is_workspace: false,
+            brz_extension_id: String::from("test"),
+            brz_last_modified: 0,
+            brz_size_bytes: 0,
+            brz_is_synced: false,
+        };
+        let _ = obj.brz_summary();
+        assert_eq!(obj.brz_size_bytes, 0);
+    }
+
+    #[test]
+    fn test_brz_is_synced() {
+        let obj = StorageValue {
+            brz_storage_key: String::from("test"),
+            brz_storage_value: String::from("test"),
+            brz_scope: String::from("test"),
+            brz_target: String::from("test"),
+            brz_is_global: false,
+            brz_is_workspace: false,
+            brz_extension_id: String::from("test"),
+            brz_last_modified: 0,
+            brz_size_bytes: 0,
+            brz_is_synced: false,
+        };
+        let _ = obj.brz_summary();
+        assert!(!obj.brz_is_synced);
     }
 
 }
