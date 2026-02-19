@@ -63503,3 +63503,184 @@ mod bch_tests {
         assert_eq!(nc.total_count(), 0);
     }
 }
+
+
+// --- bci_: Editor quick input/pick model ---
+
+/// A quick pick item.
+#[derive(Debug, Clone)]
+pub struct BciQuickPickItem {
+    pub label: String,
+    pub description: Option<String>,
+    pub detail: Option<String>,
+    pub picked: bool,
+    pub always_show: bool,
+    pub kind: BciItemKind,
+}
+
+/// Kind of quick pick item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BciItemKind { Default, Separator }
+
+impl BciQuickPickItem {
+    pub fn new(label: &str) -> Self {
+        Self { label: label.to_string(), description: None, detail: None, picked: false, always_show: false, kind: BciItemKind::Default }
+    }
+
+    pub fn with_description(mut self, d: &str) -> Self { self.description = Some(d.to_string()); self }
+    pub fn with_detail(mut self, d: &str) -> Self { self.detail = Some(d.to_string()); self }
+    pub fn separator(label: &str) -> Self { Self { label: label.to_string(), description: None, detail: None, picked: false, always_show: false, kind: BciItemKind::Separator } }
+
+    pub fn matches(&self, query: &str) -> bool {
+        if query.is_empty() || self.always_show { return true; }
+        let q = query.to_lowercase();
+        self.label.to_lowercase().contains(&q) || self.description.as_ref().is_some_and(|d| d.to_lowercase().contains(&q))
+    }
+
+    pub fn render_line(&self) -> String {
+        match self.kind {
+            BciItemKind::Separator => format!("── {} ──", self.label),
+            BciItemKind::Default => {
+                let pick = if self.picked { "✓ " } else { "  " };
+                let desc = self.description.as_deref().unwrap_or("");
+                format!("{}{:<40} {}", pick, self.label, desc)
+            }
+        }
+    }
+}
+
+/// Quick pick multi-select model.
+#[derive(Debug)]
+pub struct BciQuickPick {
+    items: Vec<BciQuickPickItem>,
+    filter: String,
+    cursor: usize,
+    multi_select: bool,
+    placeholder: String,
+    title: Option<String>,
+}
+
+impl BciQuickPick {
+    pub fn new(placeholder: &str) -> Self {
+        Self { items: Vec::new(), filter: String::new(), cursor: 0, multi_select: false, placeholder: placeholder.to_string(), title: None }
+    }
+
+    pub fn set_items(&mut self, items: Vec<BciQuickPickItem>) { self.items = items; self.cursor = 0; }
+    pub fn set_filter(&mut self, f: &str) { self.filter = f.to_string(); self.cursor = 0; }
+    pub fn set_multi_select(&mut self, m: bool) { self.multi_select = m; }
+    pub fn set_title(&mut self, t: &str) { self.title = Some(t.to_string()); }
+
+    pub fn filtered_items(&self) -> Vec<&BciQuickPickItem> {
+        self.items.iter().filter(|i| i.matches(&self.filter)).collect()
+    }
+
+    pub fn cursor_item(&self) -> Option<&BciQuickPickItem> {
+        self.filtered_items().get(self.cursor).copied()
+    }
+
+    pub fn move_cursor(&mut self, delta: i32) {
+        let count = self.filtered_items().len();
+        if count == 0 { return; }
+        let new = self.cursor as i32 + delta;
+        self.cursor = new.rem_euclid(count as i32) as usize;
+    }
+
+    pub fn toggle_pick(&mut self) {
+        if !self.multi_select { return; }
+        let filtered: Vec<usize> = self.items.iter().enumerate().filter(|(_, i)| i.matches(&self.filter)).map(|(idx, _)| idx).collect();
+        if let Some(&real_idx) = filtered.get(self.cursor) {
+            self.items[real_idx].picked = !self.items[real_idx].picked;
+        }
+    }
+
+    pub fn selected(&self) -> Vec<&BciQuickPickItem> {
+        if self.multi_select { self.items.iter().filter(|i| i.picked).collect() }
+        else { self.cursor_item().into_iter().collect() }
+    }
+
+    pub fn placeholder(&self) -> &str { &self.placeholder }
+    pub fn filter(&self) -> &str { &self.filter }
+}
+
+#[cfg(test)]
+mod bci_tests {
+    use super::*;
+
+    #[test]
+    fn test_bci_item_new() {
+        let item = BciQuickPickItem::new("Open File");
+        assert_eq!(item.label, "Open File");
+        assert!(!item.picked);
+    }
+
+    #[test]
+    fn test_bci_item_matches() {
+        let item = BciQuickPickItem::new("Open File").with_description("opens a file");
+        assert!(item.matches("open"));
+        assert!(item.matches("file"));
+        assert!(!item.matches("close"));
+    }
+
+    #[test]
+    fn test_bci_separator() {
+        let s = BciQuickPickItem::separator("Recent");
+        assert_eq!(s.kind, BciItemKind::Separator);
+        assert!(s.render_line().contains("──"));
+    }
+
+    #[test]
+    fn test_bci_pick_new() {
+        let qp = BciQuickPick::new("Type to search...");
+        assert_eq!(qp.placeholder(), "Type to search...");
+    }
+
+    #[test]
+    fn test_bci_filter() {
+        let mut qp = BciQuickPick::new("");
+        qp.set_items(vec![BciQuickPickItem::new("alpha"), BciQuickPickItem::new("beta")]);
+        qp.set_filter("al");
+        assert_eq!(qp.filtered_items().len(), 1);
+    }
+
+    #[test]
+    fn test_bci_cursor_move() {
+        let mut qp = BciQuickPick::new("");
+        qp.set_items(vec![BciQuickPickItem::new("a"), BciQuickPickItem::new("b"), BciQuickPickItem::new("c")]);
+        qp.move_cursor(1);
+        assert_eq!(qp.cursor_item().unwrap().label, "b");
+        qp.move_cursor(-2); // wraps to c
+        assert_eq!(qp.cursor_item().unwrap().label, "c");
+    }
+
+    #[test]
+    fn test_bci_multi_select() {
+        let mut qp = BciQuickPick::new("");
+        qp.set_multi_select(true);
+        qp.set_items(vec![BciQuickPickItem::new("x"), BciQuickPickItem::new("y")]);
+        qp.toggle_pick(); // pick x
+        qp.move_cursor(1);
+        qp.toggle_pick(); // pick y
+        assert_eq!(qp.selected().len(), 2);
+    }
+
+    #[test]
+    fn test_bci_single_select() {
+        let mut qp = BciQuickPick::new("");
+        qp.set_items(vec![BciQuickPickItem::new("only")]);
+        assert_eq!(qp.selected().len(), 1);
+    }
+
+    #[test]
+    fn test_bci_render_line() {
+        let item = BciQuickPickItem::new("Test").with_description("desc");
+        let line = item.render_line();
+        assert!(line.contains("Test"));
+    }
+
+    #[test]
+    fn test_bci_title() {
+        let mut qp = BciQuickPick::new("");
+        qp.set_title("Select Language");
+        assert_eq!(qp.title.as_deref(), Some("Select Language"));
+    }
+}
