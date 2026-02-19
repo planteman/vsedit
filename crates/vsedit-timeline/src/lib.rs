@@ -61792,3 +61792,210 @@ mod bby_tests {
         assert!(!r.is_waiting_chord());
     }
 }
+
+
+// --- bbz_: Editor status bar model ---
+
+/// Status bar alignment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbzAlignment { Left, Right }
+
+/// Priority for status bar items (higher = further left/right).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BbzPriority(pub i32);
+
+/// A status bar item.
+#[derive(Debug, Clone)]
+pub struct BbzStatusItem {
+    pub id: String,
+    pub text: String,
+    pub tooltip: Option<String>,
+    pub command: Option<String>,
+    pub alignment: BbzAlignment,
+    pub priority: BbzPriority,
+    pub visible: bool,
+    pub color: Option<String>,
+    pub background_color: Option<String>,
+}
+
+impl BbzStatusItem {
+    pub fn new(id: &str, text: &str, align: BbzAlignment, priority: i32) -> Self {
+        Self {
+            id: id.to_string(), text: text.to_string(),
+            tooltip: None, command: None, alignment: align,
+            priority: BbzPriority(priority), visible: true,
+            color: None, background_color: None,
+        }
+    }
+
+    pub fn left(id: &str, text: &str, priority: i32) -> Self {
+        Self::new(id, text, BbzAlignment::Left, priority)
+    }
+
+    pub fn right(id: &str, text: &str, priority: i32) -> Self {
+        Self::new(id, text, BbzAlignment::Right, priority)
+    }
+
+    pub fn with_tooltip(mut self, t: &str) -> Self { self.tooltip = Some(t.to_string()); self }
+    pub fn with_command(mut self, c: &str) -> Self { self.command = Some(c.to_string()); self }
+    pub fn with_color(mut self, c: &str) -> Self { self.color = Some(c.to_string()); self }
+
+    pub fn set_text(&mut self, text: &str) { self.text = text.to_string(); }
+    pub fn show(&mut self) { self.visible = true; }
+    pub fn hide(&mut self) { self.visible = false; }
+    pub fn is_clickable(&self) -> bool { self.command.is_some() }
+
+    pub fn display_width(&self) -> usize { self.text.chars().count() + 2 } // padding
+}
+
+/// The status bar model.
+#[derive(Debug)]
+pub struct BbzStatusBar {
+    items: Vec<BbzStatusItem>,
+    background_color: Option<String>,
+}
+
+impl BbzStatusBar {
+    pub fn new() -> Self { Self { items: Vec::new(), background_color: None } }
+
+    pub fn add_item(&mut self, item: BbzStatusItem) { self.items.push(item); }
+
+    pub fn remove_item(&mut self, id: &str) { self.items.retain(|i| i.id != id); }
+
+    pub fn find_item(&self, id: &str) -> Option<&BbzStatusItem> {
+        self.items.iter().find(|i| i.id == id)
+    }
+
+    pub fn find_item_mut(&mut self, id: &str) -> Option<&mut BbzStatusItem> {
+        self.items.iter_mut().find(|i| i.id == id)
+    }
+
+    pub fn update_text(&mut self, id: &str, text: &str) {
+        if let Some(item) = self.find_item_mut(id) { item.set_text(text); }
+    }
+
+    pub fn left_items(&self) -> Vec<&BbzStatusItem> {
+        let mut items: Vec<_> = self.items.iter()
+            .filter(|i| i.alignment == BbzAlignment::Left && i.visible)
+            .collect();
+        items.sort_by(|a, b| b.priority.cmp(&a.priority));
+        items
+    }
+
+    pub fn right_items(&self) -> Vec<&BbzStatusItem> {
+        let mut items: Vec<_> = self.items.iter()
+            .filter(|i| i.alignment == BbzAlignment::Right && i.visible)
+            .collect();
+        items.sort_by(|a, b| b.priority.cmp(&a.priority));
+        items
+    }
+
+    pub fn item_count(&self) -> usize { self.items.len() }
+    pub fn visible_count(&self) -> usize { self.items.iter().filter(|i| i.visible).count() }
+
+    pub fn item_at_col(&self, col: usize, total_width: usize) -> Option<&BbzStatusItem> {
+        let mut offset = 0;
+        for item in self.left_items() {
+            let w = item.display_width();
+            if col >= offset && col < offset + w { return Some(item); }
+            offset += w;
+        }
+        let mut right_offset = total_width;
+        for item in self.right_items() {
+            let w = item.display_width();
+            right_offset -= w;
+            if col >= right_offset && col < right_offset + w { return Some(item); }
+        }
+        None
+    }
+
+    pub fn set_background(&mut self, color: Option<String>) { self.background_color = color; }
+
+    pub fn render_line(&self, width: usize) -> String {
+        let left: String = self.left_items().iter().map(|i| format!(" {} ", i.text)).collect();
+        let right: String = self.right_items().iter().map(|i| format!(" {} ", i.text)).collect();
+        let gap = width.saturating_sub(left.len() + right.len());
+        format!("{}{}{}", left, " ".repeat(gap), right)
+    }
+}
+
+#[cfg(test)]
+mod bbz_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbz_item_basic() {
+        let i = BbzStatusItem::left("git", "main", 100).with_tooltip("Branch: main");
+        assert_eq!(i.alignment, BbzAlignment::Left);
+        assert!(i.visible);
+    }
+
+    #[test]
+    fn test_bbz_item_clickable() {
+        let i = BbzStatusItem::right("encoding", "UTF-8", 50).with_command("change.encoding");
+        assert!(i.is_clickable());
+    }
+
+    #[test]
+    fn test_bbz_bar_add_remove() {
+        let mut bar = BbzStatusBar::new();
+        bar.add_item(BbzStatusItem::left("a", "A", 100));
+        bar.add_item(BbzStatusItem::right("b", "B", 50));
+        assert_eq!(bar.item_count(), 2);
+        bar.remove_item("a");
+        assert_eq!(bar.item_count(), 1);
+    }
+
+    #[test]
+    fn test_bbz_bar_update() {
+        let mut bar = BbzStatusBar::new();
+        bar.add_item(BbzStatusItem::left("line", "Ln 1, Col 1", 100));
+        bar.update_text("line", "Ln 42, Col 10");
+        assert_eq!(bar.find_item("line").unwrap().text, "Ln 42, Col 10");
+    }
+
+    #[test]
+    fn test_bbz_bar_left_right() {
+        let mut bar = BbzStatusBar::new();
+        bar.add_item(BbzStatusItem::left("a", "A", 100));
+        bar.add_item(BbzStatusItem::left("b", "B", 50));
+        bar.add_item(BbzStatusItem::right("c", "C", 100));
+        assert_eq!(bar.left_items().len(), 2);
+        assert_eq!(bar.right_items().len(), 1);
+    }
+
+    #[test]
+    fn test_bbz_bar_priority_order() {
+        let mut bar = BbzStatusBar::new();
+        bar.add_item(BbzStatusItem::left("low", "L", 10));
+        bar.add_item(BbzStatusItem::left("high", "H", 100));
+        let left = bar.left_items();
+        assert_eq!(left[0].id, "high"); // Higher priority first
+    }
+
+    #[test]
+    fn test_bbz_bar_visibility() {
+        let mut bar = BbzStatusBar::new();
+        bar.add_item(BbzStatusItem::left("a", "A", 100));
+        bar.add_item(BbzStatusItem::left("b", "B", 50));
+        bar.find_item_mut("b").unwrap().hide();
+        assert_eq!(bar.visible_count(), 1);
+    }
+
+    #[test]
+    fn test_bbz_render() {
+        let mut bar = BbzStatusBar::new();
+        bar.add_item(BbzStatusItem::left("git", "main", 100));
+        bar.add_item(BbzStatusItem::right("enc", "UTF-8", 100));
+        let line = bar.render_line(40);
+        assert!(line.contains("main"));
+        assert!(line.contains("UTF-8"));
+        assert_eq!(line.len(), 40);
+    }
+
+    #[test]
+    fn test_bbz_display_width() {
+        let i = BbzStatusItem::left("x", "hello", 0);
+        assert_eq!(i.display_width(), 7); // 5 chars + 2 padding
+    }
+}
