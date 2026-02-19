@@ -59948,3 +59948,217 @@ mod bbq_tests {
         assert_eq!(m.total_ranges(), 0);
     }
 }
+
+
+// --- bbr_: Editor text search model ---
+
+/// Search match.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BbrSearchMatch {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+}
+
+impl BbrSearchMatch {
+    pub fn new(line: u32, start: u32, end: u32) -> Self {
+        Self { line, start_col: start, end_col: end }
+    }
+
+    pub fn length(&self) -> u32 { self.end_col - self.start_col }
+}
+
+/// Find/replace state.
+#[derive(Debug)]
+pub struct BbrFindState {
+    pub search_text: String,
+    pub replace_text: String,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub regex: bool,
+    pub in_selection: bool,
+    pub preserve_case: bool,
+    pub matches: Vec<BbrSearchMatch>,
+    pub current_index: Option<usize>,
+    pub is_visible: bool,
+}
+
+impl BbrFindState {
+    pub fn new() -> Self {
+        Self {
+            search_text: String::new(), replace_text: String::new(),
+            case_sensitive: false, whole_word: false, regex: false,
+            in_selection: false, preserve_case: false,
+            matches: Vec::new(), current_index: None, is_visible: false,
+        }
+    }
+
+    pub fn set_search(&mut self, text: &str) {
+        self.search_text = text.to_string();
+        self.current_index = None;
+    }
+
+    pub fn set_replace(&mut self, text: &str) { self.replace_text = text.to_string(); }
+
+    pub fn match_count(&self) -> usize { self.matches.len() }
+
+    pub fn set_matches(&mut self, matches: Vec<BbrSearchMatch>) {
+        self.matches = matches;
+        self.current_index = if self.matches.is_empty() { None } else { Some(0) };
+    }
+
+    pub fn current_match(&self) -> Option<&BbrSearchMatch> {
+        self.current_index.map(|i| &self.matches[i])
+    }
+
+    pub fn next_match(&mut self) -> Option<&BbrSearchMatch> {
+        if self.matches.is_empty() { return None; }
+        let idx = match self.current_index {
+            Some(i) => (i + 1) % self.matches.len(),
+            None => 0,
+        };
+        self.current_index = Some(idx);
+        Some(&self.matches[idx])
+    }
+
+    pub fn prev_match(&mut self) -> Option<&BbrSearchMatch> {
+        if self.matches.is_empty() { return None; }
+        let idx = match self.current_index {
+            Some(0) => self.matches.len() - 1,
+            Some(i) => i - 1,
+            None => 0,
+        };
+        self.current_index = Some(idx);
+        Some(&self.matches[idx])
+    }
+
+    pub fn matches_on_line(&self, line: u32) -> Vec<&BbrSearchMatch> {
+        self.matches.iter().filter(|m| m.line == line).collect()
+    }
+
+    pub fn toggle_case(&mut self) { self.case_sensitive = !self.case_sensitive; }
+    pub fn toggle_whole_word(&mut self) { self.whole_word = !self.whole_word; }
+    pub fn toggle_regex(&mut self) { self.regex = !self.regex; }
+
+    pub fn show(&mut self) { self.is_visible = true; }
+    pub fn hide(&mut self) { self.is_visible = false; }
+
+    pub fn clear(&mut self) {
+        self.search_text.clear();
+        self.replace_text.clear();
+        self.matches.clear();
+        self.current_index = None;
+    }
+
+    pub fn status_text(&self) -> String {
+        if self.search_text.is_empty() { return String::new(); }
+        if self.matches.is_empty() { return "No results".to_string(); }
+        let idx = self.current_index.map_or(0, |i| i + 1);
+        format!("{} of {} results", idx, self.matches.len())
+    }
+}
+
+#[cfg(test)]
+mod bbr_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbr_match() {
+        let m = BbrSearchMatch::new(5, 10, 15);
+        assert_eq!(m.length(), 5);
+    }
+
+    #[test]
+    fn test_bbr_find_basic() {
+        let mut f = BbrFindState::new();
+        f.set_search("hello");
+        assert_eq!(f.search_text, "hello");
+        assert_eq!(f.match_count(), 0);
+    }
+
+    #[test]
+    fn test_bbr_find_matches() {
+        let mut f = BbrFindState::new();
+        f.set_matches(vec![
+            BbrSearchMatch::new(1, 0, 5),
+            BbrSearchMatch::new(3, 10, 15),
+            BbrSearchMatch::new(7, 0, 5),
+        ]);
+        assert_eq!(f.match_count(), 3);
+        assert_eq!(f.current_match().unwrap().line, 1);
+    }
+
+    #[test]
+    fn test_bbr_find_navigation() {
+        let mut f = BbrFindState::new();
+        f.set_matches(vec![
+            BbrSearchMatch::new(1, 0, 5),
+            BbrSearchMatch::new(3, 0, 5),
+        ]);
+        let m = f.next_match().unwrap();
+        assert_eq!(m.line, 3);
+        let m = f.next_match().unwrap();
+        assert_eq!(m.line, 1); // wrap
+    }
+
+    #[test]
+    fn test_bbr_find_prev() {
+        let mut f = BbrFindState::new();
+        f.set_matches(vec![
+            BbrSearchMatch::new(1, 0, 5),
+            BbrSearchMatch::new(3, 0, 5),
+        ]);
+        let m = f.prev_match().unwrap();
+        assert_eq!(m.line, 3); // wrap from 0 to last
+    }
+
+    #[test]
+    fn test_bbr_find_toggles() {
+        let mut f = BbrFindState::new();
+        assert!(!f.case_sensitive);
+        f.toggle_case();
+        assert!(f.case_sensitive);
+        f.toggle_whole_word();
+        assert!(f.whole_word);
+    }
+
+    #[test]
+    fn test_bbr_find_status() {
+        let mut f = BbrFindState::new();
+        f.set_search("x");
+        assert_eq!(f.status_text(), "No results");
+        f.set_matches(vec![BbrSearchMatch::new(1, 0, 1), BbrSearchMatch::new(5, 0, 1)]);
+        assert_eq!(f.status_text(), "1 of 2 results");
+    }
+
+    #[test]
+    fn test_bbr_find_clear() {
+        let mut f = BbrFindState::new();
+        f.set_search("test");
+        f.set_matches(vec![BbrSearchMatch::new(1, 0, 4)]);
+        f.clear();
+        assert!(f.search_text.is_empty());
+        assert_eq!(f.match_count(), 0);
+    }
+
+    #[test]
+    fn test_bbr_find_line_matches() {
+        let mut f = BbrFindState::new();
+        f.set_matches(vec![
+            BbrSearchMatch::new(1, 0, 5),
+            BbrSearchMatch::new(1, 10, 15),
+            BbrSearchMatch::new(3, 0, 5),
+        ]);
+        assert_eq!(f.matches_on_line(1).len(), 2);
+    }
+
+    #[test]
+    fn test_bbr_visibility() {
+        let mut f = BbrFindState::new();
+        assert!(!f.is_visible);
+        f.show();
+        assert!(f.is_visible);
+        f.hide();
+        assert!(!f.is_visible);
+    }
+}
