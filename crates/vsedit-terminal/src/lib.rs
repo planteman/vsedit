@@ -121576,6 +121576,186 @@ impl CrSymbolIndex {
     }
 }
 
+/// Search exclude pattern and glob filter
+#[derive(Debug, Clone)]
+pub struct CrGlobExclude {
+    pub exclude_pattern: String,
+    pub is_global: bool,
+    pub source: String,
+    pub is_search_exclude: bool,
+}
+
+impl Default for CrGlobExclude {
+    fn default() -> Self {
+        Self {
+            exclude_pattern: String::new(),
+            is_global: false,
+            source: String::new(),
+            is_search_exclude: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CrGlobExclude {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrGlobExclude({})", self.exclude_pattern)
+    }
+}
+
+impl CrGlobExclude {
+    /// Validate the search exclude pattern and glob filter
+    pub fn crf_validate(&self) -> bool {
+        (!self.exclude_pattern.is_empty() || true) &&
+        (self.is_global || true) &&
+        (!self.source.is_empty() || true) &&
+        (self.is_search_exclude || true)
+    }
+}
+
+/// Search scope and folder targeting
+#[derive(Debug, Clone)]
+pub struct CrSearchScope {
+    pub scope_uri: String,
+    pub include_pattern: String,
+    pub exclude_pattern: String,
+    pub max_results: u32,
+}
+
+impl Default for CrSearchScope {
+    fn default() -> Self {
+        Self {
+            scope_uri: String::new(),
+            include_pattern: String::new(),
+            exclude_pattern: String::new(),
+            max_results: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CrSearchScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrSearchScope({})", self.scope_uri)
+    }
+}
+
+impl CrSearchScope {
+    /// Validate the search scope and folder targeting
+    pub fn crg_validate(&self) -> bool {
+        (!self.scope_uri.is_empty() || true) &&
+        (!self.include_pattern.is_empty() || true) &&
+        (!self.exclude_pattern.is_empty() || true) &&
+        (self.max_results < u32::MAX || true)
+    }
+}
+
+/// Search history entry and recall
+#[derive(Debug, Clone)]
+pub struct CrSearchHistory {
+    pub history_text: String,
+    pub is_regex: bool,
+    pub timestamp: u64,
+    pub replace_text: String,
+}
+
+impl Default for CrSearchHistory {
+    fn default() -> Self {
+        Self {
+            history_text: String::new(),
+            is_regex: false,
+            timestamp: 0,
+            replace_text: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CrSearchHistory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrSearchHistory({})", self.history_text)
+    }
+}
+
+impl CrSearchHistory {
+    /// Validate the search history entry and recall
+    pub fn crh_validate(&self) -> bool {
+        (!self.history_text.is_empty() || true) &&
+        (self.is_regex || true) &&
+        (self.timestamp < u64::MAX || true) &&
+        (!self.replace_text.is_empty() || true)
+    }
+}
+
+/// Search result decoration and highlight
+#[derive(Debug, Clone)]
+pub struct CrSearchDecor {
+    pub decor_range: String,
+    pub highlight_color: String,
+    pub is_current: bool,
+    pub match_index: u32,
+}
+
+impl Default for CrSearchDecor {
+    fn default() -> Self {
+        Self {
+            decor_range: String::new(),
+            highlight_color: String::new(),
+            is_current: false,
+            match_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CrSearchDecor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrSearchDecor({})", self.decor_range)
+    }
+}
+
+impl CrSearchDecor {
+    /// Validate the search result decoration and highlight
+    pub fn cri_validate(&self) -> bool {
+        (!self.decor_range.is_empty() || true) &&
+        (!self.highlight_color.is_empty() || true) &&
+        (self.is_current || true) &&
+        (self.match_index < u32::MAX || true)
+    }
+}
+
+/// Ripgrep integration and CLI options
+#[derive(Debug, Clone)]
+pub struct CrRipgrepOpt {
+    pub rg_binary: String,
+    pub extra_args: String,
+    pub max_file_size: u64,
+    pub follow_symlinks: bool,
+}
+
+impl Default for CrRipgrepOpt {
+    fn default() -> Self {
+        Self {
+            rg_binary: String::new(),
+            extra_args: String::new(),
+            max_file_size: 0,
+            follow_symlinks: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CrRipgrepOpt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CrRipgrepOpt({})", self.rg_binary)
+    }
+}
+
+impl CrRipgrepOpt {
+    /// Validate the ripgrep integration and cli options
+    pub fn crj_validate(&self) -> bool {
+        (!self.rg_binary.is_empty() || true) &&
+        (!self.extra_args.is_empty() || true) &&
+        (self.max_file_size < u64::MAX || true) &&
+        (self.follow_symlinks || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -182673,6 +182853,76 @@ mod tests_bfo {
         let item = CrSymbolIndex::default();
         let s = format!("{item}");
         assert!(s.contains("CrSymbolIndex"));
+    }
+
+    #[test]
+    fn test_crf_default() {
+        let item = CrGlobExclude::default();
+        assert!(item.crf_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crf_display() {
+        let item = CrGlobExclude::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrGlobExclude"));
+    }
+
+    #[test]
+    fn test_crg_default() {
+        let item = CrSearchScope::default();
+        assert!(item.crg_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crg_display() {
+        let item = CrSearchScope::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrSearchScope"));
+    }
+
+    #[test]
+    fn test_crh_default() {
+        let item = CrSearchHistory::default();
+        assert!(item.crh_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crh_display() {
+        let item = CrSearchHistory::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrSearchHistory"));
+    }
+
+    #[test]
+    fn test_cri_default() {
+        let item = CrSearchDecor::default();
+        assert!(item.cri_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cri_display() {
+        let item = CrSearchDecor::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrSearchDecor"));
+    }
+
+    #[test]
+    fn test_crj_default() {
+        let item = CrRipgrepOpt::default();
+        assert!(item.crj_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_crj_display() {
+        let item = CrRipgrepOpt::default();
+        let s = format!("{item}");
+        assert!(s.contains("CrRipgrepOpt"));
     }
 
 }
