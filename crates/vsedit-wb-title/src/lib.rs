@@ -52676,3 +52676,295 @@ mod bap_tests {
         assert_eq!(elem.level, Some(2));
     }
 }
+
+
+// --- baq_: Workspace trust model ---
+
+/// Trust state for a workspace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BaqTrustState {
+    Trusted,
+    Untrusted,
+    Unknown,
+}
+
+impl BaqTrustState {
+    pub fn is_trusted(&self) -> bool {
+        matches!(self, Self::Trusted)
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Trusted => "Trusted",
+            Self::Untrusted => "Restricted Mode",
+            Self::Unknown => "Unknown",
+        }
+    }
+
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Self::Trusted => "\u{2705}",
+            Self::Untrusted => "\u{1f512}",
+            Self::Unknown => "\u{2753}",
+        }
+    }
+}
+
+/// A folder that has been granted or denied trust.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BaqTrustedFolder {
+    pub path: String,
+    pub parent_trust: bool,
+}
+
+impl BaqTrustedFolder {
+    pub fn new(path: &str, trusted: bool) -> Self {
+        Self { path: path.to_string(), parent_trust: trusted }
+    }
+
+    pub fn contains_path(&self, check_path: &str) -> bool {
+        check_path.starts_with(&self.path)
+    }
+}
+
+/// Features that are restricted in untrusted workspaces.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BaqRestrictedFeature {
+    Tasks,
+    Debugging,
+    Extensions,
+    Terminal,
+    WorkspaceSettings,
+    Git,
+}
+
+impl BaqRestrictedFeature {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Tasks => "Tasks",
+            Self::Debugging => "Debugging",
+            Self::Extensions => "Extensions",
+            Self::Terminal => "Terminal",
+            Self::WorkspaceSettings => "Workspace Settings",
+            Self::Git => "Git",
+        }
+    }
+
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::Tasks => "Task execution is disabled in restricted mode",
+            Self::Debugging => "Debugging is disabled in restricted mode",
+            Self::Extensions => "Some extensions are disabled in restricted mode",
+            Self::Terminal => "Terminal access may be restricted",
+            Self::WorkspaceSettings => "Workspace settings may be ignored",
+            Self::Git => "Git operations may be restricted",
+        }
+    }
+}
+
+/// The workspace trust model.
+#[derive(Debug, Clone)]
+pub struct BaqWorkspaceTrust {
+    pub state: BaqTrustState,
+    pub workspace_path: Option<String>,
+    trusted_folders: Vec<BaqTrustedFolder>,
+    pub restricted_features: Vec<BaqRestrictedFeature>,
+    pub trust_requested: bool,
+    pub startup_prompt_shown: bool,
+}
+
+impl BaqWorkspaceTrust {
+    pub fn new() -> Self {
+        Self {
+            state: BaqTrustState::Unknown,
+            workspace_path: None,
+            trusted_folders: Vec::new(),
+            restricted_features: vec![
+                BaqRestrictedFeature::Tasks,
+                BaqRestrictedFeature::Debugging,
+                BaqRestrictedFeature::Extensions,
+                BaqRestrictedFeature::Terminal,
+            ],
+            trust_requested: false,
+            startup_prompt_shown: false,
+        }
+    }
+
+    pub fn set_workspace(&mut self, path: &str) {
+        self.workspace_path = Some(path.to_string());
+        self.state = self.resolve_trust(path);
+    }
+
+    fn resolve_trust(&self, path: &str) -> BaqTrustState {
+        for folder in &self.trusted_folders {
+            if folder.contains_path(path) {
+                return if folder.parent_trust {
+                    BaqTrustState::Trusted
+                } else {
+                    BaqTrustState::Untrusted
+                };
+            }
+        }
+        BaqTrustState::Unknown
+    }
+
+    pub fn grant_trust(&mut self) {
+        self.state = BaqTrustState::Trusted;
+        if let Some(path) = &self.workspace_path {
+            let path = path.clone();
+            self.trusted_folders.push(BaqTrustedFolder::new(&path, true));
+        }
+    }
+
+    pub fn deny_trust(&mut self) {
+        self.state = BaqTrustState::Untrusted;
+    }
+
+    pub fn is_trusted(&self) -> bool {
+        self.state.is_trusted()
+    }
+
+    pub fn is_feature_allowed(&self, feature: BaqRestrictedFeature) -> bool {
+        if self.is_trusted() {
+            return true;
+        }
+        !self.restricted_features.contains(&feature)
+    }
+
+    pub fn add_trusted_folder(&mut self, path: &str) {
+        self.trusted_folders.push(BaqTrustedFolder::new(path, true));
+    }
+
+    pub fn remove_trusted_folder(&mut self, path: &str) -> bool {
+        if let Some(idx) = self.trusted_folders.iter().position(|f| f.path == path) {
+            self.trusted_folders.remove(idx);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn trusted_folder_count(&self) -> usize {
+        self.trusted_folders.iter().filter(|f| f.parent_trust).count()
+    }
+
+    pub fn is_path_trusted(&self, path: &str) -> bool {
+        self.trusted_folders.iter().any(|f| f.parent_trust && f.contains_path(path))
+    }
+
+    pub fn status_text(&self) -> String {
+        format!("{} {}", self.state.icon(), self.state.label())
+    }
+
+    pub fn request_trust(&mut self) {
+        self.trust_requested = true;
+    }
+
+    pub fn restricted_feature_count(&self) -> usize {
+        if self.is_trusted() { 0 } else { self.restricted_features.len() }
+    }
+}
+
+#[cfg(test)]
+mod baq_tests {
+    use super::*;
+
+    #[test]
+    fn test_baq_trust_state() {
+        assert!(BaqTrustState::Trusted.is_trusted());
+        assert!(!BaqTrustState::Untrusted.is_trusted());
+        assert!(!BaqTrustState::Unknown.is_trusted());
+    }
+
+    #[test]
+    fn test_baq_trusted_folder() {
+        let f = BaqTrustedFolder::new("/home/user/projects", true);
+        assert!(f.contains_path("/home/user/projects/vsedit"));
+        assert!(!f.contains_path("/home/other"));
+    }
+
+    #[test]
+    fn test_baq_restricted_features() {
+        assert_eq!(BaqRestrictedFeature::Tasks.label(), "Tasks");
+        assert!(!BaqRestrictedFeature::Debugging.description().is_empty());
+    }
+
+    #[test]
+    fn test_baq_trust_lifecycle() {
+        let mut trust = BaqWorkspaceTrust::new();
+        assert_eq!(trust.state, BaqTrustState::Unknown);
+
+        trust.set_workspace("/home/user/project");
+        assert_eq!(trust.state, BaqTrustState::Unknown);
+
+        trust.grant_trust();
+        assert!(trust.is_trusted());
+        assert!(trust.is_feature_allowed(BaqRestrictedFeature::Tasks));
+    }
+
+    #[test]
+    fn test_baq_deny_trust() {
+        let mut trust = BaqWorkspaceTrust::new();
+        trust.set_workspace("/tmp/untrusted");
+        trust.deny_trust();
+        assert!(!trust.is_trusted());
+        assert!(!trust.is_feature_allowed(BaqRestrictedFeature::Tasks));
+        assert!(!trust.is_feature_allowed(BaqRestrictedFeature::Debugging));
+    }
+
+    #[test]
+    fn test_baq_trusted_folders() {
+        let mut trust = BaqWorkspaceTrust::new();
+        trust.add_trusted_folder("/home/user/projects");
+        assert_eq!(trust.trusted_folder_count(), 1);
+        assert!(trust.is_path_trusted("/home/user/projects/vsedit"));
+        assert!(!trust.is_path_trusted("/tmp/other"));
+    }
+
+    #[test]
+    fn test_baq_remove_folder() {
+        let mut trust = BaqWorkspaceTrust::new();
+        trust.add_trusted_folder("/home/user/projects");
+        assert!(trust.remove_trusted_folder("/home/user/projects"));
+        assert_eq!(trust.trusted_folder_count(), 0);
+        assert!(!trust.remove_trusted_folder("/nonexistent"));
+    }
+
+    #[test]
+    fn test_baq_resolve_trust() {
+        let mut trust = BaqWorkspaceTrust::new();
+        trust.add_trusted_folder("/home/user/safe");
+        trust.set_workspace("/home/user/safe/project");
+        assert_eq!(trust.state, BaqTrustState::Trusted);
+    }
+
+    #[test]
+    fn test_baq_status_text() {
+        let mut trust = BaqWorkspaceTrust::new();
+        trust.grant_trust();
+        let status = trust.status_text();
+        assert!(status.contains("Trusted"));
+    }
+
+    #[test]
+    fn test_baq_request_trust() {
+        let mut trust = BaqWorkspaceTrust::new();
+        assert!(!trust.trust_requested);
+        trust.request_trust();
+        assert!(trust.trust_requested);
+    }
+
+    #[test]
+    fn test_baq_restricted_count() {
+        let mut trust = BaqWorkspaceTrust::new();
+        assert!(trust.restricted_feature_count() > 0);
+        trust.grant_trust();
+        assert_eq!(trust.restricted_feature_count(), 0);
+    }
+
+    #[test]
+    fn test_baq_trust_state_labels() {
+        assert_eq!(BaqTrustState::Trusted.label(), "Trusted");
+        assert_eq!(BaqTrustState::Untrusted.label(), "Restricted Mode");
+    }
+}
