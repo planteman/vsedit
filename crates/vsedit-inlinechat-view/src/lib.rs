@@ -52819,3 +52819,376 @@ mod baq_tests {
         assert_eq!(BaqTrustState::Untrusted.label(), "Restricted Mode");
     }
 }
+
+
+// --- bar_: Editor rename/refactor model ---
+
+/// Type of refactoring operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BarRefactorKind {
+    Rename,
+    ExtractFunction,
+    ExtractVariable,
+    InlineVariable,
+    MoveFile,
+    OrganizeImports,
+    ConvertToNamedParameters,
+    EncapsulateField,
+}
+
+impl BarRefactorKind {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Rename => "Rename Symbol",
+            Self::ExtractFunction => "Extract Function",
+            Self::ExtractVariable => "Extract Variable",
+            Self::InlineVariable => "Inline Variable",
+            Self::MoveFile => "Move File",
+            Self::OrganizeImports => "Organize Imports",
+            Self::ConvertToNamedParameters => "Convert to Named Parameters",
+            Self::EncapsulateField => "Encapsulate Field",
+        }
+    }
+
+    pub fn is_rename(&self) -> bool {
+        matches!(self, Self::Rename)
+    }
+}
+
+/// A text edit within a single file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BarTextEdit {
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub new_text: String,
+}
+
+impl BarTextEdit {
+    pub fn new(start_line: u32, start_col: u32, end_line: u32, end_col: u32, new_text: &str) -> Self {
+        Self { start_line, start_col, end_line, end_col, new_text: new_text.to_string() }
+    }
+
+    pub fn is_insert(&self) -> bool {
+        self.start_line == self.end_line && self.start_col == self.end_col
+    }
+
+    pub fn is_delete(&self) -> bool {
+        self.new_text.is_empty()
+    }
+
+    pub fn is_replace(&self) -> bool {
+        !self.is_insert() && !self.is_delete()
+    }
+
+    pub fn spans_lines(&self) -> bool {
+        self.end_line > self.start_line
+    }
+}
+
+/// Edits for a single file in a workspace edit.
+#[derive(Debug, Clone)]
+pub struct BarFileEdit {
+    pub file_path: String,
+    pub edits: Vec<BarTextEdit>,
+    pub create_file: bool,
+    pub delete_file: bool,
+    pub rename_to: Option<String>,
+}
+
+impl BarFileEdit {
+    pub fn new(path: &str) -> Self {
+        Self {
+            file_path: path.to_string(),
+            edits: Vec::new(),
+            create_file: false,
+            delete_file: false,
+            rename_to: None,
+        }
+    }
+
+    pub fn add_edit(&mut self, edit: BarTextEdit) {
+        self.edits.push(edit);
+    }
+
+    pub fn edit_count(&self) -> usize {
+        self.edits.len()
+    }
+
+    pub fn is_file_operation(&self) -> bool {
+        self.create_file || self.delete_file || self.rename_to.is_some()
+    }
+
+    pub fn sort_edits_reverse(&mut self) {
+        self.edits.sort_by(|a, b| {
+            b.start_line.cmp(&a.start_line)
+                .then(b.start_col.cmp(&a.start_col))
+        });
+    }
+
+    pub fn filename(&self) -> &str {
+        self.file_path.rsplit('/').next().unwrap_or(&self.file_path)
+    }
+}
+
+/// A complete workspace edit (multiple files).
+#[derive(Debug, Clone)]
+pub struct BarWorkspaceEdit {
+    pub label: String,
+    pub file_edits: Vec<BarFileEdit>,
+    pub needs_confirmation: bool,
+}
+
+impl BarWorkspaceEdit {
+    pub fn new(label: &str) -> Self {
+        Self {
+            label: label.to_string(),
+            file_edits: Vec::new(),
+            needs_confirmation: false,
+        }
+    }
+
+    pub fn add_file_edit(&mut self, edit: BarFileEdit) {
+        self.file_edits.push(edit);
+    }
+
+    pub fn file_count(&self) -> usize {
+        self.file_edits.len()
+    }
+
+    pub fn total_edit_count(&self) -> usize {
+        self.file_edits.iter().map(|f| f.edit_count()).sum()
+    }
+
+    pub fn has_file_operations(&self) -> bool {
+        self.file_edits.iter().any(|f| f.is_file_operation())
+    }
+
+    pub fn affected_files(&self) -> Vec<&str> {
+        self.file_edits.iter().map(|f| f.file_path.as_str()).collect()
+    }
+
+    pub fn summary(&self) -> String {
+        let files = self.file_count();
+        let edits = self.total_edit_count();
+        format!("{}: {} edits across {} files", self.label, edits, files)
+    }
+}
+
+/// The rename widget model for inline renaming.
+#[derive(Debug, Clone)]
+pub struct BarRenameWidget {
+    pub old_name: String,
+    pub new_name: String,
+    pub file_path: String,
+    pub line: u32,
+    pub column: u32,
+    pub is_visible: bool,
+    pub preview_edits: Option<BarWorkspaceEdit>,
+    pub is_valid: bool,
+    pub error_message: Option<String>,
+}
+
+impl BarRenameWidget {
+    pub fn new(old_name: &str, file: &str, line: u32, col: u32) -> Self {
+        Self {
+            old_name: old_name.to_string(),
+            new_name: old_name.to_string(),
+            file_path: file.to_string(),
+            line,
+            column: col,
+            is_visible: true,
+            preview_edits: None,
+            is_valid: true,
+            error_message: None,
+        }
+    }
+
+    pub fn set_new_name(&mut self, name: &str) {
+        self.new_name = name.to_string();
+        self.validate();
+    }
+
+    fn validate(&mut self) {
+        if self.new_name.is_empty() {
+            self.is_valid = false;
+            self.error_message = Some("Name cannot be empty".to_string());
+        } else if self.new_name == self.old_name {
+            self.is_valid = false;
+            self.error_message = Some("Name is unchanged".to_string());
+        } else if self.new_name.contains(' ') {
+            self.is_valid = false;
+            self.error_message = Some("Name cannot contain spaces".to_string());
+        } else {
+            self.is_valid = true;
+            self.error_message = None;
+        }
+    }
+
+    pub fn has_changed(&self) -> bool {
+        self.new_name != self.old_name
+    }
+
+    pub fn set_preview(&mut self, edit: BarWorkspaceEdit) {
+        self.preview_edits = Some(edit);
+    }
+
+    pub fn preview_file_count(&self) -> usize {
+        self.preview_edits.as_ref().map(|e| e.file_count()).unwrap_or(0)
+    }
+
+    pub fn dismiss(&mut self) {
+        self.is_visible = false;
+    }
+
+    pub fn accept(&self) -> Option<&BarWorkspaceEdit> {
+        if self.is_valid && self.has_changed() {
+            self.preview_edits.as_ref()
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod bar_tests {
+    use super::*;
+
+    #[test]
+    fn test_bar_refactor_kind() {
+        assert!(BarRefactorKind::Rename.is_rename());
+        assert!(!BarRefactorKind::ExtractFunction.is_rename());
+        assert_eq!(BarRefactorKind::ExtractVariable.label(), "Extract Variable");
+    }
+
+    #[test]
+    fn test_bar_text_edit_types() {
+        let insert = BarTextEdit::new(5, 10, 5, 10, "hello");
+        assert!(insert.is_insert());
+
+        let delete = BarTextEdit::new(5, 0, 5, 10, "");
+        assert!(delete.is_delete());
+
+        let replace = BarTextEdit::new(5, 0, 5, 10, "new");
+        assert!(replace.is_replace());
+    }
+
+    #[test]
+    fn test_bar_text_edit_multiline() {
+        let edit = BarTextEdit::new(5, 0, 8, 10, "replacement");
+        assert!(edit.spans_lines());
+    }
+
+    #[test]
+    fn test_bar_file_edit() {
+        let mut fe = BarFileEdit::new("src/main.rs");
+        fe.add_edit(BarTextEdit::new(5, 0, 5, 3, "new_name"));
+        fe.add_edit(BarTextEdit::new(10, 0, 10, 3, "new_name"));
+        assert_eq!(fe.edit_count(), 2);
+        assert_eq!(fe.filename(), "main.rs");
+        assert!(!fe.is_file_operation());
+    }
+
+    #[test]
+    fn test_bar_file_edit_sort() {
+        let mut fe = BarFileEdit::new("test.rs");
+        fe.add_edit(BarTextEdit::new(5, 0, 5, 3, "a"));
+        fe.add_edit(BarTextEdit::new(20, 0, 20, 3, "b"));
+        fe.add_edit(BarTextEdit::new(10, 0, 10, 3, "c"));
+        fe.sort_edits_reverse();
+        assert_eq!(fe.edits[0].start_line, 20);
+        assert_eq!(fe.edits[2].start_line, 5);
+    }
+
+    #[test]
+    fn test_bar_file_operations() {
+        let mut fe = BarFileEdit::new("new.rs");
+        fe.create_file = true;
+        assert!(fe.is_file_operation());
+
+        let mut fe2 = BarFileEdit::new("old.rs");
+        fe2.rename_to = Some("renamed.rs".to_string());
+        assert!(fe2.is_file_operation());
+    }
+
+    #[test]
+    fn test_bar_workspace_edit() {
+        let mut we = BarWorkspaceEdit::new("Rename 'foo' to 'bar'");
+        let mut fe1 = BarFileEdit::new("a.rs");
+        fe1.add_edit(BarTextEdit::new(1, 0, 1, 3, "bar"));
+        let mut fe2 = BarFileEdit::new("b.rs");
+        fe2.add_edit(BarTextEdit::new(5, 0, 5, 3, "bar"));
+        fe2.add_edit(BarTextEdit::new(10, 0, 10, 3, "bar"));
+        we.add_file_edit(fe1);
+        we.add_file_edit(fe2);
+
+        assert_eq!(we.file_count(), 2);
+        assert_eq!(we.total_edit_count(), 3);
+        assert!(we.summary().contains("3 edits"));
+    }
+
+    #[test]
+    fn test_bar_rename_widget_creation() {
+        let widget = BarRenameWidget::new("old_name", "test.rs", 10, 5);
+        assert!(widget.is_visible);
+        assert_eq!(widget.old_name, "old_name");
+        assert_eq!(widget.new_name, "old_name");
+    }
+
+    #[test]
+    fn test_bar_rename_validation() {
+        let mut widget = BarRenameWidget::new("foo", "test.rs", 1, 0);
+
+        widget.set_new_name("");
+        assert!(!widget.is_valid);
+
+        widget.set_new_name("foo");
+        assert!(!widget.is_valid); // Unchanged
+
+        widget.set_new_name("has space");
+        assert!(!widget.is_valid);
+
+        widget.set_new_name("bar");
+        assert!(widget.is_valid);
+        assert!(widget.has_changed());
+    }
+
+    #[test]
+    fn test_bar_rename_accept() {
+        let mut widget = BarRenameWidget::new("foo", "test.rs", 1, 0);
+        widget.set_new_name("bar");
+        assert!(widget.accept().is_none()); // No preview yet
+
+        widget.set_preview(BarWorkspaceEdit::new("Rename foo to bar"));
+        assert!(widget.accept().is_some());
+    }
+
+    #[test]
+    fn test_bar_rename_dismiss() {
+        let mut widget = BarRenameWidget::new("foo", "test.rs", 1, 0);
+        widget.dismiss();
+        assert!(!widget.is_visible);
+    }
+
+    #[test]
+    fn test_bar_rename_preview_count() {
+        let mut widget = BarRenameWidget::new("foo", "test.rs", 1, 0);
+        assert_eq!(widget.preview_file_count(), 0);
+
+        let mut edit = BarWorkspaceEdit::new("test");
+        edit.add_file_edit(BarFileEdit::new("a.rs"));
+        edit.add_file_edit(BarFileEdit::new("b.rs"));
+        widget.set_preview(edit);
+        assert_eq!(widget.preview_file_count(), 2);
+    }
+
+    #[test]
+    fn test_bar_affected_files() {
+        let mut we = BarWorkspaceEdit::new("test");
+        we.add_file_edit(BarFileEdit::new("a.rs"));
+        we.add_file_edit(BarFileEdit::new("b.rs"));
+        let files = we.affected_files();
+        assert_eq!(files, vec!["a.rs", "b.rs"]);
+    }
+}
