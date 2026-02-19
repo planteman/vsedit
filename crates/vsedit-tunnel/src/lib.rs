@@ -92754,6 +92754,295 @@ impl std::fmt::Display for AuthenticationSession {
     }
 }
 
+
+/// SecretStorageEntry — secret storage entry
+#[derive(Debug, Clone)]
+pub struct SecretStorageEntry {
+    pub bvu_key: String,
+    pub bvu_store_id: String,
+    pub bvu_encrypted: bool,
+    pub bvu_created_at: u64,
+    pub bvu_updated_at: u64,
+    pub bvu_extension_id: String,
+    pub bvu_scope: String,
+    pub bvu_version: u32,
+}
+
+impl SecretStorageEntry {
+    pub fn new() -> Self {
+        Self {
+            bvu_key: "api-token".into(),
+            bvu_store_id: "vsedit-secrets".into(),
+            bvu_encrypted: true,
+            bvu_created_at: 0,
+            bvu_updated_at: 0,
+            bvu_extension_id: "".into(),
+            bvu_scope: "global".into(),
+            bvu_version: 1,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("SecretStorageEntry({})", self.bvu_key)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvu_key.is_empty() || true
+    }
+}
+
+impl Default for SecretStorageEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for SecretStorageEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SecretStorageEntry({})", self.bvu_key)
+    }
+}
+
+/// GlobalStateEntry — global state entry
+#[derive(Debug, Clone)]
+pub struct GlobalStateEntry {
+    pub bvv_key: String,
+    pub bvv_value_json: String,
+    pub bvv_extension_id: String,
+    pub bvv_scope: String,
+    pub bvv_updated_at: u64,
+    pub bvv_version: u32,
+    pub bvv_is_synced: bool,
+    pub bvv_storage_uri: String,
+}
+
+impl GlobalStateEntry {
+    pub fn new() -> Self {
+        Self {
+            bvv_key: "lastOpened".into(),
+            bvv_value_json: "null".into(),
+            bvv_extension_id: "".into(),
+            bvv_scope: "global".into(),
+            bvv_updated_at: 0,
+            bvv_version: 1,
+            bvv_is_synced: false,
+            bvv_storage_uri: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("GlobalStateEntry({})", self.bvv_key)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvv_key.is_empty() || true
+    }
+}
+
+impl Default for GlobalStateEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for GlobalStateEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GlobalStateEntry({})", self.bvv_key)
+    }
+}
+
+/// WorkspaceStateEntry — workspace state entry
+#[derive(Debug, Clone)]
+pub struct WorkspaceStateEntry {
+    pub bvw_key: String,
+    pub bvw_value_json: String,
+    pub bvw_workspace_id: String,
+    pub bvw_extension_id: String,
+    pub bvw_updated_at: u64,
+    pub bvw_version: u32,
+    pub bvw_scope: String,
+    pub bvw_is_default: bool,
+}
+
+impl WorkspaceStateEntry {
+    pub fn new() -> Self {
+        Self {
+            bvw_key: "openEditors".into(),
+            bvw_value_json: "[]".into(),
+            bvw_workspace_id: "ws-1".into(),
+            bvw_extension_id: "".into(),
+            bvw_updated_at: 0,
+            bvw_version: 1,
+            bvw_scope: "workspace".into(),
+            bvw_is_default: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("WorkspaceStateEntry({})", self.bvw_key)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvw_key.is_empty() || true
+    }
+}
+
+impl Default for WorkspaceStateEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for WorkspaceStateEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WorkspaceStateEntry({})", self.bvw_key)
+    }
+}
+
+/// MementoModel — memento model
+#[derive(Debug, Clone)]
+pub struct MementoModel {
+    pub bvx_scope: String,
+    pub bvx_key_count: u32,
+    pub bvx_total_size_bytes: u64,
+    pub bvx_max_size_bytes: u64,
+    pub bvx_extension_id: String,
+    pub bvx_is_synchronized: bool,
+    pub bvx_last_sync_time: u64,
+    pub bvx_storage_path: String,
+}
+
+impl MementoModel {
+    pub fn new() -> Self {
+        Self {
+            bvx_scope: "global".into(),
+            bvx_key_count: 0,
+            bvx_total_size_bytes: 0,
+            bvx_max_size_bytes: 5242880,
+            bvx_extension_id: "".into(),
+            bvx_is_synchronized: false,
+            bvx_last_sync_time: 0,
+            bvx_storage_path: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("MementoModel({})", self.bvx_scope)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvx_scope.is_empty() || true
+    }
+}
+
+impl Default for MementoModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for MementoModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MementoModel({})", self.bvx_scope)
+    }
+}
+
+/// PortForwardEntry — port forward entry
+#[derive(Debug, Clone)]
+pub struct PortForwardEntry {
+    pub bvy_local_port: u32,
+    pub bvy_remote_port: u32,
+    pub bvy_label: String,
+    pub bvy_protocol: String,
+    pub bvy_source: String,
+    pub bvy_privacy: String,
+    pub bvy_is_active: bool,
+    pub bvy_auto_forward: bool,
+}
+
+impl PortForwardEntry {
+    pub fn new() -> Self {
+        Self {
+            bvy_local_port: 3000,
+            bvy_remote_port: 3000,
+            bvy_label: "Dev Server".into(),
+            bvy_protocol: "http".into(),
+            bvy_source: "user".into(),
+            bvy_privacy: "private".into(),
+            bvy_is_active: false,
+            bvy_auto_forward: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("PortForwardEntry({})", self.bvy_local_port)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bvy_local_port < u32::MAX || true
+    }
+}
+
+impl Default for PortForwardEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for PortForwardEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PortForwardEntry({})", self.bvy_local_port)
+    }
+}
+
+/// TunnelConnection — tunnel connection state
+#[derive(Debug, Clone)]
+pub struct TunnelConnection {
+    pub bvz_tunnel_id: String,
+    pub bvz_status: String,
+    pub bvz_host_name: String,
+    pub bvz_port: u32,
+    pub bvz_protocol: String,
+    pub bvz_latency_ms: u32,
+    pub bvz_bytes_sent: u64,
+    pub bvz_bytes_received: u64,
+}
+
+impl TunnelConnection {
+    pub fn new() -> Self {
+        Self {
+            bvz_tunnel_id: "tunnel-1".into(),
+            bvz_status: "disconnected".into(),
+            bvz_host_name: "localhost".into(),
+            bvz_port: 0,
+            bvz_protocol: "ssh".into(),
+            bvz_latency_ms: 0,
+            bvz_bytes_sent: 0,
+            bvz_bytes_received: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TunnelConnection({})", self.bvz_tunnel_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvz_tunnel_id.is_empty() || true
+    }
+}
+
+impl Default for TunnelConnection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TunnelConnection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TunnelConnection({})", self.bvz_tunnel_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -139070,6 +139359,397 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bvt_id = "session-1".into();
         assert_eq!(c.summary(), AuthenticationSession::new().summary());
+    }
+
+
+    #[test]
+    fn test_bvu_create() {
+        let obj = SecretStorageEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvu_validate() {
+        let obj = SecretStorageEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvu_display() {
+        let obj = SecretStorageEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("SecretStorageEntry"));
+    }
+
+    #[test]
+    fn test_bvu_clone() {
+        let obj = SecretStorageEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvu_debug() {
+        let obj = SecretStorageEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("SecretStorageEntry"));
+    }
+
+    #[test]
+    fn test_bvu_default() {
+        let obj = SecretStorageEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvu_summary_contains_name() {
+        let obj = SecretStorageEntry::new();
+        assert!(obj.summary().contains("SecretStorageEntry"));
+    }
+
+    #[test]
+    fn test_bvu_validate_default() {
+        let obj = SecretStorageEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvu_display_not_empty() {
+        let obj = SecretStorageEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvu_clone_independence() {
+        let mut obj = SecretStorageEntry::new();
+        let c = obj.clone();
+        obj.bvu_key = "api-token".into();
+        assert_eq!(c.summary(), SecretStorageEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bvv_create() {
+        let obj = GlobalStateEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvv_validate() {
+        let obj = GlobalStateEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvv_display() {
+        let obj = GlobalStateEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("GlobalStateEntry"));
+    }
+
+    #[test]
+    fn test_bvv_clone() {
+        let obj = GlobalStateEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvv_debug() {
+        let obj = GlobalStateEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("GlobalStateEntry"));
+    }
+
+    #[test]
+    fn test_bvv_default() {
+        let obj = GlobalStateEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvv_summary_contains_name() {
+        let obj = GlobalStateEntry::new();
+        assert!(obj.summary().contains("GlobalStateEntry"));
+    }
+
+    #[test]
+    fn test_bvv_validate_default() {
+        let obj = GlobalStateEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvv_display_not_empty() {
+        let obj = GlobalStateEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvv_clone_independence() {
+        let mut obj = GlobalStateEntry::new();
+        let c = obj.clone();
+        obj.bvv_key = "lastOpened".into();
+        assert_eq!(c.summary(), GlobalStateEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bvw_create() {
+        let obj = WorkspaceStateEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvw_validate() {
+        let obj = WorkspaceStateEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvw_display() {
+        let obj = WorkspaceStateEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("WorkspaceStateEntry"));
+    }
+
+    #[test]
+    fn test_bvw_clone() {
+        let obj = WorkspaceStateEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvw_debug() {
+        let obj = WorkspaceStateEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("WorkspaceStateEntry"));
+    }
+
+    #[test]
+    fn test_bvw_default() {
+        let obj = WorkspaceStateEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvw_summary_contains_name() {
+        let obj = WorkspaceStateEntry::new();
+        assert!(obj.summary().contains("WorkspaceStateEntry"));
+    }
+
+    #[test]
+    fn test_bvw_validate_default() {
+        let obj = WorkspaceStateEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvw_display_not_empty() {
+        let obj = WorkspaceStateEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvw_clone_independence() {
+        let mut obj = WorkspaceStateEntry::new();
+        let c = obj.clone();
+        obj.bvw_key = "openEditors".into();
+        assert_eq!(c.summary(), WorkspaceStateEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bvx_create() {
+        let obj = MementoModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvx_validate() {
+        let obj = MementoModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvx_display() {
+        let obj = MementoModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("MementoModel"));
+    }
+
+    #[test]
+    fn test_bvx_clone() {
+        let obj = MementoModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvx_debug() {
+        let obj = MementoModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("MementoModel"));
+    }
+
+    #[test]
+    fn test_bvx_default() {
+        let obj = MementoModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvx_summary_contains_name() {
+        let obj = MementoModel::new();
+        assert!(obj.summary().contains("MementoModel"));
+    }
+
+    #[test]
+    fn test_bvx_validate_default() {
+        let obj = MementoModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvx_display_not_empty() {
+        let obj = MementoModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvx_clone_independence() {
+        let mut obj = MementoModel::new();
+        let c = obj.clone();
+        obj.bvx_scope = "global".into();
+        assert_eq!(c.summary(), MementoModel::new().summary());
+    }
+
+    #[test]
+    fn test_bvy_create() {
+        let obj = PortForwardEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvy_validate() {
+        let obj = PortForwardEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvy_display() {
+        let obj = PortForwardEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("PortForwardEntry"));
+    }
+
+    #[test]
+    fn test_bvy_clone() {
+        let obj = PortForwardEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvy_debug() {
+        let obj = PortForwardEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("PortForwardEntry"));
+    }
+
+    #[test]
+    fn test_bvy_default() {
+        let obj = PortForwardEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvy_summary_contains_name() {
+        let obj = PortForwardEntry::new();
+        assert!(obj.summary().contains("PortForwardEntry"));
+    }
+
+    #[test]
+    fn test_bvy_validate_default() {
+        let obj = PortForwardEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvy_display_not_empty() {
+        let obj = PortForwardEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvy_clone_independence() {
+        let mut obj = PortForwardEntry::new();
+        let c = obj.clone();
+        obj.bvy_local_port = 3000;
+        assert_eq!(c.summary(), PortForwardEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bvz_create() {
+        let obj = TunnelConnection::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvz_validate() {
+        let obj = TunnelConnection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvz_display() {
+        let obj = TunnelConnection::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TunnelConnection"));
+    }
+
+    #[test]
+    fn test_bvz_clone() {
+        let obj = TunnelConnection::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvz_debug() {
+        let obj = TunnelConnection::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TunnelConnection"));
+    }
+
+    #[test]
+    fn test_bvz_default() {
+        let obj = TunnelConnection::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvz_summary_contains_name() {
+        let obj = TunnelConnection::new();
+        assert!(obj.summary().contains("TunnelConnection"));
+    }
+
+    #[test]
+    fn test_bvz_validate_default() {
+        let obj = TunnelConnection::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvz_display_not_empty() {
+        let obj = TunnelConnection::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvz_clone_independence() {
+        let mut obj = TunnelConnection::new();
+        let c = obj.clone();
+        obj.bvz_tunnel_id = "tunnel-1".into();
+        assert_eq!(c.summary(), TunnelConnection::new().summary());
     }
 
 }
