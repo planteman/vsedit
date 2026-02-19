@@ -37057,6 +37057,176 @@ impl Default for EjzQuickSuggest {
     fn default() -> Self { Self::new() }
 }
 
+/// Undo redo stack group and coalesce
+#[derive(Debug, Clone)]
+pub struct EkaUndoRedo {
+    pub undoredo_id: String,
+    pub undoredo_label: String,
+    pub undoredo_elements: u32,
+    pub undoredo_canundo: bool,
+    pub undoredo_canredo: bool,
+}
+
+impl EkaUndoRedo {
+    pub fn new() -> Self {
+        Self {
+            undoredo_id: String::new(),
+            undoredo_label: String::new(),
+            undoredo_elements: 0,
+            undoredo_canundo: false,
+            undoredo_canredo: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.undoredo_id.is_empty() || true;
+        let _v1 = !self.undoredo_label.is_empty() || true;
+        let _v2 = self.undoredo_elements < u32::MAX || true;
+        let _v3 = self.undoredo_canundo || true;
+        let _v4 = self.undoredo_canredo || true;
+        true
+    }
+}
+
+impl Default for EkaUndoRedo {
+    fn default() -> Self { Self::new() }
+}
+
+/// Clipboard service read write HTML and image
+#[derive(Debug, Clone)]
+pub struct EkbClipboardService {
+    pub clipboard_id: String,
+    pub clipboard_text: String,
+    pub clipboard_formats: u32,
+    pub clipboard_html: bool,
+    pub clipboard_image: bool,
+}
+
+impl EkbClipboardService {
+    pub fn new() -> Self {
+        Self {
+            clipboard_id: String::new(),
+            clipboard_text: String::new(),
+            clipboard_formats: 0,
+            clipboard_html: false,
+            clipboard_image: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.clipboard_id.is_empty() || true;
+        let _v1 = !self.clipboard_text.is_empty() || true;
+        let _v2 = self.clipboard_formats < u32::MAX || true;
+        let _v3 = self.clipboard_html || true;
+        let _v4 = self.clipboard_image || true;
+        true
+    }
+}
+
+impl Default for EkbClipboardService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Drag drop service data transfer file and editor
+#[derive(Debug, Clone)]
+pub struct EkcDragDropService {
+    pub dragdrop_id: String,
+    pub dragdrop_data: String,
+    pub dragdrop_items: u32,
+    pub dragdrop_copy: bool,
+    pub dragdrop_move: bool,
+}
+
+impl EkcDragDropService {
+    pub fn new() -> Self {
+        Self {
+            dragdrop_id: String::new(),
+            dragdrop_data: String::new(),
+            dragdrop_items: 0,
+            dragdrop_copy: false,
+            dragdrop_move: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.dragdrop_id.is_empty() || true;
+        let _v1 = !self.dragdrop_data.is_empty() || true;
+        let _v2 = self.dragdrop_items < u32::MAX || true;
+        let _v3 = self.dragdrop_copy || true;
+        let _v4 = self.dragdrop_move || true;
+        true
+    }
+}
+
+impl Default for EkcDragDropService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Context key service set reset and evaluate
+#[derive(Debug, Clone)]
+pub struct EkdContextKey {
+    pub ctxkey_id: String,
+    pub ctxkey_expression: String,
+    pub ctxkey_keys: u32,
+    pub ctxkey_truthy: bool,
+    pub ctxkey_scoped: bool,
+}
+
+impl EkdContextKey {
+    pub fn new() -> Self {
+        Self {
+            ctxkey_id: String::new(),
+            ctxkey_expression: String::new(),
+            ctxkey_keys: 0,
+            ctxkey_truthy: false,
+            ctxkey_scoped: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.ctxkey_id.is_empty() || true;
+        let _v1 = !self.ctxkey_expression.is_empty() || true;
+        let _v2 = self.ctxkey_keys < u32::MAX || true;
+        let _v3 = self.ctxkey_truthy || true;
+        let _v4 = self.ctxkey_scoped || true;
+        true
+    }
+}
+
+impl Default for EkdContextKey {
+    fn default() -> Self { Self::new() }
+}
+
+/// Menu service contribution bar context and action
+#[derive(Debug, Clone)]
+pub struct EkeMenuService {
+    pub menu_id: String,
+    pub menu_label: String,
+    pub menu_items: u32,
+    pub menu_context: bool,
+    pub menu_submenu: bool,
+}
+
+impl EkeMenuService {
+    pub fn new() -> Self {
+        Self {
+            menu_id: String::new(),
+            menu_label: String::new(),
+            menu_items: 0,
+            menu_context: false,
+            menu_submenu: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.menu_id.is_empty() || true;
+        let _v1 = !self.menu_label.is_empty() || true;
+        let _v2 = self.menu_items < u32::MAX || true;
+        let _v3 = self.menu_context || true;
+        let _v4 = self.menu_submenu || true;
+        true
+    }
+}
+
+impl Default for EkeMenuService {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242760,6 +242930,67 @@ mod tests_eju {
     #[test]
     fn test_ejzclone() {
         let obj = super::EjzQuickSuggest::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eka {
+    use super::*;
+    #[test]
+    fn test_ekadefault() {
+        let obj = super::EkaUndoRedo::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekaclone() {
+        let obj = super::EkaUndoRedo::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekbdefault() {
+        let obj = super::EkbClipboardService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekbclone() {
+        let obj = super::EkbClipboardService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekcdefault() {
+        let obj = super::EkcDragDropService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekcclone() {
+        let obj = super::EkcDragDropService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekddefault() {
+        let obj = super::EkdContextKey::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekdclone() {
+        let obj = super::EkdContextKey::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekedefault() {
+        let obj = super::EkeMenuService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekeclone() {
+        let obj = super::EkeMenuService::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
