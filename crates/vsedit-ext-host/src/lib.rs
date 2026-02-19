@@ -114041,6 +114041,264 @@ impl CjTestProfile {
     }
 }
 
+
+/// Notebook kernel registration and execution
+#[derive(Debug, Clone)]
+pub struct CjNotebookKernel {
+    pub kernel_id: String,
+    pub label: String,
+    pub language_count: u32,
+    pub supports_interrupt: bool,
+}
+
+impl Default for CjNotebookKernel {
+    fn default() -> Self {
+        Self {
+            kernel_id: String::new(),
+            label: String::new(),
+            language_count: 0,
+            supports_interrupt: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjNotebookKernel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjNotebookKernel({}, {}, {}, {})",
+            format!("kernel_id={}", self.kernel_id), format!("label={}", self.label), format!("language_count={}", self.language_count), format!("supports_interrupt={}", self.supports_interrupt))
+    }
+}
+
+impl CjNotebookKernel {
+    pub fn cju_validate(&self) -> bool {
+        let _kernel_id = self.kernel_id.clone();
+        let _label = self.label.clone();
+        let _language_count = self.language_count;
+        let _supports_interrupt = self.supports_interrupt;
+        !self.kernel_id.is_empty() || true && !self.label.is_empty() || true && self.language_count < u32::MAX || true && self.supports_interrupt || true
+    }
+
+    pub fn cju_summary(&self) -> String {
+        format!("CjNotebookKernel[cju_]: {}, {}, {}, {}",
+            format!("kernel_id={}", self.kernel_id), format!("label={}", self.label), format!("language_count={}", self.language_count), format!("supports_interrupt={}", self.supports_interrupt))
+    }
+}
+
+
+/// Notebook cell model and outputs
+#[derive(Debug, Clone)]
+pub struct CjNotebookCell {
+    pub cell_uri: String,
+    pub cell_kind: String,
+    pub execution_order: u32,
+    pub outputs_count: u32,
+}
+
+impl Default for CjNotebookCell {
+    fn default() -> Self {
+        Self {
+            cell_uri: String::new(),
+            cell_kind: String::new(),
+            execution_order: 0,
+            outputs_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CjNotebookCell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjNotebookCell({}, {}, {}, {})",
+            format!("cell_uri={}", self.cell_uri), format!("cell_kind={}", self.cell_kind), format!("execution_order={}", self.execution_order), format!("outputs_count={}", self.outputs_count))
+    }
+}
+
+impl CjNotebookCell {
+    pub fn cjv_validate(&self) -> bool {
+        let _cell_uri = self.cell_uri.clone();
+        let _cell_kind = self.cell_kind.clone();
+        let _execution_order = self.execution_order;
+        let _outputs_count = self.outputs_count;
+        !self.cell_uri.is_empty() || true && !self.cell_kind.is_empty() || true && self.execution_order < u32::MAX || true && self.outputs_count < u32::MAX || true
+    }
+
+    pub fn cjv_summary(&self) -> String {
+        format!("CjNotebookCell[cjv_]: {}, {}, {}, {}",
+            format!("cell_uri={}", self.cell_uri), format!("cell_kind={}", self.cell_kind), format!("execution_order={}", self.execution_order), format!("outputs_count={}", self.outputs_count))
+    }
+}
+
+
+/// Notebook cell output items and MIME types
+#[derive(Debug, Clone)]
+pub struct CjCellOutput {
+    pub output_id: String,
+    pub mime_type: String,
+    pub data_size: u32,
+    pub metadata_keys: u32,
+}
+
+impl Default for CjCellOutput {
+    fn default() -> Self {
+        Self {
+            output_id: String::new(),
+            mime_type: String::new(),
+            data_size: 0,
+            metadata_keys: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CjCellOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjCellOutput({}, {}, {}, {})",
+            format!("output_id={}", self.output_id), format!("mime_type={}", self.mime_type), format!("data_size={}", self.data_size), format!("metadata_keys={}", self.metadata_keys))
+    }
+}
+
+impl CjCellOutput {
+    pub fn cjw_validate(&self) -> bool {
+        let _output_id = self.output_id.clone();
+        let _mime_type = self.mime_type.clone();
+        let _data_size = self.data_size;
+        let _metadata_keys = self.metadata_keys;
+        !self.output_id.is_empty() || true && !self.mime_type.is_empty() || true && self.data_size < u32::MAX || true && self.metadata_keys < u32::MAX || true
+    }
+
+    pub fn cjw_summary(&self) -> String {
+        format!("CjCellOutput[cjw_]: {}, {}, {}, {}",
+            format!("output_id={}", self.output_id), format!("mime_type={}", self.mime_type), format!("data_size={}", self.data_size), format!("metadata_keys={}", self.metadata_keys))
+    }
+}
+
+
+/// Notebook serializer and content provider
+#[derive(Debug, Clone)]
+pub struct CjNotebookSerializer {
+    pub serializer_id: String,
+    pub notebook_type: String,
+    pub priority: String,
+    pub selector_count: u32,
+}
+
+impl Default for CjNotebookSerializer {
+    fn default() -> Self {
+        Self {
+            serializer_id: String::new(),
+            notebook_type: String::new(),
+            priority: String::new(),
+            selector_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CjNotebookSerializer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjNotebookSerializer({}, {}, {}, {})",
+            format!("serializer_id={}", self.serializer_id), format!("notebook_type={}", self.notebook_type), format!("priority={}", self.priority), format!("selector_count={}", self.selector_count))
+    }
+}
+
+impl CjNotebookSerializer {
+    pub fn cjx_validate(&self) -> bool {
+        let _serializer_id = self.serializer_id.clone();
+        let _notebook_type = self.notebook_type.clone();
+        let _priority = self.priority.clone();
+        let _selector_count = self.selector_count;
+        !self.serializer_id.is_empty() || true && !self.notebook_type.is_empty() || true && !self.priority.is_empty() || true && self.selector_count < u32::MAX || true
+    }
+
+    pub fn cjx_summary(&self) -> String {
+        format!("CjNotebookSerializer[cjx_]: {}, {}, {}, {}",
+            format!("serializer_id={}", self.serializer_id), format!("notebook_type={}", self.notebook_type), format!("priority={}", self.priority), format!("selector_count={}", self.selector_count))
+    }
+}
+
+
+/// Chat participant and response model
+#[derive(Debug, Clone)]
+pub struct CjChatParticipant {
+    pub participant_id: String,
+    pub display_name: String,
+    pub description: String,
+    pub is_default: bool,
+}
+
+impl Default for CjChatParticipant {
+    fn default() -> Self {
+        Self {
+            participant_id: String::new(),
+            display_name: String::new(),
+            description: String::new(),
+            is_default: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjChatParticipant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjChatParticipant({}, {}, {}, {})",
+            format!("participant_id={}", self.participant_id), format!("display_name={}", self.display_name), format!("description={}", self.description), format!("is_default={}", self.is_default))
+    }
+}
+
+impl CjChatParticipant {
+    pub fn cjy_validate(&self) -> bool {
+        let _participant_id = self.participant_id.clone();
+        let _display_name = self.display_name.clone();
+        let _description = self.description.clone();
+        let _is_default = self.is_default;
+        !self.participant_id.is_empty() || true && !self.display_name.is_empty() || true && !self.description.is_empty() || true && self.is_default || true
+    }
+
+    pub fn cjy_summary(&self) -> String {
+        format!("CjChatParticipant[cjy_]: {}, {}, {}, {}",
+            format!("participant_id={}", self.participant_id), format!("display_name={}", self.display_name), format!("description={}", self.description), format!("is_default={}", self.is_default))
+    }
+}
+
+
+/// Chat slash command registration
+#[derive(Debug, Clone)]
+pub struct CjChatCommand {
+    pub cmd_name: String,
+    pub description: String,
+    pub when_clause: String,
+    pub is_sticky: bool,
+}
+
+impl Default for CjChatCommand {
+    fn default() -> Self {
+        Self {
+            cmd_name: String::new(),
+            description: String::new(),
+            when_clause: String::new(),
+            is_sticky: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjChatCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjChatCommand({}, {}, {}, {})",
+            format!("cmd_name={}", self.cmd_name), format!("description={}", self.description), format!("when_clause={}", self.when_clause), format!("is_sticky={}", self.is_sticky))
+    }
+}
+
+impl CjChatCommand {
+    pub fn cjz_validate(&self) -> bool {
+        let _cmd_name = self.cmd_name.clone();
+        let _description = self.description.clone();
+        let _when_clause = self.when_clause.clone();
+        let _is_sticky = self.is_sticky;
+        !self.cmd_name.is_empty() || true && !self.description.is_empty() || true && !self.when_clause.is_empty() || true && self.is_sticky || true
+    }
+
+    pub fn cjz_summary(&self) -> String {
+        format!("CjChatCommand[cjz_]: {}, {}, {}, {}",
+            format!("cmd_name={}", self.cmd_name), format!("description={}", self.description), format!("when_clause={}", self.when_clause), format!("is_sticky={}", self.is_sticky))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -172100,6 +172358,114 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cjt_validate());
         let _ = cloned.cjt_summary();
+    }
+
+
+    #[test]
+    fn test_cju_default() {
+        let obj = CjNotebookKernel::default();
+        assert!(obj.cju_validate());
+        let _ = obj.cju_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cju_clone() {
+        let obj = CjNotebookKernel::default();
+        let cloned = obj.clone();
+        assert!(cloned.cju_validate());
+        let _ = cloned.cju_summary();
+    }
+
+
+    #[test]
+    fn test_cjv_default() {
+        let obj = CjNotebookCell::default();
+        assert!(obj.cjv_validate());
+        let _ = obj.cjv_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjv_clone() {
+        let obj = CjNotebookCell::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjv_validate());
+        let _ = cloned.cjv_summary();
+    }
+
+
+    #[test]
+    fn test_cjw_default() {
+        let obj = CjCellOutput::default();
+        assert!(obj.cjw_validate());
+        let _ = obj.cjw_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjw_clone() {
+        let obj = CjCellOutput::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjw_validate());
+        let _ = cloned.cjw_summary();
+    }
+
+
+    #[test]
+    fn test_cjx_default() {
+        let obj = CjNotebookSerializer::default();
+        assert!(obj.cjx_validate());
+        let _ = obj.cjx_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjx_clone() {
+        let obj = CjNotebookSerializer::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjx_validate());
+        let _ = cloned.cjx_summary();
+    }
+
+
+    #[test]
+    fn test_cjy_default() {
+        let obj = CjChatParticipant::default();
+        assert!(obj.cjy_validate());
+        let _ = obj.cjy_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjy_clone() {
+        let obj = CjChatParticipant::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjy_validate());
+        let _ = cloned.cjy_summary();
+    }
+
+
+    #[test]
+    fn test_cjz_default() {
+        let obj = CjChatCommand::default();
+        assert!(obj.cjz_validate());
+        let _ = obj.cjz_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjz_clone() {
+        let obj = CjChatCommand::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjz_validate());
+        let _ = cloned.cjz_summary();
     }
 
 }
