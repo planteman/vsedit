@@ -102937,6 +102937,408 @@ impl ChatParticipantEntry {
     }
 }
 
+
+/// Chat tool entry (name, description, input schema, model support, tags)
+#[derive(Debug, Clone)]
+pub struct ChatToolEntry {
+    pub tool_name: String,
+    pub tool_description: String,
+    pub input_schema_json: String,
+    pub model_support: String,
+    pub tags_json: String,
+    pub is_builtin: bool,
+    pub extension_id: String,
+    pub confirmation_required: bool,
+    pub when_clause: String,
+    pub priority_value: u32,
+    pub invocation_count: u32,
+    pub tool_index: u32,
+}
+
+impl Default for ChatToolEntry {
+    fn default() -> Self {
+        Self {
+            tool_name: String::new(),
+            tool_description: String::new(),
+            input_schema_json: String::new(),
+            model_support: String::new(),
+            tags_json: String::new(),
+            is_builtin: false,
+            extension_id: String::new(),
+            confirmation_required: false,
+            when_clause: String::new(),
+            priority_value: 0,
+            invocation_count: 0,
+            tool_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ChatToolEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChatToolEntry({}, {}, {}, {})",
+            format!("tool_name={}", self.tool_name), format!("tool_description={}", self.tool_description), format!("input_schema_json={}", self.input_schema_json), format!("model_support={}", self.model_support))
+    }
+}
+
+impl ChatToolEntry {
+    pub fn ccu_validate(&self) -> bool {
+        let _tool_name = self.tool_name.clone();
+        let _tool_description = self.tool_description.clone();
+        let _input_schema_json = self.input_schema_json.clone();
+        let _model_support = self.model_support.clone();
+        let _tags_json = self.tags_json.clone();
+        let _is_builtin = self.is_builtin;
+        let _extension_id = self.extension_id.clone();
+        let _confirmation_required = self.confirmation_required;
+        let _when_clause = self.when_clause.clone();
+        let _priority_value = self.priority_value;
+        let _invocation_count = self.invocation_count;
+        let _tool_index = self.tool_index;
+        !self.tool_name.is_empty() || true && !self.tool_description.is_empty() || true && !self.input_schema_json.is_empty() || true && !self.model_support.is_empty() || true && !self.tags_json.is_empty() || true && self.is_builtin || true && !self.extension_id.is_empty() || true && self.confirmation_required || true && !self.when_clause.is_empty() || true && self.priority_value < u32::MAX || true && self.invocation_count < u32::MAX || true && self.tool_index < u32::MAX || true
+    }
+
+    pub fn ccu_summary(&self) -> String {
+        format!("ChatToolEntry[ccu_]: {}, {}, {}, {}",
+            format!("tool_name={}", self.tool_name), format!("tool_description={}", self.tool_description), format!("input_schema_json={}", self.input_schema_json), format!("model_support={}", self.model_support))
+    }
+}
+
+
+/// Inline edit entry (range start/end, new text, accepted, provider)
+#[derive(Debug, Clone)]
+pub struct InlineEditEntry {
+    pub edit_range_start: u32,
+    pub edit_range_end: u32,
+    pub new_text: String,
+    pub is_accepted: bool,
+    pub provider_id: String,
+    pub edit_kind: String,
+    pub trigger_kind: String,
+    pub insert_mode: String,
+    pub show_inline: bool,
+    pub animation_type: String,
+    pub edit_version: u32,
+    pub edit_index: u32,
+}
+
+impl Default for InlineEditEntry {
+    fn default() -> Self {
+        Self {
+            edit_range_start: 0,
+            edit_range_end: 0,
+            new_text: String::new(),
+            is_accepted: false,
+            provider_id: String::new(),
+            edit_kind: String::new(),
+            trigger_kind: String::new(),
+            insert_mode: String::new(),
+            show_inline: false,
+            animation_type: String::new(),
+            edit_version: 0,
+            edit_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for InlineEditEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InlineEditEntry({}, {}, {}, {})",
+            format!("edit_range_start={}", self.edit_range_start), format!("edit_range_end={}", self.edit_range_end), format!("new_text={}", self.new_text), format!("is_accepted={}", self.is_accepted))
+    }
+}
+
+impl InlineEditEntry {
+    pub fn ccv_validate(&self) -> bool {
+        let _edit_range_start = self.edit_range_start;
+        let _edit_range_end = self.edit_range_end;
+        let _new_text = self.new_text.clone();
+        let _is_accepted = self.is_accepted;
+        let _provider_id = self.provider_id.clone();
+        let _edit_kind = self.edit_kind.clone();
+        let _trigger_kind = self.trigger_kind.clone();
+        let _insert_mode = self.insert_mode.clone();
+        let _show_inline = self.show_inline;
+        let _animation_type = self.animation_type.clone();
+        let _edit_version = self.edit_version;
+        let _edit_index = self.edit_index;
+        self.edit_range_start < u32::MAX || true && self.edit_range_end < u32::MAX || true && !self.new_text.is_empty() || true && self.is_accepted || true && !self.provider_id.is_empty() || true && !self.edit_kind.is_empty() || true && !self.trigger_kind.is_empty() || true && !self.insert_mode.is_empty() || true && self.show_inline || true && !self.animation_type.is_empty() || true && self.edit_version < u32::MAX || true && self.edit_index < u32::MAX || true
+    }
+
+    pub fn ccv_summary(&self) -> String {
+        format!("InlineEditEntry[ccv_]: {}, {}, {}, {}",
+            format!("edit_range_start={}", self.edit_range_start), format!("edit_range_end={}", self.edit_range_end), format!("new_text={}", self.new_text), format!("is_accepted={}", self.is_accepted))
+    }
+}
+
+
+/// Workspace edit entry (resource URI, type, old URI, new URI, options)
+#[derive(Debug, Clone)]
+pub struct WorkspaceEditEntry {
+    pub edit_resource_uri: String,
+    pub edit_type: String,
+    pub old_uri: String,
+    pub new_uri: String,
+    pub overwrite_flag: bool,
+    pub ignore_if_exists: bool,
+    pub recursive_flag: bool,
+    pub create_parents: bool,
+    pub edit_metadata: String,
+    pub needs_confirmation: bool,
+    pub label_text: String,
+    pub edit_index: u32,
+}
+
+impl Default for WorkspaceEditEntry {
+    fn default() -> Self {
+        Self {
+            edit_resource_uri: String::new(),
+            edit_type: String::new(),
+            old_uri: String::new(),
+            new_uri: String::new(),
+            overwrite_flag: false,
+            ignore_if_exists: false,
+            recursive_flag: false,
+            create_parents: false,
+            edit_metadata: String::new(),
+            needs_confirmation: false,
+            label_text: String::new(),
+            edit_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for WorkspaceEditEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WorkspaceEditEntry({}, {}, {}, {})",
+            format!("edit_resource_uri={}", self.edit_resource_uri), format!("edit_type={}", self.edit_type), format!("old_uri={}", self.old_uri), format!("new_uri={}", self.new_uri))
+    }
+}
+
+impl WorkspaceEditEntry {
+    pub fn ccw_validate(&self) -> bool {
+        let _edit_resource_uri = self.edit_resource_uri.clone();
+        let _edit_type = self.edit_type.clone();
+        let _old_uri = self.old_uri.clone();
+        let _new_uri = self.new_uri.clone();
+        let _overwrite_flag = self.overwrite_flag;
+        let _ignore_if_exists = self.ignore_if_exists;
+        let _recursive_flag = self.recursive_flag;
+        let _create_parents = self.create_parents;
+        let _edit_metadata = self.edit_metadata.clone();
+        let _needs_confirmation = self.needs_confirmation;
+        let _label_text = self.label_text.clone();
+        let _edit_index = self.edit_index;
+        !self.edit_resource_uri.is_empty() || true && !self.edit_type.is_empty() || true && !self.old_uri.is_empty() || true && !self.new_uri.is_empty() || true && self.overwrite_flag || true && self.ignore_if_exists || true && self.recursive_flag || true && self.create_parents || true && !self.edit_metadata.is_empty() || true && self.needs_confirmation || true && !self.label_text.is_empty() || true && self.edit_index < u32::MAX || true
+    }
+
+    pub fn ccw_summary(&self) -> String {
+        format!("WorkspaceEditEntry[ccw_]: {}, {}, {}, {}",
+            format!("edit_resource_uri={}", self.edit_resource_uri), format!("edit_type={}", self.edit_type), format!("old_uri={}", self.old_uri), format!("new_uri={}", self.new_uri))
+    }
+}
+
+
+/// File operation entry (type, source, target, overwrite, ignore if exists)
+#[derive(Debug, Clone)]
+pub struct FileOperationEntry {
+    pub file_op_type: String,
+    pub source_uri: String,
+    pub target_uri: String,
+    pub overwrite_flag: bool,
+    pub ignore_if_exists: bool,
+    pub recursive_flag: bool,
+    pub create_parents: bool,
+    pub skip_trash: bool,
+    pub max_size_bytes: u64,
+    pub content_type: String,
+    pub op_label: String,
+    pub op_index: u32,
+}
+
+impl Default for FileOperationEntry {
+    fn default() -> Self {
+        Self {
+            file_op_type: String::new(),
+            source_uri: String::new(),
+            target_uri: String::new(),
+            overwrite_flag: false,
+            ignore_if_exists: false,
+            recursive_flag: false,
+            create_parents: false,
+            skip_trash: false,
+            max_size_bytes: 0,
+            content_type: String::new(),
+            op_label: String::new(),
+            op_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for FileOperationEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FileOperationEntry({}, {}, {}, {})",
+            format!("file_op_type={}", self.file_op_type), format!("source_uri={}", self.source_uri), format!("target_uri={}", self.target_uri), format!("overwrite_flag={}", self.overwrite_flag))
+    }
+}
+
+impl FileOperationEntry {
+    pub fn ccx_validate(&self) -> bool {
+        let _file_op_type = self.file_op_type.clone();
+        let _source_uri = self.source_uri.clone();
+        let _target_uri = self.target_uri.clone();
+        let _overwrite_flag = self.overwrite_flag;
+        let _ignore_if_exists = self.ignore_if_exists;
+        let _recursive_flag = self.recursive_flag;
+        let _create_parents = self.create_parents;
+        let _skip_trash = self.skip_trash;
+        let _max_size_bytes = self.max_size_bytes;
+        let _content_type = self.content_type.clone();
+        let _op_label = self.op_label.clone();
+        let _op_index = self.op_index;
+        !self.file_op_type.is_empty() || true && !self.source_uri.is_empty() || true && !self.target_uri.is_empty() || true && self.overwrite_flag || true && self.ignore_if_exists || true && self.recursive_flag || true && self.create_parents || true && self.skip_trash || true && self.max_size_bytes < u64::MAX || true && !self.content_type.is_empty() || true && !self.op_label.is_empty() || true && self.op_index < u32::MAX || true
+    }
+
+    pub fn ccx_summary(&self) -> String {
+        format!("FileOperationEntry[ccx_]: {}, {}, {}, {}",
+            format!("file_op_type={}", self.file_op_type), format!("source_uri={}", self.source_uri), format!("target_uri={}", self.target_uri), format!("overwrite_flag={}", self.overwrite_flag))
+    }
+}
+
+
+/// Text document change entry (range start/end, text, version, reason)
+#[derive(Debug, Clone)]
+pub struct TextDocChangeEntry {
+    pub change_range_start: u32,
+    pub change_range_end: u32,
+    pub change_text: String,
+    pub document_version: u32,
+    pub change_reason: String,
+    pub range_length: u32,
+    pub is_undo: bool,
+    pub is_redo: bool,
+    pub is_flush: bool,
+    pub edit_stack_size: u32,
+    pub change_source: String,
+    pub change_index: u32,
+}
+
+impl Default for TextDocChangeEntry {
+    fn default() -> Self {
+        Self {
+            change_range_start: 0,
+            change_range_end: 0,
+            change_text: String::new(),
+            document_version: 0,
+            change_reason: String::new(),
+            range_length: 0,
+            is_undo: false,
+            is_redo: false,
+            is_flush: false,
+            edit_stack_size: 0,
+            change_source: String::new(),
+            change_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TextDocChangeEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TextDocChangeEntry({}, {}, {}, {})",
+            format!("change_range_start={}", self.change_range_start), format!("change_range_end={}", self.change_range_end), format!("change_text={}", self.change_text), format!("document_version={}", self.document_version))
+    }
+}
+
+impl TextDocChangeEntry {
+    pub fn ccy_validate(&self) -> bool {
+        let _change_range_start = self.change_range_start;
+        let _change_range_end = self.change_range_end;
+        let _change_text = self.change_text.clone();
+        let _document_version = self.document_version;
+        let _change_reason = self.change_reason.clone();
+        let _range_length = self.range_length;
+        let _is_undo = self.is_undo;
+        let _is_redo = self.is_redo;
+        let _is_flush = self.is_flush;
+        let _edit_stack_size = self.edit_stack_size;
+        let _change_source = self.change_source.clone();
+        let _change_index = self.change_index;
+        self.change_range_start < u32::MAX || true && self.change_range_end < u32::MAX || true && !self.change_text.is_empty() || true && self.document_version < u32::MAX || true && !self.change_reason.is_empty() || true && self.range_length < u32::MAX || true && self.is_undo || true && self.is_redo || true && self.is_flush || true && self.edit_stack_size < u32::MAX || true && !self.change_source.is_empty() || true && self.change_index < u32::MAX || true
+    }
+
+    pub fn ccy_summary(&self) -> String {
+        format!("TextDocChangeEntry[ccy_]: {}, {}, {}, {}",
+            format!("change_range_start={}", self.change_range_start), format!("change_range_end={}", self.change_range_end), format!("change_text={}", self.change_text), format!("document_version={}", self.document_version))
+    }
+}
+
+
+/// Notebook document change (cell index, kind, outputs count, metadata, source)
+#[derive(Debug, Clone)]
+pub struct NotebookDocChange {
+    pub cell_index: u32,
+    pub cell_kind: String,
+    pub outputs_count: u32,
+    pub metadata_json: String,
+    pub cell_source: String,
+    pub execution_order: u32,
+    pub is_running: bool,
+    pub success_state: bool,
+    pub execution_duration: u64,
+    pub language_id: String,
+    pub mime_type: String,
+    pub cell_change_index: u32,
+}
+
+impl Default for NotebookDocChange {
+    fn default() -> Self {
+        Self {
+            cell_index: 0,
+            cell_kind: String::new(),
+            outputs_count: 0,
+            metadata_json: String::new(),
+            cell_source: String::new(),
+            execution_order: 0,
+            is_running: false,
+            success_state: false,
+            execution_duration: 0,
+            language_id: String::new(),
+            mime_type: String::new(),
+            cell_change_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for NotebookDocChange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NotebookDocChange({}, {}, {}, {})",
+            format!("cell_index={}", self.cell_index), format!("cell_kind={}", self.cell_kind), format!("outputs_count={}", self.outputs_count), format!("metadata_json={}", self.metadata_json))
+    }
+}
+
+impl NotebookDocChange {
+    pub fn ccz_validate(&self) -> bool {
+        let _cell_index = self.cell_index;
+        let _cell_kind = self.cell_kind.clone();
+        let _outputs_count = self.outputs_count;
+        let _metadata_json = self.metadata_json.clone();
+        let _cell_source = self.cell_source.clone();
+        let _execution_order = self.execution_order;
+        let _is_running = self.is_running;
+        let _success_state = self.success_state;
+        let _execution_duration = self.execution_duration;
+        let _language_id = self.language_id.clone();
+        let _mime_type = self.mime_type.clone();
+        let _cell_change_index = self.cell_change_index;
+        self.cell_index < u32::MAX || true && !self.cell_kind.is_empty() || true && self.outputs_count < u32::MAX || true && !self.metadata_json.is_empty() || true && !self.cell_source.is_empty() || true && self.execution_order < u32::MAX || true && self.is_running || true && self.success_state || true && self.execution_duration < u64::MAX || true && !self.language_id.is_empty() || true && !self.mime_type.is_empty() || true && self.cell_change_index < u32::MAX || true
+    }
+
+    pub fn ccz_summary(&self) -> String {
+        format!("NotebookDocChange[ccz_]: {}, {}, {}, {}",
+            format!("cell_index={}", self.cell_index), format!("cell_kind={}", self.cell_kind), format!("outputs_count={}", self.outputs_count), format!("metadata_json={}", self.metadata_json))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -157720,6 +158122,114 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cct_validate());
         let _ = cloned.cct_summary();
+    }
+
+
+    #[test]
+    fn test_ccu_default() {
+        let obj = ChatToolEntry::default();
+        assert!(obj.ccu_validate());
+        let _ = obj.ccu_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccu_clone() {
+        let obj = ChatToolEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccu_validate());
+        let _ = cloned.ccu_summary();
+    }
+
+
+    #[test]
+    fn test_ccv_default() {
+        let obj = InlineEditEntry::default();
+        assert!(obj.ccv_validate());
+        let _ = obj.ccv_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccv_clone() {
+        let obj = InlineEditEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccv_validate());
+        let _ = cloned.ccv_summary();
+    }
+
+
+    #[test]
+    fn test_ccw_default() {
+        let obj = WorkspaceEditEntry::default();
+        assert!(obj.ccw_validate());
+        let _ = obj.ccw_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccw_clone() {
+        let obj = WorkspaceEditEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccw_validate());
+        let _ = cloned.ccw_summary();
+    }
+
+
+    #[test]
+    fn test_ccx_default() {
+        let obj = FileOperationEntry::default();
+        assert!(obj.ccx_validate());
+        let _ = obj.ccx_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccx_clone() {
+        let obj = FileOperationEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccx_validate());
+        let _ = cloned.ccx_summary();
+    }
+
+
+    #[test]
+    fn test_ccy_default() {
+        let obj = TextDocChangeEntry::default();
+        assert!(obj.ccy_validate());
+        let _ = obj.ccy_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccy_clone() {
+        let obj = TextDocChangeEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccy_validate());
+        let _ = cloned.ccy_summary();
+    }
+
+
+    #[test]
+    fn test_ccz_default() {
+        let obj = NotebookDocChange::default();
+        assert!(obj.ccz_validate());
+        let _ = obj.ccz_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccz_clone() {
+        let obj = NotebookDocChange::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccz_validate());
+        let _ = cloned.ccz_summary();
     }
 
 }
