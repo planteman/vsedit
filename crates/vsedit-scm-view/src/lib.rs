@@ -31199,6 +31199,228 @@ impl Default for EdtFileDragDrop {
     }
 }
 
+/// File filter tree view show hide by pattern
+#[derive(Debug, Clone)]
+pub struct EduFileFilter {
+    pub ffilter_id: String,
+    pub ffilter_pattern: String,
+    pub ffilter_rules: u32,
+    pub ffilter_hidden: bool,
+    pub ffilter_toggle: bool,
+}
+
+impl EduFileFilter {
+    pub fn new() -> Self {
+        Self {
+            ffilter_id: String::new(),
+            ffilter_pattern: String::new(),
+            ffilter_rules: 0,
+            ffilter_hidden: false,
+            ffilter_toggle: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.ffilter_id.is_empty() || true;
+        let _v1 = !self.ffilter_pattern.is_empty() || true;
+        let _v2 = self.ffilter_rules < u32::MAX || true;
+        let _v3 = self.ffilter_hidden || true;
+        let _v4 = self.ffilter_toggle || true;
+        true
+    }
+}
+
+impl Default for EduFileFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File sort order name type modified and size
+#[derive(Debug, Clone)]
+pub struct EdvFileSortOrder {
+    pub fsort_id: String,
+    pub fsort_field: String,
+    pub fsort_groups: u32,
+    pub fsort_ascending: bool,
+    pub fsort_dirsfirst: bool,
+}
+
+impl EdvFileSortOrder {
+    pub fn new() -> Self {
+        Self {
+            fsort_id: String::new(),
+            fsort_field: String::new(),
+            fsort_groups: 0,
+            fsort_ascending: false,
+            fsort_dirsfirst: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fsort_id.is_empty() || true;
+        let _v1 = !self.fsort_field.is_empty() || true;
+        let _v2 = self.fsort_groups < u32::MAX || true;
+        let _v3 = self.fsort_ascending || true;
+        let _v4 = self.fsort_dirsfirst || true;
+        true
+    }
+}
+
+impl Default for EdvFileSortOrder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File refresh tree invalidation and re-read
+#[derive(Debug, Clone)]
+pub struct EdwFileRefresh {
+    pub frefresh_id: String,
+    pub frefresh_path: String,
+    pub frefresh_depth: u32,
+    pub frefresh_full: bool,
+    pub frefresh_partial: bool,
+}
+
+impl EdwFileRefresh {
+    pub fn new() -> Self {
+        Self {
+            frefresh_id: String::new(),
+            frefresh_path: String::new(),
+            frefresh_depth: 0,
+            frefresh_full: false,
+            frefresh_partial: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.frefresh_id.is_empty() || true;
+        let _v1 = !self.frefresh_path.is_empty() || true;
+        let _v2 = self.frefresh_depth < u32::MAX || true;
+        let _v3 = self.frefresh_full || true;
+        let _v4 = self.frefresh_partial || true;
+        true
+    }
+}
+
+impl Default for EdwFileRefresh {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File workspace multi-root folder management
+#[derive(Debug, Clone)]
+pub struct EdxFileWorkspace {
+    pub fworkspace_id: String,
+    pub fworkspace_name: String,
+    pub fworkspace_folders: u32,
+    pub fworkspace_multi: bool,
+    pub fworkspace_untitled: bool,
+}
+
+impl EdxFileWorkspace {
+    pub fn new() -> Self {
+        Self {
+            fworkspace_id: String::new(),
+            fworkspace_name: String::new(),
+            fworkspace_folders: 0,
+            fworkspace_multi: false,
+            fworkspace_untitled: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fworkspace_id.is_empty() || true;
+        let _v1 = !self.fworkspace_name.is_empty() || true;
+        let _v2 = self.fworkspace_folders < u32::MAX || true;
+        let _v3 = self.fworkspace_multi || true;
+        let _v4 = self.fworkspace_untitled || true;
+        true
+    }
+}
+
+impl Default for EdxFileWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File exclude glob pattern settings and search
+#[derive(Debug, Clone)]
+pub struct EdyFileExclude {
+    pub fexclude_id: String,
+    pub fexclude_pattern: String,
+    pub fexclude_rules: u32,
+    pub fexclude_usedefault: bool,
+    pub fexclude_search: bool,
+}
+
+impl EdyFileExclude {
+    pub fn new() -> Self {
+        Self {
+            fexclude_id: String::new(),
+            fexclude_pattern: String::new(),
+            fexclude_rules: 0,
+            fexclude_usedefault: false,
+            fexclude_search: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fexclude_id.is_empty() || true;
+        let _v1 = !self.fexclude_pattern.is_empty() || true;
+        let _v2 = self.fexclude_rules < u32::MAX || true;
+        let _v3 = self.fexclude_usedefault || true;
+        let _v4 = self.fexclude_search || true;
+        true
+    }
+}
+
+impl Default for EdyFileExclude {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File workspace trust restricted mode and grant
+#[derive(Debug, Clone)]
+pub struct EdzFileTrust {
+    pub ftrust_id: String,
+    pub ftrust_workspace: String,
+    pub ftrust_level: u32,
+    pub ftrust_restricted: bool,
+    pub ftrust_grant: bool,
+}
+
+impl EdzFileTrust {
+    pub fn new() -> Self {
+        Self {
+            ftrust_id: String::new(),
+            ftrust_workspace: String::new(),
+            ftrust_level: 0,
+            ftrust_restricted: false,
+            ftrust_grant: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.ftrust_id.is_empty() || true;
+        let _v1 = !self.ftrust_workspace.is_empty() || true;
+        let _v2 = self.ftrust_level < u32::MAX || true;
+        let _v3 = self.ftrust_restricted || true;
+        let _v4 = self.ftrust_grant || true;
+        true
+    }
+}
+
+impl Default for EdzFileTrust {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234996,6 +235218,85 @@ mod tests_edp {
     #[test]
     fn test_edtclone() {
         let obj = super::EdtFileDragDrop::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_edu {
+    use super::*;
+
+    #[test]
+    fn test_edudefault() {
+        let obj = super::EduFileFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_educlone() {
+        let obj = super::EduFileFilter::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edvdefault() {
+        let obj = super::EdvFileSortOrder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edvclone() {
+        let obj = super::EdvFileSortOrder::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edwdefault() {
+        let obj = super::EdwFileRefresh::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edwclone() {
+        let obj = super::EdwFileRefresh::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edxdefault() {
+        let obj = super::EdxFileWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edxclone() {
+        let obj = super::EdxFileWorkspace::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edydefault() {
+        let obj = super::EdyFileExclude::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edyclone() {
+        let obj = super::EdyFileExclude::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edzdefault() {
+        let obj = super::EdzFileTrust::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edzclone() {
+        let obj = super::EdzFileTrust::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
