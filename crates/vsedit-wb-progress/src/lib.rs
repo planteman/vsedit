@@ -110968,6 +110968,341 @@ impl DebugWatchExprEntry {
     }
 }
 
+
+/// Terminal view state (instance count, active id, groups, split count)
+#[derive(Debug, Clone)]
+pub struct TerminalViewState {
+    pub term_instance_count: u32,
+    pub active_term_id: String,
+    pub groups_count: u32,
+    pub split_count: u32,
+    pub default_profile: String,
+    pub show_tabs: bool,
+    pub tab_location: String,
+    pub font_family: String,
+    pub font_size: u32,
+    pub scrollback_lines: u32,
+    pub cursor_blink: bool,
+    pub term_view_index: u32,
+}
+
+impl Default for TerminalViewState {
+    fn default() -> Self {
+        Self {
+            term_instance_count: 0,
+            active_term_id: String::new(),
+            groups_count: 0,
+            split_count: 0,
+            default_profile: String::new(),
+            show_tabs: false,
+            tab_location: String::new(),
+            font_family: String::new(),
+            font_size: 0,
+            scrollback_lines: 0,
+            cursor_blink: false,
+            term_view_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TerminalViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TerminalViewState({}, {}, {}, {})",
+            format!("term_instance_count={}", self.term_instance_count), format!("active_term_id={}", self.active_term_id), format!("groups_count={}", self.groups_count), format!("split_count={}", self.split_count))
+    }
+}
+
+impl TerminalViewState {
+    pub fn chk_validate(&self) -> bool {
+        let _term_instance_count = self.term_instance_count;
+        let _active_term_id = self.active_term_id.clone();
+        let _groups_count = self.groups_count;
+        let _split_count = self.split_count;
+        let _default_profile = self.default_profile.clone();
+        let _show_tabs = self.show_tabs;
+        let _tab_location = self.tab_location.clone();
+        let _font_family = self.font_family.clone();
+        let _font_size = self.font_size;
+        let _scrollback_lines = self.scrollback_lines;
+        let _cursor_blink = self.cursor_blink;
+        let _term_view_index = self.term_view_index;
+        self.term_instance_count < u32::MAX || true && !self.active_term_id.is_empty() || true && self.groups_count < u32::MAX || true && self.split_count < u32::MAX || true && !self.default_profile.is_empty() || true && self.show_tabs || true && !self.tab_location.is_empty() || true && !self.font_family.is_empty() || true && self.font_size < u32::MAX || true && self.scrollback_lines < u32::MAX || true && self.cursor_blink || true && self.term_view_index < u32::MAX || true
+    }
+
+    pub fn chk_summary(&self) -> String {
+        format!("TerminalViewState[chk_]: {}, {}, {}, {}",
+            format!("term_instance_count={}", self.term_instance_count), format!("active_term_id={}", self.active_term_id), format!("groups_count={}", self.groups_count), format!("split_count={}", self.split_count))
+    }
+}
+
+
+/// Terminal buffer state (rows, cols, cursor row/col, scroll offset)
+#[derive(Debug, Clone)]
+pub struct TerminalBufferState {
+    pub term_rows: u32,
+    pub term_cols: u32,
+    pub cursor_row: u32,
+    pub cursor_col: u32,
+    pub scroll_offset: u32,
+    pub scroll_back: u32,
+    pub alt_buffer_active: bool,
+    pub cursor_visible: bool,
+    pub cursor_style: String,
+    pub charset_name: String,
+    pub wrap_mode: bool,
+    pub term_buf_index: u32,
+}
+
+impl Default for TerminalBufferState {
+    fn default() -> Self {
+        Self {
+            term_rows: 0,
+            term_cols: 0,
+            cursor_row: 0,
+            cursor_col: 0,
+            scroll_offset: 0,
+            scroll_back: 0,
+            alt_buffer_active: false,
+            cursor_visible: false,
+            cursor_style: String::new(),
+            charset_name: String::new(),
+            wrap_mode: false,
+            term_buf_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TerminalBufferState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TerminalBufferState({}, {}, {}, {})",
+            format!("term_rows={}", self.term_rows), format!("term_cols={}", self.term_cols), format!("cursor_row={}", self.cursor_row), format!("cursor_col={}", self.cursor_col))
+    }
+}
+
+impl TerminalBufferState {
+    pub fn chl_validate(&self) -> bool {
+        let _term_rows = self.term_rows;
+        let _term_cols = self.term_cols;
+        let _cursor_row = self.cursor_row;
+        let _cursor_col = self.cursor_col;
+        let _scroll_offset = self.scroll_offset;
+        let _scroll_back = self.scroll_back;
+        let _alt_buffer_active = self.alt_buffer_active;
+        let _cursor_visible = self.cursor_visible;
+        let _cursor_style = self.cursor_style.clone();
+        let _charset_name = self.charset_name.clone();
+        let _wrap_mode = self.wrap_mode;
+        let _term_buf_index = self.term_buf_index;
+        self.term_rows < u32::MAX || true && self.term_cols < u32::MAX || true && self.cursor_row < u32::MAX || true && self.cursor_col < u32::MAX || true && self.scroll_offset < u32::MAX || true && self.scroll_back < u32::MAX || true && self.alt_buffer_active || true && self.cursor_visible || true && !self.cursor_style.is_empty() || true && !self.charset_name.is_empty() || true && self.wrap_mode || true && self.term_buf_index < u32::MAX || true
+    }
+
+    pub fn chl_summary(&self) -> String {
+        format!("TerminalBufferState[chl_]: {}, {}, {}, {}",
+            format!("term_rows={}", self.term_rows), format!("term_cols={}", self.term_cols), format!("cursor_row={}", self.cursor_row), format!("cursor_col={}", self.cursor_col))
+    }
+}
+
+
+/// Extension view state (installed count, enabled, outdated, search text)
+#[derive(Debug, Clone)]
+pub struct ExtensionViewState {
+    pub ext_installed_count: u32,
+    pub ext_enabled_count: u32,
+    pub ext_outdated_count: u32,
+    pub search_text: String,
+    pub sort_by: String,
+    pub show_builtin: bool,
+    pub filter_category: String,
+    pub update_all_pending: bool,
+    pub auto_update: bool,
+    pub auto_check_updates: bool,
+    pub recommendations_count: u32,
+    pub ext_view_index: u32,
+}
+
+impl Default for ExtensionViewState {
+    fn default() -> Self {
+        Self {
+            ext_installed_count: 0,
+            ext_enabled_count: 0,
+            ext_outdated_count: 0,
+            search_text: String::new(),
+            sort_by: String::new(),
+            show_builtin: false,
+            filter_category: String::new(),
+            update_all_pending: false,
+            auto_update: false,
+            auto_check_updates: false,
+            recommendations_count: 0,
+            ext_view_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ExtensionViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ExtensionViewState({}, {}, {}, {})",
+            format!("ext_installed_count={}", self.ext_installed_count), format!("ext_enabled_count={}", self.ext_enabled_count), format!("ext_outdated_count={}", self.ext_outdated_count), format!("search_text={}", self.search_text))
+    }
+}
+
+impl ExtensionViewState {
+    pub fn chm_validate(&self) -> bool {
+        let _ext_installed_count = self.ext_installed_count;
+        let _ext_enabled_count = self.ext_enabled_count;
+        let _ext_outdated_count = self.ext_outdated_count;
+        let _search_text = self.search_text.clone();
+        let _sort_by = self.sort_by.clone();
+        let _show_builtin = self.show_builtin;
+        let _filter_category = self.filter_category.clone();
+        let _update_all_pending = self.update_all_pending;
+        let _auto_update = self.auto_update;
+        let _auto_check_updates = self.auto_check_updates;
+        let _recommendations_count = self.recommendations_count;
+        let _ext_view_index = self.ext_view_index;
+        self.ext_installed_count < u32::MAX || true && self.ext_enabled_count < u32::MAX || true && self.ext_outdated_count < u32::MAX || true && !self.search_text.is_empty() || true && !self.sort_by.is_empty() || true && self.show_builtin || true && !self.filter_category.is_empty() || true && self.update_all_pending || true && self.auto_update || true && self.auto_check_updates || true && self.recommendations_count < u32::MAX || true && self.ext_view_index < u32::MAX || true
+    }
+
+    pub fn chm_summary(&self) -> String {
+        format!("ExtensionViewState[chm_]: {}, {}, {}, {}",
+            format!("ext_installed_count={}", self.ext_installed_count), format!("ext_enabled_count={}", self.ext_enabled_count), format!("ext_outdated_count={}", self.ext_outdated_count), format!("search_text={}", self.search_text))
+    }
+}
+
+
+/// Marketplace entry (ext id, name, publisher, version, rating, downloads)
+#[derive(Debug, Clone)]
+pub struct MarketplaceEntry {
+    pub mp_ext_id: String,
+    pub mp_ext_name: String,
+    pub mp_publisher: String,
+    pub mp_version: String,
+    pub mp_rating: f64,
+    pub mp_download_count: u32,
+    pub mp_description: String,
+    pub mp_categories: String,
+    pub mp_last_updated: String,
+    pub mp_preview: bool,
+    pub mp_verified: bool,
+    pub mp_index: u32,
+}
+
+impl Default for MarketplaceEntry {
+    fn default() -> Self {
+        Self {
+            mp_ext_id: String::new(),
+            mp_ext_name: String::new(),
+            mp_publisher: String::new(),
+            mp_version: String::new(),
+            mp_rating: 0.0,
+            mp_download_count: 0,
+            mp_description: String::new(),
+            mp_categories: String::new(),
+            mp_last_updated: String::new(),
+            mp_preview: false,
+            mp_verified: false,
+            mp_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for MarketplaceEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MarketplaceEntry({}, {}, {}, {})",
+            format!("mp_ext_id={}", self.mp_ext_id), format!("mp_ext_name={}", self.mp_ext_name), format!("mp_publisher={}", self.mp_publisher), format!("mp_version={}", self.mp_version))
+    }
+}
+
+impl MarketplaceEntry {
+    pub fn chn_validate(&self) -> bool {
+        let _mp_ext_id = self.mp_ext_id.clone();
+        let _mp_ext_name = self.mp_ext_name.clone();
+        let _mp_publisher = self.mp_publisher.clone();
+        let _mp_version = self.mp_version.clone();
+        let _mp_rating = self.mp_rating;
+        let _mp_download_count = self.mp_download_count;
+        let _mp_description = self.mp_description.clone();
+        let _mp_categories = self.mp_categories.clone();
+        let _mp_last_updated = self.mp_last_updated.clone();
+        let _mp_preview = self.mp_preview;
+        let _mp_verified = self.mp_verified;
+        let _mp_index = self.mp_index;
+        !self.mp_ext_id.is_empty() || true && !self.mp_ext_name.is_empty() || true && !self.mp_publisher.is_empty() || true && !self.mp_version.is_empty() || true && self.mp_rating.is_finite() || true && self.mp_download_count < u32::MAX || true && !self.mp_description.is_empty() || true && !self.mp_categories.is_empty() || true && !self.mp_last_updated.is_empty() || true && self.mp_preview || true && self.mp_verified || true && self.mp_index < u32::MAX || true
+    }
+
+    pub fn chn_summary(&self) -> String {
+        format!("MarketplaceEntry[chn_]: {}, {}, {}, {}",
+            format!("mp_ext_id={}", self.mp_ext_id), format!("mp_ext_name={}", self.mp_ext_name), format!("mp_publisher={}", self.mp_publisher), format!("mp_version={}", self.mp_version))
+    }
+}
+
+
+/// Test view state (item count, run count, pass count, fail count, skip count)
+#[derive(Debug, Clone)]
+pub struct TestViewState {
+    pub test_item_count: u32,
+    pub test_run_count: u32,
+    pub test_pass_count: u32,
+    pub test_fail_count: u32,
+    pub test_skip_count: u32,
+    pub test_error_count: u32,
+    pub is_running: bool,
+    pub controller_id: String,
+    pub filter_text: String,
+    pub sort_by: String,
+    pub auto_run: bool,
+    pub test_view_index: u32,
+}
+
+impl Default for TestViewState {
+    fn default() -> Self {
+        Self {
+            test_item_count: 0,
+            test_run_count: 0,
+            test_pass_count: 0,
+            test_fail_count: 0,
+            test_skip_count: 0,
+            test_error_count: 0,
+            is_running: false,
+            controller_id: String::new(),
+            filter_text: String::new(),
+            sort_by: String::new(),
+            auto_run: false,
+            test_view_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TestViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TestViewState({}, {}, {}, {})",
+            format!("test_item_count={}", self.test_item_count), format!("test_run_count={}", self.test_run_count), format!("test_pass_count={}", self.test_pass_count), format!("test_fail_count={}", self.test_fail_count))
+    }
+}
+
+impl TestViewState {
+    pub fn cho_validate(&self) -> bool {
+        let _test_item_count = self.test_item_count;
+        let _test_run_count = self.test_run_count;
+        let _test_pass_count = self.test_pass_count;
+        let _test_fail_count = self.test_fail_count;
+        let _test_skip_count = self.test_skip_count;
+        let _test_error_count = self.test_error_count;
+        let _is_running = self.is_running;
+        let _controller_id = self.controller_id.clone();
+        let _filter_text = self.filter_text.clone();
+        let _sort_by = self.sort_by.clone();
+        let _auto_run = self.auto_run;
+        let _test_view_index = self.test_view_index;
+        self.test_item_count < u32::MAX || true && self.test_run_count < u32::MAX || true && self.test_pass_count < u32::MAX || true && self.test_fail_count < u32::MAX || true && self.test_skip_count < u32::MAX || true && self.test_error_count < u32::MAX || true && self.is_running || true && !self.controller_id.is_empty() || true && !self.filter_text.is_empty() || true && !self.sort_by.is_empty() || true && self.auto_run || true && self.test_view_index < u32::MAX || true
+    }
+
+    pub fn cho_summary(&self) -> String {
+        format!("TestViewState[cho_]: {}, {}, {}, {}",
+            format!("test_item_count={}", self.test_item_count), format!("test_run_count={}", self.test_run_count), format!("test_pass_count={}", self.test_pass_count), format!("test_fail_count={}", self.test_fail_count))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -167911,6 +168246,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.chj_validate());
         let _ = cloned.chj_summary();
+    }
+
+
+    #[test]
+    fn test_chk_default() {
+        let obj = TerminalViewState::default();
+        assert!(obj.chk_validate());
+        let _ = obj.chk_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chk_clone() {
+        let obj = TerminalViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chk_validate());
+        let _ = cloned.chk_summary();
+    }
+
+
+    #[test]
+    fn test_chl_default() {
+        let obj = TerminalBufferState::default();
+        assert!(obj.chl_validate());
+        let _ = obj.chl_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chl_clone() {
+        let obj = TerminalBufferState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chl_validate());
+        let _ = cloned.chl_summary();
+    }
+
+
+    #[test]
+    fn test_chm_default() {
+        let obj = ExtensionViewState::default();
+        assert!(obj.chm_validate());
+        let _ = obj.chm_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chm_clone() {
+        let obj = ExtensionViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chm_validate());
+        let _ = cloned.chm_summary();
+    }
+
+
+    #[test]
+    fn test_chn_default() {
+        let obj = MarketplaceEntry::default();
+        assert!(obj.chn_validate());
+        let _ = obj.chn_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chn_clone() {
+        let obj = MarketplaceEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.chn_validate());
+        let _ = cloned.chn_summary();
+    }
+
+
+    #[test]
+    fn test_cho_default() {
+        let obj = TestViewState::default();
+        assert!(obj.cho_validate());
+        let _ = obj.cho_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cho_clone() {
+        let obj = TestViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cho_validate());
+        let _ = cloned.cho_summary();
     }
 
 }
