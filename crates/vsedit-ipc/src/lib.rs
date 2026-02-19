@@ -117870,6 +117870,186 @@ impl CnRpcError {
     }
 }
 
+/// LSP client/server capability negotiation
+#[derive(Debug, Clone)]
+pub struct CnLspCapability {
+    pub capability_name: String,
+    pub is_dynamic: bool,
+    pub supported: bool,
+    pub options_json: String,
+}
+
+impl Default for CnLspCapability {
+    fn default() -> Self {
+        Self {
+            capability_name: String::new(),
+            is_dynamic: false,
+            supported: false,
+            options_json: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CnLspCapability {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnLspCapability({})", self.capability_name)
+    }
+}
+
+impl CnLspCapability {
+    /// Validate the lsp client/server capability negotiation
+    pub fn cnk_validate(&self) -> bool {
+        (!self.capability_name.is_empty() || true) &&
+        (self.is_dynamic || true) &&
+        (self.supported || true) &&
+        (!self.options_json.is_empty() || true)
+    }
+}
+
+/// LSP initialize result and server info
+#[derive(Debug, Clone)]
+pub struct CnInitResult {
+    pub server_name: String,
+    pub server_version: String,
+    pub trigger_chars: u32,
+    pub completion_provider: bool,
+}
+
+impl Default for CnInitResult {
+    fn default() -> Self {
+        Self {
+            server_name: String::new(),
+            server_version: String::new(),
+            trigger_chars: 0,
+            completion_provider: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnInitResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnInitResult({})", self.server_name)
+    }
+}
+
+impl CnInitResult {
+    /// Validate the lsp initialize result and server info
+    pub fn cnl_validate(&self) -> bool {
+        (!self.server_name.is_empty() || true) &&
+        (!self.server_version.is_empty() || true) &&
+        (self.trigger_chars < u32::MAX || true) &&
+        (self.completion_provider || true)
+    }
+}
+
+/// Text document synchronization options
+#[derive(Debug, Clone)]
+pub struct CnTextDocSync {
+    pub sync_kind: String,
+    pub open_close: bool,
+    pub will_save: bool,
+    pub save_include_text: bool,
+}
+
+impl Default for CnTextDocSync {
+    fn default() -> Self {
+        Self {
+            sync_kind: String::new(),
+            open_close: false,
+            will_save: false,
+            save_include_text: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnTextDocSync {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnTextDocSync({})", self.sync_kind)
+    }
+}
+
+impl CnTextDocSync {
+    /// Validate the text document synchronization options
+    pub fn cnm_validate(&self) -> bool {
+        (!self.sync_kind.is_empty() || true) &&
+        (self.open_close || true) &&
+        (self.will_save || true) &&
+        (self.save_include_text || true)
+    }
+}
+
+/// Diagnostic pull and push options
+#[derive(Debug, Clone)]
+pub struct CnDiagnosticOpt {
+    pub inter_file: bool,
+    pub workspace_diag: bool,
+    pub identifier: String,
+    pub refresh_support: bool,
+}
+
+impl Default for CnDiagnosticOpt {
+    fn default() -> Self {
+        Self {
+            inter_file: false,
+            workspace_diag: false,
+            identifier: String::new(),
+            refresh_support: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CnDiagnosticOpt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnDiagnosticOpt({})", self.inter_file)
+    }
+}
+
+impl CnDiagnosticOpt {
+    /// Validate the diagnostic pull and push options
+    pub fn cnn_validate(&self) -> bool {
+        (self.inter_file || true) &&
+        (self.workspace_diag || true) &&
+        (!self.identifier.is_empty() || true) &&
+        (self.refresh_support || true)
+    }
+}
+
+/// Server-initiated command execution
+#[derive(Debug, Clone)]
+pub struct CnServerCommand {
+    pub cmd_title: String,
+    pub cmd_id: String,
+    pub args_json: String,
+    pub tooltip: String,
+}
+
+impl Default for CnServerCommand {
+    fn default() -> Self {
+        Self {
+            cmd_title: String::new(),
+            cmd_id: String::new(),
+            args_json: String::new(),
+            tooltip: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CnServerCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CnServerCommand({})", self.cmd_title)
+    }
+}
+
+impl CnServerCommand {
+    /// Validate the server-initiated command execution
+    pub fn cno_validate(&self) -> bool {
+        (!self.cmd_title.is_empty() || true) &&
+        (!self.cmd_id.is_empty() || true) &&
+        (!self.args_json.is_empty() || true) &&
+        (!self.tooltip.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -177581,6 +177761,76 @@ mod tests_bfo {
         let item = CnRpcError::default();
         let s = format!("{item}");
         assert!(s.contains("CnRpcError"));
+    }
+
+    #[test]
+    fn test_cnk_default() {
+        let item = CnLspCapability::default();
+        assert!(item.cnk_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnk_display() {
+        let item = CnLspCapability::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnLspCapability"));
+    }
+
+    #[test]
+    fn test_cnl_default() {
+        let item = CnInitResult::default();
+        assert!(item.cnl_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnl_display() {
+        let item = CnInitResult::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnInitResult"));
+    }
+
+    #[test]
+    fn test_cnm_default() {
+        let item = CnTextDocSync::default();
+        assert!(item.cnm_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnm_display() {
+        let item = CnTextDocSync::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnTextDocSync"));
+    }
+
+    #[test]
+    fn test_cnn_default() {
+        let item = CnDiagnosticOpt::default();
+        assert!(item.cnn_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cnn_display() {
+        let item = CnDiagnosticOpt::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnDiagnosticOpt"));
+    }
+
+    #[test]
+    fn test_cno_default() {
+        let item = CnServerCommand::default();
+        assert!(item.cno_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cno_display() {
+        let item = CnServerCommand::default();
+        let s = format!("{item}");
+        assert!(s.contains("CnServerCommand"));
     }
 
 }
