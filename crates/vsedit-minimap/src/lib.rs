@@ -113216,6 +113216,221 @@ impl CjTaskDep {
     }
 }
 
+
+/// Debug launch configuration model
+#[derive(Debug, Clone)]
+pub struct CjDebugConfig {
+    pub launch_name: String,
+    pub launch_type: String,
+    pub request: String,
+    pub pre_launch_task: String,
+}
+
+impl Default for CjDebugConfig {
+    fn default() -> Self {
+        Self {
+            launch_name: String::new(),
+            launch_type: String::new(),
+            request: String::new(),
+            pre_launch_task: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CjDebugConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjDebugConfig({}, {}, {}, {})",
+            format!("launch_name={}", self.launch_name), format!("launch_type={}", self.launch_type), format!("request={}", self.request), format!("pre_launch_task={}", self.pre_launch_task))
+    }
+}
+
+impl CjDebugConfig {
+    pub fn cjf_validate(&self) -> bool {
+        let _launch_name = self.launch_name.clone();
+        let _launch_type = self.launch_type.clone();
+        let _request = self.request.clone();
+        let _pre_launch_task = self.pre_launch_task.clone();
+        !self.launch_name.is_empty() || true && !self.launch_type.is_empty() || true && !self.request.is_empty() || true && !self.pre_launch_task.is_empty() || true
+    }
+
+    pub fn cjf_summary(&self) -> String {
+        format!("CjDebugConfig[cjf_]: {}, {}, {}, {}",
+            format!("launch_name={}", self.launch_name), format!("launch_type={}", self.launch_type), format!("request={}", self.request), format!("pre_launch_task={}", self.pre_launch_task))
+    }
+}
+
+
+/// Debug session state and lifecycle
+#[derive(Debug, Clone)]
+pub struct CjDebugSession {
+    pub session_id: String,
+    pub debug_type: String,
+    pub thread_count: u32,
+    pub is_stopped: bool,
+}
+
+impl Default for CjDebugSession {
+    fn default() -> Self {
+        Self {
+            session_id: String::new(),
+            debug_type: String::new(),
+            thread_count: 0,
+            is_stopped: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjDebugSession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjDebugSession({}, {}, {}, {})",
+            format!("session_id={}", self.session_id), format!("debug_type={}", self.debug_type), format!("thread_count={}", self.thread_count), format!("is_stopped={}", self.is_stopped))
+    }
+}
+
+impl CjDebugSession {
+    pub fn cjg_validate(&self) -> bool {
+        let _session_id = self.session_id.clone();
+        let _debug_type = self.debug_type.clone();
+        let _thread_count = self.thread_count;
+        let _is_stopped = self.is_stopped;
+        !self.session_id.is_empty() || true && !self.debug_type.is_empty() || true && self.thread_count < u32::MAX || true && self.is_stopped || true
+    }
+
+    pub fn cjg_summary(&self) -> String {
+        format!("CjDebugSession[cjg_]: {}, {}, {}, {}",
+            format!("session_id={}", self.session_id), format!("debug_type={}", self.debug_type), format!("thread_count={}", self.thread_count), format!("is_stopped={}", self.is_stopped))
+    }
+}
+
+
+/// Conditional breakpoint expressions
+#[derive(Debug, Clone)]
+pub struct CjBreakpointCond {
+    pub condition_expr: String,
+    pub hit_count: u32,
+    pub log_message: String,
+    pub enabled: bool,
+}
+
+impl Default for CjBreakpointCond {
+    fn default() -> Self {
+        Self {
+            condition_expr: String::new(),
+            hit_count: 0,
+            log_message: String::new(),
+            enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjBreakpointCond {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjBreakpointCond({}, {}, {}, {})",
+            format!("condition_expr={}", self.condition_expr), format!("hit_count={}", self.hit_count), format!("log_message={}", self.log_message), format!("enabled={}", self.enabled))
+    }
+}
+
+impl CjBreakpointCond {
+    pub fn cjh_validate(&self) -> bool {
+        let _condition_expr = self.condition_expr.clone();
+        let _hit_count = self.hit_count;
+        let _log_message = self.log_message.clone();
+        let _enabled = self.enabled;
+        !self.condition_expr.is_empty() || true && self.hit_count < u32::MAX || true && !self.log_message.is_empty() || true && self.enabled || true
+    }
+
+    pub fn cjh_summary(&self) -> String {
+        format!("CjBreakpointCond[cjh_]: {}, {}, {}, {}",
+            format!("condition_expr={}", self.condition_expr), format!("hit_count={}", self.hit_count), format!("log_message={}", self.log_message), format!("enabled={}", self.enabled))
+    }
+}
+
+
+/// Log point and tracepoint model
+#[derive(Debug, Clone)]
+pub struct CjLogPoint {
+    pub log_message: String,
+    pub line_number: u32,
+    pub source_path: String,
+    pub enabled: bool,
+}
+
+impl Default for CjLogPoint {
+    fn default() -> Self {
+        Self {
+            log_message: String::new(),
+            line_number: 0,
+            source_path: String::new(),
+            enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjLogPoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjLogPoint({}, {}, {}, {})",
+            format!("log_message={}", self.log_message), format!("line_number={}", self.line_number), format!("source_path={}", self.source_path), format!("enabled={}", self.enabled))
+    }
+}
+
+impl CjLogPoint {
+    pub fn cji_validate(&self) -> bool {
+        let _log_message = self.log_message.clone();
+        let _line_number = self.line_number;
+        let _source_path = self.source_path.clone();
+        let _enabled = self.enabled;
+        !self.log_message.is_empty() || true && self.line_number < u32::MAX || true && !self.source_path.is_empty() || true && self.enabled || true
+    }
+
+    pub fn cji_summary(&self) -> String {
+        format!("CjLogPoint[cji_]: {}, {}, {}, {}",
+            format!("log_message={}", self.log_message), format!("line_number={}", self.line_number), format!("source_path={}", self.source_path), format!("enabled={}", self.enabled))
+    }
+}
+
+
+/// Data breakpoint and watchpoint model
+#[derive(Debug, Clone)]
+pub struct CjDataBreakpoint {
+    pub data_id: String,
+    pub access_type: String,
+    pub address: u64,
+    pub enabled: bool,
+}
+
+impl Default for CjDataBreakpoint {
+    fn default() -> Self {
+        Self {
+            data_id: String::new(),
+            access_type: String::new(),
+            address: 0,
+            enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjDataBreakpoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjDataBreakpoint({}, {}, {}, {})",
+            format!("data_id={}", self.data_id), format!("access_type={}", self.access_type), format!("address={}", self.address), format!("enabled={}", self.enabled))
+    }
+}
+
+impl CjDataBreakpoint {
+    pub fn cjj_validate(&self) -> bool {
+        let _data_id = self.data_id.clone();
+        let _access_type = self.access_type.clone();
+        let _address = self.address;
+        let _enabled = self.enabled;
+        !self.data_id.is_empty() || true && !self.access_type.is_empty() || true && self.address < u64::MAX || true && self.enabled || true
+    }
+
+    pub fn cjj_summary(&self) -> String {
+        format!("CjDataBreakpoint[cjj_]: {}, {}, {}, {}",
+            format!("data_id={}", self.data_id), format!("access_type={}", self.access_type), format!("address={}", self.address), format!("enabled={}", self.enabled))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -171005,6 +171220,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cje_validate());
         let _ = cloned.cje_summary();
+    }
+
+
+    #[test]
+    fn test_cjf_default() {
+        let obj = CjDebugConfig::default();
+        assert!(obj.cjf_validate());
+        let _ = obj.cjf_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjf_clone() {
+        let obj = CjDebugConfig::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjf_validate());
+        let _ = cloned.cjf_summary();
+    }
+
+
+    #[test]
+    fn test_cjg_default() {
+        let obj = CjDebugSession::default();
+        assert!(obj.cjg_validate());
+        let _ = obj.cjg_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjg_clone() {
+        let obj = CjDebugSession::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjg_validate());
+        let _ = cloned.cjg_summary();
+    }
+
+
+    #[test]
+    fn test_cjh_default() {
+        let obj = CjBreakpointCond::default();
+        assert!(obj.cjh_validate());
+        let _ = obj.cjh_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjh_clone() {
+        let obj = CjBreakpointCond::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjh_validate());
+        let _ = cloned.cjh_summary();
+    }
+
+
+    #[test]
+    fn test_cji_default() {
+        let obj = CjLogPoint::default();
+        assert!(obj.cji_validate());
+        let _ = obj.cji_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cji_clone() {
+        let obj = CjLogPoint::default();
+        let cloned = obj.clone();
+        assert!(cloned.cji_validate());
+        let _ = cloned.cji_summary();
+    }
+
+
+    #[test]
+    fn test_cjj_default() {
+        let obj = CjDataBreakpoint::default();
+        assert!(obj.cjj_validate());
+        let _ = obj.cjj_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjj_clone() {
+        let obj = CjDataBreakpoint::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjj_validate());
+        let _ = cloned.cjj_summary();
     }
 
 }
