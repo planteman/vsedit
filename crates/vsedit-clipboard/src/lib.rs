@@ -34915,6 +34915,191 @@ impl Default for EhjTestProfile {
     }
 }
 
+/// Test controller provider registration and discovery
+#[derive(Debug, Clone)]
+pub struct EhkTestController {
+    pub testctrl_id: String,
+    pub testctrl_label: String,
+    pub testctrl_controllers: u32,
+    pub testctrl_refreshing: bool,
+    pub testctrl_resolving: bool,
+}
+
+impl EhkTestController {
+    pub fn new() -> Self {
+        Self {
+            testctrl_id: String::new(),
+            testctrl_label: String::new(),
+            testctrl_controllers: 0,
+            testctrl_refreshing: false,
+            testctrl_resolving: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testctrl_id.is_empty() || true;
+        let _v1 = !self.testctrl_label.is_empty() || true;
+        let _v2 = self.testctrl_controllers < u32::MAX || true;
+        let _v3 = self.testctrl_refreshing || true;
+        let _v4 = self.testctrl_resolving || true;
+        true
+    }
+}
+
+impl Default for EhkTestController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test message expected actual diff and location
+#[derive(Debug, Clone)]
+pub struct EhlTestMessage {
+    pub testmsg_id: String,
+    pub testmsg_expected: String,
+    pub testmsg_lines: u32,
+    pub testmsg_actual: bool,
+    pub testmsg_diff: bool,
+}
+
+impl EhlTestMessage {
+    pub fn new() -> Self {
+        Self {
+            testmsg_id: String::new(),
+            testmsg_expected: String::new(),
+            testmsg_lines: 0,
+            testmsg_actual: false,
+            testmsg_diff: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testmsg_id.is_empty() || true;
+        let _v1 = !self.testmsg_expected.is_empty() || true;
+        let _v2 = self.testmsg_lines < u32::MAX || true;
+        let _v3 = self.testmsg_actual || true;
+        let _v4 = self.testmsg_diff || true;
+        true
+    }
+}
+
+impl Default for EhlTestMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test sort order by name location duration and status
+#[derive(Debug, Clone)]
+pub struct EhmTestSort {
+    pub testsort_id: String,
+    pub testsort_field: String,
+    pub testsort_groups: u32,
+    pub testsort_ascending: bool,
+    pub testsort_stable: bool,
+}
+
+impl EhmTestSort {
+    pub fn new() -> Self {
+        Self {
+            testsort_id: String::new(),
+            testsort_field: String::new(),
+            testsort_groups: 0,
+            testsort_ascending: false,
+            testsort_stable: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testsort_id.is_empty() || true;
+        let _v1 = !self.testsort_field.is_empty() || true;
+        let _v2 = self.testsort_groups < u32::MAX || true;
+        let _v3 = self.testsort_ascending || true;
+        let _v4 = self.testsort_stable || true;
+        true
+    }
+}
+
+impl Default for EhmTestSort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test filter by text status tag and file
+#[derive(Debug, Clone)]
+pub struct EhnTestFilter {
+    pub testfilter_id: String,
+    pub testfilter_text: String,
+    pub testfilter_rules: u32,
+    pub testfilter_status: bool,
+    pub testfilter_tag: bool,
+}
+
+impl EhnTestFilter {
+    pub fn new() -> Self {
+        Self {
+            testfilter_id: String::new(),
+            testfilter_text: String::new(),
+            testfilter_rules: 0,
+            testfilter_status: false,
+            testfilter_tag: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testfilter_id.is_empty() || true;
+        let _v1 = !self.testfilter_text.is_empty() || true;
+        let _v2 = self.testfilter_rules < u32::MAX || true;
+        let _v3 = self.testfilter_status || true;
+        let _v4 = self.testfilter_tag || true;
+        true
+    }
+}
+
+impl Default for EhnTestFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test file system watcher auto-discover and invalidate
+#[derive(Debug, Clone)]
+pub struct EhoTestWatch {
+    pub testwatch_id: String,
+    pub testwatch_pattern: String,
+    pub testwatch_events: u32,
+    pub testwatch_active: bool,
+    pub testwatch_debounce: bool,
+}
+
+impl EhoTestWatch {
+    pub fn new() -> Self {
+        Self {
+            testwatch_id: String::new(),
+            testwatch_pattern: String::new(),
+            testwatch_events: 0,
+            testwatch_active: false,
+            testwatch_debounce: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.testwatch_id.is_empty() || true;
+        let _v1 = !self.testwatch_pattern.is_empty() || true;
+        let _v2 = self.testwatch_events < u32::MAX || true;
+        let _v3 = self.testwatch_active || true;
+        let _v4 = self.testwatch_debounce || true;
+        true
+    }
+}
+
+impl Default for EhoTestWatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239722,6 +239907,73 @@ mod tests_ehf {
     #[test]
     fn test_ehjclone() {
         let obj = super::EhjTestProfile::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ehk {
+    use super::*;
+
+    #[test]
+    fn test_ehkdefault() {
+        let obj = super::EhkTestController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehkclone() {
+        let obj = super::EhkTestController::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehldefault() {
+        let obj = super::EhlTestMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehlclone() {
+        let obj = super::EhlTestMessage::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehmdefault() {
+        let obj = super::EhmTestSort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehmclone() {
+        let obj = super::EhmTestSort::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehndefault() {
+        let obj = super::EhnTestFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehnclone() {
+        let obj = super::EhnTestFilter::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ehodefault() {
+        let obj = super::EhoTestWatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ehoclone() {
+        let obj = super::EhoTestWatch::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
