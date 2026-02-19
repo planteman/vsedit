@@ -88836,6 +88836,111 @@ impl TestMessage {
     }
 }
 
+/// Runtime wiring: bqp_ ScmResource
+#[derive(Debug, Clone)]
+pub struct ScmResource {
+    pub bqp_resource_uri: String,
+    pub bqp_resource_group_id: String,
+    pub bqp_decorations_letter: String,
+    pub bqp_decorations_color: String,
+    pub bqp_decorations_tooltip: String,
+    pub bqp_context_value: String,
+    pub bqp_command_id: String,
+    pub bqp_is_faux: bool,
+    pub bqp_is_selected: bool,
+    pub bqp_original_uri: String,
+}
+
+impl ScmResource {
+    pub fn bqp_summary(&self) -> String {
+        format!("ScmResource({})", self.bqp_resource_uri)
+    }
+}
+
+/// Runtime wiring: bqq_ ScmResourceGroup
+#[derive(Debug, Clone)]
+pub struct ScmResourceGroup {
+    pub bqq_group_id: String,
+    pub bqq_group_label: String,
+    pub bqq_resource_count: usize,
+    pub bqq_hide_when_empty: bool,
+    pub bqq_is_collapsed: bool,
+    pub bqq_context_value: String,
+    pub bqq_repository_id: String,
+    pub bqq_sort_order: u32,
+    pub bqq_icon_path: String,
+    pub bqq_description: String,
+}
+
+impl ScmResourceGroup {
+    pub fn bqq_summary(&self) -> String {
+        format!("ScmResourceGroup({})", self.bqq_group_id)
+    }
+}
+
+/// Runtime wiring: bqr_ ScmInput
+#[derive(Debug, Clone)]
+pub struct ScmInput {
+    pub bqr_input_value: String,
+    pub bqr_placeholder: String,
+    pub bqr_is_visible: bool,
+    pub bqr_is_enabled: bool,
+    pub bqr_validation_message: String,
+    pub bqr_validation_type: u8,
+    pub bqr_repository_id: String,
+    pub bqr_action_button_label: String,
+    pub bqr_action_button_enabled: bool,
+    pub bqr_focus_on_show: bool,
+}
+
+impl ScmInput {
+    pub fn bqr_summary(&self) -> String {
+        format!("ScmInput({})", self.bqr_input_value)
+    }
+}
+
+/// Runtime wiring: bqs_ ScmHistory
+#[derive(Debug, Clone)]
+pub struct ScmHistory {
+    pub bqs_history_item_id: String,
+    pub bqs_parent_ids: Vec<String>,
+    pub bqs_label: String,
+    pub bqs_description: String,
+    pub bqs_icon_path: String,
+    pub bqs_timestamp: u64,
+    pub bqs_author: String,
+    pub bqs_message: String,
+    pub bqs_statistics_files: u32,
+    pub bqs_statistics_insertions: u32,
+}
+
+impl ScmHistory {
+    pub fn bqs_summary(&self) -> String {
+        format!("ScmHistory({})", self.bqs_history_item_id)
+    }
+}
+
+/// Runtime wiring: bqt_ ScmAction
+#[derive(Debug, Clone)]
+pub struct ScmAction {
+    pub bqt_action_id: String,
+    pub bqt_action_label: String,
+    pub bqt_action_tooltip: String,
+    pub bqt_action_icon: String,
+    pub bqt_is_primary: bool,
+    pub bqt_is_inline: bool,
+    pub bqt_repository_id: String,
+    pub bqt_group_id: String,
+    pub bqt_when_clause: String,
+    pub bqt_command_args: Vec<String>,
+}
+
+impl ScmAction {
+    pub fn bqt_summary(&self) -> String {
+        format!("ScmAction({})", self.bqt_action_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -114905,6 +115010,910 @@ mod tests_bfo {
         };
         let _ = obj.bqo_summary();
         assert!(!obj.bqo_is_markdown);
+    }
+
+    #[test]
+    fn test_bqp_resource_uri() {
+        let obj = ScmResource {
+            bqp_resource_uri: String::from("test"),
+            bqp_resource_group_id: String::from("test"),
+            bqp_decorations_letter: String::from("test"),
+            bqp_decorations_color: String::from("test"),
+            bqp_decorations_tooltip: String::from("test"),
+            bqp_context_value: String::from("test"),
+            bqp_command_id: String::from("test"),
+            bqp_is_faux: false,
+            bqp_is_selected: false,
+            bqp_original_uri: String::from("test"),
+        };
+        let _ = obj.bqp_summary();
+        assert_eq!(obj.bqp_resource_uri, "test");
+    }
+
+    #[test]
+    fn test_bqp_resource_group_id() {
+        let obj = ScmResource {
+            bqp_resource_uri: String::from("test"),
+            bqp_resource_group_id: String::from("test"),
+            bqp_decorations_letter: String::from("test"),
+            bqp_decorations_color: String::from("test"),
+            bqp_decorations_tooltip: String::from("test"),
+            bqp_context_value: String::from("test"),
+            bqp_command_id: String::from("test"),
+            bqp_is_faux: false,
+            bqp_is_selected: false,
+            bqp_original_uri: String::from("test"),
+        };
+        let _ = obj.bqp_summary();
+        assert_eq!(obj.bqp_resource_group_id, "test");
+    }
+
+    #[test]
+    fn test_bqp_decorations_letter() {
+        let obj = ScmResource {
+            bqp_resource_uri: String::from("test"),
+            bqp_resource_group_id: String::from("test"),
+            bqp_decorations_letter: String::from("test"),
+            bqp_decorations_color: String::from("test"),
+            bqp_decorations_tooltip: String::from("test"),
+            bqp_context_value: String::from("test"),
+            bqp_command_id: String::from("test"),
+            bqp_is_faux: false,
+            bqp_is_selected: false,
+            bqp_original_uri: String::from("test"),
+        };
+        let _ = obj.bqp_summary();
+        assert_eq!(obj.bqp_decorations_letter, "test");
+    }
+
+    #[test]
+    fn test_bqp_decorations_color() {
+        let obj = ScmResource {
+            bqp_resource_uri: String::from("test"),
+            bqp_resource_group_id: String::from("test"),
+            bqp_decorations_letter: String::from("test"),
+            bqp_decorations_color: String::from("test"),
+            bqp_decorations_tooltip: String::from("test"),
+            bqp_context_value: String::from("test"),
+            bqp_command_id: String::from("test"),
+            bqp_is_faux: false,
+            bqp_is_selected: false,
+            bqp_original_uri: String::from("test"),
+        };
+        let _ = obj.bqp_summary();
+        assert_eq!(obj.bqp_decorations_color, "test");
+    }
+
+    #[test]
+    fn test_bqp_decorations_tooltip() {
+        let obj = ScmResource {
+            bqp_resource_uri: String::from("test"),
+            bqp_resource_group_id: String::from("test"),
+            bqp_decorations_letter: String::from("test"),
+            bqp_decorations_color: String::from("test"),
+            bqp_decorations_tooltip: String::from("test"),
+            bqp_context_value: String::from("test"),
+            bqp_command_id: String::from("test"),
+            bqp_is_faux: false,
+            bqp_is_selected: false,
+            bqp_original_uri: String::from("test"),
+        };
+        let _ = obj.bqp_summary();
+        assert_eq!(obj.bqp_decorations_tooltip, "test");
+    }
+
+    #[test]
+    fn test_bqp_context_value() {
+        let obj = ScmResource {
+            bqp_resource_uri: String::from("test"),
+            bqp_resource_group_id: String::from("test"),
+            bqp_decorations_letter: String::from("test"),
+            bqp_decorations_color: String::from("test"),
+            bqp_decorations_tooltip: String::from("test"),
+            bqp_context_value: String::from("test"),
+            bqp_command_id: String::from("test"),
+            bqp_is_faux: false,
+            bqp_is_selected: false,
+            bqp_original_uri: String::from("test"),
+        };
+        let _ = obj.bqp_summary();
+        assert_eq!(obj.bqp_context_value, "test");
+    }
+
+    #[test]
+    fn test_bqp_command_id() {
+        let obj = ScmResource {
+            bqp_resource_uri: String::from("test"),
+            bqp_resource_group_id: String::from("test"),
+            bqp_decorations_letter: String::from("test"),
+            bqp_decorations_color: String::from("test"),
+            bqp_decorations_tooltip: String::from("test"),
+            bqp_context_value: String::from("test"),
+            bqp_command_id: String::from("test"),
+            bqp_is_faux: false,
+            bqp_is_selected: false,
+            bqp_original_uri: String::from("test"),
+        };
+        let _ = obj.bqp_summary();
+        assert_eq!(obj.bqp_command_id, "test");
+    }
+
+    #[test]
+    fn test_bqp_is_faux() {
+        let obj = ScmResource {
+            bqp_resource_uri: String::from("test"),
+            bqp_resource_group_id: String::from("test"),
+            bqp_decorations_letter: String::from("test"),
+            bqp_decorations_color: String::from("test"),
+            bqp_decorations_tooltip: String::from("test"),
+            bqp_context_value: String::from("test"),
+            bqp_command_id: String::from("test"),
+            bqp_is_faux: false,
+            bqp_is_selected: false,
+            bqp_original_uri: String::from("test"),
+        };
+        let _ = obj.bqp_summary();
+        assert!(!obj.bqp_is_faux);
+    }
+
+    #[test]
+    fn test_bqp_is_selected() {
+        let obj = ScmResource {
+            bqp_resource_uri: String::from("test"),
+            bqp_resource_group_id: String::from("test"),
+            bqp_decorations_letter: String::from("test"),
+            bqp_decorations_color: String::from("test"),
+            bqp_decorations_tooltip: String::from("test"),
+            bqp_context_value: String::from("test"),
+            bqp_command_id: String::from("test"),
+            bqp_is_faux: false,
+            bqp_is_selected: false,
+            bqp_original_uri: String::from("test"),
+        };
+        let _ = obj.bqp_summary();
+        assert!(!obj.bqp_is_selected);
+    }
+
+    #[test]
+    fn test_bqp_original_uri() {
+        let obj = ScmResource {
+            bqp_resource_uri: String::from("test"),
+            bqp_resource_group_id: String::from("test"),
+            bqp_decorations_letter: String::from("test"),
+            bqp_decorations_color: String::from("test"),
+            bqp_decorations_tooltip: String::from("test"),
+            bqp_context_value: String::from("test"),
+            bqp_command_id: String::from("test"),
+            bqp_is_faux: false,
+            bqp_is_selected: false,
+            bqp_original_uri: String::from("test"),
+        };
+        let _ = obj.bqp_summary();
+        assert_eq!(obj.bqp_original_uri, "test");
+    }
+
+
+    #[test]
+    fn test_bqq_group_id() {
+        let obj = ScmResourceGroup {
+            bqq_group_id: String::from("test"),
+            bqq_group_label: String::from("test"),
+            bqq_resource_count: 0,
+            bqq_hide_when_empty: false,
+            bqq_is_collapsed: false,
+            bqq_context_value: String::from("test"),
+            bqq_repository_id: String::from("test"),
+            bqq_sort_order: 0,
+            bqq_icon_path: String::from("test"),
+            bqq_description: String::from("test"),
+        };
+        let _ = obj.bqq_summary();
+        assert_eq!(obj.bqq_group_id, "test");
+    }
+
+    #[test]
+    fn test_bqq_group_label() {
+        let obj = ScmResourceGroup {
+            bqq_group_id: String::from("test"),
+            bqq_group_label: String::from("test"),
+            bqq_resource_count: 0,
+            bqq_hide_when_empty: false,
+            bqq_is_collapsed: false,
+            bqq_context_value: String::from("test"),
+            bqq_repository_id: String::from("test"),
+            bqq_sort_order: 0,
+            bqq_icon_path: String::from("test"),
+            bqq_description: String::from("test"),
+        };
+        let _ = obj.bqq_summary();
+        assert_eq!(obj.bqq_group_label, "test");
+    }
+
+    #[test]
+    fn test_bqq_resource_count() {
+        let obj = ScmResourceGroup {
+            bqq_group_id: String::from("test"),
+            bqq_group_label: String::from("test"),
+            bqq_resource_count: 0,
+            bqq_hide_when_empty: false,
+            bqq_is_collapsed: false,
+            bqq_context_value: String::from("test"),
+            bqq_repository_id: String::from("test"),
+            bqq_sort_order: 0,
+            bqq_icon_path: String::from("test"),
+            bqq_description: String::from("test"),
+        };
+        let _ = obj.bqq_summary();
+        assert_eq!(obj.bqq_resource_count, 0);
+    }
+
+    #[test]
+    fn test_bqq_hide_when_empty() {
+        let obj = ScmResourceGroup {
+            bqq_group_id: String::from("test"),
+            bqq_group_label: String::from("test"),
+            bqq_resource_count: 0,
+            bqq_hide_when_empty: false,
+            bqq_is_collapsed: false,
+            bqq_context_value: String::from("test"),
+            bqq_repository_id: String::from("test"),
+            bqq_sort_order: 0,
+            bqq_icon_path: String::from("test"),
+            bqq_description: String::from("test"),
+        };
+        let _ = obj.bqq_summary();
+        assert!(!obj.bqq_hide_when_empty);
+    }
+
+    #[test]
+    fn test_bqq_is_collapsed() {
+        let obj = ScmResourceGroup {
+            bqq_group_id: String::from("test"),
+            bqq_group_label: String::from("test"),
+            bqq_resource_count: 0,
+            bqq_hide_when_empty: false,
+            bqq_is_collapsed: false,
+            bqq_context_value: String::from("test"),
+            bqq_repository_id: String::from("test"),
+            bqq_sort_order: 0,
+            bqq_icon_path: String::from("test"),
+            bqq_description: String::from("test"),
+        };
+        let _ = obj.bqq_summary();
+        assert!(!obj.bqq_is_collapsed);
+    }
+
+    #[test]
+    fn test_bqq_context_value() {
+        let obj = ScmResourceGroup {
+            bqq_group_id: String::from("test"),
+            bqq_group_label: String::from("test"),
+            bqq_resource_count: 0,
+            bqq_hide_when_empty: false,
+            bqq_is_collapsed: false,
+            bqq_context_value: String::from("test"),
+            bqq_repository_id: String::from("test"),
+            bqq_sort_order: 0,
+            bqq_icon_path: String::from("test"),
+            bqq_description: String::from("test"),
+        };
+        let _ = obj.bqq_summary();
+        assert_eq!(obj.bqq_context_value, "test");
+    }
+
+    #[test]
+    fn test_bqq_repository_id() {
+        let obj = ScmResourceGroup {
+            bqq_group_id: String::from("test"),
+            bqq_group_label: String::from("test"),
+            bqq_resource_count: 0,
+            bqq_hide_when_empty: false,
+            bqq_is_collapsed: false,
+            bqq_context_value: String::from("test"),
+            bqq_repository_id: String::from("test"),
+            bqq_sort_order: 0,
+            bqq_icon_path: String::from("test"),
+            bqq_description: String::from("test"),
+        };
+        let _ = obj.bqq_summary();
+        assert_eq!(obj.bqq_repository_id, "test");
+    }
+
+    #[test]
+    fn test_bqq_sort_order() {
+        let obj = ScmResourceGroup {
+            bqq_group_id: String::from("test"),
+            bqq_group_label: String::from("test"),
+            bqq_resource_count: 0,
+            bqq_hide_when_empty: false,
+            bqq_is_collapsed: false,
+            bqq_context_value: String::from("test"),
+            bqq_repository_id: String::from("test"),
+            bqq_sort_order: 0,
+            bqq_icon_path: String::from("test"),
+            bqq_description: String::from("test"),
+        };
+        let _ = obj.bqq_summary();
+        assert_eq!(obj.bqq_sort_order, 0);
+    }
+
+    #[test]
+    fn test_bqq_icon_path() {
+        let obj = ScmResourceGroup {
+            bqq_group_id: String::from("test"),
+            bqq_group_label: String::from("test"),
+            bqq_resource_count: 0,
+            bqq_hide_when_empty: false,
+            bqq_is_collapsed: false,
+            bqq_context_value: String::from("test"),
+            bqq_repository_id: String::from("test"),
+            bqq_sort_order: 0,
+            bqq_icon_path: String::from("test"),
+            bqq_description: String::from("test"),
+        };
+        let _ = obj.bqq_summary();
+        assert_eq!(obj.bqq_icon_path, "test");
+    }
+
+    #[test]
+    fn test_bqq_description() {
+        let obj = ScmResourceGroup {
+            bqq_group_id: String::from("test"),
+            bqq_group_label: String::from("test"),
+            bqq_resource_count: 0,
+            bqq_hide_when_empty: false,
+            bqq_is_collapsed: false,
+            bqq_context_value: String::from("test"),
+            bqq_repository_id: String::from("test"),
+            bqq_sort_order: 0,
+            bqq_icon_path: String::from("test"),
+            bqq_description: String::from("test"),
+        };
+        let _ = obj.bqq_summary();
+        assert_eq!(obj.bqq_description, "test");
+    }
+
+
+    #[test]
+    fn test_bqr_input_value() {
+        let obj = ScmInput {
+            bqr_input_value: String::from("test"),
+            bqr_placeholder: String::from("test"),
+            bqr_is_visible: false,
+            bqr_is_enabled: false,
+            bqr_validation_message: String::from("test"),
+            bqr_validation_type: 0,
+            bqr_repository_id: String::from("test"),
+            bqr_action_button_label: String::from("test"),
+            bqr_action_button_enabled: false,
+            bqr_focus_on_show: false,
+        };
+        let _ = obj.bqr_summary();
+        assert_eq!(obj.bqr_input_value, "test");
+    }
+
+    #[test]
+    fn test_bqr_placeholder() {
+        let obj = ScmInput {
+            bqr_input_value: String::from("test"),
+            bqr_placeholder: String::from("test"),
+            bqr_is_visible: false,
+            bqr_is_enabled: false,
+            bqr_validation_message: String::from("test"),
+            bqr_validation_type: 0,
+            bqr_repository_id: String::from("test"),
+            bqr_action_button_label: String::from("test"),
+            bqr_action_button_enabled: false,
+            bqr_focus_on_show: false,
+        };
+        let _ = obj.bqr_summary();
+        assert_eq!(obj.bqr_placeholder, "test");
+    }
+
+    #[test]
+    fn test_bqr_is_visible() {
+        let obj = ScmInput {
+            bqr_input_value: String::from("test"),
+            bqr_placeholder: String::from("test"),
+            bqr_is_visible: false,
+            bqr_is_enabled: false,
+            bqr_validation_message: String::from("test"),
+            bqr_validation_type: 0,
+            bqr_repository_id: String::from("test"),
+            bqr_action_button_label: String::from("test"),
+            bqr_action_button_enabled: false,
+            bqr_focus_on_show: false,
+        };
+        let _ = obj.bqr_summary();
+        assert!(!obj.bqr_is_visible);
+    }
+
+    #[test]
+    fn test_bqr_is_enabled() {
+        let obj = ScmInput {
+            bqr_input_value: String::from("test"),
+            bqr_placeholder: String::from("test"),
+            bqr_is_visible: false,
+            bqr_is_enabled: false,
+            bqr_validation_message: String::from("test"),
+            bqr_validation_type: 0,
+            bqr_repository_id: String::from("test"),
+            bqr_action_button_label: String::from("test"),
+            bqr_action_button_enabled: false,
+            bqr_focus_on_show: false,
+        };
+        let _ = obj.bqr_summary();
+        assert!(!obj.bqr_is_enabled);
+    }
+
+    #[test]
+    fn test_bqr_validation_message() {
+        let obj = ScmInput {
+            bqr_input_value: String::from("test"),
+            bqr_placeholder: String::from("test"),
+            bqr_is_visible: false,
+            bqr_is_enabled: false,
+            bqr_validation_message: String::from("test"),
+            bqr_validation_type: 0,
+            bqr_repository_id: String::from("test"),
+            bqr_action_button_label: String::from("test"),
+            bqr_action_button_enabled: false,
+            bqr_focus_on_show: false,
+        };
+        let _ = obj.bqr_summary();
+        assert_eq!(obj.bqr_validation_message, "test");
+    }
+
+    #[test]
+    fn test_bqr_validation_type() {
+        let obj = ScmInput {
+            bqr_input_value: String::from("test"),
+            bqr_placeholder: String::from("test"),
+            bqr_is_visible: false,
+            bqr_is_enabled: false,
+            bqr_validation_message: String::from("test"),
+            bqr_validation_type: 0,
+            bqr_repository_id: String::from("test"),
+            bqr_action_button_label: String::from("test"),
+            bqr_action_button_enabled: false,
+            bqr_focus_on_show: false,
+        };
+        let _ = obj.bqr_summary();
+        assert_eq!(obj.bqr_validation_type, 0);
+    }
+
+    #[test]
+    fn test_bqr_repository_id() {
+        let obj = ScmInput {
+            bqr_input_value: String::from("test"),
+            bqr_placeholder: String::from("test"),
+            bqr_is_visible: false,
+            bqr_is_enabled: false,
+            bqr_validation_message: String::from("test"),
+            bqr_validation_type: 0,
+            bqr_repository_id: String::from("test"),
+            bqr_action_button_label: String::from("test"),
+            bqr_action_button_enabled: false,
+            bqr_focus_on_show: false,
+        };
+        let _ = obj.bqr_summary();
+        assert_eq!(obj.bqr_repository_id, "test");
+    }
+
+    #[test]
+    fn test_bqr_action_button_label() {
+        let obj = ScmInput {
+            bqr_input_value: String::from("test"),
+            bqr_placeholder: String::from("test"),
+            bqr_is_visible: false,
+            bqr_is_enabled: false,
+            bqr_validation_message: String::from("test"),
+            bqr_validation_type: 0,
+            bqr_repository_id: String::from("test"),
+            bqr_action_button_label: String::from("test"),
+            bqr_action_button_enabled: false,
+            bqr_focus_on_show: false,
+        };
+        let _ = obj.bqr_summary();
+        assert_eq!(obj.bqr_action_button_label, "test");
+    }
+
+    #[test]
+    fn test_bqr_action_button_enabled() {
+        let obj = ScmInput {
+            bqr_input_value: String::from("test"),
+            bqr_placeholder: String::from("test"),
+            bqr_is_visible: false,
+            bqr_is_enabled: false,
+            bqr_validation_message: String::from("test"),
+            bqr_validation_type: 0,
+            bqr_repository_id: String::from("test"),
+            bqr_action_button_label: String::from("test"),
+            bqr_action_button_enabled: false,
+            bqr_focus_on_show: false,
+        };
+        let _ = obj.bqr_summary();
+        assert!(!obj.bqr_action_button_enabled);
+    }
+
+    #[test]
+    fn test_bqr_focus_on_show() {
+        let obj = ScmInput {
+            bqr_input_value: String::from("test"),
+            bqr_placeholder: String::from("test"),
+            bqr_is_visible: false,
+            bqr_is_enabled: false,
+            bqr_validation_message: String::from("test"),
+            bqr_validation_type: 0,
+            bqr_repository_id: String::from("test"),
+            bqr_action_button_label: String::from("test"),
+            bqr_action_button_enabled: false,
+            bqr_focus_on_show: false,
+        };
+        let _ = obj.bqr_summary();
+        assert!(!obj.bqr_focus_on_show);
+    }
+
+
+    #[test]
+    fn test_bqs_history_item_id() {
+        let obj = ScmHistory {
+            bqs_history_item_id: String::from("test"),
+            bqs_parent_ids: Vec::new(),
+            bqs_label: String::from("test"),
+            bqs_description: String::from("test"),
+            bqs_icon_path: String::from("test"),
+            bqs_timestamp: 0,
+            bqs_author: String::from("test"),
+            bqs_message: String::from("test"),
+            bqs_statistics_files: 0,
+            bqs_statistics_insertions: 0,
+        };
+        let _ = obj.bqs_summary();
+        assert_eq!(obj.bqs_history_item_id, "test");
+    }
+
+    #[test]
+    fn test_bqs_parent_ids() {
+        let obj = ScmHistory {
+            bqs_history_item_id: String::from("test"),
+            bqs_parent_ids: Vec::new(),
+            bqs_label: String::from("test"),
+            bqs_description: String::from("test"),
+            bqs_icon_path: String::from("test"),
+            bqs_timestamp: 0,
+            bqs_author: String::from("test"),
+            bqs_message: String::from("test"),
+            bqs_statistics_files: 0,
+            bqs_statistics_insertions: 0,
+        };
+        let _ = obj.bqs_summary();
+        assert!(obj.bqs_parent_ids.is_empty());
+    }
+
+    #[test]
+    fn test_bqs_label() {
+        let obj = ScmHistory {
+            bqs_history_item_id: String::from("test"),
+            bqs_parent_ids: Vec::new(),
+            bqs_label: String::from("test"),
+            bqs_description: String::from("test"),
+            bqs_icon_path: String::from("test"),
+            bqs_timestamp: 0,
+            bqs_author: String::from("test"),
+            bqs_message: String::from("test"),
+            bqs_statistics_files: 0,
+            bqs_statistics_insertions: 0,
+        };
+        let _ = obj.bqs_summary();
+        assert_eq!(obj.bqs_label, "test");
+    }
+
+    #[test]
+    fn test_bqs_description() {
+        let obj = ScmHistory {
+            bqs_history_item_id: String::from("test"),
+            bqs_parent_ids: Vec::new(),
+            bqs_label: String::from("test"),
+            bqs_description: String::from("test"),
+            bqs_icon_path: String::from("test"),
+            bqs_timestamp: 0,
+            bqs_author: String::from("test"),
+            bqs_message: String::from("test"),
+            bqs_statistics_files: 0,
+            bqs_statistics_insertions: 0,
+        };
+        let _ = obj.bqs_summary();
+        assert_eq!(obj.bqs_description, "test");
+    }
+
+    #[test]
+    fn test_bqs_icon_path() {
+        let obj = ScmHistory {
+            bqs_history_item_id: String::from("test"),
+            bqs_parent_ids: Vec::new(),
+            bqs_label: String::from("test"),
+            bqs_description: String::from("test"),
+            bqs_icon_path: String::from("test"),
+            bqs_timestamp: 0,
+            bqs_author: String::from("test"),
+            bqs_message: String::from("test"),
+            bqs_statistics_files: 0,
+            bqs_statistics_insertions: 0,
+        };
+        let _ = obj.bqs_summary();
+        assert_eq!(obj.bqs_icon_path, "test");
+    }
+
+    #[test]
+    fn test_bqs_timestamp() {
+        let obj = ScmHistory {
+            bqs_history_item_id: String::from("test"),
+            bqs_parent_ids: Vec::new(),
+            bqs_label: String::from("test"),
+            bqs_description: String::from("test"),
+            bqs_icon_path: String::from("test"),
+            bqs_timestamp: 0,
+            bqs_author: String::from("test"),
+            bqs_message: String::from("test"),
+            bqs_statistics_files: 0,
+            bqs_statistics_insertions: 0,
+        };
+        let _ = obj.bqs_summary();
+        assert_eq!(obj.bqs_timestamp, 0);
+    }
+
+    #[test]
+    fn test_bqs_author() {
+        let obj = ScmHistory {
+            bqs_history_item_id: String::from("test"),
+            bqs_parent_ids: Vec::new(),
+            bqs_label: String::from("test"),
+            bqs_description: String::from("test"),
+            bqs_icon_path: String::from("test"),
+            bqs_timestamp: 0,
+            bqs_author: String::from("test"),
+            bqs_message: String::from("test"),
+            bqs_statistics_files: 0,
+            bqs_statistics_insertions: 0,
+        };
+        let _ = obj.bqs_summary();
+        assert_eq!(obj.bqs_author, "test");
+    }
+
+    #[test]
+    fn test_bqs_message() {
+        let obj = ScmHistory {
+            bqs_history_item_id: String::from("test"),
+            bqs_parent_ids: Vec::new(),
+            bqs_label: String::from("test"),
+            bqs_description: String::from("test"),
+            bqs_icon_path: String::from("test"),
+            bqs_timestamp: 0,
+            bqs_author: String::from("test"),
+            bqs_message: String::from("test"),
+            bqs_statistics_files: 0,
+            bqs_statistics_insertions: 0,
+        };
+        let _ = obj.bqs_summary();
+        assert_eq!(obj.bqs_message, "test");
+    }
+
+    #[test]
+    fn test_bqs_statistics_files() {
+        let obj = ScmHistory {
+            bqs_history_item_id: String::from("test"),
+            bqs_parent_ids: Vec::new(),
+            bqs_label: String::from("test"),
+            bqs_description: String::from("test"),
+            bqs_icon_path: String::from("test"),
+            bqs_timestamp: 0,
+            bqs_author: String::from("test"),
+            bqs_message: String::from("test"),
+            bqs_statistics_files: 0,
+            bqs_statistics_insertions: 0,
+        };
+        let _ = obj.bqs_summary();
+        assert_eq!(obj.bqs_statistics_files, 0);
+    }
+
+    #[test]
+    fn test_bqs_statistics_insertions() {
+        let obj = ScmHistory {
+            bqs_history_item_id: String::from("test"),
+            bqs_parent_ids: Vec::new(),
+            bqs_label: String::from("test"),
+            bqs_description: String::from("test"),
+            bqs_icon_path: String::from("test"),
+            bqs_timestamp: 0,
+            bqs_author: String::from("test"),
+            bqs_message: String::from("test"),
+            bqs_statistics_files: 0,
+            bqs_statistics_insertions: 0,
+        };
+        let _ = obj.bqs_summary();
+        assert_eq!(obj.bqs_statistics_insertions, 0);
+    }
+
+
+    #[test]
+    fn test_bqt_action_id() {
+        let obj = ScmAction {
+            bqt_action_id: String::from("test"),
+            bqt_action_label: String::from("test"),
+            bqt_action_tooltip: String::from("test"),
+            bqt_action_icon: String::from("test"),
+            bqt_is_primary: false,
+            bqt_is_inline: false,
+            bqt_repository_id: String::from("test"),
+            bqt_group_id: String::from("test"),
+            bqt_when_clause: String::from("test"),
+            bqt_command_args: Vec::new(),
+        };
+        let _ = obj.bqt_summary();
+        assert_eq!(obj.bqt_action_id, "test");
+    }
+
+    #[test]
+    fn test_bqt_action_label() {
+        let obj = ScmAction {
+            bqt_action_id: String::from("test"),
+            bqt_action_label: String::from("test"),
+            bqt_action_tooltip: String::from("test"),
+            bqt_action_icon: String::from("test"),
+            bqt_is_primary: false,
+            bqt_is_inline: false,
+            bqt_repository_id: String::from("test"),
+            bqt_group_id: String::from("test"),
+            bqt_when_clause: String::from("test"),
+            bqt_command_args: Vec::new(),
+        };
+        let _ = obj.bqt_summary();
+        assert_eq!(obj.bqt_action_label, "test");
+    }
+
+    #[test]
+    fn test_bqt_action_tooltip() {
+        let obj = ScmAction {
+            bqt_action_id: String::from("test"),
+            bqt_action_label: String::from("test"),
+            bqt_action_tooltip: String::from("test"),
+            bqt_action_icon: String::from("test"),
+            bqt_is_primary: false,
+            bqt_is_inline: false,
+            bqt_repository_id: String::from("test"),
+            bqt_group_id: String::from("test"),
+            bqt_when_clause: String::from("test"),
+            bqt_command_args: Vec::new(),
+        };
+        let _ = obj.bqt_summary();
+        assert_eq!(obj.bqt_action_tooltip, "test");
+    }
+
+    #[test]
+    fn test_bqt_action_icon() {
+        let obj = ScmAction {
+            bqt_action_id: String::from("test"),
+            bqt_action_label: String::from("test"),
+            bqt_action_tooltip: String::from("test"),
+            bqt_action_icon: String::from("test"),
+            bqt_is_primary: false,
+            bqt_is_inline: false,
+            bqt_repository_id: String::from("test"),
+            bqt_group_id: String::from("test"),
+            bqt_when_clause: String::from("test"),
+            bqt_command_args: Vec::new(),
+        };
+        let _ = obj.bqt_summary();
+        assert_eq!(obj.bqt_action_icon, "test");
+    }
+
+    #[test]
+    fn test_bqt_is_primary() {
+        let obj = ScmAction {
+            bqt_action_id: String::from("test"),
+            bqt_action_label: String::from("test"),
+            bqt_action_tooltip: String::from("test"),
+            bqt_action_icon: String::from("test"),
+            bqt_is_primary: false,
+            bqt_is_inline: false,
+            bqt_repository_id: String::from("test"),
+            bqt_group_id: String::from("test"),
+            bqt_when_clause: String::from("test"),
+            bqt_command_args: Vec::new(),
+        };
+        let _ = obj.bqt_summary();
+        assert!(!obj.bqt_is_primary);
+    }
+
+    #[test]
+    fn test_bqt_is_inline() {
+        let obj = ScmAction {
+            bqt_action_id: String::from("test"),
+            bqt_action_label: String::from("test"),
+            bqt_action_tooltip: String::from("test"),
+            bqt_action_icon: String::from("test"),
+            bqt_is_primary: false,
+            bqt_is_inline: false,
+            bqt_repository_id: String::from("test"),
+            bqt_group_id: String::from("test"),
+            bqt_when_clause: String::from("test"),
+            bqt_command_args: Vec::new(),
+        };
+        let _ = obj.bqt_summary();
+        assert!(!obj.bqt_is_inline);
+    }
+
+    #[test]
+    fn test_bqt_repository_id() {
+        let obj = ScmAction {
+            bqt_action_id: String::from("test"),
+            bqt_action_label: String::from("test"),
+            bqt_action_tooltip: String::from("test"),
+            bqt_action_icon: String::from("test"),
+            bqt_is_primary: false,
+            bqt_is_inline: false,
+            bqt_repository_id: String::from("test"),
+            bqt_group_id: String::from("test"),
+            bqt_when_clause: String::from("test"),
+            bqt_command_args: Vec::new(),
+        };
+        let _ = obj.bqt_summary();
+        assert_eq!(obj.bqt_repository_id, "test");
+    }
+
+    #[test]
+    fn test_bqt_group_id() {
+        let obj = ScmAction {
+            bqt_action_id: String::from("test"),
+            bqt_action_label: String::from("test"),
+            bqt_action_tooltip: String::from("test"),
+            bqt_action_icon: String::from("test"),
+            bqt_is_primary: false,
+            bqt_is_inline: false,
+            bqt_repository_id: String::from("test"),
+            bqt_group_id: String::from("test"),
+            bqt_when_clause: String::from("test"),
+            bqt_command_args: Vec::new(),
+        };
+        let _ = obj.bqt_summary();
+        assert_eq!(obj.bqt_group_id, "test");
+    }
+
+    #[test]
+    fn test_bqt_when_clause() {
+        let obj = ScmAction {
+            bqt_action_id: String::from("test"),
+            bqt_action_label: String::from("test"),
+            bqt_action_tooltip: String::from("test"),
+            bqt_action_icon: String::from("test"),
+            bqt_is_primary: false,
+            bqt_is_inline: false,
+            bqt_repository_id: String::from("test"),
+            bqt_group_id: String::from("test"),
+            bqt_when_clause: String::from("test"),
+            bqt_command_args: Vec::new(),
+        };
+        let _ = obj.bqt_summary();
+        assert_eq!(obj.bqt_when_clause, "test");
+    }
+
+    #[test]
+    fn test_bqt_command_args() {
+        let obj = ScmAction {
+            bqt_action_id: String::from("test"),
+            bqt_action_label: String::from("test"),
+            bqt_action_tooltip: String::from("test"),
+            bqt_action_icon: String::from("test"),
+            bqt_is_primary: false,
+            bqt_is_inline: false,
+            bqt_repository_id: String::from("test"),
+            bqt_group_id: String::from("test"),
+            bqt_when_clause: String::from("test"),
+            bqt_command_args: Vec::new(),
+        };
+        let _ = obj.bqt_summary();
+        assert!(obj.bqt_command_args.is_empty());
     }
 
 }
