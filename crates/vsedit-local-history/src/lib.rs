@@ -59000,3 +59000,222 @@ mod bbm_tests {
         assert_eq!(m.encoding(), BbmEncoding::Latin1);
     }
 }
+
+
+// --- bbn_: Editor language mode model ---
+
+/// A language identifier.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BbnLanguageId(pub String);
+
+impl BbnLanguageId {
+    pub fn new(id: &str) -> Self { Self(id.to_string()) }
+    pub fn as_str(&self) -> &str { &self.0 }
+}
+
+/// File association for language detection.
+#[derive(Debug, Clone)]
+pub struct BbnFileAssociation {
+    pub extensions: Vec<String>,
+    pub filenames: Vec<String>,
+    pub first_line_pattern: Option<String>,
+}
+
+impl BbnFileAssociation {
+    pub fn new() -> Self {
+        Self { extensions: Vec::new(), filenames: Vec::new(), first_line_pattern: None }
+    }
+
+    pub fn matches_extension(&self, ext: &str) -> bool {
+        self.extensions.iter().any(|e| e.eq_ignore_ascii_case(ext))
+    }
+
+    pub fn matches_filename(&self, name: &str) -> bool {
+        self.filenames.iter().any(|f| f == name)
+    }
+}
+
+/// A language definition.
+#[derive(Debug, Clone)]
+pub struct BbnLanguageDef {
+    pub id: BbnLanguageId,
+    pub name: String,
+    pub aliases: Vec<String>,
+    pub associations: BbnFileAssociation,
+    pub configuration: BbnLanguageConfig,
+}
+
+impl BbnLanguageDef {
+    pub fn new(id: &str, name: &str) -> Self {
+        Self {
+            id: BbnLanguageId::new(id), name: name.to_string(),
+            aliases: Vec::new(), associations: BbnFileAssociation::new(),
+            configuration: BbnLanguageConfig::default_config(),
+        }
+    }
+
+    pub fn with_extensions(mut self, exts: Vec<&str>) -> Self {
+        self.associations.extensions = exts.into_iter().map(|s| s.to_string()).collect();
+        self
+    }
+
+    pub fn with_alias(mut self, alias: &str) -> Self {
+        self.aliases.push(alias.to_string()); self
+    }
+}
+
+/// Language-specific configuration.
+#[derive(Debug, Clone)]
+pub struct BbnLanguageConfig {
+    pub comment_line: Option<String>,
+    pub comment_block_start: Option<String>,
+    pub comment_block_end: Option<String>,
+    pub brackets: Vec<(String, String)>,
+    pub auto_closing_pairs: Vec<(String, String)>,
+    pub word_pattern: Option<String>,
+}
+
+impl BbnLanguageConfig {
+    pub fn default_config() -> Self {
+        Self {
+            comment_line: None, comment_block_start: None, comment_block_end: None,
+            brackets: vec![("(".to_string(), ")".to_string()), ("[".to_string(), "]".to_string()), ("{".to_string(), "}".to_string())],
+            auto_closing_pairs: vec![("\"".to_string(), "\"".to_string()), ("'".to_string(), "'".to_string())],
+            word_pattern: None,
+        }
+    }
+
+    pub fn has_line_comment(&self) -> bool { self.comment_line.is_some() }
+    pub fn has_block_comment(&self) -> bool { self.comment_block_start.is_some() && self.comment_block_end.is_some() }
+}
+
+/// The language registry.
+#[derive(Debug)]
+pub struct BbnLanguageRegistry {
+    languages: Vec<BbnLanguageDef>,
+    current: Option<BbnLanguageId>,
+}
+
+impl BbnLanguageRegistry {
+    pub fn new() -> Self { Self { languages: Vec::new(), current: None } }
+
+    pub fn register(&mut self, lang: BbnLanguageDef) { self.languages.push(lang); }
+    pub fn language_count(&self) -> usize { self.languages.len() }
+
+    pub fn find_by_id(&self, id: &str) -> Option<&BbnLanguageDef> {
+        self.languages.iter().find(|l| l.id.as_str() == id)
+    }
+
+    pub fn detect_by_extension(&self, ext: &str) -> Option<&BbnLanguageDef> {
+        self.languages.iter().find(|l| l.associations.matches_extension(ext))
+    }
+
+    pub fn detect_by_filename(&self, name: &str) -> Option<&BbnLanguageDef> {
+        self.languages.iter().find(|l| l.associations.matches_filename(name))
+    }
+
+    pub fn set_current(&mut self, id: &str) {
+        self.current = Some(BbnLanguageId::new(id));
+    }
+
+    pub fn current(&self) -> Option<&BbnLanguageDef> {
+        self.current.as_ref().and_then(|id| self.find_by_id(id.as_str()))
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&BbnLanguageDef> {
+        let ql = query.to_lowercase();
+        self.languages.iter().filter(|l| {
+            l.name.to_lowercase().contains(&ql) || l.id.as_str().to_lowercase().contains(&ql) ||
+            l.aliases.iter().any(|a| a.to_lowercase().contains(&ql))
+        }).collect()
+    }
+
+    pub fn all_ids(&self) -> Vec<&str> {
+        self.languages.iter().map(|l| l.id.as_str()).collect()
+    }
+
+    pub fn status_text(&self) -> String {
+        match self.current() {
+            Some(l) => l.name.clone(),
+            None => "Plain Text".to_string(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod bbn_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbn_language_id() {
+        let id = BbnLanguageId::new("rust");
+        assert_eq!(id.as_str(), "rust");
+    }
+
+    #[test]
+    fn test_bbn_file_association() {
+        let mut a = BbnFileAssociation::new();
+        a.extensions = vec!["rs".to_string(), "rlib".to_string()];
+        a.filenames = vec!["Cargo.toml".to_string()];
+        assert!(a.matches_extension("rs"));
+        assert!(a.matches_extension("RS")); // case insensitive
+        assert!(a.matches_filename("Cargo.toml"));
+    }
+
+    #[test]
+    fn test_bbn_language_def() {
+        let lang = BbnLanguageDef::new("rust", "Rust")
+            .with_extensions(vec!["rs"])
+            .with_alias("Rust Language");
+        assert_eq!(lang.id.as_str(), "rust");
+        assert_eq!(lang.aliases.len(), 1);
+    }
+
+    #[test]
+    fn test_bbn_config() {
+        let mut c = BbnLanguageConfig::default_config();
+        assert!(!c.has_line_comment());
+        c.comment_line = Some("//".to_string());
+        assert!(c.has_line_comment());
+    }
+
+    #[test]
+    fn test_bbn_registry_register() {
+        let mut r = BbnLanguageRegistry::new();
+        r.register(BbnLanguageDef::new("rust", "Rust").with_extensions(vec!["rs"]));
+        r.register(BbnLanguageDef::new("python", "Python").with_extensions(vec!["py"]));
+        assert_eq!(r.language_count(), 2);
+    }
+
+    #[test]
+    fn test_bbn_registry_detect() {
+        let mut r = BbnLanguageRegistry::new();
+        r.register(BbnLanguageDef::new("rust", "Rust").with_extensions(vec!["rs"]));
+        assert_eq!(r.detect_by_extension("rs").unwrap().name, "Rust");
+        assert!(r.detect_by_extension("py").is_none());
+    }
+
+    #[test]
+    fn test_bbn_registry_current() {
+        let mut r = BbnLanguageRegistry::new();
+        r.register(BbnLanguageDef::new("rust", "Rust"));
+        r.set_current("rust");
+        assert_eq!(r.current().unwrap().name, "Rust");
+        assert_eq!(r.status_text(), "Rust");
+    }
+
+    #[test]
+    fn test_bbn_registry_search() {
+        let mut r = BbnLanguageRegistry::new();
+        r.register(BbnLanguageDef::new("rust", "Rust").with_alias("rs"));
+        r.register(BbnLanguageDef::new("python", "Python"));
+        assert_eq!(r.search("rust").len(), 1);
+        assert_eq!(r.search("rs").len(), 1);
+    }
+
+    #[test]
+    fn test_bbn_registry_status_default() {
+        let r = BbnLanguageRegistry::new();
+        assert_eq!(r.status_text(), "Plain Text");
+    }
+}
