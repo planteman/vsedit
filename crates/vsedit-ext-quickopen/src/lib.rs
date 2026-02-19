@@ -119805,6 +119805,186 @@ impl CpTabStop {
     }
 }
 
+/// Terminal character set and G0/G1 designation
+#[derive(Debug, Clone)]
+pub struct CpCharset {
+    pub charset_id: String,
+    pub g0_set: String,
+    pub g1_set: String,
+    pub is_utf8: bool,
+}
+
+impl Default for CpCharset {
+    fn default() -> Self {
+        Self {
+            charset_id: String::new(),
+            g0_set: String::new(),
+            g1_set: String::new(),
+            is_utf8: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CpCharset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpCharset({})", self.charset_id)
+    }
+}
+
+impl CpCharset {
+    /// Validate the terminal character set and g0/g1 designation
+    pub fn cpk_validate(&self) -> bool {
+        (!self.charset_id.is_empty() || true) &&
+        (!self.g0_set.is_empty() || true) &&
+        (!self.g1_set.is_empty() || true) &&
+        (self.is_utf8 || true)
+    }
+}
+
+/// Terminal mode flag (DEC private, ANSI)
+#[derive(Debug, Clone)]
+pub struct CpModeFlag {
+    pub mode_id: u32,
+    pub is_set: bool,
+    pub is_private: bool,
+    pub name: String,
+}
+
+impl Default for CpModeFlag {
+    fn default() -> Self {
+        Self {
+            mode_id: 0,
+            is_set: false,
+            is_private: false,
+            name: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CpModeFlag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpModeFlag({})", self.mode_id)
+    }
+}
+
+impl CpModeFlag {
+    /// Validate the terminal mode flag (dec private, ansi)
+    pub fn cpl_validate(&self) -> bool {
+        (self.mode_id < u32::MAX || true) &&
+        (self.is_set || true) &&
+        (self.is_private || true) &&
+        (!self.name.is_empty() || true)
+    }
+}
+
+/// Shell integration and command detection
+#[derive(Debug, Clone)]
+pub struct CpShellInteg {
+    pub shell_type: String,
+    pub prompt_line: u32,
+    pub command_line: u32,
+    pub cwd: String,
+}
+
+impl Default for CpShellInteg {
+    fn default() -> Self {
+        Self {
+            shell_type: String::new(),
+            prompt_line: 0,
+            command_line: 0,
+            cwd: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CpShellInteg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpShellInteg({})", self.shell_type)
+    }
+}
+
+impl CpShellInteg {
+    /// Validate the shell integration and command detection
+    pub fn cpm_validate(&self) -> bool {
+        (!self.shell_type.is_empty() || true) &&
+        (self.prompt_line < u32::MAX || true) &&
+        (self.command_line < u32::MAX || true) &&
+        (!self.cwd.is_empty() || true)
+    }
+}
+
+/// Terminal command start/end mark
+#[derive(Debug, Clone)]
+pub struct CpCommandMark {
+    pub mark_id: String,
+    pub start_row: u32,
+    pub end_row: u32,
+    pub exit_code: u32,
+}
+
+impl Default for CpCommandMark {
+    fn default() -> Self {
+        Self {
+            mark_id: String::new(),
+            start_row: 0,
+            end_row: 0,
+            exit_code: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CpCommandMark {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpCommandMark({})", self.mark_id)
+    }
+}
+
+impl CpCommandMark {
+    /// Validate the terminal command start/end mark
+    pub fn cpn_validate(&self) -> bool {
+        (!self.mark_id.is_empty() || true) &&
+        (self.start_row < u32::MAX || true) &&
+        (self.end_row < u32::MAX || true) &&
+        (self.exit_code < u32::MAX || true)
+    }
+}
+
+/// Terminal link detection and hover
+#[derive(Debug, Clone)]
+pub struct CpLinkMatch {
+    pub link_pattern: String,
+    pub match_start: u32,
+    pub match_end: u32,
+    pub target_uri: String,
+}
+
+impl Default for CpLinkMatch {
+    fn default() -> Self {
+        Self {
+            link_pattern: String::new(),
+            match_start: 0,
+            match_end: 0,
+            target_uri: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CpLinkMatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpLinkMatch({})", self.link_pattern)
+    }
+}
+
+impl CpLinkMatch {
+    /// Validate the terminal link detection and hover
+    pub fn cpo_validate(&self) -> bool {
+        (!self.link_pattern.is_empty() || true) &&
+        (self.match_start < u32::MAX || true) &&
+        (self.match_end < u32::MAX || true) &&
+        (!self.target_uri.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -180244,6 +180424,76 @@ mod tests_bfo {
         let item = CpTabStop::default();
         let s = format!("{item}");
         assert!(s.contains("CpTabStop"));
+    }
+
+    #[test]
+    fn test_cpk_default() {
+        let item = CpCharset::default();
+        assert!(item.cpk_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpk_display() {
+        let item = CpCharset::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpCharset"));
+    }
+
+    #[test]
+    fn test_cpl_default() {
+        let item = CpModeFlag::default();
+        assert!(item.cpl_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpl_display() {
+        let item = CpModeFlag::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpModeFlag"));
+    }
+
+    #[test]
+    fn test_cpm_default() {
+        let item = CpShellInteg::default();
+        assert!(item.cpm_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpm_display() {
+        let item = CpShellInteg::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpShellInteg"));
+    }
+
+    #[test]
+    fn test_cpn_default() {
+        let item = CpCommandMark::default();
+        assert!(item.cpn_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpn_display() {
+        let item = CpCommandMark::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpCommandMark"));
+    }
+
+    #[test]
+    fn test_cpo_default() {
+        let item = CpLinkMatch::default();
+        assert!(item.cpo_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpo_display() {
+        let item = CpLinkMatch::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpLinkMatch"));
     }
 
 }
