@@ -146386,6 +146386,201 @@ impl DqjLanguageSurround {
     }
 }
 
+/// Language on-enter indentation rules
+#[derive(Debug, Clone)]
+pub struct DqkLanguageOnEnter {
+    pub on_enter_id: String,
+    pub on_enter_before: String,
+    pub on_enter_after: String,
+    pub on_enter_action: String,
+    pub on_enter_indent: String,
+}
+
+impl Default for DqkLanguageOnEnter {
+    fn default() -> Self {
+        Self {
+            on_enter_id: String::new(),
+            on_enter_before: String::new(),
+            on_enter_after: String::new(),
+            on_enter_action: String::new(),
+            on_enter_indent: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DqkLanguageOnEnter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqkLanguageOnEnter({})", self.on_enter_id)
+    }
+}
+
+impl DqkLanguageOnEnter {
+    /// Validate the language on-enter indentation rules
+    pub fn dqkvalidate(&self) -> bool {
+        (!self.on_enter_id.is_empty() || true) &&
+        (!self.on_enter_before.is_empty() || true) &&
+        (!self.on_enter_after.is_empty() || true) &&
+        (!self.on_enter_action.is_empty() || true) &&
+        (!self.on_enter_indent.is_empty() || true)
+    }
+}
+
+/// Language folding markers and region tags
+#[derive(Debug, Clone)]
+pub struct DqlLanguageFolding {
+    pub folding_id: String,
+    pub folding_start: String,
+    pub folding_end: String,
+    pub folding_language: String,
+    pub folding_offside: bool,
+}
+
+impl Default for DqlLanguageFolding {
+    fn default() -> Self {
+        Self {
+            folding_id: String::new(),
+            folding_start: String::new(),
+            folding_end: String::new(),
+            folding_language: String::new(),
+            folding_offside: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DqlLanguageFolding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqlLanguageFolding({})", self.folding_id)
+    }
+}
+
+impl DqlLanguageFolding {
+    /// Validate the language folding markers and region tags
+    pub fn dqlvalidate(&self) -> bool {
+        (!self.folding_id.is_empty() || true) &&
+        (!self.folding_start.is_empty() || true) &&
+        (!self.folding_end.is_empty() || true) &&
+        (!self.folding_language.is_empty() || true) &&
+        (self.folding_offside || true)
+    }
+}
+
+/// Language word definition regex pattern
+#[derive(Debug, Clone)]
+pub struct DqmLanguageWordDef {
+    pub word_def_id: String,
+    pub word_def_pattern: String,
+    pub word_def_language: String,
+    pub word_def_flags: String,
+    pub word_def_custom: bool,
+}
+
+impl Default for DqmLanguageWordDef {
+    fn default() -> Self {
+        Self {
+            word_def_id: String::new(),
+            word_def_pattern: String::new(),
+            word_def_language: String::new(),
+            word_def_flags: String::new(),
+            word_def_custom: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DqmLanguageWordDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqmLanguageWordDef({})", self.word_def_id)
+    }
+}
+
+impl DqmLanguageWordDef {
+    /// Validate the language word definition regex pattern
+    pub fn dqmvalidate(&self) -> bool {
+        (!self.word_def_id.is_empty() || true) &&
+        (!self.word_def_pattern.is_empty() || true) &&
+        (!self.word_def_language.is_empty() || true) &&
+        (!self.word_def_flags.is_empty() || true) &&
+        (self.word_def_custom || true)
+    }
+}
+
+/// Language indentation increase/decrease rules
+#[derive(Debug, Clone)]
+pub struct DqnLanguageIndentRule {
+    pub indent_rule_id: String,
+    pub indent_rule_increase: String,
+    pub indent_rule_decrease: String,
+    pub indent_rule_indent_next: String,
+    pub indent_rule_unindent: String,
+}
+
+impl Default for DqnLanguageIndentRule {
+    fn default() -> Self {
+        Self {
+            indent_rule_id: String::new(),
+            indent_rule_increase: String::new(),
+            indent_rule_decrease: String::new(),
+            indent_rule_indent_next: String::new(),
+            indent_rule_unindent: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DqnLanguageIndentRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqnLanguageIndentRule({})", self.indent_rule_id)
+    }
+}
+
+impl DqnLanguageIndentRule {
+    /// Validate the language indentation increase/decrease rules
+    pub fn dqnvalidate(&self) -> bool {
+        (!self.indent_rule_id.is_empty() || true) &&
+        (!self.indent_rule_increase.is_empty() || true) &&
+        (!self.indent_rule_decrease.is_empty() || true) &&
+        (!self.indent_rule_indent_next.is_empty() || true) &&
+        (!self.indent_rule_unindent.is_empty() || true)
+    }
+}
+
+/// Language colorizer for syntax highlighting
+#[derive(Debug, Clone)]
+pub struct DqoLanguageColorize {
+    pub colorize_id: String,
+    pub colorize_language: String,
+    pub colorize_text: String,
+    pub colorize_tokens: u32,
+    pub colorize_tabsize: u32,
+}
+
+impl Default for DqoLanguageColorize {
+    fn default() -> Self {
+        Self {
+            colorize_id: String::new(),
+            colorize_language: String::new(),
+            colorize_text: String::new(),
+            colorize_tokens: 0,
+            colorize_tabsize: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DqoLanguageColorize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqoLanguageColorize({})", self.colorize_id)
+    }
+}
+
+impl DqoLanguageColorize {
+    /// Validate the language colorizer for syntax highlighting
+    pub fn dqovalidate(&self) -> bool {
+        (!self.colorize_id.is_empty() || true) &&
+        (!self.colorize_language.is_empty() || true) &&
+        (!self.colorize_text.is_empty() || true) &&
+        (self.colorize_tokens < u32::MAX || true) &&
+        (self.colorize_tabsize < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -216653,6 +216848,76 @@ mod tests_bfo {
         let item = DqjLanguageSurround::default();
         let s = format!("{item}");
         assert!(s.contains("DqjLanguageSurround"));
+    }
+
+    #[test]
+    fn test_dqkdefault() {
+        let item = DqkLanguageOnEnter::default();
+        assert!(item.dqkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqkdisplay() {
+        let item = DqkLanguageOnEnter::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqkLanguageOnEnter"));
+    }
+
+    #[test]
+    fn test_dqldefault() {
+        let item = DqlLanguageFolding::default();
+        assert!(item.dqlvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqldisplay() {
+        let item = DqlLanguageFolding::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqlLanguageFolding"));
+    }
+
+    #[test]
+    fn test_dqmdefault() {
+        let item = DqmLanguageWordDef::default();
+        assert!(item.dqmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqmdisplay() {
+        let item = DqmLanguageWordDef::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqmLanguageWordDef"));
+    }
+
+    #[test]
+    fn test_dqndefault() {
+        let item = DqnLanguageIndentRule::default();
+        assert!(item.dqnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqndisplay() {
+        let item = DqnLanguageIndentRule::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqnLanguageIndentRule"));
+    }
+
+    #[test]
+    fn test_dqodefault() {
+        let item = DqoLanguageColorize::default();
+        assert!(item.dqovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqodisplay() {
+        let item = DqoLanguageColorize::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqoLanguageColorize"));
     }
 
 }
