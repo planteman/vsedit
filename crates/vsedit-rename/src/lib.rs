@@ -89541,6 +89541,111 @@ impl QuickAccess {
     }
 }
 
+/// Runtime wiring: brp_ StatusBarEntry
+#[derive(Debug, Clone)]
+pub struct StatusBarEntry {
+    pub brp_entry_id: String,
+    pub brp_alignment: u8,
+    pub brp_priority: u32,
+    pub brp_text: String,
+    pub brp_tooltip: String,
+    pub brp_command_id: String,
+    pub brp_color: String,
+    pub brp_background_color: String,
+    pub brp_is_visible: bool,
+    pub brp_accessibility_info: String,
+}
+
+impl StatusBarEntry {
+    pub fn brp_summary(&self) -> String {
+        format!("StatusBarEntry({})", self.brp_entry_id)
+    }
+}
+
+/// Runtime wiring: brq_ ProgressBar
+#[derive(Debug, Clone)]
+pub struct ProgressBar {
+    pub brq_progress_id: String,
+    pub brq_title: String,
+    pub brq_message: String,
+    pub brq_percentage: Option<u32>,
+    pub brq_is_infinite: bool,
+    pub brq_is_cancellable: bool,
+    pub brq_location: String,
+    pub brq_source_id: String,
+    pub brq_total_work: u64,
+    pub brq_worked: u64,
+}
+
+impl ProgressBar {
+    pub fn brq_summary(&self) -> String {
+        format!("ProgressBar({})", self.brq_progress_id)
+    }
+}
+
+/// Runtime wiring: brr_ NotificationItem
+#[derive(Debug, Clone)]
+pub struct NotificationItem {
+    pub brr_notification_id: String,
+    pub brr_severity: u8,
+    pub brr_message: String,
+    pub brr_source_id: String,
+    pub brr_is_sticky: bool,
+    pub brr_is_silent: bool,
+    pub brr_has_progress: bool,
+    pub brr_actions: Vec<String>,
+    pub brr_detail: String,
+    pub brr_timestamp: u64,
+}
+
+impl NotificationItem {
+    pub fn brr_summary(&self) -> String {
+        format!("NotificationItem({})", self.brr_notification_id)
+    }
+}
+
+/// Runtime wiring: brs_ BannerMessage
+#[derive(Debug, Clone)]
+pub struct BannerMessage {
+    pub brs_banner_id: String,
+    pub brs_message: String,
+    pub brs_icon_id: String,
+    pub brs_actions: Vec<String>,
+    pub brs_close_action: String,
+    pub brs_is_closeable: bool,
+    pub brs_priority: u32,
+    pub brs_aria_label: String,
+    pub brs_link_text: String,
+    pub brs_link_href: String,
+}
+
+impl BannerMessage {
+    pub fn brs_summary(&self) -> String {
+        format!("BannerMessage({})", self.brs_banner_id)
+    }
+}
+
+/// Runtime wiring: brt_ WalkthroughStep
+#[derive(Debug, Clone)]
+pub struct WalkthroughStep {
+    pub brt_step_id: String,
+    pub brt_title: String,
+    pub brt_description: String,
+    pub brt_media_type: String,
+    pub brt_media_path: String,
+    pub brt_completion_events: Vec<String>,
+    pub brt_is_complete: bool,
+    pub brt_category_id: String,
+    pub brt_order: u32,
+    pub brt_when_clause: String,
+}
+
+impl WalkthroughStep {
+    pub fn brt_summary(&self) -> String {
+        format!("WalkthroughStep({})", self.brt_step_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -120311,6 +120416,910 @@ mod tests_bfo {
         };
         let _ = obj.bro_summary();
         assert_eq!(obj.bro_current_step, 0);
+    }
+
+    #[test]
+    fn test_brp_entry_id() {
+        let obj = StatusBarEntry {
+            brp_entry_id: String::from("test"),
+            brp_alignment: 0,
+            brp_priority: 0,
+            brp_text: String::from("test"),
+            brp_tooltip: String::from("test"),
+            brp_command_id: String::from("test"),
+            brp_color: String::from("test"),
+            brp_background_color: String::from("test"),
+            brp_is_visible: false,
+            brp_accessibility_info: String::from("test"),
+        };
+        let _ = obj.brp_summary();
+        assert_eq!(obj.brp_entry_id, "test");
+    }
+
+    #[test]
+    fn test_brp_alignment() {
+        let obj = StatusBarEntry {
+            brp_entry_id: String::from("test"),
+            brp_alignment: 0,
+            brp_priority: 0,
+            brp_text: String::from("test"),
+            brp_tooltip: String::from("test"),
+            brp_command_id: String::from("test"),
+            brp_color: String::from("test"),
+            brp_background_color: String::from("test"),
+            brp_is_visible: false,
+            brp_accessibility_info: String::from("test"),
+        };
+        let _ = obj.brp_summary();
+        assert_eq!(obj.brp_alignment, 0);
+    }
+
+    #[test]
+    fn test_brp_priority() {
+        let obj = StatusBarEntry {
+            brp_entry_id: String::from("test"),
+            brp_alignment: 0,
+            brp_priority: 0,
+            brp_text: String::from("test"),
+            brp_tooltip: String::from("test"),
+            brp_command_id: String::from("test"),
+            brp_color: String::from("test"),
+            brp_background_color: String::from("test"),
+            brp_is_visible: false,
+            brp_accessibility_info: String::from("test"),
+        };
+        let _ = obj.brp_summary();
+        assert_eq!(obj.brp_priority, 0);
+    }
+
+    #[test]
+    fn test_brp_text() {
+        let obj = StatusBarEntry {
+            brp_entry_id: String::from("test"),
+            brp_alignment: 0,
+            brp_priority: 0,
+            brp_text: String::from("test"),
+            brp_tooltip: String::from("test"),
+            brp_command_id: String::from("test"),
+            brp_color: String::from("test"),
+            brp_background_color: String::from("test"),
+            brp_is_visible: false,
+            brp_accessibility_info: String::from("test"),
+        };
+        let _ = obj.brp_summary();
+        assert_eq!(obj.brp_text, "test");
+    }
+
+    #[test]
+    fn test_brp_tooltip() {
+        let obj = StatusBarEntry {
+            brp_entry_id: String::from("test"),
+            brp_alignment: 0,
+            brp_priority: 0,
+            brp_text: String::from("test"),
+            brp_tooltip: String::from("test"),
+            brp_command_id: String::from("test"),
+            brp_color: String::from("test"),
+            brp_background_color: String::from("test"),
+            brp_is_visible: false,
+            brp_accessibility_info: String::from("test"),
+        };
+        let _ = obj.brp_summary();
+        assert_eq!(obj.brp_tooltip, "test");
+    }
+
+    #[test]
+    fn test_brp_command_id() {
+        let obj = StatusBarEntry {
+            brp_entry_id: String::from("test"),
+            brp_alignment: 0,
+            brp_priority: 0,
+            brp_text: String::from("test"),
+            brp_tooltip: String::from("test"),
+            brp_command_id: String::from("test"),
+            brp_color: String::from("test"),
+            brp_background_color: String::from("test"),
+            brp_is_visible: false,
+            brp_accessibility_info: String::from("test"),
+        };
+        let _ = obj.brp_summary();
+        assert_eq!(obj.brp_command_id, "test");
+    }
+
+    #[test]
+    fn test_brp_color() {
+        let obj = StatusBarEntry {
+            brp_entry_id: String::from("test"),
+            brp_alignment: 0,
+            brp_priority: 0,
+            brp_text: String::from("test"),
+            brp_tooltip: String::from("test"),
+            brp_command_id: String::from("test"),
+            brp_color: String::from("test"),
+            brp_background_color: String::from("test"),
+            brp_is_visible: false,
+            brp_accessibility_info: String::from("test"),
+        };
+        let _ = obj.brp_summary();
+        assert_eq!(obj.brp_color, "test");
+    }
+
+    #[test]
+    fn test_brp_background_color() {
+        let obj = StatusBarEntry {
+            brp_entry_id: String::from("test"),
+            brp_alignment: 0,
+            brp_priority: 0,
+            brp_text: String::from("test"),
+            brp_tooltip: String::from("test"),
+            brp_command_id: String::from("test"),
+            brp_color: String::from("test"),
+            brp_background_color: String::from("test"),
+            brp_is_visible: false,
+            brp_accessibility_info: String::from("test"),
+        };
+        let _ = obj.brp_summary();
+        assert_eq!(obj.brp_background_color, "test");
+    }
+
+    #[test]
+    fn test_brp_is_visible() {
+        let obj = StatusBarEntry {
+            brp_entry_id: String::from("test"),
+            brp_alignment: 0,
+            brp_priority: 0,
+            brp_text: String::from("test"),
+            brp_tooltip: String::from("test"),
+            brp_command_id: String::from("test"),
+            brp_color: String::from("test"),
+            brp_background_color: String::from("test"),
+            brp_is_visible: false,
+            brp_accessibility_info: String::from("test"),
+        };
+        let _ = obj.brp_summary();
+        assert!(!obj.brp_is_visible);
+    }
+
+    #[test]
+    fn test_brp_accessibility_info() {
+        let obj = StatusBarEntry {
+            brp_entry_id: String::from("test"),
+            brp_alignment: 0,
+            brp_priority: 0,
+            brp_text: String::from("test"),
+            brp_tooltip: String::from("test"),
+            brp_command_id: String::from("test"),
+            brp_color: String::from("test"),
+            brp_background_color: String::from("test"),
+            brp_is_visible: false,
+            brp_accessibility_info: String::from("test"),
+        };
+        let _ = obj.brp_summary();
+        assert_eq!(obj.brp_accessibility_info, "test");
+    }
+
+
+    #[test]
+    fn test_brq_progress_id() {
+        let obj = ProgressBar {
+            brq_progress_id: String::from("test"),
+            brq_title: String::from("test"),
+            brq_message: String::from("test"),
+            brq_percentage: None,
+            brq_is_infinite: false,
+            brq_is_cancellable: false,
+            brq_location: String::from("test"),
+            brq_source_id: String::from("test"),
+            brq_total_work: 0,
+            brq_worked: 0,
+        };
+        let _ = obj.brq_summary();
+        assert_eq!(obj.brq_progress_id, "test");
+    }
+
+    #[test]
+    fn test_brq_title() {
+        let obj = ProgressBar {
+            brq_progress_id: String::from("test"),
+            brq_title: String::from("test"),
+            brq_message: String::from("test"),
+            brq_percentage: None,
+            brq_is_infinite: false,
+            brq_is_cancellable: false,
+            brq_location: String::from("test"),
+            brq_source_id: String::from("test"),
+            brq_total_work: 0,
+            brq_worked: 0,
+        };
+        let _ = obj.brq_summary();
+        assert_eq!(obj.brq_title, "test");
+    }
+
+    #[test]
+    fn test_brq_message() {
+        let obj = ProgressBar {
+            brq_progress_id: String::from("test"),
+            brq_title: String::from("test"),
+            brq_message: String::from("test"),
+            brq_percentage: None,
+            brq_is_infinite: false,
+            brq_is_cancellable: false,
+            brq_location: String::from("test"),
+            brq_source_id: String::from("test"),
+            brq_total_work: 0,
+            brq_worked: 0,
+        };
+        let _ = obj.brq_summary();
+        assert_eq!(obj.brq_message, "test");
+    }
+
+    #[test]
+    fn test_brq_percentage() {
+        let obj = ProgressBar {
+            brq_progress_id: String::from("test"),
+            brq_title: String::from("test"),
+            brq_message: String::from("test"),
+            brq_percentage: None,
+            brq_is_infinite: false,
+            brq_is_cancellable: false,
+            brq_location: String::from("test"),
+            brq_source_id: String::from("test"),
+            brq_total_work: 0,
+            brq_worked: 0,
+        };
+        let _ = obj.brq_summary();
+        assert!(obj.brq_percentage.is_none());
+    }
+
+    #[test]
+    fn test_brq_is_infinite() {
+        let obj = ProgressBar {
+            brq_progress_id: String::from("test"),
+            brq_title: String::from("test"),
+            brq_message: String::from("test"),
+            brq_percentage: None,
+            brq_is_infinite: false,
+            brq_is_cancellable: false,
+            brq_location: String::from("test"),
+            brq_source_id: String::from("test"),
+            brq_total_work: 0,
+            brq_worked: 0,
+        };
+        let _ = obj.brq_summary();
+        assert!(!obj.brq_is_infinite);
+    }
+
+    #[test]
+    fn test_brq_is_cancellable() {
+        let obj = ProgressBar {
+            brq_progress_id: String::from("test"),
+            brq_title: String::from("test"),
+            brq_message: String::from("test"),
+            brq_percentage: None,
+            brq_is_infinite: false,
+            brq_is_cancellable: false,
+            brq_location: String::from("test"),
+            brq_source_id: String::from("test"),
+            brq_total_work: 0,
+            brq_worked: 0,
+        };
+        let _ = obj.brq_summary();
+        assert!(!obj.brq_is_cancellable);
+    }
+
+    #[test]
+    fn test_brq_location() {
+        let obj = ProgressBar {
+            brq_progress_id: String::from("test"),
+            brq_title: String::from("test"),
+            brq_message: String::from("test"),
+            brq_percentage: None,
+            brq_is_infinite: false,
+            brq_is_cancellable: false,
+            brq_location: String::from("test"),
+            brq_source_id: String::from("test"),
+            brq_total_work: 0,
+            brq_worked: 0,
+        };
+        let _ = obj.brq_summary();
+        assert_eq!(obj.brq_location, "test");
+    }
+
+    #[test]
+    fn test_brq_source_id() {
+        let obj = ProgressBar {
+            brq_progress_id: String::from("test"),
+            brq_title: String::from("test"),
+            brq_message: String::from("test"),
+            brq_percentage: None,
+            brq_is_infinite: false,
+            brq_is_cancellable: false,
+            brq_location: String::from("test"),
+            brq_source_id: String::from("test"),
+            brq_total_work: 0,
+            brq_worked: 0,
+        };
+        let _ = obj.brq_summary();
+        assert_eq!(obj.brq_source_id, "test");
+    }
+
+    #[test]
+    fn test_brq_total_work() {
+        let obj = ProgressBar {
+            brq_progress_id: String::from("test"),
+            brq_title: String::from("test"),
+            brq_message: String::from("test"),
+            brq_percentage: None,
+            brq_is_infinite: false,
+            brq_is_cancellable: false,
+            brq_location: String::from("test"),
+            brq_source_id: String::from("test"),
+            brq_total_work: 0,
+            brq_worked: 0,
+        };
+        let _ = obj.brq_summary();
+        assert_eq!(obj.brq_total_work, 0);
+    }
+
+    #[test]
+    fn test_brq_worked() {
+        let obj = ProgressBar {
+            brq_progress_id: String::from("test"),
+            brq_title: String::from("test"),
+            brq_message: String::from("test"),
+            brq_percentage: None,
+            brq_is_infinite: false,
+            brq_is_cancellable: false,
+            brq_location: String::from("test"),
+            brq_source_id: String::from("test"),
+            brq_total_work: 0,
+            brq_worked: 0,
+        };
+        let _ = obj.brq_summary();
+        assert_eq!(obj.brq_worked, 0);
+    }
+
+
+    #[test]
+    fn test_brr_notification_id() {
+        let obj = NotificationItem {
+            brr_notification_id: String::from("test"),
+            brr_severity: 0,
+            brr_message: String::from("test"),
+            brr_source_id: String::from("test"),
+            brr_is_sticky: false,
+            brr_is_silent: false,
+            brr_has_progress: false,
+            brr_actions: Vec::new(),
+            brr_detail: String::from("test"),
+            brr_timestamp: 0,
+        };
+        let _ = obj.brr_summary();
+        assert_eq!(obj.brr_notification_id, "test");
+    }
+
+    #[test]
+    fn test_brr_severity() {
+        let obj = NotificationItem {
+            brr_notification_id: String::from("test"),
+            brr_severity: 0,
+            brr_message: String::from("test"),
+            brr_source_id: String::from("test"),
+            brr_is_sticky: false,
+            brr_is_silent: false,
+            brr_has_progress: false,
+            brr_actions: Vec::new(),
+            brr_detail: String::from("test"),
+            brr_timestamp: 0,
+        };
+        let _ = obj.brr_summary();
+        assert_eq!(obj.brr_severity, 0);
+    }
+
+    #[test]
+    fn test_brr_message() {
+        let obj = NotificationItem {
+            brr_notification_id: String::from("test"),
+            brr_severity: 0,
+            brr_message: String::from("test"),
+            brr_source_id: String::from("test"),
+            brr_is_sticky: false,
+            brr_is_silent: false,
+            brr_has_progress: false,
+            brr_actions: Vec::new(),
+            brr_detail: String::from("test"),
+            brr_timestamp: 0,
+        };
+        let _ = obj.brr_summary();
+        assert_eq!(obj.brr_message, "test");
+    }
+
+    #[test]
+    fn test_brr_source_id() {
+        let obj = NotificationItem {
+            brr_notification_id: String::from("test"),
+            brr_severity: 0,
+            brr_message: String::from("test"),
+            brr_source_id: String::from("test"),
+            brr_is_sticky: false,
+            brr_is_silent: false,
+            brr_has_progress: false,
+            brr_actions: Vec::new(),
+            brr_detail: String::from("test"),
+            brr_timestamp: 0,
+        };
+        let _ = obj.brr_summary();
+        assert_eq!(obj.brr_source_id, "test");
+    }
+
+    #[test]
+    fn test_brr_is_sticky() {
+        let obj = NotificationItem {
+            brr_notification_id: String::from("test"),
+            brr_severity: 0,
+            brr_message: String::from("test"),
+            brr_source_id: String::from("test"),
+            brr_is_sticky: false,
+            brr_is_silent: false,
+            brr_has_progress: false,
+            brr_actions: Vec::new(),
+            brr_detail: String::from("test"),
+            brr_timestamp: 0,
+        };
+        let _ = obj.brr_summary();
+        assert!(!obj.brr_is_sticky);
+    }
+
+    #[test]
+    fn test_brr_is_silent() {
+        let obj = NotificationItem {
+            brr_notification_id: String::from("test"),
+            brr_severity: 0,
+            brr_message: String::from("test"),
+            brr_source_id: String::from("test"),
+            brr_is_sticky: false,
+            brr_is_silent: false,
+            brr_has_progress: false,
+            brr_actions: Vec::new(),
+            brr_detail: String::from("test"),
+            brr_timestamp: 0,
+        };
+        let _ = obj.brr_summary();
+        assert!(!obj.brr_is_silent);
+    }
+
+    #[test]
+    fn test_brr_has_progress() {
+        let obj = NotificationItem {
+            brr_notification_id: String::from("test"),
+            brr_severity: 0,
+            brr_message: String::from("test"),
+            brr_source_id: String::from("test"),
+            brr_is_sticky: false,
+            brr_is_silent: false,
+            brr_has_progress: false,
+            brr_actions: Vec::new(),
+            brr_detail: String::from("test"),
+            brr_timestamp: 0,
+        };
+        let _ = obj.brr_summary();
+        assert!(!obj.brr_has_progress);
+    }
+
+    #[test]
+    fn test_brr_actions() {
+        let obj = NotificationItem {
+            brr_notification_id: String::from("test"),
+            brr_severity: 0,
+            brr_message: String::from("test"),
+            brr_source_id: String::from("test"),
+            brr_is_sticky: false,
+            brr_is_silent: false,
+            brr_has_progress: false,
+            brr_actions: Vec::new(),
+            brr_detail: String::from("test"),
+            brr_timestamp: 0,
+        };
+        let _ = obj.brr_summary();
+        assert!(obj.brr_actions.is_empty());
+    }
+
+    #[test]
+    fn test_brr_detail() {
+        let obj = NotificationItem {
+            brr_notification_id: String::from("test"),
+            brr_severity: 0,
+            brr_message: String::from("test"),
+            brr_source_id: String::from("test"),
+            brr_is_sticky: false,
+            brr_is_silent: false,
+            brr_has_progress: false,
+            brr_actions: Vec::new(),
+            brr_detail: String::from("test"),
+            brr_timestamp: 0,
+        };
+        let _ = obj.brr_summary();
+        assert_eq!(obj.brr_detail, "test");
+    }
+
+    #[test]
+    fn test_brr_timestamp() {
+        let obj = NotificationItem {
+            brr_notification_id: String::from("test"),
+            brr_severity: 0,
+            brr_message: String::from("test"),
+            brr_source_id: String::from("test"),
+            brr_is_sticky: false,
+            brr_is_silent: false,
+            brr_has_progress: false,
+            brr_actions: Vec::new(),
+            brr_detail: String::from("test"),
+            brr_timestamp: 0,
+        };
+        let _ = obj.brr_summary();
+        assert_eq!(obj.brr_timestamp, 0);
+    }
+
+
+    #[test]
+    fn test_brs_banner_id() {
+        let obj = BannerMessage {
+            brs_banner_id: String::from("test"),
+            brs_message: String::from("test"),
+            brs_icon_id: String::from("test"),
+            brs_actions: Vec::new(),
+            brs_close_action: String::from("test"),
+            brs_is_closeable: false,
+            brs_priority: 0,
+            brs_aria_label: String::from("test"),
+            brs_link_text: String::from("test"),
+            brs_link_href: String::from("test"),
+        };
+        let _ = obj.brs_summary();
+        assert_eq!(obj.brs_banner_id, "test");
+    }
+
+    #[test]
+    fn test_brs_message() {
+        let obj = BannerMessage {
+            brs_banner_id: String::from("test"),
+            brs_message: String::from("test"),
+            brs_icon_id: String::from("test"),
+            brs_actions: Vec::new(),
+            brs_close_action: String::from("test"),
+            brs_is_closeable: false,
+            brs_priority: 0,
+            brs_aria_label: String::from("test"),
+            brs_link_text: String::from("test"),
+            brs_link_href: String::from("test"),
+        };
+        let _ = obj.brs_summary();
+        assert_eq!(obj.brs_message, "test");
+    }
+
+    #[test]
+    fn test_brs_icon_id() {
+        let obj = BannerMessage {
+            brs_banner_id: String::from("test"),
+            brs_message: String::from("test"),
+            brs_icon_id: String::from("test"),
+            brs_actions: Vec::new(),
+            brs_close_action: String::from("test"),
+            brs_is_closeable: false,
+            brs_priority: 0,
+            brs_aria_label: String::from("test"),
+            brs_link_text: String::from("test"),
+            brs_link_href: String::from("test"),
+        };
+        let _ = obj.brs_summary();
+        assert_eq!(obj.brs_icon_id, "test");
+    }
+
+    #[test]
+    fn test_brs_actions() {
+        let obj = BannerMessage {
+            brs_banner_id: String::from("test"),
+            brs_message: String::from("test"),
+            brs_icon_id: String::from("test"),
+            brs_actions: Vec::new(),
+            brs_close_action: String::from("test"),
+            brs_is_closeable: false,
+            brs_priority: 0,
+            brs_aria_label: String::from("test"),
+            brs_link_text: String::from("test"),
+            brs_link_href: String::from("test"),
+        };
+        let _ = obj.brs_summary();
+        assert!(obj.brs_actions.is_empty());
+    }
+
+    #[test]
+    fn test_brs_close_action() {
+        let obj = BannerMessage {
+            brs_banner_id: String::from("test"),
+            brs_message: String::from("test"),
+            brs_icon_id: String::from("test"),
+            brs_actions: Vec::new(),
+            brs_close_action: String::from("test"),
+            brs_is_closeable: false,
+            brs_priority: 0,
+            brs_aria_label: String::from("test"),
+            brs_link_text: String::from("test"),
+            brs_link_href: String::from("test"),
+        };
+        let _ = obj.brs_summary();
+        assert_eq!(obj.brs_close_action, "test");
+    }
+
+    #[test]
+    fn test_brs_is_closeable() {
+        let obj = BannerMessage {
+            brs_banner_id: String::from("test"),
+            brs_message: String::from("test"),
+            brs_icon_id: String::from("test"),
+            brs_actions: Vec::new(),
+            brs_close_action: String::from("test"),
+            brs_is_closeable: false,
+            brs_priority: 0,
+            brs_aria_label: String::from("test"),
+            brs_link_text: String::from("test"),
+            brs_link_href: String::from("test"),
+        };
+        let _ = obj.brs_summary();
+        assert!(!obj.brs_is_closeable);
+    }
+
+    #[test]
+    fn test_brs_priority() {
+        let obj = BannerMessage {
+            brs_banner_id: String::from("test"),
+            brs_message: String::from("test"),
+            brs_icon_id: String::from("test"),
+            brs_actions: Vec::new(),
+            brs_close_action: String::from("test"),
+            brs_is_closeable: false,
+            brs_priority: 0,
+            brs_aria_label: String::from("test"),
+            brs_link_text: String::from("test"),
+            brs_link_href: String::from("test"),
+        };
+        let _ = obj.brs_summary();
+        assert_eq!(obj.brs_priority, 0);
+    }
+
+    #[test]
+    fn test_brs_aria_label() {
+        let obj = BannerMessage {
+            brs_banner_id: String::from("test"),
+            brs_message: String::from("test"),
+            brs_icon_id: String::from("test"),
+            brs_actions: Vec::new(),
+            brs_close_action: String::from("test"),
+            brs_is_closeable: false,
+            brs_priority: 0,
+            brs_aria_label: String::from("test"),
+            brs_link_text: String::from("test"),
+            brs_link_href: String::from("test"),
+        };
+        let _ = obj.brs_summary();
+        assert_eq!(obj.brs_aria_label, "test");
+    }
+
+    #[test]
+    fn test_brs_link_text() {
+        let obj = BannerMessage {
+            brs_banner_id: String::from("test"),
+            brs_message: String::from("test"),
+            brs_icon_id: String::from("test"),
+            brs_actions: Vec::new(),
+            brs_close_action: String::from("test"),
+            brs_is_closeable: false,
+            brs_priority: 0,
+            brs_aria_label: String::from("test"),
+            brs_link_text: String::from("test"),
+            brs_link_href: String::from("test"),
+        };
+        let _ = obj.brs_summary();
+        assert_eq!(obj.brs_link_text, "test");
+    }
+
+    #[test]
+    fn test_brs_link_href() {
+        let obj = BannerMessage {
+            brs_banner_id: String::from("test"),
+            brs_message: String::from("test"),
+            brs_icon_id: String::from("test"),
+            brs_actions: Vec::new(),
+            brs_close_action: String::from("test"),
+            brs_is_closeable: false,
+            brs_priority: 0,
+            brs_aria_label: String::from("test"),
+            brs_link_text: String::from("test"),
+            brs_link_href: String::from("test"),
+        };
+        let _ = obj.brs_summary();
+        assert_eq!(obj.brs_link_href, "test");
+    }
+
+
+    #[test]
+    fn test_brt_step_id() {
+        let obj = WalkthroughStep {
+            brt_step_id: String::from("test"),
+            brt_title: String::from("test"),
+            brt_description: String::from("test"),
+            brt_media_type: String::from("test"),
+            brt_media_path: String::from("test"),
+            brt_completion_events: Vec::new(),
+            brt_is_complete: false,
+            brt_category_id: String::from("test"),
+            brt_order: 0,
+            brt_when_clause: String::from("test"),
+        };
+        let _ = obj.brt_summary();
+        assert_eq!(obj.brt_step_id, "test");
+    }
+
+    #[test]
+    fn test_brt_title() {
+        let obj = WalkthroughStep {
+            brt_step_id: String::from("test"),
+            brt_title: String::from("test"),
+            brt_description: String::from("test"),
+            brt_media_type: String::from("test"),
+            brt_media_path: String::from("test"),
+            brt_completion_events: Vec::new(),
+            brt_is_complete: false,
+            brt_category_id: String::from("test"),
+            brt_order: 0,
+            brt_when_clause: String::from("test"),
+        };
+        let _ = obj.brt_summary();
+        assert_eq!(obj.brt_title, "test");
+    }
+
+    #[test]
+    fn test_brt_description() {
+        let obj = WalkthroughStep {
+            brt_step_id: String::from("test"),
+            brt_title: String::from("test"),
+            brt_description: String::from("test"),
+            brt_media_type: String::from("test"),
+            brt_media_path: String::from("test"),
+            brt_completion_events: Vec::new(),
+            brt_is_complete: false,
+            brt_category_id: String::from("test"),
+            brt_order: 0,
+            brt_when_clause: String::from("test"),
+        };
+        let _ = obj.brt_summary();
+        assert_eq!(obj.brt_description, "test");
+    }
+
+    #[test]
+    fn test_brt_media_type() {
+        let obj = WalkthroughStep {
+            brt_step_id: String::from("test"),
+            brt_title: String::from("test"),
+            brt_description: String::from("test"),
+            brt_media_type: String::from("test"),
+            brt_media_path: String::from("test"),
+            brt_completion_events: Vec::new(),
+            brt_is_complete: false,
+            brt_category_id: String::from("test"),
+            brt_order: 0,
+            brt_when_clause: String::from("test"),
+        };
+        let _ = obj.brt_summary();
+        assert_eq!(obj.brt_media_type, "test");
+    }
+
+    #[test]
+    fn test_brt_media_path() {
+        let obj = WalkthroughStep {
+            brt_step_id: String::from("test"),
+            brt_title: String::from("test"),
+            brt_description: String::from("test"),
+            brt_media_type: String::from("test"),
+            brt_media_path: String::from("test"),
+            brt_completion_events: Vec::new(),
+            brt_is_complete: false,
+            brt_category_id: String::from("test"),
+            brt_order: 0,
+            brt_when_clause: String::from("test"),
+        };
+        let _ = obj.brt_summary();
+        assert_eq!(obj.brt_media_path, "test");
+    }
+
+    #[test]
+    fn test_brt_completion_events() {
+        let obj = WalkthroughStep {
+            brt_step_id: String::from("test"),
+            brt_title: String::from("test"),
+            brt_description: String::from("test"),
+            brt_media_type: String::from("test"),
+            brt_media_path: String::from("test"),
+            brt_completion_events: Vec::new(),
+            brt_is_complete: false,
+            brt_category_id: String::from("test"),
+            brt_order: 0,
+            brt_when_clause: String::from("test"),
+        };
+        let _ = obj.brt_summary();
+        assert!(obj.brt_completion_events.is_empty());
+    }
+
+    #[test]
+    fn test_brt_is_complete() {
+        let obj = WalkthroughStep {
+            brt_step_id: String::from("test"),
+            brt_title: String::from("test"),
+            brt_description: String::from("test"),
+            brt_media_type: String::from("test"),
+            brt_media_path: String::from("test"),
+            brt_completion_events: Vec::new(),
+            brt_is_complete: false,
+            brt_category_id: String::from("test"),
+            brt_order: 0,
+            brt_when_clause: String::from("test"),
+        };
+        let _ = obj.brt_summary();
+        assert!(!obj.brt_is_complete);
+    }
+
+    #[test]
+    fn test_brt_category_id() {
+        let obj = WalkthroughStep {
+            brt_step_id: String::from("test"),
+            brt_title: String::from("test"),
+            brt_description: String::from("test"),
+            brt_media_type: String::from("test"),
+            brt_media_path: String::from("test"),
+            brt_completion_events: Vec::new(),
+            brt_is_complete: false,
+            brt_category_id: String::from("test"),
+            brt_order: 0,
+            brt_when_clause: String::from("test"),
+        };
+        let _ = obj.brt_summary();
+        assert_eq!(obj.brt_category_id, "test");
+    }
+
+    #[test]
+    fn test_brt_order() {
+        let obj = WalkthroughStep {
+            brt_step_id: String::from("test"),
+            brt_title: String::from("test"),
+            brt_description: String::from("test"),
+            brt_media_type: String::from("test"),
+            brt_media_path: String::from("test"),
+            brt_completion_events: Vec::new(),
+            brt_is_complete: false,
+            brt_category_id: String::from("test"),
+            brt_order: 0,
+            brt_when_clause: String::from("test"),
+        };
+        let _ = obj.brt_summary();
+        assert_eq!(obj.brt_order, 0);
+    }
+
+    #[test]
+    fn test_brt_when_clause() {
+        let obj = WalkthroughStep {
+            brt_step_id: String::from("test"),
+            brt_title: String::from("test"),
+            brt_description: String::from("test"),
+            brt_media_type: String::from("test"),
+            brt_media_path: String::from("test"),
+            brt_completion_events: Vec::new(),
+            brt_is_complete: false,
+            brt_category_id: String::from("test"),
+            brt_order: 0,
+            brt_when_clause: String::from("test"),
+        };
+        let _ = obj.brt_summary();
+        assert_eq!(obj.brt_when_clause, "test");
     }
 
 }
