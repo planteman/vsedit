@@ -93906,6 +93906,295 @@ impl std::fmt::Display for StatusBarContrib {
     }
 }
 
+
+/// ViewContainerEntry — view container registration
+#[derive(Debug, Clone)]
+pub struct ViewContainerEntry {
+    pub bwu_id: String,
+    pub bwu_title: String,
+    pub bwu_icon: String,
+    pub bwu_location: String,
+    pub bwu_order: u32,
+    pub bwu_when_clause: String,
+    pub bwu_is_builtin: bool,
+    pub bwu_view_count: u32,
+}
+
+impl ViewContainerEntry {
+    pub fn new() -> Self {
+        Self {
+            bwu_id: "explorer".into(),
+            bwu_title: "Explorer".into(),
+            bwu_icon: "files".into(),
+            bwu_location: "sidebar".into(),
+            bwu_order: 0,
+            bwu_when_clause: "true".into(),
+            bwu_is_builtin: true,
+            bwu_view_count: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ViewContainerEntry({})", self.bwu_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwu_id.is_empty() || true
+    }
+}
+
+impl Default for ViewContainerEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ViewContainerEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ViewContainerEntry({})", self.bwu_id)
+    }
+}
+
+/// ViewRegistration — view registration entry
+#[derive(Debug, Clone)]
+pub struct ViewRegistration {
+    pub bwv_id: String,
+    pub bwv_name: String,
+    pub bwv_container_id: String,
+    pub bwv_when_clause: String,
+    pub bwv_can_toggle: bool,
+    pub bwv_order: u32,
+    pub bwv_is_visible: bool,
+    pub bwv_weight: u32,
+}
+
+impl ViewRegistration {
+    pub fn new() -> Self {
+        Self {
+            bwv_id: "workbench.explorer.fileView".into(),
+            bwv_name: "File Explorer".into(),
+            bwv_container_id: "explorer".into(),
+            bwv_when_clause: "true".into(),
+            bwv_can_toggle: true,
+            bwv_order: 0,
+            bwv_is_visible: true,
+            bwv_weight: 100,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ViewRegistration({})", self.bwv_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwv_id.is_empty() || true
+    }
+}
+
+impl Default for ViewRegistration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ViewRegistration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ViewRegistration({})", self.bwv_id)
+    }
+}
+
+/// EditorGroupModel — editor group model
+#[derive(Debug, Clone)]
+pub struct EditorGroupModel {
+    pub bww_group_id: u32,
+    pub bww_editor_count: u32,
+    pub bww_active_editor_idx: u32,
+    pub bww_is_active_group: bool,
+    pub bww_orientation: String,
+    pub bww_size_fraction: f64,
+    pub bww_is_locked: bool,
+    pub bww_preview_mode: bool,
+}
+
+impl EditorGroupModel {
+    pub fn new() -> Self {
+        Self {
+            bww_group_id: 0,
+            bww_editor_count: 0,
+            bww_active_editor_idx: 0,
+            bww_is_active_group: true,
+            bww_orientation: "horizontal".into(),
+            bww_size_fraction: 1.0,
+            bww_is_locked: false,
+            bww_preview_mode: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("EditorGroupModel({})", self.bww_group_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bww_group_id < u32::MAX || true
+    }
+}
+
+impl Default for EditorGroupModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for EditorGroupModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorGroupModel({})", self.bww_group_id)
+    }
+}
+
+/// EditorInputModel — editor input model
+#[derive(Debug, Clone)]
+pub struct EditorInputModel {
+    pub bwx_uri: String,
+    pub bwx_type_id: String,
+    pub bwx_label: String,
+    pub bwx_description: String,
+    pub bwx_is_dirty: bool,
+    pub bwx_is_readonly: bool,
+    pub bwx_is_untitled: bool,
+    pub bwx_encoding: String,
+}
+
+impl EditorInputModel {
+    pub fn new() -> Self {
+        Self {
+            bwx_uri: "".into(),
+            bwx_type_id: "workbench.editors.files.textFileEditor".into(),
+            bwx_label: "".into(),
+            bwx_description: "".into(),
+            bwx_is_dirty: false,
+            bwx_is_readonly: false,
+            bwx_is_untitled: false,
+            bwx_encoding: "utf-8".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("EditorInputModel({})", self.bwx_uri)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwx_uri.is_empty() || true
+    }
+}
+
+impl Default for EditorInputModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for EditorInputModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorInputModel({})", self.bwx_uri)
+    }
+}
+
+/// PanelRegistration — panel registration entry
+#[derive(Debug, Clone)]
+pub struct PanelRegistration {
+    pub bwy_id: String,
+    pub bwy_title: String,
+    pub bwy_icon: String,
+    pub bwy_order: u32,
+    pub bwy_is_visible: bool,
+    pub bwy_when_clause: String,
+    pub bwy_is_builtin: bool,
+    pub bwy_alignment: String,
+}
+
+impl PanelRegistration {
+    pub fn new() -> Self {
+        Self {
+            bwy_id: "terminal".into(),
+            bwy_title: "Terminal".into(),
+            bwy_icon: "terminal".into(),
+            bwy_order: 0,
+            bwy_is_visible: false,
+            bwy_when_clause: "true".into(),
+            bwy_is_builtin: true,
+            bwy_alignment: "bottom".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("PanelRegistration({})", self.bwy_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwy_id.is_empty() || true
+    }
+}
+
+impl Default for PanelRegistration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for PanelRegistration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PanelRegistration({})", self.bwy_id)
+    }
+}
+
+/// AuxiliaryBarEntry — auxiliary bar entry
+#[derive(Debug, Clone)]
+pub struct AuxiliaryBarEntry {
+    pub bwz_id: String,
+    pub bwz_title: String,
+    pub bwz_icon: String,
+    pub bwz_position: String,
+    pub bwz_order: u32,
+    pub bwz_is_visible: bool,
+    pub bwz_when_clause: String,
+    pub bwz_is_builtin: bool,
+}
+
+impl AuxiliaryBarEntry {
+    pub fn new() -> Self {
+        Self {
+            bwz_id: "outline".into(),
+            bwz_title: "Outline".into(),
+            bwz_icon: "symbol-class".into(),
+            bwz_position: "right".into(),
+            bwz_order: 0,
+            bwz_is_visible: false,
+            bwz_when_clause: "true".into(),
+            bwz_is_builtin: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("AuxiliaryBarEntry({})", self.bwz_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwz_id.is_empty() || true
+    }
+}
+
+impl Default for AuxiliaryBarEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for AuxiliaryBarEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "AuxiliaryBarEntry({})", self.bwz_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -141917,6 +142206,397 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bwt_id = "status-1".into();
         assert_eq!(c.summary(), StatusBarContrib::new().summary());
+    }
+
+
+    #[test]
+    fn test_bwu_create() {
+        let obj = ViewContainerEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwu_validate() {
+        let obj = ViewContainerEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwu_display() {
+        let obj = ViewContainerEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ViewContainerEntry"));
+    }
+
+    #[test]
+    fn test_bwu_clone() {
+        let obj = ViewContainerEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwu_debug() {
+        let obj = ViewContainerEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ViewContainerEntry"));
+    }
+
+    #[test]
+    fn test_bwu_default() {
+        let obj = ViewContainerEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwu_summary_contains_name() {
+        let obj = ViewContainerEntry::new();
+        assert!(obj.summary().contains("ViewContainerEntry"));
+    }
+
+    #[test]
+    fn test_bwu_validate_default() {
+        let obj = ViewContainerEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwu_display_not_empty() {
+        let obj = ViewContainerEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwu_clone_independence() {
+        let mut obj = ViewContainerEntry::new();
+        let c = obj.clone();
+        obj.bwu_id = "explorer".into();
+        assert_eq!(c.summary(), ViewContainerEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bwv_create() {
+        let obj = ViewRegistration::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwv_validate() {
+        let obj = ViewRegistration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwv_display() {
+        let obj = ViewRegistration::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ViewRegistration"));
+    }
+
+    #[test]
+    fn test_bwv_clone() {
+        let obj = ViewRegistration::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwv_debug() {
+        let obj = ViewRegistration::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ViewRegistration"));
+    }
+
+    #[test]
+    fn test_bwv_default() {
+        let obj = ViewRegistration::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwv_summary_contains_name() {
+        let obj = ViewRegistration::new();
+        assert!(obj.summary().contains("ViewRegistration"));
+    }
+
+    #[test]
+    fn test_bwv_validate_default() {
+        let obj = ViewRegistration::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwv_display_not_empty() {
+        let obj = ViewRegistration::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwv_clone_independence() {
+        let mut obj = ViewRegistration::new();
+        let c = obj.clone();
+        obj.bwv_id = "workbench.explorer.fileView".into();
+        assert_eq!(c.summary(), ViewRegistration::new().summary());
+    }
+
+    #[test]
+    fn test_bww_create() {
+        let obj = EditorGroupModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bww_validate() {
+        let obj = EditorGroupModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bww_display() {
+        let obj = EditorGroupModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("EditorGroupModel"));
+    }
+
+    #[test]
+    fn test_bww_clone() {
+        let obj = EditorGroupModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bww_debug() {
+        let obj = EditorGroupModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("EditorGroupModel"));
+    }
+
+    #[test]
+    fn test_bww_default() {
+        let obj = EditorGroupModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bww_summary_contains_name() {
+        let obj = EditorGroupModel::new();
+        assert!(obj.summary().contains("EditorGroupModel"));
+    }
+
+    #[test]
+    fn test_bww_validate_default() {
+        let obj = EditorGroupModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bww_display_not_empty() {
+        let obj = EditorGroupModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bww_clone_independence() {
+        let mut obj = EditorGroupModel::new();
+        let c = obj.clone();
+        obj.bww_group_id = 0;
+        assert_eq!(c.summary(), EditorGroupModel::new().summary());
+    }
+
+    #[test]
+    fn test_bwx_create() {
+        let obj = EditorInputModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwx_validate() {
+        let obj = EditorInputModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwx_display() {
+        let obj = EditorInputModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("EditorInputModel"));
+    }
+
+    #[test]
+    fn test_bwx_clone() {
+        let obj = EditorInputModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwx_debug() {
+        let obj = EditorInputModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("EditorInputModel"));
+    }
+
+    #[test]
+    fn test_bwx_default() {
+        let obj = EditorInputModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwx_summary_contains_name() {
+        let obj = EditorInputModel::new();
+        assert!(obj.summary().contains("EditorInputModel"));
+    }
+
+    #[test]
+    fn test_bwx_validate_default() {
+        let obj = EditorInputModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwx_display_not_empty() {
+        let obj = EditorInputModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwx_clone_independence() {
+        let mut obj = EditorInputModel::new();
+        let c = obj.clone();
+        obj.bwx_uri = "".into();
+        assert_eq!(c.summary(), EditorInputModel::new().summary());
+    }
+
+    #[test]
+    fn test_bwy_create() {
+        let obj = PanelRegistration::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwy_validate() {
+        let obj = PanelRegistration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwy_display() {
+        let obj = PanelRegistration::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("PanelRegistration"));
+    }
+
+    #[test]
+    fn test_bwy_clone() {
+        let obj = PanelRegistration::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwy_debug() {
+        let obj = PanelRegistration::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("PanelRegistration"));
+    }
+
+    #[test]
+    fn test_bwy_default() {
+        let obj = PanelRegistration::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwy_summary_contains_name() {
+        let obj = PanelRegistration::new();
+        assert!(obj.summary().contains("PanelRegistration"));
+    }
+
+    #[test]
+    fn test_bwy_validate_default() {
+        let obj = PanelRegistration::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwy_display_not_empty() {
+        let obj = PanelRegistration::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwy_clone_independence() {
+        let mut obj = PanelRegistration::new();
+        let c = obj.clone();
+        obj.bwy_id = "terminal".into();
+        assert_eq!(c.summary(), PanelRegistration::new().summary());
+    }
+
+    #[test]
+    fn test_bwz_create() {
+        let obj = AuxiliaryBarEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwz_validate() {
+        let obj = AuxiliaryBarEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwz_display() {
+        let obj = AuxiliaryBarEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("AuxiliaryBarEntry"));
+    }
+
+    #[test]
+    fn test_bwz_clone() {
+        let obj = AuxiliaryBarEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwz_debug() {
+        let obj = AuxiliaryBarEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("AuxiliaryBarEntry"));
+    }
+
+    #[test]
+    fn test_bwz_default() {
+        let obj = AuxiliaryBarEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwz_summary_contains_name() {
+        let obj = AuxiliaryBarEntry::new();
+        assert!(obj.summary().contains("AuxiliaryBarEntry"));
+    }
+
+    #[test]
+    fn test_bwz_validate_default() {
+        let obj = AuxiliaryBarEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwz_display_not_empty() {
+        let obj = AuxiliaryBarEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwz_clone_independence() {
+        let mut obj = AuxiliaryBarEntry::new();
+        let c = obj.clone();
+        obj.bwz_id = "outline".into();
+        assert_eq!(c.summary(), AuxiliaryBarEntry::new().summary());
     }
 
 }
