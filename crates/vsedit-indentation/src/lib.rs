@@ -59544,3 +59544,225 @@ mod bbp_tests {
         assert_eq!(m.hint_count(), 0);
     }
 }
+
+
+// --- bbq_: Editor text decoration model ---
+
+/// Decoration rendering style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbqDecoStyle {
+    Background, Border, Outline, Underline, Overline, Strikethrough, Gutter, Ruler,
+}
+
+impl BbqDecoStyle {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Background => "Background", Self::Border => "Border",
+            Self::Outline => "Outline", Self::Underline => "Underline",
+            Self::Overline => "Overline", Self::Strikethrough => "Strikethrough",
+            Self::Gutter => "Gutter", Self::Ruler => "Overview Ruler",
+        }
+    }
+
+    pub fn is_text_style(&self) -> bool {
+        matches!(self, Self::Underline | Self::Overline | Self::Strikethrough)
+    }
+}
+
+/// Overview ruler lane.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbqRulerLane { Left, Center, Right, Full }
+
+/// A decoration type (reusable across ranges).
+#[derive(Debug, Clone)]
+pub struct BbqDecoType {
+    pub id: String,
+    pub style: BbqDecoStyle,
+    pub color: Option<String>,
+    pub is_whole_line: bool,
+    pub ruler_lane: Option<BbqRulerLane>,
+    pub after_text: Option<String>,
+    pub before_text: Option<String>,
+}
+
+impl BbqDecoType {
+    pub fn new(id: &str, style: BbqDecoStyle) -> Self {
+        Self {
+            id: id.to_string(), style, color: None, is_whole_line: false,
+            ruler_lane: None, after_text: None, before_text: None,
+        }
+    }
+
+    pub fn with_color(mut self, c: &str) -> Self { self.color = Some(c.to_string()); self }
+    pub fn whole_line(mut self) -> Self { self.is_whole_line = true; self }
+    pub fn with_after(mut self, t: &str) -> Self { self.after_text = Some(t.to_string()); self }
+}
+
+/// A decoration range.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BbqDecoRange {
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+}
+
+impl BbqDecoRange {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec }
+    }
+
+    pub fn single_line(line: u32, sc: u32, ec: u32) -> Self {
+        Self::new(line, sc, line, ec)
+    }
+
+    pub fn whole_line(line: u32) -> Self { Self::new(line, 0, line, u32::MAX) }
+
+    pub fn contains_line(&self, line: u32) -> bool {
+        line >= self.start_line && line <= self.end_line
+    }
+}
+
+/// A decoration instance (type + ranges).
+#[derive(Debug, Clone)]
+pub struct BbqDecoration {
+    pub type_id: String,
+    pub ranges: Vec<BbqDecoRange>,
+}
+
+impl BbqDecoration {
+    pub fn new(type_id: &str, ranges: Vec<BbqDecoRange>) -> Self {
+        Self { type_id: type_id.to_string(), ranges }
+    }
+
+    pub fn range_count(&self) -> usize { self.ranges.len() }
+
+    pub fn ranges_on_line(&self, line: u32) -> Vec<&BbqDecoRange> {
+        self.ranges.iter().filter(|r| r.contains_line(line)).collect()
+    }
+}
+
+/// The decoration model.
+#[derive(Debug)]
+pub struct BbqDecoModel {
+    types: Vec<BbqDecoType>,
+    decorations: Vec<BbqDecoration>,
+}
+
+impl BbqDecoModel {
+    pub fn new() -> Self { Self { types: Vec::new(), decorations: Vec::new() } }
+
+    pub fn register_type(&mut self, t: BbqDecoType) { self.types.push(t); }
+    pub fn type_count(&self) -> usize { self.types.len() }
+
+    pub fn find_type(&self, id: &str) -> Option<&BbqDecoType> {
+        self.types.iter().find(|t| t.id == id)
+    }
+
+    pub fn set_decorations(&mut self, type_id: &str, ranges: Vec<BbqDecoRange>) {
+        self.decorations.retain(|d| d.type_id != type_id);
+        if !ranges.is_empty() {
+            self.decorations.push(BbqDecoration::new(type_id, ranges));
+        }
+    }
+
+    pub fn remove_decorations(&mut self, type_id: &str) {
+        self.decorations.retain(|d| d.type_id != type_id);
+    }
+
+    pub fn decorations_on_line(&self, line: u32) -> Vec<(&BbqDecoType, &BbqDecoRange)> {
+        let mut result = Vec::new();
+        for deco in &self.decorations {
+            if let Some(dtype) = self.find_type(&deco.type_id) {
+                for range in deco.ranges_on_line(line) {
+                    result.push((dtype, range));
+                }
+            }
+        }
+        result
+    }
+
+    pub fn total_ranges(&self) -> usize {
+        self.decorations.iter().map(|d| d.range_count()).sum()
+    }
+
+    pub fn clear_all(&mut self) { self.decorations.clear(); }
+}
+
+#[cfg(test)]
+mod bbq_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbq_style() {
+        assert!(BbqDecoStyle::Underline.is_text_style());
+        assert!(!BbqDecoStyle::Background.is_text_style());
+    }
+
+    #[test]
+    fn test_bbq_deco_type() {
+        let t = BbqDecoType::new("error", BbqDecoStyle::Underline).with_color("#ff0000");
+        assert_eq!(t.color.as_deref(), Some("#ff0000"));
+    }
+
+    #[test]
+    fn test_bbq_range() {
+        let r = BbqDecoRange::single_line(5, 10, 20);
+        assert!(r.contains_line(5));
+        assert!(!r.contains_line(6));
+    }
+
+    #[test]
+    fn test_bbq_whole_line() {
+        let r = BbqDecoRange::whole_line(3);
+        assert!(r.contains_line(3));
+        assert_eq!(r.end_col, u32::MAX);
+    }
+
+    #[test]
+    fn test_bbq_decoration() {
+        let d = BbqDecoration::new("error", vec![
+            BbqDecoRange::single_line(1, 0, 5),
+            BbqDecoRange::single_line(3, 0, 10),
+        ]);
+        assert_eq!(d.range_count(), 2);
+        assert_eq!(d.ranges_on_line(1).len(), 1);
+    }
+
+    #[test]
+    fn test_bbq_model_lifecycle() {
+        let mut m = BbqDecoModel::new();
+        m.register_type(BbqDecoType::new("err", BbqDecoStyle::Underline));
+        m.set_decorations("err", vec![BbqDecoRange::single_line(5, 0, 10)]);
+        assert_eq!(m.total_ranges(), 1);
+        assert_eq!(m.decorations_on_line(5).len(), 1);
+    }
+
+    #[test]
+    fn test_bbq_model_replace() {
+        let mut m = BbqDecoModel::new();
+        m.register_type(BbqDecoType::new("err", BbqDecoStyle::Underline));
+        m.set_decorations("err", vec![BbqDecoRange::single_line(1, 0, 5)]);
+        m.set_decorations("err", vec![BbqDecoRange::single_line(2, 0, 5)]);
+        assert_eq!(m.total_ranges(), 1);
+        assert_eq!(m.decorations_on_line(2).len(), 1);
+    }
+
+    #[test]
+    fn test_bbq_model_remove() {
+        let mut m = BbqDecoModel::new();
+        m.register_type(BbqDecoType::new("x", BbqDecoStyle::Background));
+        m.set_decorations("x", vec![BbqDecoRange::whole_line(1)]);
+        m.remove_decorations("x");
+        assert_eq!(m.total_ranges(), 0);
+    }
+
+    #[test]
+    fn test_bbq_model_clear() {
+        let mut m = BbqDecoModel::new();
+        m.register_type(BbqDecoType::new("a", BbqDecoStyle::Background));
+        m.set_decorations("a", vec![BbqDecoRange::whole_line(1)]);
+        m.clear_all();
+        assert_eq!(m.total_ranges(), 0);
+    }
+}
