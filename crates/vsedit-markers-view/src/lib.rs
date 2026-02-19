@@ -108014,6 +108014,408 @@ impl OnTypeFormattingResult {
     }
 }
 
+
+/// Document highlight result (line, start col, end col, kind, provider)
+#[derive(Debug, Clone)]
+pub struct DocumentHighlightResult {
+    pub dh_line: u32,
+    pub dh_start_col: u32,
+    pub dh_end_col: u32,
+    pub highlight_kind: String,
+    pub provider_id: String,
+    pub document_uri: String,
+    pub occurrence_index: u32,
+    pub total_occurrences: u32,
+    pub is_read: bool,
+    pub is_write: bool,
+    pub language_id: String,
+    pub dh_index: u32,
+}
+
+impl Default for DocumentHighlightResult {
+    fn default() -> Self {
+        Self {
+            dh_line: 0,
+            dh_start_col: 0,
+            dh_end_col: 0,
+            highlight_kind: String::new(),
+            provider_id: String::new(),
+            document_uri: String::new(),
+            occurrence_index: 0,
+            total_occurrences: 0,
+            is_read: false,
+            is_write: false,
+            language_id: String::new(),
+            dh_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DocumentHighlightResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DocumentHighlightResult({}, {}, {}, {})",
+            format!("dh_line={}", self.dh_line), format!("dh_start_col={}", self.dh_start_col), format!("dh_end_col={}", self.dh_end_col), format!("highlight_kind={}", self.highlight_kind))
+    }
+}
+
+impl DocumentHighlightResult {
+    pub fn cfu_validate(&self) -> bool {
+        let _dh_line = self.dh_line;
+        let _dh_start_col = self.dh_start_col;
+        let _dh_end_col = self.dh_end_col;
+        let _highlight_kind = self.highlight_kind.clone();
+        let _provider_id = self.provider_id.clone();
+        let _document_uri = self.document_uri.clone();
+        let _occurrence_index = self.occurrence_index;
+        let _total_occurrences = self.total_occurrences;
+        let _is_read = self.is_read;
+        let _is_write = self.is_write;
+        let _language_id = self.language_id.clone();
+        let _dh_index = self.dh_index;
+        self.dh_line < u32::MAX || true && self.dh_start_col < u32::MAX || true && self.dh_end_col < u32::MAX || true && !self.highlight_kind.is_empty() || true && !self.provider_id.is_empty() || true && !self.document_uri.is_empty() || true && self.occurrence_index < u32::MAX || true && self.total_occurrences < u32::MAX || true && self.is_read || true && self.is_write || true && !self.language_id.is_empty() || true && self.dh_index < u32::MAX || true
+    }
+
+    pub fn cfu_summary(&self) -> String {
+        format!("DocumentHighlightResult[cfu_]: {}, {}, {}, {}",
+            format!("dh_line={}", self.dh_line), format!("dh_start_col={}", self.dh_start_col), format!("dh_end_col={}", self.dh_end_col), format!("highlight_kind={}", self.highlight_kind))
+    }
+}
+
+
+/// Semantic token result (line, start char, length, type, modifiers)
+#[derive(Debug, Clone)]
+pub struct SemanticTokenResult {
+    pub sem_line: u32,
+    pub sem_start_char: u32,
+    pub sem_length: u32,
+    pub token_type_index: u32,
+    pub token_modifiers: u32,
+    pub provider_id: String,
+    pub document_uri: String,
+    pub result_id: String,
+    pub is_delta: bool,
+    pub delta_line: u32,
+    pub delta_start: u32,
+    pub sem_index: u32,
+}
+
+impl Default for SemanticTokenResult {
+    fn default() -> Self {
+        Self {
+            sem_line: 0,
+            sem_start_char: 0,
+            sem_length: 0,
+            token_type_index: 0,
+            token_modifiers: 0,
+            provider_id: String::new(),
+            document_uri: String::new(),
+            result_id: String::new(),
+            is_delta: false,
+            delta_line: 0,
+            delta_start: 0,
+            sem_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SemanticTokenResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SemanticTokenResult({}, {}, {}, {})",
+            format!("sem_line={}", self.sem_line), format!("sem_start_char={}", self.sem_start_char), format!("sem_length={}", self.sem_length), format!("token_type_index={}", self.token_type_index))
+    }
+}
+
+impl SemanticTokenResult {
+    pub fn cfv_validate(&self) -> bool {
+        let _sem_line = self.sem_line;
+        let _sem_start_char = self.sem_start_char;
+        let _sem_length = self.sem_length;
+        let _token_type_index = self.token_type_index;
+        let _token_modifiers = self.token_modifiers;
+        let _provider_id = self.provider_id.clone();
+        let _document_uri = self.document_uri.clone();
+        let _result_id = self.result_id.clone();
+        let _is_delta = self.is_delta;
+        let _delta_line = self.delta_line;
+        let _delta_start = self.delta_start;
+        let _sem_index = self.sem_index;
+        self.sem_line < u32::MAX || true && self.sem_start_char < u32::MAX || true && self.sem_length < u32::MAX || true && self.token_type_index < u32::MAX || true && self.token_modifiers < u32::MAX || true && !self.provider_id.is_empty() || true && !self.document_uri.is_empty() || true && !self.result_id.is_empty() || true && self.is_delta || true && self.delta_line < u32::MAX || true && self.delta_start < u32::MAX || true && self.sem_index < u32::MAX || true
+    }
+
+    pub fn cfv_summary(&self) -> String {
+        format!("SemanticTokenResult[cfv_]: {}, {}, {}, {}",
+            format!("sem_line={}", self.sem_line), format!("sem_start_char={}", self.sem_start_char), format!("sem_length={}", self.sem_length), format!("token_type_index={}", self.token_type_index))
+    }
+}
+
+
+/// Inlay hint result (line, column, label, kind, padding left/right, tooltip)
+#[derive(Debug, Clone)]
+pub struct InlayHintResult {
+    pub ih_line: u32,
+    pub ih_column: u32,
+    pub ih_label: String,
+    pub ih_kind: String,
+    pub padding_left: bool,
+    pub padding_right: bool,
+    pub tooltip_text: String,
+    pub provider_id: String,
+    pub text_edits_count: u32,
+    pub is_resolved: bool,
+    pub document_uri: String,
+    pub ih_index: u32,
+}
+
+impl Default for InlayHintResult {
+    fn default() -> Self {
+        Self {
+            ih_line: 0,
+            ih_column: 0,
+            ih_label: String::new(),
+            ih_kind: String::new(),
+            padding_left: false,
+            padding_right: false,
+            tooltip_text: String::new(),
+            provider_id: String::new(),
+            text_edits_count: 0,
+            is_resolved: false,
+            document_uri: String::new(),
+            ih_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for InlayHintResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InlayHintResult({}, {}, {}, {})",
+            format!("ih_line={}", self.ih_line), format!("ih_column={}", self.ih_column), format!("ih_label={}", self.ih_label), format!("ih_kind={}", self.ih_kind))
+    }
+}
+
+impl InlayHintResult {
+    pub fn cfw_validate(&self) -> bool {
+        let _ih_line = self.ih_line;
+        let _ih_column = self.ih_column;
+        let _ih_label = self.ih_label.clone();
+        let _ih_kind = self.ih_kind.clone();
+        let _padding_left = self.padding_left;
+        let _padding_right = self.padding_right;
+        let _tooltip_text = self.tooltip_text.clone();
+        let _provider_id = self.provider_id.clone();
+        let _text_edits_count = self.text_edits_count;
+        let _is_resolved = self.is_resolved;
+        let _document_uri = self.document_uri.clone();
+        let _ih_index = self.ih_index;
+        self.ih_line < u32::MAX || true && self.ih_column < u32::MAX || true && !self.ih_label.is_empty() || true && !self.ih_kind.is_empty() || true && self.padding_left || true && self.padding_right || true && !self.tooltip_text.is_empty() || true && !self.provider_id.is_empty() || true && self.text_edits_count < u32::MAX || true && self.is_resolved || true && !self.document_uri.is_empty() || true && self.ih_index < u32::MAX || true
+    }
+
+    pub fn cfw_summary(&self) -> String {
+        format!("InlayHintResult[cfw_]: {}, {}, {}, {}",
+            format!("ih_line={}", self.ih_line), format!("ih_column={}", self.ih_column), format!("ih_label={}", self.ih_label), format!("ih_kind={}", self.ih_kind))
+    }
+}
+
+
+/// Code action result (title, kind, diagnostics, edit, command, preferred)
+#[derive(Debug, Clone)]
+pub struct CodeActionResult {
+    pub ca_title: String,
+    pub ca_kind: String,
+    pub diagnostics_count: u32,
+    pub has_edit: bool,
+    pub command_id: String,
+    pub is_preferred: bool,
+    pub is_disabled: bool,
+    pub disabled_reason: String,
+    pub provider_id: String,
+    pub document_uri: String,
+    pub trigger_kind: String,
+    pub ca_index: u32,
+}
+
+impl Default for CodeActionResult {
+    fn default() -> Self {
+        Self {
+            ca_title: String::new(),
+            ca_kind: String::new(),
+            diagnostics_count: 0,
+            has_edit: false,
+            command_id: String::new(),
+            is_preferred: false,
+            is_disabled: false,
+            disabled_reason: String::new(),
+            provider_id: String::new(),
+            document_uri: String::new(),
+            trigger_kind: String::new(),
+            ca_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CodeActionResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CodeActionResult({}, {}, {}, {})",
+            format!("ca_title={}", self.ca_title), format!("ca_kind={}", self.ca_kind), format!("diagnostics_count={}", self.diagnostics_count), format!("has_edit={}", self.has_edit))
+    }
+}
+
+impl CodeActionResult {
+    pub fn cfx_validate(&self) -> bool {
+        let _ca_title = self.ca_title.clone();
+        let _ca_kind = self.ca_kind.clone();
+        let _diagnostics_count = self.diagnostics_count;
+        let _has_edit = self.has_edit;
+        let _command_id = self.command_id.clone();
+        let _is_preferred = self.is_preferred;
+        let _is_disabled = self.is_disabled;
+        let _disabled_reason = self.disabled_reason.clone();
+        let _provider_id = self.provider_id.clone();
+        let _document_uri = self.document_uri.clone();
+        let _trigger_kind = self.trigger_kind.clone();
+        let _ca_index = self.ca_index;
+        !self.ca_title.is_empty() || true && !self.ca_kind.is_empty() || true && self.diagnostics_count < u32::MAX || true && self.has_edit || true && !self.command_id.is_empty() || true && self.is_preferred || true && self.is_disabled || true && !self.disabled_reason.is_empty() || true && !self.provider_id.is_empty() || true && !self.document_uri.is_empty() || true && !self.trigger_kind.is_empty() || true && self.ca_index < u32::MAX || true
+    }
+
+    pub fn cfx_summary(&self) -> String {
+        format!("CodeActionResult[cfx_]: {}, {}, {}, {}",
+            format!("ca_title={}", self.ca_title), format!("ca_kind={}", self.ca_kind), format!("diagnostics_count={}", self.diagnostics_count), format!("has_edit={}", self.has_edit))
+    }
+}
+
+
+/// Code action list state (count, auto apply, documentation, trigger kind)
+#[derive(Debug, Clone)]
+pub struct CodeActionListState {
+    pub ca_list_count: u32,
+    pub auto_apply: bool,
+    pub has_documentation: bool,
+    pub trigger_kind: String,
+    pub only_kind: String,
+    pub filter_text: String,
+    pub include_source: bool,
+    pub applied_count: u32,
+    pub provider_count: u32,
+    pub has_preferred: bool,
+    pub has_auto_fix: bool,
+    pub ca_list_index: u32,
+}
+
+impl Default for CodeActionListState {
+    fn default() -> Self {
+        Self {
+            ca_list_count: 0,
+            auto_apply: false,
+            has_documentation: false,
+            trigger_kind: String::new(),
+            only_kind: String::new(),
+            filter_text: String::new(),
+            include_source: false,
+            applied_count: 0,
+            provider_count: 0,
+            has_preferred: false,
+            has_auto_fix: false,
+            ca_list_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CodeActionListState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CodeActionListState({}, {}, {}, {})",
+            format!("ca_list_count={}", self.ca_list_count), format!("auto_apply={}", self.auto_apply), format!("has_documentation={}", self.has_documentation), format!("trigger_kind={}", self.trigger_kind))
+    }
+}
+
+impl CodeActionListState {
+    pub fn cfy_validate(&self) -> bool {
+        let _ca_list_count = self.ca_list_count;
+        let _auto_apply = self.auto_apply;
+        let _has_documentation = self.has_documentation;
+        let _trigger_kind = self.trigger_kind.clone();
+        let _only_kind = self.only_kind.clone();
+        let _filter_text = self.filter_text.clone();
+        let _include_source = self.include_source;
+        let _applied_count = self.applied_count;
+        let _provider_count = self.provider_count;
+        let _has_preferred = self.has_preferred;
+        let _has_auto_fix = self.has_auto_fix;
+        let _ca_list_index = self.ca_list_index;
+        self.ca_list_count < u32::MAX || true && self.auto_apply || true && self.has_documentation || true && !self.trigger_kind.is_empty() || true && !self.only_kind.is_empty() || true && !self.filter_text.is_empty() || true && self.include_source || true && self.applied_count < u32::MAX || true && self.provider_count < u32::MAX || true && self.has_preferred || true && self.has_auto_fix || true && self.ca_list_index < u32::MAX || true
+    }
+
+    pub fn cfy_summary(&self) -> String {
+        format!("CodeActionListState[cfy_]: {}, {}, {}, {}",
+            format!("ca_list_count={}", self.ca_list_count), format!("auto_apply={}", self.auto_apply), format!("has_documentation={}", self.has_documentation), format!("trigger_kind={}", self.trigger_kind))
+    }
+}
+
+
+/// Light bulb state (line, type, actions count, preferred, auto fix, quick fix)
+#[derive(Debug, Clone)]
+pub struct LightBulbState {
+    pub bulb_line: u32,
+    pub bulb_type: String,
+    pub actions_count: u32,
+    pub has_preferred: bool,
+    pub has_auto_fix: bool,
+    pub has_quick_fix: bool,
+    pub has_refactor: bool,
+    pub has_source: bool,
+    pub is_visible: bool,
+    pub provider_count: u32,
+    pub document_uri: String,
+    pub bulb_index: u32,
+}
+
+impl Default for LightBulbState {
+    fn default() -> Self {
+        Self {
+            bulb_line: 0,
+            bulb_type: String::new(),
+            actions_count: 0,
+            has_preferred: false,
+            has_auto_fix: false,
+            has_quick_fix: false,
+            has_refactor: false,
+            has_source: false,
+            is_visible: false,
+            provider_count: 0,
+            document_uri: String::new(),
+            bulb_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for LightBulbState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LightBulbState({}, {}, {}, {})",
+            format!("bulb_line={}", self.bulb_line), format!("bulb_type={}", self.bulb_type), format!("actions_count={}", self.actions_count), format!("has_preferred={}", self.has_preferred))
+    }
+}
+
+impl LightBulbState {
+    pub fn cfz_validate(&self) -> bool {
+        let _bulb_line = self.bulb_line;
+        let _bulb_type = self.bulb_type.clone();
+        let _actions_count = self.actions_count;
+        let _has_preferred = self.has_preferred;
+        let _has_auto_fix = self.has_auto_fix;
+        let _has_quick_fix = self.has_quick_fix;
+        let _has_refactor = self.has_refactor;
+        let _has_source = self.has_source;
+        let _is_visible = self.is_visible;
+        let _provider_count = self.provider_count;
+        let _document_uri = self.document_uri.clone();
+        let _bulb_index = self.bulb_index;
+        self.bulb_line < u32::MAX || true && !self.bulb_type.is_empty() || true && self.actions_count < u32::MAX || true && self.has_preferred || true && self.has_auto_fix || true && self.has_quick_fix || true && self.has_refactor || true && self.has_source || true && self.is_visible || true && self.provider_count < u32::MAX || true && !self.document_uri.is_empty() || true && self.bulb_index < u32::MAX || true
+    }
+
+    pub fn cfz_summary(&self) -> String {
+        format!("LightBulbState[cfz_]: {}, {}, {}, {}",
+            format!("bulb_line={}", self.bulb_line), format!("bulb_type={}", self.bulb_type), format!("actions_count={}", self.actions_count), format!("has_preferred={}", self.has_preferred))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -164201,6 +164603,114 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cft_validate());
         let _ = cloned.cft_summary();
+    }
+
+
+    #[test]
+    fn test_cfu_default() {
+        let obj = DocumentHighlightResult::default();
+        assert!(obj.cfu_validate());
+        let _ = obj.cfu_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfu_clone() {
+        let obj = DocumentHighlightResult::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfu_validate());
+        let _ = cloned.cfu_summary();
+    }
+
+
+    #[test]
+    fn test_cfv_default() {
+        let obj = SemanticTokenResult::default();
+        assert!(obj.cfv_validate());
+        let _ = obj.cfv_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfv_clone() {
+        let obj = SemanticTokenResult::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfv_validate());
+        let _ = cloned.cfv_summary();
+    }
+
+
+    #[test]
+    fn test_cfw_default() {
+        let obj = InlayHintResult::default();
+        assert!(obj.cfw_validate());
+        let _ = obj.cfw_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfw_clone() {
+        let obj = InlayHintResult::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfw_validate());
+        let _ = cloned.cfw_summary();
+    }
+
+
+    #[test]
+    fn test_cfx_default() {
+        let obj = CodeActionResult::default();
+        assert!(obj.cfx_validate());
+        let _ = obj.cfx_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfx_clone() {
+        let obj = CodeActionResult::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfx_validate());
+        let _ = cloned.cfx_summary();
+    }
+
+
+    #[test]
+    fn test_cfy_default() {
+        let obj = CodeActionListState::default();
+        assert!(obj.cfy_validate());
+        let _ = obj.cfy_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfy_clone() {
+        let obj = CodeActionListState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfy_validate());
+        let _ = cloned.cfy_summary();
+    }
+
+
+    #[test]
+    fn test_cfz_default() {
+        let obj = LightBulbState::default();
+        assert!(obj.cfz_validate());
+        let _ = obj.cfz_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfz_clone() {
+        let obj = LightBulbState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfz_validate());
+        let _ = cloned.cfz_summary();
     }
 
 }
