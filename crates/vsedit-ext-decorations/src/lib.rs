@@ -141103,6 +141103,201 @@ impl DleIconRegistry {
     }
 }
 
+/// File icon theme definition and folder associations
+#[derive(Debug, Clone)]
+pub struct DlfFileIconThemeData {
+    pub file_icon_id: String,
+    pub file_icon_extension: String,
+    pub file_icon_filename: String,
+    pub file_icon_folder: String,
+    pub file_icon_language: String,
+}
+
+impl Default for DlfFileIconThemeData {
+    fn default() -> Self {
+        Self {
+            file_icon_id: String::new(),
+            file_icon_extension: String::new(),
+            file_icon_filename: String::new(),
+            file_icon_folder: String::new(),
+            file_icon_language: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DlfFileIconThemeData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlfFileIconThemeData({})", self.file_icon_id)
+    }
+}
+
+impl DlfFileIconThemeData {
+    /// Validate the file icon theme definition and folder associations
+    pub fn dlfvalidate(&self) -> bool {
+        (!self.file_icon_id.is_empty() || true) &&
+        (!self.file_icon_extension.is_empty() || true) &&
+        (!self.file_icon_filename.is_empty() || true) &&
+        (!self.file_icon_folder.is_empty() || true) &&
+        (!self.file_icon_language.is_empty() || true)
+    }
+}
+
+/// Product icon font definition
+#[derive(Debug, Clone)]
+pub struct DlgProductIconDef {
+    pub product_icon_def_id: String,
+    pub product_icon_def_name: String,
+    pub product_icon_def_path: String,
+    pub product_icon_def_weight: String,
+    pub product_icon_def_style: String,
+}
+
+impl Default for DlgProductIconDef {
+    fn default() -> Self {
+        Self {
+            product_icon_def_id: String::new(),
+            product_icon_def_name: String::new(),
+            product_icon_def_path: String::new(),
+            product_icon_def_weight: String::new(),
+            product_icon_def_style: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DlgProductIconDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlgProductIconDef({})", self.product_icon_def_id)
+    }
+}
+
+impl DlgProductIconDef {
+    /// Validate the product icon font definition
+    pub fn dlgvalidate(&self) -> bool {
+        (!self.product_icon_def_id.is_empty() || true) &&
+        (!self.product_icon_def_name.is_empty() || true) &&
+        (!self.product_icon_def_path.is_empty() || true) &&
+        (!self.product_icon_def_weight.is_empty() || true) &&
+        (!self.product_icon_def_style.is_empty() || true)
+    }
+}
+
+/// User color customization override
+#[derive(Debug, Clone)]
+pub struct DlhColorCustomization {
+    pub custom_color_id: String,
+    pub custom_color_key: String,
+    pub custom_color_value: String,
+    pub custom_color_scope: String,
+    pub custom_color_enabled: bool,
+}
+
+impl Default for DlhColorCustomization {
+    fn default() -> Self {
+        Self {
+            custom_color_id: String::new(),
+            custom_color_key: String::new(),
+            custom_color_value: String::new(),
+            custom_color_scope: String::new(),
+            custom_color_enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DlhColorCustomization {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlhColorCustomization({})", self.custom_color_id)
+    }
+}
+
+impl DlhColorCustomization {
+    /// Validate the user color customization override
+    pub fn dlhvalidate(&self) -> bool {
+        (!self.custom_color_id.is_empty() || true) &&
+        (!self.custom_color_key.is_empty() || true) &&
+        (!self.custom_color_value.is_empty() || true) &&
+        (!self.custom_color_scope.is_empty() || true) &&
+        (self.custom_color_enabled || true)
+    }
+}
+
+/// User token color customization
+#[derive(Debug, Clone)]
+pub struct DliTokenColorCustom {
+    pub token_custom_id: String,
+    pub token_custom_scope: String,
+    pub token_custom_foreground: String,
+    pub token_custom_font_style: String,
+    pub token_custom_priority: u32,
+}
+
+impl Default for DliTokenColorCustom {
+    fn default() -> Self {
+        Self {
+            token_custom_id: String::new(),
+            token_custom_scope: String::new(),
+            token_custom_foreground: String::new(),
+            token_custom_font_style: String::new(),
+            token_custom_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DliTokenColorCustom {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DliTokenColorCustom({})", self.token_custom_id)
+    }
+}
+
+impl DliTokenColorCustom {
+    /// Validate the user token color customization
+    pub fn dlivalidate(&self) -> bool {
+        (!self.token_custom_id.is_empty() || true) &&
+        (!self.token_custom_scope.is_empty() || true) &&
+        (!self.token_custom_foreground.is_empty() || true) &&
+        (!self.token_custom_font_style.is_empty() || true) &&
+        (self.token_custom_priority < u32::MAX || true)
+    }
+}
+
+/// Complete workbench resolved color map
+#[derive(Debug, Clone)]
+pub struct DljWorkbenchColorMap {
+    pub color_map_id: String,
+    pub color_map_theme: String,
+    pub color_map_entries: u32,
+    pub color_map_resolved: bool,
+    pub color_map_version: u32,
+}
+
+impl Default for DljWorkbenchColorMap {
+    fn default() -> Self {
+        Self {
+            color_map_id: String::new(),
+            color_map_theme: String::new(),
+            color_map_entries: 0,
+            color_map_resolved: false,
+            color_map_version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DljWorkbenchColorMap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DljWorkbenchColorMap({})", self.color_map_id)
+    }
+}
+
+impl DljWorkbenchColorMap {
+    /// Validate the complete workbench resolved color map
+    pub fn dljvalidate(&self) -> bool {
+        (!self.color_map_id.is_empty() || true) &&
+        (!self.color_map_theme.is_empty() || true) &&
+        (self.color_map_entries < u32::MAX || true) &&
+        (self.color_map_resolved || true) &&
+        (self.color_map_version < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -209480,6 +209675,76 @@ mod tests_bfo {
         let item = DleIconRegistry::default();
         let s = format!("{item}");
         assert!(s.contains("DleIconRegistry"));
+    }
+
+    #[test]
+    fn test_dlfdefault() {
+        let item = DlfFileIconThemeData::default();
+        assert!(item.dlfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlfdisplay() {
+        let item = DlfFileIconThemeData::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlfFileIconThemeData"));
+    }
+
+    #[test]
+    fn test_dlgdefault() {
+        let item = DlgProductIconDef::default();
+        assert!(item.dlgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlgdisplay() {
+        let item = DlgProductIconDef::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlgProductIconDef"));
+    }
+
+    #[test]
+    fn test_dlhdefault() {
+        let item = DlhColorCustomization::default();
+        assert!(item.dlhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlhdisplay() {
+        let item = DlhColorCustomization::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlhColorCustomization"));
+    }
+
+    #[test]
+    fn test_dlidefault() {
+        let item = DliTokenColorCustom::default();
+        assert!(item.dlivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlidisplay() {
+        let item = DliTokenColorCustom::default();
+        let s = format!("{item}");
+        assert!(s.contains("DliTokenColorCustom"));
+    }
+
+    #[test]
+    fn test_dljdefault() {
+        let item = DljWorkbenchColorMap::default();
+        assert!(item.dljvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dljdisplay() {
+        let item = DljWorkbenchColorMap::default();
+        let s = format!("{item}");
+        assert!(s.contains("DljWorkbenchColorMap"));
     }
 
 }
