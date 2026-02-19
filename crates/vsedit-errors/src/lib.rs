@@ -48139,3 +48139,419 @@ mod bae_tests {
         assert_eq!(BaeScmStatus::TypeChanged.label(), "Type Changed");
     }
 }
+
+
+// --- baf_: Notification/toast model ---
+
+/// Severity level for a notification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BafNotificationSeverity {
+    Info,
+    Warning,
+    Error,
+}
+
+impl BafNotificationSeverity {
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Self::Info => "ℹ",
+            Self::Warning => "⚠",
+            Self::Error => "✗",
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Info => "Info",
+            Self::Warning => "Warning",
+            Self::Error => "Error",
+        }
+    }
+}
+
+/// An action button on a notification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BafNotificationAction {
+    pub label: String,
+    pub command_id: Option<String>,
+    pub is_primary: bool,
+}
+
+impl BafNotificationAction {
+    pub fn new(label: &str) -> Self {
+        Self {
+            label: label.to_string(),
+            command_id: None,
+            is_primary: false,
+        }
+    }
+
+    pub fn primary(label: &str) -> Self {
+        Self {
+            label: label.to_string(),
+            command_id: None,
+            is_primary: true,
+        }
+    }
+
+    pub fn with_command(mut self, command_id: &str) -> Self {
+        self.command_id = Some(command_id.to_string());
+        self
+    }
+}
+
+/// State of a notification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BafNotificationState {
+    Pending,
+    Visible,
+    Dismissed,
+    Closed,
+}
+
+/// A notification (toast) in the workbench.
+#[derive(Debug, Clone)]
+pub struct BafNotification {
+    pub id: u64,
+    pub severity: BafNotificationSeverity,
+    pub message: String,
+    pub source: Option<String>,
+    pub actions: Vec<BafNotificationAction>,
+    pub state: BafNotificationState,
+    pub is_sticky: bool,
+    pub has_progress: bool,
+    pub progress_percent: Option<f64>,
+    pub created_at_ms: u64,
+    pub details: Option<String>,
+}
+
+impl BafNotification {
+    pub fn new(id: u64, severity: BafNotificationSeverity, message: &str, created_at_ms: u64) -> Self {
+        Self {
+            id,
+            severity,
+            message: message.to_string(),
+            source: None,
+            actions: Vec::new(),
+            state: BafNotificationState::Pending,
+            is_sticky: false,
+            has_progress: false,
+            progress_percent: None,
+            created_at_ms,
+            details: None,
+        }
+    }
+
+    pub fn with_source(mut self, source: &str) -> Self {
+        self.source = Some(source.to_string());
+        self
+    }
+
+    pub fn with_action(mut self, action: BafNotificationAction) -> Self {
+        self.actions.push(action);
+        self
+    }
+
+    pub fn with_details(mut self, details: &str) -> Self {
+        self.details = Some(details.to_string());
+        self
+    }
+
+    pub fn set_sticky(mut self) -> Self {
+        self.is_sticky = true;
+        self
+    }
+
+    pub fn with_progress(mut self) -> Self {
+        self.has_progress = true;
+        self
+    }
+
+    pub fn update_progress(&mut self, percent: f64) {
+        self.progress_percent = Some(percent.clamp(0.0, 100.0));
+    }
+
+    pub fn show(&mut self) {
+        self.state = BafNotificationState::Visible;
+    }
+
+    pub fn dismiss(&mut self) {
+        self.state = BafNotificationState::Dismissed;
+    }
+
+    pub fn close(&mut self) {
+        self.state = BafNotificationState::Closed;
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.state == BafNotificationState::Visible
+    }
+
+    pub fn is_closed(&self) -> bool {
+        matches!(self.state, BafNotificationState::Closed | BafNotificationState::Dismissed)
+    }
+
+    pub fn age_ms(&self, now_ms: u64) -> u64 {
+        now_ms.saturating_sub(self.created_at_ms)
+    }
+
+    pub fn should_auto_dismiss(&self, now_ms: u64, timeout_ms: u64) -> bool {
+        !self.is_sticky && !self.has_progress && self.age_ms(now_ms) >= timeout_ms
+    }
+}
+
+/// Manages all notifications in the workbench.
+#[derive(Debug, Clone)]
+pub struct BafNotificationCenter {
+    notifications: Vec<BafNotification>,
+    next_id: u64,
+    auto_dismiss_ms: u64,
+    do_not_disturb: bool,
+}
+
+impl BafNotificationCenter {
+    pub fn new() -> Self {
+        Self {
+            notifications: Vec::new(),
+            next_id: 1,
+            auto_dismiss_ms: 10_000,
+            do_not_disturb: false,
+        }
+    }
+
+    pub fn notify(&mut self, severity: BafNotificationSeverity, message: &str, timestamp_ms: u64) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        let mut notif = BafNotification::new(id, severity, message, timestamp_ms);
+        if !self.do_not_disturb {
+            notif.show();
+        }
+        self.notifications.push(notif);
+        id
+    }
+
+    pub fn info(&mut self, message: &str, timestamp_ms: u64) -> u64 {
+        self.notify(BafNotificationSeverity::Info, message, timestamp_ms)
+    }
+
+    pub fn warn(&mut self, message: &str, timestamp_ms: u64) -> u64 {
+        self.notify(BafNotificationSeverity::Warning, message, timestamp_ms)
+    }
+
+    pub fn error(&mut self, message: &str, timestamp_ms: u64) -> u64 {
+        self.notify(BafNotificationSeverity::Error, message, timestamp_ms)
+    }
+
+    pub fn get(&self, id: u64) -> Option<&BafNotification> {
+        self.notifications.iter().find(|n| n.id == id)
+    }
+
+    pub fn get_mut(&mut self, id: u64) -> Option<&mut BafNotification> {
+        self.notifications.iter_mut().find(|n| n.id == id)
+    }
+
+    pub fn dismiss(&mut self, id: u64) {
+        if let Some(n) = self.get_mut(id) {
+            n.dismiss();
+        }
+    }
+
+    pub fn dismiss_all(&mut self) {
+        for n in &mut self.notifications {
+            if n.is_visible() {
+                n.dismiss();
+            }
+        }
+    }
+
+    pub fn visible_notifications(&self) -> Vec<&BafNotification> {
+        self.notifications.iter().filter(|n| n.is_visible()).collect()
+    }
+
+    pub fn visible_count(&self) -> usize {
+        self.notifications.iter().filter(|n| n.is_visible()).count()
+    }
+
+    pub fn all_notifications(&self) -> &[BafNotification] {
+        &self.notifications
+    }
+
+    pub fn unread_count(&self) -> usize {
+        self.notifications.iter()
+            .filter(|n| !n.is_closed())
+            .count()
+    }
+
+    pub fn tick(&mut self, now_ms: u64) {
+        let timeout = self.auto_dismiss_ms;
+        for n in &mut self.notifications {
+            if n.is_visible() && n.should_auto_dismiss(now_ms, timeout) {
+                n.dismiss();
+            }
+        }
+    }
+
+    pub fn set_do_not_disturb(&mut self, dnd: bool) {
+        self.do_not_disturb = dnd;
+    }
+
+    pub fn is_do_not_disturb(&self) -> bool {
+        self.do_not_disturb
+    }
+
+    pub fn clear_closed(&mut self) {
+        self.notifications.retain(|n| !n.is_closed());
+    }
+
+    pub fn error_count(&self) -> usize {
+        self.notifications.iter()
+            .filter(|n| n.severity == BafNotificationSeverity::Error && !n.is_closed())
+            .count()
+    }
+}
+
+#[cfg(test)]
+mod baf_tests {
+    use super::*;
+
+    #[test]
+    fn test_baf_severity_icon() {
+        assert_eq!(BafNotificationSeverity::Info.icon(), "\u{2139}");
+        assert_eq!(BafNotificationSeverity::Warning.icon(), "\u{26a0}");
+        assert_eq!(BafNotificationSeverity::Error.icon(), "\u{2717}");
+    }
+
+    #[test]
+    fn test_baf_action_creation() {
+        let action = BafNotificationAction::primary("Retry")
+            .with_command("workbench.action.retry");
+        assert!(action.is_primary);
+        assert_eq!(action.command_id.as_deref(), Some("workbench.action.retry"));
+    }
+
+    #[test]
+    fn test_baf_notification_creation() {
+        let notif = BafNotification::new(1, BafNotificationSeverity::Info, "Hello", 1000);
+        assert_eq!(notif.state, BafNotificationState::Pending);
+        assert!(!notif.is_sticky);
+        assert!(!notif.has_progress);
+    }
+
+    #[test]
+    fn test_baf_notification_lifecycle() {
+        let mut notif = BafNotification::new(1, BafNotificationSeverity::Info, "Test", 1000);
+        assert!(!notif.is_visible());
+        notif.show();
+        assert!(notif.is_visible());
+        notif.dismiss();
+        assert!(!notif.is_visible());
+        assert!(notif.is_closed());
+    }
+
+    #[test]
+    fn test_baf_notification_progress() {
+        let mut notif = BafNotification::new(1, BafNotificationSeverity::Info, "Loading", 1000)
+            .with_progress();
+        notif.update_progress(50.0);
+        assert_eq!(notif.progress_percent, Some(50.0));
+        notif.update_progress(150.0);
+        assert_eq!(notif.progress_percent, Some(100.0));
+    }
+
+    #[test]
+    fn test_baf_notification_auto_dismiss() {
+        let notif = BafNotification::new(1, BafNotificationSeverity::Info, "Auto", 1000);
+        assert!(notif.should_auto_dismiss(12000, 10000));
+        assert!(!notif.should_auto_dismiss(5000, 10000));
+
+        let sticky = BafNotification::new(2, BafNotificationSeverity::Info, "Sticky", 1000)
+            .set_sticky();
+        assert!(!sticky.should_auto_dismiss(12000, 10000));
+    }
+
+    #[test]
+    fn test_baf_notification_with_builders() {
+        let notif = BafNotification::new(1, BafNotificationSeverity::Warning, "msg", 0)
+            .with_source("Git")
+            .with_details("Details here")
+            .with_action(BafNotificationAction::new("OK"));
+        assert_eq!(notif.source.as_deref(), Some("Git"));
+        assert_eq!(notif.details.as_deref(), Some("Details here"));
+        assert_eq!(notif.actions.len(), 1);
+    }
+
+    #[test]
+    fn test_baf_center_notify() {
+        let mut center = BafNotificationCenter::new();
+        let id = center.info("Hello", 1000);
+        assert_eq!(center.visible_count(), 1);
+        assert_eq!(center.unread_count(), 1);
+        assert!(center.get(id).is_some());
+    }
+
+    #[test]
+    fn test_baf_center_dismiss() {
+        let mut center = BafNotificationCenter::new();
+        let id = center.info("Hello", 1000);
+        center.dismiss(id);
+        assert_eq!(center.visible_count(), 0);
+    }
+
+    #[test]
+    fn test_baf_center_dismiss_all() {
+        let mut center = BafNotificationCenter::new();
+        center.info("A", 1000);
+        center.info("B", 2000);
+        center.warn("C", 3000);
+        assert_eq!(center.visible_count(), 3);
+        center.dismiss_all();
+        assert_eq!(center.visible_count(), 0);
+    }
+
+    #[test]
+    fn test_baf_center_tick_auto_dismiss() {
+        let mut center = BafNotificationCenter::new();
+        center.auto_dismiss_ms = 5000;
+        center.info("Old", 1000);
+        center.info("New", 4000);
+        center.tick(7000);
+        // "Old" at 1000 should be dismissed at 7000 (age=6000 > 5000)
+        // "New" at 4000 should still be visible (age=3000 < 5000)
+        assert_eq!(center.visible_count(), 1);
+    }
+
+    #[test]
+    fn test_baf_center_do_not_disturb() {
+        let mut center = BafNotificationCenter::new();
+        center.set_do_not_disturb(true);
+        center.info("Silenced", 1000);
+        assert_eq!(center.visible_count(), 0);
+        assert_eq!(center.unread_count(), 1);
+    }
+
+    #[test]
+    fn test_baf_center_clear_closed() {
+        let mut center = BafNotificationCenter::new();
+        let id = center.info("Test", 1000);
+        center.dismiss(id);
+        assert_eq!(center.all_notifications().len(), 1);
+        center.clear_closed();
+        assert_eq!(center.all_notifications().len(), 0);
+    }
+
+    #[test]
+    fn test_baf_center_error_count() {
+        let mut center = BafNotificationCenter::new();
+        center.error("Fail 1", 1000);
+        center.error("Fail 2", 2000);
+        center.info("OK", 3000);
+        assert_eq!(center.error_count(), 2);
+    }
+
+    #[test]
+    fn test_baf_notification_age() {
+        let notif = BafNotification::new(1, BafNotificationSeverity::Info, "Test", 5000);
+        assert_eq!(notif.age_ms(8000), 3000);
+        assert_eq!(notif.age_ms(3000), 0); // Can't be negative
+    }
+}
