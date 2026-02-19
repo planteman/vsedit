@@ -90435,6 +90435,111 @@ impl TaskDependency {
     }
 }
 
+/// Runtime wiring: btf_ LaunchConfig
+#[derive(Debug, Clone)]
+pub struct LaunchConfig {
+    pub btf_config_name: String,
+    pub btf_config_type: String,
+    pub btf_request_type: String,
+    pub btf_program_path: String,
+    pub btf_args: Vec<String>,
+    pub btf_cwd: String,
+    pub btf_env_vars: Vec<String>,
+    pub btf_stop_on_entry: bool,
+    pub btf_console_mode: String,
+    pub btf_pre_launch_task: String,
+}
+
+impl LaunchConfig {
+    pub fn btf_summary(&self) -> String {
+        format!("LaunchConfig({})", self.btf_config_name)
+    }
+}
+
+/// Runtime wiring: btg_ DapMessage
+#[derive(Debug, Clone)]
+pub struct DapMessage {
+    pub btg_seq: u64,
+    pub btg_message_type: String,
+    pub btg_command: String,
+    pub btg_request_seq: u64,
+    pub btg_success: bool,
+    pub btg_message: String,
+    pub btg_body_json: String,
+    pub btg_event_name: String,
+    pub btg_is_request: bool,
+    pub btg_is_response: bool,
+}
+
+impl DapMessage {
+    pub fn btg_summary(&self) -> String {
+        format!("DapMessage({})", self.btg_seq)
+    }
+}
+
+/// Runtime wiring: bth_ DebugCapability
+#[derive(Debug, Clone)]
+pub struct DebugCapability {
+    pub bth_supports_configuration_done: bool,
+    pub bth_supports_function_breakpoints: bool,
+    pub bth_supports_conditional_breakpoints: bool,
+    pub bth_supports_hit_conditional_breakpoints: bool,
+    pub bth_supports_evaluate_for_hovers: bool,
+    pub bth_supports_step_back: bool,
+    pub bth_supports_set_variable: bool,
+    pub bth_supports_restart_frame: bool,
+    pub bth_supports_goto_targets: bool,
+    pub bth_supports_completions: bool,
+}
+
+impl DebugCapability {
+    pub fn bth_summary(&self) -> String {
+        format!("DebugCapability({})", self.bth_supports_configuration_done)
+    }
+}
+
+/// Runtime wiring: bti_ BreakpointMode
+#[derive(Debug, Clone)]
+pub struct BreakpointMode {
+    pub bti_mode_id: String,
+    pub bti_label: String,
+    pub bti_description: String,
+    pub bti_applies_to_source: bool,
+    pub bti_applies_to_exception: bool,
+    pub bti_applies_to_data: bool,
+    pub bti_applies_to_function: bool,
+    pub bti_applies_to_instruction: bool,
+    pub bti_is_default: bool,
+    pub bti_adapter_id: String,
+}
+
+impl BreakpointMode {
+    pub fn bti_summary(&self) -> String {
+        format!("BreakpointMode({})", self.bti_mode_id)
+    }
+}
+
+/// Runtime wiring: btj_ DataBreakpoint
+#[derive(Debug, Clone)]
+pub struct DataBreakpoint {
+    pub btj_data_id: String,
+    pub btj_access_type: String,
+    pub btj_condition: String,
+    pub btj_hit_condition: String,
+    pub btj_description: String,
+    pub btj_can_persist: bool,
+    pub btj_is_enabled: bool,
+    pub btj_is_verified: bool,
+    pub btj_address: String,
+    pub btj_byte_size: u32,
+}
+
+impl DataBreakpoint {
+    pub fn btj_summary(&self) -> String {
+        format!("DataBreakpoint({})", self.btj_data_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -128799,6 +128904,910 @@ mod tests_bfo {
         };
         let _ = obj.bte_summary();
         assert!(!obj.bte_cycle_detected);
+    }
+
+    #[test]
+    fn test_btf_config_name() {
+        let obj = LaunchConfig {
+            btf_config_name: String::from("test"),
+            btf_config_type: String::from("test"),
+            btf_request_type: String::from("test"),
+            btf_program_path: String::from("test"),
+            btf_args: Vec::new(),
+            btf_cwd: String::from("test"),
+            btf_env_vars: Vec::new(),
+            btf_stop_on_entry: false,
+            btf_console_mode: String::from("test"),
+            btf_pre_launch_task: String::from("test"),
+        };
+        let _ = obj.btf_summary();
+        assert_eq!(obj.btf_config_name, "test");
+    }
+
+    #[test]
+    fn test_btf_config_type() {
+        let obj = LaunchConfig {
+            btf_config_name: String::from("test"),
+            btf_config_type: String::from("test"),
+            btf_request_type: String::from("test"),
+            btf_program_path: String::from("test"),
+            btf_args: Vec::new(),
+            btf_cwd: String::from("test"),
+            btf_env_vars: Vec::new(),
+            btf_stop_on_entry: false,
+            btf_console_mode: String::from("test"),
+            btf_pre_launch_task: String::from("test"),
+        };
+        let _ = obj.btf_summary();
+        assert_eq!(obj.btf_config_type, "test");
+    }
+
+    #[test]
+    fn test_btf_request_type() {
+        let obj = LaunchConfig {
+            btf_config_name: String::from("test"),
+            btf_config_type: String::from("test"),
+            btf_request_type: String::from("test"),
+            btf_program_path: String::from("test"),
+            btf_args: Vec::new(),
+            btf_cwd: String::from("test"),
+            btf_env_vars: Vec::new(),
+            btf_stop_on_entry: false,
+            btf_console_mode: String::from("test"),
+            btf_pre_launch_task: String::from("test"),
+        };
+        let _ = obj.btf_summary();
+        assert_eq!(obj.btf_request_type, "test");
+    }
+
+    #[test]
+    fn test_btf_program_path() {
+        let obj = LaunchConfig {
+            btf_config_name: String::from("test"),
+            btf_config_type: String::from("test"),
+            btf_request_type: String::from("test"),
+            btf_program_path: String::from("test"),
+            btf_args: Vec::new(),
+            btf_cwd: String::from("test"),
+            btf_env_vars: Vec::new(),
+            btf_stop_on_entry: false,
+            btf_console_mode: String::from("test"),
+            btf_pre_launch_task: String::from("test"),
+        };
+        let _ = obj.btf_summary();
+        assert_eq!(obj.btf_program_path, "test");
+    }
+
+    #[test]
+    fn test_btf_args() {
+        let obj = LaunchConfig {
+            btf_config_name: String::from("test"),
+            btf_config_type: String::from("test"),
+            btf_request_type: String::from("test"),
+            btf_program_path: String::from("test"),
+            btf_args: Vec::new(),
+            btf_cwd: String::from("test"),
+            btf_env_vars: Vec::new(),
+            btf_stop_on_entry: false,
+            btf_console_mode: String::from("test"),
+            btf_pre_launch_task: String::from("test"),
+        };
+        let _ = obj.btf_summary();
+        assert!(obj.btf_args.is_empty());
+    }
+
+    #[test]
+    fn test_btf_cwd() {
+        let obj = LaunchConfig {
+            btf_config_name: String::from("test"),
+            btf_config_type: String::from("test"),
+            btf_request_type: String::from("test"),
+            btf_program_path: String::from("test"),
+            btf_args: Vec::new(),
+            btf_cwd: String::from("test"),
+            btf_env_vars: Vec::new(),
+            btf_stop_on_entry: false,
+            btf_console_mode: String::from("test"),
+            btf_pre_launch_task: String::from("test"),
+        };
+        let _ = obj.btf_summary();
+        assert_eq!(obj.btf_cwd, "test");
+    }
+
+    #[test]
+    fn test_btf_env_vars() {
+        let obj = LaunchConfig {
+            btf_config_name: String::from("test"),
+            btf_config_type: String::from("test"),
+            btf_request_type: String::from("test"),
+            btf_program_path: String::from("test"),
+            btf_args: Vec::new(),
+            btf_cwd: String::from("test"),
+            btf_env_vars: Vec::new(),
+            btf_stop_on_entry: false,
+            btf_console_mode: String::from("test"),
+            btf_pre_launch_task: String::from("test"),
+        };
+        let _ = obj.btf_summary();
+        assert!(obj.btf_env_vars.is_empty());
+    }
+
+    #[test]
+    fn test_btf_stop_on_entry() {
+        let obj = LaunchConfig {
+            btf_config_name: String::from("test"),
+            btf_config_type: String::from("test"),
+            btf_request_type: String::from("test"),
+            btf_program_path: String::from("test"),
+            btf_args: Vec::new(),
+            btf_cwd: String::from("test"),
+            btf_env_vars: Vec::new(),
+            btf_stop_on_entry: false,
+            btf_console_mode: String::from("test"),
+            btf_pre_launch_task: String::from("test"),
+        };
+        let _ = obj.btf_summary();
+        assert!(!obj.btf_stop_on_entry);
+    }
+
+    #[test]
+    fn test_btf_console_mode() {
+        let obj = LaunchConfig {
+            btf_config_name: String::from("test"),
+            btf_config_type: String::from("test"),
+            btf_request_type: String::from("test"),
+            btf_program_path: String::from("test"),
+            btf_args: Vec::new(),
+            btf_cwd: String::from("test"),
+            btf_env_vars: Vec::new(),
+            btf_stop_on_entry: false,
+            btf_console_mode: String::from("test"),
+            btf_pre_launch_task: String::from("test"),
+        };
+        let _ = obj.btf_summary();
+        assert_eq!(obj.btf_console_mode, "test");
+    }
+
+    #[test]
+    fn test_btf_pre_launch_task() {
+        let obj = LaunchConfig {
+            btf_config_name: String::from("test"),
+            btf_config_type: String::from("test"),
+            btf_request_type: String::from("test"),
+            btf_program_path: String::from("test"),
+            btf_args: Vec::new(),
+            btf_cwd: String::from("test"),
+            btf_env_vars: Vec::new(),
+            btf_stop_on_entry: false,
+            btf_console_mode: String::from("test"),
+            btf_pre_launch_task: String::from("test"),
+        };
+        let _ = obj.btf_summary();
+        assert_eq!(obj.btf_pre_launch_task, "test");
+    }
+
+
+    #[test]
+    fn test_btg_seq() {
+        let obj = DapMessage {
+            btg_seq: 0,
+            btg_message_type: String::from("test"),
+            btg_command: String::from("test"),
+            btg_request_seq: 0,
+            btg_success: false,
+            btg_message: String::from("test"),
+            btg_body_json: String::from("test"),
+            btg_event_name: String::from("test"),
+            btg_is_request: false,
+            btg_is_response: false,
+        };
+        let _ = obj.btg_summary();
+        assert_eq!(obj.btg_seq, 0);
+    }
+
+    #[test]
+    fn test_btg_message_type() {
+        let obj = DapMessage {
+            btg_seq: 0,
+            btg_message_type: String::from("test"),
+            btg_command: String::from("test"),
+            btg_request_seq: 0,
+            btg_success: false,
+            btg_message: String::from("test"),
+            btg_body_json: String::from("test"),
+            btg_event_name: String::from("test"),
+            btg_is_request: false,
+            btg_is_response: false,
+        };
+        let _ = obj.btg_summary();
+        assert_eq!(obj.btg_message_type, "test");
+    }
+
+    #[test]
+    fn test_btg_command() {
+        let obj = DapMessage {
+            btg_seq: 0,
+            btg_message_type: String::from("test"),
+            btg_command: String::from("test"),
+            btg_request_seq: 0,
+            btg_success: false,
+            btg_message: String::from("test"),
+            btg_body_json: String::from("test"),
+            btg_event_name: String::from("test"),
+            btg_is_request: false,
+            btg_is_response: false,
+        };
+        let _ = obj.btg_summary();
+        assert_eq!(obj.btg_command, "test");
+    }
+
+    #[test]
+    fn test_btg_request_seq() {
+        let obj = DapMessage {
+            btg_seq: 0,
+            btg_message_type: String::from("test"),
+            btg_command: String::from("test"),
+            btg_request_seq: 0,
+            btg_success: false,
+            btg_message: String::from("test"),
+            btg_body_json: String::from("test"),
+            btg_event_name: String::from("test"),
+            btg_is_request: false,
+            btg_is_response: false,
+        };
+        let _ = obj.btg_summary();
+        assert_eq!(obj.btg_request_seq, 0);
+    }
+
+    #[test]
+    fn test_btg_success() {
+        let obj = DapMessage {
+            btg_seq: 0,
+            btg_message_type: String::from("test"),
+            btg_command: String::from("test"),
+            btg_request_seq: 0,
+            btg_success: false,
+            btg_message: String::from("test"),
+            btg_body_json: String::from("test"),
+            btg_event_name: String::from("test"),
+            btg_is_request: false,
+            btg_is_response: false,
+        };
+        let _ = obj.btg_summary();
+        assert!(!obj.btg_success);
+    }
+
+    #[test]
+    fn test_btg_message() {
+        let obj = DapMessage {
+            btg_seq: 0,
+            btg_message_type: String::from("test"),
+            btg_command: String::from("test"),
+            btg_request_seq: 0,
+            btg_success: false,
+            btg_message: String::from("test"),
+            btg_body_json: String::from("test"),
+            btg_event_name: String::from("test"),
+            btg_is_request: false,
+            btg_is_response: false,
+        };
+        let _ = obj.btg_summary();
+        assert_eq!(obj.btg_message, "test");
+    }
+
+    #[test]
+    fn test_btg_body_json() {
+        let obj = DapMessage {
+            btg_seq: 0,
+            btg_message_type: String::from("test"),
+            btg_command: String::from("test"),
+            btg_request_seq: 0,
+            btg_success: false,
+            btg_message: String::from("test"),
+            btg_body_json: String::from("test"),
+            btg_event_name: String::from("test"),
+            btg_is_request: false,
+            btg_is_response: false,
+        };
+        let _ = obj.btg_summary();
+        assert_eq!(obj.btg_body_json, "test");
+    }
+
+    #[test]
+    fn test_btg_event_name() {
+        let obj = DapMessage {
+            btg_seq: 0,
+            btg_message_type: String::from("test"),
+            btg_command: String::from("test"),
+            btg_request_seq: 0,
+            btg_success: false,
+            btg_message: String::from("test"),
+            btg_body_json: String::from("test"),
+            btg_event_name: String::from("test"),
+            btg_is_request: false,
+            btg_is_response: false,
+        };
+        let _ = obj.btg_summary();
+        assert_eq!(obj.btg_event_name, "test");
+    }
+
+    #[test]
+    fn test_btg_is_request() {
+        let obj = DapMessage {
+            btg_seq: 0,
+            btg_message_type: String::from("test"),
+            btg_command: String::from("test"),
+            btg_request_seq: 0,
+            btg_success: false,
+            btg_message: String::from("test"),
+            btg_body_json: String::from("test"),
+            btg_event_name: String::from("test"),
+            btg_is_request: false,
+            btg_is_response: false,
+        };
+        let _ = obj.btg_summary();
+        assert!(!obj.btg_is_request);
+    }
+
+    #[test]
+    fn test_btg_is_response() {
+        let obj = DapMessage {
+            btg_seq: 0,
+            btg_message_type: String::from("test"),
+            btg_command: String::from("test"),
+            btg_request_seq: 0,
+            btg_success: false,
+            btg_message: String::from("test"),
+            btg_body_json: String::from("test"),
+            btg_event_name: String::from("test"),
+            btg_is_request: false,
+            btg_is_response: false,
+        };
+        let _ = obj.btg_summary();
+        assert!(!obj.btg_is_response);
+    }
+
+
+    #[test]
+    fn test_bth_supports_configuration_done() {
+        let obj = DebugCapability {
+            bth_supports_configuration_done: false,
+            bth_supports_function_breakpoints: false,
+            bth_supports_conditional_breakpoints: false,
+            bth_supports_hit_conditional_breakpoints: false,
+            bth_supports_evaluate_for_hovers: false,
+            bth_supports_step_back: false,
+            bth_supports_set_variable: false,
+            bth_supports_restart_frame: false,
+            bth_supports_goto_targets: false,
+            bth_supports_completions: false,
+        };
+        let _ = obj.bth_summary();
+        assert!(!obj.bth_supports_configuration_done);
+    }
+
+    #[test]
+    fn test_bth_supports_function_breakpoints() {
+        let obj = DebugCapability {
+            bth_supports_configuration_done: false,
+            bth_supports_function_breakpoints: false,
+            bth_supports_conditional_breakpoints: false,
+            bth_supports_hit_conditional_breakpoints: false,
+            bth_supports_evaluate_for_hovers: false,
+            bth_supports_step_back: false,
+            bth_supports_set_variable: false,
+            bth_supports_restart_frame: false,
+            bth_supports_goto_targets: false,
+            bth_supports_completions: false,
+        };
+        let _ = obj.bth_summary();
+        assert!(!obj.bth_supports_function_breakpoints);
+    }
+
+    #[test]
+    fn test_bth_supports_conditional_breakpoints() {
+        let obj = DebugCapability {
+            bth_supports_configuration_done: false,
+            bth_supports_function_breakpoints: false,
+            bth_supports_conditional_breakpoints: false,
+            bth_supports_hit_conditional_breakpoints: false,
+            bth_supports_evaluate_for_hovers: false,
+            bth_supports_step_back: false,
+            bth_supports_set_variable: false,
+            bth_supports_restart_frame: false,
+            bth_supports_goto_targets: false,
+            bth_supports_completions: false,
+        };
+        let _ = obj.bth_summary();
+        assert!(!obj.bth_supports_conditional_breakpoints);
+    }
+
+    #[test]
+    fn test_bth_supports_hit_conditional_breakpoints() {
+        let obj = DebugCapability {
+            bth_supports_configuration_done: false,
+            bth_supports_function_breakpoints: false,
+            bth_supports_conditional_breakpoints: false,
+            bth_supports_hit_conditional_breakpoints: false,
+            bth_supports_evaluate_for_hovers: false,
+            bth_supports_step_back: false,
+            bth_supports_set_variable: false,
+            bth_supports_restart_frame: false,
+            bth_supports_goto_targets: false,
+            bth_supports_completions: false,
+        };
+        let _ = obj.bth_summary();
+        assert!(!obj.bth_supports_hit_conditional_breakpoints);
+    }
+
+    #[test]
+    fn test_bth_supports_evaluate_for_hovers() {
+        let obj = DebugCapability {
+            bth_supports_configuration_done: false,
+            bth_supports_function_breakpoints: false,
+            bth_supports_conditional_breakpoints: false,
+            bth_supports_hit_conditional_breakpoints: false,
+            bth_supports_evaluate_for_hovers: false,
+            bth_supports_step_back: false,
+            bth_supports_set_variable: false,
+            bth_supports_restart_frame: false,
+            bth_supports_goto_targets: false,
+            bth_supports_completions: false,
+        };
+        let _ = obj.bth_summary();
+        assert!(!obj.bth_supports_evaluate_for_hovers);
+    }
+
+    #[test]
+    fn test_bth_supports_step_back() {
+        let obj = DebugCapability {
+            bth_supports_configuration_done: false,
+            bth_supports_function_breakpoints: false,
+            bth_supports_conditional_breakpoints: false,
+            bth_supports_hit_conditional_breakpoints: false,
+            bth_supports_evaluate_for_hovers: false,
+            bth_supports_step_back: false,
+            bth_supports_set_variable: false,
+            bth_supports_restart_frame: false,
+            bth_supports_goto_targets: false,
+            bth_supports_completions: false,
+        };
+        let _ = obj.bth_summary();
+        assert!(!obj.bth_supports_step_back);
+    }
+
+    #[test]
+    fn test_bth_supports_set_variable() {
+        let obj = DebugCapability {
+            bth_supports_configuration_done: false,
+            bth_supports_function_breakpoints: false,
+            bth_supports_conditional_breakpoints: false,
+            bth_supports_hit_conditional_breakpoints: false,
+            bth_supports_evaluate_for_hovers: false,
+            bth_supports_step_back: false,
+            bth_supports_set_variable: false,
+            bth_supports_restart_frame: false,
+            bth_supports_goto_targets: false,
+            bth_supports_completions: false,
+        };
+        let _ = obj.bth_summary();
+        assert!(!obj.bth_supports_set_variable);
+    }
+
+    #[test]
+    fn test_bth_supports_restart_frame() {
+        let obj = DebugCapability {
+            bth_supports_configuration_done: false,
+            bth_supports_function_breakpoints: false,
+            bth_supports_conditional_breakpoints: false,
+            bth_supports_hit_conditional_breakpoints: false,
+            bth_supports_evaluate_for_hovers: false,
+            bth_supports_step_back: false,
+            bth_supports_set_variable: false,
+            bth_supports_restart_frame: false,
+            bth_supports_goto_targets: false,
+            bth_supports_completions: false,
+        };
+        let _ = obj.bth_summary();
+        assert!(!obj.bth_supports_restart_frame);
+    }
+
+    #[test]
+    fn test_bth_supports_goto_targets() {
+        let obj = DebugCapability {
+            bth_supports_configuration_done: false,
+            bth_supports_function_breakpoints: false,
+            bth_supports_conditional_breakpoints: false,
+            bth_supports_hit_conditional_breakpoints: false,
+            bth_supports_evaluate_for_hovers: false,
+            bth_supports_step_back: false,
+            bth_supports_set_variable: false,
+            bth_supports_restart_frame: false,
+            bth_supports_goto_targets: false,
+            bth_supports_completions: false,
+        };
+        let _ = obj.bth_summary();
+        assert!(!obj.bth_supports_goto_targets);
+    }
+
+    #[test]
+    fn test_bth_supports_completions() {
+        let obj = DebugCapability {
+            bth_supports_configuration_done: false,
+            bth_supports_function_breakpoints: false,
+            bth_supports_conditional_breakpoints: false,
+            bth_supports_hit_conditional_breakpoints: false,
+            bth_supports_evaluate_for_hovers: false,
+            bth_supports_step_back: false,
+            bth_supports_set_variable: false,
+            bth_supports_restart_frame: false,
+            bth_supports_goto_targets: false,
+            bth_supports_completions: false,
+        };
+        let _ = obj.bth_summary();
+        assert!(!obj.bth_supports_completions);
+    }
+
+
+    #[test]
+    fn test_bti_mode_id() {
+        let obj = BreakpointMode {
+            bti_mode_id: String::from("test"),
+            bti_label: String::from("test"),
+            bti_description: String::from("test"),
+            bti_applies_to_source: false,
+            bti_applies_to_exception: false,
+            bti_applies_to_data: false,
+            bti_applies_to_function: false,
+            bti_applies_to_instruction: false,
+            bti_is_default: false,
+            bti_adapter_id: String::from("test"),
+        };
+        let _ = obj.bti_summary();
+        assert_eq!(obj.bti_mode_id, "test");
+    }
+
+    #[test]
+    fn test_bti_label() {
+        let obj = BreakpointMode {
+            bti_mode_id: String::from("test"),
+            bti_label: String::from("test"),
+            bti_description: String::from("test"),
+            bti_applies_to_source: false,
+            bti_applies_to_exception: false,
+            bti_applies_to_data: false,
+            bti_applies_to_function: false,
+            bti_applies_to_instruction: false,
+            bti_is_default: false,
+            bti_adapter_id: String::from("test"),
+        };
+        let _ = obj.bti_summary();
+        assert_eq!(obj.bti_label, "test");
+    }
+
+    #[test]
+    fn test_bti_description() {
+        let obj = BreakpointMode {
+            bti_mode_id: String::from("test"),
+            bti_label: String::from("test"),
+            bti_description: String::from("test"),
+            bti_applies_to_source: false,
+            bti_applies_to_exception: false,
+            bti_applies_to_data: false,
+            bti_applies_to_function: false,
+            bti_applies_to_instruction: false,
+            bti_is_default: false,
+            bti_adapter_id: String::from("test"),
+        };
+        let _ = obj.bti_summary();
+        assert_eq!(obj.bti_description, "test");
+    }
+
+    #[test]
+    fn test_bti_applies_to_source() {
+        let obj = BreakpointMode {
+            bti_mode_id: String::from("test"),
+            bti_label: String::from("test"),
+            bti_description: String::from("test"),
+            bti_applies_to_source: false,
+            bti_applies_to_exception: false,
+            bti_applies_to_data: false,
+            bti_applies_to_function: false,
+            bti_applies_to_instruction: false,
+            bti_is_default: false,
+            bti_adapter_id: String::from("test"),
+        };
+        let _ = obj.bti_summary();
+        assert!(!obj.bti_applies_to_source);
+    }
+
+    #[test]
+    fn test_bti_applies_to_exception() {
+        let obj = BreakpointMode {
+            bti_mode_id: String::from("test"),
+            bti_label: String::from("test"),
+            bti_description: String::from("test"),
+            bti_applies_to_source: false,
+            bti_applies_to_exception: false,
+            bti_applies_to_data: false,
+            bti_applies_to_function: false,
+            bti_applies_to_instruction: false,
+            bti_is_default: false,
+            bti_adapter_id: String::from("test"),
+        };
+        let _ = obj.bti_summary();
+        assert!(!obj.bti_applies_to_exception);
+    }
+
+    #[test]
+    fn test_bti_applies_to_data() {
+        let obj = BreakpointMode {
+            bti_mode_id: String::from("test"),
+            bti_label: String::from("test"),
+            bti_description: String::from("test"),
+            bti_applies_to_source: false,
+            bti_applies_to_exception: false,
+            bti_applies_to_data: false,
+            bti_applies_to_function: false,
+            bti_applies_to_instruction: false,
+            bti_is_default: false,
+            bti_adapter_id: String::from("test"),
+        };
+        let _ = obj.bti_summary();
+        assert!(!obj.bti_applies_to_data);
+    }
+
+    #[test]
+    fn test_bti_applies_to_function() {
+        let obj = BreakpointMode {
+            bti_mode_id: String::from("test"),
+            bti_label: String::from("test"),
+            bti_description: String::from("test"),
+            bti_applies_to_source: false,
+            bti_applies_to_exception: false,
+            bti_applies_to_data: false,
+            bti_applies_to_function: false,
+            bti_applies_to_instruction: false,
+            bti_is_default: false,
+            bti_adapter_id: String::from("test"),
+        };
+        let _ = obj.bti_summary();
+        assert!(!obj.bti_applies_to_function);
+    }
+
+    #[test]
+    fn test_bti_applies_to_instruction() {
+        let obj = BreakpointMode {
+            bti_mode_id: String::from("test"),
+            bti_label: String::from("test"),
+            bti_description: String::from("test"),
+            bti_applies_to_source: false,
+            bti_applies_to_exception: false,
+            bti_applies_to_data: false,
+            bti_applies_to_function: false,
+            bti_applies_to_instruction: false,
+            bti_is_default: false,
+            bti_adapter_id: String::from("test"),
+        };
+        let _ = obj.bti_summary();
+        assert!(!obj.bti_applies_to_instruction);
+    }
+
+    #[test]
+    fn test_bti_is_default() {
+        let obj = BreakpointMode {
+            bti_mode_id: String::from("test"),
+            bti_label: String::from("test"),
+            bti_description: String::from("test"),
+            bti_applies_to_source: false,
+            bti_applies_to_exception: false,
+            bti_applies_to_data: false,
+            bti_applies_to_function: false,
+            bti_applies_to_instruction: false,
+            bti_is_default: false,
+            bti_adapter_id: String::from("test"),
+        };
+        let _ = obj.bti_summary();
+        assert!(!obj.bti_is_default);
+    }
+
+    #[test]
+    fn test_bti_adapter_id() {
+        let obj = BreakpointMode {
+            bti_mode_id: String::from("test"),
+            bti_label: String::from("test"),
+            bti_description: String::from("test"),
+            bti_applies_to_source: false,
+            bti_applies_to_exception: false,
+            bti_applies_to_data: false,
+            bti_applies_to_function: false,
+            bti_applies_to_instruction: false,
+            bti_is_default: false,
+            bti_adapter_id: String::from("test"),
+        };
+        let _ = obj.bti_summary();
+        assert_eq!(obj.bti_adapter_id, "test");
+    }
+
+
+    #[test]
+    fn test_btj_data_id() {
+        let obj = DataBreakpoint {
+            btj_data_id: String::from("test"),
+            btj_access_type: String::from("test"),
+            btj_condition: String::from("test"),
+            btj_hit_condition: String::from("test"),
+            btj_description: String::from("test"),
+            btj_can_persist: false,
+            btj_is_enabled: false,
+            btj_is_verified: false,
+            btj_address: String::from("test"),
+            btj_byte_size: 0,
+        };
+        let _ = obj.btj_summary();
+        assert_eq!(obj.btj_data_id, "test");
+    }
+
+    #[test]
+    fn test_btj_access_type() {
+        let obj = DataBreakpoint {
+            btj_data_id: String::from("test"),
+            btj_access_type: String::from("test"),
+            btj_condition: String::from("test"),
+            btj_hit_condition: String::from("test"),
+            btj_description: String::from("test"),
+            btj_can_persist: false,
+            btj_is_enabled: false,
+            btj_is_verified: false,
+            btj_address: String::from("test"),
+            btj_byte_size: 0,
+        };
+        let _ = obj.btj_summary();
+        assert_eq!(obj.btj_access_type, "test");
+    }
+
+    #[test]
+    fn test_btj_condition() {
+        let obj = DataBreakpoint {
+            btj_data_id: String::from("test"),
+            btj_access_type: String::from("test"),
+            btj_condition: String::from("test"),
+            btj_hit_condition: String::from("test"),
+            btj_description: String::from("test"),
+            btj_can_persist: false,
+            btj_is_enabled: false,
+            btj_is_verified: false,
+            btj_address: String::from("test"),
+            btj_byte_size: 0,
+        };
+        let _ = obj.btj_summary();
+        assert_eq!(obj.btj_condition, "test");
+    }
+
+    #[test]
+    fn test_btj_hit_condition() {
+        let obj = DataBreakpoint {
+            btj_data_id: String::from("test"),
+            btj_access_type: String::from("test"),
+            btj_condition: String::from("test"),
+            btj_hit_condition: String::from("test"),
+            btj_description: String::from("test"),
+            btj_can_persist: false,
+            btj_is_enabled: false,
+            btj_is_verified: false,
+            btj_address: String::from("test"),
+            btj_byte_size: 0,
+        };
+        let _ = obj.btj_summary();
+        assert_eq!(obj.btj_hit_condition, "test");
+    }
+
+    #[test]
+    fn test_btj_description() {
+        let obj = DataBreakpoint {
+            btj_data_id: String::from("test"),
+            btj_access_type: String::from("test"),
+            btj_condition: String::from("test"),
+            btj_hit_condition: String::from("test"),
+            btj_description: String::from("test"),
+            btj_can_persist: false,
+            btj_is_enabled: false,
+            btj_is_verified: false,
+            btj_address: String::from("test"),
+            btj_byte_size: 0,
+        };
+        let _ = obj.btj_summary();
+        assert_eq!(obj.btj_description, "test");
+    }
+
+    #[test]
+    fn test_btj_can_persist() {
+        let obj = DataBreakpoint {
+            btj_data_id: String::from("test"),
+            btj_access_type: String::from("test"),
+            btj_condition: String::from("test"),
+            btj_hit_condition: String::from("test"),
+            btj_description: String::from("test"),
+            btj_can_persist: false,
+            btj_is_enabled: false,
+            btj_is_verified: false,
+            btj_address: String::from("test"),
+            btj_byte_size: 0,
+        };
+        let _ = obj.btj_summary();
+        assert!(!obj.btj_can_persist);
+    }
+
+    #[test]
+    fn test_btj_is_enabled() {
+        let obj = DataBreakpoint {
+            btj_data_id: String::from("test"),
+            btj_access_type: String::from("test"),
+            btj_condition: String::from("test"),
+            btj_hit_condition: String::from("test"),
+            btj_description: String::from("test"),
+            btj_can_persist: false,
+            btj_is_enabled: false,
+            btj_is_verified: false,
+            btj_address: String::from("test"),
+            btj_byte_size: 0,
+        };
+        let _ = obj.btj_summary();
+        assert!(!obj.btj_is_enabled);
+    }
+
+    #[test]
+    fn test_btj_is_verified() {
+        let obj = DataBreakpoint {
+            btj_data_id: String::from("test"),
+            btj_access_type: String::from("test"),
+            btj_condition: String::from("test"),
+            btj_hit_condition: String::from("test"),
+            btj_description: String::from("test"),
+            btj_can_persist: false,
+            btj_is_enabled: false,
+            btj_is_verified: false,
+            btj_address: String::from("test"),
+            btj_byte_size: 0,
+        };
+        let _ = obj.btj_summary();
+        assert!(!obj.btj_is_verified);
+    }
+
+    #[test]
+    fn test_btj_address() {
+        let obj = DataBreakpoint {
+            btj_data_id: String::from("test"),
+            btj_access_type: String::from("test"),
+            btj_condition: String::from("test"),
+            btj_hit_condition: String::from("test"),
+            btj_description: String::from("test"),
+            btj_can_persist: false,
+            btj_is_enabled: false,
+            btj_is_verified: false,
+            btj_address: String::from("test"),
+            btj_byte_size: 0,
+        };
+        let _ = obj.btj_summary();
+        assert_eq!(obj.btj_address, "test");
+    }
+
+    #[test]
+    fn test_btj_byte_size() {
+        let obj = DataBreakpoint {
+            btj_data_id: String::from("test"),
+            btj_access_type: String::from("test"),
+            btj_condition: String::from("test"),
+            btj_hit_condition: String::from("test"),
+            btj_description: String::from("test"),
+            btj_can_persist: false,
+            btj_is_enabled: false,
+            btj_is_verified: false,
+            btj_address: String::from("test"),
+            btj_byte_size: 0,
+        };
+        let _ = obj.btj_summary();
+        assert_eq!(obj.btj_byte_size, 0);
     }
 
 }
