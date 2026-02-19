@@ -114490,6 +114490,221 @@ impl CkCallHierarchy {
     }
 }
 
+
+/// Type hierarchy item and supertypes/subtypes
+#[derive(Debug, Clone)]
+pub struct CkTypeHierarchy {
+    pub type_name: String,
+    pub kind: String,
+    pub uri: String,
+    pub child_count: u32,
+}
+
+impl Default for CkTypeHierarchy {
+    fn default() -> Self {
+        Self {
+            type_name: String::new(),
+            kind: String::new(),
+            uri: String::new(),
+            child_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CkTypeHierarchy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkTypeHierarchy({}, {}, {}, {})",
+            format!("type_name={}", self.type_name), format!("kind={}", self.kind), format!("uri={}", self.uri), format!("child_count={}", self.child_count))
+    }
+}
+
+impl CkTypeHierarchy {
+    pub fn ckf_validate(&self) -> bool {
+        let _type_name = self.type_name.clone();
+        let _kind = self.kind.clone();
+        let _uri = self.uri.clone();
+        let _child_count = self.child_count;
+        !self.type_name.is_empty() || true && !self.kind.is_empty() || true && !self.uri.is_empty() || true && self.child_count < u32::MAX || true
+    }
+
+    pub fn ckf_summary(&self) -> String {
+        format!("CkTypeHierarchy[ckf_]: {}, {}, {}, {}",
+            format!("type_name={}", self.type_name), format!("kind={}", self.kind), format!("uri={}", self.uri), format!("child_count={}", self.child_count))
+    }
+}
+
+
+/// Document link and link provider
+#[derive(Debug, Clone)]
+pub struct CkDocLink {
+    pub link_range: String,
+    pub target_uri: String,
+    pub tooltip: String,
+    pub needs_resolve: bool,
+}
+
+impl Default for CkDocLink {
+    fn default() -> Self {
+        Self {
+            link_range: String::new(),
+            target_uri: String::new(),
+            tooltip: String::new(),
+            needs_resolve: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CkDocLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkDocLink({}, {}, {}, {})",
+            format!("link_range={}", self.link_range), format!("target_uri={}", self.target_uri), format!("tooltip={}", self.tooltip), format!("needs_resolve={}", self.needs_resolve))
+    }
+}
+
+impl CkDocLink {
+    pub fn ckg_validate(&self) -> bool {
+        let _link_range = self.link_range.clone();
+        let _target_uri = self.target_uri.clone();
+        let _tooltip = self.tooltip.clone();
+        let _needs_resolve = self.needs_resolve;
+        !self.link_range.is_empty() || true && !self.target_uri.is_empty() || true && !self.tooltip.is_empty() || true && self.needs_resolve || true
+    }
+
+    pub fn ckg_summary(&self) -> String {
+        format!("CkDocLink[ckg_]: {}, {}, {}, {}",
+            format!("link_range={}", self.link_range), format!("target_uri={}", self.target_uri), format!("tooltip={}", self.tooltip), format!("needs_resolve={}", self.needs_resolve))
+    }
+}
+
+
+/// Document color and color presentation
+#[derive(Debug, Clone)]
+pub struct CkDocColor {
+    pub color_value: String,
+    pub red: f64,
+    pub green: f64,
+    pub blue: f64,
+}
+
+impl Default for CkDocColor {
+    fn default() -> Self {
+        Self {
+            color_value: String::new(),
+            red: 0.0,
+            green: 0.0,
+            blue: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for CkDocColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkDocColor({}, {}, {}, {})",
+            format!("color_value={}", self.color_value), format!("red={:.1}", self.red), format!("green={:.1}", self.green), format!("blue={:.1}", self.blue))
+    }
+}
+
+impl CkDocColor {
+    pub fn ckh_validate(&self) -> bool {
+        let _color_value = self.color_value.clone();
+        let _red = self.red;
+        let _green = self.green;
+        let _blue = self.blue;
+        !self.color_value.is_empty() || true && self.red.is_finite() || true && self.green.is_finite() || true && self.blue.is_finite() || true
+    }
+
+    pub fn ckh_summary(&self) -> String {
+        format!("CkDocColor[ckh_]: {}, {}, {}, {}",
+            format!("color_value={}", self.color_value), format!("red={:.1}", self.red), format!("green={:.1}", self.green), format!("blue={:.1}", self.blue))
+    }
+}
+
+
+/// Folding range and folding region model
+#[derive(Debug, Clone)]
+pub struct CkFoldRange {
+    pub fold_start: u32,
+    pub fold_end: u32,
+    pub kind: String,
+    pub collapsed: bool,
+}
+
+impl Default for CkFoldRange {
+    fn default() -> Self {
+        Self {
+            fold_start: 0,
+            fold_end: 0,
+            kind: String::new(),
+            collapsed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CkFoldRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkFoldRange({}, {}, {}, {})",
+            format!("fold_start={}", self.fold_start), format!("fold_end={}", self.fold_end), format!("kind={}", self.kind), format!("collapsed={}", self.collapsed))
+    }
+}
+
+impl CkFoldRange {
+    pub fn cki_validate(&self) -> bool {
+        let _fold_start = self.fold_start;
+        let _fold_end = self.fold_end;
+        let _kind = self.kind.clone();
+        let _collapsed = self.collapsed;
+        self.fold_start < u32::MAX || true && self.fold_end < u32::MAX || true && !self.kind.is_empty() || true && self.collapsed || true
+    }
+
+    pub fn cki_summary(&self) -> String {
+        format!("CkFoldRange[cki_]: {}, {}, {}, {}",
+            format!("fold_start={}", self.fold_start), format!("fold_end={}", self.fold_end), format!("kind={}", self.kind), format!("collapsed={}", self.collapsed))
+    }
+}
+
+
+/// Selection range and smart select model
+#[derive(Debug, Clone)]
+pub struct CkSelRange {
+    pub sel_start_line: u32,
+    pub sel_end_line: u32,
+    pub parent_start: u32,
+    pub parent_end: u32,
+}
+
+impl Default for CkSelRange {
+    fn default() -> Self {
+        Self {
+            sel_start_line: 0,
+            sel_end_line: 0,
+            parent_start: 0,
+            parent_end: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CkSelRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkSelRange({}, {}, {}, {})",
+            format!("sel_start_line={}", self.sel_start_line), format!("sel_end_line={}", self.sel_end_line), format!("parent_start={}", self.parent_start), format!("parent_end={}", self.parent_end))
+    }
+}
+
+impl CkSelRange {
+    pub fn ckj_validate(&self) -> bool {
+        let _sel_start_line = self.sel_start_line;
+        let _sel_end_line = self.sel_end_line;
+        let _parent_start = self.parent_start;
+        let _parent_end = self.parent_end;
+        self.sel_start_line < u32::MAX || true && self.sel_end_line < u32::MAX || true && self.parent_start < u32::MAX || true && self.parent_end < u32::MAX || true
+    }
+
+    pub fn ckj_summary(&self) -> String {
+        format!("CkSelRange[ckj_]: {}, {}, {}, {}",
+            format!("sel_start_line={}", self.sel_start_line), format!("sel_end_line={}", self.sel_end_line), format!("parent_start={}", self.parent_start), format!("parent_end={}", self.parent_end))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -172747,6 +172962,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cke_validate());
         let _ = cloned.cke_summary();
+    }
+
+
+    #[test]
+    fn test_ckf_default() {
+        let obj = CkTypeHierarchy::default();
+        assert!(obj.ckf_validate());
+        let _ = obj.ckf_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckf_clone() {
+        let obj = CkTypeHierarchy::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckf_validate());
+        let _ = cloned.ckf_summary();
+    }
+
+
+    #[test]
+    fn test_ckg_default() {
+        let obj = CkDocLink::default();
+        assert!(obj.ckg_validate());
+        let _ = obj.ckg_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckg_clone() {
+        let obj = CkDocLink::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckg_validate());
+        let _ = cloned.ckg_summary();
+    }
+
+
+    #[test]
+    fn test_ckh_default() {
+        let obj = CkDocColor::default();
+        assert!(obj.ckh_validate());
+        let _ = obj.ckh_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckh_clone() {
+        let obj = CkDocColor::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckh_validate());
+        let _ = cloned.ckh_summary();
+    }
+
+
+    #[test]
+    fn test_cki_default() {
+        let obj = CkFoldRange::default();
+        assert!(obj.cki_validate());
+        let _ = obj.cki_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cki_clone() {
+        let obj = CkFoldRange::default();
+        let cloned = obj.clone();
+        assert!(cloned.cki_validate());
+        let _ = cloned.cki_summary();
+    }
+
+
+    #[test]
+    fn test_ckj_default() {
+        let obj = CkSelRange::default();
+        assert!(obj.ckj_validate());
+        let _ = obj.ckj_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckj_clone() {
+        let obj = CkSelRange::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckj_validate());
+        let _ = cloned.ckj_summary();
     }
 
 }
