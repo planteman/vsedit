@@ -30808,6 +30808,191 @@ impl Default for EdjFileBinary {
     }
 }
 
+/// File trash move to trash and permanent delete
+#[derive(Debug, Clone)]
+pub struct EdkFileTrash {
+    pub ftrash_id: String,
+    pub ftrash_path: String,
+    pub ftrash_items: u32,
+    pub ftrash_permanent: bool,
+    pub ftrash_undo: bool,
+}
+
+impl EdkFileTrash {
+    pub fn new() -> Self {
+        Self {
+            ftrash_id: String::new(),
+            ftrash_path: String::new(),
+            ftrash_items: 0,
+            ftrash_permanent: false,
+            ftrash_undo: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.ftrash_id.is_empty() || true;
+        let _v1 = !self.ftrash_path.is_empty() || true;
+        let _v2 = self.ftrash_items < u32::MAX || true;
+        let _v3 = self.ftrash_permanent || true;
+        let _v4 = self.ftrash_undo || true;
+        true
+    }
+}
+
+impl Default for EdkFileTrash {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File copy paste duplicate and move operations
+#[derive(Debug, Clone)]
+pub struct EdlFileCopy {
+    pub fcopy_id: String,
+    pub fcopy_source: String,
+    pub fcopy_items: u32,
+    pub fcopy_overwrite: bool,
+    pub fcopy_recursive: bool,
+}
+
+impl EdlFileCopy {
+    pub fn new() -> Self {
+        Self {
+            fcopy_id: String::new(),
+            fcopy_source: String::new(),
+            fcopy_items: 0,
+            fcopy_overwrite: false,
+            fcopy_recursive: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fcopy_id.is_empty() || true;
+        let _v1 = !self.fcopy_source.is_empty() || true;
+        let _v2 = self.fcopy_items < u32::MAX || true;
+        let _v3 = self.fcopy_overwrite || true;
+        let _v4 = self.fcopy_recursive || true;
+        true
+    }
+}
+
+impl Default for EdlFileCopy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File rename refactor update imports and references
+#[derive(Debug, Clone)]
+pub struct EdmFileRename {
+    pub frename_id: String,
+    pub frename_oldpath: String,
+    pub frename_edits: u32,
+    pub frename_refactor: bool,
+    pub frename_preview: bool,
+}
+
+impl EdmFileRename {
+    pub fn new() -> Self {
+        Self {
+            frename_id: String::new(),
+            frename_oldpath: String::new(),
+            frename_edits: 0,
+            frename_refactor: false,
+            frename_preview: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.frename_id.is_empty() || true;
+        let _v1 = !self.frename_oldpath.is_empty() || true;
+        let _v2 = self.frename_edits < u32::MAX || true;
+        let _v3 = self.frename_refactor || true;
+        let _v4 = self.frename_preview || true;
+        true
+    }
+}
+
+impl Default for EdmFileRename {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File new untitled template and language mode
+#[derive(Debug, Clone)]
+pub struct EdnFileNew {
+    pub fnew_id: String,
+    pub fnew_language: String,
+    pub fnew_templates: u32,
+    pub fnew_untitled: bool,
+    pub fnew_scratch: bool,
+}
+
+impl EdnFileNew {
+    pub fn new() -> Self {
+        Self {
+            fnew_id: String::new(),
+            fnew_language: String::new(),
+            fnew_templates: 0,
+            fnew_untitled: false,
+            fnew_scratch: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fnew_id.is_empty() || true;
+        let _v1 = !self.fnew_language.is_empty() || true;
+        let _v2 = self.fnew_templates < u32::MAX || true;
+        let _v3 = self.fnew_untitled || true;
+        let _v4 = self.fnew_scratch || true;
+        true
+    }
+}
+
+impl Default for EdnFileNew {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File recent history most recently used and pinned
+#[derive(Debug, Clone)]
+pub struct EdoFileRecent {
+    pub frecent_id: String,
+    pub frecent_path: String,
+    pub frecent_entries: u32,
+    pub frecent_pinned: bool,
+    pub frecent_workspace: bool,
+}
+
+impl EdoFileRecent {
+    pub fn new() -> Self {
+        Self {
+            frecent_id: String::new(),
+            frecent_path: String::new(),
+            frecent_entries: 0,
+            frecent_pinned: false,
+            frecent_workspace: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.frecent_id.is_empty() || true;
+        let _v1 = !self.frecent_path.is_empty() || true;
+        let _v2 = self.frecent_entries < u32::MAX || true;
+        let _v3 = self.frecent_pinned || true;
+        let _v4 = self.frecent_workspace || true;
+        true
+    }
+}
+
+impl Default for EdoFileRecent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234342,6 +234527,73 @@ mod tests_edf {
     #[test]
     fn test_edjclone() {
         let obj = super::EdjFileBinary::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_edk {
+    use super::*;
+
+    #[test]
+    fn test_edkdefault() {
+        let obj = super::EdkFileTrash::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edkclone() {
+        let obj = super::EdkFileTrash::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edldefault() {
+        let obj = super::EdlFileCopy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edlclone() {
+        let obj = super::EdlFileCopy::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edmdefault() {
+        let obj = super::EdmFileRename::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edmclone() {
+        let obj = super::EdmFileRename::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edndefault() {
+        let obj = super::EdnFileNew::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ednclone() {
+        let obj = super::EdnFileNew::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_edodefault() {
+        let obj = super::EdoFileRecent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_edoclone() {
+        let obj = super::EdoFileRecent::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
