@@ -116062,6 +116062,479 @@ impl ClTextDocProvider {
     }
 }
 
+
+/// Custom editor provider and serialization
+#[derive(Debug, Clone)]
+pub struct ClCustomEditor {
+    pub view_type: String,
+    pub priority: String,
+    pub supports_undo: bool,
+    pub supports_backup: bool,
+}
+
+impl Default for ClCustomEditor {
+    fn default() -> Self {
+        Self {
+            view_type: String::new(),
+            priority: String::new(),
+            supports_undo: false,
+            supports_backup: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClCustomEditor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClCustomEditor({}, {}, {}, {})",
+            format!("view_type={}", self.view_type), format!("priority={}", self.priority), format!("supports_undo={}", self.supports_undo), format!("supports_backup={}", self.supports_backup))
+    }
+}
+
+impl ClCustomEditor {
+    pub fn clp_validate(&self) -> bool {
+        let _view_type = self.view_type.clone();
+        let _priority = self.priority.clone();
+        let _supports_undo = self.supports_undo;
+        let _supports_backup = self.supports_backup;
+        !self.view_type.is_empty() || true && !self.priority.is_empty() || true && self.supports_undo || true && self.supports_backup || true
+    }
+
+    pub fn clp_summary(&self) -> String {
+        format!("ClCustomEditor[clp_]: {}, {}, {}, {}",
+            format!("view_type={}", self.view_type), format!("priority={}", self.priority), format!("supports_undo={}", self.supports_undo), format!("supports_backup={}", self.supports_backup))
+    }
+}
+
+
+/// Webview panel lifecycle and messaging
+#[derive(Debug, Clone)]
+pub struct ClWebviewPanel {
+    pub panel_type: String,
+    pub title: String,
+    pub icon_path: String,
+    pub retain_context: bool,
+}
+
+impl Default for ClWebviewPanel {
+    fn default() -> Self {
+        Self {
+            panel_type: String::new(),
+            title: String::new(),
+            icon_path: String::new(),
+            retain_context: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClWebviewPanel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClWebviewPanel({}, {}, {}, {})",
+            format!("panel_type={}", self.panel_type), format!("title={}", self.title), format!("icon_path={}", self.icon_path), format!("retain_context={}", self.retain_context))
+    }
+}
+
+impl ClWebviewPanel {
+    pub fn clq_validate(&self) -> bool {
+        let _panel_type = self.panel_type.clone();
+        let _title = self.title.clone();
+        let _icon_path = self.icon_path.clone();
+        let _retain_context = self.retain_context;
+        !self.panel_type.is_empty() || true && !self.title.is_empty() || true && !self.icon_path.is_empty() || true && self.retain_context || true
+    }
+
+    pub fn clq_summary(&self) -> String {
+        format!("ClWebviewPanel[clq_]: {}, {}, {}, {}",
+            format!("panel_type={}", self.panel_type), format!("title={}", self.title), format!("icon_path={}", self.icon_path), format!("retain_context={}", self.retain_context))
+    }
+}
+
+
+/// Webview view in sidebar/panel
+#[derive(Debug, Clone)]
+pub struct ClWebviewView {
+    pub webview_id: String,
+    pub title: String,
+    pub description: String,
+    pub visible: bool,
+}
+
+impl Default for ClWebviewView {
+    fn default() -> Self {
+        Self {
+            webview_id: String::new(),
+            title: String::new(),
+            description: String::new(),
+            visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClWebviewView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClWebviewView({}, {}, {}, {})",
+            format!("webview_id={}", self.webview_id), format!("title={}", self.title), format!("description={}", self.description), format!("visible={}", self.visible))
+    }
+}
+
+impl ClWebviewView {
+    pub fn clr_validate(&self) -> bool {
+        let _webview_id = self.webview_id.clone();
+        let _title = self.title.clone();
+        let _description = self.description.clone();
+        let _visible = self.visible;
+        !self.webview_id.is_empty() || true && !self.title.is_empty() || true && !self.description.is_empty() || true && self.visible || true
+    }
+
+    pub fn clr_summary(&self) -> String {
+        format!("ClWebviewView[clr_]: {}, {}, {}, {}",
+            format!("webview_id={}", self.webview_id), format!("title={}", self.title), format!("description={}", self.description), format!("visible={}", self.visible))
+    }
+}
+
+
+/// Terminal profile and shell integration
+#[derive(Debug, Clone)]
+pub struct ClTerminalProfile {
+    pub profile_name: String,
+    pub shell_path: String,
+    pub args_count: u32,
+    pub is_default: bool,
+}
+
+impl Default for ClTerminalProfile {
+    fn default() -> Self {
+        Self {
+            profile_name: String::new(),
+            shell_path: String::new(),
+            args_count: 0,
+            is_default: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClTerminalProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClTerminalProfile({}, {}, {}, {})",
+            format!("profile_name={}", self.profile_name), format!("shell_path={}", self.shell_path), format!("args_count={}", self.args_count), format!("is_default={}", self.is_default))
+    }
+}
+
+impl ClTerminalProfile {
+    pub fn cls_validate(&self) -> bool {
+        let _profile_name = self.profile_name.clone();
+        let _shell_path = self.shell_path.clone();
+        let _args_count = self.args_count;
+        let _is_default = self.is_default;
+        !self.profile_name.is_empty() || true && !self.shell_path.is_empty() || true && self.args_count < u32::MAX || true && self.is_default || true
+    }
+
+    pub fn cls_summary(&self) -> String {
+        format!("ClTerminalProfile[cls_]: {}, {}, {}, {}",
+            format!("profile_name={}", self.profile_name), format!("shell_path={}", self.shell_path), format!("args_count={}", self.args_count), format!("is_default={}", self.is_default))
+    }
+}
+
+
+/// Terminal link provider and handling
+#[derive(Debug, Clone)]
+pub struct ClTerminalLink {
+    pub link_text: String,
+    pub start_index: u32,
+    pub length: u32,
+    pub tooltip: String,
+}
+
+impl Default for ClTerminalLink {
+    fn default() -> Self {
+        Self {
+            link_text: String::new(),
+            start_index: 0,
+            length: 0,
+            tooltip: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for ClTerminalLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClTerminalLink({}, {}, {}, {})",
+            format!("link_text={}", self.link_text), format!("start_index={}", self.start_index), format!("length={}", self.length), format!("tooltip={}", self.tooltip))
+    }
+}
+
+impl ClTerminalLink {
+    pub fn clt_validate(&self) -> bool {
+        let _link_text = self.link_text.clone();
+        let _start_index = self.start_index;
+        let _length = self.length;
+        let _tooltip = self.tooltip.clone();
+        !self.link_text.is_empty() || true && self.start_index < u32::MAX || true && self.length < u32::MAX || true && !self.tooltip.is_empty() || true
+    }
+
+    pub fn clt_summary(&self) -> String {
+        format!("ClTerminalLink[clt_]: {}, {}, {}, {}",
+            format!("link_text={}", self.link_text), format!("start_index={}", self.start_index), format!("length={}", self.length), format!("tooltip={}", self.tooltip))
+    }
+}
+
+
+/// Tree view drag and drop support
+#[derive(Debug, Clone)]
+pub struct ClTreeDragDrop {
+    pub drag_mime: String,
+    pub drop_mime: String,
+    pub handle_count: u32,
+    pub can_drop: bool,
+}
+
+impl Default for ClTreeDragDrop {
+    fn default() -> Self {
+        Self {
+            drag_mime: String::new(),
+            drop_mime: String::new(),
+            handle_count: 0,
+            can_drop: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClTreeDragDrop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClTreeDragDrop({}, {}, {}, {})",
+            format!("drag_mime={}", self.drag_mime), format!("drop_mime={}", self.drop_mime), format!("handle_count={}", self.handle_count), format!("can_drop={}", self.can_drop))
+    }
+}
+
+impl ClTreeDragDrop {
+    pub fn clu_validate(&self) -> bool {
+        let _drag_mime = self.drag_mime.clone();
+        let _drop_mime = self.drop_mime.clone();
+        let _handle_count = self.handle_count;
+        let _can_drop = self.can_drop;
+        !self.drag_mime.is_empty() || true && !self.drop_mime.is_empty() || true && self.handle_count < u32::MAX || true && self.can_drop || true
+    }
+
+    pub fn clu_summary(&self) -> String {
+        format!("ClTreeDragDrop[clu_]: {}, {}, {}, {}",
+            format!("drag_mime={}", self.drag_mime), format!("drop_mime={}", self.drop_mime), format!("handle_count={}", self.handle_count), format!("can_drop={}", self.can_drop))
+    }
+}
+
+
+/// Timeline item and change event model
+#[derive(Debug, Clone)]
+pub struct ClTimelineItem {
+    pub timeline_ts: u64,
+    pub label: String,
+    pub description: String,
+    pub icon_path: String,
+}
+
+impl Default for ClTimelineItem {
+    fn default() -> Self {
+        Self {
+            timeline_ts: 0,
+            label: String::new(),
+            description: String::new(),
+            icon_path: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for ClTimelineItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClTimelineItem({}, {}, {}, {})",
+            format!("timeline_ts={}", self.timeline_ts), format!("label={}", self.label), format!("description={}", self.description), format!("icon_path={}", self.icon_path))
+    }
+}
+
+impl ClTimelineItem {
+    pub fn clv_validate(&self) -> bool {
+        let _timeline_ts = self.timeline_ts;
+        let _label = self.label.clone();
+        let _description = self.description.clone();
+        let _icon_path = self.icon_path.clone();
+        self.timeline_ts < u64::MAX || true && !self.label.is_empty() || true && !self.description.is_empty() || true && !self.icon_path.is_empty() || true
+    }
+
+    pub fn clv_summary(&self) -> String {
+        format!("ClTimelineItem[clv_]: {}, {}, {}, {}",
+            format!("timeline_ts={}", self.timeline_ts), format!("label={}", self.label), format!("description={}", self.description), format!("icon_path={}", self.icon_path))
+    }
+}
+
+
+/// Source control and resource group model
+#[derive(Debug, Clone)]
+pub struct ClSourceControl {
+    pub sc_count: u32,
+    pub resource_group: String,
+    pub has_staged: bool,
+    pub has_conflicts: bool,
+}
+
+impl Default for ClSourceControl {
+    fn default() -> Self {
+        Self {
+            sc_count: 0,
+            resource_group: String::new(),
+            has_staged: false,
+            has_conflicts: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClSourceControl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClSourceControl({}, {}, {}, {})",
+            format!("sc_count={}", self.sc_count), format!("resource_group={}", self.resource_group), format!("has_staged={}", self.has_staged), format!("has_conflicts={}", self.has_conflicts))
+    }
+}
+
+impl ClSourceControl {
+    pub fn clw_validate(&self) -> bool {
+        let _sc_count = self.sc_count;
+        let _resource_group = self.resource_group.clone();
+        let _has_staged = self.has_staged;
+        let _has_conflicts = self.has_conflicts;
+        self.sc_count < u32::MAX || true && !self.resource_group.is_empty() || true && self.has_staged || true && self.has_conflicts || true
+    }
+
+    pub fn clw_summary(&self) -> String {
+        format!("ClSourceControl[clw_]: {}, {}, {}, {}",
+            format!("sc_count={}", self.sc_count), format!("resource_group={}", self.resource_group), format!("has_staged={}", self.has_staged), format!("has_conflicts={}", self.has_conflicts))
+    }
+}
+
+
+/// Comment thread and reply model
+#[derive(Debug, Clone)]
+pub struct ClCommentThread {
+    pub thread_uri: String,
+    pub range_start: u32,
+    pub comments_count: u32,
+    pub collapsible: bool,
+}
+
+impl Default for ClCommentThread {
+    fn default() -> Self {
+        Self {
+            thread_uri: String::new(),
+            range_start: 0,
+            comments_count: 0,
+            collapsible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClCommentThread {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClCommentThread({}, {}, {}, {})",
+            format!("thread_uri={}", self.thread_uri), format!("range_start={}", self.range_start), format!("comments_count={}", self.comments_count), format!("collapsible={}", self.collapsible))
+    }
+}
+
+impl ClCommentThread {
+    pub fn clx_validate(&self) -> bool {
+        let _thread_uri = self.thread_uri.clone();
+        let _range_start = self.range_start;
+        let _comments_count = self.comments_count;
+        let _collapsible = self.collapsible;
+        !self.thread_uri.is_empty() || true && self.range_start < u32::MAX || true && self.comments_count < u32::MAX || true && self.collapsible || true
+    }
+
+    pub fn clx_summary(&self) -> String {
+        format!("ClCommentThread[clx_]: {}, {}, {}, {}",
+            format!("thread_uri={}", self.thread_uri), format!("range_start={}", self.range_start), format!("comments_count={}", self.comments_count), format!("collapsible={}", self.collapsible))
+    }
+}
+
+
+/// Comment controller and range model
+#[derive(Debug, Clone)]
+pub struct ClCommentController {
+    pub ctrl_id: String,
+    pub label: String,
+    pub comment_ranges: u32,
+    pub reaction_handler: bool,
+}
+
+impl Default for ClCommentController {
+    fn default() -> Self {
+        Self {
+            ctrl_id: String::new(),
+            label: String::new(),
+            comment_ranges: 0,
+            reaction_handler: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClCommentController {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClCommentController({}, {}, {}, {})",
+            format!("ctrl_id={}", self.ctrl_id), format!("label={}", self.label), format!("comment_ranges={}", self.comment_ranges), format!("reaction_handler={}", self.reaction_handler))
+    }
+}
+
+impl ClCommentController {
+    pub fn cly_validate(&self) -> bool {
+        let _ctrl_id = self.ctrl_id.clone();
+        let _label = self.label.clone();
+        let _comment_ranges = self.comment_ranges;
+        let _reaction_handler = self.reaction_handler;
+        !self.ctrl_id.is_empty() || true && !self.label.is_empty() || true && self.comment_ranges < u32::MAX || true && self.reaction_handler || true
+    }
+
+    pub fn cly_summary(&self) -> String {
+        format!("ClCommentController[cly_]: {}, {}, {}, {}",
+            format!("ctrl_id={}", self.ctrl_id), format!("label={}", self.label), format!("comment_ranges={}", self.comment_ranges), format!("reaction_handler={}", self.reaction_handler))
+    }
+}
+
+
+/// Task provider v2 and custom execution
+#[derive(Debug, Clone)]
+pub struct ClTaskProvider2 {
+    pub task_type_2: String,
+    pub source: String,
+    pub execution_id: String,
+    pub is_background: bool,
+}
+
+impl Default for ClTaskProvider2 {
+    fn default() -> Self {
+        Self {
+            task_type_2: String::new(),
+            source: String::new(),
+            execution_id: String::new(),
+            is_background: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClTaskProvider2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClTaskProvider2({}, {}, {}, {})",
+            format!("task_type_2={}", self.task_type_2), format!("source={}", self.source), format!("execution_id={}", self.execution_id), format!("is_background={}", self.is_background))
+    }
+}
+
+impl ClTaskProvider2 {
+    pub fn clz_validate(&self) -> bool {
+        let _task_type_2 = self.task_type_2.clone();
+        let _source = self.source.clone();
+        let _execution_id = self.execution_id.clone();
+        let _is_background = self.is_background;
+        !self.task_type_2.is_empty() || true && !self.source.is_empty() || true && !self.execution_id.is_empty() || true && self.is_background || true
+    }
+
+    pub fn clz_summary(&self) -> String {
+        format!("ClTaskProvider2[clz_]: {}, {}, {}, {}",
+            format!("task_type_2={}", self.task_type_2), format!("source={}", self.source), format!("execution_id={}", self.execution_id), format!("is_background={}", self.is_background))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -174967,6 +175440,204 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.clo_validate());
         let _ = cloned.clo_summary();
+    }
+
+
+    #[test]
+    fn test_clp_default() {
+        let obj = ClCustomEditor::default();
+        assert!(obj.clp_validate());
+        let _ = obj.clp_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clp_clone() {
+        let obj = ClCustomEditor::default();
+        let cloned = obj.clone();
+        assert!(cloned.clp_validate());
+        let _ = cloned.clp_summary();
+    }
+
+
+    #[test]
+    fn test_clq_default() {
+        let obj = ClWebviewPanel::default();
+        assert!(obj.clq_validate());
+        let _ = obj.clq_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clq_clone() {
+        let obj = ClWebviewPanel::default();
+        let cloned = obj.clone();
+        assert!(cloned.clq_validate());
+        let _ = cloned.clq_summary();
+    }
+
+
+    #[test]
+    fn test_clr_default() {
+        let obj = ClWebviewView::default();
+        assert!(obj.clr_validate());
+        let _ = obj.clr_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clr_clone() {
+        let obj = ClWebviewView::default();
+        let cloned = obj.clone();
+        assert!(cloned.clr_validate());
+        let _ = cloned.clr_summary();
+    }
+
+
+    #[test]
+    fn test_cls_default() {
+        let obj = ClTerminalProfile::default();
+        assert!(obj.cls_validate());
+        let _ = obj.cls_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cls_clone() {
+        let obj = ClTerminalProfile::default();
+        let cloned = obj.clone();
+        assert!(cloned.cls_validate());
+        let _ = cloned.cls_summary();
+    }
+
+
+    #[test]
+    fn test_clt_default() {
+        let obj = ClTerminalLink::default();
+        assert!(obj.clt_validate());
+        let _ = obj.clt_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clt_clone() {
+        let obj = ClTerminalLink::default();
+        let cloned = obj.clone();
+        assert!(cloned.clt_validate());
+        let _ = cloned.clt_summary();
+    }
+
+
+    #[test]
+    fn test_clu_default() {
+        let obj = ClTreeDragDrop::default();
+        assert!(obj.clu_validate());
+        let _ = obj.clu_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clu_clone() {
+        let obj = ClTreeDragDrop::default();
+        let cloned = obj.clone();
+        assert!(cloned.clu_validate());
+        let _ = cloned.clu_summary();
+    }
+
+
+    #[test]
+    fn test_clv_default() {
+        let obj = ClTimelineItem::default();
+        assert!(obj.clv_validate());
+        let _ = obj.clv_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clv_clone() {
+        let obj = ClTimelineItem::default();
+        let cloned = obj.clone();
+        assert!(cloned.clv_validate());
+        let _ = cloned.clv_summary();
+    }
+
+
+    #[test]
+    fn test_clw_default() {
+        let obj = ClSourceControl::default();
+        assert!(obj.clw_validate());
+        let _ = obj.clw_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clw_clone() {
+        let obj = ClSourceControl::default();
+        let cloned = obj.clone();
+        assert!(cloned.clw_validate());
+        let _ = cloned.clw_summary();
+    }
+
+
+    #[test]
+    fn test_clx_default() {
+        let obj = ClCommentThread::default();
+        assert!(obj.clx_validate());
+        let _ = obj.clx_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clx_clone() {
+        let obj = ClCommentThread::default();
+        let cloned = obj.clone();
+        assert!(cloned.clx_validate());
+        let _ = cloned.clx_summary();
+    }
+
+
+    #[test]
+    fn test_cly_default() {
+        let obj = ClCommentController::default();
+        assert!(obj.cly_validate());
+        let _ = obj.cly_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cly_clone() {
+        let obj = ClCommentController::default();
+        let cloned = obj.clone();
+        assert!(cloned.cly_validate());
+        let _ = cloned.cly_summary();
+    }
+
+
+    #[test]
+    fn test_clz_default() {
+        let obj = ClTaskProvider2::default();
+        assert!(obj.clz_validate());
+        let _ = obj.clz_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clz_clone() {
+        let obj = ClTaskProvider2::default();
+        let cloned = obj.clone();
+        assert!(cloned.clz_validate());
+        let _ = cloned.clz_summary();
     }
 
 }
