@@ -87795,6 +87795,111 @@ impl ModelDecoration {
     }
 }
 
+/// Runtime wiring: bok_ CursorState
+#[derive(Debug, Clone)]
+pub struct CursorState {
+    pub bok_line_number: u32,
+    pub bok_column: u32,
+    pub bok_left_over: u32,
+    pub bok_preferred_column: u32,
+    pub bok_selection_start_line: u32,
+    pub bok_selection_start_col: u32,
+    pub bok_selection_end_line: u32,
+    pub bok_selection_end_col: u32,
+    pub bok_is_selecting: bool,
+    pub bok_cursor_index: u32,
+}
+
+impl CursorState {
+    pub fn bok_summary(&self) -> String {
+        format!("CursorState({})", self.bok_line_number)
+    }
+}
+
+/// Runtime wiring: bol_ SelectionModel
+#[derive(Debug, Clone)]
+pub struct SelectionModel {
+    pub bol_selection_direction: u8,
+    pub bol_position_line: u32,
+    pub bol_position_column: u32,
+    pub bol_anchor_line: u32,
+    pub bol_anchor_column: u32,
+    pub bol_is_empty: bool,
+    pub bol_is_single_line: bool,
+    pub bol_is_reversed: bool,
+    pub bol_selected_text_length: usize,
+    pub bol_word_selection: bool,
+}
+
+impl SelectionModel {
+    pub fn bol_summary(&self) -> String {
+        format!("SelectionModel({})", self.bol_selection_direction)
+    }
+}
+
+/// Runtime wiring: bom_ MultiCursorEdit
+#[derive(Debug, Clone)]
+pub struct MultiCursorEdit {
+    pub bom_cursor_count: u32,
+    pub bom_primary_cursor_index: u32,
+    pub bom_cursors_line_numbers: Vec<u32>,
+    pub bom_cursors_columns: Vec<u32>,
+    pub bom_is_adding_cursor: bool,
+    pub bom_add_cursor_above: bool,
+    pub bom_add_cursor_below: bool,
+    pub bom_select_highlights: bool,
+    pub bom_undo_stop_before: bool,
+    pub bom_undo_stop_after: bool,
+}
+
+impl MultiCursorEdit {
+    pub fn bom_summary(&self) -> String {
+        format!("MultiCursorEdit({})", self.bom_cursor_count)
+    }
+}
+
+/// Runtime wiring: bon_ FindMatch
+#[derive(Debug, Clone)]
+pub struct FindMatch {
+    pub bon_match_start_line: u32,
+    pub bon_match_start_col: u32,
+    pub bon_match_end_line: u32,
+    pub bon_match_end_col: u32,
+    pub bon_match_text: String,
+    pub bon_match_index: u32,
+    pub bon_total_matches: u32,
+    pub bon_is_regex: bool,
+    pub bon_is_case_sensitive: bool,
+    pub bon_is_whole_word: bool,
+}
+
+impl FindMatch {
+    pub fn bon_summary(&self) -> String {
+        format!("FindMatch({})", self.bon_match_start_line)
+    }
+}
+
+/// Runtime wiring: boo_ SnippetSession
+#[derive(Debug, Clone)]
+pub struct SnippetSession {
+    pub boo_snippet_id: String,
+    pub boo_template_text: String,
+    pub boo_placeholder_count: u32,
+    pub boo_current_placeholder: u32,
+    pub boo_is_active: bool,
+    pub boo_is_nested: bool,
+    pub boo_choice_values: Vec<String>,
+    pub boo_variable_values: Vec<String>,
+    pub boo_final_tabstop_line: u32,
+    pub boo_final_tabstop_col: u32,
+}
+
+impl SnippetSession {
+    pub fn boo_summary(&self) -> String {
+        format!("SnippetSession({})", self.boo_snippet_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -103558,6 +103663,910 @@ mod tests_bfo {
         };
         let _ = obj.boj_summary();
         assert_eq!(obj.boj_hover_message, "test");
+    }
+
+    #[test]
+    fn test_bok_line_number() {
+        let obj = CursorState {
+            bok_line_number: 0,
+            bok_column: 0,
+            bok_left_over: 0,
+            bok_preferred_column: 0,
+            bok_selection_start_line: 0,
+            bok_selection_start_col: 0,
+            bok_selection_end_line: 0,
+            bok_selection_end_col: 0,
+            bok_is_selecting: false,
+            bok_cursor_index: 0,
+        };
+        let _ = obj.bok_summary();
+        assert_eq!(obj.bok_line_number, 0);
+    }
+
+    #[test]
+    fn test_bok_column() {
+        let obj = CursorState {
+            bok_line_number: 0,
+            bok_column: 0,
+            bok_left_over: 0,
+            bok_preferred_column: 0,
+            bok_selection_start_line: 0,
+            bok_selection_start_col: 0,
+            bok_selection_end_line: 0,
+            bok_selection_end_col: 0,
+            bok_is_selecting: false,
+            bok_cursor_index: 0,
+        };
+        let _ = obj.bok_summary();
+        assert_eq!(obj.bok_column, 0);
+    }
+
+    #[test]
+    fn test_bok_left_over() {
+        let obj = CursorState {
+            bok_line_number: 0,
+            bok_column: 0,
+            bok_left_over: 0,
+            bok_preferred_column: 0,
+            bok_selection_start_line: 0,
+            bok_selection_start_col: 0,
+            bok_selection_end_line: 0,
+            bok_selection_end_col: 0,
+            bok_is_selecting: false,
+            bok_cursor_index: 0,
+        };
+        let _ = obj.bok_summary();
+        assert_eq!(obj.bok_left_over, 0);
+    }
+
+    #[test]
+    fn test_bok_preferred_column() {
+        let obj = CursorState {
+            bok_line_number: 0,
+            bok_column: 0,
+            bok_left_over: 0,
+            bok_preferred_column: 0,
+            bok_selection_start_line: 0,
+            bok_selection_start_col: 0,
+            bok_selection_end_line: 0,
+            bok_selection_end_col: 0,
+            bok_is_selecting: false,
+            bok_cursor_index: 0,
+        };
+        let _ = obj.bok_summary();
+        assert_eq!(obj.bok_preferred_column, 0);
+    }
+
+    #[test]
+    fn test_bok_selection_start_line() {
+        let obj = CursorState {
+            bok_line_number: 0,
+            bok_column: 0,
+            bok_left_over: 0,
+            bok_preferred_column: 0,
+            bok_selection_start_line: 0,
+            bok_selection_start_col: 0,
+            bok_selection_end_line: 0,
+            bok_selection_end_col: 0,
+            bok_is_selecting: false,
+            bok_cursor_index: 0,
+        };
+        let _ = obj.bok_summary();
+        assert_eq!(obj.bok_selection_start_line, 0);
+    }
+
+    #[test]
+    fn test_bok_selection_start_col() {
+        let obj = CursorState {
+            bok_line_number: 0,
+            bok_column: 0,
+            bok_left_over: 0,
+            bok_preferred_column: 0,
+            bok_selection_start_line: 0,
+            bok_selection_start_col: 0,
+            bok_selection_end_line: 0,
+            bok_selection_end_col: 0,
+            bok_is_selecting: false,
+            bok_cursor_index: 0,
+        };
+        let _ = obj.bok_summary();
+        assert_eq!(obj.bok_selection_start_col, 0);
+    }
+
+    #[test]
+    fn test_bok_selection_end_line() {
+        let obj = CursorState {
+            bok_line_number: 0,
+            bok_column: 0,
+            bok_left_over: 0,
+            bok_preferred_column: 0,
+            bok_selection_start_line: 0,
+            bok_selection_start_col: 0,
+            bok_selection_end_line: 0,
+            bok_selection_end_col: 0,
+            bok_is_selecting: false,
+            bok_cursor_index: 0,
+        };
+        let _ = obj.bok_summary();
+        assert_eq!(obj.bok_selection_end_line, 0);
+    }
+
+    #[test]
+    fn test_bok_selection_end_col() {
+        let obj = CursorState {
+            bok_line_number: 0,
+            bok_column: 0,
+            bok_left_over: 0,
+            bok_preferred_column: 0,
+            bok_selection_start_line: 0,
+            bok_selection_start_col: 0,
+            bok_selection_end_line: 0,
+            bok_selection_end_col: 0,
+            bok_is_selecting: false,
+            bok_cursor_index: 0,
+        };
+        let _ = obj.bok_summary();
+        assert_eq!(obj.bok_selection_end_col, 0);
+    }
+
+    #[test]
+    fn test_bok_is_selecting() {
+        let obj = CursorState {
+            bok_line_number: 0,
+            bok_column: 0,
+            bok_left_over: 0,
+            bok_preferred_column: 0,
+            bok_selection_start_line: 0,
+            bok_selection_start_col: 0,
+            bok_selection_end_line: 0,
+            bok_selection_end_col: 0,
+            bok_is_selecting: false,
+            bok_cursor_index: 0,
+        };
+        let _ = obj.bok_summary();
+        assert!(!obj.bok_is_selecting);
+    }
+
+    #[test]
+    fn test_bok_cursor_index() {
+        let obj = CursorState {
+            bok_line_number: 0,
+            bok_column: 0,
+            bok_left_over: 0,
+            bok_preferred_column: 0,
+            bok_selection_start_line: 0,
+            bok_selection_start_col: 0,
+            bok_selection_end_line: 0,
+            bok_selection_end_col: 0,
+            bok_is_selecting: false,
+            bok_cursor_index: 0,
+        };
+        let _ = obj.bok_summary();
+        assert_eq!(obj.bok_cursor_index, 0);
+    }
+
+
+    #[test]
+    fn test_bol_selection_direction() {
+        let obj = SelectionModel {
+            bol_selection_direction: 0,
+            bol_position_line: 0,
+            bol_position_column: 0,
+            bol_anchor_line: 0,
+            bol_anchor_column: 0,
+            bol_is_empty: false,
+            bol_is_single_line: false,
+            bol_is_reversed: false,
+            bol_selected_text_length: 0,
+            bol_word_selection: false,
+        };
+        let _ = obj.bol_summary();
+        assert_eq!(obj.bol_selection_direction, 0);
+    }
+
+    #[test]
+    fn test_bol_position_line() {
+        let obj = SelectionModel {
+            bol_selection_direction: 0,
+            bol_position_line: 0,
+            bol_position_column: 0,
+            bol_anchor_line: 0,
+            bol_anchor_column: 0,
+            bol_is_empty: false,
+            bol_is_single_line: false,
+            bol_is_reversed: false,
+            bol_selected_text_length: 0,
+            bol_word_selection: false,
+        };
+        let _ = obj.bol_summary();
+        assert_eq!(obj.bol_position_line, 0);
+    }
+
+    #[test]
+    fn test_bol_position_column() {
+        let obj = SelectionModel {
+            bol_selection_direction: 0,
+            bol_position_line: 0,
+            bol_position_column: 0,
+            bol_anchor_line: 0,
+            bol_anchor_column: 0,
+            bol_is_empty: false,
+            bol_is_single_line: false,
+            bol_is_reversed: false,
+            bol_selected_text_length: 0,
+            bol_word_selection: false,
+        };
+        let _ = obj.bol_summary();
+        assert_eq!(obj.bol_position_column, 0);
+    }
+
+    #[test]
+    fn test_bol_anchor_line() {
+        let obj = SelectionModel {
+            bol_selection_direction: 0,
+            bol_position_line: 0,
+            bol_position_column: 0,
+            bol_anchor_line: 0,
+            bol_anchor_column: 0,
+            bol_is_empty: false,
+            bol_is_single_line: false,
+            bol_is_reversed: false,
+            bol_selected_text_length: 0,
+            bol_word_selection: false,
+        };
+        let _ = obj.bol_summary();
+        assert_eq!(obj.bol_anchor_line, 0);
+    }
+
+    #[test]
+    fn test_bol_anchor_column() {
+        let obj = SelectionModel {
+            bol_selection_direction: 0,
+            bol_position_line: 0,
+            bol_position_column: 0,
+            bol_anchor_line: 0,
+            bol_anchor_column: 0,
+            bol_is_empty: false,
+            bol_is_single_line: false,
+            bol_is_reversed: false,
+            bol_selected_text_length: 0,
+            bol_word_selection: false,
+        };
+        let _ = obj.bol_summary();
+        assert_eq!(obj.bol_anchor_column, 0);
+    }
+
+    #[test]
+    fn test_bol_is_empty() {
+        let obj = SelectionModel {
+            bol_selection_direction: 0,
+            bol_position_line: 0,
+            bol_position_column: 0,
+            bol_anchor_line: 0,
+            bol_anchor_column: 0,
+            bol_is_empty: false,
+            bol_is_single_line: false,
+            bol_is_reversed: false,
+            bol_selected_text_length: 0,
+            bol_word_selection: false,
+        };
+        let _ = obj.bol_summary();
+        assert!(!obj.bol_is_empty);
+    }
+
+    #[test]
+    fn test_bol_is_single_line() {
+        let obj = SelectionModel {
+            bol_selection_direction: 0,
+            bol_position_line: 0,
+            bol_position_column: 0,
+            bol_anchor_line: 0,
+            bol_anchor_column: 0,
+            bol_is_empty: false,
+            bol_is_single_line: false,
+            bol_is_reversed: false,
+            bol_selected_text_length: 0,
+            bol_word_selection: false,
+        };
+        let _ = obj.bol_summary();
+        assert!(!obj.bol_is_single_line);
+    }
+
+    #[test]
+    fn test_bol_is_reversed() {
+        let obj = SelectionModel {
+            bol_selection_direction: 0,
+            bol_position_line: 0,
+            bol_position_column: 0,
+            bol_anchor_line: 0,
+            bol_anchor_column: 0,
+            bol_is_empty: false,
+            bol_is_single_line: false,
+            bol_is_reversed: false,
+            bol_selected_text_length: 0,
+            bol_word_selection: false,
+        };
+        let _ = obj.bol_summary();
+        assert!(!obj.bol_is_reversed);
+    }
+
+    #[test]
+    fn test_bol_selected_text_length() {
+        let obj = SelectionModel {
+            bol_selection_direction: 0,
+            bol_position_line: 0,
+            bol_position_column: 0,
+            bol_anchor_line: 0,
+            bol_anchor_column: 0,
+            bol_is_empty: false,
+            bol_is_single_line: false,
+            bol_is_reversed: false,
+            bol_selected_text_length: 0,
+            bol_word_selection: false,
+        };
+        let _ = obj.bol_summary();
+        assert_eq!(obj.bol_selected_text_length, 0);
+    }
+
+    #[test]
+    fn test_bol_word_selection() {
+        let obj = SelectionModel {
+            bol_selection_direction: 0,
+            bol_position_line: 0,
+            bol_position_column: 0,
+            bol_anchor_line: 0,
+            bol_anchor_column: 0,
+            bol_is_empty: false,
+            bol_is_single_line: false,
+            bol_is_reversed: false,
+            bol_selected_text_length: 0,
+            bol_word_selection: false,
+        };
+        let _ = obj.bol_summary();
+        assert!(!obj.bol_word_selection);
+    }
+
+
+    #[test]
+    fn test_bom_cursor_count() {
+        let obj = MultiCursorEdit {
+            bom_cursor_count: 0,
+            bom_primary_cursor_index: 0,
+            bom_cursors_line_numbers: Vec::new(),
+            bom_cursors_columns: Vec::new(),
+            bom_is_adding_cursor: false,
+            bom_add_cursor_above: false,
+            bom_add_cursor_below: false,
+            bom_select_highlights: false,
+            bom_undo_stop_before: false,
+            bom_undo_stop_after: false,
+        };
+        let _ = obj.bom_summary();
+        assert_eq!(obj.bom_cursor_count, 0);
+    }
+
+    #[test]
+    fn test_bom_primary_cursor_index() {
+        let obj = MultiCursorEdit {
+            bom_cursor_count: 0,
+            bom_primary_cursor_index: 0,
+            bom_cursors_line_numbers: Vec::new(),
+            bom_cursors_columns: Vec::new(),
+            bom_is_adding_cursor: false,
+            bom_add_cursor_above: false,
+            bom_add_cursor_below: false,
+            bom_select_highlights: false,
+            bom_undo_stop_before: false,
+            bom_undo_stop_after: false,
+        };
+        let _ = obj.bom_summary();
+        assert_eq!(obj.bom_primary_cursor_index, 0);
+    }
+
+    #[test]
+    fn test_bom_cursors_line_numbers() {
+        let obj = MultiCursorEdit {
+            bom_cursor_count: 0,
+            bom_primary_cursor_index: 0,
+            bom_cursors_line_numbers: Vec::new(),
+            bom_cursors_columns: Vec::new(),
+            bom_is_adding_cursor: false,
+            bom_add_cursor_above: false,
+            bom_add_cursor_below: false,
+            bom_select_highlights: false,
+            bom_undo_stop_before: false,
+            bom_undo_stop_after: false,
+        };
+        let _ = obj.bom_summary();
+        assert!(obj.bom_cursors_line_numbers.is_empty());
+    }
+
+    #[test]
+    fn test_bom_cursors_columns() {
+        let obj = MultiCursorEdit {
+            bom_cursor_count: 0,
+            bom_primary_cursor_index: 0,
+            bom_cursors_line_numbers: Vec::new(),
+            bom_cursors_columns: Vec::new(),
+            bom_is_adding_cursor: false,
+            bom_add_cursor_above: false,
+            bom_add_cursor_below: false,
+            bom_select_highlights: false,
+            bom_undo_stop_before: false,
+            bom_undo_stop_after: false,
+        };
+        let _ = obj.bom_summary();
+        assert!(obj.bom_cursors_columns.is_empty());
+    }
+
+    #[test]
+    fn test_bom_is_adding_cursor() {
+        let obj = MultiCursorEdit {
+            bom_cursor_count: 0,
+            bom_primary_cursor_index: 0,
+            bom_cursors_line_numbers: Vec::new(),
+            bom_cursors_columns: Vec::new(),
+            bom_is_adding_cursor: false,
+            bom_add_cursor_above: false,
+            bom_add_cursor_below: false,
+            bom_select_highlights: false,
+            bom_undo_stop_before: false,
+            bom_undo_stop_after: false,
+        };
+        let _ = obj.bom_summary();
+        assert!(!obj.bom_is_adding_cursor);
+    }
+
+    #[test]
+    fn test_bom_add_cursor_above() {
+        let obj = MultiCursorEdit {
+            bom_cursor_count: 0,
+            bom_primary_cursor_index: 0,
+            bom_cursors_line_numbers: Vec::new(),
+            bom_cursors_columns: Vec::new(),
+            bom_is_adding_cursor: false,
+            bom_add_cursor_above: false,
+            bom_add_cursor_below: false,
+            bom_select_highlights: false,
+            bom_undo_stop_before: false,
+            bom_undo_stop_after: false,
+        };
+        let _ = obj.bom_summary();
+        assert!(!obj.bom_add_cursor_above);
+    }
+
+    #[test]
+    fn test_bom_add_cursor_below() {
+        let obj = MultiCursorEdit {
+            bom_cursor_count: 0,
+            bom_primary_cursor_index: 0,
+            bom_cursors_line_numbers: Vec::new(),
+            bom_cursors_columns: Vec::new(),
+            bom_is_adding_cursor: false,
+            bom_add_cursor_above: false,
+            bom_add_cursor_below: false,
+            bom_select_highlights: false,
+            bom_undo_stop_before: false,
+            bom_undo_stop_after: false,
+        };
+        let _ = obj.bom_summary();
+        assert!(!obj.bom_add_cursor_below);
+    }
+
+    #[test]
+    fn test_bom_select_highlights() {
+        let obj = MultiCursorEdit {
+            bom_cursor_count: 0,
+            bom_primary_cursor_index: 0,
+            bom_cursors_line_numbers: Vec::new(),
+            bom_cursors_columns: Vec::new(),
+            bom_is_adding_cursor: false,
+            bom_add_cursor_above: false,
+            bom_add_cursor_below: false,
+            bom_select_highlights: false,
+            bom_undo_stop_before: false,
+            bom_undo_stop_after: false,
+        };
+        let _ = obj.bom_summary();
+        assert!(!obj.bom_select_highlights);
+    }
+
+    #[test]
+    fn test_bom_undo_stop_before() {
+        let obj = MultiCursorEdit {
+            bom_cursor_count: 0,
+            bom_primary_cursor_index: 0,
+            bom_cursors_line_numbers: Vec::new(),
+            bom_cursors_columns: Vec::new(),
+            bom_is_adding_cursor: false,
+            bom_add_cursor_above: false,
+            bom_add_cursor_below: false,
+            bom_select_highlights: false,
+            bom_undo_stop_before: false,
+            bom_undo_stop_after: false,
+        };
+        let _ = obj.bom_summary();
+        assert!(!obj.bom_undo_stop_before);
+    }
+
+    #[test]
+    fn test_bom_undo_stop_after() {
+        let obj = MultiCursorEdit {
+            bom_cursor_count: 0,
+            bom_primary_cursor_index: 0,
+            bom_cursors_line_numbers: Vec::new(),
+            bom_cursors_columns: Vec::new(),
+            bom_is_adding_cursor: false,
+            bom_add_cursor_above: false,
+            bom_add_cursor_below: false,
+            bom_select_highlights: false,
+            bom_undo_stop_before: false,
+            bom_undo_stop_after: false,
+        };
+        let _ = obj.bom_summary();
+        assert!(!obj.bom_undo_stop_after);
+    }
+
+
+    #[test]
+    fn test_bon_match_start_line() {
+        let obj = FindMatch {
+            bon_match_start_line: 0,
+            bon_match_start_col: 0,
+            bon_match_end_line: 0,
+            bon_match_end_col: 0,
+            bon_match_text: String::from("test"),
+            bon_match_index: 0,
+            bon_total_matches: 0,
+            bon_is_regex: false,
+            bon_is_case_sensitive: false,
+            bon_is_whole_word: false,
+        };
+        let _ = obj.bon_summary();
+        assert_eq!(obj.bon_match_start_line, 0);
+    }
+
+    #[test]
+    fn test_bon_match_start_col() {
+        let obj = FindMatch {
+            bon_match_start_line: 0,
+            bon_match_start_col: 0,
+            bon_match_end_line: 0,
+            bon_match_end_col: 0,
+            bon_match_text: String::from("test"),
+            bon_match_index: 0,
+            bon_total_matches: 0,
+            bon_is_regex: false,
+            bon_is_case_sensitive: false,
+            bon_is_whole_word: false,
+        };
+        let _ = obj.bon_summary();
+        assert_eq!(obj.bon_match_start_col, 0);
+    }
+
+    #[test]
+    fn test_bon_match_end_line() {
+        let obj = FindMatch {
+            bon_match_start_line: 0,
+            bon_match_start_col: 0,
+            bon_match_end_line: 0,
+            bon_match_end_col: 0,
+            bon_match_text: String::from("test"),
+            bon_match_index: 0,
+            bon_total_matches: 0,
+            bon_is_regex: false,
+            bon_is_case_sensitive: false,
+            bon_is_whole_word: false,
+        };
+        let _ = obj.bon_summary();
+        assert_eq!(obj.bon_match_end_line, 0);
+    }
+
+    #[test]
+    fn test_bon_match_end_col() {
+        let obj = FindMatch {
+            bon_match_start_line: 0,
+            bon_match_start_col: 0,
+            bon_match_end_line: 0,
+            bon_match_end_col: 0,
+            bon_match_text: String::from("test"),
+            bon_match_index: 0,
+            bon_total_matches: 0,
+            bon_is_regex: false,
+            bon_is_case_sensitive: false,
+            bon_is_whole_word: false,
+        };
+        let _ = obj.bon_summary();
+        assert_eq!(obj.bon_match_end_col, 0);
+    }
+
+    #[test]
+    fn test_bon_match_text() {
+        let obj = FindMatch {
+            bon_match_start_line: 0,
+            bon_match_start_col: 0,
+            bon_match_end_line: 0,
+            bon_match_end_col: 0,
+            bon_match_text: String::from("test"),
+            bon_match_index: 0,
+            bon_total_matches: 0,
+            bon_is_regex: false,
+            bon_is_case_sensitive: false,
+            bon_is_whole_word: false,
+        };
+        let _ = obj.bon_summary();
+        assert_eq!(obj.bon_match_text, "test");
+    }
+
+    #[test]
+    fn test_bon_match_index() {
+        let obj = FindMatch {
+            bon_match_start_line: 0,
+            bon_match_start_col: 0,
+            bon_match_end_line: 0,
+            bon_match_end_col: 0,
+            bon_match_text: String::from("test"),
+            bon_match_index: 0,
+            bon_total_matches: 0,
+            bon_is_regex: false,
+            bon_is_case_sensitive: false,
+            bon_is_whole_word: false,
+        };
+        let _ = obj.bon_summary();
+        assert_eq!(obj.bon_match_index, 0);
+    }
+
+    #[test]
+    fn test_bon_total_matches() {
+        let obj = FindMatch {
+            bon_match_start_line: 0,
+            bon_match_start_col: 0,
+            bon_match_end_line: 0,
+            bon_match_end_col: 0,
+            bon_match_text: String::from("test"),
+            bon_match_index: 0,
+            bon_total_matches: 0,
+            bon_is_regex: false,
+            bon_is_case_sensitive: false,
+            bon_is_whole_word: false,
+        };
+        let _ = obj.bon_summary();
+        assert_eq!(obj.bon_total_matches, 0);
+    }
+
+    #[test]
+    fn test_bon_is_regex() {
+        let obj = FindMatch {
+            bon_match_start_line: 0,
+            bon_match_start_col: 0,
+            bon_match_end_line: 0,
+            bon_match_end_col: 0,
+            bon_match_text: String::from("test"),
+            bon_match_index: 0,
+            bon_total_matches: 0,
+            bon_is_regex: false,
+            bon_is_case_sensitive: false,
+            bon_is_whole_word: false,
+        };
+        let _ = obj.bon_summary();
+        assert!(!obj.bon_is_regex);
+    }
+
+    #[test]
+    fn test_bon_is_case_sensitive() {
+        let obj = FindMatch {
+            bon_match_start_line: 0,
+            bon_match_start_col: 0,
+            bon_match_end_line: 0,
+            bon_match_end_col: 0,
+            bon_match_text: String::from("test"),
+            bon_match_index: 0,
+            bon_total_matches: 0,
+            bon_is_regex: false,
+            bon_is_case_sensitive: false,
+            bon_is_whole_word: false,
+        };
+        let _ = obj.bon_summary();
+        assert!(!obj.bon_is_case_sensitive);
+    }
+
+    #[test]
+    fn test_bon_is_whole_word() {
+        let obj = FindMatch {
+            bon_match_start_line: 0,
+            bon_match_start_col: 0,
+            bon_match_end_line: 0,
+            bon_match_end_col: 0,
+            bon_match_text: String::from("test"),
+            bon_match_index: 0,
+            bon_total_matches: 0,
+            bon_is_regex: false,
+            bon_is_case_sensitive: false,
+            bon_is_whole_word: false,
+        };
+        let _ = obj.bon_summary();
+        assert!(!obj.bon_is_whole_word);
+    }
+
+
+    #[test]
+    fn test_boo_snippet_id() {
+        let obj = SnippetSession {
+            boo_snippet_id: String::from("test"),
+            boo_template_text: String::from("test"),
+            boo_placeholder_count: 0,
+            boo_current_placeholder: 0,
+            boo_is_active: false,
+            boo_is_nested: false,
+            boo_choice_values: Vec::new(),
+            boo_variable_values: Vec::new(),
+            boo_final_tabstop_line: 0,
+            boo_final_tabstop_col: 0,
+        };
+        let _ = obj.boo_summary();
+        assert_eq!(obj.boo_snippet_id, "test");
+    }
+
+    #[test]
+    fn test_boo_template_text() {
+        let obj = SnippetSession {
+            boo_snippet_id: String::from("test"),
+            boo_template_text: String::from("test"),
+            boo_placeholder_count: 0,
+            boo_current_placeholder: 0,
+            boo_is_active: false,
+            boo_is_nested: false,
+            boo_choice_values: Vec::new(),
+            boo_variable_values: Vec::new(),
+            boo_final_tabstop_line: 0,
+            boo_final_tabstop_col: 0,
+        };
+        let _ = obj.boo_summary();
+        assert_eq!(obj.boo_template_text, "test");
+    }
+
+    #[test]
+    fn test_boo_placeholder_count() {
+        let obj = SnippetSession {
+            boo_snippet_id: String::from("test"),
+            boo_template_text: String::from("test"),
+            boo_placeholder_count: 0,
+            boo_current_placeholder: 0,
+            boo_is_active: false,
+            boo_is_nested: false,
+            boo_choice_values: Vec::new(),
+            boo_variable_values: Vec::new(),
+            boo_final_tabstop_line: 0,
+            boo_final_tabstop_col: 0,
+        };
+        let _ = obj.boo_summary();
+        assert_eq!(obj.boo_placeholder_count, 0);
+    }
+
+    #[test]
+    fn test_boo_current_placeholder() {
+        let obj = SnippetSession {
+            boo_snippet_id: String::from("test"),
+            boo_template_text: String::from("test"),
+            boo_placeholder_count: 0,
+            boo_current_placeholder: 0,
+            boo_is_active: false,
+            boo_is_nested: false,
+            boo_choice_values: Vec::new(),
+            boo_variable_values: Vec::new(),
+            boo_final_tabstop_line: 0,
+            boo_final_tabstop_col: 0,
+        };
+        let _ = obj.boo_summary();
+        assert_eq!(obj.boo_current_placeholder, 0);
+    }
+
+    #[test]
+    fn test_boo_is_active() {
+        let obj = SnippetSession {
+            boo_snippet_id: String::from("test"),
+            boo_template_text: String::from("test"),
+            boo_placeholder_count: 0,
+            boo_current_placeholder: 0,
+            boo_is_active: false,
+            boo_is_nested: false,
+            boo_choice_values: Vec::new(),
+            boo_variable_values: Vec::new(),
+            boo_final_tabstop_line: 0,
+            boo_final_tabstop_col: 0,
+        };
+        let _ = obj.boo_summary();
+        assert!(!obj.boo_is_active);
+    }
+
+    #[test]
+    fn test_boo_is_nested() {
+        let obj = SnippetSession {
+            boo_snippet_id: String::from("test"),
+            boo_template_text: String::from("test"),
+            boo_placeholder_count: 0,
+            boo_current_placeholder: 0,
+            boo_is_active: false,
+            boo_is_nested: false,
+            boo_choice_values: Vec::new(),
+            boo_variable_values: Vec::new(),
+            boo_final_tabstop_line: 0,
+            boo_final_tabstop_col: 0,
+        };
+        let _ = obj.boo_summary();
+        assert!(!obj.boo_is_nested);
+    }
+
+    #[test]
+    fn test_boo_choice_values() {
+        let obj = SnippetSession {
+            boo_snippet_id: String::from("test"),
+            boo_template_text: String::from("test"),
+            boo_placeholder_count: 0,
+            boo_current_placeholder: 0,
+            boo_is_active: false,
+            boo_is_nested: false,
+            boo_choice_values: Vec::new(),
+            boo_variable_values: Vec::new(),
+            boo_final_tabstop_line: 0,
+            boo_final_tabstop_col: 0,
+        };
+        let _ = obj.boo_summary();
+        assert!(obj.boo_choice_values.is_empty());
+    }
+
+    #[test]
+    fn test_boo_variable_values() {
+        let obj = SnippetSession {
+            boo_snippet_id: String::from("test"),
+            boo_template_text: String::from("test"),
+            boo_placeholder_count: 0,
+            boo_current_placeholder: 0,
+            boo_is_active: false,
+            boo_is_nested: false,
+            boo_choice_values: Vec::new(),
+            boo_variable_values: Vec::new(),
+            boo_final_tabstop_line: 0,
+            boo_final_tabstop_col: 0,
+        };
+        let _ = obj.boo_summary();
+        assert!(obj.boo_variable_values.is_empty());
+    }
+
+    #[test]
+    fn test_boo_final_tabstop_line() {
+        let obj = SnippetSession {
+            boo_snippet_id: String::from("test"),
+            boo_template_text: String::from("test"),
+            boo_placeholder_count: 0,
+            boo_current_placeholder: 0,
+            boo_is_active: false,
+            boo_is_nested: false,
+            boo_choice_values: Vec::new(),
+            boo_variable_values: Vec::new(),
+            boo_final_tabstop_line: 0,
+            boo_final_tabstop_col: 0,
+        };
+        let _ = obj.boo_summary();
+        assert_eq!(obj.boo_final_tabstop_line, 0);
+    }
+
+    #[test]
+    fn test_boo_final_tabstop_col() {
+        let obj = SnippetSession {
+            boo_snippet_id: String::from("test"),
+            boo_template_text: String::from("test"),
+            boo_placeholder_count: 0,
+            boo_current_placeholder: 0,
+            boo_is_active: false,
+            boo_is_nested: false,
+            boo_choice_values: Vec::new(),
+            boo_variable_values: Vec::new(),
+            boo_final_tabstop_line: 0,
+            boo_final_tabstop_col: 0,
+        };
+        let _ = obj.boo_summary();
+        assert_eq!(obj.boo_final_tabstop_col, 0);
     }
 
 }
