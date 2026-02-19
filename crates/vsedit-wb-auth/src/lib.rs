@@ -86684,6 +86684,79 @@ pub struct BltReplacePreview { pub file: String, pub line: usize, pub original: 
 #[derive(Debug, Clone)]
 pub struct BltSearchResultState { pub files: Vec<BltFileMatch>, pub total_matches: usize, pub searching: bool }
 
+
+// SCM view model — source control groups, resource states, commit message, input validation
+#[derive(Debug, Clone)]
+pub struct BluScmResource { pub uri: String, pub state: u8, pub decorations: Option<String>, pub original_uri: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BluScmGroup { pub id: String, pub label: String, pub resources: Vec<BluScmResource> }
+#[derive(Debug, Clone)]
+pub struct BluScmInputBox { pub value: String, pub placeholder: String, pub visible: bool }
+#[derive(Debug, Clone)]
+pub struct BluScmProvider { pub id: String, pub label: String, pub root_uri: String, pub count: usize }
+#[derive(Debug, Clone)]
+pub struct BluScmViewState { pub providers: Vec<BluScmProvider>, pub active_provider: Option<String> }
+
+// Timeline view model — timeline items, filters, date grouping, provider registration
+#[derive(Debug, Clone)]
+pub struct BlvTimelineItem { pub id: String, pub label: String, pub description: Option<String>, pub timestamp: u64, pub icon: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BlvTimelineFilter { pub scheme: Option<String>, pub source: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BlvTimelineProvider { pub id: String, pub label: String, pub scheme: String }
+#[derive(Debug, Clone)]
+pub struct BlvTimelineGroup { pub label: String, pub items: Vec<BlvTimelineItem> }
+#[derive(Debug, Clone)]
+pub struct BlvTimelineState { pub items: Vec<BlvTimelineItem>, pub loading: bool, pub has_more: bool }
+
+// Extensions view model — extension items, install/uninstall, ratings, recommendations
+#[derive(Debug, Clone)]
+pub struct BlwExtensionItem { pub id: String, pub display_name: String, pub publisher: String, pub version: String, pub installed: bool, pub enabled: bool }
+#[derive(Debug, Clone)]
+pub struct BlwExtensionRating { pub average: f64, pub count: u32 }
+#[derive(Debug, Clone)]
+pub struct BlwExtensionAction { pub extension_id: String, pub action: u8 }
+#[derive(Debug, Clone)]
+pub struct BlwRecommendation { pub extension_id: String, pub reason: String, pub source: u8 }
+#[derive(Debug, Clone)]
+pub struct BlwExtensionsViewState { pub installed: Vec<BlwExtensionItem>, pub recommended: Vec<BlwRecommendation>, pub searching: bool }
+
+// Settings UI model — setting items, setting categories, modified indicators, search filtering
+#[derive(Debug, Clone)]
+pub struct BlxSettingItem { pub key: String, pub value: String, pub default_value: String, pub scope: u8, pub modified: bool }
+#[derive(Debug, Clone)]
+pub struct BlxSettingCategory { pub id: String, pub label: String, pub order: i32, pub settings: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BlxSettingSearch { pub query: String, pub results: Vec<String>, pub total: usize }
+#[derive(Debug, Clone)]
+pub struct BlxSettingEdit { pub key: String, pub new_value: String, pub scope: u8 }
+#[derive(Debug, Clone)]
+pub struct BlxSettingsUIState { pub categories: Vec<BlxSettingCategory>, pub active_category: Option<String>, pub search_query: String }
+
+// Keybindings UI model — keybinding items, conflict detection, when clause display, recording mode
+#[derive(Debug, Clone)]
+pub struct BlyKeybindingItem { pub command: String, pub keybinding: String, pub when_clause: Option<String>, pub source: u8 }
+#[derive(Debug, Clone)]
+pub struct BlyKeybindingConflict { pub command_a: String, pub command_b: String, pub keybinding: String }
+#[derive(Debug, Clone)]
+pub struct BlyRecordingState { pub active: bool, pub keys: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BlyKeybindingEdit { pub command: String, pub new_keybinding: String, pub when_clause: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BlyKeybindingsState { pub items: Vec<BlyKeybindingItem>, pub conflicts: Vec<BlyKeybindingConflict>, pub search_query: String }
+
+// Welcome view model — welcome content, walkthrough steps, getting started, recently opened
+#[derive(Debug, Clone)]
+pub struct BlzWalkthroughStep { pub id: String, pub title: String, pub description: String, pub completed: bool, pub media_path: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BlzWalkthrough { pub id: String, pub title: String, pub steps: Vec<BlzWalkthroughStep> }
+#[derive(Debug, Clone)]
+pub struct BlzRecentItem { pub uri: String, pub label: String, pub workspace: bool, pub timestamp: u64 }
+#[derive(Debug, Clone)]
+pub struct BlzWelcomeButton { pub label: String, pub command: String, pub description: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BlzWelcomeState { pub walkthroughs: Vec<BlzWalkthrough>, pub recent_items: Vec<BlzRecentItem>, pub show_on_startup: bool }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -96104,4 +96177,124 @@ mod tests_bfo {
     fn test_blt_state_with_results() { let m = BltSearchMatch { line: 0, col: 0, length: 1, preview_text: "x".into() }; let f = BltFileMatch { file: "f.rs".into(), matches: vec![m], collapsed: false }; let s = BltSearchResultState { files: vec![f], total_matches: 1, searching: false }; assert_eq!(s.total_matches, 1); }
     #[test]
     fn test_blt_query_whole_word() { let q = BltSearchQuery { pattern: "fn".into(), is_regex: false, case_sensitive: true, whole_word: true, include_pattern: None, exclude_pattern: None }; assert!(q.whole_word); }
+    #[test]
+    fn test_blu_resource_modified() { let r = BluScmResource { uri: "file:///a.rs".into(), state: 1, decorations: Some("M".into()), original_uri: None }; assert_eq!(r.state, 1); }
+    #[test]
+    fn test_blu_resource_untracked() { let r = BluScmResource { uri: "file:///b.rs".into(), state: 4, decorations: Some("U".into()), original_uri: None }; assert_eq!(r.state, 4); }
+    #[test]
+    fn test_blu_group_staged() { let r = BluScmResource { uri: "f".into(), state: 0, decorations: None, original_uri: None }; let g = BluScmGroup { id: "staged".into(), label: "Staged Changes".into(), resources: vec![r] }; assert_eq!(g.resources.len(), 1); }
+    #[test]
+    fn test_blu_input_box() { let i = BluScmInputBox { value: "fix: bug".into(), placeholder: "Message".into(), visible: true }; assert!(i.visible); }
+    #[test]
+    fn test_blu_provider() { let p = BluScmProvider { id: "git".into(), label: "Git".into(), root_uri: "file:///repo".into(), count: 5 }; assert_eq!(p.count, 5); }
+    #[test]
+    fn test_blu_view_state_active() { let p = BluScmProvider { id: "git".into(), label: "Git".into(), root_uri: "/".into(), count: 0 }; let s = BluScmViewState { providers: vec![p], active_provider: Some("git".into()) }; assert!(s.active_provider.is_some()); }
+    #[test]
+    fn test_blu_view_state_empty() { let s = BluScmViewState { providers: vec![], active_provider: None }; assert!(s.providers.is_empty()); }
+    #[test]
+    fn test_blu_resource_with_original() { let r = BluScmResource { uri: "file:///a.rs".into(), state: 1, decorations: None, original_uri: Some("file:///a.rs.orig".into()) }; assert!(r.original_uri.is_some()); }
+    #[test]
+    fn test_blu_empty_group() { let g = BluScmGroup { id: "changes".into(), label: "Changes".into(), resources: vec![] }; assert!(g.resources.is_empty()); }
+    #[test]
+    fn test_blu_input_hidden() { let i = BluScmInputBox { value: String::new(), placeholder: String::new(), visible: false }; assert!(!i.visible); }
+    #[test]
+    fn test_blv_item_basic() { let i = BlvTimelineItem { id: "t1".into(), label: "Save".into(), description: None, timestamp: 1000, icon: None }; assert_eq!(i.timestamp, 1000); }
+    #[test]
+    fn test_blv_item_with_desc() { let i = BlvTimelineItem { id: "t2".into(), label: "Commit".into(), description: Some("fix bug".into()), timestamp: 2000, icon: Some("git-commit".into()) }; assert!(i.description.is_some()); }
+    #[test]
+    fn test_blv_filter_by_scheme() { let f = BlvTimelineFilter { scheme: Some("file".into()), source: None }; assert!(f.scheme.is_some()); }
+    #[test]
+    fn test_blv_filter_by_source() { let f = BlvTimelineFilter { scheme: None, source: Some("git".into()) }; assert!(f.source.is_some()); }
+    #[test]
+    fn test_blv_provider() { let p = BlvTimelineProvider { id: "git".into(), label: "Git History".into(), scheme: "file".into() }; assert_eq!(p.scheme, "file"); }
+    #[test]
+    fn test_blv_group() { let i = BlvTimelineItem { id: "g1".into(), label: "X".into(), description: None, timestamp: 0, icon: None }; let g = BlvTimelineGroup { label: "Today".into(), items: vec![i] }; assert_eq!(g.items.len(), 1); }
+    #[test]
+    fn test_blv_state_loading() { let s = BlvTimelineState { items: vec![], loading: true, has_more: false }; assert!(s.loading); }
+    #[test]
+    fn test_blv_state_loaded() { let s = BlvTimelineState { items: vec![], loading: false, has_more: true }; assert!(s.has_more); }
+    #[test]
+    fn test_blv_state_complete() { let s = BlvTimelineState { items: vec![], loading: false, has_more: false }; assert!(!s.has_more); }
+    #[test]
+    fn test_blv_empty_group() { let g = BlvTimelineGroup { label: "Yesterday".into(), items: vec![] }; assert!(g.items.is_empty()); }
+    #[test]
+    fn test_blw_installed_ext() { let e = BlwExtensionItem { id: "rust-lang.rust-analyzer".into(), display_name: "rust-analyzer".into(), publisher: "rust-lang".into(), version: "0.4.0".into(), installed: true, enabled: true }; assert!(e.installed); }
+    #[test]
+    fn test_blw_disabled_ext() { let e = BlwExtensionItem { id: "x.y".into(), display_name: "Y".into(), publisher: "x".into(), version: "1.0.0".into(), installed: true, enabled: false }; assert!(!e.enabled); }
+    #[test]
+    fn test_blw_not_installed() { let e = BlwExtensionItem { id: "a.b".into(), display_name: "B".into(), publisher: "a".into(), version: "2.0.0".into(), installed: false, enabled: false }; assert!(!e.installed); }
+    #[test]
+    fn test_blw_rating() { let r = BlwExtensionRating { average: 4.5, count: 1000 }; assert!(r.average > 4.0); }
+    #[test]
+    fn test_blw_no_ratings() { let r = BlwExtensionRating { average: 0.0, count: 0 }; assert_eq!(r.count, 0); }
+    #[test]
+    fn test_blw_install_action() { let a = BlwExtensionAction { extension_id: "x.y".into(), action: 0 }; assert_eq!(a.action, 0); }
+    #[test]
+    fn test_blw_uninstall_action() { let a = BlwExtensionAction { extension_id: "x.y".into(), action: 1 }; assert_eq!(a.action, 1); }
+    #[test]
+    fn test_blw_recommendation() { let r = BlwRecommendation { extension_id: "x.y".into(), reason: "Popular".into(), source: 0 }; assert_eq!(r.source, 0); }
+    #[test]
+    fn test_blw_state_idle() { let s = BlwExtensionsViewState { installed: vec![], recommended: vec![], searching: false }; assert!(!s.searching); }
+    #[test]
+    fn test_blw_state_searching() { let s = BlwExtensionsViewState { installed: vec![], recommended: vec![], searching: true }; assert!(s.searching); }
+    #[test]
+    fn test_blx_setting_default() { let s = BlxSettingItem { key: "editor.fontSize".into(), value: "14".into(), default_value: "14".into(), scope: 0, modified: false }; assert!(!s.modified); }
+    #[test]
+    fn test_blx_setting_modified() { let s = BlxSettingItem { key: "editor.tabSize".into(), value: "2".into(), default_value: "4".into(), scope: 1, modified: true }; assert!(s.modified); }
+    #[test]
+    fn test_blx_category() { let c = BlxSettingCategory { id: "editor".into(), label: "Text Editor".into(), order: 0, settings: vec!["editor.fontSize".into()] }; assert_eq!(c.settings.len(), 1); }
+    #[test]
+    fn test_blx_search_results() { let s = BlxSettingSearch { query: "font".into(), results: vec!["editor.fontSize".into(), "editor.fontFamily".into()], total: 2 }; assert_eq!(s.total, 2); }
+    #[test]
+    fn test_blx_search_empty() { let s = BlxSettingSearch { query: "nonexistent".into(), results: vec![], total: 0 }; assert_eq!(s.total, 0); }
+    #[test]
+    fn test_blx_edit_user() { let e = BlxSettingEdit { key: "editor.fontSize".into(), new_value: "16".into(), scope: 0 }; assert_eq!(e.scope, 0); }
+    #[test]
+    fn test_blx_edit_workspace() { let e = BlxSettingEdit { key: "editor.tabSize".into(), new_value: "2".into(), scope: 1 }; assert_eq!(e.scope, 1); }
+    #[test]
+    fn test_blx_state_empty() { let s = BlxSettingsUIState { categories: vec![], active_category: None, search_query: String::new() }; assert!(s.categories.is_empty()); }
+    #[test]
+    fn test_blx_state_with_search() { let s = BlxSettingsUIState { categories: vec![], active_category: None, search_query: "font".into() }; assert!(!s.search_query.is_empty()); }
+    #[test]
+    fn test_blx_state_active_cat() { let c = BlxSettingCategory { id: "editor".into(), label: "Editor".into(), order: 0, settings: vec![] }; let s = BlxSettingsUIState { categories: vec![c], active_category: Some("editor".into()), search_query: String::new() }; assert!(s.active_category.is_some()); }
+    #[test]
+    fn test_bly_default_binding() { let k = BlyKeybindingItem { command: "editor.action.commentLine".into(), keybinding: "Ctrl+/".into(), when_clause: Some("editorTextFocus".into()), source: 0 }; assert_eq!(k.source, 0); }
+    #[test]
+    fn test_bly_user_binding() { let k = BlyKeybindingItem { command: "custom.cmd".into(), keybinding: "Ctrl+K Ctrl+C".into(), when_clause: None, source: 1 }; assert_eq!(k.source, 1); }
+    #[test]
+    fn test_bly_conflict() { let c = BlyKeybindingConflict { command_a: "a".into(), command_b: "b".into(), keybinding: "Ctrl+S".into() }; assert_eq!(c.keybinding, "Ctrl+S"); }
+    #[test]
+    fn test_bly_recording_active() { let r = BlyRecordingState { active: true, keys: vec!["Ctrl".into()] }; assert!(r.active); }
+    #[test]
+    fn test_bly_recording_inactive() { let r = BlyRecordingState { active: false, keys: vec![] }; assert!(!r.active); }
+    #[test]
+    fn test_bly_edit() { let e = BlyKeybindingEdit { command: "x".into(), new_keybinding: "Alt+X".into(), when_clause: None }; assert_eq!(e.new_keybinding, "Alt+X"); }
+    #[test]
+    fn test_bly_edit_with_when() { let e = BlyKeybindingEdit { command: "y".into(), new_keybinding: "Ctrl+Y".into(), when_clause: Some("editorFocus".into()) }; assert!(e.when_clause.is_some()); }
+    #[test]
+    fn test_bly_state_empty() { let s = BlyKeybindingsState { items: vec![], conflicts: vec![], search_query: String::new() }; assert!(s.items.is_empty()); }
+    #[test]
+    fn test_bly_state_with_search() { let s = BlyKeybindingsState { items: vec![], conflicts: vec![], search_query: "ctrl+s".into() }; assert!(!s.search_query.is_empty()); }
+    #[test]
+    fn test_bly_state_with_conflicts() { let c = BlyKeybindingConflict { command_a: "a".into(), command_b: "b".into(), keybinding: "X".into() }; let s = BlyKeybindingsState { items: vec![], conflicts: vec![c], search_query: String::new() }; assert_eq!(s.conflicts.len(), 1); }
+    #[test]
+    fn test_blz_step_incomplete() { let s = BlzWalkthroughStep { id: "s1".into(), title: "Open File".into(), description: "Open a file".into(), completed: false, media_path: None }; assert!(!s.completed); }
+    #[test]
+    fn test_blz_step_completed() { let s = BlzWalkthroughStep { id: "s2".into(), title: "Install Extension".into(), description: "desc".into(), completed: true, media_path: Some("/img/ext.svg".into()) }; assert!(s.completed); }
+    #[test]
+    fn test_blz_walkthrough() { let s = BlzWalkthroughStep { id: "s1".into(), title: "T".into(), description: "D".into(), completed: false, media_path: None }; let w = BlzWalkthrough { id: "w1".into(), title: "Getting Started".into(), steps: vec![s] }; assert_eq!(w.steps.len(), 1); }
+    #[test]
+    fn test_blz_recent_file() { let r = BlzRecentItem { uri: "file:///a.rs".into(), label: "a.rs".into(), workspace: false, timestamp: 1000 }; assert!(!r.workspace); }
+    #[test]
+    fn test_blz_recent_workspace() { let r = BlzRecentItem { uri: "file:///project".into(), label: "project".into(), workspace: true, timestamp: 2000 }; assert!(r.workspace); }
+    #[test]
+    fn test_blz_button() { let b = BlzWelcomeButton { label: "New File".into(), command: "workbench.action.files.newUntitledFile".into(), description: Some("Create a new file".into()) }; assert!(b.description.is_some()); }
+    #[test]
+    fn test_blz_button_no_desc() { let b = BlzWelcomeButton { label: "Open Folder".into(), command: "workbench.action.openFolder".into(), description: None }; assert!(b.description.is_none()); }
+    #[test]
+    fn test_blz_state_show_startup() { let s = BlzWelcomeState { walkthroughs: vec![], recent_items: vec![], show_on_startup: true }; assert!(s.show_on_startup); }
+    #[test]
+    fn test_blz_state_hide_startup() { let s = BlzWelcomeState { walkthroughs: vec![], recent_items: vec![], show_on_startup: false }; assert!(!s.show_on_startup); }
+    #[test]
+    fn test_blz_state_with_recent() { let r = BlzRecentItem { uri: "f".into(), label: "f".into(), workspace: false, timestamp: 0 }; let s = BlzWelcomeState { walkthroughs: vec![], recent_items: vec![r], show_on_startup: true }; assert_eq!(s.recent_items.len(), 1); }
 }
