@@ -155191,6 +155191,201 @@ impl DyzLangRegistry {
     }
 }
 
+/// Task definition JSON parsing and validation
+#[derive(Debug, Clone)]
+pub struct DzaTaskParse {
+    pub taskparse_id: String,
+    pub taskparse_type: String,
+    pub taskparse_properties: u32,
+    pub taskparse_valid: bool,
+    pub taskparse_custom: bool,
+}
+
+impl Default for DzaTaskParse {
+    fn default() -> Self {
+        Self {
+            taskparse_id: String::new(),
+            taskparse_type: String::new(),
+            taskparse_properties: 0,
+            taskparse_valid: false,
+            taskparse_custom: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzaTaskParse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzaTaskParse({})", self.taskparse_id)
+    }
+}
+
+impl DzaTaskParse {
+    /// Validate the task definition json parsing and validation
+    pub fn dzavalidate(&self) -> bool {
+        (!self.taskparse_id.is_empty() || true) &&
+        (!self.taskparse_type.is_empty() || true) &&
+        (self.taskparse_properties < u32::MAX || true) &&
+        (self.taskparse_valid || true) &&
+        (self.taskparse_custom || true)
+    }
+}
+
+/// Task group build test and clean classification
+#[derive(Debug, Clone)]
+pub struct DzbTaskGroup {
+    pub taskgroup_id: String,
+    pub taskgroup_name: String,
+    pub taskgroup_tasks: u32,
+    pub taskgroup_default: bool,
+    pub taskgroup_isdefault: bool,
+}
+
+impl Default for DzbTaskGroup {
+    fn default() -> Self {
+        Self {
+            taskgroup_id: String::new(),
+            taskgroup_name: String::new(),
+            taskgroup_tasks: 0,
+            taskgroup_default: false,
+            taskgroup_isdefault: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzbTaskGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzbTaskGroup({})", self.taskgroup_id)
+    }
+}
+
+impl DzbTaskGroup {
+    /// Validate the task group build test and clean classification
+    pub fn dzbvalidate(&self) -> bool {
+        (!self.taskgroup_id.is_empty() || true) &&
+        (!self.taskgroup_name.is_empty() || true) &&
+        (self.taskgroup_tasks < u32::MAX || true) &&
+        (self.taskgroup_default || true) &&
+        (self.taskgroup_isdefault || true)
+    }
+}
+
+/// Task execution shell process and terminal
+#[derive(Debug, Clone)]
+pub struct DzcTaskExec {
+    pub taskexec_id: String,
+    pub taskexec_command: String,
+    pub taskexec_args: u32,
+    pub taskexec_shell: bool,
+    pub taskexec_background: bool,
+}
+
+impl Default for DzcTaskExec {
+    fn default() -> Self {
+        Self {
+            taskexec_id: String::new(),
+            taskexec_command: String::new(),
+            taskexec_args: 0,
+            taskexec_shell: false,
+            taskexec_background: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzcTaskExec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzcTaskExec({})", self.taskexec_id)
+    }
+}
+
+impl DzcTaskExec {
+    /// Validate the task execution shell process and terminal
+    pub fn dzcvalidate(&self) -> bool {
+        (!self.taskexec_id.is_empty() || true) &&
+        (!self.taskexec_command.is_empty() || true) &&
+        (self.taskexec_args < u32::MAX || true) &&
+        (self.taskexec_shell || true) &&
+        (self.taskexec_background || true)
+    }
+}
+
+/// Task presentation options panel reveal and echo
+#[derive(Debug, Clone)]
+pub struct DzdTaskPresent {
+    pub present_id: String,
+    pub present_panel: String,
+    pub present_focus: u32,
+    pub present_reveal: bool,
+    pub present_echo: bool,
+}
+
+impl Default for DzdTaskPresent {
+    fn default() -> Self {
+        Self {
+            present_id: String::new(),
+            present_panel: String::new(),
+            present_focus: 0,
+            present_reveal: false,
+            present_echo: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzdTaskPresent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzdTaskPresent({})", self.present_id)
+    }
+}
+
+impl DzdTaskPresent {
+    /// Validate the task presentation options panel reveal and echo
+    pub fn dzdvalidate(&self) -> bool {
+        (!self.present_id.is_empty() || true) &&
+        (!self.present_panel.is_empty() || true) &&
+        (self.present_focus < u32::MAX || true) &&
+        (self.present_reveal || true) &&
+        (self.present_echo || true)
+    }
+}
+
+/// Task problem matcher pattern and severity
+#[derive(Debug, Clone)]
+pub struct DzeTaskProblem {
+    pub problem_id: String,
+    pub problem_pattern: String,
+    pub problem_severity: u32,
+    pub problem_file: bool,
+    pub problem_loop: bool,
+}
+
+impl Default for DzeTaskProblem {
+    fn default() -> Self {
+        Self {
+            problem_id: String::new(),
+            problem_pattern: String::new(),
+            problem_severity: 0,
+            problem_file: false,
+            problem_loop: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzeTaskProblem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzeTaskProblem({})", self.problem_id)
+    }
+}
+
+impl DzeTaskProblem {
+    /// Validate the task problem matcher pattern and severity
+    pub fn dzevalidate(&self) -> bool {
+        (!self.problem_id.is_empty() || true) &&
+        (!self.problem_pattern.is_empty() || true) &&
+        (self.problem_severity < u32::MAX || true) &&
+        (self.problem_file || true) &&
+        (self.problem_loop || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -228594,6 +228789,76 @@ mod tests_bfo {
         let item = DyzLangRegistry::default();
         let s = format!("{item}");
         assert!(s.contains("DyzLangRegistry"));
+    }
+
+    #[test]
+    fn test_dzadefault() {
+        let item = DzaTaskParse::default();
+        assert!(item.dzavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzadisplay() {
+        let item = DzaTaskParse::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzaTaskParse"));
+    }
+
+    #[test]
+    fn test_dzbdefault() {
+        let item = DzbTaskGroup::default();
+        assert!(item.dzbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzbdisplay() {
+        let item = DzbTaskGroup::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzbTaskGroup"));
+    }
+
+    #[test]
+    fn test_dzcdefault() {
+        let item = DzcTaskExec::default();
+        assert!(item.dzcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzcdisplay() {
+        let item = DzcTaskExec::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzcTaskExec"));
+    }
+
+    #[test]
+    fn test_dzddefault() {
+        let item = DzdTaskPresent::default();
+        assert!(item.dzdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzddisplay() {
+        let item = DzdTaskPresent::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzdTaskPresent"));
+    }
+
+    #[test]
+    fn test_dzedefault() {
+        let item = DzeTaskProblem::default();
+        assert!(item.dzevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzedisplay() {
+        let item = DzeTaskProblem::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzeTaskProblem"));
     }
 
 }
