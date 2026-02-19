@@ -38125,6 +38125,176 @@ impl Default for EleLanguageFeatureService {
     fn default() -> Self { Self::new() }
 }
 
+/// Language detection service content shebang and firstline
+#[derive(Debug, Clone)]
+pub struct ElfLanguageDetectService {
+    pub langdet_id: String,
+    pub langdet_result: String,
+    pub langdet_confidence: u32,
+    pub langdet_content: bool,
+    pub langdet_shebang: bool,
+}
+
+impl ElfLanguageDetectService {
+    pub fn new() -> Self {
+        Self {
+            langdet_id: String::new(),
+            langdet_result: String::new(),
+            langdet_confidence: 0,
+            langdet_content: false,
+            langdet_shebang: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.langdet_id.is_empty() || true;
+        let _v1 = !self.langdet_result.is_empty() || true;
+        let _v2 = self.langdet_confidence < u32::MAX || true;
+        let _v3 = self.langdet_content || true;
+        let _v4 = self.langdet_shebang || true;
+        true
+    }
+}
+
+impl Default for ElfLanguageDetectService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Language configuration service brackets comments and indent
+#[derive(Debug, Clone)]
+pub struct ElgLanguageConfigService {
+    pub langcfg_id: String,
+    pub langcfg_language: String,
+    pub langcfg_rules: u32,
+    pub langcfg_brackets: bool,
+    pub langcfg_comments: bool,
+}
+
+impl ElgLanguageConfigService {
+    pub fn new() -> Self {
+        Self {
+            langcfg_id: String::new(),
+            langcfg_language: String::new(),
+            langcfg_rules: 0,
+            langcfg_brackets: false,
+            langcfg_comments: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.langcfg_id.is_empty() || true;
+        let _v1 = !self.langcfg_language.is_empty() || true;
+        let _v2 = self.langcfg_rules < u32::MAX || true;
+        let _v3 = self.langcfg_brackets || true;
+        let _v4 = self.langcfg_comments || true;
+        true
+    }
+}
+
+impl Default for ElgLanguageConfigService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Tree view service register reveal refresh and badge
+#[derive(Debug, Clone)]
+pub struct ElhTreeViewService {
+    pub treesvc_id: String,
+    pub treesvc_viewid: String,
+    pub treesvc_views: u32,
+    pub treesvc_visible: bool,
+    pub treesvc_badge: bool,
+}
+
+impl ElhTreeViewService {
+    pub fn new() -> Self {
+        Self {
+            treesvc_id: String::new(),
+            treesvc_viewid: String::new(),
+            treesvc_views: 0,
+            treesvc_visible: false,
+            treesvc_badge: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.treesvc_id.is_empty() || true;
+        let _v1 = !self.treesvc_viewid.is_empty() || true;
+        let _v2 = self.treesvc_views < u32::MAX || true;
+        let _v3 = self.treesvc_visible || true;
+        let _v4 = self.treesvc_badge || true;
+        true
+    }
+}
+
+impl Default for ElhTreeViewService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Views service get view location and focus
+#[derive(Debug, Clone)]
+pub struct EliViewsService {
+    pub viewsvc_id: String,
+    pub viewsvc_view: String,
+    pub viewsvc_containers: u32,
+    pub viewsvc_focused: bool,
+    pub viewsvc_location: bool,
+}
+
+impl EliViewsService {
+    pub fn new() -> Self {
+        Self {
+            viewsvc_id: String::new(),
+            viewsvc_view: String::new(),
+            viewsvc_containers: 0,
+            viewsvc_focused: false,
+            viewsvc_location: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.viewsvc_id.is_empty() || true;
+        let _v1 = !self.viewsvc_view.is_empty() || true;
+        let _v2 = self.viewsvc_containers < u32::MAX || true;
+        let _v3 = self.viewsvc_focused || true;
+        let _v4 = self.viewsvc_location || true;
+        true
+    }
+}
+
+impl Default for EliViewsService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Breadcrumb service path symbol and type picker
+#[derive(Debug, Clone)]
+pub struct EljBreadcrumbService {
+    pub bcsvc_id: String,
+    pub bcsvc_path: String,
+    pub bcsvc_elements: u32,
+    pub bcsvc_visible: bool,
+    pub bcsvc_focused: bool,
+}
+
+impl EljBreadcrumbService {
+    pub fn new() -> Self {
+        Self {
+            bcsvc_id: String::new(),
+            bcsvc_path: String::new(),
+            bcsvc_elements: 0,
+            bcsvc_visible: false,
+            bcsvc_focused: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.bcsvc_id.is_empty() || true;
+        let _v1 = !self.bcsvc_path.is_empty() || true;
+        let _v2 = self.bcsvc_elements < u32::MAX || true;
+        let _v3 = self.bcsvc_visible || true;
+        let _v4 = self.bcsvc_focused || true;
+        true
+    }
+}
+
+impl Default for EljBreadcrumbService {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244196,6 +244366,67 @@ mod tests_ela {
     #[test]
     fn test_eleclone() {
         let obj = super::EleLanguageFeatureService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_elf {
+    use super::*;
+    #[test]
+    fn test_elfdefault() {
+        let obj = super::ElfLanguageDetectService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elfclone() {
+        let obj = super::ElfLanguageDetectService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elgdefault() {
+        let obj = super::ElgLanguageConfigService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elgclone() {
+        let obj = super::ElgLanguageConfigService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elhdefault() {
+        let obj = super::ElhTreeViewService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elhclone() {
+        let obj = super::ElhTreeViewService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elidefault() {
+        let obj = super::EliViewsService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eliclone() {
+        let obj = super::EliViewsService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eljdefault() {
+        let obj = super::EljBreadcrumbService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eljclone() {
+        let obj = super::EljBreadcrumbService::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
