@@ -51496,3 +51496,398 @@ mod bam_tests {
         assert_eq!(BamFsEventType::Deleted.label(), "deleted");
     }
 }
+
+
+// --- ban_: Editor problem/diagnostics panel model ---
+
+/// Diagnostic severity level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum BanDiagSeverity {
+    Error,
+    Warning,
+    Info,
+    Hint,
+}
+
+impl BanDiagSeverity {
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Self::Error => "\u{2717}",
+            Self::Warning => "\u{26a0}",
+            Self::Info => "\u{2139}",
+            Self::Hint => "\u{1f4a1}",
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Error => "Error",
+            Self::Warning => "Warning",
+            Self::Info => "Information",
+            Self::Hint => "Hint",
+        }
+    }
+}
+
+/// A single diagnostic within a file.
+#[derive(Debug, Clone)]
+pub struct BanDiagnostic {
+    pub severity: BanDiagSeverity,
+    pub message: String,
+    pub source: Option<String>,
+    pub code: Option<String>,
+    pub line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub related_info: Vec<BanRelatedInfo>,
+    pub tags: Vec<BanDiagTag>,
+}
+
+/// Tag modifying diagnostic display.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BanDiagTag {
+    Unnecessary,
+    Deprecated,
+}
+
+/// Related information for a diagnostic.
+#[derive(Debug, Clone)]
+pub struct BanRelatedInfo {
+    pub path: String,
+    pub line: u32,
+    pub column: u32,
+    pub message: String,
+}
+
+impl BanRelatedInfo {
+    pub fn new(path: &str, line: u32, col: u32, msg: &str) -> Self {
+        Self { path: path.to_string(), line, column: col, message: msg.to_string() }
+    }
+}
+
+impl BanDiagnostic {
+    pub fn new(severity: BanDiagSeverity, message: &str, line: u32, start_col: u32) -> Self {
+        Self {
+            severity,
+            message: message.to_string(),
+            source: None,
+            code: None,
+            line,
+            start_col,
+            end_line: line,
+            end_col: start_col + 1,
+            related_info: Vec::new(),
+            tags: Vec::new(),
+        }
+    }
+
+    pub fn with_source(mut self, source: &str) -> Self {
+        self.source = Some(source.to_string());
+        self
+    }
+
+    pub fn with_code(mut self, code: &str) -> Self {
+        self.code = Some(code.to_string());
+        self
+    }
+
+    pub fn with_end(mut self, end_line: u32, end_col: u32) -> Self {
+        self.end_line = end_line;
+        self.end_col = end_col;
+        self
+    }
+
+    pub fn with_tag(mut self, tag: BanDiagTag) -> Self {
+        self.tags.push(tag);
+        self
+    }
+
+    pub fn is_multiline(&self) -> bool {
+        self.end_line > self.line
+    }
+
+    pub fn is_deprecated(&self) -> bool {
+        self.tags.contains(&BanDiagTag::Deprecated)
+    }
+
+    pub fn is_unnecessary(&self) -> bool {
+        self.tags.contains(&BanDiagTag::Unnecessary)
+    }
+
+    pub fn location_string(&self) -> String {
+        format!("[Ln {}, Col {}]", self.line + 1, self.start_col + 1)
+    }
+}
+
+/// Diagnostics for a single file.
+#[derive(Debug, Clone)]
+pub struct BanFileDiagnostics {
+    pub file_path: String,
+    pub diagnostics: Vec<BanDiagnostic>,
+}
+
+impl BanFileDiagnostics {
+    pub fn new(path: &str) -> Self {
+        Self { file_path: path.to_string(), diagnostics: Vec::new() }
+    }
+
+    pub fn add(&mut self, diag: BanDiagnostic) {
+        self.diagnostics.push(diag);
+    }
+
+    pub fn error_count(&self) -> usize {
+        self.diagnostics.iter().filter(|d| d.severity == BanDiagSeverity::Error).count()
+    }
+
+    pub fn warning_count(&self) -> usize {
+        self.diagnostics.iter().filter(|d| d.severity == BanDiagSeverity::Warning).count()
+    }
+
+    pub fn total(&self) -> usize {
+        self.diagnostics.len()
+    }
+
+    pub fn at_line(&self, line: u32) -> Vec<&BanDiagnostic> {
+        self.diagnostics.iter().filter(|d| d.line == line).collect()
+    }
+
+    pub fn sort_by_severity(&mut self) {
+        self.diagnostics.sort_by_key(|d| d.severity);
+    }
+
+    pub fn sort_by_line(&mut self) {
+        self.diagnostics.sort_by_key(|d| (d.line, d.start_col));
+    }
+
+    pub fn filename(&self) -> &str {
+        self.file_path.rsplit('/').next().unwrap_or(&self.file_path)
+    }
+}
+
+/// The problems panel model.
+#[derive(Debug, Clone)]
+pub struct BanProblemsPanel {
+    pub files: Vec<BanFileDiagnostics>,
+    pub filter_text: Option<String>,
+    pub show_errors: bool,
+    pub show_warnings: bool,
+    pub show_infos: bool,
+    pub active_file: Option<usize>,
+}
+
+impl BanProblemsPanel {
+    pub fn new() -> Self {
+        Self {
+            files: Vec::new(),
+            filter_text: None,
+            show_errors: true,
+            show_warnings: true,
+            show_infos: true,
+            active_file: None,
+        }
+    }
+
+    pub fn set_diagnostics(&mut self, path: &str, diagnostics: Vec<BanDiagnostic>) {
+        if let Some(fd) = self.files.iter_mut().find(|f| f.file_path == path) {
+            fd.diagnostics = diagnostics;
+        } else {
+            let mut fd = BanFileDiagnostics::new(path);
+            fd.diagnostics = diagnostics;
+            self.files.push(fd);
+        }
+        // Remove empty files
+        self.files.retain(|f| !f.diagnostics.is_empty());
+    }
+
+    pub fn clear_file(&mut self, path: &str) {
+        self.files.retain(|f| f.file_path != path);
+    }
+
+    pub fn clear_all(&mut self) {
+        self.files.clear();
+    }
+
+    pub fn total_errors(&self) -> usize {
+        self.files.iter().map(|f| f.error_count()).sum()
+    }
+
+    pub fn total_warnings(&self) -> usize {
+        self.files.iter().map(|f| f.warning_count()).sum()
+    }
+
+    pub fn total_diagnostics(&self) -> usize {
+        self.files.iter().map(|f| f.total()).sum()
+    }
+
+    pub fn file_count(&self) -> usize {
+        self.files.len()
+    }
+
+    pub fn filtered_files(&self) -> Vec<&BanFileDiagnostics> {
+        self.files.iter().filter(|f| {
+            if let Some(filter) = &self.filter_text {
+                let fl = filter.to_lowercase();
+                f.file_path.to_lowercase().contains(&fl) ||
+                f.diagnostics.iter().any(|d| d.message.to_lowercase().contains(&fl))
+            } else {
+                true
+            }
+        }).collect()
+    }
+
+    pub fn set_filter(&mut self, text: Option<String>) {
+        self.filter_text = text;
+    }
+
+    pub fn status_bar_text(&self) -> String {
+        let e = self.total_errors();
+        let w = self.total_warnings();
+        format!("{} {} {}", BanDiagSeverity::Error.icon(), e, w)
+    }
+
+    pub fn diagnostics_for(&self, path: &str) -> Option<&BanFileDiagnostics> {
+        self.files.iter().find(|f| f.file_path == path)
+    }
+}
+
+#[cfg(test)]
+mod ban_tests {
+    use super::*;
+
+    #[test]
+    fn test_ban_severity_ordering() {
+        assert!(BanDiagSeverity::Error < BanDiagSeverity::Warning);
+        assert!(BanDiagSeverity::Warning < BanDiagSeverity::Info);
+    }
+
+    #[test]
+    fn test_ban_diagnostic_creation() {
+        let d = BanDiagnostic::new(BanDiagSeverity::Error, "expected ';'", 10, 5)
+            .with_source("rustc")
+            .with_code("E0001")
+            .with_end(10, 20);
+        assert_eq!(d.source.as_deref(), Some("rustc"));
+        assert_eq!(d.code.as_deref(), Some("E0001"));
+        assert!(!d.is_multiline());
+        assert_eq!(d.location_string(), "[Ln 11, Col 6]");
+    }
+
+    #[test]
+    fn test_ban_diagnostic_tags() {
+        let d = BanDiagnostic::new(BanDiagSeverity::Hint, "unused", 5, 0)
+            .with_tag(BanDiagTag::Unnecessary);
+        assert!(d.is_unnecessary());
+        assert!(!d.is_deprecated());
+    }
+
+    #[test]
+    fn test_ban_diagnostic_multiline() {
+        let d = BanDiagnostic::new(BanDiagSeverity::Error, "block error", 5, 0)
+            .with_end(10, 5);
+        assert!(d.is_multiline());
+    }
+
+    #[test]
+    fn test_ban_file_diagnostics() {
+        let mut fd = BanFileDiagnostics::new("src/main.rs");
+        fd.add(BanDiagnostic::new(BanDiagSeverity::Error, "err1", 1, 0));
+        fd.add(BanDiagnostic::new(BanDiagSeverity::Warning, "warn1", 5, 0));
+        fd.add(BanDiagnostic::new(BanDiagSeverity::Error, "err2", 10, 0));
+
+        assert_eq!(fd.error_count(), 2);
+        assert_eq!(fd.warning_count(), 1);
+        assert_eq!(fd.total(), 3);
+        assert_eq!(fd.filename(), "main.rs");
+    }
+
+    #[test]
+    fn test_ban_file_diagnostics_at_line() {
+        let mut fd = BanFileDiagnostics::new("test.rs");
+        fd.add(BanDiagnostic::new(BanDiagSeverity::Error, "a", 5, 0));
+        fd.add(BanDiagnostic::new(BanDiagSeverity::Warning, "b", 5, 10));
+        fd.add(BanDiagnostic::new(BanDiagSeverity::Error, "c", 10, 0));
+        assert_eq!(fd.at_line(5).len(), 2);
+    }
+
+    #[test]
+    fn test_ban_file_sort() {
+        let mut fd = BanFileDiagnostics::new("test.rs");
+        fd.add(BanDiagnostic::new(BanDiagSeverity::Warning, "w", 10, 0));
+        fd.add(BanDiagnostic::new(BanDiagSeverity::Error, "e", 5, 0));
+        fd.sort_by_severity();
+        assert_eq!(fd.diagnostics[0].severity, BanDiagSeverity::Error);
+
+        fd.sort_by_line();
+        assert_eq!(fd.diagnostics[0].line, 5);
+    }
+
+    #[test]
+    fn test_ban_panel_set_diagnostics() {
+        let mut panel = BanProblemsPanel::new();
+        panel.set_diagnostics("a.rs", vec![
+            BanDiagnostic::new(BanDiagSeverity::Error, "err", 1, 0),
+        ]);
+        assert_eq!(panel.file_count(), 1);
+        assert_eq!(panel.total_errors(), 1);
+
+        // Update
+        panel.set_diagnostics("a.rs", vec![
+            BanDiagnostic::new(BanDiagSeverity::Warning, "warn", 1, 0),
+        ]);
+        assert_eq!(panel.total_errors(), 0);
+        assert_eq!(panel.total_warnings(), 1);
+    }
+
+    #[test]
+    fn test_ban_panel_clear() {
+        let mut panel = BanProblemsPanel::new();
+        panel.set_diagnostics("a.rs", vec![
+            BanDiagnostic::new(BanDiagSeverity::Error, "err", 1, 0),
+        ]);
+        panel.clear_file("a.rs");
+        assert_eq!(panel.file_count(), 0);
+    }
+
+    #[test]
+    fn test_ban_panel_filter() {
+        let mut panel = BanProblemsPanel::new();
+        panel.set_diagnostics("a.rs", vec![
+            BanDiagnostic::new(BanDiagSeverity::Error, "missing semicolon", 1, 0),
+        ]);
+        panel.set_diagnostics("b.rs", vec![
+            BanDiagnostic::new(BanDiagSeverity::Warning, "unused variable", 1, 0),
+        ]);
+
+        panel.set_filter(Some("semicolon".to_string()));
+        assert_eq!(panel.filtered_files().len(), 1);
+    }
+
+    #[test]
+    fn test_ban_panel_status() {
+        let mut panel = BanProblemsPanel::new();
+        panel.set_diagnostics("a.rs", vec![
+            BanDiagnostic::new(BanDiagSeverity::Error, "e", 1, 0),
+            BanDiagnostic::new(BanDiagSeverity::Warning, "w", 2, 0),
+        ]);
+        let status = panel.status_bar_text();
+        assert!(status.contains("1"));
+    }
+
+    #[test]
+    fn test_ban_related_info() {
+        let ri = BanRelatedInfo::new("other.rs", 5, 10, "defined here");
+        assert_eq!(ri.path, "other.rs");
+        assert_eq!(ri.line, 5);
+    }
+
+    #[test]
+    fn test_ban_panel_empty_removal() {
+        let mut panel = BanProblemsPanel::new();
+        panel.set_diagnostics("a.rs", vec![
+            BanDiagnostic::new(BanDiagSeverity::Error, "e", 1, 0),
+        ]);
+        panel.set_diagnostics("a.rs", vec![]); // Clear by setting empty
+        assert_eq!(panel.file_count(), 0);
+    }
+}
