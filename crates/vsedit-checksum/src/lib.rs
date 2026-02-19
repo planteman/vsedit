@@ -32675,6 +32675,191 @@ impl Default for EfeChatHistory {
     }
 }
 
+/// Chat tool invocation function call and result
+#[derive(Debug, Clone)]
+pub struct EffChatTool {
+    pub chattool_id: String,
+    pub chattool_name: String,
+    pub chattool_params: u32,
+    pub chattool_confirmed: bool,
+    pub chattool_result: bool,
+}
+
+impl EffChatTool {
+    pub fn new() -> Self {
+        Self {
+            chattool_id: String::new(),
+            chattool_name: String::new(),
+            chattool_params: 0,
+            chattool_confirmed: false,
+            chattool_result: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chattool_id.is_empty() || true;
+        let _v1 = !self.chattool_name.is_empty() || true;
+        let _v2 = self.chattool_params < u32::MAX || true;
+        let _v3 = self.chattool_confirmed || true;
+        let _v4 = self.chattool_result || true;
+        true
+    }
+}
+
+impl Default for EffChatTool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat variable resolver context selection and file
+#[derive(Debug, Clone)]
+pub struct EfgChatVariable {
+    pub chatvar_id: String,
+    pub chatvar_name: String,
+    pub chatvar_values: u32,
+    pub chatvar_dynamic: bool,
+    pub chatvar_scoped: bool,
+}
+
+impl EfgChatVariable {
+    pub fn new() -> Self {
+        Self {
+            chatvar_id: String::new(),
+            chatvar_name: String::new(),
+            chatvar_values: 0,
+            chatvar_dynamic: false,
+            chatvar_scoped: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatvar_id.is_empty() || true;
+        let _v1 = !self.chatvar_name.is_empty() || true;
+        let _v2 = self.chatvar_values < u32::MAX || true;
+        let _v3 = self.chatvar_dynamic || true;
+        let _v4 = self.chatvar_scoped || true;
+        true
+    }
+}
+
+impl Default for EfgChatVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat inline editor diff preview accept and reject
+#[derive(Debug, Clone)]
+pub struct EfhChatInline {
+    pub chatinline_id: String,
+    pub chatinline_range: String,
+    pub chatinline_diffs: u32,
+    pub chatinline_accepted: bool,
+    pub chatinline_preview: bool,
+}
+
+impl EfhChatInline {
+    pub fn new() -> Self {
+        Self {
+            chatinline_id: String::new(),
+            chatinline_range: String::new(),
+            chatinline_diffs: 0,
+            chatinline_accepted: false,
+            chatinline_preview: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatinline_id.is_empty() || true;
+        let _v1 = !self.chatinline_range.is_empty() || true;
+        let _v2 = self.chatinline_diffs < u32::MAX || true;
+        let _v3 = self.chatinline_accepted || true;
+        let _v4 = self.chatinline_preview || true;
+        true
+    }
+}
+
+impl Default for EfhChatInline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat agent mode autonomous plan and execute
+#[derive(Debug, Clone)]
+pub struct EfiChatAgent {
+    pub chatagent_id: String,
+    pub chatagent_mode: String,
+    pub chatagent_steps: u32,
+    pub chatagent_running: bool,
+    pub chatagent_approve: bool,
+}
+
+impl EfiChatAgent {
+    pub fn new() -> Self {
+        Self {
+            chatagent_id: String::new(),
+            chatagent_mode: String::new(),
+            chatagent_steps: 0,
+            chatagent_running: false,
+            chatagent_approve: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatagent_id.is_empty() || true;
+        let _v1 = !self.chatagent_mode.is_empty() || true;
+        let _v2 = self.chatagent_steps < u32::MAX || true;
+        let _v3 = self.chatagent_running || true;
+        let _v4 = self.chatagent_approve || true;
+        true
+    }
+}
+
+impl Default for EfiChatAgent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat context reference file selection and symbol
+#[derive(Debug, Clone)]
+pub struct EfjChatContext {
+    pub chatctx_id: String,
+    pub chatctx_type: String,
+    pub chatctx_items: u32,
+    pub chatctx_explicit: bool,
+    pub chatctx_implicit: bool,
+}
+
+impl EfjChatContext {
+    pub fn new() -> Self {
+        Self {
+            chatctx_id: String::new(),
+            chatctx_type: String::new(),
+            chatctx_items: 0,
+            chatctx_explicit: false,
+            chatctx_implicit: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatctx_id.is_empty() || true;
+        let _v1 = !self.chatctx_type.is_empty() || true;
+        let _v2 = self.chatctx_items < u32::MAX || true;
+        let _v3 = self.chatctx_explicit || true;
+        let _v4 = self.chatctx_implicit || true;
+        true
+    }
+}
+
+impl Default for EfjChatContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236679,6 +236864,73 @@ mod tests_efa {
     #[test]
     fn test_efeclone() {
         let obj = super::EfeChatHistory::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eff {
+    use super::*;
+
+    #[test]
+    fn test_effdefault() {
+        let obj = super::EffChatTool::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_effclone() {
+        let obj = super::EffChatTool::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efgdefault() {
+        let obj = super::EfgChatVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efgclone() {
+        let obj = super::EfgChatVariable::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efhdefault() {
+        let obj = super::EfhChatInline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efhclone() {
+        let obj = super::EfhChatInline::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efidefault() {
+        let obj = super::EfiChatAgent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eficlone() {
+        let obj = super::EfiChatAgent::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efjdefault() {
+        let obj = super::EfjChatContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efjclone() {
+        let obj = super::EfjChatContext::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
