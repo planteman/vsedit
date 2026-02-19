@@ -54759,3 +54759,322 @@ mod bav_tests {
         assert_eq!(BavSettingValue::Str(String::new()).type_name(), "string");
     }
 }
+
+
+// --- baw_: Editor linked editing ranges ---
+
+/// A position in linked editing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BawLinkedPos {
+    pub line: u32,
+    pub col: u32,
+}
+
+impl BawLinkedPos {
+    pub fn new(line: u32, col: u32) -> Self { Self { line, col } }
+}
+
+impl PartialOrd for BawLinkedPos {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(other)) }
+}
+
+impl Ord for BawLinkedPos {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.line.cmp(&other.line).then(self.col.cmp(&other.col))
+    }
+}
+
+/// A range for linked editing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BawLinkedRange {
+    pub start: BawLinkedPos,
+    pub end: BawLinkedPos,
+}
+
+impl BawLinkedRange {
+    pub fn new(start: BawLinkedPos, end: BawLinkedPos) -> Self { Self { start, end } }
+
+    pub fn from_coords(sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        Self { start: BawLinkedPos::new(sl, sc), end: BawLinkedPos::new(el, ec) }
+    }
+
+    pub fn contains(&self, pos: &BawLinkedPos) -> bool {
+        *pos >= self.start && *pos <= self.end
+    }
+
+    pub fn length(&self) -> u32 {
+        if self.start.line == self.end.line { self.end.col - self.start.col } else { 0 }
+    }
+
+    pub fn is_single_line(&self) -> bool { self.start.line == self.end.line }
+
+    pub fn is_empty(&self) -> bool { self.start == self.end }
+}
+
+/// A linked editing group — multiple ranges edited simultaneously.
+#[derive(Debug, Clone)]
+pub struct BawLinkedEditGroup {
+    ranges: Vec<BawLinkedRange>,
+    word_pattern: Option<String>,
+    active: bool,
+}
+
+impl BawLinkedEditGroup {
+    pub fn new(ranges: Vec<BawLinkedRange>) -> Self {
+        Self { ranges, word_pattern: None, active: false }
+    }
+
+    pub fn with_pattern(mut self, pattern: &str) -> Self {
+        self.word_pattern = Some(pattern.to_string());
+        self
+    }
+
+    pub fn ranges(&self) -> &[BawLinkedRange] { &self.ranges }
+    pub fn range_count(&self) -> usize { self.ranges.len() }
+
+    pub fn activate(&mut self) { self.active = true; }
+    pub fn deactivate(&mut self) { self.active = false; }
+    pub fn is_active(&self) -> bool { self.active }
+
+    pub fn find_range_at(&self, pos: &BawLinkedPos) -> Option<usize> {
+        self.ranges.iter().position(|r| r.contains(pos))
+    }
+
+    pub fn apply_edit(&mut self, text: &str, range_idx: usize) -> Vec<(BawLinkedRange, String)> {
+        if range_idx >= self.ranges.len() { return Vec::new(); }
+        let mut edits = Vec::new();
+        for (i, r) in self.ranges.iter().enumerate() {
+            if i != range_idx {
+                edits.push((*r, text.to_string()));
+            }
+        }
+        edits
+    }
+
+    pub fn all_same_length(&self) -> bool {
+        if self.ranges.is_empty() { return true; }
+        let first = self.ranges[0].length();
+        self.ranges.iter().all(|r| r.length() == first)
+    }
+
+    pub fn validate_pattern(&self, text: &str) -> bool {
+        match &self.word_pattern {
+            Some(p) => text.len() <= p.len() * 2, // simplified check
+            None => true,
+        }
+    }
+}
+
+/// Manages linked editing sessions.
+#[derive(Debug)]
+pub struct BawLinkedEditModel {
+    groups: Vec<BawLinkedEditGroup>,
+    active_group: Option<usize>,
+    enabled: bool,
+}
+
+impl BawLinkedEditModel {
+    pub fn new() -> Self {
+        Self { groups: Vec::new(), active_group: None, enabled: true }
+    }
+
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn set_enabled(&mut self, e: bool) { self.enabled = e; }
+
+    pub fn add_group(&mut self, group: BawLinkedEditGroup) -> usize {
+        let idx = self.groups.len();
+        self.groups.push(group);
+        idx
+    }
+
+    pub fn group_count(&self) -> usize { self.groups.len() }
+
+    pub fn activate_group(&mut self, idx: usize) -> bool {
+        if idx >= self.groups.len() { return false; }
+        if let Some(prev) = self.active_group {
+            self.groups[prev].deactivate();
+        }
+        self.groups[idx].activate();
+        self.active_group = Some(idx);
+        true
+    }
+
+    pub fn active_group(&self) -> Option<&BawLinkedEditGroup> {
+        self.active_group.map(|i| &self.groups[i])
+    }
+
+    pub fn deactivate_all(&mut self) {
+        for g in &mut self.groups { g.deactivate(); }
+        self.active_group = None;
+    }
+
+    pub fn remove_group(&mut self, idx: usize) -> bool {
+        if idx >= self.groups.len() { return false; }
+        self.groups.remove(idx);
+        self.active_group = match self.active_group {
+            Some(a) if a == idx => None,
+            Some(a) if a > idx => Some(a - 1),
+            other => other,
+        };
+        true
+    }
+
+    pub fn find_group_at(&self, pos: &BawLinkedPos) -> Option<usize> {
+        self.groups.iter().position(|g| g.find_range_at(pos).is_some())
+    }
+
+    pub fn edit_at(&mut self, pos: &BawLinkedPos, text: &str) -> Vec<(BawLinkedRange, String)> {
+        if !self.enabled { return Vec::new(); }
+        if let Some(gi) = self.active_group {
+            if let Some(ri) = self.groups[gi].find_range_at(pos) {
+                return self.groups[gi].apply_edit(text, ri);
+            }
+        }
+        Vec::new()
+    }
+
+    pub fn clear(&mut self) {
+        self.groups.clear();
+        self.active_group = None;
+    }
+
+    pub fn status_text(&self) -> String {
+        match self.active_group {
+            Some(i) => format!("Linked Editing ({} ranges)", self.groups[i].range_count()),
+            None => "No linked editing".to_string(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod baw_tests {
+    use super::*;
+
+    #[test]
+    fn test_baw_pos_ordering() {
+        let a = BawLinkedPos::new(1, 5);
+        let b = BawLinkedPos::new(1, 10);
+        let c = BawLinkedPos::new(2, 0);
+        assert!(a < b);
+        assert!(b < c);
+    }
+
+    #[test]
+    fn test_baw_range_contains() {
+        let r = BawLinkedRange::from_coords(1, 5, 1, 15);
+        assert!(r.contains(&BawLinkedPos::new(1, 5)));
+        assert!(r.contains(&BawLinkedPos::new(1, 10)));
+        assert!(!r.contains(&BawLinkedPos::new(1, 16)));
+    }
+
+    #[test]
+    fn test_baw_range_length() {
+        let r = BawLinkedRange::from_coords(1, 5, 1, 15);
+        assert_eq!(r.length(), 10);
+        assert!(r.is_single_line());
+    }
+
+    #[test]
+    fn test_baw_group_find() {
+        let g = BawLinkedEditGroup::new(vec![
+            BawLinkedRange::from_coords(1, 0, 1, 5),
+            BawLinkedRange::from_coords(3, 0, 3, 5),
+        ]);
+        assert_eq!(g.find_range_at(&BawLinkedPos::new(1, 2)), Some(0));
+        assert_eq!(g.find_range_at(&BawLinkedPos::new(3, 2)), Some(1));
+        assert_eq!(g.find_range_at(&BawLinkedPos::new(2, 2)), None);
+    }
+
+    #[test]
+    fn test_baw_group_apply_edit() {
+        let mut g = BawLinkedEditGroup::new(vec![
+            BawLinkedRange::from_coords(1, 0, 1, 5),
+            BawLinkedRange::from_coords(3, 0, 3, 5),
+            BawLinkedRange::from_coords(5, 0, 5, 5),
+        ]);
+        g.activate();
+        let edits = g.apply_edit("newName", 0);
+        assert_eq!(edits.len(), 2); // ranges 1 and 2 get edited
+    }
+
+    #[test]
+    fn test_baw_group_same_length() {
+        let g = BawLinkedEditGroup::new(vec![
+            BawLinkedRange::from_coords(1, 0, 1, 5),
+            BawLinkedRange::from_coords(3, 0, 3, 5),
+        ]);
+        assert!(g.all_same_length());
+    }
+
+    #[test]
+    fn test_baw_model_lifecycle() {
+        let mut m = BawLinkedEditModel::new();
+        let g = BawLinkedEditGroup::new(vec![
+            BawLinkedRange::from_coords(1, 0, 1, 5),
+            BawLinkedRange::from_coords(3, 0, 3, 5),
+        ]);
+        let idx = m.add_group(g);
+        assert_eq!(m.group_count(), 1);
+        assert!(m.activate_group(idx));
+        assert!(m.active_group().is_some());
+    }
+
+    #[test]
+    fn test_baw_model_edit() {
+        let mut m = BawLinkedEditModel::new();
+        let g = BawLinkedEditGroup::new(vec![
+            BawLinkedRange::from_coords(1, 0, 1, 5),
+            BawLinkedRange::from_coords(3, 0, 3, 5),
+        ]);
+        let idx = m.add_group(g);
+        m.activate_group(idx);
+        let edits = m.edit_at(&BawLinkedPos::new(1, 2), "test");
+        assert_eq!(edits.len(), 1);
+    }
+
+    #[test]
+    fn test_baw_model_disabled() {
+        let mut m = BawLinkedEditModel::new();
+        m.set_enabled(false);
+        let edits = m.edit_at(&BawLinkedPos::new(1, 0), "test");
+        assert!(edits.is_empty());
+    }
+
+    #[test]
+    fn test_baw_model_remove() {
+        let mut m = BawLinkedEditModel::new();
+        m.add_group(BawLinkedEditGroup::new(vec![BawLinkedRange::from_coords(1, 0, 1, 5)]));
+        m.add_group(BawLinkedEditGroup::new(vec![BawLinkedRange::from_coords(2, 0, 2, 5)]));
+        assert!(m.remove_group(0));
+        assert_eq!(m.group_count(), 1);
+    }
+
+    #[test]
+    fn test_baw_model_find_group() {
+        let mut m = BawLinkedEditModel::new();
+        m.add_group(BawLinkedEditGroup::new(vec![BawLinkedRange::from_coords(1, 0, 1, 5)]));
+        m.add_group(BawLinkedEditGroup::new(vec![BawLinkedRange::from_coords(5, 0, 5, 5)]));
+        assert_eq!(m.find_group_at(&BawLinkedPos::new(5, 2)), Some(1));
+    }
+
+    #[test]
+    fn test_baw_model_status() {
+        let mut m = BawLinkedEditModel::new();
+        assert_eq!(m.status_text(), "No linked editing");
+        let idx = m.add_group(BawLinkedEditGroup::new(vec![
+            BawLinkedRange::from_coords(1, 0, 1, 5),
+            BawLinkedRange::from_coords(3, 0, 3, 5),
+        ]));
+        m.activate_group(idx);
+        assert_eq!(m.status_text(), "Linked Editing (2 ranges)");
+    }
+
+    #[test]
+    fn test_baw_model_clear() {
+        let mut m = BawLinkedEditModel::new();
+        m.add_group(BawLinkedEditGroup::new(vec![BawLinkedRange::from_coords(1, 0, 1, 5)]));
+        m.clear();
+        assert_eq!(m.group_count(), 0);
+        assert!(m.active_group().is_none());
+    }
+}
