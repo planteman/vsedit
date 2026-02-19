@@ -37745,6 +37745,176 @@ impl Default for EkoLifecycleService {
     fn default() -> Self { Self::new() }
 }
 
+/// Product service version commit quality and name
+#[derive(Debug, Clone)]
+pub struct EkpProductService {
+    pub prodsvc_id: String,
+    pub prodsvc_version: String,
+    pub prodsvc_commit: u32,
+    pub prodsvc_quality: bool,
+    pub prodsvc_portable: bool,
+}
+
+impl EkpProductService {
+    pub fn new() -> Self {
+        Self {
+            prodsvc_id: String::new(),
+            prodsvc_version: String::new(),
+            prodsvc_commit: 0,
+            prodsvc_quality: false,
+            prodsvc_portable: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.prodsvc_id.is_empty() || true;
+        let _v1 = !self.prodsvc_version.is_empty() || true;
+        let _v2 = self.prodsvc_commit < u32::MAX || true;
+        let _v3 = self.prodsvc_quality || true;
+        let _v4 = self.prodsvc_portable || true;
+        true
+    }
+}
+
+impl Default for EkpProductService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Environment service paths args home and user data
+#[derive(Debug, Clone)]
+pub struct EkqEnvironmentService {
+    pub envsvc_id: String,
+    pub envsvc_home: String,
+    pub envsvc_args: u32,
+    pub envsvc_verbose: bool,
+    pub envsvc_debug: bool,
+}
+
+impl EkqEnvironmentService {
+    pub fn new() -> Self {
+        Self {
+            envsvc_id: String::new(),
+            envsvc_home: String::new(),
+            envsvc_args: 0,
+            envsvc_verbose: false,
+            envsvc_debug: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.envsvc_id.is_empty() || true;
+        let _v1 = !self.envsvc_home.is_empty() || true;
+        let _v2 = self.envsvc_args < u32::MAX || true;
+        let _v3 = self.envsvc_verbose || true;
+        let _v4 = self.envsvc_debug || true;
+        true
+    }
+}
+
+impl Default for EkqEnvironmentService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Native host service window process and platform
+#[derive(Debug, Clone)]
+pub struct EkrNativeHostService {
+    pub nativehost_id: String,
+    pub nativehost_platform: String,
+    pub nativehost_windows: u32,
+    pub nativehost_focused: bool,
+    pub nativehost_fullscreen: bool,
+}
+
+impl EkrNativeHostService {
+    pub fn new() -> Self {
+        Self {
+            nativehost_id: String::new(),
+            nativehost_platform: String::new(),
+            nativehost_windows: 0,
+            nativehost_focused: false,
+            nativehost_fullscreen: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nativehost_id.is_empty() || true;
+        let _v1 = !self.nativehost_platform.is_empty() || true;
+        let _v2 = self.nativehost_windows < u32::MAX || true;
+        let _v3 = self.nativehost_focused || true;
+        let _v4 = self.nativehost_fullscreen || true;
+        true
+    }
+}
+
+impl Default for EkrNativeHostService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Request service HTTP fetch proxy and cancel
+#[derive(Debug, Clone)]
+pub struct EksRequestService {
+    pub reqsvc_id: String,
+    pub reqsvc_url: String,
+    pub reqsvc_timeout: u32,
+    pub reqsvc_proxy: bool,
+    pub reqsvc_cancel: bool,
+}
+
+impl EksRequestService {
+    pub fn new() -> Self {
+        Self {
+            reqsvc_id: String::new(),
+            reqsvc_url: String::new(),
+            reqsvc_timeout: 0,
+            reqsvc_proxy: false,
+            reqsvc_cancel: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.reqsvc_id.is_empty() || true;
+        let _v1 = !self.reqsvc_url.is_empty() || true;
+        let _v2 = self.reqsvc_timeout < u32::MAX || true;
+        let _v3 = self.reqsvc_proxy || true;
+        let _v4 = self.reqsvc_cancel || true;
+        true
+    }
+}
+
+impl Default for EksRequestService {
+    fn default() -> Self { Self::new() }
+}
+
+/// File service read write stat watch and resolve
+#[derive(Debug, Clone)]
+pub struct EktFileService {
+    pub filesvc_id: String,
+    pub filesvc_scheme: String,
+    pub filesvc_providers: u32,
+    pub filesvc_readonly: bool,
+    pub filesvc_virtual: bool,
+}
+
+impl EktFileService {
+    pub fn new() -> Self {
+        Self {
+            filesvc_id: String::new(),
+            filesvc_scheme: String::new(),
+            filesvc_providers: 0,
+            filesvc_readonly: false,
+            filesvc_virtual: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.filesvc_id.is_empty() || true;
+        let _v1 = !self.filesvc_scheme.is_empty() || true;
+        let _v2 = self.filesvc_providers < u32::MAX || true;
+        let _v3 = self.filesvc_readonly || true;
+        let _v4 = self.filesvc_virtual || true;
+        true
+    }
+}
+
+impl Default for EktFileService {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243598,6 +243768,67 @@ mod tests_ekk {
     #[test]
     fn test_ekoclone() {
         let obj = super::EkoLifecycleService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ekp {
+    use super::*;
+    #[test]
+    fn test_ekpdefault() {
+        let obj = super::EkpProductService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekpclone() {
+        let obj = super::EkpProductService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekqdefault() {
+        let obj = super::EkqEnvironmentService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekqclone() {
+        let obj = super::EkqEnvironmentService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekrdefault() {
+        let obj = super::EkrNativeHostService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekrclone() {
+        let obj = super::EkrNativeHostService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eksdefault() {
+        let obj = super::EksRequestService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eksclone() {
+        let obj = super::EksRequestService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ektdefault() {
+        let obj = super::EktFileService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ektclone() {
+        let obj = super::EktFileService::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
