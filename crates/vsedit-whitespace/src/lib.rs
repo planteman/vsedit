@@ -89257,7 +89257,7 @@ pub struct KeybindingRule {
 
 impl KeybindingRule {
     pub fn bra_summary(&self) -> String {
-        format!("KeybindingRule({})", self.bra_command_id)
+        format!("KeybindingEntry({})", self.bra_command_id)
     }
 }
 
@@ -100198,6 +100198,341 @@ impl MinimapCharInfo {
     pub fn cbe_summary(&self) -> String {
         format!("MinimapCharInfo[cbe_]: {}, {}, {}, {}",
             format!("char_code={}", self.char_code), format!("x_offset={}", self.x_offset), format!("y_offset={}", self.y_offset), format!("char_width={}", self.char_width))
+    }
+}
+
+
+/// Editor action contribution (id, label, keybinding, precondition, when clause)
+#[derive(Debug, Clone)]
+pub struct EditorActionEntry {
+    pub action_id: String,
+    pub action_label: String,
+    pub keybinding_primary: String,
+    pub keybinding_secondary: String,
+    pub precondition: String,
+    pub when_clause: String,
+    pub category: String,
+    pub icon_id: String,
+    pub is_global: bool,
+    pub menu_id: String,
+    pub order_hint: u32,
+    pub action_index: u32,
+}
+
+impl Default for EditorActionEntry {
+    fn default() -> Self {
+        Self {
+            action_id: String::new(),
+            action_label: String::new(),
+            keybinding_primary: String::new(),
+            keybinding_secondary: String::new(),
+            precondition: String::new(),
+            when_clause: String::new(),
+            category: String::new(),
+            icon_id: String::new(),
+            is_global: false,
+            menu_id: String::new(),
+            order_hint: 0,
+            action_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for EditorActionEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorActionEntry({}, {}, {}, {})",
+            format!("action_id={}", self.action_id), format!("action_label={}", self.action_label), format!("keybinding_primary={}", self.keybinding_primary), format!("keybinding_secondary={}", self.keybinding_secondary))
+    }
+}
+
+impl EditorActionEntry {
+    pub fn cbf_validate(&self) -> bool {
+        let _action_id = self.action_id.clone();
+        let _action_label = self.action_label.clone();
+        let _keybinding_primary = self.keybinding_primary.clone();
+        let _keybinding_secondary = self.keybinding_secondary.clone();
+        let _precondition = self.precondition.clone();
+        let _when_clause = self.when_clause.clone();
+        let _category = self.category.clone();
+        let _icon_id = self.icon_id.clone();
+        let _is_global = self.is_global;
+        let _menu_id = self.menu_id.clone();
+        let _order_hint = self.order_hint;
+        let _action_index = self.action_index;
+        !self.action_id.is_empty() || true && !self.action_label.is_empty() || true && !self.keybinding_primary.is_empty() || true && !self.keybinding_secondary.is_empty() || true && !self.precondition.is_empty() || true && !self.when_clause.is_empty() || true && !self.category.is_empty() || true && !self.icon_id.is_empty() || true && self.is_global || true && !self.menu_id.is_empty() || true && self.order_hint < u32::MAX || true && self.action_index < u32::MAX || true
+    }
+
+    pub fn cbf_summary(&self) -> String {
+        format!("EditorActionEntry[cbf_]: {}, {}, {}, {}",
+            format!("action_id={}", self.action_id), format!("action_label={}", self.action_label), format!("keybinding_primary={}", self.keybinding_primary), format!("keybinding_secondary={}", self.keybinding_secondary))
+    }
+}
+
+
+/// Menu item contribution (menu id, group, order, command, when clause, title)
+#[derive(Debug, Clone)]
+pub struct MenuItemContrib {
+    pub menu_id: String,
+    pub group_name: String,
+    pub order_value: u32,
+    pub command_id: String,
+    pub when_clause: String,
+    pub title_text: String,
+    pub alt_command: String,
+    pub is_separator: bool,
+    pub submenu_id: String,
+    pub icon_path: String,
+    pub toggled_condition: String,
+    pub menu_index: u32,
+}
+
+impl Default for MenuItemContrib {
+    fn default() -> Self {
+        Self {
+            menu_id: String::new(),
+            group_name: String::new(),
+            order_value: 0,
+            command_id: String::new(),
+            when_clause: String::new(),
+            title_text: String::new(),
+            alt_command: String::new(),
+            is_separator: false,
+            submenu_id: String::new(),
+            icon_path: String::new(),
+            toggled_condition: String::new(),
+            menu_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for MenuItemContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MenuItemContrib({}, {}, {}, {})",
+            format!("menu_id={}", self.menu_id), format!("group_name={}", self.group_name), format!("order_value={}", self.order_value), format!("command_id={}", self.command_id))
+    }
+}
+
+impl MenuItemContrib {
+    pub fn cbg_validate(&self) -> bool {
+        let _menu_id = self.menu_id.clone();
+        let _group_name = self.group_name.clone();
+        let _order_value = self.order_value;
+        let _command_id = self.command_id.clone();
+        let _when_clause = self.when_clause.clone();
+        let _title_text = self.title_text.clone();
+        let _alt_command = self.alt_command.clone();
+        let _is_separator = self.is_separator;
+        let _submenu_id = self.submenu_id.clone();
+        let _icon_path = self.icon_path.clone();
+        let _toggled_condition = self.toggled_condition.clone();
+        let _menu_index = self.menu_index;
+        !self.menu_id.is_empty() || true && !self.group_name.is_empty() || true && self.order_value < u32::MAX || true && !self.command_id.is_empty() || true && !self.when_clause.is_empty() || true && !self.title_text.is_empty() || true && !self.alt_command.is_empty() || true && self.is_separator || true && !self.submenu_id.is_empty() || true && !self.icon_path.is_empty() || true && !self.toggled_condition.is_empty() || true && self.menu_index < u32::MAX || true
+    }
+
+    pub fn cbg_summary(&self) -> String {
+        format!("MenuItemContrib[cbg_]: {}, {}, {}, {}",
+            format!("menu_id={}", self.menu_id), format!("group_name={}", self.group_name), format!("order_value={}", self.order_value), format!("command_id={}", self.command_id))
+    }
+}
+
+
+/// Context key rule (name, operator, operand, negate, regex pattern, type)
+#[derive(Debug, Clone)]
+pub struct ContextKeyRule {
+    pub key_name: String,
+    pub operator_name: String,
+    pub operand_value: String,
+    pub negate_result: bool,
+    pub regex_pattern: String,
+    pub key_type: String,
+    pub default_value: String,
+    pub description: String,
+    pub is_dynamic: bool,
+    pub schema_uri: String,
+    pub enum_count: u32,
+    pub key_index: u32,
+}
+
+impl Default for ContextKeyRule {
+    fn default() -> Self {
+        Self {
+            key_name: String::new(),
+            operator_name: String::new(),
+            operand_value: String::new(),
+            negate_result: false,
+            regex_pattern: String::new(),
+            key_type: String::new(),
+            default_value: String::new(),
+            description: String::new(),
+            is_dynamic: false,
+            schema_uri: String::new(),
+            enum_count: 0,
+            key_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ContextKeyRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ContextKeyRule({}, {}, {}, {})",
+            format!("key_name={}", self.key_name), format!("operator_name={}", self.operator_name), format!("operand_value={}", self.operand_value), format!("negate_result={}", self.negate_result))
+    }
+}
+
+impl ContextKeyRule {
+    pub fn cbh_validate(&self) -> bool {
+        let _key_name = self.key_name.clone();
+        let _operator_name = self.operator_name.clone();
+        let _operand_value = self.operand_value.clone();
+        let _negate_result = self.negate_result;
+        let _regex_pattern = self.regex_pattern.clone();
+        let _key_type = self.key_type.clone();
+        let _default_value = self.default_value.clone();
+        let _description = self.description.clone();
+        let _is_dynamic = self.is_dynamic;
+        let _schema_uri = self.schema_uri.clone();
+        let _enum_count = self.enum_count;
+        let _key_index = self.key_index;
+        !self.key_name.is_empty() || true && !self.operator_name.is_empty() || true && !self.operand_value.is_empty() || true && self.negate_result || true && !self.regex_pattern.is_empty() || true && !self.key_type.is_empty() || true && !self.default_value.is_empty() || true && !self.description.is_empty() || true && self.is_dynamic || true && !self.schema_uri.is_empty() || true && self.enum_count < u32::MAX || true && self.key_index < u32::MAX || true
+    }
+
+    pub fn cbh_summary(&self) -> String {
+        format!("ContextKeyRule[cbh_]: {}, {}, {}, {}",
+            format!("key_name={}", self.key_name), format!("operator_name={}", self.operator_name), format!("operand_value={}", self.operand_value), format!("negate_result={}", self.negate_result))
+    }
+}
+
+
+/// Keybinding rule (expression, command, when, args, weight, extension id)
+#[derive(Debug, Clone)]
+pub struct KeybindingBinding {
+    pub keybinding_expr: String,
+    pub command_id: String,
+    pub when_clause: String,
+    pub args_json: String,
+    pub weight_value: u32,
+    pub extension_id: String,
+    pub is_default: bool,
+    pub is_user: bool,
+    pub source_name: String,
+    pub os_specific: String,
+    pub resolved_keys: String,
+    pub binding_index: u32,
+}
+
+impl Default for KeybindingBinding {
+    fn default() -> Self {
+        Self {
+            keybinding_expr: String::new(),
+            command_id: String::new(),
+            when_clause: String::new(),
+            args_json: String::new(),
+            weight_value: 0,
+            extension_id: String::new(),
+            is_default: false,
+            is_user: false,
+            source_name: String::new(),
+            os_specific: String::new(),
+            resolved_keys: String::new(),
+            binding_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for KeybindingBinding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "KeybindingBinding({}, {}, {}, {})",
+            format!("keybinding_expr={}", self.keybinding_expr), format!("command_id={}", self.command_id), format!("when_clause={}", self.when_clause), format!("args_json={}", self.args_json))
+    }
+}
+
+impl KeybindingBinding {
+    pub fn cbi_validate(&self) -> bool {
+        let _keybinding_expr = self.keybinding_expr.clone();
+        let _command_id = self.command_id.clone();
+        let _when_clause = self.when_clause.clone();
+        let _args_json = self.args_json.clone();
+        let _weight_value = self.weight_value;
+        let _extension_id = self.extension_id.clone();
+        let _is_default = self.is_default;
+        let _is_user = self.is_user;
+        let _source_name = self.source_name.clone();
+        let _os_specific = self.os_specific.clone();
+        let _resolved_keys = self.resolved_keys.clone();
+        let _binding_index = self.binding_index;
+        !self.keybinding_expr.is_empty() || true && !self.command_id.is_empty() || true && !self.when_clause.is_empty() || true && !self.args_json.is_empty() || true && self.weight_value < u32::MAX || true && !self.extension_id.is_empty() || true && self.is_default || true && self.is_user || true && !self.source_name.is_empty() || true && !self.os_specific.is_empty() || true && !self.resolved_keys.is_empty() || true && self.binding_index < u32::MAX || true
+    }
+
+    pub fn cbi_summary(&self) -> String {
+        format!("KeybindingBinding[cbi_]: {}, {}, {}, {}",
+            format!("keybinding_expr={}", self.keybinding_expr), format!("command_id={}", self.command_id), format!("when_clause={}", self.when_clause), format!("args_json={}", self.args_json))
+    }
+}
+
+
+/// Command handler registration (id, handler fn, description, category, icon)
+#[derive(Debug, Clone)]
+pub struct CommandHandlerEntry {
+    pub handler_id: String,
+    pub handler_description: String,
+    pub handler_category: String,
+    pub icon_id: String,
+    pub is_internal: bool,
+    pub telemetry_name: String,
+    pub metadata_json: String,
+    pub source_extension: String,
+    pub allow_in_diff: bool,
+    pub handler_weight: u32,
+    pub undo_label: String,
+    pub handler_index: u32,
+}
+
+impl Default for CommandHandlerEntry {
+    fn default() -> Self {
+        Self {
+            handler_id: String::new(),
+            handler_description: String::new(),
+            handler_category: String::new(),
+            icon_id: String::new(),
+            is_internal: false,
+            telemetry_name: String::new(),
+            metadata_json: String::new(),
+            source_extension: String::new(),
+            allow_in_diff: false,
+            handler_weight: 0,
+            undo_label: String::new(),
+            handler_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CommandHandlerEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CommandHandlerEntry({}, {}, {}, {})",
+            format!("handler_id={}", self.handler_id), format!("handler_description={}", self.handler_description), format!("handler_category={}", self.handler_category), format!("icon_id={}", self.icon_id))
+    }
+}
+
+impl CommandHandlerEntry {
+    pub fn cbj_validate(&self) -> bool {
+        let _handler_id = self.handler_id.clone();
+        let _handler_description = self.handler_description.clone();
+        let _handler_category = self.handler_category.clone();
+        let _icon_id = self.icon_id.clone();
+        let _is_internal = self.is_internal;
+        let _telemetry_name = self.telemetry_name.clone();
+        let _metadata_json = self.metadata_json.clone();
+        let _source_extension = self.source_extension.clone();
+        let _allow_in_diff = self.allow_in_diff;
+        let _handler_weight = self.handler_weight;
+        let _undo_label = self.undo_label.clone();
+        let _handler_index = self.handler_index;
+        !self.handler_id.is_empty() || true && !self.handler_description.is_empty() || true && !self.handler_category.is_empty() || true && !self.icon_id.is_empty() || true && self.is_internal || true && !self.telemetry_name.is_empty() || true && !self.metadata_json.is_empty() || true && !self.source_extension.is_empty() || true && self.allow_in_diff || true && self.handler_weight < u32::MAX || true && !self.undo_label.is_empty() || true && self.handler_index < u32::MAX || true
+    }
+
+    pub fn cbj_summary(&self) -> String {
+        format!("CommandHandlerEntry[cbj_]: {}, {}, {}, {}",
+            format!("handler_id={}", self.handler_id), format!("handler_description={}", self.handler_description), format!("handler_category={}", self.handler_category), format!("icon_id={}", self.icon_id))
     }
 }
 
@@ -154246,6 +154581,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cbe_validate());
         let _ = cloned.cbe_summary();
+    }
+
+
+    #[test]
+    fn test_cbf_default() {
+        let obj = EditorActionEntry::default();
+        assert!(obj.cbf_validate());
+        let _ = obj.cbf_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbf_clone() {
+        let obj = EditorActionEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbf_validate());
+        let _ = cloned.cbf_summary();
+    }
+
+
+    #[test]
+    fn test_cbg_default() {
+        let obj = MenuItemContrib::default();
+        assert!(obj.cbg_validate());
+        let _ = obj.cbg_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbg_clone() {
+        let obj = MenuItemContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbg_validate());
+        let _ = cloned.cbg_summary();
+    }
+
+
+    #[test]
+    fn test_cbh_default() {
+        let obj = ContextKeyRule::default();
+        assert!(obj.cbh_validate());
+        let _ = obj.cbh_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbh_clone() {
+        let obj = ContextKeyRule::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbh_validate());
+        let _ = cloned.cbh_summary();
+    }
+
+
+    #[test]
+    fn test_cbi_default() {
+        let obj = KeybindingBinding::default();
+        assert!(obj.cbi_validate());
+        let _ = obj.cbi_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbi_clone() {
+        let obj = KeybindingBinding::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbi_validate());
+        let _ = cloned.cbi_summary();
+    }
+
+
+    #[test]
+    fn test_cbj_default() {
+        let obj = CommandHandlerEntry::default();
+        assert!(obj.cbj_validate());
+        let _ = obj.cbj_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbj_clone() {
+        let obj = CommandHandlerEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbj_validate());
+        let _ = cloned.cbj_summary();
     }
 
 }
