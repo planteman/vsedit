@@ -101524,6 +101524,341 @@ impl IconThemeContrib {
     }
 }
 
+
+/// Snippet contribution (language, path, body, prefix, description, scope)
+#[derive(Debug, Clone)]
+pub struct SnippetContrib {
+    pub snippet_lang: String,
+    pub snippet_path: String,
+    pub snippet_body: String,
+    pub snippet_prefix: String,
+    pub snippet_description: String,
+    pub snippet_scope: String,
+    pub is_builtin: bool,
+    pub is_extension: bool,
+    pub source_ext_id: String,
+    pub snippet_count: u32,
+    pub is_global: bool,
+    pub snippet_index: u32,
+}
+
+impl Default for SnippetContrib {
+    fn default() -> Self {
+        Self {
+            snippet_lang: String::new(),
+            snippet_path: String::new(),
+            snippet_body: String::new(),
+            snippet_prefix: String::new(),
+            snippet_description: String::new(),
+            snippet_scope: String::new(),
+            is_builtin: false,
+            is_extension: false,
+            source_ext_id: String::new(),
+            snippet_count: 0,
+            is_global: false,
+            snippet_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SnippetContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SnippetContrib({}, {}, {}, {})",
+            format!("snippet_lang={}", self.snippet_lang), format!("snippet_path={}", self.snippet_path), format!("snippet_body={}", self.snippet_body), format!("snippet_prefix={}", self.snippet_prefix))
+    }
+}
+
+impl SnippetContrib {
+    pub fn cca_validate(&self) -> bool {
+        let _snippet_lang = self.snippet_lang.clone();
+        let _snippet_path = self.snippet_path.clone();
+        let _snippet_body = self.snippet_body.clone();
+        let _snippet_prefix = self.snippet_prefix.clone();
+        let _snippet_description = self.snippet_description.clone();
+        let _snippet_scope = self.snippet_scope.clone();
+        let _is_builtin = self.is_builtin;
+        let _is_extension = self.is_extension;
+        let _source_ext_id = self.source_ext_id.clone();
+        let _snippet_count = self.snippet_count;
+        let _is_global = self.is_global;
+        let _snippet_index = self.snippet_index;
+        !self.snippet_lang.is_empty() || true && !self.snippet_path.is_empty() || true && !self.snippet_body.is_empty() || true && !self.snippet_prefix.is_empty() || true && !self.snippet_description.is_empty() || true && !self.snippet_scope.is_empty() || true && self.is_builtin || true && self.is_extension || true && !self.source_ext_id.is_empty() || true && self.snippet_count < u32::MAX || true && self.is_global || true && self.snippet_index < u32::MAX || true
+    }
+
+    pub fn cca_summary(&self) -> String {
+        format!("SnippetContrib[cca_]: {}, {}, {}, {}",
+            format!("snippet_lang={}", self.snippet_lang), format!("snippet_path={}", self.snippet_path), format!("snippet_body={}", self.snippet_body), format!("snippet_prefix={}", self.snippet_prefix))
+    }
+}
+
+
+/// Configuration default entry (section, key, value, type, scope, overridable)
+#[derive(Debug, Clone)]
+pub struct ConfigDefaultEntry {
+    pub config_section: String,
+    pub config_key: String,
+    pub config_value: String,
+    pub value_type: String,
+    pub scope_name: String,
+    pub is_overridable: bool,
+    pub deprecation_msg: String,
+    pub markdown_desc: String,
+    pub enum_values: String,
+    pub default_json: String,
+    pub order_hint: u32,
+    pub config_index: u32,
+}
+
+impl Default for ConfigDefaultEntry {
+    fn default() -> Self {
+        Self {
+            config_section: String::new(),
+            config_key: String::new(),
+            config_value: String::new(),
+            value_type: String::new(),
+            scope_name: String::new(),
+            is_overridable: false,
+            deprecation_msg: String::new(),
+            markdown_desc: String::new(),
+            enum_values: String::new(),
+            default_json: String::new(),
+            order_hint: 0,
+            config_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ConfigDefaultEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ConfigDefaultEntry({}, {}, {}, {})",
+            format!("config_section={}", self.config_section), format!("config_key={}", self.config_key), format!("config_value={}", self.config_value), format!("value_type={}", self.value_type))
+    }
+}
+
+impl ConfigDefaultEntry {
+    pub fn ccb_validate(&self) -> bool {
+        let _config_section = self.config_section.clone();
+        let _config_key = self.config_key.clone();
+        let _config_value = self.config_value.clone();
+        let _value_type = self.value_type.clone();
+        let _scope_name = self.scope_name.clone();
+        let _is_overridable = self.is_overridable;
+        let _deprecation_msg = self.deprecation_msg.clone();
+        let _markdown_desc = self.markdown_desc.clone();
+        let _enum_values = self.enum_values.clone();
+        let _default_json = self.default_json.clone();
+        let _order_hint = self.order_hint;
+        let _config_index = self.config_index;
+        !self.config_section.is_empty() || true && !self.config_key.is_empty() || true && !self.config_value.is_empty() || true && !self.value_type.is_empty() || true && !self.scope_name.is_empty() || true && self.is_overridable || true && !self.deprecation_msg.is_empty() || true && !self.markdown_desc.is_empty() || true && !self.enum_values.is_empty() || true && !self.default_json.is_empty() || true && self.order_hint < u32::MAX || true && self.config_index < u32::MAX || true
+    }
+
+    pub fn ccb_summary(&self) -> String {
+        format!("ConfigDefaultEntry[ccb_]: {}, {}, {}, {}",
+            format!("config_section={}", self.config_section), format!("config_key={}", self.config_key), format!("config_value={}", self.config_value), format!("value_type={}", self.value_type))
+    }
+}
+
+
+/// View container contribution (id, title, icon, location, order, when)
+#[derive(Debug, Clone)]
+pub struct ViewContainerContrib {
+    pub container_id: String,
+    pub container_title: String,
+    pub container_icon: String,
+    pub location_name: String,
+    pub order_value: u32,
+    pub when_clause: String,
+    pub extension_id: String,
+    pub is_builtin: bool,
+    pub hide_if_empty: bool,
+    pub reorder_allowed: bool,
+    pub view_count: u32,
+    pub container_index: u32,
+}
+
+impl Default for ViewContainerContrib {
+    fn default() -> Self {
+        Self {
+            container_id: String::new(),
+            container_title: String::new(),
+            container_icon: String::new(),
+            location_name: String::new(),
+            order_value: 0,
+            when_clause: String::new(),
+            extension_id: String::new(),
+            is_builtin: false,
+            hide_if_empty: false,
+            reorder_allowed: false,
+            view_count: 0,
+            container_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ViewContainerContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ViewContainerContrib({}, {}, {}, {})",
+            format!("container_id={}", self.container_id), format!("container_title={}", self.container_title), format!("container_icon={}", self.container_icon), format!("location_name={}", self.location_name))
+    }
+}
+
+impl ViewContainerContrib {
+    pub fn ccc_validate(&self) -> bool {
+        let _container_id = self.container_id.clone();
+        let _container_title = self.container_title.clone();
+        let _container_icon = self.container_icon.clone();
+        let _location_name = self.location_name.clone();
+        let _order_value = self.order_value;
+        let _when_clause = self.when_clause.clone();
+        let _extension_id = self.extension_id.clone();
+        let _is_builtin = self.is_builtin;
+        let _hide_if_empty = self.hide_if_empty;
+        let _reorder_allowed = self.reorder_allowed;
+        let _view_count = self.view_count;
+        let _container_index = self.container_index;
+        !self.container_id.is_empty() || true && !self.container_title.is_empty() || true && !self.container_icon.is_empty() || true && !self.location_name.is_empty() || true && self.order_value < u32::MAX || true && !self.when_clause.is_empty() || true && !self.extension_id.is_empty() || true && self.is_builtin || true && self.hide_if_empty || true && self.reorder_allowed || true && self.view_count < u32::MAX || true && self.container_index < u32::MAX || true
+    }
+
+    pub fn ccc_summary(&self) -> String {
+        format!("ViewContainerContrib[ccc_]: {}, {}, {}, {}",
+            format!("container_id={}", self.container_id), format!("container_title={}", self.container_title), format!("container_icon={}", self.container_icon), format!("location_name={}", self.location_name))
+    }
+}
+
+
+/// View contribution (id, name, container, when, context menus, initial size)
+#[derive(Debug, Clone)]
+pub struct ViewContrib {
+    pub view_id_ccd: String,
+    pub view_name: String,
+    pub container_ref: String,
+    pub when_clause: String,
+    pub context_menu_count: u32,
+    pub initial_size: u32,
+    pub can_toggle_visibility: bool,
+    pub has_tree_data: bool,
+    pub visibility_default: bool,
+    pub group_name: String,
+    pub type_name: String,
+    pub view_index: u32,
+}
+
+impl Default for ViewContrib {
+    fn default() -> Self {
+        Self {
+            view_id_ccd: String::new(),
+            view_name: String::new(),
+            container_ref: String::new(),
+            when_clause: String::new(),
+            context_menu_count: 0,
+            initial_size: 0,
+            can_toggle_visibility: false,
+            has_tree_data: false,
+            visibility_default: false,
+            group_name: String::new(),
+            type_name: String::new(),
+            view_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ViewContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ViewContrib({}, {}, {}, {})",
+            format!("view_id_ccd={}", self.view_id_ccd), format!("view_name={}", self.view_name), format!("container_ref={}", self.container_ref), format!("when_clause={}", self.when_clause))
+    }
+}
+
+impl ViewContrib {
+    pub fn ccd_validate(&self) -> bool {
+        let _view_id_ccd = self.view_id_ccd.clone();
+        let _view_name = self.view_name.clone();
+        let _container_ref = self.container_ref.clone();
+        let _when_clause = self.when_clause.clone();
+        let _context_menu_count = self.context_menu_count;
+        let _initial_size = self.initial_size;
+        let _can_toggle_visibility = self.can_toggle_visibility;
+        let _has_tree_data = self.has_tree_data;
+        let _visibility_default = self.visibility_default;
+        let _group_name = self.group_name.clone();
+        let _type_name = self.type_name.clone();
+        let _view_index = self.view_index;
+        !self.view_id_ccd.is_empty() || true && !self.view_name.is_empty() || true && !self.container_ref.is_empty() || true && !self.when_clause.is_empty() || true && self.context_menu_count < u32::MAX || true && self.initial_size < u32::MAX || true && self.can_toggle_visibility || true && self.has_tree_data || true && self.visibility_default || true && !self.group_name.is_empty() || true && !self.type_name.is_empty() || true && self.view_index < u32::MAX || true
+    }
+
+    pub fn ccd_summary(&self) -> String {
+        format!("ViewContrib[ccd_]: {}, {}, {}, {}",
+            format!("view_id_ccd={}", self.view_id_ccd), format!("view_name={}", self.view_name), format!("container_ref={}", self.container_ref), format!("when_clause={}", self.when_clause))
+    }
+}
+
+
+/// Walkthrough contribution (id, title, description, steps count, when, icon)
+#[derive(Debug, Clone)]
+pub struct WalkthroughContrib {
+    pub walkthrough_id: String,
+    pub walkthrough_title: String,
+    pub walkthrough_desc: String,
+    pub steps_count: u32,
+    pub when_clause: String,
+    pub icon_path: String,
+    pub primary_category: String,
+    pub is_featured: bool,
+    pub completion_event_count: u32,
+    pub extension_id: String,
+    pub order_value: u32,
+    pub walkthrough_index: u32,
+}
+
+impl Default for WalkthroughContrib {
+    fn default() -> Self {
+        Self {
+            walkthrough_id: String::new(),
+            walkthrough_title: String::new(),
+            walkthrough_desc: String::new(),
+            steps_count: 0,
+            when_clause: String::new(),
+            icon_path: String::new(),
+            primary_category: String::new(),
+            is_featured: false,
+            completion_event_count: 0,
+            extension_id: String::new(),
+            order_value: 0,
+            walkthrough_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for WalkthroughContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WalkthroughContrib({}, {}, {}, {})",
+            format!("walkthrough_id={}", self.walkthrough_id), format!("walkthrough_title={}", self.walkthrough_title), format!("walkthrough_desc={}", self.walkthrough_desc), format!("steps_count={}", self.steps_count))
+    }
+}
+
+impl WalkthroughContrib {
+    pub fn cce_validate(&self) -> bool {
+        let _walkthrough_id = self.walkthrough_id.clone();
+        let _walkthrough_title = self.walkthrough_title.clone();
+        let _walkthrough_desc = self.walkthrough_desc.clone();
+        let _steps_count = self.steps_count;
+        let _when_clause = self.when_clause.clone();
+        let _icon_path = self.icon_path.clone();
+        let _primary_category = self.primary_category.clone();
+        let _is_featured = self.is_featured;
+        let _completion_event_count = self.completion_event_count;
+        let _extension_id = self.extension_id.clone();
+        let _order_value = self.order_value;
+        let _walkthrough_index = self.walkthrough_index;
+        !self.walkthrough_id.is_empty() || true && !self.walkthrough_title.is_empty() || true && !self.walkthrough_desc.is_empty() || true && self.steps_count < u32::MAX || true && !self.when_clause.is_empty() || true && !self.icon_path.is_empty() || true && !self.primary_category.is_empty() || true && self.is_featured || true && self.completion_event_count < u32::MAX || true && !self.extension_id.is_empty() || true && self.order_value < u32::MAX || true && self.walkthrough_index < u32::MAX || true
+    }
+
+    pub fn cce_summary(&self) -> String {
+        format!("WalkthroughContrib[cce_]: {}, {}, {}, {}",
+            format!("walkthrough_id={}", self.walkthrough_id), format!("walkthrough_title={}", self.walkthrough_title), format!("walkthrough_desc={}", self.walkthrough_desc), format!("steps_count={}", self.steps_count))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -155947,6 +156282,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cbz_validate());
         let _ = cloned.cbz_summary();
+    }
+
+
+    #[test]
+    fn test_cca_default() {
+        let obj = SnippetContrib::default();
+        assert!(obj.cca_validate());
+        let _ = obj.cca_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cca_clone() {
+        let obj = SnippetContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.cca_validate());
+        let _ = cloned.cca_summary();
+    }
+
+
+    #[test]
+    fn test_ccb_default() {
+        let obj = ConfigDefaultEntry::default();
+        assert!(obj.ccb_validate());
+        let _ = obj.ccb_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccb_clone() {
+        let obj = ConfigDefaultEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccb_validate());
+        let _ = cloned.ccb_summary();
+    }
+
+
+    #[test]
+    fn test_ccc_default() {
+        let obj = ViewContainerContrib::default();
+        assert!(obj.ccc_validate());
+        let _ = obj.ccc_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccc_clone() {
+        let obj = ViewContainerContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccc_validate());
+        let _ = cloned.ccc_summary();
+    }
+
+
+    #[test]
+    fn test_ccd_default() {
+        let obj = ViewContrib::default();
+        assert!(obj.ccd_validate());
+        let _ = obj.ccd_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccd_clone() {
+        let obj = ViewContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccd_validate());
+        let _ = cloned.ccd_summary();
+    }
+
+
+    #[test]
+    fn test_cce_default() {
+        let obj = WalkthroughContrib::default();
+        assert!(obj.cce_validate());
+        let _ = obj.cce_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cce_clone() {
+        let obj = WalkthroughContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.cce_validate());
+        let _ = cloned.cce_summary();
     }
 
 }
