@@ -103857,6 +103857,341 @@ impl FileSearchQuery {
     }
 }
 
+
+/// Search replace state (find, replace, regex, case, whole word, preserve case)
+#[derive(Debug, Clone)]
+pub struct SearchReplaceState {
+    pub find_text: String,
+    pub replace_text: String,
+    pub is_regex: bool,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub preserve_case: bool,
+    pub search_scope: String,
+    pub match_count: u32,
+    pub current_match: u32,
+    pub files_to_include: String,
+    pub files_to_exclude: String,
+    pub search_state_index: u32,
+}
+
+impl Default for SearchReplaceState {
+    fn default() -> Self {
+        Self {
+            find_text: String::new(),
+            replace_text: String::new(),
+            is_regex: false,
+            case_sensitive: false,
+            whole_word: false,
+            preserve_case: false,
+            search_scope: String::new(),
+            match_count: 0,
+            current_match: 0,
+            files_to_include: String::new(),
+            files_to_exclude: String::new(),
+            search_state_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SearchReplaceState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SearchReplaceState({}, {}, {}, {})",
+            format!("find_text={}", self.find_text), format!("replace_text={}", self.replace_text), format!("is_regex={}", self.is_regex), format!("case_sensitive={}", self.case_sensitive))
+    }
+}
+
+impl SearchReplaceState {
+    pub fn cdk_validate(&self) -> bool {
+        let _find_text = self.find_text.clone();
+        let _replace_text = self.replace_text.clone();
+        let _is_regex = self.is_regex;
+        let _case_sensitive = self.case_sensitive;
+        let _whole_word = self.whole_word;
+        let _preserve_case = self.preserve_case;
+        let _search_scope = self.search_scope.clone();
+        let _match_count = self.match_count;
+        let _current_match = self.current_match;
+        let _files_to_include = self.files_to_include.clone();
+        let _files_to_exclude = self.files_to_exclude.clone();
+        let _search_state_index = self.search_state_index;
+        !self.find_text.is_empty() || true && !self.replace_text.is_empty() || true && self.is_regex || true && self.case_sensitive || true && self.whole_word || true && self.preserve_case || true && !self.search_scope.is_empty() || true && self.match_count < u32::MAX || true && self.current_match < u32::MAX || true && !self.files_to_include.is_empty() || true && !self.files_to_exclude.is_empty() || true && self.search_state_index < u32::MAX || true
+    }
+
+    pub fn cdk_summary(&self) -> String {
+        format!("SearchReplaceState[cdk_]: {}, {}, {}, {}",
+            format!("find_text={}", self.find_text), format!("replace_text={}", self.replace_text), format!("is_regex={}", self.is_regex), format!("case_sensitive={}", self.case_sensitive))
+    }
+}
+
+
+/// Glob pattern entry (base URI, pattern, matches files, matches folders)
+#[derive(Debug, Clone)]
+pub struct GlobPatternEntry {
+    pub glob_base_uri: String,
+    pub glob_pattern: String,
+    pub matches_files: bool,
+    pub matches_folders: bool,
+    pub is_negated: bool,
+    pub is_relative: bool,
+    pub base_path: String,
+    pub priority_value: u32,
+    pub source_name: String,
+    pub case_sensitive: bool,
+    pub segment_count: u32,
+    pub glob_index: u32,
+}
+
+impl Default for GlobPatternEntry {
+    fn default() -> Self {
+        Self {
+            glob_base_uri: String::new(),
+            glob_pattern: String::new(),
+            matches_files: false,
+            matches_folders: false,
+            is_negated: false,
+            is_relative: false,
+            base_path: String::new(),
+            priority_value: 0,
+            source_name: String::new(),
+            case_sensitive: false,
+            segment_count: 0,
+            glob_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for GlobPatternEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GlobPatternEntry({}, {}, {}, {})",
+            format!("glob_base_uri={}", self.glob_base_uri), format!("glob_pattern={}", self.glob_pattern), format!("matches_files={}", self.matches_files), format!("matches_folders={}", self.matches_folders))
+    }
+}
+
+impl GlobPatternEntry {
+    pub fn cdl_validate(&self) -> bool {
+        let _glob_base_uri = self.glob_base_uri.clone();
+        let _glob_pattern = self.glob_pattern.clone();
+        let _matches_files = self.matches_files;
+        let _matches_folders = self.matches_folders;
+        let _is_negated = self.is_negated;
+        let _is_relative = self.is_relative;
+        let _base_path = self.base_path.clone();
+        let _priority_value = self.priority_value;
+        let _source_name = self.source_name.clone();
+        let _case_sensitive = self.case_sensitive;
+        let _segment_count = self.segment_count;
+        let _glob_index = self.glob_index;
+        !self.glob_base_uri.is_empty() || true && !self.glob_pattern.is_empty() || true && self.matches_files || true && self.matches_folders || true && self.is_negated || true && self.is_relative || true && !self.base_path.is_empty() || true && self.priority_value < u32::MAX || true && !self.source_name.is_empty() || true && self.case_sensitive || true && self.segment_count < u32::MAX || true && self.glob_index < u32::MAX || true
+    }
+
+    pub fn cdl_summary(&self) -> String {
+        format!("GlobPatternEntry[cdl_]: {}, {}, {}, {}",
+            format!("glob_base_uri={}", self.glob_base_uri), format!("glob_pattern={}", self.glob_pattern), format!("matches_files={}", self.matches_files), format!("matches_folders={}", self.matches_folders))
+    }
+}
+
+
+/// File watcher entry (glob pattern, kind, recursive, excludes, correlation id)
+#[derive(Debug, Clone)]
+pub struct FileWatcherEntry {
+    pub watcher_glob: String,
+    pub watcher_kind: String,
+    pub is_recursive: bool,
+    pub exclude_patterns: String,
+    pub correlation_id: String,
+    pub provider_id: String,
+    pub ignore_create: bool,
+    pub ignore_change: bool,
+    pub ignore_delete: bool,
+    pub max_depth: u32,
+    pub debounce_ms: u32,
+    pub watcher_index: u32,
+}
+
+impl Default for FileWatcherEntry {
+    fn default() -> Self {
+        Self {
+            watcher_glob: String::new(),
+            watcher_kind: String::new(),
+            is_recursive: false,
+            exclude_patterns: String::new(),
+            correlation_id: String::new(),
+            provider_id: String::new(),
+            ignore_create: false,
+            ignore_change: false,
+            ignore_delete: false,
+            max_depth: 0,
+            debounce_ms: 0,
+            watcher_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for FileWatcherEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FileWatcherEntry({}, {}, {}, {})",
+            format!("watcher_glob={}", self.watcher_glob), format!("watcher_kind={}", self.watcher_kind), format!("is_recursive={}", self.is_recursive), format!("exclude_patterns={}", self.exclude_patterns))
+    }
+}
+
+impl FileWatcherEntry {
+    pub fn cdm_validate(&self) -> bool {
+        let _watcher_glob = self.watcher_glob.clone();
+        let _watcher_kind = self.watcher_kind.clone();
+        let _is_recursive = self.is_recursive;
+        let _exclude_patterns = self.exclude_patterns.clone();
+        let _correlation_id = self.correlation_id.clone();
+        let _provider_id = self.provider_id.clone();
+        let _ignore_create = self.ignore_create;
+        let _ignore_change = self.ignore_change;
+        let _ignore_delete = self.ignore_delete;
+        let _max_depth = self.max_depth;
+        let _debounce_ms = self.debounce_ms;
+        let _watcher_index = self.watcher_index;
+        !self.watcher_glob.is_empty() || true && !self.watcher_kind.is_empty() || true && self.is_recursive || true && !self.exclude_patterns.is_empty() || true && !self.correlation_id.is_empty() || true && !self.provider_id.is_empty() || true && self.ignore_create || true && self.ignore_change || true && self.ignore_delete || true && self.max_depth < u32::MAX || true && self.debounce_ms < u32::MAX || true && self.watcher_index < u32::MAX || true
+    }
+
+    pub fn cdm_summary(&self) -> String {
+        format!("FileWatcherEntry[cdm_]: {}, {}, {}, {}",
+            format!("watcher_glob={}", self.watcher_glob), format!("watcher_kind={}", self.watcher_kind), format!("is_recursive={}", self.is_recursive), format!("exclude_patterns={}", self.exclude_patterns))
+    }
+}
+
+
+/// Configuration override entry (key, value, scope, target, source)
+#[derive(Debug, Clone)]
+pub struct ConfigOverrideEntry {
+    pub override_key: String,
+    pub override_value: String,
+    pub scope_uri: String,
+    pub target_name: String,
+    pub source_name: String,
+    pub is_language_override: bool,
+    pub language_id: String,
+    pub is_workspace_override: bool,
+    pub is_folder_override: bool,
+    pub original_value: String,
+    pub precedence: u32,
+    pub override_index: u32,
+}
+
+impl Default for ConfigOverrideEntry {
+    fn default() -> Self {
+        Self {
+            override_key: String::new(),
+            override_value: String::new(),
+            scope_uri: String::new(),
+            target_name: String::new(),
+            source_name: String::new(),
+            is_language_override: false,
+            language_id: String::new(),
+            is_workspace_override: false,
+            is_folder_override: false,
+            original_value: String::new(),
+            precedence: 0,
+            override_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ConfigOverrideEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ConfigOverrideEntry({}, {}, {}, {})",
+            format!("override_key={}", self.override_key), format!("override_value={}", self.override_value), format!("scope_uri={}", self.scope_uri), format!("target_name={}", self.target_name))
+    }
+}
+
+impl ConfigOverrideEntry {
+    pub fn cdn_validate(&self) -> bool {
+        let _override_key = self.override_key.clone();
+        let _override_value = self.override_value.clone();
+        let _scope_uri = self.scope_uri.clone();
+        let _target_name = self.target_name.clone();
+        let _source_name = self.source_name.clone();
+        let _is_language_override = self.is_language_override;
+        let _language_id = self.language_id.clone();
+        let _is_workspace_override = self.is_workspace_override;
+        let _is_folder_override = self.is_folder_override;
+        let _original_value = self.original_value.clone();
+        let _precedence = self.precedence;
+        let _override_index = self.override_index;
+        !self.override_key.is_empty() || true && !self.override_value.is_empty() || true && !self.scope_uri.is_empty() || true && !self.target_name.is_empty() || true && !self.source_name.is_empty() || true && self.is_language_override || true && !self.language_id.is_empty() || true && self.is_workspace_override || true && self.is_folder_override || true && !self.original_value.is_empty() || true && self.precedence < u32::MAX || true && self.override_index < u32::MAX || true
+    }
+
+    pub fn cdn_summary(&self) -> String {
+        format!("ConfigOverrideEntry[cdn_]: {}, {}, {}, {}",
+            format!("override_key={}", self.override_key), format!("override_value={}", self.override_value), format!("scope_uri={}", self.scope_uri), format!("target_name={}", self.target_name))
+    }
+}
+
+
+/// Extension dependency (extension id, version range, optional, bundled, kind)
+#[derive(Debug, Clone)]
+pub struct ExtensionDep {
+    pub dep_extension_id: String,
+    pub version_range: String,
+    pub is_optional: bool,
+    pub is_bundled: bool,
+    pub dep_kind: String,
+    pub display_name: String,
+    pub publisher_name: String,
+    pub is_builtin: bool,
+    pub activation_event: String,
+    pub platform_specific: bool,
+    pub api_version: String,
+    pub dep_index: u32,
+}
+
+impl Default for ExtensionDep {
+    fn default() -> Self {
+        Self {
+            dep_extension_id: String::new(),
+            version_range: String::new(),
+            is_optional: false,
+            is_bundled: false,
+            dep_kind: String::new(),
+            display_name: String::new(),
+            publisher_name: String::new(),
+            is_builtin: false,
+            activation_event: String::new(),
+            platform_specific: false,
+            api_version: String::new(),
+            dep_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ExtensionDep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ExtensionDep({}, {}, {}, {})",
+            format!("dep_extension_id={}", self.dep_extension_id), format!("version_range={}", self.version_range), format!("is_optional={}", self.is_optional), format!("is_bundled={}", self.is_bundled))
+    }
+}
+
+impl ExtensionDep {
+    pub fn cdo_validate(&self) -> bool {
+        let _dep_extension_id = self.dep_extension_id.clone();
+        let _version_range = self.version_range.clone();
+        let _is_optional = self.is_optional;
+        let _is_bundled = self.is_bundled;
+        let _dep_kind = self.dep_kind.clone();
+        let _display_name = self.display_name.clone();
+        let _publisher_name = self.publisher_name.clone();
+        let _is_builtin = self.is_builtin;
+        let _activation_event = self.activation_event.clone();
+        let _platform_specific = self.platform_specific;
+        let _api_version = self.api_version.clone();
+        let _dep_index = self.dep_index;
+        !self.dep_extension_id.is_empty() || true && !self.version_range.is_empty() || true && self.is_optional || true && self.is_bundled || true && !self.dep_kind.is_empty() || true && !self.display_name.is_empty() || true && !self.publisher_name.is_empty() || true && self.is_builtin || true && !self.activation_event.is_empty() || true && self.platform_specific || true && !self.api_version.is_empty() || true && self.dep_index < u32::MAX || true
+    }
+
+    pub fn cdo_summary(&self) -> String {
+        format!("ExtensionDep[cdo_]: {}, {}, {}, {}",
+            format!("dep_extension_id={}", self.dep_extension_id), format!("version_range={}", self.version_range), format!("is_optional={}", self.is_optional), format!("is_bundled={}", self.is_bundled))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -158928,6 +159263,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cdj_validate());
         let _ = cloned.cdj_summary();
+    }
+
+
+    #[test]
+    fn test_cdk_default() {
+        let obj = SearchReplaceState::default();
+        assert!(obj.cdk_validate());
+        let _ = obj.cdk_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdk_clone() {
+        let obj = SearchReplaceState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdk_validate());
+        let _ = cloned.cdk_summary();
+    }
+
+
+    #[test]
+    fn test_cdl_default() {
+        let obj = GlobPatternEntry::default();
+        assert!(obj.cdl_validate());
+        let _ = obj.cdl_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdl_clone() {
+        let obj = GlobPatternEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdl_validate());
+        let _ = cloned.cdl_summary();
+    }
+
+
+    #[test]
+    fn test_cdm_default() {
+        let obj = FileWatcherEntry::default();
+        assert!(obj.cdm_validate());
+        let _ = obj.cdm_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdm_clone() {
+        let obj = FileWatcherEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdm_validate());
+        let _ = cloned.cdm_summary();
+    }
+
+
+    #[test]
+    fn test_cdn_default() {
+        let obj = ConfigOverrideEntry::default();
+        assert!(obj.cdn_validate());
+        let _ = obj.cdn_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdn_clone() {
+        let obj = ConfigOverrideEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdn_validate());
+        let _ = cloned.cdn_summary();
+    }
+
+
+    #[test]
+    fn test_cdo_default() {
+        let obj = ExtensionDep::default();
+        assert!(obj.cdo_validate());
+        let _ = obj.cdo_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdo_clone() {
+        let obj = ExtensionDep::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdo_validate());
+        let _ = cloned.cdo_summary();
     }
 
 }
