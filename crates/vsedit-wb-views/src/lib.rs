@@ -60129,3 +60129,207 @@ mod bbr_tests {
         assert!(!f.is_visible);
     }
 }
+
+
+// --- bbs_: Editor git gutter model ---
+
+/// Git change type for a line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbsGitChangeType { Added, Modified, Deleted }
+
+impl BbsGitChangeType {
+    pub fn label(&self) -> &'static str {
+        match self { Self::Added => "Added", Self::Modified => "Modified", Self::Deleted => "Deleted" }
+    }
+
+    pub fn gutter_char(&self) -> char {
+        match self { Self::Added => '+', Self::Modified => '~', Self::Deleted => '-' }
+    }
+
+    pub fn color_class(&self) -> &'static str {
+        match self {
+            Self::Added => "git-added", Self::Modified => "git-modified", Self::Deleted => "git-deleted",
+        }
+    }
+}
+
+/// A git change region.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BbsGitChange {
+    pub start_line: u32,
+    pub line_count: u32,
+    pub change_type: BbsGitChangeType,
+    pub original_start: u32,
+    pub original_count: u32,
+}
+
+impl BbsGitChange {
+    pub fn added(start: u32, count: u32) -> Self {
+        Self { start_line: start, line_count: count, change_type: BbsGitChangeType::Added, original_start: start, original_count: 0 }
+    }
+
+    pub fn modified(start: u32, count: u32) -> Self {
+        Self { start_line: start, line_count: count, change_type: BbsGitChangeType::Modified, original_start: start, original_count: count }
+    }
+
+    pub fn deleted(at_line: u32, orig_count: u32) -> Self {
+        Self { start_line: at_line, line_count: 0, change_type: BbsGitChangeType::Deleted, original_start: at_line, original_count: orig_count }
+    }
+
+    pub fn end_line(&self) -> u32 { self.start_line + self.line_count.saturating_sub(1) }
+    pub fn contains_line(&self, line: u32) -> bool {
+        if self.line_count == 0 { return line == self.start_line; }
+        line >= self.start_line && line <= self.end_line()
+    }
+}
+
+/// The git gutter model.
+#[derive(Debug)]
+pub struct BbsGitGutterModel {
+    changes: Vec<BbsGitChange>,
+    enabled: bool,
+    show_inline_diff: bool,
+    current_index: Option<usize>,
+}
+
+impl BbsGitGutterModel {
+    pub fn new() -> Self {
+        Self { changes: Vec::new(), enabled: true, show_inline_diff: false, current_index: None }
+    }
+
+    pub fn set_changes(&mut self, changes: Vec<BbsGitChange>) {
+        self.changes = changes;
+        self.current_index = None;
+    }
+
+    pub fn changes(&self) -> &[BbsGitChange] { &self.changes }
+    pub fn change_count(&self) -> usize { self.changes.len() }
+
+    pub fn change_at_line(&self, line: u32) -> Option<&BbsGitChange> {
+        self.changes.iter().find(|c| c.contains_line(line))
+    }
+
+    pub fn gutter_for_line(&self, line: u32) -> Option<(char, &'static str)> {
+        self.change_at_line(line).map(|c| (c.change_type.gutter_char(), c.change_type.color_class()))
+    }
+
+    pub fn next_change(&mut self) -> Option<&BbsGitChange> {
+        if self.changes.is_empty() { return None; }
+        let idx = match self.current_index {
+            Some(i) => (i + 1) % self.changes.len(),
+            None => 0,
+        };
+        self.current_index = Some(idx);
+        Some(&self.changes[idx])
+    }
+
+    pub fn prev_change(&mut self) -> Option<&BbsGitChange> {
+        if self.changes.is_empty() { return None; }
+        let idx = match self.current_index {
+            Some(0) => self.changes.len() - 1,
+            Some(i) => i - 1,
+            None => 0,
+        };
+        self.current_index = Some(idx);
+        Some(&self.changes[idx])
+    }
+
+    pub fn added_count(&self) -> usize { self.changes.iter().filter(|c| c.change_type == BbsGitChangeType::Added).count() }
+    pub fn modified_count(&self) -> usize { self.changes.iter().filter(|c| c.change_type == BbsGitChangeType::Modified).count() }
+    pub fn deleted_count(&self) -> usize { self.changes.iter().filter(|c| c.change_type == BbsGitChangeType::Deleted).count() }
+
+    pub fn set_enabled(&mut self, v: bool) { self.enabled = v; }
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn set_show_inline_diff(&mut self, v: bool) { self.show_inline_diff = v; }
+
+    pub fn clear(&mut self) { self.changes.clear(); self.current_index = None; }
+
+    pub fn status_text(&self) -> String {
+        let a = self.added_count();
+        let m = self.modified_count();
+        let d = self.deleted_count();
+        format!("+{} ~{} -{}", a, m, d)
+    }
+}
+
+#[cfg(test)]
+mod bbs_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbs_change_type() {
+        assert_eq!(BbsGitChangeType::Added.gutter_char(), '+');
+        assert_eq!(BbsGitChangeType::Modified.color_class(), "git-modified");
+    }
+
+    #[test]
+    fn test_bbs_added() {
+        let c = BbsGitChange::added(5, 3);
+        assert!(c.contains_line(5));
+        assert!(c.contains_line(7));
+        assert!(!c.contains_line(8));
+    }
+
+    #[test]
+    fn test_bbs_deleted() {
+        let c = BbsGitChange::deleted(10, 2);
+        assert!(c.contains_line(10));
+        assert_eq!(c.line_count, 0);
+    }
+
+    #[test]
+    fn test_bbs_model_gutter() {
+        let mut m = BbsGitGutterModel::new();
+        m.set_changes(vec![
+            BbsGitChange::added(5, 3),
+            BbsGitChange::modified(15, 2),
+        ]);
+        let (ch, _class) = m.gutter_for_line(5).unwrap();
+        assert_eq!(ch, '+');
+        assert!(m.gutter_for_line(10).is_none());
+    }
+
+    #[test]
+    fn test_bbs_model_navigation() {
+        let mut m = BbsGitGutterModel::new();
+        m.set_changes(vec![
+            BbsGitChange::added(5, 1),
+            BbsGitChange::modified(15, 1),
+        ]);
+        assert_eq!(m.next_change().unwrap().start_line, 5);
+        assert_eq!(m.next_change().unwrap().start_line, 15);
+        assert_eq!(m.next_change().unwrap().start_line, 5); // wrap
+    }
+
+    #[test]
+    fn test_bbs_model_counts() {
+        let mut m = BbsGitGutterModel::new();
+        m.set_changes(vec![
+            BbsGitChange::added(1, 1),
+            BbsGitChange::added(5, 2),
+            BbsGitChange::modified(10, 1),
+            BbsGitChange::deleted(20, 3),
+        ]);
+        assert_eq!(m.added_count(), 2);
+        assert_eq!(m.modified_count(), 1);
+        assert_eq!(m.deleted_count(), 1);
+    }
+
+    #[test]
+    fn test_bbs_model_status() {
+        let mut m = BbsGitGutterModel::new();
+        m.set_changes(vec![
+            BbsGitChange::added(1, 1),
+            BbsGitChange::modified(5, 1),
+        ]);
+        assert_eq!(m.status_text(), "+1 ~1 -0");
+    }
+
+    #[test]
+    fn test_bbs_model_clear() {
+        let mut m = BbsGitGutterModel::new();
+        m.set_changes(vec![BbsGitChange::added(1, 1)]);
+        m.clear();
+        assert_eq!(m.change_count(), 0);
+    }
+}
