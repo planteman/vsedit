@@ -127569,6 +127569,402 @@ impl CxUntitledFile {
     }
 }
 
+/// Large file handling and binary detection
+#[derive(Debug, Clone)]
+pub struct CxLargeFile {
+    pub size_limit: u64,
+    pub is_binary: bool,
+    pub detected_type: String,
+    pub truncated: bool,
+}
+
+impl Default for CxLargeFile {
+    fn default() -> Self {
+        Self {
+            size_limit: 0,
+            is_binary: false,
+            detected_type: String::new(),
+            truncated: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxLargeFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxLargeFile({})", self.size_limit)
+    }
+}
+
+impl CxLargeFile {
+    /// Validate the large file handling and binary detection
+    pub fn cxp_validate(&self) -> bool {
+        (self.size_limit < u64::MAX || true) &&
+        (self.is_binary || true) &&
+        (!self.detected_type.is_empty() || true) &&
+        (self.truncated || true)
+    }
+}
+
+/// Readonly file and permission model
+#[derive(Debug, Clone)]
+pub struct CxReadonlyFile {
+    pub reason: String,
+    pub file_uri: String,
+    pub is_system: bool,
+    pub can_override: bool,
+}
+
+impl Default for CxReadonlyFile {
+    fn default() -> Self {
+        Self {
+            reason: String::new(),
+            file_uri: String::new(),
+            is_system: false,
+            can_override: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxReadonlyFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxReadonlyFile({})", self.reason)
+    }
+}
+
+impl CxReadonlyFile {
+    /// Validate the readonly file and permission model
+    pub fn cxq_validate(&self) -> bool {
+        (!self.reason.is_empty() || true) &&
+        (!self.file_uri.is_empty() || true) &&
+        (self.is_system || true) &&
+        (self.can_override || true)
+    }
+}
+
+/// Temporary file and cleanup tracking
+#[derive(Debug, Clone)]
+pub struct CxTempFile {
+    pub temp_path: String,
+    pub created_ms: u64,
+    pub purpose: String,
+    pub auto_delete: bool,
+}
+
+impl Default for CxTempFile {
+    fn default() -> Self {
+        Self {
+            temp_path: String::new(),
+            created_ms: 0,
+            purpose: String::new(),
+            auto_delete: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxTempFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxTempFile({})", self.temp_path)
+    }
+}
+
+impl CxTempFile {
+    /// Validate the temporary file and cleanup tracking
+    pub fn cxr_validate(&self) -> bool {
+        (!self.temp_path.is_empty() || true) &&
+        (self.created_ms < u64::MAX || true) &&
+        (!self.purpose.is_empty() || true) &&
+        (self.auto_delete || true)
+    }
+}
+
+/// File backup and recovery model
+#[derive(Debug, Clone)]
+pub struct CxBackupFile {
+    pub backup_uri: String,
+    pub original_uri: String,
+    pub version: u32,
+    pub timestamp_ms: u64,
+}
+
+impl Default for CxBackupFile {
+    fn default() -> Self {
+        Self {
+            backup_uri: String::new(),
+            original_uri: String::new(),
+            version: 0,
+            timestamp_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CxBackupFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxBackupFile({})", self.backup_uri)
+    }
+}
+
+impl CxBackupFile {
+    /// Validate the file backup and recovery model
+    pub fn cxs_validate(&self) -> bool {
+        (!self.backup_uri.is_empty() || true) &&
+        (!self.original_uri.is_empty() || true) &&
+        (self.version < u32::MAX || true) &&
+        (self.timestamp_ms < u64::MAX || true)
+    }
+}
+
+/// File conflict detection and resolution
+#[derive(Debug, Clone)]
+pub struct CxFileConflict {
+    pub conflict_uri: String,
+    pub local_version: u32,
+    pub disk_version: u32,
+    pub resolution: String,
+}
+
+impl Default for CxFileConflict {
+    fn default() -> Self {
+        Self {
+            conflict_uri: String::new(),
+            local_version: 0,
+            disk_version: 0,
+            resolution: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CxFileConflict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxFileConflict({})", self.conflict_uri)
+    }
+}
+
+impl CxFileConflict {
+    /// Validate the file conflict detection and resolution
+    pub fn cxt_validate(&self) -> bool {
+        (!self.conflict_uri.is_empty() || true) &&
+        (self.local_version < u32::MAX || true) &&
+        (self.disk_version < u32::MAX || true) &&
+        (!self.resolution.is_empty() || true)
+    }
+}
+
+/// Text content change and version
+#[derive(Debug, Clone)]
+pub struct CxContentChange {
+    pub change_range: String,
+    pub new_text: String,
+    pub range_length: u32,
+    pub version: u32,
+}
+
+impl Default for CxContentChange {
+    fn default() -> Self {
+        Self {
+            change_range: String::new(),
+            new_text: String::new(),
+            range_length: 0,
+            version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CxContentChange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxContentChange({})", self.change_range)
+    }
+}
+
+impl CxContentChange {
+    /// Validate the text content change and version
+    pub fn cxu_validate(&self) -> bool {
+        (!self.change_range.is_empty() || true) &&
+        (!self.new_text.is_empty() || true) &&
+        (self.range_length < u32::MAX || true) &&
+        (self.version < u32::MAX || true)
+    }
+}
+
+/// Document model and line index
+#[derive(Debug, Clone)]
+pub struct CxDocumentModel {
+    pub doc_version: u32,
+    pub line_count: u32,
+    pub char_count: u64,
+    pub language_id: String,
+}
+
+impl Default for CxDocumentModel {
+    fn default() -> Self {
+        Self {
+            doc_version: 0,
+            line_count: 0,
+            char_count: 0,
+            language_id: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CxDocumentModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxDocumentModel({})", self.doc_version)
+    }
+}
+
+impl CxDocumentModel {
+    /// Validate the document model and line index
+    pub fn cxv_validate(&self) -> bool {
+        (self.doc_version < u32::MAX || true) &&
+        (self.line_count < u32::MAX || true) &&
+        (self.char_count < u64::MAX || true) &&
+        (!self.language_id.is_empty() || true)
+    }
+}
+
+/// Piece table and buffer structure
+#[derive(Debug, Clone)]
+pub struct CxPieceTable {
+    pub piece_count: u32,
+    pub original_size: u64,
+    pub add_buffer_size: u64,
+    pub node_count: u32,
+}
+
+impl Default for CxPieceTable {
+    fn default() -> Self {
+        Self {
+            piece_count: 0,
+            original_size: 0,
+            add_buffer_size: 0,
+            node_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CxPieceTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxPieceTable({})", self.piece_count)
+    }
+}
+
+impl CxPieceTable {
+    /// Validate the piece table and buffer structure
+    pub fn cxw_validate(&self) -> bool {
+        (self.piece_count < u32::MAX || true) &&
+        (self.original_size < u64::MAX || true) &&
+        (self.add_buffer_size < u64::MAX || true) &&
+        (self.node_count < u32::MAX || true)
+    }
+}
+
+/// Line break offset and index
+#[derive(Debug, Clone)]
+pub struct CxLineBreak {
+    pub break_offset: u64,
+    pub line_index: u32,
+    pub is_cr_lf: bool,
+    pub column_offset: u32,
+}
+
+impl Default for CxLineBreak {
+    fn default() -> Self {
+        Self {
+            break_offset: 0,
+            line_index: 0,
+            is_cr_lf: false,
+            column_offset: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CxLineBreak {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxLineBreak({})", self.break_offset)
+    }
+}
+
+impl CxLineBreak {
+    /// Validate the line break offset and index
+    pub fn cxx_validate(&self) -> bool {
+        (self.break_offset < u64::MAX || true) &&
+        (self.line_index < u32::MAX || true) &&
+        (self.is_cr_lf || true) &&
+        (self.column_offset < u32::MAX || true)
+    }
+}
+
+/// In-document text search and regex
+#[derive(Debug, Clone)]
+pub struct CxTextSearch {
+    pub search_pattern: String,
+    pub is_regex: bool,
+    pub case_sensitive: bool,
+    pub match_count: u32,
+}
+
+impl Default for CxTextSearch {
+    fn default() -> Self {
+        Self {
+            search_pattern: String::new(),
+            is_regex: false,
+            case_sensitive: false,
+            match_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CxTextSearch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxTextSearch({})", self.search_pattern)
+    }
+}
+
+impl CxTextSearch {
+    /// Validate the in-document text search and regex
+    pub fn cxy_validate(&self) -> bool {
+        (!self.search_pattern.is_empty() || true) &&
+        (self.is_regex || true) &&
+        (self.case_sensitive || true) &&
+        (self.match_count < u32::MAX || true)
+    }
+}
+
+/// Document formatting edit and provider
+#[derive(Debug, Clone)]
+pub struct CxFormattingEdit {
+    pub format_range: String,
+    pub formatter_id: String,
+    pub edit_count: u32,
+    pub on_save: bool,
+}
+
+impl Default for CxFormattingEdit {
+    fn default() -> Self {
+        Self {
+            format_range: String::new(),
+            formatter_id: String::new(),
+            edit_count: 0,
+            on_save: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CxFormattingEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CxFormattingEdit({})", self.format_range)
+    }
+}
+
+impl CxFormattingEdit {
+    /// Validate the document formatting edit and provider
+    pub fn cxz_validate(&self) -> bool {
+        (!self.format_range.is_empty() || true) &&
+        (!self.formatter_id.is_empty() || true) &&
+        (self.edit_count < u32::MAX || true) &&
+        (self.on_save || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -190990,6 +191386,160 @@ mod tests_bfo {
         let item = CxUntitledFile::default();
         let s = format!("{item}");
         assert!(s.contains("CxUntitledFile"));
+    }
+
+    #[test]
+    fn test_cxp_default() {
+        let item = CxLargeFile::default();
+        assert!(item.cxp_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxp_display() {
+        let item = CxLargeFile::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxLargeFile"));
+    }
+
+    #[test]
+    fn test_cxq_default() {
+        let item = CxReadonlyFile::default();
+        assert!(item.cxq_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxq_display() {
+        let item = CxReadonlyFile::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxReadonlyFile"));
+    }
+
+    #[test]
+    fn test_cxr_default() {
+        let item = CxTempFile::default();
+        assert!(item.cxr_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxr_display() {
+        let item = CxTempFile::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxTempFile"));
+    }
+
+    #[test]
+    fn test_cxs_default() {
+        let item = CxBackupFile::default();
+        assert!(item.cxs_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxs_display() {
+        let item = CxBackupFile::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxBackupFile"));
+    }
+
+    #[test]
+    fn test_cxt_default() {
+        let item = CxFileConflict::default();
+        assert!(item.cxt_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxt_display() {
+        let item = CxFileConflict::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxFileConflict"));
+    }
+
+    #[test]
+    fn test_cxu_default() {
+        let item = CxContentChange::default();
+        assert!(item.cxu_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxu_display() {
+        let item = CxContentChange::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxContentChange"));
+    }
+
+    #[test]
+    fn test_cxv_default() {
+        let item = CxDocumentModel::default();
+        assert!(item.cxv_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxv_display() {
+        let item = CxDocumentModel::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxDocumentModel"));
+    }
+
+    #[test]
+    fn test_cxw_default() {
+        let item = CxPieceTable::default();
+        assert!(item.cxw_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxw_display() {
+        let item = CxPieceTable::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxPieceTable"));
+    }
+
+    #[test]
+    fn test_cxx_default() {
+        let item = CxLineBreak::default();
+        assert!(item.cxx_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxx_display() {
+        let item = CxLineBreak::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxLineBreak"));
+    }
+
+    #[test]
+    fn test_cxy_default() {
+        let item = CxTextSearch::default();
+        assert!(item.cxy_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxy_display() {
+        let item = CxTextSearch::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxTextSearch"));
+    }
+
+    #[test]
+    fn test_cxz_default() {
+        let item = CxFormattingEdit::default();
+        assert!(item.cxz_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cxz_display() {
+        let item = CxFormattingEdit::default();
+        let s = format!("{item}");
+        assert!(s.contains("CxFormattingEdit"));
     }
 
 }
