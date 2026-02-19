@@ -64017,3 +64017,200 @@ mod bck_tests {
         assert!(d.selected_button().is_none());
     }
 }
+
+
+// --- bcl_: Editor file dialog model ---
+
+/// File dialog mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BclDialogMode { Open, Save, OpenFolder }
+
+/// A file entry in the dialog.
+#[derive(Debug, Clone)]
+pub struct BclFileEntry {
+    pub name: String,
+    pub is_dir: bool,
+    pub size: u64,
+    pub modified: u64,
+}
+
+impl BclFileEntry {
+    pub fn dir(name: &str) -> Self { Self { name: name.to_string(), is_dir: true, size: 0, modified: 0 } }
+    pub fn file(name: &str, size: u64) -> Self { Self { name: name.to_string(), is_dir: false, size, modified: 0 } }
+
+    pub fn icon(&self) -> char { if self.is_dir { '📁' } else { '📄' } }
+
+    pub fn display(&self) -> String {
+        if self.is_dir { format!("{} {}/", self.icon(), self.name) }
+        else { format!("{} {} ({})", self.icon(), self.name, self.human_size()) }
+    }
+
+    pub fn human_size(&self) -> String {
+        if self.size < 1024 { format!("{} B", self.size) }
+        else if self.size < 1024 * 1024 { format!("{:.1} KB", self.size as f64 / 1024.0) }
+        else { format!("{:.1} MB", self.size as f64 / (1024.0 * 1024.0)) }
+    }
+
+    pub fn matches_filter(&self, filter: &str) -> bool {
+        if filter.is_empty() { return true; }
+        self.name.to_lowercase().contains(&filter.to_lowercase())
+    }
+}
+
+/// The file dialog model.
+#[derive(Debug)]
+pub struct BclFileDialog {
+    mode: BclDialogMode,
+    current_path: String,
+    entries: Vec<BclFileEntry>,
+    filter: String,
+    cursor: usize,
+    filename_input: String,
+    show_hidden: bool,
+    filters: Vec<(String, Vec<String>)>,
+    active_filter: usize,
+}
+
+impl BclFileDialog {
+    pub fn new(mode: BclDialogMode, path: &str) -> Self {
+        Self { mode, current_path: path.to_string(), entries: Vec::new(), filter: String::new(), cursor: 0, filename_input: String::new(), show_hidden: false, filters: Vec::new(), active_filter: 0 }
+    }
+
+    pub fn mode(&self) -> BclDialogMode { self.mode }
+    pub fn current_path(&self) -> &str { &self.current_path }
+
+    pub fn set_entries(&mut self, entries: Vec<BclFileEntry>) {
+        self.entries = entries;
+        self.entries.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name)));
+        self.cursor = 0;
+    }
+
+    pub fn set_filter(&mut self, f: &str) { self.filter = f.to_string(); self.cursor = 0; }
+
+    pub fn visible_entries(&self) -> Vec<&BclFileEntry> {
+        self.entries.iter().filter(|e| {
+            if !self.show_hidden && e.name.starts_with('.') { return false; }
+            e.matches_filter(&self.filter)
+        }).collect()
+    }
+
+    pub fn cursor_entry(&self) -> Option<&BclFileEntry> { self.visible_entries().get(self.cursor).copied() }
+
+    pub fn move_cursor(&mut self, delta: i32) {
+        let count = self.visible_entries().len();
+        if count == 0 { return; }
+        self.cursor = ((self.cursor as i32 + delta).rem_euclid(count as i32)) as usize;
+    }
+
+    pub fn navigate_into(&mut self) -> bool {
+        if let Some(entry) = self.cursor_entry() {
+            if entry.is_dir {
+                let name = entry.name.clone();
+                if name == ".." {
+                    if let Some(parent) = self.current_path.rsplit_once('/') {
+                        self.current_path = if parent.0.is_empty() { "/".to_string() } else { parent.0.to_string() };
+                    }
+                } else {
+                    self.current_path = format!("{}/{}", self.current_path.trim_end_matches('/'), name);
+                }
+                self.entries.clear();
+                self.cursor = 0;
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn selected_path(&self) -> Option<String> {
+        match self.mode {
+            BclDialogMode::Save => {
+                if self.filename_input.is_empty() { None }
+                else { Some(format!("{}/{}", self.current_path.trim_end_matches('/'), self.filename_input)) }
+            }
+            BclDialogMode::OpenFolder => Some(self.current_path.clone()),
+            BclDialogMode::Open => self.cursor_entry().filter(|e| !e.is_dir).map(|e| format!("{}/{}", self.current_path.trim_end_matches('/'), e.name)),
+        }
+    }
+
+    pub fn set_filename(&mut self, name: &str) { self.filename_input = name.to_string(); }
+    pub fn toggle_hidden(&mut self) { self.show_hidden = !self.show_hidden; }
+
+    pub fn add_filter(&mut self, label: &str, exts: Vec<String>) { self.filters.push((label.to_string(), exts)); }
+}
+
+#[cfg(test)]
+mod bcl_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcl_new() {
+        let d = BclFileDialog::new(BclDialogMode::Open, "/home/user");
+        assert_eq!(d.mode(), BclDialogMode::Open);
+        assert_eq!(d.current_path(), "/home/user");
+    }
+
+    #[test]
+    fn test_bcl_entries_sorted() {
+        let mut d = BclFileDialog::new(BclDialogMode::Open, "/");
+        d.set_entries(vec![BclFileEntry::file("b.txt", 100), BclFileEntry::dir("adir")]);
+        assert!(d.visible_entries()[0].is_dir); // dirs first
+    }
+
+    #[test]
+    fn test_bcl_filter() {
+        let mut d = BclFileDialog::new(BclDialogMode::Open, "/");
+        d.set_entries(vec![BclFileEntry::file("main.rs", 500), BclFileEntry::file("lib.rs", 300)]);
+        d.set_filter("main");
+        assert_eq!(d.visible_entries().len(), 1);
+    }
+
+    #[test]
+    fn test_bcl_hidden() {
+        let mut d = BclFileDialog::new(BclDialogMode::Open, "/");
+        d.set_entries(vec![BclFileEntry::file(".gitignore", 50), BclFileEntry::file("readme", 100)]);
+        assert_eq!(d.visible_entries().len(), 1);
+        d.toggle_hidden();
+        assert_eq!(d.visible_entries().len(), 2);
+    }
+
+    #[test]
+    fn test_bcl_cursor() {
+        let mut d = BclFileDialog::new(BclDialogMode::Open, "/");
+        d.set_entries(vec![BclFileEntry::file("a", 1), BclFileEntry::file("b", 2)]);
+        d.move_cursor(1);
+        assert_eq!(d.cursor_entry().unwrap().name, "b");
+    }
+
+    #[test]
+    fn test_bcl_navigate_into() {
+        let mut d = BclFileDialog::new(BclDialogMode::Open, "/home");
+        d.set_entries(vec![BclFileEntry::dir("user"), BclFileEntry::file("f", 1)]);
+        assert!(d.navigate_into());
+        assert_eq!(d.current_path(), "/home/user");
+    }
+
+    #[test]
+    fn test_bcl_save_path() {
+        let mut d = BclFileDialog::new(BclDialogMode::Save, "/home/user");
+        d.set_filename("new.rs");
+        assert_eq!(d.selected_path(), Some("/home/user/new.rs".to_string()));
+    }
+
+    #[test]
+    fn test_bcl_open_folder() {
+        let d = BclFileDialog::new(BclDialogMode::OpenFolder, "/workspace");
+        assert_eq!(d.selected_path(), Some("/workspace".to_string()));
+    }
+
+    #[test]
+    fn test_bcl_file_display() {
+        let f = BclFileEntry::file("test.rs", 2048);
+        assert!(f.display().contains("2.0 KB"));
+    }
+
+    #[test]
+    fn test_bcl_human_size() {
+        assert_eq!(BclFileEntry::file("x", 500).human_size(), "500 B");
+        assert!(BclFileEntry::file("x", 1500000).human_size().contains("MB"));
+    }
+}
