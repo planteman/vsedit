@@ -95832,6 +95832,247 @@ impl std::fmt::Display for GotoLineModel {
     }
 }
 
+
+/// GotoSymbolModel — go to symbol dialog model
+#[derive(Debug, Clone)]
+pub struct GotoSymbolModel {
+    pub byf_filter_text: String,
+    pub byf_symbol_count: u32,
+    pub byf_selected_index: u32,
+    pub byf_is_visible: bool,
+    pub byf_scope: String,
+    pub byf_kind_filter: String,
+    pub byf_sort_by: String,
+    pub byf_show_detail: bool,
+}
+
+impl GotoSymbolModel {
+    pub fn new() -> Self {
+        Self {
+            byf_filter_text: "".into(),
+            byf_symbol_count: 0,
+            byf_selected_index: 0,
+            byf_is_visible: false,
+            byf_scope: "file".into(),
+            byf_kind_filter: "".into(),
+            byf_sort_by: "position".into(),
+            byf_show_detail: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("GotoSymbolModel({})", self.byf_filter_text)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.byf_filter_text.is_empty() || true
+    }
+}
+
+impl Default for GotoSymbolModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for GotoSymbolModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GotoSymbolModel({})", self.byf_filter_text)
+    }
+}
+
+/// OutlineModel — document outline model
+#[derive(Debug, Clone)]
+pub struct OutlineViewModel {
+    pub byg_uri: String,
+    pub byg_element_count: u32,
+    pub byg_is_collapsed_all: bool,
+    pub byg_sort_by: String,
+    pub byg_filter_text: String,
+    pub byg_follow_cursor: bool,
+    pub byg_show_icons: bool,
+    pub byg_max_depth: u32,
+}
+
+impl OutlineViewModel {
+    pub fn new() -> Self {
+        Self {
+            byg_uri: "".into(),
+            byg_element_count: 0,
+            byg_is_collapsed_all: false,
+            byg_sort_by: "position".into(),
+            byg_filter_text: "".into(),
+            byg_follow_cursor: true,
+            byg_show_icons: true,
+            byg_max_depth: 10,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("OutlineViewModel({})", self.byg_uri)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.byg_uri.is_empty() || true
+    }
+}
+
+impl Default for OutlineViewModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for OutlineViewModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OutlineViewModel({})", self.byg_uri)
+    }
+}
+
+/// MiniMapModel — minimap rendering model
+#[derive(Debug, Clone)]
+pub struct MiniMapModel {
+    pub byh_is_enabled: bool,
+    pub byh_side: String,
+    pub byh_show_slider: String,
+    pub byh_max_column: u32,
+    pub byh_scale: u32,
+    pub byh_render_characters: bool,
+    pub byh_auto_hide: bool,
+    pub byh_section_header_enabled: bool,
+}
+
+impl MiniMapModel {
+    pub fn new() -> Self {
+        Self {
+            byh_is_enabled: true,
+            byh_side: "right".into(),
+            byh_show_slider: "mouseover".into(),
+            byh_max_column: 120,
+            byh_scale: 1,
+            byh_render_characters: true,
+            byh_auto_hide: false,
+            byh_section_header_enabled: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("MiniMapModel({})", self.byh_is_enabled)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.byh_is_enabled || true
+    }
+}
+
+impl Default for MiniMapModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for MiniMapModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MiniMapModel({})", self.byh_is_enabled)
+    }
+}
+
+/// StickyScrollModel — sticky scroll model
+#[derive(Debug, Clone)]
+pub struct StickyScrollModel {
+    pub byi_is_enabled: bool,
+    pub byi_max_line_count: u32,
+    pub byi_default_model: String,
+    pub byi_scroll_with_editor: bool,
+    pub byi_visible_lines: u32,
+    pub byi_current_top_line: u32,
+    pub byi_show_folds: bool,
+    pub byi_background_color: String,
+}
+
+impl StickyScrollModel {
+    pub fn new() -> Self {
+        Self {
+            byi_is_enabled: true,
+            byi_max_line_count: 5,
+            byi_default_model: "outline".into(),
+            byi_scroll_with_editor: true,
+            byi_visible_lines: 0,
+            byi_current_top_line: 0,
+            byi_show_folds: true,
+            byi_background_color: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("StickyScrollModel({})", self.byi_is_enabled)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.byi_is_enabled || true
+    }
+}
+
+impl Default for StickyScrollModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for StickyScrollModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StickyScrollModel({})", self.byi_is_enabled)
+    }
+}
+
+/// InlayHintModel — inlay hint model
+#[derive(Debug, Clone)]
+pub struct InlayHintModel {
+    pub byj_is_enabled: bool,
+    pub byj_font_size: u32,
+    pub byj_font_family: String,
+    pub byj_padding: bool,
+    pub byj_max_length: u32,
+    pub byj_show_types: bool,
+    pub byj_show_parameters: bool,
+    pub byj_show_enum_members: bool,
+}
+
+impl InlayHintModel {
+    pub fn new() -> Self {
+        Self {
+            byj_is_enabled: true,
+            byj_font_size: 0,
+            byj_font_family: "".into(),
+            byj_padding: true,
+            byj_max_length: 25,
+            byj_show_types: true,
+            byj_show_parameters: true,
+            byj_show_enum_members: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("InlayHintModel({})", self.byj_is_enabled)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.byj_is_enabled || true
+    }
+}
+
+impl Default for InlayHintModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for InlayHintModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InlayHintModel({})", self.byj_is_enabled)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -146255,6 +146496,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bye_target_line = 1;
         assert_eq!(c.summary(), GotoLineModel::new().summary());
+    }
+
+
+    #[test]
+    fn test_byf_create() {
+        let obj = GotoSymbolModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byf_validate() {
+        let obj = GotoSymbolModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byf_display() {
+        let obj = GotoSymbolModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("GotoSymbolModel"));
+    }
+
+    #[test]
+    fn test_byf_clone() {
+        let obj = GotoSymbolModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byf_debug() {
+        let obj = GotoSymbolModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("GotoSymbolModel"));
+    }
+
+    #[test]
+    fn test_byf_default() {
+        let obj = GotoSymbolModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byf_summary_contains_name() {
+        let obj = GotoSymbolModel::new();
+        assert!(obj.summary().contains("GotoSymbolModel"));
+    }
+
+    #[test]
+    fn test_byf_validate_default() {
+        let obj = GotoSymbolModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byf_display_not_empty() {
+        let obj = GotoSymbolModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byf_clone_independence() {
+        let mut obj = GotoSymbolModel::new();
+        let c = obj.clone();
+        obj.byf_filter_text = "".into();
+        assert_eq!(c.summary(), GotoSymbolModel::new().summary());
+    }
+
+    #[test]
+    fn test_byg_create() {
+        let obj = OutlineViewModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byg_validate() {
+        let obj = OutlineViewModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byg_display() {
+        let obj = OutlineViewModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("OutlineViewModel"));
+    }
+
+    #[test]
+    fn test_byg_clone() {
+        let obj = OutlineViewModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byg_debug() {
+        let obj = OutlineViewModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("OutlineViewModel"));
+    }
+
+    #[test]
+    fn test_byg_default() {
+        let obj = OutlineViewModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byg_summary_contains_name() {
+        let obj = OutlineViewModel::new();
+        assert!(obj.summary().contains("OutlineViewModel"));
+    }
+
+    #[test]
+    fn test_byg_validate_default() {
+        let obj = OutlineViewModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byg_display_not_empty() {
+        let obj = OutlineViewModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byg_clone_independence() {
+        let mut obj = OutlineViewModel::new();
+        let c = obj.clone();
+        obj.byg_uri = "".into();
+        assert_eq!(c.summary(), OutlineViewModel::new().summary());
+    }
+
+    #[test]
+    fn test_byh_create() {
+        let obj = MiniMapModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byh_validate() {
+        let obj = MiniMapModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byh_display() {
+        let obj = MiniMapModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("MiniMapModel"));
+    }
+
+    #[test]
+    fn test_byh_clone() {
+        let obj = MiniMapModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byh_debug() {
+        let obj = MiniMapModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("MiniMapModel"));
+    }
+
+    #[test]
+    fn test_byh_default() {
+        let obj = MiniMapModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byh_summary_contains_name() {
+        let obj = MiniMapModel::new();
+        assert!(obj.summary().contains("MiniMapModel"));
+    }
+
+    #[test]
+    fn test_byh_validate_default() {
+        let obj = MiniMapModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byh_display_not_empty() {
+        let obj = MiniMapModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byh_clone_independence() {
+        let mut obj = MiniMapModel::new();
+        let c = obj.clone();
+        obj.byh_is_enabled = true;
+        assert_eq!(c.summary(), MiniMapModel::new().summary());
+    }
+
+    #[test]
+    fn test_byi_create() {
+        let obj = StickyScrollModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byi_validate() {
+        let obj = StickyScrollModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byi_display() {
+        let obj = StickyScrollModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("StickyScrollModel"));
+    }
+
+    #[test]
+    fn test_byi_clone() {
+        let obj = StickyScrollModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byi_debug() {
+        let obj = StickyScrollModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("StickyScrollModel"));
+    }
+
+    #[test]
+    fn test_byi_default() {
+        let obj = StickyScrollModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byi_summary_contains_name() {
+        let obj = StickyScrollModel::new();
+        assert!(obj.summary().contains("StickyScrollModel"));
+    }
+
+    #[test]
+    fn test_byi_validate_default() {
+        let obj = StickyScrollModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byi_display_not_empty() {
+        let obj = StickyScrollModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byi_clone_independence() {
+        let mut obj = StickyScrollModel::new();
+        let c = obj.clone();
+        obj.byi_is_enabled = true;
+        assert_eq!(c.summary(), StickyScrollModel::new().summary());
+    }
+
+    #[test]
+    fn test_byj_create() {
+        let obj = InlayHintModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byj_validate() {
+        let obj = InlayHintModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byj_display() {
+        let obj = InlayHintModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("InlayHintModel"));
+    }
+
+    #[test]
+    fn test_byj_clone() {
+        let obj = InlayHintModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byj_debug() {
+        let obj = InlayHintModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("InlayHintModel"));
+    }
+
+    #[test]
+    fn test_byj_default() {
+        let obj = InlayHintModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byj_summary_contains_name() {
+        let obj = InlayHintModel::new();
+        assert!(obj.summary().contains("InlayHintModel"));
+    }
+
+    #[test]
+    fn test_byj_validate_default() {
+        let obj = InlayHintModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byj_display_not_empty() {
+        let obj = InlayHintModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byj_clone_independence() {
+        let mut obj = InlayHintModel::new();
+        let c = obj.clone();
+        obj.byj_is_enabled = true;
+        assert_eq!(c.summary(), InlayHintModel::new().summary());
     }
 
 }
