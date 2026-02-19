@@ -68330,3 +68330,177 @@ mod bdi_tests {
         assert!(t.all_indicators().is_empty());
     }
 }
+
+
+// --- bdj_: Editor code lens / action model ---
+
+/// A code lens item.
+#[derive(Debug, Clone)]
+pub struct BdjCodeLens {
+    pub line: u32,
+    pub title: String,
+    pub command_id: Option<String>,
+    pub tooltip: Option<String>,
+    pub provider: String,
+    pub resolved: bool,
+}
+
+impl BdjCodeLens {
+    pub fn new(line: u32, title: &str, provider: &str) -> Self {
+        Self { line, title: title.to_string(), command_id: None, tooltip: None, provider: provider.to_string(), resolved: false }
+    }
+
+    pub fn with_command(mut self, cmd: &str) -> Self { self.command_id = Some(cmd.to_string()); self.resolved = true; self }
+    pub fn with_tooltip(mut self, t: &str) -> Self { self.tooltip = Some(t.to_string()); self }
+
+    pub fn is_clickable(&self) -> bool { self.command_id.is_some() }
+
+    pub fn render(&self) -> String {
+        if self.resolved { self.title.clone() }
+        else { format!("{}...", self.title) }
+    }
+}
+
+/// Manages code lenses for a file.
+#[derive(Debug)]
+pub struct BdjCodeLensManager {
+    lenses: Vec<BdjCodeLens>,
+    enabled: bool,
+}
+
+impl BdjCodeLensManager {
+    pub fn new() -> Self { Self { lenses: Vec::new(), enabled: true } }
+
+    pub fn set_lenses(&mut self, lenses: Vec<BdjCodeLens>) {
+        self.lenses = lenses;
+        self.lenses.sort_by_key(|l| l.line);
+    }
+
+    pub fn add_lens(&mut self, lens: BdjCodeLens) { self.lenses.push(lens); }
+
+    pub fn lenses_at_line(&self, line: u32) -> Vec<&BdjCodeLens> {
+        if !self.enabled { return Vec::new(); }
+        self.lenses.iter().filter(|l| l.line == line).collect()
+    }
+
+    pub fn all_lenses(&self) -> &[BdjCodeLens] { &self.lenses }
+    pub fn lens_count(&self) -> usize { self.lenses.len() }
+
+    pub fn set_enabled(&mut self, e: bool) { self.enabled = e; }
+    pub fn is_enabled(&self) -> bool { self.enabled }
+
+    pub fn lines_with_lenses(&self) -> Vec<u32> {
+        if !self.enabled { return Vec::new(); }
+        let mut lines: Vec<_> = self.lenses.iter().map(|l| l.line).collect();
+        lines.sort();
+        lines.dedup();
+        lines
+    }
+
+    pub fn resolve_lens(&mut self, line: u32, title: &str, command: &str) {
+        if let Some(l) = self.lenses.iter_mut().find(|l| l.line == line && !l.resolved) {
+            l.title = title.to_string();
+            l.command_id = Some(command.to_string());
+            l.resolved = true;
+        }
+    }
+
+    pub fn render_line_lenses(&self, line: u32) -> Option<String> {
+        let lenses = self.lenses_at_line(line);
+        if lenses.is_empty() { return None; }
+        Some(lenses.iter().map(|l| l.render()).collect::<Vec<_>>().join(" | "))
+    }
+
+    pub fn by_provider(&self, provider: &str) -> Vec<&BdjCodeLens> {
+        self.lenses.iter().filter(|l| l.provider == provider).collect()
+    }
+
+    pub fn clear(&mut self) { self.lenses.clear(); }
+}
+
+#[cfg(test)]
+mod bdj_tests {
+    use super::*;
+
+    #[test]
+    fn test_bdj_lens() {
+        let l = BdjCodeLens::new(5, "2 references", "refs").with_command("editor.showRefs");
+        assert!(l.is_clickable());
+        assert!(l.resolved);
+    }
+
+    #[test]
+    fn test_bdj_render() {
+        let l = BdjCodeLens::new(1, "Run Test", "test");
+        assert!(l.render().contains("..."));
+        let l2 = l.with_command("test.run");
+        assert!(!l2.render().contains("..."));
+    }
+
+    #[test]
+    fn test_bdj_manager() {
+        let mut m = BdjCodeLensManager::new();
+        m.set_lenses(vec![
+            BdjCodeLens::new(1, "3 refs", "refs").with_command("show"),
+            BdjCodeLens::new(5, "Run", "test").with_command("run"),
+        ]);
+        assert_eq!(m.lens_count(), 2);
+    }
+
+    #[test]
+    fn test_bdj_at_line() {
+        let mut m = BdjCodeLensManager::new();
+        m.add_lens(BdjCodeLens::new(10, "x", "p").with_command("c"));
+        assert_eq!(m.lenses_at_line(10).len(), 1);
+        assert_eq!(m.lenses_at_line(11).len(), 0);
+    }
+
+    #[test]
+    fn test_bdj_disabled() {
+        let mut m = BdjCodeLensManager::new();
+        m.add_lens(BdjCodeLens::new(1, "x", "p"));
+        m.set_enabled(false);
+        assert!(m.lenses_at_line(1).is_empty());
+    }
+
+    #[test]
+    fn test_bdj_resolve() {
+        let mut m = BdjCodeLensManager::new();
+        m.add_lens(BdjCodeLens::new(5, "loading", "refs"));
+        m.resolve_lens(5, "3 references", "editor.showRefs");
+        assert!(m.all_lenses()[0].resolved);
+    }
+
+    #[test]
+    fn test_bdj_render_line() {
+        let mut m = BdjCodeLensManager::new();
+        m.add_lens(BdjCodeLens::new(1, "A", "p").with_command("c"));
+        m.add_lens(BdjCodeLens::new(1, "B", "p").with_command("c"));
+        let r = m.render_line_lenses(1).unwrap();
+        assert!(r.contains("A | B"));
+    }
+
+    #[test]
+    fn test_bdj_lines() {
+        let mut m = BdjCodeLensManager::new();
+        m.add_lens(BdjCodeLens::new(1, "x", "p"));
+        m.add_lens(BdjCodeLens::new(5, "y", "p"));
+        assert_eq!(m.lines_with_lenses(), vec![1, 5]);
+    }
+
+    #[test]
+    fn test_bdj_by_provider() {
+        let mut m = BdjCodeLensManager::new();
+        m.add_lens(BdjCodeLens::new(1, "a", "refs"));
+        m.add_lens(BdjCodeLens::new(2, "b", "test"));
+        assert_eq!(m.by_provider("refs").len(), 1);
+    }
+
+    #[test]
+    fn test_bdj_clear() {
+        let mut m = BdjCodeLensManager::new();
+        m.add_lens(BdjCodeLens::new(1, "x", "p"));
+        m.clear();
+        assert_eq!(m.lens_count(), 0);
+    }
+}
