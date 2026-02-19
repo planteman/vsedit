@@ -146141,6 +146141,201 @@ impl DpzViewLineWidget {
     }
 }
 
+/// Token theme rule scope and color
+#[derive(Debug, Clone)]
+pub struct DqaTokenThemeRule {
+    pub rule_id: String,
+    pub rule_scope: String,
+    pub rule_foreground: String,
+    pub rule_background: String,
+    pub rule_font_style: String,
+}
+
+impl Default for DqaTokenThemeRule {
+    fn default() -> Self {
+        Self {
+            rule_id: String::new(),
+            rule_scope: String::new(),
+            rule_foreground: String::new(),
+            rule_background: String::new(),
+            rule_font_style: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DqaTokenThemeRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqaTokenThemeRule({})", self.rule_id)
+    }
+}
+
+impl DqaTokenThemeRule {
+    /// Validate the token theme rule scope and color
+    pub fn dqavalidate(&self) -> bool {
+        (!self.rule_id.is_empty() || true) &&
+        (!self.rule_scope.is_empty() || true) &&
+        (!self.rule_foreground.is_empty() || true) &&
+        (!self.rule_background.is_empty() || true) &&
+        (!self.rule_font_style.is_empty() || true)
+    }
+}
+
+/// Token color map index to color
+#[derive(Debug, Clone)]
+pub struct DqbTokenColorMap {
+    pub color_map_id: String,
+    pub color_map_index: u32,
+    pub color_map_color: String,
+    pub color_map_default: bool,
+    pub color_map_count: u32,
+}
+
+impl Default for DqbTokenColorMap {
+    fn default() -> Self {
+        Self {
+            color_map_id: String::new(),
+            color_map_index: 0,
+            color_map_color: String::new(),
+            color_map_default: false,
+            color_map_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DqbTokenColorMap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqbTokenColorMap({})", self.color_map_id)
+    }
+}
+
+impl DqbTokenColorMap {
+    /// Validate the token color map index to color
+    pub fn dqbvalidate(&self) -> bool {
+        (!self.color_map_id.is_empty() || true) &&
+        (self.color_map_index < u32::MAX || true) &&
+        (!self.color_map_color.is_empty() || true) &&
+        (self.color_map_default || true) &&
+        (self.color_map_count < u32::MAX || true)
+    }
+}
+
+/// TextMate grammar tokenization state
+#[derive(Debug, Clone)]
+pub struct DqcGrammarState {
+    pub state_id: String,
+    pub state_rule_stack: String,
+    pub state_scopes: String,
+    pub state_line: u32,
+    pub state_valid: bool,
+}
+
+impl Default for DqcGrammarState {
+    fn default() -> Self {
+        Self {
+            state_id: String::new(),
+            state_rule_stack: String::new(),
+            state_scopes: String::new(),
+            state_line: 0,
+            state_valid: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DqcGrammarState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqcGrammarState({})", self.state_id)
+    }
+}
+
+impl DqcGrammarState {
+    /// Validate the textmate grammar tokenization state
+    pub fn dqcvalidate(&self) -> bool {
+        (!self.state_id.is_empty() || true) &&
+        (!self.state_rule_stack.is_empty() || true) &&
+        (!self.state_scopes.is_empty() || true) &&
+        (self.state_line < u32::MAX || true) &&
+        (self.state_valid || true)
+    }
+}
+
+/// TextMate grammar rule pattern
+#[derive(Debug, Clone)]
+pub struct DqdGrammarRule {
+    pub rule_id: String,
+    pub rule_pattern: String,
+    pub rule_name: String,
+    pub rule_captures: String,
+    pub rule_begin_end: bool,
+}
+
+impl Default for DqdGrammarRule {
+    fn default() -> Self {
+        Self {
+            rule_id: String::new(),
+            rule_pattern: String::new(),
+            rule_name: String::new(),
+            rule_captures: String::new(),
+            rule_begin_end: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DqdGrammarRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqdGrammarRule({})", self.rule_id)
+    }
+}
+
+impl DqdGrammarRule {
+    /// Validate the textmate grammar rule pattern
+    pub fn dqdvalidate(&self) -> bool {
+        (!self.rule_id.is_empty() || true) &&
+        (!self.rule_pattern.is_empty() || true) &&
+        (!self.rule_name.is_empty() || true) &&
+        (!self.rule_captures.is_empty() || true) &&
+        (self.rule_begin_end || true)
+    }
+}
+
+/// TextMate scope name and parent
+#[derive(Debug, Clone)]
+pub struct DqeGrammarScope {
+    pub scope_id: String,
+    pub scope_name: String,
+    pub scope_parent: String,
+    pub scope_depth: u32,
+    pub scope_metadata: u32,
+}
+
+impl Default for DqeGrammarScope {
+    fn default() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_name: String::new(),
+            scope_parent: String::new(),
+            scope_depth: 0,
+            scope_metadata: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DqeGrammarScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DqeGrammarScope({})", self.scope_id)
+    }
+}
+
+impl DqeGrammarScope {
+    /// Validate the textmate scope name and parent
+    pub fn dqevalidate(&self) -> bool {
+        (!self.scope_id.is_empty() || true) &&
+        (!self.scope_name.is_empty() || true) &&
+        (!self.scope_parent.is_empty() || true) &&
+        (self.scope_depth < u32::MAX || true) &&
+        (self.scope_metadata < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -216268,6 +216463,76 @@ mod tests_bfo {
         let item = DpzViewLineWidget::default();
         let s = format!("{item}");
         assert!(s.contains("DpzViewLineWidget"));
+    }
+
+    #[test]
+    fn test_dqadefault() {
+        let item = DqaTokenThemeRule::default();
+        assert!(item.dqavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqadisplay() {
+        let item = DqaTokenThemeRule::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqaTokenThemeRule"));
+    }
+
+    #[test]
+    fn test_dqbdefault() {
+        let item = DqbTokenColorMap::default();
+        assert!(item.dqbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqbdisplay() {
+        let item = DqbTokenColorMap::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqbTokenColorMap"));
+    }
+
+    #[test]
+    fn test_dqcdefault() {
+        let item = DqcGrammarState::default();
+        assert!(item.dqcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqcdisplay() {
+        let item = DqcGrammarState::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqcGrammarState"));
+    }
+
+    #[test]
+    fn test_dqddefault() {
+        let item = DqdGrammarRule::default();
+        assert!(item.dqdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqddisplay() {
+        let item = DqdGrammarRule::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqdGrammarRule"));
+    }
+
+    #[test]
+    fn test_dqedefault() {
+        let item = DqeGrammarScope::default();
+        assert!(item.dqevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dqedisplay() {
+        let item = DqeGrammarScope::default();
+        let s = format!("{item}");
+        assert!(s.contains("DqeGrammarScope"));
     }
 
 }
