@@ -56500,3 +56500,231 @@ mod bbb_tests {
         assert_eq!(m.visible_line_count(10), 8);
     }
 }
+
+
+// --- bbc_: Editor snippet variables model ---
+
+/// Known VS Code snippet variable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbcSnippetVar {
+    TmSelectedText, TmCurrentLine, TmCurrentWord, TmLineIndex,
+    TmLineNumber, TmFilename, TmFilenameBase, TmDirectory, TmFilepath,
+    ClipboardContent, WorkspaceName, WorkspaceFolder,
+    CurrentYear, CurrentYearShort, CurrentMonth, CurrentMonthName,
+    CurrentMonthNameShort, CurrentDate, CurrentDayName, CurrentDayNameShort,
+    CurrentHour, CurrentMinute, CurrentSecond, CurrentSecondsUnix,
+    RandomHex, RandomDecimal, UUID, BlockCommentStart, BlockCommentEnd,
+    LineComment,
+}
+
+impl BbcSnippetVar {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::TmSelectedText => "TM_SELECTED_TEXT",
+            Self::TmCurrentLine => "TM_CURRENT_LINE",
+            Self::TmCurrentWord => "TM_CURRENT_WORD",
+            Self::TmLineIndex => "TM_LINE_INDEX",
+            Self::TmLineNumber => "TM_LINE_NUMBER",
+            Self::TmFilename => "TM_FILENAME",
+            Self::TmFilenameBase => "TM_FILENAME_BASE",
+            Self::TmDirectory => "TM_DIRECTORY",
+            Self::TmFilepath => "TM_FILEPATH",
+            Self::ClipboardContent => "CLIPBOARD",
+            Self::WorkspaceName => "WORKSPACE_NAME",
+            Self::WorkspaceFolder => "WORKSPACE_FOLDER",
+            Self::CurrentYear => "CURRENT_YEAR",
+            Self::CurrentYearShort => "CURRENT_YEAR_SHORT",
+            Self::CurrentMonth => "CURRENT_MONTH",
+            Self::CurrentMonthName => "CURRENT_MONTH_NAME",
+            Self::CurrentMonthNameShort => "CURRENT_MONTH_NAME_SHORT",
+            Self::CurrentDate => "CURRENT_DATE",
+            Self::CurrentDayName => "CURRENT_DAY_NAME",
+            Self::CurrentDayNameShort => "CURRENT_DAY_NAME_SHORT",
+            Self::CurrentHour => "CURRENT_HOUR",
+            Self::CurrentMinute => "CURRENT_MINUTE",
+            Self::CurrentSecond => "CURRENT_SECONDS_UNIX",
+            Self::CurrentSecondsUnix => "CURRENT_SECONDS_UNIX",
+            Self::RandomHex => "RANDOM_HEX",
+            Self::RandomDecimal => "RANDOM",
+            Self::UUID => "UUID",
+            Self::BlockCommentStart => "BLOCK_COMMENT_START",
+            Self::BlockCommentEnd => "BLOCK_COMMENT_END",
+            Self::LineComment => "LINE_COMMENT",
+        }
+    }
+
+    pub fn is_datetime(&self) -> bool {
+        matches!(self,
+            Self::CurrentYear | Self::CurrentYearShort | Self::CurrentMonth |
+            Self::CurrentMonthName | Self::CurrentMonthNameShort | Self::CurrentDate |
+            Self::CurrentDayName | Self::CurrentDayNameShort | Self::CurrentHour |
+            Self::CurrentMinute | Self::CurrentSecond | Self::CurrentSecondsUnix
+        )
+    }
+
+    pub fn is_editor_context(&self) -> bool {
+        matches!(self,
+            Self::TmSelectedText | Self::TmCurrentLine | Self::TmCurrentWord |
+            Self::TmLineIndex | Self::TmLineNumber
+        )
+    }
+
+    pub fn is_file_context(&self) -> bool {
+        matches!(self,
+            Self::TmFilename | Self::TmFilenameBase | Self::TmDirectory | Self::TmFilepath
+        )
+    }
+}
+
+/// A snippet tabstop.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BbcTabstop {
+    pub index: u32,
+    pub placeholder: Option<String>,
+    pub choices: Vec<String>,
+    pub variable: Option<BbcSnippetVar>,
+}
+
+impl BbcTabstop {
+    pub fn simple(index: u32) -> Self {
+        Self { index, placeholder: None, choices: Vec::new(), variable: None }
+    }
+
+    pub fn with_placeholder(index: u32, ph: &str) -> Self {
+        Self { index, placeholder: Some(ph.to_string()), choices: Vec::new(), variable: None }
+    }
+
+    pub fn with_choices(index: u32, choices: Vec<&str>) -> Self {
+        Self { index, placeholder: None, choices: choices.into_iter().map(|s| s.to_string()).collect(), variable: None }
+    }
+
+    pub fn has_choices(&self) -> bool { !self.choices.is_empty() }
+    pub fn is_final_tabstop(&self) -> bool { self.index == 0 }
+
+    pub fn display(&self) -> String {
+        if let Some(p) = &self.placeholder { format!("${{{}: {}}}", self.index, p) }
+        else if !self.choices.is_empty() { format!("${{{}: |{}|}}", self.index, self.choices.join(",")) }
+        else { format!("${}", self.index) }
+    }
+}
+
+/// Snippet variable resolver context.
+#[derive(Debug, Clone)]
+pub struct BbcVarContext {
+    pub selected_text: String,
+    pub current_line: String,
+    pub current_word: String,
+    pub line_index: u32,
+    pub filename: String,
+    pub filename_base: String,
+    pub directory: String,
+    pub filepath: String,
+    pub clipboard: String,
+    pub workspace_name: String,
+    pub workspace_folder: String,
+}
+
+impl BbcVarContext {
+    pub fn new() -> Self {
+        Self {
+            selected_text: String::new(), current_line: String::new(),
+            current_word: String::new(), line_index: 0,
+            filename: String::new(), filename_base: String::new(),
+            directory: String::new(), filepath: String::new(),
+            clipboard: String::new(), workspace_name: String::new(),
+            workspace_folder: String::new(),
+        }
+    }
+
+    pub fn resolve(&self, var: BbcSnippetVar) -> String {
+        match var {
+            BbcSnippetVar::TmSelectedText => self.selected_text.clone(),
+            BbcSnippetVar::TmCurrentLine => self.current_line.clone(),
+            BbcSnippetVar::TmCurrentWord => self.current_word.clone(),
+            BbcSnippetVar::TmLineIndex => self.line_index.to_string(),
+            BbcSnippetVar::TmLineNumber => (self.line_index + 1).to_string(),
+            BbcSnippetVar::TmFilename => self.filename.clone(),
+            BbcSnippetVar::TmFilenameBase => self.filename_base.clone(),
+            BbcSnippetVar::TmDirectory => self.directory.clone(),
+            BbcSnippetVar::TmFilepath => self.filepath.clone(),
+            BbcSnippetVar::ClipboardContent => self.clipboard.clone(),
+            BbcSnippetVar::WorkspaceName => self.workspace_name.clone(),
+            BbcSnippetVar::WorkspaceFolder => self.workspace_folder.clone(),
+            _ => String::new(), // datetime/random resolved at expansion time
+        }
+    }
+
+    pub fn has_value(&self, var: BbcSnippetVar) -> bool {
+        !self.resolve(var).is_empty()
+    }
+}
+
+#[cfg(test)]
+mod bbc_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbc_var_names() {
+        assert_eq!(BbcSnippetVar::TmFilename.name(), "TM_FILENAME");
+        assert_eq!(BbcSnippetVar::UUID.name(), "UUID");
+    }
+
+    #[test]
+    fn test_bbc_var_categories() {
+        assert!(BbcSnippetVar::CurrentYear.is_datetime());
+        assert!(BbcSnippetVar::TmSelectedText.is_editor_context());
+        assert!(BbcSnippetVar::TmFilepath.is_file_context());
+        assert!(!BbcSnippetVar::UUID.is_datetime());
+    }
+
+    #[test]
+    fn test_bbc_tabstop_simple() {
+        let t = BbcTabstop::simple(1);
+        assert_eq!(t.display(), "$1");
+        assert!(!t.is_final_tabstop());
+    }
+
+    #[test]
+    fn test_bbc_tabstop_placeholder() {
+        let t = BbcTabstop::with_placeholder(1, "name");
+        assert_eq!(t.display(), "${1: name}");
+    }
+
+    #[test]
+    fn test_bbc_tabstop_choices() {
+        let t = BbcTabstop::with_choices(1, vec!["a", "b", "c"]);
+        assert!(t.has_choices());
+        assert_eq!(t.display(), "${1: |a,b,c|}");
+    }
+
+    #[test]
+    fn test_bbc_final_tabstop() {
+        let t = BbcTabstop::simple(0);
+        assert!(t.is_final_tabstop());
+    }
+
+    #[test]
+    fn test_bbc_context_resolve() {
+        let mut ctx = BbcVarContext::new();
+        ctx.filename = "main.rs".to_string();
+        ctx.line_index = 9;
+        assert_eq!(ctx.resolve(BbcSnippetVar::TmFilename), "main.rs");
+        assert_eq!(ctx.resolve(BbcSnippetVar::TmLineNumber), "10");
+    }
+
+    #[test]
+    fn test_bbc_context_has_value() {
+        let mut ctx = BbcVarContext::new();
+        assert!(!ctx.has_value(BbcSnippetVar::TmSelectedText));
+        ctx.selected_text = "hello".to_string();
+        assert!(ctx.has_value(BbcSnippetVar::TmSelectedText));
+    }
+
+    #[test]
+    fn test_bbc_context_editor() {
+        let mut ctx = BbcVarContext::new();
+        ctx.current_word = "println".to_string();
+        ctx.current_line = "    println!(\"hello\");".to_string();
+        assert_eq!(ctx.resolve(BbcSnippetVar::TmCurrentWord), "println");
+    }
+}
