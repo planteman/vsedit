@@ -53978,3 +53978,359 @@ mod bat_tests {
         assert_eq!(loc.end_column, Some(10));
     }
 }
+
+
+// --- bau_: Editor testing/test explorer model ---
+
+/// Test item state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BauTestState {
+    Unset,
+    Queued,
+    Running,
+    Passed,
+    Failed,
+    Errored,
+    Skipped,
+}
+
+impl BauTestState {
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Self::Unset => "\u{25cb}",
+            Self::Queued => "\u{25cc}",
+            Self::Running => "\u{25cf}",
+            Self::Passed => "\u{2714}",
+            Self::Failed => "\u{2718}",
+            Self::Errored => "\u{26a0}",
+            Self::Skipped => "\u{2192}",
+        }
+    }
+
+    pub fn is_completed(&self) -> bool {
+        matches!(self, Self::Passed | Self::Failed | Self::Errored | Self::Skipped)
+    }
+
+    pub fn is_failure(&self) -> bool {
+        matches!(self, Self::Failed | Self::Errored)
+    }
+}
+
+/// A single test item in the test tree.
+#[derive(Debug, Clone)]
+pub struct BauTestItem {
+    pub id: String,
+    pub label: String,
+    pub description: Option<String>,
+    pub file_path: Option<String>,
+    pub line: Option<u32>,
+    pub state: BauTestState,
+    pub duration_ms: Option<u64>,
+    pub error_message: Option<String>,
+    pub children: Vec<BauTestItem>,
+    pub is_expanded: bool,
+    pub tags: Vec<String>,
+}
+
+impl BauTestItem {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            description: None,
+            file_path: None,
+            line: None,
+            state: BauTestState::Unset,
+            duration_ms: None,
+            error_message: None,
+            children: Vec::new(),
+            is_expanded: false,
+            tags: Vec::new(),
+        }
+    }
+
+    pub fn with_location(mut self, path: &str, line: u32) -> Self {
+        self.file_path = Some(path.to_string());
+        self.line = Some(line);
+        self
+    }
+
+    pub fn add_child(&mut self, child: BauTestItem) {
+        self.children.push(child);
+    }
+
+    pub fn child_count(&self) -> usize {
+        self.children.len()
+    }
+
+    pub fn is_leaf(&self) -> bool {
+        self.children.is_empty()
+    }
+
+    pub fn total_count(&self) -> usize {
+        1 + self.children.iter().map(|c| c.total_count()).sum::<usize>()
+    }
+
+    pub fn passed_count(&self) -> usize {
+        let self_count = if self.state == BauTestState::Passed { 1 } else { 0 };
+        self_count + self.children.iter().map(|c| c.passed_count()).sum::<usize>()
+    }
+
+    pub fn failed_count(&self) -> usize {
+        let self_count = if self.state.is_failure() { 1 } else { 0 };
+        self_count + self.children.iter().map(|c| c.failed_count()).sum::<usize>()
+    }
+
+    pub fn set_state(&mut self, state: BauTestState) {
+        self.state = state;
+    }
+
+    pub fn set_result(&mut self, state: BauTestState, duration_ms: u64, error: Option<&str>) {
+        self.state = state;
+        self.duration_ms = Some(duration_ms);
+        self.error_message = error.map(|e| e.to_string());
+    }
+
+    pub fn toggle_expand(&mut self) {
+        self.is_expanded = !self.is_expanded;
+    }
+
+    pub fn duration_display(&self) -> String {
+        match self.duration_ms {
+            Some(ms) if ms < 1000 => format!("{}ms", ms),
+            Some(ms) => format!("{:.1}s", ms as f64 / 1000.0),
+            None => String::new(),
+        }
+    }
+
+    pub fn find_by_id(&self, id: &str) -> Option<&BauTestItem> {
+        if self.id == id {
+            return Some(self);
+        }
+        self.children.iter().find_map(|c| c.find_by_id(id))
+    }
+
+    pub fn find_by_id_mut(&mut self, id: &str) -> Option<&mut BauTestItem> {
+        if self.id == id {
+            return Some(self);
+        }
+        self.children.iter_mut().find_map(|c| c.find_by_id_mut(id))
+    }
+}
+
+/// Test run state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BauRunState {
+    Idle,
+    Running,
+    Complete,
+    Cancelled,
+}
+
+/// The test explorer model.
+#[derive(Debug, Clone)]
+pub struct BauTestExplorer {
+    pub root_items: Vec<BauTestItem>,
+    pub run_state: BauRunState,
+    pub selected_id: Option<String>,
+    pub filter_text: Option<String>,
+    pub show_passed: bool,
+    pub show_failed: bool,
+    pub show_skipped: bool,
+    pub auto_run_on_save: bool,
+}
+
+impl BauTestExplorer {
+    pub fn new() -> Self {
+        Self {
+            root_items: Vec::new(),
+            run_state: BauRunState::Idle,
+            selected_id: None,
+            filter_text: None,
+            show_passed: true,
+            show_failed: true,
+            show_skipped: true,
+            auto_run_on_save: false,
+        }
+    }
+
+    pub fn set_items(&mut self, items: Vec<BauTestItem>) {
+        self.root_items = items;
+    }
+
+    pub fn total_tests(&self) -> usize {
+        self.root_items.iter().map(|i| i.total_count()).sum()
+    }
+
+    pub fn passed_tests(&self) -> usize {
+        self.root_items.iter().map(|i| i.passed_count()).sum()
+    }
+
+    pub fn failed_tests(&self) -> usize {
+        self.root_items.iter().map(|i| i.failed_count()).sum()
+    }
+
+    pub fn find_item(&self, id: &str) -> Option<&BauTestItem> {
+        self.root_items.iter().find_map(|i| i.find_by_id(id))
+    }
+
+    pub fn find_item_mut(&mut self, id: &str) -> Option<&mut BauTestItem> {
+        self.root_items.iter_mut().find_map(|i| i.find_by_id_mut(id))
+    }
+
+    pub fn start_run(&mut self) {
+        self.run_state = BauRunState::Running;
+    }
+
+    pub fn complete_run(&mut self) {
+        self.run_state = BauRunState::Complete;
+    }
+
+    pub fn cancel_run(&mut self) {
+        self.run_state = BauRunState::Cancelled;
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.run_state == BauRunState::Running
+    }
+
+    pub fn status_text(&self) -> String {
+        let total = self.total_tests();
+        let passed = self.passed_tests();
+        let failed = self.failed_tests();
+        match self.run_state {
+            BauRunState::Idle => format!("{} tests", total),
+            BauRunState::Running => format!("Running... {}/{}", passed + failed, total),
+            BauRunState::Complete => format!("{} passed, {} failed of {}", passed, failed, total),
+            BauRunState::Cancelled => format!("Cancelled ({}/{})", passed + failed, total),
+        }
+    }
+
+    pub fn set_filter(&mut self, text: Option<String>) {
+        self.filter_text = text;
+    }
+
+    pub fn root_count(&self) -> usize {
+        self.root_items.len()
+    }
+}
+
+#[cfg(test)]
+mod bau_tests {
+    use super::*;
+
+    #[test]
+    fn test_bau_test_state() {
+        assert!(BauTestState::Passed.is_completed());
+        assert!(BauTestState::Failed.is_failure());
+        assert!(!BauTestState::Running.is_completed());
+        assert!(!BauTestState::Passed.is_failure());
+    }
+
+    #[test]
+    fn test_bau_test_item_creation() {
+        let item = BauTestItem::new("test1", "my test")
+            .with_location("test.rs", 10);
+        assert_eq!(item.label, "my test");
+        assert!(item.is_leaf());
+        assert_eq!(item.total_count(), 1);
+    }
+
+    #[test]
+    fn test_bau_test_item_tree() {
+        let mut suite = BauTestItem::new("suite", "Test Suite");
+        suite.add_child(BauTestItem::new("t1", "test 1"));
+        suite.add_child(BauTestItem::new("t2", "test 2"));
+        assert_eq!(suite.child_count(), 2);
+        assert_eq!(suite.total_count(), 3);
+        assert!(!suite.is_leaf());
+    }
+
+    #[test]
+    fn test_bau_test_counts() {
+        let mut suite = BauTestItem::new("suite", "Suite");
+        let mut t1 = BauTestItem::new("t1", "test 1");
+        t1.set_state(BauTestState::Passed);
+        let mut t2 = BauTestItem::new("t2", "test 2");
+        t2.set_state(BauTestState::Failed);
+        let mut t3 = BauTestItem::new("t3", "test 3");
+        t3.set_state(BauTestState::Passed);
+        suite.add_child(t1);
+        suite.add_child(t2);
+        suite.add_child(t3);
+
+        assert_eq!(suite.passed_count(), 2);
+        assert_eq!(suite.failed_count(), 1);
+    }
+
+    #[test]
+    fn test_bau_test_result() {
+        let mut item = BauTestItem::new("t1", "test");
+        item.set_result(BauTestState::Failed, 150, Some("assertion failed"));
+        assert!(item.state.is_failure());
+        assert_eq!(item.duration_ms, Some(150));
+        assert_eq!(item.error_message.as_deref(), Some("assertion failed"));
+    }
+
+    #[test]
+    fn test_bau_duration_display() {
+        let mut item = BauTestItem::new("t1", "test");
+        item.duration_ms = Some(500);
+        assert_eq!(item.duration_display(), "500ms");
+        item.duration_ms = Some(2500);
+        assert_eq!(item.duration_display(), "2.5s");
+    }
+
+    #[test]
+    fn test_bau_find_by_id() {
+        let mut suite = BauTestItem::new("suite", "Suite");
+        suite.add_child(BauTestItem::new("t1", "test 1"));
+        suite.add_child(BauTestItem::new("t2", "test 2"));
+        assert!(suite.find_by_id("t1").is_some());
+        assert!(suite.find_by_id("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_bau_explorer_basic() {
+        let mut explorer = BauTestExplorer::new();
+        explorer.set_items(vec![BauTestItem::new("t1", "test 1")]);
+        assert_eq!(explorer.total_tests(), 1);
+        assert_eq!(explorer.root_count(), 1);
+    }
+
+    #[test]
+    fn test_bau_explorer_run_lifecycle() {
+        let mut explorer = BauTestExplorer::new();
+        assert_eq!(explorer.run_state, BauRunState::Idle);
+        explorer.start_run();
+        assert!(explorer.is_running());
+        explorer.complete_run();
+        assert_eq!(explorer.run_state, BauRunState::Complete);
+    }
+
+    #[test]
+    fn test_bau_explorer_status() {
+        let mut explorer = BauTestExplorer::new();
+        let mut t1 = BauTestItem::new("t1", "test 1");
+        t1.set_state(BauTestState::Passed);
+        explorer.set_items(vec![t1]);
+        explorer.complete_run();
+        let status = explorer.status_text();
+        assert!(status.contains("1 passed"));
+    }
+
+    #[test]
+    fn test_bau_explorer_find() {
+        let mut explorer = BauTestExplorer::new();
+        explorer.set_items(vec![BauTestItem::new("t1", "test 1")]);
+        assert!(explorer.find_item("t1").is_some());
+    }
+
+    #[test]
+    fn test_bau_toggle_expand() {
+        let mut item = BauTestItem::new("t1", "test");
+        assert!(!item.is_expanded);
+        item.toggle_expand();
+        assert!(item.is_expanded);
+    }
+}
