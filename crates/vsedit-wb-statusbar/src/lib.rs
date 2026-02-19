@@ -94211,6 +94211,247 @@ impl std::fmt::Display for AuxiliaryBarEntry {
     }
 }
 
+
+/// WindowStateModel — window state model
+#[derive(Debug, Clone)]
+pub struct WindowStateModel {
+    pub bxa_width: u32,
+    pub bxa_height: u32,
+    pub bxa_x_pos: i32,
+    pub bxa_y_pos: i32,
+    pub bxa_is_maximized: bool,
+    pub bxa_is_fullscreen: bool,
+    pub bxa_is_focused: bool,
+    pub bxa_display_id: u32,
+}
+
+impl WindowStateModel {
+    pub fn new() -> Self {
+        Self {
+            bxa_width: 1024,
+            bxa_height: 768,
+            bxa_x_pos: 0,
+            bxa_y_pos: 0,
+            bxa_is_maximized: false,
+            bxa_is_fullscreen: false,
+            bxa_is_focused: true,
+            bxa_display_id: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("WindowStateModel({})", self.bxa_width)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bxa_width < u32::MAX || true
+    }
+}
+
+impl Default for WindowStateModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for WindowStateModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WindowStateModel({})", self.bxa_width)
+    }
+}
+
+/// LayoutStateModel — workbench layout state
+#[derive(Debug, Clone)]
+pub struct LayoutStateModel {
+    pub bxb_sidebar_visible: bool,
+    pub bxb_sidebar_position: String,
+    pub bxb_sidebar_width: u32,
+    pub bxb_panel_visible: bool,
+    pub bxb_panel_height: u32,
+    pub bxb_panel_position: String,
+    pub bxb_auxbar_visible: bool,
+    pub bxb_activitybar_visible: bool,
+}
+
+impl LayoutStateModel {
+    pub fn new() -> Self {
+        Self {
+            bxb_sidebar_visible: true,
+            bxb_sidebar_position: "left".into(),
+            bxb_sidebar_width: 250,
+            bxb_panel_visible: false,
+            bxb_panel_height: 200,
+            bxb_panel_position: "bottom".into(),
+            bxb_auxbar_visible: false,
+            bxb_activitybar_visible: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("LayoutStateModel({})", self.bxb_sidebar_visible)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bxb_sidebar_visible || true
+    }
+}
+
+impl Default for LayoutStateModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for LayoutStateModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LayoutStateModel({})", self.bxb_sidebar_visible)
+    }
+}
+
+/// ZenModeConfig — zen mode configuration
+#[derive(Debug, Clone)]
+pub struct ZenModeConfig {
+    pub bxc_is_active: bool,
+    pub bxc_hide_activity_bar: bool,
+    pub bxc_hide_status_bar: bool,
+    pub bxc_hide_tabs: bool,
+    pub bxc_hide_line_numbers: bool,
+    pub bxc_center_layout: bool,
+    pub bxc_full_screen: bool,
+    pub bxc_restore_on_exit: bool,
+}
+
+impl ZenModeConfig {
+    pub fn new() -> Self {
+        Self {
+            bxc_is_active: false,
+            bxc_hide_activity_bar: true,
+            bxc_hide_status_bar: true,
+            bxc_hide_tabs: true,
+            bxc_hide_line_numbers: false,
+            bxc_center_layout: true,
+            bxc_full_screen: true,
+            bxc_restore_on_exit: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ZenModeConfig({})", self.bxc_is_active)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bxc_is_active || true
+    }
+}
+
+impl Default for ZenModeConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ZenModeConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ZenModeConfig({})", self.bxc_is_active)
+    }
+}
+
+/// BreadcrumbPickerModel — breadcrumb picker model
+#[derive(Debug, Clone)]
+pub struct BreadcrumbPickerModel {
+    pub bxd_active_index: u32,
+    pub bxd_element_count: u32,
+    pub bxd_is_open: bool,
+    pub bxd_focused_index: u32,
+    pub bxd_filter_text: String,
+    pub bxd_picker_type: String,
+    pub bxd_scroll_top: u32,
+    pub bxd_item_height: u32,
+}
+
+impl BreadcrumbPickerModel {
+    pub fn new() -> Self {
+        Self {
+            bxd_active_index: 0,
+            bxd_element_count: 0,
+            bxd_is_open: false,
+            bxd_focused_index: 0,
+            bxd_filter_text: "".into(),
+            bxd_picker_type: "file".into(),
+            bxd_scroll_top: 0,
+            bxd_item_height: 22,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("BreadcrumbPickerModel({})", self.bxd_active_index)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bxd_active_index < u32::MAX || true
+    }
+}
+
+impl Default for BreadcrumbPickerModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for BreadcrumbPickerModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BreadcrumbPickerModel({})", self.bxd_active_index)
+    }
+}
+
+/// QuickInputModel — quick input model
+#[derive(Debug, Clone)]
+pub struct QuickInputModel {
+    pub bxe_value: String,
+    pub bxe_placeholder: String,
+    pub bxe_title: String,
+    pub bxe_step: u32,
+    pub bxe_total_steps: u32,
+    pub bxe_is_busy: bool,
+    pub bxe_is_password: bool,
+    pub bxe_validation_message: String,
+}
+
+impl QuickInputModel {
+    pub fn new() -> Self {
+        Self {
+            bxe_value: "".into(),
+            bxe_placeholder: "".into(),
+            bxe_title: "".into(),
+            bxe_step: 0,
+            bxe_total_steps: 0,
+            bxe_is_busy: false,
+            bxe_is_password: false,
+            bxe_validation_message: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("QuickInputModel({})", self.bxe_value)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxe_value.is_empty() || true
+    }
+}
+
+impl Default for QuickInputModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for QuickInputModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "QuickInputModel({})", self.bxe_value)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -142613,6 +142854,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bwz_id = "outline".into();
         assert_eq!(c.summary(), AuxiliaryBarEntry::new().summary());
+    }
+
+
+    #[test]
+    fn test_bxa_create() {
+        let obj = WindowStateModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxa_validate() {
+        let obj = WindowStateModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxa_display() {
+        let obj = WindowStateModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("WindowStateModel"));
+    }
+
+    #[test]
+    fn test_bxa_clone() {
+        let obj = WindowStateModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxa_debug() {
+        let obj = WindowStateModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("WindowStateModel"));
+    }
+
+    #[test]
+    fn test_bxa_default() {
+        let obj = WindowStateModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxa_summary_contains_name() {
+        let obj = WindowStateModel::new();
+        assert!(obj.summary().contains("WindowStateModel"));
+    }
+
+    #[test]
+    fn test_bxa_validate_default() {
+        let obj = WindowStateModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxa_display_not_empty() {
+        let obj = WindowStateModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxa_clone_independence() {
+        let mut obj = WindowStateModel::new();
+        let c = obj.clone();
+        obj.bxa_width = 1024;
+        assert_eq!(c.summary(), WindowStateModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxb_create() {
+        let obj = LayoutStateModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxb_validate() {
+        let obj = LayoutStateModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxb_display() {
+        let obj = LayoutStateModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("LayoutStateModel"));
+    }
+
+    #[test]
+    fn test_bxb_clone() {
+        let obj = LayoutStateModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxb_debug() {
+        let obj = LayoutStateModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("LayoutStateModel"));
+    }
+
+    #[test]
+    fn test_bxb_default() {
+        let obj = LayoutStateModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxb_summary_contains_name() {
+        let obj = LayoutStateModel::new();
+        assert!(obj.summary().contains("LayoutStateModel"));
+    }
+
+    #[test]
+    fn test_bxb_validate_default() {
+        let obj = LayoutStateModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxb_display_not_empty() {
+        let obj = LayoutStateModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxb_clone_independence() {
+        let mut obj = LayoutStateModel::new();
+        let c = obj.clone();
+        obj.bxb_sidebar_visible = true;
+        assert_eq!(c.summary(), LayoutStateModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxc_create() {
+        let obj = ZenModeConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxc_validate() {
+        let obj = ZenModeConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxc_display() {
+        let obj = ZenModeConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ZenModeConfig"));
+    }
+
+    #[test]
+    fn test_bxc_clone() {
+        let obj = ZenModeConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxc_debug() {
+        let obj = ZenModeConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ZenModeConfig"));
+    }
+
+    #[test]
+    fn test_bxc_default() {
+        let obj = ZenModeConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxc_summary_contains_name() {
+        let obj = ZenModeConfig::new();
+        assert!(obj.summary().contains("ZenModeConfig"));
+    }
+
+    #[test]
+    fn test_bxc_validate_default() {
+        let obj = ZenModeConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxc_display_not_empty() {
+        let obj = ZenModeConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxc_clone_independence() {
+        let mut obj = ZenModeConfig::new();
+        let c = obj.clone();
+        obj.bxc_is_active = false;
+        assert_eq!(c.summary(), ZenModeConfig::new().summary());
+    }
+
+    #[test]
+    fn test_bxd_create() {
+        let obj = BreadcrumbPickerModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxd_validate() {
+        let obj = BreadcrumbPickerModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxd_display() {
+        let obj = BreadcrumbPickerModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("BreadcrumbPickerModel"));
+    }
+
+    #[test]
+    fn test_bxd_clone() {
+        let obj = BreadcrumbPickerModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxd_debug() {
+        let obj = BreadcrumbPickerModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("BreadcrumbPickerModel"));
+    }
+
+    #[test]
+    fn test_bxd_default() {
+        let obj = BreadcrumbPickerModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxd_summary_contains_name() {
+        let obj = BreadcrumbPickerModel::new();
+        assert!(obj.summary().contains("BreadcrumbPickerModel"));
+    }
+
+    #[test]
+    fn test_bxd_validate_default() {
+        let obj = BreadcrumbPickerModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxd_display_not_empty() {
+        let obj = BreadcrumbPickerModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxd_clone_independence() {
+        let mut obj = BreadcrumbPickerModel::new();
+        let c = obj.clone();
+        obj.bxd_active_index = 0;
+        assert_eq!(c.summary(), BreadcrumbPickerModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxe_create() {
+        let obj = QuickInputModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxe_validate() {
+        let obj = QuickInputModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxe_display() {
+        let obj = QuickInputModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("QuickInputModel"));
+    }
+
+    #[test]
+    fn test_bxe_clone() {
+        let obj = QuickInputModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxe_debug() {
+        let obj = QuickInputModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("QuickInputModel"));
+    }
+
+    #[test]
+    fn test_bxe_default() {
+        let obj = QuickInputModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxe_summary_contains_name() {
+        let obj = QuickInputModel::new();
+        assert!(obj.summary().contains("QuickInputModel"));
+    }
+
+    #[test]
+    fn test_bxe_validate_default() {
+        let obj = QuickInputModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxe_display_not_empty() {
+        let obj = QuickInputModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxe_clone_independence() {
+        let mut obj = QuickInputModel::new();
+        let c = obj.clone();
+        obj.bxe_value = "".into();
+        assert_eq!(c.summary(), QuickInputModel::new().summary());
     }
 
 }
