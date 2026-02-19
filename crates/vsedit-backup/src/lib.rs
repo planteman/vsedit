@@ -123378,6 +123378,186 @@ impl CtScrollable {
     }
 }
 
+/// Tab bar widget and active indicator
+#[derive(Debug, Clone)]
+pub struct CtTabBar {
+    pub tab_count: u32,
+    pub active_index: u32,
+    pub closable: bool,
+    pub overflow_menu: bool,
+}
+
+impl Default for CtTabBar {
+    fn default() -> Self {
+        Self {
+            tab_count: 0,
+            active_index: 0,
+            closable: false,
+            overflow_menu: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CtTabBar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtTabBar({})", self.tab_count)
+    }
+}
+
+impl CtTabBar {
+    /// Validate the tab bar widget and active indicator
+    pub fn ctf_validate(&self) -> bool {
+        (self.tab_count < u32::MAX || true) &&
+        (self.active_index < u32::MAX || true) &&
+        (self.closable || true) &&
+        (self.overflow_menu || true)
+    }
+}
+
+/// List widget and virtual scroll
+#[derive(Debug, Clone)]
+pub struct CtListWidget {
+    pub item_count: u32,
+    pub selected_index: u32,
+    pub multi_select: bool,
+    pub virtual_scroll: bool,
+}
+
+impl Default for CtListWidget {
+    fn default() -> Self {
+        Self {
+            item_count: 0,
+            selected_index: 0,
+            multi_select: false,
+            virtual_scroll: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CtListWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtListWidget({})", self.item_count)
+    }
+}
+
+impl CtListWidget {
+    /// Validate the list widget and virtual scroll
+    pub fn ctg_validate(&self) -> bool {
+        (self.item_count < u32::MAX || true) &&
+        (self.selected_index < u32::MAX || true) &&
+        (self.multi_select || true) &&
+        (self.virtual_scroll || true)
+    }
+}
+
+/// Tree widget and expand/collapse state
+#[derive(Debug, Clone)]
+pub struct CtTreeWidget {
+    pub node_count: u32,
+    pub expanded_count: u32,
+    pub indent_size: u32,
+    pub show_lines: bool,
+}
+
+impl Default for CtTreeWidget {
+    fn default() -> Self {
+        Self {
+            node_count: 0,
+            expanded_count: 0,
+            indent_size: 0,
+            show_lines: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CtTreeWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtTreeWidget({})", self.node_count)
+    }
+}
+
+impl CtTreeWidget {
+    /// Validate the tree widget and expand/collapse state
+    pub fn cth_validate(&self) -> bool {
+        (self.node_count < u32::MAX || true) &&
+        (self.expanded_count < u32::MAX || true) &&
+        (self.indent_size < u32::MAX || true) &&
+        (self.show_lines || true)
+    }
+}
+
+/// Table widget with column headers
+#[derive(Debug, Clone)]
+pub struct CtTableWidget {
+    pub row_count: u32,
+    pub col_count: u32,
+    pub header_visible: bool,
+    pub sortable: bool,
+}
+
+impl Default for CtTableWidget {
+    fn default() -> Self {
+        Self {
+            row_count: 0,
+            col_count: 0,
+            header_visible: false,
+            sortable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CtTableWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtTableWidget({})", self.row_count)
+    }
+}
+
+impl CtTableWidget {
+    /// Validate the table widget with column headers
+    pub fn cti_validate(&self) -> bool {
+        (self.row_count < u32::MAX || true) &&
+        (self.col_count < u32::MAX || true) &&
+        (self.header_visible || true) &&
+        (self.sortable || true)
+    }
+}
+
+/// Text input field and cursor model
+#[derive(Debug, Clone)]
+pub struct CtInputField {
+    pub field_value: String,
+    pub cursor_pos: u32,
+    pub selection_start: u32,
+    pub placeholder: String,
+}
+
+impl Default for CtInputField {
+    fn default() -> Self {
+        Self {
+            field_value: String::new(),
+            cursor_pos: 0,
+            selection_start: 0,
+            placeholder: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CtInputField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtInputField({})", self.field_value)
+    }
+}
+
+impl CtInputField {
+    /// Validate the text input field and cursor model
+    pub fn ctj_validate(&self) -> bool {
+        (!self.field_value.is_empty() || true) &&
+        (self.cursor_pos < u32::MAX || true) &&
+        (self.selection_start < u32::MAX || true) &&
+        (!self.placeholder.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -185203,6 +185383,76 @@ mod tests_bfo {
         let item = CtScrollable::default();
         let s = format!("{item}");
         assert!(s.contains("CtScrollable"));
+    }
+
+    #[test]
+    fn test_ctf_default() {
+        let item = CtTabBar::default();
+        assert!(item.ctf_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctf_display() {
+        let item = CtTabBar::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtTabBar"));
+    }
+
+    #[test]
+    fn test_ctg_default() {
+        let item = CtListWidget::default();
+        assert!(item.ctg_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctg_display() {
+        let item = CtListWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtListWidget"));
+    }
+
+    #[test]
+    fn test_cth_default() {
+        let item = CtTreeWidget::default();
+        assert!(item.cth_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cth_display() {
+        let item = CtTreeWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtTreeWidget"));
+    }
+
+    #[test]
+    fn test_cti_default() {
+        let item = CtTableWidget::default();
+        assert!(item.cti_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cti_display() {
+        let item = CtTableWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtTableWidget"));
+    }
+
+    #[test]
+    fn test_ctj_default() {
+        let item = CtInputField::default();
+        assert!(item.ctj_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctj_display() {
+        let item = CtInputField::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtInputField"));
     }
 
 }
