@@ -69055,3 +69055,168 @@ mod bdn_tests {
         assert!(!list.is_visible());
     }
 }
+
+
+// --- bdo_: Editor workspace symbol search model ---
+
+/// Symbol kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BdoSymbolKind { File, Module, Namespace, Package, Class, Method, Property, Field, Constructor, Enum, Interface, Function, Variable, Constant, String, Number, Boolean, Array, Object, Key, Null, EnumMember, Struct, Event, Operator, TypeParameter }
+
+impl BdoSymbolKind {
+    pub fn icon(&self) -> char {
+        match self {
+            BdoSymbolKind::Function | BdoSymbolKind::Method => 'ƒ',
+            BdoSymbolKind::Class | BdoSymbolKind::Struct => '◆',
+            BdoSymbolKind::Interface => '◇',
+            BdoSymbolKind::Enum => '∈',
+            BdoSymbolKind::Variable | BdoSymbolKind::Field | BdoSymbolKind::Property => '⊳',
+            BdoSymbolKind::Constant => '◈',
+            BdoSymbolKind::Module | BdoSymbolKind::Namespace | BdoSymbolKind::Package => '▦',
+            _ => '○',
+        }
+    }
+}
+
+/// A workspace symbol result.
+#[derive(Debug, Clone)]
+pub struct BdoWorkspaceSymbol {
+    pub name: String,
+    pub kind: BdoSymbolKind,
+    pub container: Option<String>,
+    pub uri: String,
+    pub line: u32,
+}
+
+impl BdoWorkspaceSymbol {
+    pub fn new(name: &str, kind: BdoSymbolKind, uri: &str, line: u32) -> Self {
+        Self { name: name.to_string(), kind, container: None, uri: uri.to_string(), line }
+    }
+
+    pub fn with_container(mut self, c: &str) -> Self { self.container = Some(c.to_string()); self }
+
+    pub fn filename(&self) -> &str { self.uri.rsplit('/').next().unwrap_or(&self.uri) }
+
+    pub fn display(&self) -> String {
+        let container = self.container.as_deref().map(|c| format!(" ({})", c)).unwrap_or_default();
+        format!("{} {}{} — {}:{}", self.kind.icon(), self.name, container, self.filename(), self.line)
+    }
+}
+
+/// Workspace symbol search model.
+#[derive(Debug)]
+pub struct BdoSymbolSearch {
+    query: String,
+    results: Vec<BdoWorkspaceSymbol>,
+    cursor: usize,
+    loading: bool,
+}
+
+impl BdoSymbolSearch {
+    pub fn new() -> Self { Self { query: String::new(), results: Vec::new(), cursor: 0, loading: false } }
+
+    pub fn set_query(&mut self, q: &str) { self.query = q.to_string(); self.cursor = 0; self.loading = true; }
+    pub fn query(&self) -> &str { &self.query }
+
+    pub fn set_results(&mut self, results: Vec<BdoWorkspaceSymbol>) { self.results = results; self.loading = false; self.cursor = 0; }
+    pub fn is_loading(&self) -> bool { self.loading }
+
+    pub fn results(&self) -> &[BdoWorkspaceSymbol] { &self.results }
+    pub fn result_count(&self) -> usize { self.results.len() }
+
+    pub fn current_result(&self) -> Option<&BdoWorkspaceSymbol> { self.results.get(self.cursor) }
+
+    pub fn move_cursor(&mut self, delta: i32) {
+        if self.results.is_empty() { return; }
+        self.cursor = ((self.cursor as i32 + delta).rem_euclid(self.results.len() as i32)) as usize;
+    }
+
+    pub fn render(&self) -> Vec<String> {
+        let mut lines = vec![format!("# {}", if self.query.is_empty() { "Type to search symbols..." } else { &self.query })];
+        if self.loading { lines.push("  Loading...".to_string()); }
+        for (i, sym) in self.results.iter().enumerate() {
+            let cursor = if i == self.cursor { "› " } else { "  " };
+            lines.push(format!("{}{}", cursor, sym.display()));
+        }
+        lines
+    }
+}
+
+#[cfg(test)]
+mod bdo_tests {
+    use super::*;
+
+    #[test]
+    fn test_bdo_symbol() {
+        let s = BdoWorkspaceSymbol::new("main", BdoSymbolKind::Function, "src/main.rs", 5);
+        assert_eq!(s.filename(), "main.rs");
+        assert!(s.display().contains('ƒ'));
+    }
+
+    #[test]
+    fn test_bdo_container() {
+        let s = BdoWorkspaceSymbol::new("foo", BdoSymbolKind::Method, "a.rs", 1).with_container("MyStruct");
+        assert!(s.display().contains("MyStruct"));
+    }
+
+    #[test]
+    fn test_bdo_icon() {
+        assert_eq!(BdoSymbolKind::Class.icon(), '◆');
+        assert_eq!(BdoSymbolKind::Enum.icon(), '∈');
+    }
+
+    #[test]
+    fn test_bdo_search_new() {
+        let s = BdoSymbolSearch::new();
+        assert!(s.query().is_empty());
+        assert_eq!(s.result_count(), 0);
+    }
+
+    #[test]
+    fn test_bdo_search_query() {
+        let mut s = BdoSymbolSearch::new();
+        s.set_query("main");
+        assert!(s.is_loading());
+        assert_eq!(s.query(), "main");
+    }
+
+    #[test]
+    fn test_bdo_search_results() {
+        let mut s = BdoSymbolSearch::new();
+        s.set_results(vec![BdoWorkspaceSymbol::new("main", BdoSymbolKind::Function, "a.rs", 1)]);
+        assert_eq!(s.result_count(), 1);
+        assert!(!s.is_loading());
+    }
+
+    #[test]
+    fn test_bdo_cursor() {
+        let mut s = BdoSymbolSearch::new();
+        s.set_results(vec![
+            BdoWorkspaceSymbol::new("a", BdoSymbolKind::Function, "a.rs", 1),
+            BdoWorkspaceSymbol::new("b", BdoSymbolKind::Function, "b.rs", 2),
+        ]);
+        s.move_cursor(1);
+        assert_eq!(s.current_result().unwrap().name, "b");
+    }
+
+    #[test]
+    fn test_bdo_render() {
+        let mut s = BdoSymbolSearch::new();
+        s.set_query("test");
+        s.set_results(vec![BdoWorkspaceSymbol::new("test_fn", BdoSymbolKind::Function, "a.rs", 1)]);
+        let lines = s.render();
+        assert!(lines.len() >= 2);
+    }
+
+    #[test]
+    fn test_bdo_empty_render() {
+        let s = BdoSymbolSearch::new();
+        let lines = s.render();
+        assert!(lines[0].contains("Type to search"));
+    }
+
+    #[test]
+    fn test_bdo_struct_icon() {
+        assert_eq!(BdoSymbolKind::Struct.icon(), '◆');
+    }
+}
