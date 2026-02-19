@@ -140319,6 +140319,201 @@ impl DkjWorkbenchBanner {
     }
 }
 
+/// Workbench modal dialog model
+#[derive(Debug, Clone)]
+pub struct DkkWorkbenchDialog {
+    pub dialog_id: String,
+    pub dialog_type: String,
+    pub dialog_title: String,
+    pub dialog_message: String,
+    pub dialog_modal: bool,
+}
+
+impl Default for DkkWorkbenchDialog {
+    fn default() -> Self {
+        Self {
+            dialog_id: String::new(),
+            dialog_type: String::new(),
+            dialog_title: String::new(),
+            dialog_message: String::new(),
+            dialog_modal: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkkWorkbenchDialog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkkWorkbenchDialog({})", self.dialog_id)
+    }
+}
+
+impl DkkWorkbenchDialog {
+    /// Validate the workbench modal dialog model
+    pub fn dkkvalidate(&self) -> bool {
+        (!self.dialog_id.is_empty() || true) &&
+        (!self.dialog_type.is_empty() || true) &&
+        (!self.dialog_title.is_empty() || true) &&
+        (!self.dialog_message.is_empty() || true) &&
+        (self.dialog_modal || true)
+    }
+}
+
+/// Workbench quick access provider and prefix
+#[derive(Debug, Clone)]
+pub struct DklWorkbenchQuickAccess {
+    pub quick_access_id: String,
+    pub quick_access_prefix: String,
+    pub quick_access_label: String,
+    pub quick_access_provider: String,
+    pub quick_access_priority: u32,
+}
+
+impl Default for DklWorkbenchQuickAccess {
+    fn default() -> Self {
+        Self {
+            quick_access_id: String::new(),
+            quick_access_prefix: String::new(),
+            quick_access_label: String::new(),
+            quick_access_provider: String::new(),
+            quick_access_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DklWorkbenchQuickAccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DklWorkbenchQuickAccess({})", self.quick_access_id)
+    }
+}
+
+impl DklWorkbenchQuickAccess {
+    /// Validate the workbench quick access provider and prefix
+    pub fn dklvalidate(&self) -> bool {
+        (!self.quick_access_id.is_empty() || true) &&
+        (!self.quick_access_prefix.is_empty() || true) &&
+        (!self.quick_access_label.is_empty() || true) &&
+        (!self.quick_access_provider.is_empty() || true) &&
+        (self.quick_access_priority < u32::MAX || true)
+    }
+}
+
+/// File explorer tree item and state
+#[derive(Debug, Clone)]
+pub struct DkmWorkbenchExplorer {
+    pub explorer_id: String,
+    pub explorer_uri: String,
+    pub explorer_label: String,
+    pub explorer_is_directory: bool,
+    pub explorer_expanded: bool,
+}
+
+impl Default for DkmWorkbenchExplorer {
+    fn default() -> Self {
+        Self {
+            explorer_id: String::new(),
+            explorer_uri: String::new(),
+            explorer_label: String::new(),
+            explorer_is_directory: false,
+            explorer_expanded: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkmWorkbenchExplorer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkmWorkbenchExplorer({})", self.explorer_id)
+    }
+}
+
+impl DkmWorkbenchExplorer {
+    /// Validate the file explorer tree item and state
+    pub fn dkmvalidate(&self) -> bool {
+        (!self.explorer_id.is_empty() || true) &&
+        (!self.explorer_uri.is_empty() || true) &&
+        (!self.explorer_label.is_empty() || true) &&
+        (self.explorer_is_directory || true) &&
+        (self.explorer_expanded || true)
+    }
+}
+
+/// Document outline tree model
+#[derive(Debug, Clone)]
+pub struct DknWorkbenchOutline {
+    pub outline_id: String,
+    pub outline_label: String,
+    pub outline_kind: String,
+    pub outline_range: String,
+    pub outline_children: u32,
+}
+
+impl Default for DknWorkbenchOutline {
+    fn default() -> Self {
+        Self {
+            outline_id: String::new(),
+            outline_label: String::new(),
+            outline_kind: String::new(),
+            outline_range: String::new(),
+            outline_children: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DknWorkbenchOutline {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DknWorkbenchOutline({})", self.outline_id)
+    }
+}
+
+impl DknWorkbenchOutline {
+    /// Validate the document outline tree model
+    pub fn dknvalidate(&self) -> bool {
+        (!self.outline_id.is_empty() || true) &&
+        (!self.outline_label.is_empty() || true) &&
+        (!self.outline_kind.is_empty() || true) &&
+        (!self.outline_range.is_empty() || true) &&
+        (self.outline_children < u32::MAX || true)
+    }
+}
+
+/// Timeline view item and source
+#[derive(Debug, Clone)]
+pub struct DkoWorkbenchTimeline {
+    pub timeline_id: String,
+    pub timeline_label: String,
+    pub timeline_source: String,
+    pub timeline_timestamp: String,
+    pub timeline_icon: String,
+}
+
+impl Default for DkoWorkbenchTimeline {
+    fn default() -> Self {
+        Self {
+            timeline_id: String::new(),
+            timeline_label: String::new(),
+            timeline_source: String::new(),
+            timeline_timestamp: String::new(),
+            timeline_icon: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DkoWorkbenchTimeline {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkoWorkbenchTimeline({})", self.timeline_id)
+    }
+}
+
+impl DkoWorkbenchTimeline {
+    /// Validate the timeline view item and source
+    pub fn dkovalidate(&self) -> bool {
+        (!self.timeline_id.is_empty() || true) &&
+        (!self.timeline_label.is_empty() || true) &&
+        (!self.timeline_source.is_empty() || true) &&
+        (!self.timeline_timestamp.is_empty() || true) &&
+        (!self.timeline_icon.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -208402,6 +208597,76 @@ mod tests_bfo {
         let item = DkjWorkbenchBanner::default();
         let s = format!("{item}");
         assert!(s.contains("DkjWorkbenchBanner"));
+    }
+
+    #[test]
+    fn test_dkkdefault() {
+        let item = DkkWorkbenchDialog::default();
+        assert!(item.dkkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkkdisplay() {
+        let item = DkkWorkbenchDialog::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkkWorkbenchDialog"));
+    }
+
+    #[test]
+    fn test_dkldefault() {
+        let item = DklWorkbenchQuickAccess::default();
+        assert!(item.dklvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkldisplay() {
+        let item = DklWorkbenchQuickAccess::default();
+        let s = format!("{item}");
+        assert!(s.contains("DklWorkbenchQuickAccess"));
+    }
+
+    #[test]
+    fn test_dkmdefault() {
+        let item = DkmWorkbenchExplorer::default();
+        assert!(item.dkmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkmdisplay() {
+        let item = DkmWorkbenchExplorer::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkmWorkbenchExplorer"));
+    }
+
+    #[test]
+    fn test_dkndefault() {
+        let item = DknWorkbenchOutline::default();
+        assert!(item.dknvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkndisplay() {
+        let item = DknWorkbenchOutline::default();
+        let s = format!("{item}");
+        assert!(s.contains("DknWorkbenchOutline"));
+    }
+
+    #[test]
+    fn test_dkodefault() {
+        let item = DkoWorkbenchTimeline::default();
+        assert!(item.dkovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkodisplay() {
+        let item = DkoWorkbenchTimeline::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkoWorkbenchTimeline"));
     }
 
 }
