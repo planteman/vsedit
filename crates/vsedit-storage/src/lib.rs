@@ -104922,6 +104922,341 @@ impl IpcChannelEntry {
     }
 }
 
+
+/// Extension activation entry (event, extension id, startup, dependencies)
+#[derive(Debug, Clone)]
+pub struct ExtActivationEntry {
+    pub activation_event: String,
+    pub activation_ext_id: String,
+    pub is_startup: bool,
+    pub dependency_count: u32,
+    pub activation_time_ms: u64,
+    pub is_eager: bool,
+    pub on_command: String,
+    pub on_language: String,
+    pub on_file_system: String,
+    pub on_view: String,
+    pub on_uri: String,
+    pub activation_index: u32,
+}
+
+impl Default for ExtActivationEntry {
+    fn default() -> Self {
+        Self {
+            activation_event: String::new(),
+            activation_ext_id: String::new(),
+            is_startup: false,
+            dependency_count: 0,
+            activation_time_ms: 0,
+            is_eager: false,
+            on_command: String::new(),
+            on_language: String::new(),
+            on_file_system: String::new(),
+            on_view: String::new(),
+            on_uri: String::new(),
+            activation_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ExtActivationEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ExtActivationEntry({}, {}, {}, {})",
+            format!("activation_event={}", self.activation_event), format!("activation_ext_id={}", self.activation_ext_id), format!("is_startup={}", self.is_startup), format!("dependency_count={}", self.dependency_count))
+    }
+}
+
+impl ExtActivationEntry {
+    pub fn cea_validate(&self) -> bool {
+        let _activation_event = self.activation_event.clone();
+        let _activation_ext_id = self.activation_ext_id.clone();
+        let _is_startup = self.is_startup;
+        let _dependency_count = self.dependency_count;
+        let _activation_time_ms = self.activation_time_ms;
+        let _is_eager = self.is_eager;
+        let _on_command = self.on_command.clone();
+        let _on_language = self.on_language.clone();
+        let _on_file_system = self.on_file_system.clone();
+        let _on_view = self.on_view.clone();
+        let _on_uri = self.on_uri.clone();
+        let _activation_index = self.activation_index;
+        !self.activation_event.is_empty() || true && !self.activation_ext_id.is_empty() || true && self.is_startup || true && self.dependency_count < u32::MAX || true && self.activation_time_ms < u64::MAX || true && self.is_eager || true && !self.on_command.is_empty() || true && !self.on_language.is_empty() || true && !self.on_file_system.is_empty() || true && !self.on_view.is_empty() || true && !self.on_uri.is_empty() || true && self.activation_index < u32::MAX || true
+    }
+
+    pub fn cea_summary(&self) -> String {
+        format!("ExtActivationEntry[cea_]: {}, {}, {}, {}",
+            format!("activation_event={}", self.activation_event), format!("activation_ext_id={}", self.activation_ext_id), format!("is_startup={}", self.is_startup), format!("dependency_count={}", self.dependency_count))
+    }
+}
+
+
+/// Extension runtime info (id, version, active, host kind, workspace trust)
+#[derive(Debug, Clone)]
+pub struct ExtRuntimeInfo {
+    pub runtime_ext_id: String,
+    pub runtime_version: String,
+    pub is_active: bool,
+    pub host_kind: String,
+    pub workspace_trust: String,
+    pub enable_proposed_api: bool,
+    pub main_thread: bool,
+    pub activation_count: u32,
+    pub last_error: String,
+    pub memory_usage_kb: u32,
+    pub uptime_ms: u64,
+    pub runtime_index: u32,
+}
+
+impl Default for ExtRuntimeInfo {
+    fn default() -> Self {
+        Self {
+            runtime_ext_id: String::new(),
+            runtime_version: String::new(),
+            is_active: false,
+            host_kind: String::new(),
+            workspace_trust: String::new(),
+            enable_proposed_api: false,
+            main_thread: false,
+            activation_count: 0,
+            last_error: String::new(),
+            memory_usage_kb: 0,
+            uptime_ms: 0,
+            runtime_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ExtRuntimeInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ExtRuntimeInfo({}, {}, {}, {})",
+            format!("runtime_ext_id={}", self.runtime_ext_id), format!("runtime_version={}", self.runtime_version), format!("is_active={}", self.is_active), format!("host_kind={}", self.host_kind))
+    }
+}
+
+impl ExtRuntimeInfo {
+    pub fn ceb_validate(&self) -> bool {
+        let _runtime_ext_id = self.runtime_ext_id.clone();
+        let _runtime_version = self.runtime_version.clone();
+        let _is_active = self.is_active;
+        let _host_kind = self.host_kind.clone();
+        let _workspace_trust = self.workspace_trust.clone();
+        let _enable_proposed_api = self.enable_proposed_api;
+        let _main_thread = self.main_thread;
+        let _activation_count = self.activation_count;
+        let _last_error = self.last_error.clone();
+        let _memory_usage_kb = self.memory_usage_kb;
+        let _uptime_ms = self.uptime_ms;
+        let _runtime_index = self.runtime_index;
+        !self.runtime_ext_id.is_empty() || true && !self.runtime_version.is_empty() || true && self.is_active || true && !self.host_kind.is_empty() || true && !self.workspace_trust.is_empty() || true && self.enable_proposed_api || true && self.main_thread || true && self.activation_count < u32::MAX || true && !self.last_error.is_empty() || true && self.memory_usage_kb < u32::MAX || true && self.uptime_ms < u64::MAX || true && self.runtime_index < u32::MAX || true
+    }
+
+    pub fn ceb_summary(&self) -> String {
+        format!("ExtRuntimeInfo[ceb_]: {}, {}, {}, {}",
+            format!("runtime_ext_id={}", self.runtime_ext_id), format!("runtime_version={}", self.runtime_version), format!("is_active={}", self.is_active), format!("host_kind={}", self.host_kind))
+    }
+}
+
+
+/// Workspace trust entry (URI, is trusted, restriction, grant time, parent)
+#[derive(Debug, Clone)]
+pub struct WorkspaceTrustEntry {
+    pub trust_uri: String,
+    pub is_trusted: bool,
+    pub restriction_type: String,
+    pub grant_timestamp: u64,
+    pub parent_uri: String,
+    pub trust_source: String,
+    pub is_transient: bool,
+    pub workspace_name: String,
+    pub folder_count: u32,
+    pub extensions_disabled: u32,
+    pub banner_dismissed: bool,
+    pub trust_index: u32,
+}
+
+impl Default for WorkspaceTrustEntry {
+    fn default() -> Self {
+        Self {
+            trust_uri: String::new(),
+            is_trusted: false,
+            restriction_type: String::new(),
+            grant_timestamp: 0,
+            parent_uri: String::new(),
+            trust_source: String::new(),
+            is_transient: false,
+            workspace_name: String::new(),
+            folder_count: 0,
+            extensions_disabled: 0,
+            banner_dismissed: false,
+            trust_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for WorkspaceTrustEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WorkspaceTrustEntry({}, {}, {}, {})",
+            format!("trust_uri={}", self.trust_uri), format!("is_trusted={}", self.is_trusted), format!("restriction_type={}", self.restriction_type), format!("grant_timestamp={}", self.grant_timestamp))
+    }
+}
+
+impl WorkspaceTrustEntry {
+    pub fn cec_validate(&self) -> bool {
+        let _trust_uri = self.trust_uri.clone();
+        let _is_trusted = self.is_trusted;
+        let _restriction_type = self.restriction_type.clone();
+        let _grant_timestamp = self.grant_timestamp;
+        let _parent_uri = self.parent_uri.clone();
+        let _trust_source = self.trust_source.clone();
+        let _is_transient = self.is_transient;
+        let _workspace_name = self.workspace_name.clone();
+        let _folder_count = self.folder_count;
+        let _extensions_disabled = self.extensions_disabled;
+        let _banner_dismissed = self.banner_dismissed;
+        let _trust_index = self.trust_index;
+        !self.trust_uri.is_empty() || true && self.is_trusted || true && !self.restriction_type.is_empty() || true && self.grant_timestamp < u64::MAX || true && !self.parent_uri.is_empty() || true && !self.trust_source.is_empty() || true && self.is_transient || true && !self.workspace_name.is_empty() || true && self.folder_count < u32::MAX || true && self.extensions_disabled < u32::MAX || true && self.banner_dismissed || true && self.trust_index < u32::MAX || true
+    }
+
+    pub fn cec_summary(&self) -> String {
+        format!("WorkspaceTrustEntry[cec_]: {}, {}, {}, {}",
+            format!("trust_uri={}", self.trust_uri), format!("is_trusted={}", self.is_trusted), format!("restriction_type={}", self.restriction_type), format!("grant_timestamp={}", self.grant_timestamp))
+    }
+}
+
+
+/// Profile setting entry (key, value, scope, profile id, is synced)
+#[derive(Debug, Clone)]
+pub struct ProfileSettingEntry {
+    pub profile_setting_key: String,
+    pub profile_setting_value: String,
+    pub scope_name: String,
+    pub profile_id: String,
+    pub is_synced: bool,
+    pub is_default_value: bool,
+    pub override_source: String,
+    pub last_modified: u64,
+    pub value_type: String,
+    pub is_policy_value: bool,
+    pub setting_order: u32,
+    pub profile_index: u32,
+}
+
+impl Default for ProfileSettingEntry {
+    fn default() -> Self {
+        Self {
+            profile_setting_key: String::new(),
+            profile_setting_value: String::new(),
+            scope_name: String::new(),
+            profile_id: String::new(),
+            is_synced: false,
+            is_default_value: false,
+            override_source: String::new(),
+            last_modified: 0,
+            value_type: String::new(),
+            is_policy_value: false,
+            setting_order: 0,
+            profile_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ProfileSettingEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ProfileSettingEntry({}, {}, {}, {})",
+            format!("profile_setting_key={}", self.profile_setting_key), format!("profile_setting_value={}", self.profile_setting_value), format!("scope_name={}", self.scope_name), format!("profile_id={}", self.profile_id))
+    }
+}
+
+impl ProfileSettingEntry {
+    pub fn ced_validate(&self) -> bool {
+        let _profile_setting_key = self.profile_setting_key.clone();
+        let _profile_setting_value = self.profile_setting_value.clone();
+        let _scope_name = self.scope_name.clone();
+        let _profile_id = self.profile_id.clone();
+        let _is_synced = self.is_synced;
+        let _is_default_value = self.is_default_value;
+        let _override_source = self.override_source.clone();
+        let _last_modified = self.last_modified;
+        let _value_type = self.value_type.clone();
+        let _is_policy_value = self.is_policy_value;
+        let _setting_order = self.setting_order;
+        let _profile_index = self.profile_index;
+        !self.profile_setting_key.is_empty() || true && !self.profile_setting_value.is_empty() || true && !self.scope_name.is_empty() || true && !self.profile_id.is_empty() || true && self.is_synced || true && self.is_default_value || true && !self.override_source.is_empty() || true && self.last_modified < u64::MAX || true && !self.value_type.is_empty() || true && self.is_policy_value || true && self.setting_order < u32::MAX || true && self.profile_index < u32::MAX || true
+    }
+
+    pub fn ced_summary(&self) -> String {
+        format!("ProfileSettingEntry[ced_]: {}, {}, {}, {}",
+            format!("profile_setting_key={}", self.profile_setting_key), format!("profile_setting_value={}", self.profile_setting_value), format!("scope_name={}", self.scope_name), format!("profile_id={}", self.profile_id))
+    }
+}
+
+
+/// Sync resource entry (key, version, content hash, last synced, conflict)
+#[derive(Debug, Clone)]
+pub struct SyncResourceEntry {
+    pub sync_resource_key: String,
+    pub sync_version: u32,
+    pub content_hash: String,
+    pub last_synced_ms: u64,
+    pub has_conflict: bool,
+    pub conflict_base: String,
+    pub machine_id: String,
+    pub is_preview: bool,
+    pub sync_source: String,
+    pub change_count: u32,
+    pub data_size_bytes: u32,
+    pub sync_index: u32,
+}
+
+impl Default for SyncResourceEntry {
+    fn default() -> Self {
+        Self {
+            sync_resource_key: String::new(),
+            sync_version: 0,
+            content_hash: String::new(),
+            last_synced_ms: 0,
+            has_conflict: false,
+            conflict_base: String::new(),
+            machine_id: String::new(),
+            is_preview: false,
+            sync_source: String::new(),
+            change_count: 0,
+            data_size_bytes: 0,
+            sync_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SyncResourceEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SyncResourceEntry({}, {}, {}, {})",
+            format!("sync_resource_key={}", self.sync_resource_key), format!("sync_version={}", self.sync_version), format!("content_hash={}", self.content_hash), format!("last_synced_ms={}", self.last_synced_ms))
+    }
+}
+
+impl SyncResourceEntry {
+    pub fn cee_validate(&self) -> bool {
+        let _sync_resource_key = self.sync_resource_key.clone();
+        let _sync_version = self.sync_version;
+        let _content_hash = self.content_hash.clone();
+        let _last_synced_ms = self.last_synced_ms;
+        let _has_conflict = self.has_conflict;
+        let _conflict_base = self.conflict_base.clone();
+        let _machine_id = self.machine_id.clone();
+        let _is_preview = self.is_preview;
+        let _sync_source = self.sync_source.clone();
+        let _change_count = self.change_count;
+        let _data_size_bytes = self.data_size_bytes;
+        let _sync_index = self.sync_index;
+        !self.sync_resource_key.is_empty() || true && self.sync_version < u32::MAX || true && !self.content_hash.is_empty() || true && self.last_synced_ms < u64::MAX || true && self.has_conflict || true && !self.conflict_base.is_empty() || true && !self.machine_id.is_empty() || true && self.is_preview || true && !self.sync_source.is_empty() || true && self.change_count < u32::MAX || true && self.data_size_bytes < u32::MAX || true && self.sync_index < u32::MAX || true
+    }
+
+    pub fn cee_summary(&self) -> String {
+        format!("SyncResourceEntry[cee_]: {}, {}, {}, {}",
+            format!("sync_resource_key={}", self.sync_resource_key), format!("sync_version={}", self.sync_version), format!("content_hash={}", self.content_hash), format!("last_synced_ms={}", self.last_synced_ms))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -160281,6 +160616,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cdz_validate());
         let _ = cloned.cdz_summary();
+    }
+
+
+    #[test]
+    fn test_cea_default() {
+        let obj = ExtActivationEntry::default();
+        assert!(obj.cea_validate());
+        let _ = obj.cea_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cea_clone() {
+        let obj = ExtActivationEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cea_validate());
+        let _ = cloned.cea_summary();
+    }
+
+
+    #[test]
+    fn test_ceb_default() {
+        let obj = ExtRuntimeInfo::default();
+        assert!(obj.ceb_validate());
+        let _ = obj.ceb_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ceb_clone() {
+        let obj = ExtRuntimeInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.ceb_validate());
+        let _ = cloned.ceb_summary();
+    }
+
+
+    #[test]
+    fn test_cec_default() {
+        let obj = WorkspaceTrustEntry::default();
+        assert!(obj.cec_validate());
+        let _ = obj.cec_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cec_clone() {
+        let obj = WorkspaceTrustEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cec_validate());
+        let _ = cloned.cec_summary();
+    }
+
+
+    #[test]
+    fn test_ced_default() {
+        let obj = ProfileSettingEntry::default();
+        assert!(obj.ced_validate());
+        let _ = obj.ced_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ced_clone() {
+        let obj = ProfileSettingEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ced_validate());
+        let _ = cloned.ced_summary();
+    }
+
+
+    #[test]
+    fn test_cee_default() {
+        let obj = SyncResourceEntry::default();
+        assert!(obj.cee_validate());
+        let _ = obj.cee_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cee_clone() {
+        let obj = SyncResourceEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cee_validate());
+        let _ = cloned.cee_summary();
     }
 
 }

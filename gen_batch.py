@@ -1,6 +1,5 @@
 import os, glob, json, sys
 
-# Read config from stdin
 config = json.loads(sys.stdin.read())
 prefixes = config["prefixes"]
 fields_map = config["fields_map"]
