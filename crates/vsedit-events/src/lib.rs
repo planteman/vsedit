@@ -73899,3 +73899,1002 @@ mod tests_bej {
         assert_eq!(bej_smart_home("hello", 3), 0);
     }
 }
+
+// bek_: Editor token model — syntax tokens, token types, token modifiers,
+// semantic token legend, token ranges
+
+/// Standard token type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BekTokenType {
+    Comment,
+    String,
+    Keyword,
+    Number,
+    Regexp,
+    Operator,
+    Namespace,
+    Type,
+    Struct,
+    Class,
+    Interface,
+    Enum,
+    EnumMember,
+    TypeParameter,
+    Function,
+    Method,
+    Macro,
+    Variable,
+    Parameter,
+    Property,
+    Label,
+    Decorator,
+    Event,
+}
+
+impl BekTokenType {
+    pub fn name(&self) -> &str {
+        match self {
+            BekTokenType::Comment => "comment",
+            BekTokenType::String => "string",
+            BekTokenType::Keyword => "keyword",
+            BekTokenType::Number => "number",
+            BekTokenType::Regexp => "regexp",
+            BekTokenType::Operator => "operator",
+            BekTokenType::Namespace => "namespace",
+            BekTokenType::Type => "type",
+            BekTokenType::Struct => "struct",
+            BekTokenType::Class => "class",
+            BekTokenType::Interface => "interface",
+            BekTokenType::Enum => "enum",
+            BekTokenType::EnumMember => "enumMember",
+            BekTokenType::TypeParameter => "typeParameter",
+            BekTokenType::Function => "function",
+            BekTokenType::Method => "method",
+            BekTokenType::Macro => "macro",
+            BekTokenType::Variable => "variable",
+            BekTokenType::Parameter => "parameter",
+            BekTokenType::Property => "property",
+            BekTokenType::Label => "label",
+            BekTokenType::Decorator => "decorator",
+            BekTokenType::Event => "event",
+        }
+    }
+}
+
+/// Token modifier flags
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BekTokenModifier {
+    Declaration,
+    Definition,
+    Readonly,
+    Static,
+    Deprecated,
+    Abstract,
+    Async,
+    Modification,
+    Documentation,
+    DefaultLibrary,
+}
+
+/// A semantic token in the document
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BekToken {
+    pub line: usize,
+    pub col: usize,
+    pub length: usize,
+    pub token_type: BekTokenType,
+    pub modifiers: Vec<BekTokenModifier>,
+}
+
+impl BekToken {
+    pub fn new(line: usize, col: usize, length: usize, token_type: BekTokenType) -> Self {
+        Self { line, col, length, token_type, modifiers: Vec::new() }
+    }
+
+    pub fn with_modifier(mut self, m: BekTokenModifier) -> Self {
+        self.modifiers.push(m); self
+    }
+
+    pub fn has_modifier(&self, m: BekTokenModifier) -> bool {
+        self.modifiers.contains(&m)
+    }
+
+    pub fn end_col(&self) -> usize { self.col + self.length }
+
+    pub fn is_deprecated(&self) -> bool { self.has_modifier(BekTokenModifier::Deprecated) }
+    pub fn is_readonly(&self) -> bool { self.has_modifier(BekTokenModifier::Readonly) }
+}
+
+/// Token store for a document
+#[derive(Debug, Clone, Default)]
+pub struct BekTokenStore {
+    pub tokens: Vec<BekToken>,
+}
+
+impl BekTokenStore {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn set_tokens(&mut self, tokens: Vec<BekToken>) { self.tokens = tokens; }
+
+    pub fn tokens_on_line(&self, line: usize) -> Vec<&BekToken> {
+        self.tokens.iter().filter(|t| t.line == line).collect()
+    }
+
+    pub fn token_at(&self, line: usize, col: usize) -> Option<&BekToken> {
+        self.tokens.iter().find(|t| t.line == line && col >= t.col && col < t.end_col())
+    }
+
+    pub fn count(&self) -> usize { self.tokens.len() }
+}
+
+#[cfg(test)]
+mod tests_bek {
+    use super::*;
+
+    #[test]
+    fn test_bek_token_type_name() {
+        assert_eq!(BekTokenType::Comment.name(), "comment");
+        assert_eq!(BekTokenType::Function.name(), "function");
+        assert_eq!(BekTokenType::EnumMember.name(), "enumMember");
+    }
+
+    #[test]
+    fn test_bek_token_basic() {
+        let t = BekToken::new(5, 10, 5, BekTokenType::Keyword);
+        assert_eq!(t.end_col(), 15);
+        assert!(!t.is_deprecated());
+    }
+
+    #[test]
+    fn test_bek_token_modifiers() {
+        let t = BekToken::new(0, 0, 3, BekTokenType::Variable)
+            .with_modifier(BekTokenModifier::Readonly)
+            .with_modifier(BekTokenModifier::Deprecated);
+        assert!(t.is_readonly());
+        assert!(t.is_deprecated());
+        assert!(!t.has_modifier(BekTokenModifier::Static));
+    }
+
+    #[test]
+    fn test_bek_token_store_line() {
+        let mut store = BekTokenStore::new();
+        store.set_tokens(vec![
+            BekToken::new(1, 0, 5, BekTokenType::Keyword),
+            BekToken::new(1, 6, 3, BekTokenType::Variable),
+            BekToken::new(3, 0, 7, BekTokenType::Function),
+        ]);
+        assert_eq!(store.tokens_on_line(1).len(), 2);
+        assert_eq!(store.tokens_on_line(3).len(), 1);
+    }
+
+    #[test]
+    fn test_bek_token_store_at() {
+        let mut store = BekTokenStore::new();
+        store.set_tokens(vec![
+            BekToken::new(1, 0, 5, BekTokenType::Keyword),
+            BekToken::new(1, 6, 3, BekTokenType::Variable),
+        ]);
+        let t = store.token_at(1, 2).unwrap();
+        assert_eq!(t.token_type, BekTokenType::Keyword);
+        let t2 = store.token_at(1, 7).unwrap();
+        assert_eq!(t2.token_type, BekTokenType::Variable);
+        assert!(store.token_at(1, 5).is_none());
+    }
+
+    #[test]
+    fn test_bek_token_store_count() {
+        let store = BekTokenStore::new();
+        assert_eq!(store.count(), 0);
+    }
+
+    #[test]
+    fn test_bek_token_store_empty_line() {
+        let store = BekTokenStore::new();
+        assert_eq!(store.tokens_on_line(0).len(), 0);
+    }
+
+    #[test]
+    fn test_bek_all_token_types() {
+        let types = [BekTokenType::Comment, BekTokenType::String, BekTokenType::Keyword,
+            BekTokenType::Number, BekTokenType::Regexp, BekTokenType::Operator,
+            BekTokenType::Namespace, BekTokenType::Type, BekTokenType::Struct,
+            BekTokenType::Class, BekTokenType::Interface];
+        for t in &types { assert!(!t.name().is_empty()); }
+    }
+
+    #[test]
+    fn test_bek_modifier_variants() {
+        assert_ne!(BekTokenModifier::Declaration, BekTokenModifier::Definition);
+        assert_ne!(BekTokenModifier::Async, BekTokenModifier::Static);
+    }
+
+    #[test]
+    fn test_bek_token_no_modifier() {
+        let t = BekToken::new(0, 0, 1, BekTokenType::Comment);
+        assert!(t.modifiers.is_empty());
+    }
+}
+
+// bel_: Editor marker model — error/warning/info markers, diagnostics,
+// marker severity, marker navigation, problems panel data
+
+/// Marker severity
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum BelMarkerSeverity {
+    Hint,
+    Info,
+    Warning,
+    Error,
+}
+
+impl BelMarkerSeverity {
+    pub fn icon(&self) -> &str {
+        match self {
+            BelMarkerSeverity::Hint => "💡",
+            BelMarkerSeverity::Info => "ℹ",
+            BelMarkerSeverity::Warning => "⚠",
+            BelMarkerSeverity::Error => "✖",
+        }
+    }
+
+    pub fn label(&self) -> &str {
+        match self {
+            BelMarkerSeverity::Hint => "hint",
+            BelMarkerSeverity::Info => "info",
+            BelMarkerSeverity::Warning => "warning",
+            BelMarkerSeverity::Error => "error",
+        }
+    }
+}
+
+/// A diagnostic marker
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BelMarker {
+    pub severity: BelMarkerSeverity,
+    pub message: String,
+    pub source: Option<String>,
+    pub code: Option<String>,
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+}
+
+impl BelMarker {
+    pub fn new(severity: BelMarkerSeverity, message: &str, sl: usize, sc: usize, el: usize, ec: usize) -> Self {
+        Self { severity, message: message.to_string(), source: None, code: None,
+               start_line: sl, start_col: sc, end_line: el, end_col: ec }
+    }
+
+    pub fn error(msg: &str, sl: usize, sc: usize, el: usize, ec: usize) -> Self {
+        Self::new(BelMarkerSeverity::Error, msg, sl, sc, el, ec)
+    }
+
+    pub fn warning(msg: &str, sl: usize, sc: usize, el: usize, ec: usize) -> Self {
+        Self::new(BelMarkerSeverity::Warning, msg, sl, sc, el, ec)
+    }
+
+    pub fn with_source(mut self, source: &str) -> Self { self.source = Some(source.to_string()); self }
+    pub fn with_code(mut self, code: &str) -> Self { self.code = Some(code.to_string()); self }
+
+    pub fn is_error(&self) -> bool { self.severity == BelMarkerSeverity::Error }
+    pub fn is_warning(&self) -> bool { self.severity == BelMarkerSeverity::Warning }
+
+    pub fn on_line(&self, line: usize) -> bool {
+        line >= self.start_line && line <= self.end_line
+    }
+
+    pub fn display_text(&self) -> String {
+        let src = self.source.as_deref().unwrap_or("");
+        let code = self.code.as_deref().unwrap_or("");
+        if !src.is_empty() && !code.is_empty() {
+            format!("{} [{}({})]: {}", self.severity.icon(), src, code, self.message)
+        } else if !src.is_empty() {
+            format!("{} [{}]: {}", self.severity.icon(), src, self.message)
+        } else {
+            format!("{} {}", self.severity.icon(), self.message)
+        }
+    }
+}
+
+/// Marker store per file
+#[derive(Debug, Clone, Default)]
+pub struct BelMarkerStore {
+    pub markers: Vec<BelMarker>,
+}
+
+impl BelMarkerStore {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn set_markers(&mut self, markers: Vec<BelMarker>) { self.markers = markers; }
+    pub fn add(&mut self, marker: BelMarker) { self.markers.push(marker); }
+    pub fn clear(&mut self) { self.markers.clear(); }
+
+    pub fn on_line(&self, line: usize) -> Vec<&BelMarker> {
+        self.markers.iter().filter(|m| m.on_line(line)).collect()
+    }
+
+    pub fn errors(&self) -> Vec<&BelMarker> {
+        self.markers.iter().filter(|m| m.is_error()).collect()
+    }
+
+    pub fn warnings(&self) -> Vec<&BelMarker> {
+        self.markers.iter().filter(|m| m.is_warning()).collect()
+    }
+
+    pub fn error_count(&self) -> usize { self.errors().len() }
+    pub fn warning_count(&self) -> usize { self.warnings().len() }
+    pub fn count(&self) -> usize { self.markers.len() }
+
+    pub fn worst_severity(&self) -> Option<BelMarkerSeverity> {
+        self.markers.iter().map(|m| m.severity).max()
+    }
+}
+
+#[cfg(test)]
+mod tests_bel {
+    use super::*;
+
+    #[test]
+    fn test_bel_severity() {
+        assert!(BelMarkerSeverity::Error > BelMarkerSeverity::Warning);
+        assert!(BelMarkerSeverity::Warning > BelMarkerSeverity::Info);
+        assert_eq!(BelMarkerSeverity::Error.label(), "error");
+    }
+
+    #[test]
+    fn test_bel_marker_basic() {
+        let m = BelMarker::error("undefined var", 5, 0, 5, 10)
+            .with_source("rustc")
+            .with_code("E0425");
+        assert!(m.is_error());
+        assert!(m.on_line(5));
+        assert!(!m.on_line(6));
+    }
+
+    #[test]
+    fn test_bel_marker_display() {
+        let m = BelMarker::error("oops", 0, 0, 0, 5).with_source("eslint").with_code("no-undef");
+        let text = m.display_text();
+        assert!(text.contains("eslint"));
+        assert!(text.contains("no-undef"));
+    }
+
+    #[test]
+    fn test_bel_marker_warning() {
+        let m = BelMarker::warning("unused var", 10, 0, 10, 5);
+        assert!(m.is_warning());
+        assert!(!m.is_error());
+    }
+
+    #[test]
+    fn test_bel_store_counts() {
+        let mut store = BelMarkerStore::new();
+        store.add(BelMarker::error("e1", 1, 0, 1, 5));
+        store.add(BelMarker::warning("w1", 2, 0, 2, 5));
+        store.add(BelMarker::error("e2", 3, 0, 3, 5));
+        assert_eq!(store.error_count(), 2);
+        assert_eq!(store.warning_count(), 1);
+        assert_eq!(store.count(), 3);
+    }
+
+    #[test]
+    fn test_bel_store_line() {
+        let mut store = BelMarkerStore::new();
+        store.add(BelMarker::error("e", 5, 0, 5, 10));
+        store.add(BelMarker::warning("w", 5, 15, 5, 20));
+        assert_eq!(store.on_line(5).len(), 2);
+        assert_eq!(store.on_line(6).len(), 0);
+    }
+
+    #[test]
+    fn test_bel_store_worst() {
+        let mut store = BelMarkerStore::new();
+        store.add(BelMarker::warning("w", 0, 0, 0, 5));
+        assert_eq!(store.worst_severity(), Some(BelMarkerSeverity::Warning));
+        store.add(BelMarker::error("e", 1, 0, 1, 5));
+        assert_eq!(store.worst_severity(), Some(BelMarkerSeverity::Error));
+    }
+
+    #[test]
+    fn test_bel_store_clear() {
+        let mut store = BelMarkerStore::new();
+        store.add(BelMarker::error("e", 0, 0, 0, 5));
+        store.clear();
+        assert_eq!(store.count(), 0);
+    }
+
+    #[test]
+    fn test_bel_store_empty_worst() {
+        let store = BelMarkerStore::new();
+        assert!(store.worst_severity().is_none());
+    }
+
+    #[test]
+    fn test_bel_severity_icons() {
+        assert!(!BelMarkerSeverity::Error.icon().is_empty());
+        assert!(!BelMarkerSeverity::Hint.icon().is_empty());
+    }
+}
+
+// bem_: Editor diff model — diff hunks, inline diff, side-by-side diff,
+// change type, diff navigation, diff decorations
+
+/// Diff change type
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BemChangeType {
+    Added,
+    Removed,
+    Modified,
+    Unchanged,
+}
+
+impl BemChangeType {
+    pub fn is_changed(&self) -> bool {
+        !matches!(self, BemChangeType::Unchanged)
+    }
+
+    pub fn gutter_indicator(&self) -> &str {
+        match self {
+            BemChangeType::Added => "+",
+            BemChangeType::Removed => "-",
+            BemChangeType::Modified => "~",
+            BemChangeType::Unchanged => " ",
+        }
+    }
+}
+
+/// A diff hunk
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BemDiffHunk {
+    pub original_start: usize,
+    pub original_count: usize,
+    pub modified_start: usize,
+    pub modified_count: usize,
+    pub change_type: BemChangeType,
+}
+
+impl BemDiffHunk {
+    pub fn new(os: usize, oc: usize, ms: usize, mc: usize, ct: BemChangeType) -> Self {
+        Self { original_start: os, original_count: oc, modified_start: ms, modified_count: mc, change_type: ct }
+    }
+
+    pub fn added(ms: usize, mc: usize) -> Self {
+        Self::new(ms, 0, ms, mc, BemChangeType::Added)
+    }
+
+    pub fn removed(os: usize, oc: usize) -> Self {
+        Self::new(os, oc, os, 0, BemChangeType::Removed)
+    }
+
+    pub fn modified(os: usize, oc: usize, ms: usize, mc: usize) -> Self {
+        Self::new(os, oc, ms, mc, BemChangeType::Modified)
+    }
+
+    pub fn original_end(&self) -> usize { self.original_start + self.original_count }
+    pub fn modified_end(&self) -> usize { self.modified_start + self.modified_count }
+
+    pub fn net_line_change(&self) -> isize {
+        self.modified_count as isize - self.original_count as isize
+    }
+}
+
+/// Diff result for a document
+#[derive(Debug, Clone, Default)]
+pub struct BemDiffResult {
+    pub hunks: Vec<BemDiffHunk>,
+    pub original_line_count: usize,
+    pub modified_line_count: usize,
+}
+
+impl BemDiffResult {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn add_hunk(&mut self, hunk: BemDiffHunk) { self.hunks.push(hunk); }
+
+    pub fn hunk_count(&self) -> usize { self.hunks.len() }
+
+    pub fn additions(&self) -> usize {
+        self.hunks.iter().filter(|h| h.change_type == BemChangeType::Added).map(|h| h.modified_count).sum()
+    }
+
+    pub fn deletions(&self) -> usize {
+        self.hunks.iter().filter(|h| h.change_type == BemChangeType::Removed).map(|h| h.original_count).sum()
+    }
+
+    pub fn modifications(&self) -> usize {
+        self.hunks.iter().filter(|h| h.change_type == BemChangeType::Modified).count()
+    }
+
+    pub fn change_type_at_line(&self, line: usize) -> BemChangeType {
+        for h in &self.hunks {
+            if line >= h.modified_start && line < h.modified_end() {
+                return h.change_type;
+            }
+        }
+        BemChangeType::Unchanged
+    }
+
+    pub fn next_change(&self, from_line: usize) -> Option<&BemDiffHunk> {
+        self.hunks.iter().find(|h| h.modified_start > from_line)
+    }
+
+    pub fn prev_change(&self, from_line: usize) -> Option<&BemDiffHunk> {
+        self.hunks.iter().rev().find(|h| h.modified_start < from_line)
+    }
+
+    pub fn summary(&self) -> String {
+        format!("+{} -{} ~{}", self.additions(), self.deletions(), self.modifications())
+    }
+}
+
+#[cfg(test)]
+mod tests_bem {
+    use super::*;
+
+    #[test]
+    fn test_bem_change_type() {
+        assert!(BemChangeType::Added.is_changed());
+        assert!(!BemChangeType::Unchanged.is_changed());
+        assert_eq!(BemChangeType::Added.gutter_indicator(), "+");
+    }
+
+    #[test]
+    fn test_bem_hunk_added() {
+        let h = BemDiffHunk::added(10, 3);
+        assert_eq!(h.modified_end(), 13);
+        assert_eq!(h.net_line_change(), 3);
+    }
+
+    #[test]
+    fn test_bem_hunk_removed() {
+        let h = BemDiffHunk::removed(5, 2);
+        assert_eq!(h.original_end(), 7);
+        assert_eq!(h.net_line_change(), -2);
+    }
+
+    #[test]
+    fn test_bem_hunk_modified() {
+        let h = BemDiffHunk::modified(5, 3, 5, 4);
+        assert_eq!(h.net_line_change(), 1);
+    }
+
+    #[test]
+    fn test_bem_diff_result_counts() {
+        let mut diff = BemDiffResult::new();
+        diff.add_hunk(BemDiffHunk::added(10, 5));
+        diff.add_hunk(BemDiffHunk::removed(20, 3));
+        diff.add_hunk(BemDiffHunk::modified(30, 2, 30, 4));
+        assert_eq!(diff.additions(), 5);
+        assert_eq!(diff.deletions(), 3);
+        assert_eq!(diff.modifications(), 1);
+    }
+
+    #[test]
+    fn test_bem_diff_line_type() {
+        let mut diff = BemDiffResult::new();
+        diff.add_hunk(BemDiffHunk::added(5, 3));
+        assert_eq!(diff.change_type_at_line(6), BemChangeType::Added);
+        assert_eq!(diff.change_type_at_line(0), BemChangeType::Unchanged);
+    }
+
+    #[test]
+    fn test_bem_diff_navigation() {
+        let mut diff = BemDiffResult::new();
+        diff.add_hunk(BemDiffHunk::added(5, 2));
+        diff.add_hunk(BemDiffHunk::added(20, 3));
+        assert_eq!(diff.next_change(10).unwrap().modified_start, 20);
+        assert_eq!(diff.prev_change(10).unwrap().modified_start, 5);
+    }
+
+    #[test]
+    fn test_bem_diff_summary() {
+        let mut diff = BemDiffResult::new();
+        diff.add_hunk(BemDiffHunk::added(0, 10));
+        diff.add_hunk(BemDiffHunk::removed(5, 3));
+        assert!(diff.summary().contains("+10"));
+        assert!(diff.summary().contains("-3"));
+    }
+
+    #[test]
+    fn test_bem_diff_empty() {
+        let diff = BemDiffResult::new();
+        assert_eq!(diff.hunk_count(), 0);
+        assert_eq!(diff.additions(), 0);
+    }
+
+    #[test]
+    fn test_bem_diff_no_nav() {
+        let diff = BemDiffResult::new();
+        assert!(diff.next_change(0).is_none());
+        assert!(diff.prev_change(100).is_none());
+    }
+}
+
+// ben_: Editor text model — piece table, line breaks, content change events,
+// version tracking, end-of-line normalization
+
+/// End of line sequence
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BenEol {
+    LF,
+    CRLF,
+    CR,
+}
+
+impl BenEol {
+    pub fn as_str(&self) -> &str {
+        match self {
+            BenEol::LF => "\n",
+            BenEol::CRLF => "\r\n",
+            BenEol::CR => "\r",
+        }
+    }
+
+    pub fn detect(text: &str) -> Self {
+        if text.contains("\r\n") { BenEol::CRLF }
+        else if text.contains('\r') { BenEol::CR }
+        else { BenEol::LF }
+    }
+}
+
+/// A content change event
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BenContentChange {
+    pub range_start_line: usize,
+    pub range_start_col: usize,
+    pub range_end_line: usize,
+    pub range_end_col: usize,
+    pub text: String,
+    pub range_length: usize,
+}
+
+impl BenContentChange {
+    pub fn new(sl: usize, sc: usize, el: usize, ec: usize, text: &str) -> Self {
+        Self { range_start_line: sl, range_start_col: sc, range_end_line: el,
+               range_end_col: ec, text: text.to_string(), range_length: 0 }
+    }
+
+    pub fn insert(line: usize, col: usize, text: &str) -> Self {
+        Self::new(line, col, line, col, text)
+    }
+
+    pub fn delete(sl: usize, sc: usize, el: usize, ec: usize) -> Self {
+        Self::new(sl, sc, el, ec, "")
+    }
+
+    pub fn is_insert(&self) -> bool {
+        self.range_start_line == self.range_end_line
+            && self.range_start_col == self.range_end_col
+            && !self.text.is_empty()
+    }
+
+    pub fn is_delete(&self) -> bool { self.text.is_empty() }
+
+    pub fn lines_added(&self) -> usize { self.text.matches('\n').count() }
+}
+
+/// Text model with versioning
+#[derive(Debug, Clone)]
+pub struct BenTextModel {
+    pub lines: Vec<String>,
+    pub eol: BenEol,
+    pub version: u64,
+    pub is_dirty: bool,
+}
+
+impl BenTextModel {
+    pub fn new(content: &str) -> Self {
+        let eol = BenEol::detect(content);
+        let lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+        Self { lines: if lines.is_empty() { vec![String::new()] } else { lines }, eol, version: 1, is_dirty: false }
+    }
+
+    pub fn line_count(&self) -> usize { self.lines.len() }
+
+    pub fn line(&self, index: usize) -> Option<&str> {
+        self.lines.get(index).map(|s| s.as_str())
+    }
+
+    pub fn full_text(&self) -> String {
+        self.lines.join(self.eol.as_str())
+    }
+
+    pub fn apply_change(&mut self, change: &BenContentChange) {
+        self.version += 1;
+        self.is_dirty = true;
+        if change.is_insert() {
+            if let Some(line) = self.lines.get_mut(change.range_start_line) {
+                line.insert_str(change.range_start_col.min(line.len()), &change.text);
+            }
+        }
+    }
+
+    pub fn total_chars(&self) -> usize {
+        self.lines.iter().map(|l| l.len()).sum::<usize>()
+            + (self.lines.len().saturating_sub(1)) * self.eol.as_str().len()
+    }
+
+    pub fn mark_clean(&mut self) { self.is_dirty = false; }
+}
+
+#[cfg(test)]
+mod tests_ben {
+    use super::*;
+
+    #[test]
+    fn test_ben_eol_detect() {
+        assert_eq!(BenEol::detect("hello\nworld"), BenEol::LF);
+        assert_eq!(BenEol::detect("hello\r\nworld"), BenEol::CRLF);
+        assert_eq!(BenEol::detect("hello\rworld"), BenEol::CR);
+    }
+
+    #[test]
+    fn test_ben_eol_str() {
+        assert_eq!(BenEol::LF.as_str(), "\n");
+        assert_eq!(BenEol::CRLF.as_str(), "\r\n");
+    }
+
+    #[test]
+    fn test_ben_content_change_insert() {
+        let c = BenContentChange::insert(0, 5, "hello");
+        assert!(c.is_insert());
+        assert!(!c.is_delete());
+    }
+
+    #[test]
+    fn test_ben_content_change_delete() {
+        let c = BenContentChange::delete(0, 0, 0, 5);
+        assert!(c.is_delete());
+        assert!(!c.is_insert());
+    }
+
+    #[test]
+    fn test_ben_content_change_lines_added() {
+        let c = BenContentChange::insert(0, 0, "a\nb\nc");
+        assert_eq!(c.lines_added(), 2);
+    }
+
+    #[test]
+    fn test_ben_text_model_new() {
+        let m = BenTextModel::new("hello\nworld");
+        assert_eq!(m.line_count(), 2);
+        assert_eq!(m.line(0), Some("hello"));
+        assert_eq!(m.line(1), Some("world"));
+        assert_eq!(m.version, 1);
+    }
+
+    #[test]
+    fn test_ben_text_model_empty() {
+        let m = BenTextModel::new("");
+        assert_eq!(m.line_count(), 1);
+        assert_eq!(m.line(0), Some(""));
+    }
+
+    #[test]
+    fn test_ben_text_model_apply() {
+        let mut m = BenTextModel::new("hello");
+        m.apply_change(&BenContentChange::insert(0, 5, " world"));
+        assert_eq!(m.line(0), Some("hello world"));
+        assert_eq!(m.version, 2);
+        assert!(m.is_dirty);
+    }
+
+    #[test]
+    fn test_ben_text_model_full_text() {
+        let m = BenTextModel::new("a\nb\nc");
+        assert_eq!(m.full_text(), "a\nb\nc");
+    }
+
+    #[test]
+    fn test_ben_text_model_clean() {
+        let mut m = BenTextModel::new("x");
+        m.apply_change(&BenContentChange::insert(0, 0, "y"));
+        assert!(m.is_dirty);
+        m.mark_clean();
+        assert!(!m.is_dirty);
+    }
+}
+
+// beo_: Editor drag-drop model — drag sources, drop targets, drag data,
+// tree drag/drop, editor tab drag, file drag into editor
+
+/// Drag source type
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BeoDragSource {
+    EditorTab,
+    TreeItem,
+    File,
+    Selection,
+    External,
+}
+
+/// Drop effect
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BeoDropEffect {
+    None,
+    Copy,
+    Move,
+    Link,
+}
+
+/// Drag data payload
+#[derive(Debug, Clone)]
+pub struct BeoDragData {
+    pub source: BeoDragSource,
+    pub uris: Vec<String>,
+    pub text: Option<String>,
+    pub metadata: std::collections::HashMap<String, String>,
+}
+
+impl BeoDragData {
+    pub fn new(source: BeoDragSource) -> Self {
+        Self { source, uris: Vec::new(), text: None, metadata: std::collections::HashMap::new() }
+    }
+
+    pub fn with_uri(mut self, uri: &str) -> Self {
+        self.uris.push(uri.to_string()); self
+    }
+
+    pub fn with_text(mut self, text: &str) -> Self {
+        self.text = Some(text.to_string()); self
+    }
+
+    pub fn with_meta(mut self, key: &str, val: &str) -> Self {
+        self.metadata.insert(key.to_string(), val.to_string()); self
+    }
+
+    pub fn has_uris(&self) -> bool { !self.uris.is_empty() }
+    pub fn has_text(&self) -> bool { self.text.is_some() }
+    pub fn uri_count(&self) -> usize { self.uris.len() }
+}
+
+/// Drop target zone
+#[derive(Debug, Clone)]
+pub struct BeoDropTarget {
+    pub zone_id: String,
+    pub accepts: Vec<BeoDragSource>,
+    pub effect: BeoDropEffect,
+}
+
+impl BeoDropTarget {
+    pub fn new(zone_id: &str, effect: BeoDropEffect) -> Self {
+        Self { zone_id: zone_id.to_string(), accepts: Vec::new(), effect }
+    }
+
+    pub fn accept(mut self, source: BeoDragSource) -> Self {
+        self.accepts.push(source); self
+    }
+
+    pub fn can_accept(&self, source: BeoDragSource) -> bool {
+        self.accepts.is_empty() || self.accepts.contains(&source)
+    }
+}
+
+/// Drag-drop state
+#[derive(Debug, Clone, Default)]
+pub struct BeoDragDropState {
+    pub active_drag: Option<BeoDragData>,
+    pub drop_targets: Vec<BeoDropTarget>,
+    pub hover_target: Option<String>,
+}
+
+impl BeoDragDropState {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn start_drag(&mut self, data: BeoDragData) {
+        self.active_drag = Some(data);
+    }
+
+    pub fn cancel_drag(&mut self) {
+        self.active_drag = None;
+        self.hover_target = None;
+    }
+
+    pub fn is_dragging(&self) -> bool { self.active_drag.is_some() }
+
+    pub fn register_target(&mut self, target: BeoDropTarget) {
+        self.drop_targets.push(target);
+    }
+
+    pub fn set_hover(&mut self, zone_id: Option<String>) {
+        self.hover_target = zone_id;
+    }
+
+    pub fn can_drop_at(&self, zone_id: &str) -> bool {
+        if let Some(drag) = &self.active_drag {
+            self.drop_targets.iter().any(|t| t.zone_id == zone_id && t.can_accept(drag.source))
+        } else { false }
+    }
+
+    pub fn drop_at(&mut self, _zone_id: &str) -> Option<BeoDragData> {
+        self.hover_target = None;
+        self.active_drag.take()
+    }
+}
+
+#[cfg(test)]
+mod tests_beo {
+    use super::*;
+
+    #[test]
+    fn test_beo_drag_data() {
+        let data = BeoDragData::new(BeoDragSource::File)
+            .with_uri("file:///a.txt")
+            .with_uri("file:///b.txt")
+            .with_text("hello");
+        assert!(data.has_uris());
+        assert!(data.has_text());
+        assert_eq!(data.uri_count(), 2);
+    }
+
+    #[test]
+    fn test_beo_drag_data_meta() {
+        let data = BeoDragData::new(BeoDragSource::TreeItem)
+            .with_meta("type", "folder");
+        assert_eq!(data.metadata.get("type").unwrap(), "folder");
+    }
+
+    #[test]
+    fn test_beo_drop_target() {
+        let target = BeoDropTarget::new("editor", BeoDropEffect::Copy)
+            .accept(BeoDragSource::File)
+            .accept(BeoDragSource::Selection);
+        assert!(target.can_accept(BeoDragSource::File));
+        assert!(!target.can_accept(BeoDragSource::EditorTab));
+    }
+
+    #[test]
+    fn test_beo_drop_target_any() {
+        let target = BeoDropTarget::new("panel", BeoDropEffect::Move);
+        assert!(target.can_accept(BeoDragSource::External));
+    }
+
+    #[test]
+    fn test_beo_state_drag() {
+        let mut state = BeoDragDropState::new();
+        assert!(!state.is_dragging());
+        state.start_drag(BeoDragData::new(BeoDragSource::EditorTab));
+        assert!(state.is_dragging());
+        state.cancel_drag();
+        assert!(!state.is_dragging());
+    }
+
+    #[test]
+    fn test_beo_state_drop() {
+        let mut state = BeoDragDropState::new();
+        state.register_target(BeoDropTarget::new("editor", BeoDropEffect::Copy).accept(BeoDragSource::File));
+        state.start_drag(BeoDragData::new(BeoDragSource::File).with_uri("file:///x.txt"));
+        assert!(state.can_drop_at("editor"));
+        let data = state.drop_at("editor").unwrap();
+        assert_eq!(data.uri_count(), 1);
+        assert!(!state.is_dragging());
+    }
+
+    #[test]
+    fn test_beo_state_cannot_drop() {
+        let mut state = BeoDragDropState::new();
+        state.register_target(BeoDropTarget::new("editor", BeoDropEffect::Copy).accept(BeoDragSource::File));
+        state.start_drag(BeoDragData::new(BeoDragSource::EditorTab));
+        assert!(!state.can_drop_at("editor"));
+    }
+
+    #[test]
+    fn test_beo_state_hover() {
+        let mut state = BeoDragDropState::new();
+        state.set_hover(Some("editor".to_string()));
+        assert_eq!(state.hover_target.as_deref(), Some("editor"));
+    }
+
+    #[test]
+    fn test_beo_drop_effects() {
+        assert_ne!(BeoDropEffect::Copy, BeoDropEffect::Move);
+        assert_ne!(BeoDropEffect::None, BeoDropEffect::Link);
+    }
+
+    #[test]
+    fn test_beo_drag_sources() {
+        assert_ne!(BeoDragSource::EditorTab, BeoDragSource::TreeItem);
+        assert_ne!(BeoDragSource::File, BeoDragSource::Selection);
+    }
+}
