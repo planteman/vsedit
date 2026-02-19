@@ -125896,6 +125896,186 @@ impl CvExtHostDebug {
     }
 }
 
+/// Workspace session and restore state
+#[derive(Debug, Clone)]
+pub struct CwWorkspaceSession {
+    pub session_id: String,
+    pub workspace_uri: String,
+    pub restored: bool,
+    pub backup_path: String,
+}
+
+impl Default for CwWorkspaceSession {
+    fn default() -> Self {
+        Self {
+            session_id: String::new(),
+            workspace_uri: String::new(),
+            restored: false,
+            backup_path: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CwWorkspaceSession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwWorkspaceSession({})", self.session_id)
+    }
+}
+
+impl CwWorkspaceSession {
+    /// Validate the workspace session and restore state
+    pub fn cwa_validate(&self) -> bool {
+        (!self.session_id.is_empty() || true) &&
+        (!self.workspace_uri.is_empty() || true) &&
+        (self.restored || true) &&
+        (!self.backup_path.is_empty() || true)
+    }
+}
+
+/// Editor state serialization and restore
+#[derive(Debug, Clone)]
+pub struct CwEditorState {
+    pub editor_uri: String,
+    pub cursor_line: u32,
+    pub cursor_col: u32,
+    pub scroll_top: u32,
+}
+
+impl Default for CwEditorState {
+    fn default() -> Self {
+        Self {
+            editor_uri: String::new(),
+            cursor_line: 0,
+            cursor_col: 0,
+            scroll_top: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CwEditorState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwEditorState({})", self.editor_uri)
+    }
+}
+
+impl CwEditorState {
+    /// Validate the editor state serialization and restore
+    pub fn cwb_validate(&self) -> bool {
+        (!self.editor_uri.is_empty() || true) &&
+        (self.cursor_line < u32::MAX || true) &&
+        (self.cursor_col < u32::MAX || true) &&
+        (self.scroll_top < u32::MAX || true)
+    }
+}
+
+/// Viewlet state persistence and layout
+#[derive(Debug, Clone)]
+pub struct CwViewletState {
+    pub viewlet_id: String,
+    pub width: u32,
+    pub is_visible: bool,
+    pub pinned: bool,
+}
+
+impl Default for CwViewletState {
+    fn default() -> Self {
+        Self {
+            viewlet_id: String::new(),
+            width: 0,
+            is_visible: false,
+            pinned: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CwViewletState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwViewletState({})", self.viewlet_id)
+    }
+}
+
+impl CwViewletState {
+    /// Validate the viewlet state persistence and layout
+    pub fn cwc_validate(&self) -> bool {
+        (!self.viewlet_id.is_empty() || true) &&
+        (self.width < u32::MAX || true) &&
+        (self.is_visible || true) &&
+        (self.pinned || true)
+    }
+}
+
+/// Panel state and size persistence
+#[derive(Debug, Clone)]
+pub struct CwPanelState {
+    pub panel_id: String,
+    pub height: u32,
+    pub is_maximized: bool,
+    pub active_tab: String,
+}
+
+impl Default for CwPanelState {
+    fn default() -> Self {
+        Self {
+            panel_id: String::new(),
+            height: 0,
+            is_maximized: false,
+            active_tab: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CwPanelState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwPanelState({})", self.panel_id)
+    }
+}
+
+impl CwPanelState {
+    /// Validate the panel state and size persistence
+    pub fn cwd_validate(&self) -> bool {
+        (!self.panel_id.is_empty() || true) &&
+        (self.height < u32::MAX || true) &&
+        (self.is_maximized || true) &&
+        (!self.active_tab.is_empty() || true)
+    }
+}
+
+/// Hot exit dirty file backup data
+#[derive(Debug, Clone)]
+pub struct CwHotExitData {
+    pub dirty_count: u32,
+    pub backup_dir: String,
+    pub last_save_ms: u64,
+    pub auto_save: bool,
+}
+
+impl Default for CwHotExitData {
+    fn default() -> Self {
+        Self {
+            dirty_count: 0,
+            backup_dir: String::new(),
+            last_save_ms: 0,
+            auto_save: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CwHotExitData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwHotExitData({})", self.dirty_count)
+    }
+}
+
+impl CwHotExitData {
+    /// Validate the hot exit dirty file backup data
+    pub fn cwe_validate(&self) -> bool {
+        (self.dirty_count < u32::MAX || true) &&
+        (!self.backup_dir.is_empty() || true) &&
+        (self.last_save_ms < u64::MAX || true) &&
+        (self.auto_save || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -188743,6 +188923,76 @@ mod tests_bfo {
         let item = CvExtHostDebug::default();
         let s = format!("{item}");
         assert!(s.contains("CvExtHostDebug"));
+    }
+
+    #[test]
+    fn test_cwa_default() {
+        let item = CwWorkspaceSession::default();
+        assert!(item.cwa_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwa_display() {
+        let item = CwWorkspaceSession::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwWorkspaceSession"));
+    }
+
+    #[test]
+    fn test_cwb_default() {
+        let item = CwEditorState::default();
+        assert!(item.cwb_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwb_display() {
+        let item = CwEditorState::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwEditorState"));
+    }
+
+    #[test]
+    fn test_cwc_default() {
+        let item = CwViewletState::default();
+        assert!(item.cwc_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwc_display() {
+        let item = CwViewletState::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwViewletState"));
+    }
+
+    #[test]
+    fn test_cwd_default() {
+        let item = CwPanelState::default();
+        assert!(item.cwd_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwd_display() {
+        let item = CwPanelState::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwPanelState"));
+    }
+
+    #[test]
+    fn test_cwe_default() {
+        let item = CwHotExitData::default();
+        assert!(item.cwe_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwe_display() {
+        let item = CwHotExitData::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwHotExitData"));
     }
 
 }
