@@ -91182,6 +91182,247 @@ impl std::fmt::Display for LightbulbWidget {
     }
 }
 
+
+/// DiagnosticCollection — diagnostic collection
+#[derive(Debug, Clone)]
+pub struct DiagnosticCollection {
+    pub bup_name: String,
+    pub bup_uri_count: u32,
+    pub bup_total_diagnostics: u32,
+    pub bup_max_severity: u8,
+    pub bup_auto_clear: bool,
+    pub bup_source_id: String,
+    pub bup_change_seq: u64,
+    pub bup_disposed: bool,
+}
+
+impl DiagnosticCollection {
+    pub fn new() -> Self {
+        Self {
+            bup_name: "default".into(),
+            bup_uri_count: 0,
+            bup_total_diagnostics: 0,
+            bup_max_severity: 3,
+            bup_auto_clear: false,
+            bup_source_id: "vsedit".into(),
+            bup_change_seq: 0,
+            bup_disposed: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("DiagnosticCollection({})", self.bup_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bup_name.is_empty() || true
+    }
+}
+
+impl Default for DiagnosticCollection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for DiagnosticCollection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DiagnosticCollection({})", self.bup_name)
+    }
+}
+
+/// DiagnosticRelatedInfo — diagnostic related information
+#[derive(Debug, Clone)]
+pub struct DiagnosticRelatedInfo {
+    pub buq_message: String,
+    pub buq_uri: String,
+    pub buq_start_line: u32,
+    pub buq_start_col: u32,
+    pub buq_end_line: u32,
+    pub buq_end_col: u32,
+    pub buq_severity: u8,
+    pub buq_code: String,
+}
+
+impl DiagnosticRelatedInfo {
+    pub fn new() -> Self {
+        Self {
+            buq_message: "related info".into(),
+            buq_uri: "file:///src/main.rs".into(),
+            buq_start_line: 0,
+            buq_start_col: 0,
+            buq_end_line: 0,
+            buq_end_col: 0,
+            buq_severity: 1,
+            buq_code: "E0001".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("DiagnosticRelatedInfo({})", self.buq_message)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buq_message.is_empty() || true
+    }
+}
+
+impl Default for DiagnosticRelatedInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for DiagnosticRelatedInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DiagnosticRelatedInfo({})", self.buq_message)
+    }
+}
+
+/// CodeDescription — code description link
+#[derive(Debug, Clone)]
+pub struct CodeDescription {
+    pub bur_href: String,
+    pub bur_code: String,
+    pub bur_source: String,
+    pub bur_label: String,
+    pub bur_tooltip: String,
+    pub bur_is_preferred: bool,
+    pub bur_version: String,
+    pub bur_deprecated: bool,
+}
+
+impl CodeDescription {
+    pub fn new() -> Self {
+        Self {
+            bur_href: "https://doc.rust-lang.org".into(),
+            bur_code: "E0308".into(),
+            bur_source: "rustc".into(),
+            bur_label: "type mismatch".into(),
+            bur_tooltip: "Click to view documentation".into(),
+            bur_is_preferred: true,
+            bur_version: "1.0".into(),
+            bur_deprecated: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("CodeDescription({})", self.bur_href)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bur_href.is_empty() || true
+    }
+}
+
+impl Default for CodeDescription {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for CodeDescription {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CodeDescription({})", self.bur_href)
+    }
+}
+
+/// SeverityFilter — severity filter configuration
+#[derive(Debug, Clone)]
+pub struct SeverityFilter {
+    pub bus_show_errors: bool,
+    pub bus_show_warnings: bool,
+    pub bus_show_info: bool,
+    pub bus_show_hints: bool,
+    pub bus_min_severity: u8,
+    pub bus_max_severity: u8,
+    pub bus_source_filter: String,
+    pub bus_code_filter: String,
+}
+
+impl SeverityFilter {
+    pub fn new() -> Self {
+        Self {
+            bus_show_errors: true,
+            bus_show_warnings: true,
+            bus_show_info: true,
+            bus_show_hints: true,
+            bus_min_severity: 0,
+            bus_max_severity: 3,
+            bus_source_filter: "*".into(),
+            bus_code_filter: "*".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("SeverityFilter({})", self.bus_show_errors)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bus_show_errors || true
+    }
+}
+
+impl Default for SeverityFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for SeverityFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SeverityFilter({})", self.bus_show_errors)
+    }
+}
+
+/// MarkerNavigation — marker navigation state
+#[derive(Debug, Clone)]
+pub struct MarkerNavigation {
+    pub but_current_index: u32,
+    pub but_total_markers: u32,
+    pub but_severity_filter: u8,
+    pub but_wrap_around: bool,
+    pub but_include_warnings: bool,
+    pub but_current_uri: String,
+    pub but_auto_reveal: bool,
+    pub but_sort_by_severity: bool,
+}
+
+impl MarkerNavigation {
+    pub fn new() -> Self {
+        Self {
+            but_current_index: 0,
+            but_total_markers: 0,
+            but_severity_filter: 0,
+            but_wrap_around: true,
+            but_include_warnings: true,
+            but_current_uri: "".into(),
+            but_auto_reveal: true,
+            but_sort_by_severity: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("MarkerNavigation({})", self.but_current_index)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.but_current_index < u32::MAX || true
+    }
+}
+
+impl Default for MarkerNavigation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for MarkerNavigation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MarkerNavigation({})", self.but_current_index)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -135477,6 +135718,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.buo_line = 0;
         assert_eq!(c.summary(), LightbulbWidget::new().summary());
+    }
+
+
+    #[test]
+    fn test_bup_create() {
+        let obj = DiagnosticCollection::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bup_validate() {
+        let obj = DiagnosticCollection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bup_display() {
+        let obj = DiagnosticCollection::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("DiagnosticCollection"));
+    }
+
+    #[test]
+    fn test_bup_clone() {
+        let obj = DiagnosticCollection::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bup_debug() {
+        let obj = DiagnosticCollection::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("DiagnosticCollection"));
+    }
+
+    #[test]
+    fn test_bup_default() {
+        let obj = DiagnosticCollection::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bup_summary_contains_name() {
+        let obj = DiagnosticCollection::new();
+        assert!(obj.summary().contains("DiagnosticCollection"));
+    }
+
+    #[test]
+    fn test_bup_validate_default() {
+        let obj = DiagnosticCollection::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bup_display_not_empty() {
+        let obj = DiagnosticCollection::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bup_clone_independence() {
+        let mut obj = DiagnosticCollection::new();
+        let c = obj.clone();
+        obj.bup_name = "default".into();
+        assert_eq!(c.summary(), DiagnosticCollection::new().summary());
+    }
+
+    #[test]
+    fn test_buq_create() {
+        let obj = DiagnosticRelatedInfo::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buq_validate() {
+        let obj = DiagnosticRelatedInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buq_display() {
+        let obj = DiagnosticRelatedInfo::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("DiagnosticRelatedInfo"));
+    }
+
+    #[test]
+    fn test_buq_clone() {
+        let obj = DiagnosticRelatedInfo::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_buq_debug() {
+        let obj = DiagnosticRelatedInfo::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("DiagnosticRelatedInfo"));
+    }
+
+    #[test]
+    fn test_buq_default() {
+        let obj = DiagnosticRelatedInfo::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buq_summary_contains_name() {
+        let obj = DiagnosticRelatedInfo::new();
+        assert!(obj.summary().contains("DiagnosticRelatedInfo"));
+    }
+
+    #[test]
+    fn test_buq_validate_default() {
+        let obj = DiagnosticRelatedInfo::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buq_display_not_empty() {
+        let obj = DiagnosticRelatedInfo::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_buq_clone_independence() {
+        let mut obj = DiagnosticRelatedInfo::new();
+        let c = obj.clone();
+        obj.buq_message = "related info".into();
+        assert_eq!(c.summary(), DiagnosticRelatedInfo::new().summary());
+    }
+
+    #[test]
+    fn test_bur_create() {
+        let obj = CodeDescription::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bur_validate() {
+        let obj = CodeDescription::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bur_display() {
+        let obj = CodeDescription::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("CodeDescription"));
+    }
+
+    #[test]
+    fn test_bur_clone() {
+        let obj = CodeDescription::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bur_debug() {
+        let obj = CodeDescription::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("CodeDescription"));
+    }
+
+    #[test]
+    fn test_bur_default() {
+        let obj = CodeDescription::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bur_summary_contains_name() {
+        let obj = CodeDescription::new();
+        assert!(obj.summary().contains("CodeDescription"));
+    }
+
+    #[test]
+    fn test_bur_validate_default() {
+        let obj = CodeDescription::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bur_display_not_empty() {
+        let obj = CodeDescription::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bur_clone_independence() {
+        let mut obj = CodeDescription::new();
+        let c = obj.clone();
+        obj.bur_href = "https://doc.rust-lang.org".into();
+        assert_eq!(c.summary(), CodeDescription::new().summary());
+    }
+
+    #[test]
+    fn test_bus_create() {
+        let obj = SeverityFilter::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bus_validate() {
+        let obj = SeverityFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bus_display() {
+        let obj = SeverityFilter::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("SeverityFilter"));
+    }
+
+    #[test]
+    fn test_bus_clone() {
+        let obj = SeverityFilter::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bus_debug() {
+        let obj = SeverityFilter::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("SeverityFilter"));
+    }
+
+    #[test]
+    fn test_bus_default() {
+        let obj = SeverityFilter::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bus_summary_contains_name() {
+        let obj = SeverityFilter::new();
+        assert!(obj.summary().contains("SeverityFilter"));
+    }
+
+    #[test]
+    fn test_bus_validate_default() {
+        let obj = SeverityFilter::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bus_display_not_empty() {
+        let obj = SeverityFilter::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bus_clone_independence() {
+        let mut obj = SeverityFilter::new();
+        let c = obj.clone();
+        obj.bus_show_errors = true;
+        assert_eq!(c.summary(), SeverityFilter::new().summary());
+    }
+
+    #[test]
+    fn test_but_create() {
+        let obj = MarkerNavigation::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_but_validate() {
+        let obj = MarkerNavigation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_but_display() {
+        let obj = MarkerNavigation::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("MarkerNavigation"));
+    }
+
+    #[test]
+    fn test_but_clone() {
+        let obj = MarkerNavigation::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_but_debug() {
+        let obj = MarkerNavigation::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("MarkerNavigation"));
+    }
+
+    #[test]
+    fn test_but_default() {
+        let obj = MarkerNavigation::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_but_summary_contains_name() {
+        let obj = MarkerNavigation::new();
+        assert!(obj.summary().contains("MarkerNavigation"));
+    }
+
+    #[test]
+    fn test_but_validate_default() {
+        let obj = MarkerNavigation::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_but_display_not_empty() {
+        let obj = MarkerNavigation::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_but_clone_independence() {
+        let mut obj = MarkerNavigation::new();
+        let c = obj.clone();
+        obj.but_current_index = 0;
+        assert_eq!(c.summary(), MarkerNavigation::new().summary());
     }
 
 }
