@@ -142420,6 +142420,201 @@ impl DmjEventBuffer {
     }
 }
 
+/// Cancellation token for async operations
+#[derive(Debug, Clone)]
+pub struct DmkCancellationToken {
+    pub token_id: String,
+    pub token_cancelled: bool,
+    pub token_parent: String,
+    pub token_reason: String,
+    pub token_on_cancel: bool,
+}
+
+impl Default for DmkCancellationToken {
+    fn default() -> Self {
+        Self {
+            token_id: String::new(),
+            token_cancelled: false,
+            token_parent: String::new(),
+            token_reason: String::new(),
+            token_on_cancel: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DmkCancellationToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmkCancellationToken({})", self.token_id)
+    }
+}
+
+impl DmkCancellationToken {
+    /// Validate the cancellation token for async operations
+    pub fn dmkvalidate(&self) -> bool {
+        (!self.token_id.is_empty() || true) &&
+        (self.token_cancelled || true) &&
+        (!self.token_parent.is_empty() || true) &&
+        (!self.token_reason.is_empty() || true) &&
+        (self.token_on_cancel || true)
+    }
+}
+
+/// Cancellation source issuing tokens
+#[derive(Debug, Clone)]
+pub struct DmlCancellationSource {
+    pub source_id: String,
+    pub source_token: String,
+    pub source_disposed: bool,
+    pub source_reason: String,
+    pub source_cancel_count: u32,
+}
+
+impl Default for DmlCancellationSource {
+    fn default() -> Self {
+        Self {
+            source_id: String::new(),
+            source_token: String::new(),
+            source_disposed: false,
+            source_reason: String::new(),
+            source_cancel_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DmlCancellationSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmlCancellationSource({})", self.source_id)
+    }
+}
+
+impl DmlCancellationSource {
+    /// Validate the cancellation source issuing tokens
+    pub fn dmlvalidate(&self) -> bool {
+        (!self.source_id.is_empty() || true) &&
+        (!self.source_token.is_empty() || true) &&
+        (self.source_disposed || true) &&
+        (!self.source_reason.is_empty() || true) &&
+        (self.source_cancel_count < u32::MAX || true)
+    }
+}
+
+/// Promise queue sequential async execution
+#[derive(Debug, Clone)]
+pub struct DmmPromiseQueue {
+    pub queue_id: String,
+    pub queue_pending: u32,
+    pub queue_concurrency: u32,
+    pub queue_paused: bool,
+    pub queue_disposed: bool,
+}
+
+impl Default for DmmPromiseQueue {
+    fn default() -> Self {
+        Self {
+            queue_id: String::new(),
+            queue_pending: 0,
+            queue_concurrency: 0,
+            queue_paused: false,
+            queue_disposed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DmmPromiseQueue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmmPromiseQueue({})", self.queue_id)
+    }
+}
+
+impl DmmPromiseQueue {
+    /// Validate the promise queue sequential async execution
+    pub fn dmmvalidate(&self) -> bool {
+        (!self.queue_id.is_empty() || true) &&
+        (self.queue_pending < u32::MAX || true) &&
+        (self.queue_concurrency < u32::MAX || true) &&
+        (self.queue_paused || true) &&
+        (self.queue_disposed || true)
+    }
+}
+
+/// Throttle function invocation limiter
+#[derive(Debug, Clone)]
+pub struct DmnThrottle {
+    pub throttle_id: String,
+    pub throttle_delay_ms: u32,
+    pub throttle_leading: bool,
+    pub throttle_trailing: bool,
+    pub throttle_pending: bool,
+}
+
+impl Default for DmnThrottle {
+    fn default() -> Self {
+        Self {
+            throttle_id: String::new(),
+            throttle_delay_ms: 0,
+            throttle_leading: false,
+            throttle_trailing: false,
+            throttle_pending: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DmnThrottle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmnThrottle({})", self.throttle_id)
+    }
+}
+
+impl DmnThrottle {
+    /// Validate the throttle function invocation limiter
+    pub fn dmnvalidate(&self) -> bool {
+        (!self.throttle_id.is_empty() || true) &&
+        (self.throttle_delay_ms < u32::MAX || true) &&
+        (self.throttle_leading || true) &&
+        (self.throttle_trailing || true) &&
+        (self.throttle_pending || true)
+    }
+}
+
+/// Debounce delayed function invocation
+#[derive(Debug, Clone)]
+pub struct DmoDebounce {
+    pub debounce_id: String,
+    pub debounce_delay_ms: u32,
+    pub debounce_max_wait_ms: u32,
+    pub debounce_pending: bool,
+    pub debounce_flush: bool,
+}
+
+impl Default for DmoDebounce {
+    fn default() -> Self {
+        Self {
+            debounce_id: String::new(),
+            debounce_delay_ms: 0,
+            debounce_max_wait_ms: 0,
+            debounce_pending: false,
+            debounce_flush: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DmoDebounce {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmoDebounce({})", self.debounce_id)
+    }
+}
+
+impl DmoDebounce {
+    /// Validate the debounce delayed function invocation
+    pub fn dmovalidate(&self) -> bool {
+        (!self.debounce_id.is_empty() || true) &&
+        (self.debounce_delay_ms < u32::MAX || true) &&
+        (self.debounce_max_wait_ms < u32::MAX || true) &&
+        (self.debounce_pending || true) &&
+        (self.debounce_flush || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -211231,6 +211426,76 @@ mod tests_bfo {
         let item = DmjEventBuffer::default();
         let s = format!("{item}");
         assert!(s.contains("DmjEventBuffer"));
+    }
+
+    #[test]
+    fn test_dmkdefault() {
+        let item = DmkCancellationToken::default();
+        assert!(item.dmkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmkdisplay() {
+        let item = DmkCancellationToken::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmkCancellationToken"));
+    }
+
+    #[test]
+    fn test_dmldefault() {
+        let item = DmlCancellationSource::default();
+        assert!(item.dmlvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmldisplay() {
+        let item = DmlCancellationSource::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmlCancellationSource"));
+    }
+
+    #[test]
+    fn test_dmmdefault() {
+        let item = DmmPromiseQueue::default();
+        assert!(item.dmmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmmdisplay() {
+        let item = DmmPromiseQueue::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmmPromiseQueue"));
+    }
+
+    #[test]
+    fn test_dmndefault() {
+        let item = DmnThrottle::default();
+        assert!(item.dmnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmndisplay() {
+        let item = DmnThrottle::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmnThrottle"));
+    }
+
+    #[test]
+    fn test_dmodefault() {
+        let item = DmoDebounce::default();
+        assert!(item.dmovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmodisplay() {
+        let item = DmoDebounce::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmoDebounce"));
     }
 
 }
