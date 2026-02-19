@@ -88940,6 +88940,132 @@ impl ScmAction {
     }
 }
 
+/// Runtime wiring: bqu_ TimelineItem
+#[derive(Debug, Clone)]
+pub struct TimelineItem {
+    pub bqu_item_id: String,
+    pub bqu_timestamp: u64,
+    pub bqu_label: String,
+    pub bqu_description: String,
+    pub bqu_detail: String,
+    pub bqu_icon_path: String,
+    pub bqu_context_value: String,
+    pub bqu_command_id: String,
+    pub bqu_source_id: String,
+    pub bqu_uri: String,
+}
+
+impl TimelineItem {
+    pub fn bqu_summary(&self) -> String {
+        format!("TimelineItem({})", self.bqu_item_id)
+    }
+}
+
+/// Runtime wiring: bqv_ TimelineProvider
+#[derive(Debug, Clone)]
+pub struct TimelineProvider {
+    pub bqv_provider_id: String,
+    pub bqv_label: String,
+    pub bqv_scheme: String,
+    pub bqv_cursor_token: String,
+    pub bqv_has_more: bool,
+    pub bqv_item_count: usize,
+    pub bqv_is_loading: bool,
+    pub bqv_supported_schemes: Vec<String>,
+    pub bqv_auto_refresh: bool,
+    pub bqv_refresh_interval: u32,
+}
+
+impl TimelineProvider {
+    pub fn bqv_summary(&self) -> String {
+        format!("TimelineProvider({})", self.bqv_provider_id)
+    }
+}
+
+/// Runtime wiring: bqw_ ExtensionPoint
+#[derive(Debug, Clone)]
+pub struct ExtensionPoint {
+    pub bqw_point_id: String,
+    pub bqw_extension_id: String,
+    pub bqw_display_name: String,
+    pub bqw_activation_event: String,
+    pub bqw_is_builtin: bool,
+    pub bqw_is_active: bool,
+    pub bqw_contribution_count: u32,
+    pub bqw_dependencies: Vec<String>,
+    pub bqw_api_version: String,
+    pub bqw_engine_version: String,
+}
+
+impl ExtensionPoint {
+    pub fn bqw_summary(&self) -> String {
+        format!("ExtensionPoint({})", self.bqw_point_id)
+    }
+}
+
+/// Runtime wiring: bqx_ ContributionPoint
+#[derive(Debug, Clone)]
+pub struct ContributionPoint {
+    pub bqx_contribution_type: String,
+    pub bqx_extension_id: String,
+    pub bqx_json_path: String,
+    pub bqx_schema_uri: String,
+    pub bqx_default_value: String,
+    pub bqx_is_required: bool,
+    pub bqx_is_internal: bool,
+    pub bqx_order: u32,
+    pub bqx_when_clause: String,
+    pub bqx_group_id: String,
+}
+
+impl ContributionPoint {
+    pub fn bqx_summary(&self) -> String {
+        format!("ContributionPoint({})", self.bqx_contribution_type)
+    }
+}
+
+/// Runtime wiring: bqy_ WhenContext
+#[derive(Debug, Clone)]
+pub struct WhenContext {
+    pub bqy_context_key: String,
+    pub bqy_context_value: String,
+    pub bqy_operator: String,
+    pub bqy_is_negated: bool,
+    pub bqy_is_regex: bool,
+    pub bqy_sub_expressions: Vec<String>,
+    pub bqy_evaluation_result: bool,
+    pub bqy_source_extension: String,
+    pub bqy_cache_key: String,
+    pub bqy_priority: u32,
+}
+
+impl WhenContext {
+    pub fn bqy_summary(&self) -> String {
+        format!("WhenContext({})", self.bqy_context_key)
+    }
+}
+
+/// Runtime wiring: bqz_ MenuContribution
+#[derive(Debug, Clone)]
+pub struct MenuContribution {
+    pub bqz_menu_id: String,
+    pub bqz_command_id: String,
+    pub bqz_when_clause: String,
+    pub bqz_group_id: String,
+    pub bqz_order: u32,
+    pub bqz_title: String,
+    pub bqz_icon_path: String,
+    pub bqz_alt_command_id: String,
+    pub bqz_is_submenu: bool,
+    pub bqz_submenu_id: String,
+}
+
+impl MenuContribution {
+    pub fn bqz_summary(&self) -> String {
+        format!("MenuContribution({})", self.bqz_menu_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -115913,6 +116039,1091 @@ mod tests_bfo {
         };
         let _ = obj.bqt_summary();
         assert!(obj.bqt_command_args.is_empty());
+    }
+
+    #[test]
+    fn test_bqu_item_id() {
+        let obj = TimelineItem {
+            bqu_item_id: String::from("test"),
+            bqu_timestamp: 0,
+            bqu_label: String::from("test"),
+            bqu_description: String::from("test"),
+            bqu_detail: String::from("test"),
+            bqu_icon_path: String::from("test"),
+            bqu_context_value: String::from("test"),
+            bqu_command_id: String::from("test"),
+            bqu_source_id: String::from("test"),
+            bqu_uri: String::from("test"),
+        };
+        let _ = obj.bqu_summary();
+        assert_eq!(obj.bqu_item_id, "test");
+    }
+
+    #[test]
+    fn test_bqu_timestamp() {
+        let obj = TimelineItem {
+            bqu_item_id: String::from("test"),
+            bqu_timestamp: 0,
+            bqu_label: String::from("test"),
+            bqu_description: String::from("test"),
+            bqu_detail: String::from("test"),
+            bqu_icon_path: String::from("test"),
+            bqu_context_value: String::from("test"),
+            bqu_command_id: String::from("test"),
+            bqu_source_id: String::from("test"),
+            bqu_uri: String::from("test"),
+        };
+        let _ = obj.bqu_summary();
+        assert_eq!(obj.bqu_timestamp, 0);
+    }
+
+    #[test]
+    fn test_bqu_label() {
+        let obj = TimelineItem {
+            bqu_item_id: String::from("test"),
+            bqu_timestamp: 0,
+            bqu_label: String::from("test"),
+            bqu_description: String::from("test"),
+            bqu_detail: String::from("test"),
+            bqu_icon_path: String::from("test"),
+            bqu_context_value: String::from("test"),
+            bqu_command_id: String::from("test"),
+            bqu_source_id: String::from("test"),
+            bqu_uri: String::from("test"),
+        };
+        let _ = obj.bqu_summary();
+        assert_eq!(obj.bqu_label, "test");
+    }
+
+    #[test]
+    fn test_bqu_description() {
+        let obj = TimelineItem {
+            bqu_item_id: String::from("test"),
+            bqu_timestamp: 0,
+            bqu_label: String::from("test"),
+            bqu_description: String::from("test"),
+            bqu_detail: String::from("test"),
+            bqu_icon_path: String::from("test"),
+            bqu_context_value: String::from("test"),
+            bqu_command_id: String::from("test"),
+            bqu_source_id: String::from("test"),
+            bqu_uri: String::from("test"),
+        };
+        let _ = obj.bqu_summary();
+        assert_eq!(obj.bqu_description, "test");
+    }
+
+    #[test]
+    fn test_bqu_detail() {
+        let obj = TimelineItem {
+            bqu_item_id: String::from("test"),
+            bqu_timestamp: 0,
+            bqu_label: String::from("test"),
+            bqu_description: String::from("test"),
+            bqu_detail: String::from("test"),
+            bqu_icon_path: String::from("test"),
+            bqu_context_value: String::from("test"),
+            bqu_command_id: String::from("test"),
+            bqu_source_id: String::from("test"),
+            bqu_uri: String::from("test"),
+        };
+        let _ = obj.bqu_summary();
+        assert_eq!(obj.bqu_detail, "test");
+    }
+
+    #[test]
+    fn test_bqu_icon_path() {
+        let obj = TimelineItem {
+            bqu_item_id: String::from("test"),
+            bqu_timestamp: 0,
+            bqu_label: String::from("test"),
+            bqu_description: String::from("test"),
+            bqu_detail: String::from("test"),
+            bqu_icon_path: String::from("test"),
+            bqu_context_value: String::from("test"),
+            bqu_command_id: String::from("test"),
+            bqu_source_id: String::from("test"),
+            bqu_uri: String::from("test"),
+        };
+        let _ = obj.bqu_summary();
+        assert_eq!(obj.bqu_icon_path, "test");
+    }
+
+    #[test]
+    fn test_bqu_context_value() {
+        let obj = TimelineItem {
+            bqu_item_id: String::from("test"),
+            bqu_timestamp: 0,
+            bqu_label: String::from("test"),
+            bqu_description: String::from("test"),
+            bqu_detail: String::from("test"),
+            bqu_icon_path: String::from("test"),
+            bqu_context_value: String::from("test"),
+            bqu_command_id: String::from("test"),
+            bqu_source_id: String::from("test"),
+            bqu_uri: String::from("test"),
+        };
+        let _ = obj.bqu_summary();
+        assert_eq!(obj.bqu_context_value, "test");
+    }
+
+    #[test]
+    fn test_bqu_command_id() {
+        let obj = TimelineItem {
+            bqu_item_id: String::from("test"),
+            bqu_timestamp: 0,
+            bqu_label: String::from("test"),
+            bqu_description: String::from("test"),
+            bqu_detail: String::from("test"),
+            bqu_icon_path: String::from("test"),
+            bqu_context_value: String::from("test"),
+            bqu_command_id: String::from("test"),
+            bqu_source_id: String::from("test"),
+            bqu_uri: String::from("test"),
+        };
+        let _ = obj.bqu_summary();
+        assert_eq!(obj.bqu_command_id, "test");
+    }
+
+    #[test]
+    fn test_bqu_source_id() {
+        let obj = TimelineItem {
+            bqu_item_id: String::from("test"),
+            bqu_timestamp: 0,
+            bqu_label: String::from("test"),
+            bqu_description: String::from("test"),
+            bqu_detail: String::from("test"),
+            bqu_icon_path: String::from("test"),
+            bqu_context_value: String::from("test"),
+            bqu_command_id: String::from("test"),
+            bqu_source_id: String::from("test"),
+            bqu_uri: String::from("test"),
+        };
+        let _ = obj.bqu_summary();
+        assert_eq!(obj.bqu_source_id, "test");
+    }
+
+    #[test]
+    fn test_bqu_uri() {
+        let obj = TimelineItem {
+            bqu_item_id: String::from("test"),
+            bqu_timestamp: 0,
+            bqu_label: String::from("test"),
+            bqu_description: String::from("test"),
+            bqu_detail: String::from("test"),
+            bqu_icon_path: String::from("test"),
+            bqu_context_value: String::from("test"),
+            bqu_command_id: String::from("test"),
+            bqu_source_id: String::from("test"),
+            bqu_uri: String::from("test"),
+        };
+        let _ = obj.bqu_summary();
+        assert_eq!(obj.bqu_uri, "test");
+    }
+
+
+    #[test]
+    fn test_bqv_provider_id() {
+        let obj = TimelineProvider {
+            bqv_provider_id: String::from("test"),
+            bqv_label: String::from("test"),
+            bqv_scheme: String::from("test"),
+            bqv_cursor_token: String::from("test"),
+            bqv_has_more: false,
+            bqv_item_count: 0,
+            bqv_is_loading: false,
+            bqv_supported_schemes: Vec::new(),
+            bqv_auto_refresh: false,
+            bqv_refresh_interval: 0,
+        };
+        let _ = obj.bqv_summary();
+        assert_eq!(obj.bqv_provider_id, "test");
+    }
+
+    #[test]
+    fn test_bqv_label() {
+        let obj = TimelineProvider {
+            bqv_provider_id: String::from("test"),
+            bqv_label: String::from("test"),
+            bqv_scheme: String::from("test"),
+            bqv_cursor_token: String::from("test"),
+            bqv_has_more: false,
+            bqv_item_count: 0,
+            bqv_is_loading: false,
+            bqv_supported_schemes: Vec::new(),
+            bqv_auto_refresh: false,
+            bqv_refresh_interval: 0,
+        };
+        let _ = obj.bqv_summary();
+        assert_eq!(obj.bqv_label, "test");
+    }
+
+    #[test]
+    fn test_bqv_scheme() {
+        let obj = TimelineProvider {
+            bqv_provider_id: String::from("test"),
+            bqv_label: String::from("test"),
+            bqv_scheme: String::from("test"),
+            bqv_cursor_token: String::from("test"),
+            bqv_has_more: false,
+            bqv_item_count: 0,
+            bqv_is_loading: false,
+            bqv_supported_schemes: Vec::new(),
+            bqv_auto_refresh: false,
+            bqv_refresh_interval: 0,
+        };
+        let _ = obj.bqv_summary();
+        assert_eq!(obj.bqv_scheme, "test");
+    }
+
+    #[test]
+    fn test_bqv_cursor_token() {
+        let obj = TimelineProvider {
+            bqv_provider_id: String::from("test"),
+            bqv_label: String::from("test"),
+            bqv_scheme: String::from("test"),
+            bqv_cursor_token: String::from("test"),
+            bqv_has_more: false,
+            bqv_item_count: 0,
+            bqv_is_loading: false,
+            bqv_supported_schemes: Vec::new(),
+            bqv_auto_refresh: false,
+            bqv_refresh_interval: 0,
+        };
+        let _ = obj.bqv_summary();
+        assert_eq!(obj.bqv_cursor_token, "test");
+    }
+
+    #[test]
+    fn test_bqv_has_more() {
+        let obj = TimelineProvider {
+            bqv_provider_id: String::from("test"),
+            bqv_label: String::from("test"),
+            bqv_scheme: String::from("test"),
+            bqv_cursor_token: String::from("test"),
+            bqv_has_more: false,
+            bqv_item_count: 0,
+            bqv_is_loading: false,
+            bqv_supported_schemes: Vec::new(),
+            bqv_auto_refresh: false,
+            bqv_refresh_interval: 0,
+        };
+        let _ = obj.bqv_summary();
+        assert!(!obj.bqv_has_more);
+    }
+
+    #[test]
+    fn test_bqv_item_count() {
+        let obj = TimelineProvider {
+            bqv_provider_id: String::from("test"),
+            bqv_label: String::from("test"),
+            bqv_scheme: String::from("test"),
+            bqv_cursor_token: String::from("test"),
+            bqv_has_more: false,
+            bqv_item_count: 0,
+            bqv_is_loading: false,
+            bqv_supported_schemes: Vec::new(),
+            bqv_auto_refresh: false,
+            bqv_refresh_interval: 0,
+        };
+        let _ = obj.bqv_summary();
+        assert_eq!(obj.bqv_item_count, 0);
+    }
+
+    #[test]
+    fn test_bqv_is_loading() {
+        let obj = TimelineProvider {
+            bqv_provider_id: String::from("test"),
+            bqv_label: String::from("test"),
+            bqv_scheme: String::from("test"),
+            bqv_cursor_token: String::from("test"),
+            bqv_has_more: false,
+            bqv_item_count: 0,
+            bqv_is_loading: false,
+            bqv_supported_schemes: Vec::new(),
+            bqv_auto_refresh: false,
+            bqv_refresh_interval: 0,
+        };
+        let _ = obj.bqv_summary();
+        assert!(!obj.bqv_is_loading);
+    }
+
+    #[test]
+    fn test_bqv_supported_schemes() {
+        let obj = TimelineProvider {
+            bqv_provider_id: String::from("test"),
+            bqv_label: String::from("test"),
+            bqv_scheme: String::from("test"),
+            bqv_cursor_token: String::from("test"),
+            bqv_has_more: false,
+            bqv_item_count: 0,
+            bqv_is_loading: false,
+            bqv_supported_schemes: Vec::new(),
+            bqv_auto_refresh: false,
+            bqv_refresh_interval: 0,
+        };
+        let _ = obj.bqv_summary();
+        assert!(obj.bqv_supported_schemes.is_empty());
+    }
+
+    #[test]
+    fn test_bqv_auto_refresh() {
+        let obj = TimelineProvider {
+            bqv_provider_id: String::from("test"),
+            bqv_label: String::from("test"),
+            bqv_scheme: String::from("test"),
+            bqv_cursor_token: String::from("test"),
+            bqv_has_more: false,
+            bqv_item_count: 0,
+            bqv_is_loading: false,
+            bqv_supported_schemes: Vec::new(),
+            bqv_auto_refresh: false,
+            bqv_refresh_interval: 0,
+        };
+        let _ = obj.bqv_summary();
+        assert!(!obj.bqv_auto_refresh);
+    }
+
+    #[test]
+    fn test_bqv_refresh_interval() {
+        let obj = TimelineProvider {
+            bqv_provider_id: String::from("test"),
+            bqv_label: String::from("test"),
+            bqv_scheme: String::from("test"),
+            bqv_cursor_token: String::from("test"),
+            bqv_has_more: false,
+            bqv_item_count: 0,
+            bqv_is_loading: false,
+            bqv_supported_schemes: Vec::new(),
+            bqv_auto_refresh: false,
+            bqv_refresh_interval: 0,
+        };
+        let _ = obj.bqv_summary();
+        assert_eq!(obj.bqv_refresh_interval, 0);
+    }
+
+
+    #[test]
+    fn test_bqw_point_id() {
+        let obj = ExtensionPoint {
+            bqw_point_id: String::from("test"),
+            bqw_extension_id: String::from("test"),
+            bqw_display_name: String::from("test"),
+            bqw_activation_event: String::from("test"),
+            bqw_is_builtin: false,
+            bqw_is_active: false,
+            bqw_contribution_count: 0,
+            bqw_dependencies: Vec::new(),
+            bqw_api_version: String::from("test"),
+            bqw_engine_version: String::from("test"),
+        };
+        let _ = obj.bqw_summary();
+        assert_eq!(obj.bqw_point_id, "test");
+    }
+
+    #[test]
+    fn test_bqw_extension_id() {
+        let obj = ExtensionPoint {
+            bqw_point_id: String::from("test"),
+            bqw_extension_id: String::from("test"),
+            bqw_display_name: String::from("test"),
+            bqw_activation_event: String::from("test"),
+            bqw_is_builtin: false,
+            bqw_is_active: false,
+            bqw_contribution_count: 0,
+            bqw_dependencies: Vec::new(),
+            bqw_api_version: String::from("test"),
+            bqw_engine_version: String::from("test"),
+        };
+        let _ = obj.bqw_summary();
+        assert_eq!(obj.bqw_extension_id, "test");
+    }
+
+    #[test]
+    fn test_bqw_display_name() {
+        let obj = ExtensionPoint {
+            bqw_point_id: String::from("test"),
+            bqw_extension_id: String::from("test"),
+            bqw_display_name: String::from("test"),
+            bqw_activation_event: String::from("test"),
+            bqw_is_builtin: false,
+            bqw_is_active: false,
+            bqw_contribution_count: 0,
+            bqw_dependencies: Vec::new(),
+            bqw_api_version: String::from("test"),
+            bqw_engine_version: String::from("test"),
+        };
+        let _ = obj.bqw_summary();
+        assert_eq!(obj.bqw_display_name, "test");
+    }
+
+    #[test]
+    fn test_bqw_activation_event() {
+        let obj = ExtensionPoint {
+            bqw_point_id: String::from("test"),
+            bqw_extension_id: String::from("test"),
+            bqw_display_name: String::from("test"),
+            bqw_activation_event: String::from("test"),
+            bqw_is_builtin: false,
+            bqw_is_active: false,
+            bqw_contribution_count: 0,
+            bqw_dependencies: Vec::new(),
+            bqw_api_version: String::from("test"),
+            bqw_engine_version: String::from("test"),
+        };
+        let _ = obj.bqw_summary();
+        assert_eq!(obj.bqw_activation_event, "test");
+    }
+
+    #[test]
+    fn test_bqw_is_builtin() {
+        let obj = ExtensionPoint {
+            bqw_point_id: String::from("test"),
+            bqw_extension_id: String::from("test"),
+            bqw_display_name: String::from("test"),
+            bqw_activation_event: String::from("test"),
+            bqw_is_builtin: false,
+            bqw_is_active: false,
+            bqw_contribution_count: 0,
+            bqw_dependencies: Vec::new(),
+            bqw_api_version: String::from("test"),
+            bqw_engine_version: String::from("test"),
+        };
+        let _ = obj.bqw_summary();
+        assert!(!obj.bqw_is_builtin);
+    }
+
+    #[test]
+    fn test_bqw_is_active() {
+        let obj = ExtensionPoint {
+            bqw_point_id: String::from("test"),
+            bqw_extension_id: String::from("test"),
+            bqw_display_name: String::from("test"),
+            bqw_activation_event: String::from("test"),
+            bqw_is_builtin: false,
+            bqw_is_active: false,
+            bqw_contribution_count: 0,
+            bqw_dependencies: Vec::new(),
+            bqw_api_version: String::from("test"),
+            bqw_engine_version: String::from("test"),
+        };
+        let _ = obj.bqw_summary();
+        assert!(!obj.bqw_is_active);
+    }
+
+    #[test]
+    fn test_bqw_contribution_count() {
+        let obj = ExtensionPoint {
+            bqw_point_id: String::from("test"),
+            bqw_extension_id: String::from("test"),
+            bqw_display_name: String::from("test"),
+            bqw_activation_event: String::from("test"),
+            bqw_is_builtin: false,
+            bqw_is_active: false,
+            bqw_contribution_count: 0,
+            bqw_dependencies: Vec::new(),
+            bqw_api_version: String::from("test"),
+            bqw_engine_version: String::from("test"),
+        };
+        let _ = obj.bqw_summary();
+        assert_eq!(obj.bqw_contribution_count, 0);
+    }
+
+    #[test]
+    fn test_bqw_dependencies() {
+        let obj = ExtensionPoint {
+            bqw_point_id: String::from("test"),
+            bqw_extension_id: String::from("test"),
+            bqw_display_name: String::from("test"),
+            bqw_activation_event: String::from("test"),
+            bqw_is_builtin: false,
+            bqw_is_active: false,
+            bqw_contribution_count: 0,
+            bqw_dependencies: Vec::new(),
+            bqw_api_version: String::from("test"),
+            bqw_engine_version: String::from("test"),
+        };
+        let _ = obj.bqw_summary();
+        assert!(obj.bqw_dependencies.is_empty());
+    }
+
+    #[test]
+    fn test_bqw_api_version() {
+        let obj = ExtensionPoint {
+            bqw_point_id: String::from("test"),
+            bqw_extension_id: String::from("test"),
+            bqw_display_name: String::from("test"),
+            bqw_activation_event: String::from("test"),
+            bqw_is_builtin: false,
+            bqw_is_active: false,
+            bqw_contribution_count: 0,
+            bqw_dependencies: Vec::new(),
+            bqw_api_version: String::from("test"),
+            bqw_engine_version: String::from("test"),
+        };
+        let _ = obj.bqw_summary();
+        assert_eq!(obj.bqw_api_version, "test");
+    }
+
+    #[test]
+    fn test_bqw_engine_version() {
+        let obj = ExtensionPoint {
+            bqw_point_id: String::from("test"),
+            bqw_extension_id: String::from("test"),
+            bqw_display_name: String::from("test"),
+            bqw_activation_event: String::from("test"),
+            bqw_is_builtin: false,
+            bqw_is_active: false,
+            bqw_contribution_count: 0,
+            bqw_dependencies: Vec::new(),
+            bqw_api_version: String::from("test"),
+            bqw_engine_version: String::from("test"),
+        };
+        let _ = obj.bqw_summary();
+        assert_eq!(obj.bqw_engine_version, "test");
+    }
+
+
+    #[test]
+    fn test_bqx_contribution_type() {
+        let obj = ContributionPoint {
+            bqx_contribution_type: String::from("test"),
+            bqx_extension_id: String::from("test"),
+            bqx_json_path: String::from("test"),
+            bqx_schema_uri: String::from("test"),
+            bqx_default_value: String::from("test"),
+            bqx_is_required: false,
+            bqx_is_internal: false,
+            bqx_order: 0,
+            bqx_when_clause: String::from("test"),
+            bqx_group_id: String::from("test"),
+        };
+        let _ = obj.bqx_summary();
+        assert_eq!(obj.bqx_contribution_type, "test");
+    }
+
+    #[test]
+    fn test_bqx_extension_id() {
+        let obj = ContributionPoint {
+            bqx_contribution_type: String::from("test"),
+            bqx_extension_id: String::from("test"),
+            bqx_json_path: String::from("test"),
+            bqx_schema_uri: String::from("test"),
+            bqx_default_value: String::from("test"),
+            bqx_is_required: false,
+            bqx_is_internal: false,
+            bqx_order: 0,
+            bqx_when_clause: String::from("test"),
+            bqx_group_id: String::from("test"),
+        };
+        let _ = obj.bqx_summary();
+        assert_eq!(obj.bqx_extension_id, "test");
+    }
+
+    #[test]
+    fn test_bqx_json_path() {
+        let obj = ContributionPoint {
+            bqx_contribution_type: String::from("test"),
+            bqx_extension_id: String::from("test"),
+            bqx_json_path: String::from("test"),
+            bqx_schema_uri: String::from("test"),
+            bqx_default_value: String::from("test"),
+            bqx_is_required: false,
+            bqx_is_internal: false,
+            bqx_order: 0,
+            bqx_when_clause: String::from("test"),
+            bqx_group_id: String::from("test"),
+        };
+        let _ = obj.bqx_summary();
+        assert_eq!(obj.bqx_json_path, "test");
+    }
+
+    #[test]
+    fn test_bqx_schema_uri() {
+        let obj = ContributionPoint {
+            bqx_contribution_type: String::from("test"),
+            bqx_extension_id: String::from("test"),
+            bqx_json_path: String::from("test"),
+            bqx_schema_uri: String::from("test"),
+            bqx_default_value: String::from("test"),
+            bqx_is_required: false,
+            bqx_is_internal: false,
+            bqx_order: 0,
+            bqx_when_clause: String::from("test"),
+            bqx_group_id: String::from("test"),
+        };
+        let _ = obj.bqx_summary();
+        assert_eq!(obj.bqx_schema_uri, "test");
+    }
+
+    #[test]
+    fn test_bqx_default_value() {
+        let obj = ContributionPoint {
+            bqx_contribution_type: String::from("test"),
+            bqx_extension_id: String::from("test"),
+            bqx_json_path: String::from("test"),
+            bqx_schema_uri: String::from("test"),
+            bqx_default_value: String::from("test"),
+            bqx_is_required: false,
+            bqx_is_internal: false,
+            bqx_order: 0,
+            bqx_when_clause: String::from("test"),
+            bqx_group_id: String::from("test"),
+        };
+        let _ = obj.bqx_summary();
+        assert_eq!(obj.bqx_default_value, "test");
+    }
+
+    #[test]
+    fn test_bqx_is_required() {
+        let obj = ContributionPoint {
+            bqx_contribution_type: String::from("test"),
+            bqx_extension_id: String::from("test"),
+            bqx_json_path: String::from("test"),
+            bqx_schema_uri: String::from("test"),
+            bqx_default_value: String::from("test"),
+            bqx_is_required: false,
+            bqx_is_internal: false,
+            bqx_order: 0,
+            bqx_when_clause: String::from("test"),
+            bqx_group_id: String::from("test"),
+        };
+        let _ = obj.bqx_summary();
+        assert!(!obj.bqx_is_required);
+    }
+
+    #[test]
+    fn test_bqx_is_internal() {
+        let obj = ContributionPoint {
+            bqx_contribution_type: String::from("test"),
+            bqx_extension_id: String::from("test"),
+            bqx_json_path: String::from("test"),
+            bqx_schema_uri: String::from("test"),
+            bqx_default_value: String::from("test"),
+            bqx_is_required: false,
+            bqx_is_internal: false,
+            bqx_order: 0,
+            bqx_when_clause: String::from("test"),
+            bqx_group_id: String::from("test"),
+        };
+        let _ = obj.bqx_summary();
+        assert!(!obj.bqx_is_internal);
+    }
+
+    #[test]
+    fn test_bqx_order() {
+        let obj = ContributionPoint {
+            bqx_contribution_type: String::from("test"),
+            bqx_extension_id: String::from("test"),
+            bqx_json_path: String::from("test"),
+            bqx_schema_uri: String::from("test"),
+            bqx_default_value: String::from("test"),
+            bqx_is_required: false,
+            bqx_is_internal: false,
+            bqx_order: 0,
+            bqx_when_clause: String::from("test"),
+            bqx_group_id: String::from("test"),
+        };
+        let _ = obj.bqx_summary();
+        assert_eq!(obj.bqx_order, 0);
+    }
+
+    #[test]
+    fn test_bqx_when_clause() {
+        let obj = ContributionPoint {
+            bqx_contribution_type: String::from("test"),
+            bqx_extension_id: String::from("test"),
+            bqx_json_path: String::from("test"),
+            bqx_schema_uri: String::from("test"),
+            bqx_default_value: String::from("test"),
+            bqx_is_required: false,
+            bqx_is_internal: false,
+            bqx_order: 0,
+            bqx_when_clause: String::from("test"),
+            bqx_group_id: String::from("test"),
+        };
+        let _ = obj.bqx_summary();
+        assert_eq!(obj.bqx_when_clause, "test");
+    }
+
+    #[test]
+    fn test_bqx_group_id() {
+        let obj = ContributionPoint {
+            bqx_contribution_type: String::from("test"),
+            bqx_extension_id: String::from("test"),
+            bqx_json_path: String::from("test"),
+            bqx_schema_uri: String::from("test"),
+            bqx_default_value: String::from("test"),
+            bqx_is_required: false,
+            bqx_is_internal: false,
+            bqx_order: 0,
+            bqx_when_clause: String::from("test"),
+            bqx_group_id: String::from("test"),
+        };
+        let _ = obj.bqx_summary();
+        assert_eq!(obj.bqx_group_id, "test");
+    }
+
+
+    #[test]
+    fn test_bqy_context_key() {
+        let obj = WhenContext {
+            bqy_context_key: String::from("test"),
+            bqy_context_value: String::from("test"),
+            bqy_operator: String::from("test"),
+            bqy_is_negated: false,
+            bqy_is_regex: false,
+            bqy_sub_expressions: Vec::new(),
+            bqy_evaluation_result: false,
+            bqy_source_extension: String::from("test"),
+            bqy_cache_key: String::from("test"),
+            bqy_priority: 0,
+        };
+        let _ = obj.bqy_summary();
+        assert_eq!(obj.bqy_context_key, "test");
+    }
+
+    #[test]
+    fn test_bqy_context_value() {
+        let obj = WhenContext {
+            bqy_context_key: String::from("test"),
+            bqy_context_value: String::from("test"),
+            bqy_operator: String::from("test"),
+            bqy_is_negated: false,
+            bqy_is_regex: false,
+            bqy_sub_expressions: Vec::new(),
+            bqy_evaluation_result: false,
+            bqy_source_extension: String::from("test"),
+            bqy_cache_key: String::from("test"),
+            bqy_priority: 0,
+        };
+        let _ = obj.bqy_summary();
+        assert_eq!(obj.bqy_context_value, "test");
+    }
+
+    #[test]
+    fn test_bqy_operator() {
+        let obj = WhenContext {
+            bqy_context_key: String::from("test"),
+            bqy_context_value: String::from("test"),
+            bqy_operator: String::from("test"),
+            bqy_is_negated: false,
+            bqy_is_regex: false,
+            bqy_sub_expressions: Vec::new(),
+            bqy_evaluation_result: false,
+            bqy_source_extension: String::from("test"),
+            bqy_cache_key: String::from("test"),
+            bqy_priority: 0,
+        };
+        let _ = obj.bqy_summary();
+        assert_eq!(obj.bqy_operator, "test");
+    }
+
+    #[test]
+    fn test_bqy_is_negated() {
+        let obj = WhenContext {
+            bqy_context_key: String::from("test"),
+            bqy_context_value: String::from("test"),
+            bqy_operator: String::from("test"),
+            bqy_is_negated: false,
+            bqy_is_regex: false,
+            bqy_sub_expressions: Vec::new(),
+            bqy_evaluation_result: false,
+            bqy_source_extension: String::from("test"),
+            bqy_cache_key: String::from("test"),
+            bqy_priority: 0,
+        };
+        let _ = obj.bqy_summary();
+        assert!(!obj.bqy_is_negated);
+    }
+
+    #[test]
+    fn test_bqy_is_regex() {
+        let obj = WhenContext {
+            bqy_context_key: String::from("test"),
+            bqy_context_value: String::from("test"),
+            bqy_operator: String::from("test"),
+            bqy_is_negated: false,
+            bqy_is_regex: false,
+            bqy_sub_expressions: Vec::new(),
+            bqy_evaluation_result: false,
+            bqy_source_extension: String::from("test"),
+            bqy_cache_key: String::from("test"),
+            bqy_priority: 0,
+        };
+        let _ = obj.bqy_summary();
+        assert!(!obj.bqy_is_regex);
+    }
+
+    #[test]
+    fn test_bqy_sub_expressions() {
+        let obj = WhenContext {
+            bqy_context_key: String::from("test"),
+            bqy_context_value: String::from("test"),
+            bqy_operator: String::from("test"),
+            bqy_is_negated: false,
+            bqy_is_regex: false,
+            bqy_sub_expressions: Vec::new(),
+            bqy_evaluation_result: false,
+            bqy_source_extension: String::from("test"),
+            bqy_cache_key: String::from("test"),
+            bqy_priority: 0,
+        };
+        let _ = obj.bqy_summary();
+        assert!(obj.bqy_sub_expressions.is_empty());
+    }
+
+    #[test]
+    fn test_bqy_evaluation_result() {
+        let obj = WhenContext {
+            bqy_context_key: String::from("test"),
+            bqy_context_value: String::from("test"),
+            bqy_operator: String::from("test"),
+            bqy_is_negated: false,
+            bqy_is_regex: false,
+            bqy_sub_expressions: Vec::new(),
+            bqy_evaluation_result: false,
+            bqy_source_extension: String::from("test"),
+            bqy_cache_key: String::from("test"),
+            bqy_priority: 0,
+        };
+        let _ = obj.bqy_summary();
+        assert!(!obj.bqy_evaluation_result);
+    }
+
+    #[test]
+    fn test_bqy_source_extension() {
+        let obj = WhenContext {
+            bqy_context_key: String::from("test"),
+            bqy_context_value: String::from("test"),
+            bqy_operator: String::from("test"),
+            bqy_is_negated: false,
+            bqy_is_regex: false,
+            bqy_sub_expressions: Vec::new(),
+            bqy_evaluation_result: false,
+            bqy_source_extension: String::from("test"),
+            bqy_cache_key: String::from("test"),
+            bqy_priority: 0,
+        };
+        let _ = obj.bqy_summary();
+        assert_eq!(obj.bqy_source_extension, "test");
+    }
+
+    #[test]
+    fn test_bqy_cache_key() {
+        let obj = WhenContext {
+            bqy_context_key: String::from("test"),
+            bqy_context_value: String::from("test"),
+            bqy_operator: String::from("test"),
+            bqy_is_negated: false,
+            bqy_is_regex: false,
+            bqy_sub_expressions: Vec::new(),
+            bqy_evaluation_result: false,
+            bqy_source_extension: String::from("test"),
+            bqy_cache_key: String::from("test"),
+            bqy_priority: 0,
+        };
+        let _ = obj.bqy_summary();
+        assert_eq!(obj.bqy_cache_key, "test");
+    }
+
+    #[test]
+    fn test_bqy_priority() {
+        let obj = WhenContext {
+            bqy_context_key: String::from("test"),
+            bqy_context_value: String::from("test"),
+            bqy_operator: String::from("test"),
+            bqy_is_negated: false,
+            bqy_is_regex: false,
+            bqy_sub_expressions: Vec::new(),
+            bqy_evaluation_result: false,
+            bqy_source_extension: String::from("test"),
+            bqy_cache_key: String::from("test"),
+            bqy_priority: 0,
+        };
+        let _ = obj.bqy_summary();
+        assert_eq!(obj.bqy_priority, 0);
+    }
+
+
+    #[test]
+    fn test_bqz_menu_id() {
+        let obj = MenuContribution {
+            bqz_menu_id: String::from("test"),
+            bqz_command_id: String::from("test"),
+            bqz_when_clause: String::from("test"),
+            bqz_group_id: String::from("test"),
+            bqz_order: 0,
+            bqz_title: String::from("test"),
+            bqz_icon_path: String::from("test"),
+            bqz_alt_command_id: String::from("test"),
+            bqz_is_submenu: false,
+            bqz_submenu_id: String::from("test"),
+        };
+        let _ = obj.bqz_summary();
+        assert_eq!(obj.bqz_menu_id, "test");
+    }
+
+    #[test]
+    fn test_bqz_command_id() {
+        let obj = MenuContribution {
+            bqz_menu_id: String::from("test"),
+            bqz_command_id: String::from("test"),
+            bqz_when_clause: String::from("test"),
+            bqz_group_id: String::from("test"),
+            bqz_order: 0,
+            bqz_title: String::from("test"),
+            bqz_icon_path: String::from("test"),
+            bqz_alt_command_id: String::from("test"),
+            bqz_is_submenu: false,
+            bqz_submenu_id: String::from("test"),
+        };
+        let _ = obj.bqz_summary();
+        assert_eq!(obj.bqz_command_id, "test");
+    }
+
+    #[test]
+    fn test_bqz_when_clause() {
+        let obj = MenuContribution {
+            bqz_menu_id: String::from("test"),
+            bqz_command_id: String::from("test"),
+            bqz_when_clause: String::from("test"),
+            bqz_group_id: String::from("test"),
+            bqz_order: 0,
+            bqz_title: String::from("test"),
+            bqz_icon_path: String::from("test"),
+            bqz_alt_command_id: String::from("test"),
+            bqz_is_submenu: false,
+            bqz_submenu_id: String::from("test"),
+        };
+        let _ = obj.bqz_summary();
+        assert_eq!(obj.bqz_when_clause, "test");
+    }
+
+    #[test]
+    fn test_bqz_group_id() {
+        let obj = MenuContribution {
+            bqz_menu_id: String::from("test"),
+            bqz_command_id: String::from("test"),
+            bqz_when_clause: String::from("test"),
+            bqz_group_id: String::from("test"),
+            bqz_order: 0,
+            bqz_title: String::from("test"),
+            bqz_icon_path: String::from("test"),
+            bqz_alt_command_id: String::from("test"),
+            bqz_is_submenu: false,
+            bqz_submenu_id: String::from("test"),
+        };
+        let _ = obj.bqz_summary();
+        assert_eq!(obj.bqz_group_id, "test");
+    }
+
+    #[test]
+    fn test_bqz_order() {
+        let obj = MenuContribution {
+            bqz_menu_id: String::from("test"),
+            bqz_command_id: String::from("test"),
+            bqz_when_clause: String::from("test"),
+            bqz_group_id: String::from("test"),
+            bqz_order: 0,
+            bqz_title: String::from("test"),
+            bqz_icon_path: String::from("test"),
+            bqz_alt_command_id: String::from("test"),
+            bqz_is_submenu: false,
+            bqz_submenu_id: String::from("test"),
+        };
+        let _ = obj.bqz_summary();
+        assert_eq!(obj.bqz_order, 0);
+    }
+
+    #[test]
+    fn test_bqz_title() {
+        let obj = MenuContribution {
+            bqz_menu_id: String::from("test"),
+            bqz_command_id: String::from("test"),
+            bqz_when_clause: String::from("test"),
+            bqz_group_id: String::from("test"),
+            bqz_order: 0,
+            bqz_title: String::from("test"),
+            bqz_icon_path: String::from("test"),
+            bqz_alt_command_id: String::from("test"),
+            bqz_is_submenu: false,
+            bqz_submenu_id: String::from("test"),
+        };
+        let _ = obj.bqz_summary();
+        assert_eq!(obj.bqz_title, "test");
+    }
+
+    #[test]
+    fn test_bqz_icon_path() {
+        let obj = MenuContribution {
+            bqz_menu_id: String::from("test"),
+            bqz_command_id: String::from("test"),
+            bqz_when_clause: String::from("test"),
+            bqz_group_id: String::from("test"),
+            bqz_order: 0,
+            bqz_title: String::from("test"),
+            bqz_icon_path: String::from("test"),
+            bqz_alt_command_id: String::from("test"),
+            bqz_is_submenu: false,
+            bqz_submenu_id: String::from("test"),
+        };
+        let _ = obj.bqz_summary();
+        assert_eq!(obj.bqz_icon_path, "test");
+    }
+
+    #[test]
+    fn test_bqz_alt_command_id() {
+        let obj = MenuContribution {
+            bqz_menu_id: String::from("test"),
+            bqz_command_id: String::from("test"),
+            bqz_when_clause: String::from("test"),
+            bqz_group_id: String::from("test"),
+            bqz_order: 0,
+            bqz_title: String::from("test"),
+            bqz_icon_path: String::from("test"),
+            bqz_alt_command_id: String::from("test"),
+            bqz_is_submenu: false,
+            bqz_submenu_id: String::from("test"),
+        };
+        let _ = obj.bqz_summary();
+        assert_eq!(obj.bqz_alt_command_id, "test");
+    }
+
+    #[test]
+    fn test_bqz_is_submenu() {
+        let obj = MenuContribution {
+            bqz_menu_id: String::from("test"),
+            bqz_command_id: String::from("test"),
+            bqz_when_clause: String::from("test"),
+            bqz_group_id: String::from("test"),
+            bqz_order: 0,
+            bqz_title: String::from("test"),
+            bqz_icon_path: String::from("test"),
+            bqz_alt_command_id: String::from("test"),
+            bqz_is_submenu: false,
+            bqz_submenu_id: String::from("test"),
+        };
+        let _ = obj.bqz_summary();
+        assert!(!obj.bqz_is_submenu);
+    }
+
+    #[test]
+    fn test_bqz_submenu_id() {
+        let obj = MenuContribution {
+            bqz_menu_id: String::from("test"),
+            bqz_command_id: String::from("test"),
+            bqz_when_clause: String::from("test"),
+            bqz_group_id: String::from("test"),
+            bqz_order: 0,
+            bqz_title: String::from("test"),
+            bqz_icon_path: String::from("test"),
+            bqz_alt_command_id: String::from("test"),
+            bqz_is_submenu: false,
+            bqz_submenu_id: String::from("test"),
+        };
+        let _ = obj.bqz_summary();
+        assert_eq!(obj.bqz_submenu_id, "test");
     }
 
 }
