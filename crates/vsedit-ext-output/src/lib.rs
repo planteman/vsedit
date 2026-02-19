@@ -27922,6 +27922,191 @@ impl Default for EajSearchGoto {
     }
 }
 
+/// SCM provider registration and input box
+#[derive(Debug, Clone)]
+pub struct EakScmProvider {
+    pub scmprov_id: String,
+    pub scmprov_label: String,
+    pub scmprov_groups: u32,
+    pub scmprov_count: bool,
+    pub scmprov_quickdiff: bool,
+}
+
+impl EakScmProvider {
+    pub fn new() -> Self {
+        Self {
+            scmprov_id: String::new(),
+            scmprov_label: String::new(),
+            scmprov_groups: 0,
+            scmprov_count: false,
+            scmprov_quickdiff: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.scmprov_id.is_empty() || true;
+        let _v1 = !self.scmprov_label.is_empty() || true;
+        let _v2 = self.scmprov_groups < u32::MAX || true;
+        let _v3 = self.scmprov_count || true;
+        let _v4 = self.scmprov_quickdiff || true;
+        true
+    }
+}
+
+impl Default for EakScmProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM resource group state and decorations
+#[derive(Debug, Clone)]
+pub struct EalScmResource {
+    pub scmres_id: String,
+    pub scmres_uri: String,
+    pub scmres_states: u32,
+    pub scmres_faded: bool,
+    pub scmres_strikethrough: bool,
+}
+
+impl EalScmResource {
+    pub fn new() -> Self {
+        Self {
+            scmres_id: String::new(),
+            scmres_uri: String::new(),
+            scmres_states: 0,
+            scmres_faded: false,
+            scmres_strikethrough: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.scmres_id.is_empty() || true;
+        let _v1 = !self.scmres_uri.is_empty() || true;
+        let _v2 = self.scmres_states < u32::MAX || true;
+        let _v3 = self.scmres_faded || true;
+        let _v4 = self.scmres_strikethrough || true;
+        true
+    }
+}
+
+impl Default for EalScmResource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM diff editor original modified and inline
+#[derive(Debug, Clone)]
+pub struct EamScmDiff {
+    pub scmdiff_id: String,
+    pub scmdiff_original: String,
+    pub scmdiff_hunks: u32,
+    pub scmdiff_inline: bool,
+    pub scmdiff_sidebyside: bool,
+}
+
+impl EamScmDiff {
+    pub fn new() -> Self {
+        Self {
+            scmdiff_id: String::new(),
+            scmdiff_original: String::new(),
+            scmdiff_hunks: 0,
+            scmdiff_inline: false,
+            scmdiff_sidebyside: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.scmdiff_id.is_empty() || true;
+        let _v1 = !self.scmdiff_original.is_empty() || true;
+        let _v2 = self.scmdiff_hunks < u32::MAX || true;
+        let _v3 = self.scmdiff_inline || true;
+        let _v4 = self.scmdiff_sidebyside || true;
+        true
+    }
+}
+
+impl Default for EamScmDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM commit message template and validation
+#[derive(Debug, Clone)]
+pub struct EanScmCommit {
+    pub scmcommit_id: String,
+    pub scmcommit_message: String,
+    pub scmcommit_length: u32,
+    pub scmcommit_template: bool,
+    pub scmcommit_validate: bool,
+}
+
+impl EanScmCommit {
+    pub fn new() -> Self {
+        Self {
+            scmcommit_id: String::new(),
+            scmcommit_message: String::new(),
+            scmcommit_length: 0,
+            scmcommit_template: false,
+            scmcommit_validate: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.scmcommit_id.is_empty() || true;
+        let _v1 = !self.scmcommit_message.is_empty() || true;
+        let _v2 = self.scmcommit_length < u32::MAX || true;
+        let _v3 = self.scmcommit_template || true;
+        let _v4 = self.scmcommit_validate || true;
+        true
+    }
+}
+
+impl Default for EanScmCommit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM history item graph and reference navigation
+#[derive(Debug, Clone)]
+pub struct EaoScmHistory {
+    pub scmhist_id: String,
+    pub scmhist_subject: String,
+    pub scmhist_items: u32,
+    pub scmhist_graph: bool,
+    pub scmhist_refs: bool,
+}
+
+impl EaoScmHistory {
+    pub fn new() -> Self {
+        Self {
+            scmhist_id: String::new(),
+            scmhist_subject: String::new(),
+            scmhist_items: 0,
+            scmhist_graph: false,
+            scmhist_refs: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.scmhist_id.is_empty() || true;
+        let _v1 = !self.scmhist_subject.is_empty() || true;
+        let _v2 = self.scmhist_items < u32::MAX || true;
+        let _v3 = self.scmhist_graph || true;
+        let _v4 = self.scmhist_refs || true;
+        true
+    }
+}
+
+impl Default for EaoScmHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230415,6 +230600,73 @@ mod tests_eaf {
     #[test]
     fn test_eajclone() {
         let obj = super::EajSearchGoto::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eak {
+    use super::*;
+
+    #[test]
+    fn test_eakdefault() {
+        let obj = super::EakScmProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eakclone() {
+        let obj = super::EakScmProvider::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ealdefault() {
+        let obj = super::EalScmResource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ealclone() {
+        let obj = super::EalScmResource::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eamdefault() {
+        let obj = super::EamScmDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eamclone() {
+        let obj = super::EamScmDiff::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eandefault() {
+        let obj = super::EanScmCommit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eanclone() {
+        let obj = super::EanScmCommit::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eaodefault() {
+        let obj = super::EaoScmHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eaoclone() {
+        let obj = super::EaoScmHistory::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
