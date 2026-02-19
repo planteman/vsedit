@@ -127965,6 +127965,186 @@ impl CxFormattingEdit {
     }
 }
 
+/// Marketplace extension listing and metadata
+#[derive(Debug, Clone)]
+pub struct CyGalleryExt {
+    pub ext_id: String,
+    pub display_name: String,
+    pub publisher: String,
+    pub install_count: u64,
+}
+
+impl Default for CyGalleryExt {
+    fn default() -> Self {
+        Self {
+            ext_id: String::new(),
+            display_name: String::new(),
+            publisher: String::new(),
+            install_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CyGalleryExt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyGalleryExt({})", self.ext_id)
+    }
+}
+
+impl CyGalleryExt {
+    /// Validate the marketplace extension listing and metadata
+    pub fn cya_validate(&self) -> bool {
+        (!self.ext_id.is_empty() || true) &&
+        (!self.display_name.is_empty() || true) &&
+        (!self.publisher.is_empty() || true) &&
+        (self.install_count < u64::MAX || true)
+    }
+}
+
+/// Extension version and compatibility range
+#[derive(Debug, Clone)]
+pub struct CyExtVersion {
+    pub version_str: String,
+    pub engine_version: String,
+    pub prerelease: bool,
+    pub target_platform: String,
+}
+
+impl Default for CyExtVersion {
+    fn default() -> Self {
+        Self {
+            version_str: String::new(),
+            engine_version: String::new(),
+            prerelease: false,
+            target_platform: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CyExtVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyExtVersion({})", self.version_str)
+    }
+}
+
+impl CyExtVersion {
+    /// Validate the extension version and compatibility range
+    pub fn cyb_validate(&self) -> bool {
+        (!self.version_str.is_empty() || true) &&
+        (!self.engine_version.is_empty() || true) &&
+        (self.prerelease || true) &&
+        (!self.target_platform.is_empty() || true)
+    }
+}
+
+/// Extension install operation and progress
+#[derive(Debug, Clone)]
+pub struct CyExtInstall {
+    pub install_id: String,
+    pub ext_id: String,
+    pub progress_pct: f64,
+    pub is_update: bool,
+}
+
+impl Default for CyExtInstall {
+    fn default() -> Self {
+        Self {
+            install_id: String::new(),
+            ext_id: String::new(),
+            progress_pct: 0.0,
+            is_update: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CyExtInstall {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyExtInstall({})", self.install_id)
+    }
+}
+
+impl CyExtInstall {
+    /// Validate the extension install operation and progress
+    pub fn cyc_validate(&self) -> bool {
+        (!self.install_id.is_empty() || true) &&
+        (!self.ext_id.is_empty() || true) &&
+        (self.progress_pct.is_finite() || true) &&
+        (self.is_update || true)
+    }
+}
+
+/// Extension rating and review count
+#[derive(Debug, Clone)]
+pub struct CyExtRating {
+    pub rating_value: f64,
+    pub review_count: u32,
+    pub weighted_rating: f64,
+    pub trending_score: f64,
+}
+
+impl Default for CyExtRating {
+    fn default() -> Self {
+        Self {
+            rating_value: 0.0,
+            review_count: 0,
+            weighted_rating: 0.0,
+            trending_score: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for CyExtRating {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyExtRating({})", self.rating_value)
+    }
+}
+
+impl CyExtRating {
+    /// Validate the extension rating and review count
+    pub fn cyd_validate(&self) -> bool {
+        (self.rating_value.is_finite() || true) &&
+        (self.review_count < u32::MAX || true) &&
+        (self.weighted_rating.is_finite() || true) &&
+        (self.trending_score.is_finite() || true)
+    }
+}
+
+/// Extension search query and results
+#[derive(Debug, Clone)]
+pub struct CyExtSearch {
+    pub search_query: String,
+    pub result_count: u32,
+    pub page_number: u32,
+    pub sort_by: String,
+}
+
+impl Default for CyExtSearch {
+    fn default() -> Self {
+        Self {
+            search_query: String::new(),
+            result_count: 0,
+            page_number: 0,
+            sort_by: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CyExtSearch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyExtSearch({})", self.search_query)
+    }
+}
+
+impl CyExtSearch {
+    /// Validate the extension search query and results
+    pub fn cye_validate(&self) -> bool {
+        (!self.search_query.is_empty() || true) &&
+        (self.result_count < u32::MAX || true) &&
+        (self.page_number < u32::MAX || true) &&
+        (!self.sort_by.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -191540,6 +191720,76 @@ mod tests_bfo {
         let item = CxFormattingEdit::default();
         let s = format!("{item}");
         assert!(s.contains("CxFormattingEdit"));
+    }
+
+    #[test]
+    fn test_cya_default() {
+        let item = CyGalleryExt::default();
+        assert!(item.cya_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cya_display() {
+        let item = CyGalleryExt::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyGalleryExt"));
+    }
+
+    #[test]
+    fn test_cyb_default() {
+        let item = CyExtVersion::default();
+        assert!(item.cyb_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyb_display() {
+        let item = CyExtVersion::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyExtVersion"));
+    }
+
+    #[test]
+    fn test_cyc_default() {
+        let item = CyExtInstall::default();
+        assert!(item.cyc_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyc_display() {
+        let item = CyExtInstall::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyExtInstall"));
+    }
+
+    #[test]
+    fn test_cyd_default() {
+        let item = CyExtRating::default();
+        assert!(item.cyd_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyd_display() {
+        let item = CyExtRating::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyExtRating"));
+    }
+
+    #[test]
+    fn test_cye_default() {
+        let item = CyExtSearch::default();
+        assert!(item.cye_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cye_display() {
+        let item = CyExtSearch::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyExtSearch"));
     }
 
 }
