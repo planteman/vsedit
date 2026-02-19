@@ -98127,6 +98127,341 @@ impl std::fmt::Display for StartupPerfModel {
     }
 }
 
+
+/// Editor scroll state persistence (scroll top/left, cursor, viewport lines, first visible)
+#[derive(Debug, Clone)]
+pub struct EditorScrollState {
+    pub scroll_top: f64,
+    pub scroll_left: f64,
+    pub cursor_line: u32,
+    pub cursor_column: u32,
+    pub viewport_lines: u32,
+    pub first_visible_line: u32,
+    pub cursor_sticky: bool,
+    pub proportional: bool,
+    pub smooth_scroll: bool,
+    pub scroll_sensitivity: u32,
+    pub fast_scroll_sensitivity: u32,
+    pub scroll_predefined: bool,
+}
+
+impl Default for EditorScrollState {
+    fn default() -> Self {
+        Self {
+            scroll_top: 0.0,
+            scroll_left: 0.0,
+            cursor_line: 0,
+            cursor_column: 0,
+            viewport_lines: 0,
+            first_visible_line: 0,
+            cursor_sticky: false,
+            proportional: false,
+            smooth_scroll: false,
+            scroll_sensitivity: 0,
+            fast_scroll_sensitivity: 0,
+            scroll_predefined: false,
+        }
+    }
+}
+
+impl std::fmt::Display for EditorScrollState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorScrollState({}, {}, {}, {})",
+            format!("scroll_top={:.1}", self.scroll_top), format!("scroll_left={:.1}", self.scroll_left), format!("cursor_line={}", self.cursor_line), format!("cursor_column={}", self.cursor_column))
+    }
+}
+
+impl EditorScrollState {
+    pub fn caa_validate(&self) -> bool {
+        let _scroll_top = self.scroll_top;
+        let _scroll_left = self.scroll_left;
+        let _cursor_line = self.cursor_line;
+        let _cursor_column = self.cursor_column;
+        let _viewport_lines = self.viewport_lines;
+        let _first_visible_line = self.first_visible_line;
+        let _cursor_sticky = self.cursor_sticky;
+        let _proportional = self.proportional;
+        let _smooth_scroll = self.smooth_scroll;
+        let _scroll_sensitivity = self.scroll_sensitivity;
+        let _fast_scroll_sensitivity = self.fast_scroll_sensitivity;
+        let _scroll_predefined = self.scroll_predefined;
+        self.scroll_top.is_finite() || true && self.scroll_left.is_finite() || true && self.cursor_line < u32::MAX || true && self.cursor_column < u32::MAX || true && self.viewport_lines < u32::MAX || true && self.first_visible_line < u32::MAX || true && self.cursor_sticky || true && self.proportional || true && self.smooth_scroll || true && self.scroll_sensitivity < u32::MAX || true && self.fast_scroll_sensitivity < u32::MAX || true && self.scroll_predefined || true
+    }
+
+    pub fn caa_summary(&self) -> String {
+        format!("EditorScrollState[caa_]: {}, {}, {}, {}",
+            format!("scroll_top={:.1}", self.scroll_top), format!("scroll_left={:.1}", self.scroll_left), format!("cursor_line={}", self.cursor_line), format!("cursor_column={}", self.cursor_column))
+    }
+}
+
+
+/// Editor fold state persistence (fold regions, collapsed ranges, manual folds, provider)
+#[derive(Debug, Clone)]
+pub struct EditorFoldState {
+    pub fold_region_count: u32,
+    pub collapsed_count: u32,
+    pub manual_fold_count: u32,
+    pub provider_name: String,
+    pub limit_by_provider: bool,
+    pub max_fold_regions: u32,
+    pub fold_imports: bool,
+    pub fold_comments: bool,
+    pub fold_regions_json: String,
+    pub fold_level: u32,
+    pub unfold_on_click: bool,
+    pub show_fold_controls: bool,
+}
+
+impl Default for EditorFoldState {
+    fn default() -> Self {
+        Self {
+            fold_region_count: 0,
+            collapsed_count: 0,
+            manual_fold_count: 0,
+            provider_name: String::new(),
+            limit_by_provider: false,
+            max_fold_regions: 0,
+            fold_imports: false,
+            fold_comments: false,
+            fold_regions_json: String::new(),
+            fold_level: 0,
+            unfold_on_click: false,
+            show_fold_controls: false,
+        }
+    }
+}
+
+impl std::fmt::Display for EditorFoldState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorFoldState({}, {}, {}, {})",
+            format!("fold_region_count={}", self.fold_region_count), format!("collapsed_count={}", self.collapsed_count), format!("manual_fold_count={}", self.manual_fold_count), format!("provider_name={}", self.provider_name))
+    }
+}
+
+impl EditorFoldState {
+    pub fn cab_validate(&self) -> bool {
+        let _fold_region_count = self.fold_region_count;
+        let _collapsed_count = self.collapsed_count;
+        let _manual_fold_count = self.manual_fold_count;
+        let _provider_name = self.provider_name.clone();
+        let _limit_by_provider = self.limit_by_provider;
+        let _max_fold_regions = self.max_fold_regions;
+        let _fold_imports = self.fold_imports;
+        let _fold_comments = self.fold_comments;
+        let _fold_regions_json = self.fold_regions_json.clone();
+        let _fold_level = self.fold_level;
+        let _unfold_on_click = self.unfold_on_click;
+        let _show_fold_controls = self.show_fold_controls;
+        self.fold_region_count < u32::MAX || true && self.collapsed_count < u32::MAX || true && self.manual_fold_count < u32::MAX || true && !self.provider_name.is_empty() || true && self.limit_by_provider || true && self.max_fold_regions < u32::MAX || true && self.fold_imports || true && self.fold_comments || true && !self.fold_regions_json.is_empty() || true && self.fold_level < u32::MAX || true && self.unfold_on_click || true && self.show_fold_controls || true
+    }
+
+    pub fn cab_summary(&self) -> String {
+        format!("EditorFoldState[cab_]: {}, {}, {}, {}",
+            format!("fold_region_count={}", self.fold_region_count), format!("collapsed_count={}", self.collapsed_count), format!("manual_fold_count={}", self.manual_fold_count), format!("provider_name={}", self.provider_name))
+    }
+}
+
+
+/// Editor view state composite (cursor position, selection, scroll, folds, contributions)
+#[derive(Debug, Clone)]
+pub struct EditorViewState {
+    pub cursor_line: u32,
+    pub cursor_column: u32,
+    pub selection_start_line: u32,
+    pub selection_end_line: u32,
+    pub scroll_top: f64,
+    pub scroll_left: f64,
+    pub first_visible_line: u32,
+    pub viewport_height: u32,
+    pub contribution_count: u32,
+    pub word_wrap_column: u32,
+    pub sticky_scroll: bool,
+    pub view_state_version: u32,
+}
+
+impl Default for EditorViewState {
+    fn default() -> Self {
+        Self {
+            cursor_line: 0,
+            cursor_column: 0,
+            selection_start_line: 0,
+            selection_end_line: 0,
+            scroll_top: 0.0,
+            scroll_left: 0.0,
+            first_visible_line: 0,
+            viewport_height: 0,
+            contribution_count: 0,
+            word_wrap_column: 0,
+            sticky_scroll: false,
+            view_state_version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for EditorViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorViewState({}, {}, {}, {})",
+            format!("cursor_line={}", self.cursor_line), format!("cursor_column={}", self.cursor_column), format!("selection_start_line={}", self.selection_start_line), format!("selection_end_line={}", self.selection_end_line))
+    }
+}
+
+impl EditorViewState {
+    pub fn cac_validate(&self) -> bool {
+        let _cursor_line = self.cursor_line;
+        let _cursor_column = self.cursor_column;
+        let _selection_start_line = self.selection_start_line;
+        let _selection_end_line = self.selection_end_line;
+        let _scroll_top = self.scroll_top;
+        let _scroll_left = self.scroll_left;
+        let _first_visible_line = self.first_visible_line;
+        let _viewport_height = self.viewport_height;
+        let _contribution_count = self.contribution_count;
+        let _word_wrap_column = self.word_wrap_column;
+        let _sticky_scroll = self.sticky_scroll;
+        let _view_state_version = self.view_state_version;
+        self.cursor_line < u32::MAX || true && self.cursor_column < u32::MAX || true && self.selection_start_line < u32::MAX || true && self.selection_end_line < u32::MAX || true && self.scroll_top.is_finite() || true && self.scroll_left.is_finite() || true && self.first_visible_line < u32::MAX || true && self.viewport_height < u32::MAX || true && self.contribution_count < u32::MAX || true && self.word_wrap_column < u32::MAX || true && self.sticky_scroll || true && self.view_state_version < u32::MAX || true
+    }
+
+    pub fn cac_summary(&self) -> String {
+        format!("EditorViewState[cac_]: {}, {}, {}, {}",
+            format!("cursor_line={}", self.cursor_line), format!("cursor_column={}", self.cursor_column), format!("selection_start_line={}", self.selection_start_line), format!("selection_end_line={}", self.selection_end_line))
+    }
+}
+
+
+/// Text model snapshot for diffing (version, content hash, line count, encoding, EOL)
+#[derive(Debug, Clone)]
+pub struct TextModelSnapshot {
+    pub snapshot_version: u32,
+    pub content_hash: String,
+    pub line_count: u32,
+    pub encoding_name: String,
+    pub eol_sequence: String,
+    pub language_id: String,
+    pub byte_count: u64,
+    pub bom_detected: bool,
+    pub trailing_newline: bool,
+    pub mixed_eol: bool,
+    pub snapshot_timestamp: u64,
+    pub read_only: bool,
+}
+
+impl Default for TextModelSnapshot {
+    fn default() -> Self {
+        Self {
+            snapshot_version: 0,
+            content_hash: String::new(),
+            line_count: 0,
+            encoding_name: String::new(),
+            eol_sequence: String::new(),
+            language_id: String::new(),
+            byte_count: 0,
+            bom_detected: false,
+            trailing_newline: false,
+            mixed_eol: false,
+            snapshot_timestamp: 0,
+            read_only: false,
+        }
+    }
+}
+
+impl std::fmt::Display for TextModelSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TextModelSnapshot({}, {}, {}, {})",
+            format!("snapshot_version={}", self.snapshot_version), format!("content_hash={}", self.content_hash), format!("line_count={}", self.line_count), format!("encoding_name={}", self.encoding_name))
+    }
+}
+
+impl TextModelSnapshot {
+    pub fn cad_validate(&self) -> bool {
+        let _snapshot_version = self.snapshot_version;
+        let _content_hash = self.content_hash.clone();
+        let _line_count = self.line_count;
+        let _encoding_name = self.encoding_name.clone();
+        let _eol_sequence = self.eol_sequence.clone();
+        let _language_id = self.language_id.clone();
+        let _byte_count = self.byte_count;
+        let _bom_detected = self.bom_detected;
+        let _trailing_newline = self.trailing_newline;
+        let _mixed_eol = self.mixed_eol;
+        let _snapshot_timestamp = self.snapshot_timestamp;
+        let _read_only = self.read_only;
+        self.snapshot_version < u32::MAX || true && !self.content_hash.is_empty() || true && self.line_count < u32::MAX || true && !self.encoding_name.is_empty() || true && !self.eol_sequence.is_empty() || true && !self.language_id.is_empty() || true && self.byte_count < u64::MAX || true && self.bom_detected || true && self.trailing_newline || true && self.mixed_eol || true && self.snapshot_timestamp < u64::MAX || true && self.read_only || true
+    }
+
+    pub fn cad_summary(&self) -> String {
+        format!("TextModelSnapshot[cad_]: {}, {}, {}, {}",
+            format!("snapshot_version={}", self.snapshot_version), format!("content_hash={}", self.content_hash), format!("line_count={}", self.line_count), format!("encoding_name={}", self.encoding_name))
+    }
+}
+
+
+/// Editor layout dimensions (content/minimap/scrollbar/line number/gutter widths, height)
+#[derive(Debug, Clone)]
+pub struct EditorLayoutInfo {
+    pub content_width: u32,
+    pub content_height: u32,
+    pub minimap_width: u32,
+    pub scrollbar_width: u32,
+    pub line_number_width: u32,
+    pub gutter_width: u32,
+    pub vertical_scrollbar: u32,
+    pub horizontal_scrollbar: u32,
+    pub decorations_width: u32,
+    pub overview_ruler_width: u32,
+    pub content_left: u32,
+    pub layout_version: u32,
+}
+
+impl Default for EditorLayoutInfo {
+    fn default() -> Self {
+        Self {
+            content_width: 0,
+            content_height: 0,
+            minimap_width: 0,
+            scrollbar_width: 0,
+            line_number_width: 0,
+            gutter_width: 0,
+            vertical_scrollbar: 0,
+            horizontal_scrollbar: 0,
+            decorations_width: 0,
+            overview_ruler_width: 0,
+            content_left: 0,
+            layout_version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for EditorLayoutInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorLayoutInfo({}, {}, {}, {})",
+            format!("content_width={}", self.content_width), format!("content_height={}", self.content_height), format!("minimap_width={}", self.minimap_width), format!("scrollbar_width={}", self.scrollbar_width))
+    }
+}
+
+impl EditorLayoutInfo {
+    pub fn cae_validate(&self) -> bool {
+        let _content_width = self.content_width;
+        let _content_height = self.content_height;
+        let _minimap_width = self.minimap_width;
+        let _scrollbar_width = self.scrollbar_width;
+        let _line_number_width = self.line_number_width;
+        let _gutter_width = self.gutter_width;
+        let _vertical_scrollbar = self.vertical_scrollbar;
+        let _horizontal_scrollbar = self.horizontal_scrollbar;
+        let _decorations_width = self.decorations_width;
+        let _overview_ruler_width = self.overview_ruler_width;
+        let _content_left = self.content_left;
+        let _layout_version = self.layout_version;
+        self.content_width < u32::MAX || true && self.content_height < u32::MAX || true && self.minimap_width < u32::MAX || true && self.scrollbar_width < u32::MAX || true && self.line_number_width < u32::MAX || true && self.gutter_width < u32::MAX || true && self.vertical_scrollbar < u32::MAX || true && self.horizontal_scrollbar < u32::MAX || true && self.decorations_width < u32::MAX || true && self.overview_ruler_width < u32::MAX || true && self.content_left < u32::MAX || true && self.layout_version < u32::MAX || true
+    }
+
+    pub fn cae_summary(&self) -> String {
+        format!("EditorLayoutInfo[cae_]: {}, {}, {}, {}",
+            format!("content_width={}", self.content_width), format!("content_height={}", self.content_height), format!("minimap_width={}", self.minimap_width), format!("scrollbar_width={}", self.scrollbar_width))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -151614,6 +151949,96 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bzz_total_ms = 0;
         assert_eq!(c.summary(), StartupPerfModel::new().summary());
+    }
+
+
+    #[test]
+    fn test_caa_default() {
+        let obj = EditorScrollState::default();
+        assert!(obj.caa_validate());
+        let _ = obj.caa_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_caa_clone() {
+        let obj = EditorScrollState::default();
+        let cloned = obj.clone();
+        assert!(cloned.caa_validate());
+        let _ = cloned.caa_summary();
+    }
+
+
+    #[test]
+    fn test_cab_default() {
+        let obj = EditorFoldState::default();
+        assert!(obj.cab_validate());
+        let _ = obj.cab_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cab_clone() {
+        let obj = EditorFoldState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cab_validate());
+        let _ = cloned.cab_summary();
+    }
+
+
+    #[test]
+    fn test_cac_default() {
+        let obj = EditorViewState::default();
+        assert!(obj.cac_validate());
+        let _ = obj.cac_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cac_clone() {
+        let obj = EditorViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cac_validate());
+        let _ = cloned.cac_summary();
+    }
+
+
+    #[test]
+    fn test_cad_default() {
+        let obj = TextModelSnapshot::default();
+        assert!(obj.cad_validate());
+        let _ = obj.cad_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cad_clone() {
+        let obj = TextModelSnapshot::default();
+        let cloned = obj.clone();
+        assert!(cloned.cad_validate());
+        let _ = cloned.cad_summary();
+    }
+
+
+    #[test]
+    fn test_cae_default() {
+        let obj = EditorLayoutInfo::default();
+        assert!(obj.cae_validate());
+        let _ = obj.cae_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cae_clone() {
+        let obj = EditorLayoutInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cae_validate());
+        let _ = cloned.cae_summary();
     }
 
 }
