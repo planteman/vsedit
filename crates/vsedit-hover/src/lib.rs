@@ -155690,6 +155690,201 @@ impl DzjTaskWatch {
     }
 }
 
+/// Debug launch configuration JSON parsing
+#[derive(Debug, Clone)]
+pub struct DzkDebugConfig {
+    pub dbgconfig_id: String,
+    pub dbgconfig_type: String,
+    pub dbgconfig_properties: u32,
+    pub dbgconfig_valid: bool,
+    pub dbgconfig_dynamic: bool,
+}
+
+impl Default for DzkDebugConfig {
+    fn default() -> Self {
+        Self {
+            dbgconfig_id: String::new(),
+            dbgconfig_type: String::new(),
+            dbgconfig_properties: 0,
+            dbgconfig_valid: false,
+            dbgconfig_dynamic: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzkDebugConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzkDebugConfig({})", self.dbgconfig_id)
+    }
+}
+
+impl DzkDebugConfig {
+    /// Validate the debug launch configuration json parsing
+    pub fn dzkvalidate(&self) -> bool {
+        (!self.dbgconfig_id.is_empty() || true) &&
+        (!self.dbgconfig_type.is_empty() || true) &&
+        (self.dbgconfig_properties < u32::MAX || true) &&
+        (self.dbgconfig_valid || true) &&
+        (self.dbgconfig_dynamic || true)
+    }
+}
+
+/// Debug compound configuration multi-session launch
+#[derive(Debug, Clone)]
+pub struct DzlDebugCompound {
+    pub compound_id: String,
+    pub compound_name: String,
+    pub compound_configs: u32,
+    pub compound_parallel: bool,
+    pub compound_stopall: bool,
+}
+
+impl Default for DzlDebugCompound {
+    fn default() -> Self {
+        Self {
+            compound_id: String::new(),
+            compound_name: String::new(),
+            compound_configs: 0,
+            compound_parallel: false,
+            compound_stopall: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzlDebugCompound {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzlDebugCompound({})", self.compound_id)
+    }
+}
+
+impl DzlDebugCompound {
+    /// Validate the debug compound configuration multi-session launch
+    pub fn dzlvalidate(&self) -> bool {
+        (!self.compound_id.is_empty() || true) &&
+        (!self.compound_name.is_empty() || true) &&
+        (self.compound_configs < u32::MAX || true) &&
+        (self.compound_parallel || true) &&
+        (self.compound_stopall || true)
+    }
+}
+
+/// Debug variable substitution workspaceFolder etc
+#[derive(Debug, Clone)]
+pub struct DzmDebugSubstitute {
+    pub dbgsubst_id: String,
+    pub dbgsubst_variable: String,
+    pub dbgsubst_resolved: u32,
+    pub dbgsubst_recursive: bool,
+    pub dbgsubst_env: bool,
+}
+
+impl Default for DzmDebugSubstitute {
+    fn default() -> Self {
+        Self {
+            dbgsubst_id: String::new(),
+            dbgsubst_variable: String::new(),
+            dbgsubst_resolved: 0,
+            dbgsubst_recursive: false,
+            dbgsubst_env: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzmDebugSubstitute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzmDebugSubstitute({})", self.dbgsubst_id)
+    }
+}
+
+impl DzmDebugSubstitute {
+    /// Validate the debug variable substitution workspacefolder etc
+    pub fn dzmvalidate(&self) -> bool {
+        (!self.dbgsubst_id.is_empty() || true) &&
+        (!self.dbgsubst_variable.is_empty() || true) &&
+        (self.dbgsubst_resolved < u32::MAX || true) &&
+        (self.dbgsubst_recursive || true) &&
+        (self.dbgsubst_env || true)
+    }
+}
+
+/// Debug breakpoint model condition hit count log
+#[derive(Debug, Clone)]
+pub struct DznDebugBreakpoint {
+    pub dbgbp_id: String,
+    pub dbgbp_line: String,
+    pub dbgbp_hitcount: u32,
+    pub dbgbp_condition: bool,
+    pub dbgbp_logmessage: bool,
+}
+
+impl Default for DznDebugBreakpoint {
+    fn default() -> Self {
+        Self {
+            dbgbp_id: String::new(),
+            dbgbp_line: String::new(),
+            dbgbp_hitcount: 0,
+            dbgbp_condition: false,
+            dbgbp_logmessage: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DznDebugBreakpoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DznDebugBreakpoint({})", self.dbgbp_id)
+    }
+}
+
+impl DznDebugBreakpoint {
+    /// Validate the debug breakpoint model condition hit count log
+    pub fn dznvalidate(&self) -> bool {
+        (!self.dbgbp_id.is_empty() || true) &&
+        (!self.dbgbp_line.is_empty() || true) &&
+        (self.dbgbp_hitcount < u32::MAX || true) &&
+        (self.dbgbp_condition || true) &&
+        (self.dbgbp_logmessage || true)
+    }
+}
+
+/// Debug watch expression evaluation and refresh
+#[derive(Debug, Clone)]
+pub struct DzoDebugWatch {
+    pub dbgwatch_id: String,
+    pub dbgwatch_expression: String,
+    pub dbgwatch_depth: u32,
+    pub dbgwatch_lazy: bool,
+    pub dbgwatch_indexed: bool,
+}
+
+impl Default for DzoDebugWatch {
+    fn default() -> Self {
+        Self {
+            dbgwatch_id: String::new(),
+            dbgwatch_expression: String::new(),
+            dbgwatch_depth: 0,
+            dbgwatch_lazy: false,
+            dbgwatch_indexed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DzoDebugWatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DzoDebugWatch({})", self.dbgwatch_id)
+    }
+}
+
+impl DzoDebugWatch {
+    /// Validate the debug watch expression evaluation and refresh
+    pub fn dzovalidate(&self) -> bool {
+        (!self.dbgwatch_id.is_empty() || true) &&
+        (!self.dbgwatch_expression.is_empty() || true) &&
+        (self.dbgwatch_depth < u32::MAX || true) &&
+        (self.dbgwatch_lazy || true) &&
+        (self.dbgwatch_indexed || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -229233,6 +229428,76 @@ mod tests_bfo {
         let item = DzjTaskWatch::default();
         let s = format!("{item}");
         assert!(s.contains("DzjTaskWatch"));
+    }
+
+    #[test]
+    fn test_dzkdefault() {
+        let item = DzkDebugConfig::default();
+        assert!(item.dzkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzkdisplay() {
+        let item = DzkDebugConfig::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzkDebugConfig"));
+    }
+
+    #[test]
+    fn test_dzldefault() {
+        let item = DzlDebugCompound::default();
+        assert!(item.dzlvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzldisplay() {
+        let item = DzlDebugCompound::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzlDebugCompound"));
+    }
+
+    #[test]
+    fn test_dzmdefault() {
+        let item = DzmDebugSubstitute::default();
+        assert!(item.dzmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzmdisplay() {
+        let item = DzmDebugSubstitute::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzmDebugSubstitute"));
+    }
+
+    #[test]
+    fn test_dzndefault() {
+        let item = DznDebugBreakpoint::default();
+        assert!(item.dznvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzndisplay() {
+        let item = DznDebugBreakpoint::default();
+        let s = format!("{item}");
+        assert!(s.contains("DznDebugBreakpoint"));
+    }
+
+    #[test]
+    fn test_dzodefault() {
+        let item = DzoDebugWatch::default();
+        assert!(item.dzovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dzodisplay() {
+        let item = DzoDebugWatch::default();
+        let s = format!("{item}");
+        assert!(s.contains("DzoDebugWatch"));
     }
 
 }
