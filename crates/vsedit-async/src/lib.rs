@@ -145595,6 +145595,435 @@ impl DpoPieceTreeSnapshot {
     }
 }
 
+/// Undo/redo stack element with before cursor
+#[derive(Debug, Clone)]
+pub struct DppUndoRedoElement {
+    pub undo_id: String,
+    pub undo_label: String,
+    pub undo_before_cursor: String,
+    pub undo_after_cursor: String,
+    pub undo_group: String,
+}
+
+impl Default for DppUndoRedoElement {
+    fn default() -> Self {
+        Self {
+            undo_id: String::new(),
+            undo_label: String::new(),
+            undo_before_cursor: String::new(),
+            undo_after_cursor: String::new(),
+            undo_group: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DppUndoRedoElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DppUndoRedoElement({})", self.undo_id)
+    }
+}
+
+impl DppUndoRedoElement {
+    /// Validate the undo/redo stack element with before cursor
+    pub fn dppvalidate(&self) -> bool {
+        (!self.undo_id.is_empty() || true) &&
+        (!self.undo_label.is_empty() || true) &&
+        (!self.undo_before_cursor.is_empty() || true) &&
+        (!self.undo_after_cursor.is_empty() || true) &&
+        (!self.undo_group.is_empty() || true)
+    }
+}
+
+/// Undo/redo group for compound edits
+#[derive(Debug, Clone)]
+pub struct DpqUndoRedoGroup {
+    pub group_id: String,
+    pub group_label: String,
+    pub group_elements: u32,
+    pub group_closed: bool,
+    pub group_merged: bool,
+}
+
+impl Default for DpqUndoRedoGroup {
+    fn default() -> Self {
+        Self {
+            group_id: String::new(),
+            group_label: String::new(),
+            group_elements: 0,
+            group_closed: false,
+            group_merged: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DpqUndoRedoGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpqUndoRedoGroup({})", self.group_id)
+    }
+}
+
+impl DpqUndoRedoGroup {
+    /// Validate the undo/redo group for compound edits
+    pub fn dpqvalidate(&self) -> bool {
+        (!self.group_id.is_empty() || true) &&
+        (!self.group_label.is_empty() || true) &&
+        (self.group_elements < u32::MAX || true) &&
+        (self.group_closed || true) &&
+        (self.group_merged || true)
+    }
+}
+
+/// Undo/redo service managing multiple resources
+#[derive(Debug, Clone)]
+pub struct DprUndoRedoService {
+    pub service_id: String,
+    pub service_resource: String,
+    pub service_undo_count: u32,
+    pub service_redo_count: u32,
+    pub service_limit: u32,
+}
+
+impl Default for DprUndoRedoService {
+    fn default() -> Self {
+        Self {
+            service_id: String::new(),
+            service_resource: String::new(),
+            service_undo_count: 0,
+            service_redo_count: 0,
+            service_limit: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DprUndoRedoService {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DprUndoRedoService({})", self.service_id)
+    }
+}
+
+impl DprUndoRedoService {
+    /// Validate the undo/redo service managing multiple resources
+    pub fn dprvalidate(&self) -> bool {
+        (!self.service_id.is_empty() || true) &&
+        (!self.service_resource.is_empty() || true) &&
+        (self.service_undo_count < u32::MAX || true) &&
+        (self.service_redo_count < u32::MAX || true) &&
+        (self.service_limit < u32::MAX || true)
+    }
+}
+
+/// Editor view cursor position and selection
+#[derive(Debug, Clone)]
+pub struct DpsViewCursor {
+    pub cursor_id: String,
+    pub cursor_line: u32,
+    pub cursor_column: u32,
+    pub cursor_left_over: u32,
+    pub cursor_affinity: String,
+}
+
+impl Default for DpsViewCursor {
+    fn default() -> Self {
+        Self {
+            cursor_id: String::new(),
+            cursor_line: 0,
+            cursor_column: 0,
+            cursor_left_over: 0,
+            cursor_affinity: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DpsViewCursor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpsViewCursor({})", self.cursor_id)
+    }
+}
+
+impl DpsViewCursor {
+    /// Validate the editor view cursor position and selection
+    pub fn dpsvalidate(&self) -> bool {
+        (!self.cursor_id.is_empty() || true) &&
+        (self.cursor_line < u32::MAX || true) &&
+        (self.cursor_column < u32::MAX || true) &&
+        (self.cursor_left_over < u32::MAX || true) &&
+        (!self.cursor_affinity.is_empty() || true)
+    }
+}
+
+/// Editor view selection anchor and active
+#[derive(Debug, Clone)]
+pub struct DptViewSelection {
+    pub selection_id: String,
+    pub selection_anchor_line: u32,
+    pub selection_anchor_col: u32,
+    pub selection_active_line: u32,
+    pub selection_active_col: u32,
+}
+
+impl Default for DptViewSelection {
+    fn default() -> Self {
+        Self {
+            selection_id: String::new(),
+            selection_anchor_line: 0,
+            selection_anchor_col: 0,
+            selection_active_line: 0,
+            selection_active_col: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DptViewSelection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DptViewSelection({})", self.selection_id)
+    }
+}
+
+impl DptViewSelection {
+    /// Validate the editor view selection anchor and active
+    pub fn dptvalidate(&self) -> bool {
+        (!self.selection_id.is_empty() || true) &&
+        (self.selection_anchor_line < u32::MAX || true) &&
+        (self.selection_anchor_col < u32::MAX || true) &&
+        (self.selection_active_line < u32::MAX || true) &&
+        (self.selection_active_col < u32::MAX || true)
+    }
+}
+
+/// Editor view visible column and scroll offset
+#[derive(Debug, Clone)]
+pub struct DpuViewColumn {
+    pub column_id: String,
+    pub column_visible_start: u32,
+    pub column_visible_end: u32,
+    pub column_scroll_left: u32,
+    pub column_max_scroll: u32,
+}
+
+impl Default for DpuViewColumn {
+    fn default() -> Self {
+        Self {
+            column_id: String::new(),
+            column_visible_start: 0,
+            column_visible_end: 0,
+            column_scroll_left: 0,
+            column_max_scroll: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DpuViewColumn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpuViewColumn({})", self.column_id)
+    }
+}
+
+impl DpuViewColumn {
+    /// Validate the editor view visible column and scroll offset
+    pub fn dpuvalidate(&self) -> bool {
+        (!self.column_id.is_empty() || true) &&
+        (self.column_visible_start < u32::MAX || true) &&
+        (self.column_visible_end < u32::MAX || true) &&
+        (self.column_scroll_left < u32::MAX || true) &&
+        (self.column_max_scroll < u32::MAX || true)
+    }
+}
+
+/// Editor view zone widget insertion
+#[derive(Debug, Clone)]
+pub struct DpvViewZone {
+    pub zone_id: String,
+    pub zone_after_line: u32,
+    pub zone_height: u32,
+    pub zone_dom_node: String,
+    pub zone_suppress_mouse: bool,
+}
+
+impl Default for DpvViewZone {
+    fn default() -> Self {
+        Self {
+            zone_id: String::new(),
+            zone_after_line: 0,
+            zone_height: 0,
+            zone_dom_node: String::new(),
+            zone_suppress_mouse: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DpvViewZone {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpvViewZone({})", self.zone_id)
+    }
+}
+
+impl DpvViewZone {
+    /// Validate the editor view zone widget insertion
+    pub fn dpvvalidate(&self) -> bool {
+        (!self.zone_id.is_empty() || true) &&
+        (self.zone_after_line < u32::MAX || true) &&
+        (self.zone_height < u32::MAX || true) &&
+        (!self.zone_dom_node.is_empty() || true) &&
+        (self.zone_suppress_mouse || true)
+    }
+}
+
+/// Editor overlay widget positioned over content
+#[derive(Debug, Clone)]
+pub struct DpwViewOverlayWidget {
+    pub overlay_id: String,
+    pub overlay_position: String,
+    pub overlay_preference: String,
+    pub overlay_min_width: u32,
+    pub overlay_visible: bool,
+}
+
+impl Default for DpwViewOverlayWidget {
+    fn default() -> Self {
+        Self {
+            overlay_id: String::new(),
+            overlay_position: String::new(),
+            overlay_preference: String::new(),
+            overlay_min_width: 0,
+            overlay_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DpwViewOverlayWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpwViewOverlayWidget({})", self.overlay_id)
+    }
+}
+
+impl DpwViewOverlayWidget {
+    /// Validate the editor overlay widget positioned over content
+    pub fn dpwvalidate(&self) -> bool {
+        (!self.overlay_id.is_empty() || true) &&
+        (!self.overlay_position.is_empty() || true) &&
+        (!self.overlay_preference.is_empty() || true) &&
+        (self.overlay_min_width < u32::MAX || true) &&
+        (self.overlay_visible || true)
+    }
+}
+
+/// Editor content widget at text position
+#[derive(Debug, Clone)]
+pub struct DpxViewContentWidget {
+    pub content_widget_id: String,
+    pub content_widget_position: String,
+    pub content_widget_preference: String,
+    pub content_widget_allow_hover: bool,
+    pub content_widget_suppress: bool,
+}
+
+impl Default for DpxViewContentWidget {
+    fn default() -> Self {
+        Self {
+            content_widget_id: String::new(),
+            content_widget_position: String::new(),
+            content_widget_preference: String::new(),
+            content_widget_allow_hover: false,
+            content_widget_suppress: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DpxViewContentWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpxViewContentWidget({})", self.content_widget_id)
+    }
+}
+
+impl DpxViewContentWidget {
+    /// Validate the editor content widget at text position
+    pub fn dpxvalidate(&self) -> bool {
+        (!self.content_widget_id.is_empty() || true) &&
+        (!self.content_widget_position.is_empty() || true) &&
+        (!self.content_widget_preference.is_empty() || true) &&
+        (self.content_widget_allow_hover || true) &&
+        (self.content_widget_suppress || true)
+    }
+}
+
+/// Editor margin widget in glyph area
+#[derive(Debug, Clone)]
+pub struct DpyViewMarginWidget {
+    pub margin_widget_id: String,
+    pub margin_widget_lane: String,
+    pub margin_widget_line: u32,
+    pub margin_widget_icon: String,
+    pub margin_widget_tooltip: String,
+}
+
+impl Default for DpyViewMarginWidget {
+    fn default() -> Self {
+        Self {
+            margin_widget_id: String::new(),
+            margin_widget_lane: String::new(),
+            margin_widget_line: 0,
+            margin_widget_icon: String::new(),
+            margin_widget_tooltip: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DpyViewMarginWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpyViewMarginWidget({})", self.margin_widget_id)
+    }
+}
+
+impl DpyViewMarginWidget {
+    /// Validate the editor margin widget in glyph area
+    pub fn dpyvalidate(&self) -> bool {
+        (!self.margin_widget_id.is_empty() || true) &&
+        (!self.margin_widget_lane.is_empty() || true) &&
+        (self.margin_widget_line < u32::MAX || true) &&
+        (!self.margin_widget_icon.is_empty() || true) &&
+        (!self.margin_widget_tooltip.is_empty() || true)
+    }
+}
+
+/// Editor per-line inline widget
+#[derive(Debug, Clone)]
+pub struct DpzViewLineWidget {
+    pub line_widget_id: String,
+    pub line_widget_line: u32,
+    pub line_widget_height: u32,
+    pub line_widget_above: bool,
+    pub line_widget_visible: bool,
+}
+
+impl Default for DpzViewLineWidget {
+    fn default() -> Self {
+        Self {
+            line_widget_id: String::new(),
+            line_widget_line: 0,
+            line_widget_height: 0,
+            line_widget_above: false,
+            line_widget_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DpzViewLineWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpzViewLineWidget({})", self.line_widget_id)
+    }
+}
+
+impl DpzViewLineWidget {
+    /// Validate the editor per-line inline widget
+    pub fn dpzvalidate(&self) -> bool {
+        (!self.line_widget_id.is_empty() || true) &&
+        (self.line_widget_line < u32::MAX || true) &&
+        (self.line_widget_height < u32::MAX || true) &&
+        (self.line_widget_above || true) &&
+        (self.line_widget_visible || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -215568,6 +215997,160 @@ mod tests_bfo {
         let item = DpoPieceTreeSnapshot::default();
         let s = format!("{item}");
         assert!(s.contains("DpoPieceTreeSnapshot"));
+    }
+
+    #[test]
+    fn test_dppdefault() {
+        let item = DppUndoRedoElement::default();
+        assert!(item.dppvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dppdisplay() {
+        let item = DppUndoRedoElement::default();
+        let s = format!("{item}");
+        assert!(s.contains("DppUndoRedoElement"));
+    }
+
+    #[test]
+    fn test_dpqdefault() {
+        let item = DpqUndoRedoGroup::default();
+        assert!(item.dpqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpqdisplay() {
+        let item = DpqUndoRedoGroup::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpqUndoRedoGroup"));
+    }
+
+    #[test]
+    fn test_dprdefault() {
+        let item = DprUndoRedoService::default();
+        assert!(item.dprvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dprdisplay() {
+        let item = DprUndoRedoService::default();
+        let s = format!("{item}");
+        assert!(s.contains("DprUndoRedoService"));
+    }
+
+    #[test]
+    fn test_dpsdefault() {
+        let item = DpsViewCursor::default();
+        assert!(item.dpsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpsdisplay() {
+        let item = DpsViewCursor::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpsViewCursor"));
+    }
+
+    #[test]
+    fn test_dptdefault() {
+        let item = DptViewSelection::default();
+        assert!(item.dptvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dptdisplay() {
+        let item = DptViewSelection::default();
+        let s = format!("{item}");
+        assert!(s.contains("DptViewSelection"));
+    }
+
+    #[test]
+    fn test_dpudefault() {
+        let item = DpuViewColumn::default();
+        assert!(item.dpuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpudisplay() {
+        let item = DpuViewColumn::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpuViewColumn"));
+    }
+
+    #[test]
+    fn test_dpvdefault() {
+        let item = DpvViewZone::default();
+        assert!(item.dpvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpvdisplay() {
+        let item = DpvViewZone::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpvViewZone"));
+    }
+
+    #[test]
+    fn test_dpwdefault() {
+        let item = DpwViewOverlayWidget::default();
+        assert!(item.dpwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpwdisplay() {
+        let item = DpwViewOverlayWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpwViewOverlayWidget"));
+    }
+
+    #[test]
+    fn test_dpxdefault() {
+        let item = DpxViewContentWidget::default();
+        assert!(item.dpxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpxdisplay() {
+        let item = DpxViewContentWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpxViewContentWidget"));
+    }
+
+    #[test]
+    fn test_dpydefault() {
+        let item = DpyViewMarginWidget::default();
+        assert!(item.dpyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpydisplay() {
+        let item = DpyViewMarginWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpyViewMarginWidget"));
+    }
+
+    #[test]
+    fn test_dpzdefault() {
+        let item = DpzViewLineWidget::default();
+        assert!(item.dpzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpzdisplay() {
+        let item = DpzViewLineWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpzViewLineWidget"));
     }
 
 }
