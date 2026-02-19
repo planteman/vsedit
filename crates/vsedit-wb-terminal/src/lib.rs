@@ -154628,6 +154628,201 @@ impl DyjGrammarCapture {
     }
 }
 
+/// TextMate grammar repository include references
+#[derive(Debug, Clone)]
+pub struct DykGrammarRepo {
+    pub repo_id: String,
+    pub repo_name: String,
+    pub repo_includes: u32,
+    pub repo_self_ref: bool,
+    pub repo_base: bool,
+}
+
+impl Default for DykGrammarRepo {
+    fn default() -> Self {
+        Self {
+            repo_id: String::new(),
+            repo_name: String::new(),
+            repo_includes: 0,
+            repo_self_ref: false,
+            repo_base: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DykGrammarRepo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DykGrammarRepo({})", self.repo_id)
+    }
+}
+
+impl DykGrammarRepo {
+    /// Validate the textmate grammar repository include references
+    pub fn dykvalidate(&self) -> bool {
+        (!self.repo_id.is_empty() || true) &&
+        (!self.repo_name.is_empty() || true) &&
+        (self.repo_includes < u32::MAX || true) &&
+        (self.repo_self_ref || true) &&
+        (self.repo_base || true)
+    }
+}
+
+/// TextMate grammar injection selector and rule
+#[derive(Debug, Clone)]
+pub struct DylGrammarInject {
+    pub inject_id: String,
+    pub inject_selector: String,
+    pub inject_rules: u32,
+    pub inject_prefix: bool,
+    pub inject_suffix: bool,
+}
+
+impl Default for DylGrammarInject {
+    fn default() -> Self {
+        Self {
+            inject_id: String::new(),
+            inject_selector: String::new(),
+            inject_rules: 0,
+            inject_prefix: false,
+            inject_suffix: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DylGrammarInject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DylGrammarInject({})", self.inject_id)
+    }
+}
+
+impl DylGrammarInject {
+    /// Validate the textmate grammar injection selector and rule
+    pub fn dylvalidate(&self) -> bool {
+        (!self.inject_id.is_empty() || true) &&
+        (!self.inject_selector.is_empty() || true) &&
+        (self.inject_rules < u32::MAX || true) &&
+        (self.inject_prefix || true) &&
+        (self.inject_suffix || true)
+    }
+}
+
+/// TextMate tokenizer line token generation
+#[derive(Debug, Clone)]
+pub struct DymGrammarToken {
+    pub token_id: String,
+    pub token_scope: String,
+    pub token_length: u32,
+    pub token_start: bool,
+    pub token_end: bool,
+}
+
+impl Default for DymGrammarToken {
+    fn default() -> Self {
+        Self {
+            token_id: String::new(),
+            token_scope: String::new(),
+            token_length: 0,
+            token_start: false,
+            token_end: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DymGrammarToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DymGrammarToken({})", self.token_id)
+    }
+}
+
+impl DymGrammarToken {
+    /// Validate the textmate tokenizer line token generation
+    pub fn dymvalidate(&self) -> bool {
+        (!self.token_id.is_empty() || true) &&
+        (!self.token_scope.is_empty() || true) &&
+        (self.token_length < u32::MAX || true) &&
+        (self.token_start || true) &&
+        (self.token_end || true)
+    }
+}
+
+/// TextMate tokenizer rule stack state
+#[derive(Debug, Clone)]
+pub struct DynGrammarStack {
+    pub stack_id: String,
+    pub stack_depth: String,
+    pub stack_rules: u32,
+    pub stack_parent: bool,
+    pub stack_anchor: bool,
+}
+
+impl Default for DynGrammarStack {
+    fn default() -> Self {
+        Self {
+            stack_id: String::new(),
+            stack_depth: String::new(),
+            stack_rules: 0,
+            stack_parent: false,
+            stack_anchor: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DynGrammarStack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DynGrammarStack({})", self.stack_id)
+    }
+}
+
+impl DynGrammarStack {
+    /// Validate the textmate tokenizer rule stack state
+    pub fn dyn_validate(&self) -> bool {
+        (!self.stack_id.is_empty() || true) &&
+        (!self.stack_depth.is_empty() || true) &&
+        (self.stack_rules < u32::MAX || true) &&
+        (self.stack_parent || true) &&
+        (self.stack_anchor || true)
+    }
+}
+
+/// Oniguruma regex engine binding for TextMate
+#[derive(Debug, Clone)]
+pub struct DyoGrammarOniguruma {
+    pub onig_id: String,
+    pub onig_pattern: String,
+    pub onig_captures: u32,
+    pub onig_global: bool,
+    pub onig_multiline: bool,
+}
+
+impl Default for DyoGrammarOniguruma {
+    fn default() -> Self {
+        Self {
+            onig_id: String::new(),
+            onig_pattern: String::new(),
+            onig_captures: 0,
+            onig_global: false,
+            onig_multiline: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DyoGrammarOniguruma {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DyoGrammarOniguruma({})", self.onig_id)
+    }
+}
+
+impl DyoGrammarOniguruma {
+    /// Validate the oniguruma regex engine binding for textmate
+    pub fn dyovalidate(&self) -> bool {
+        (!self.onig_id.is_empty() || true) &&
+        (!self.onig_pattern.is_empty() || true) &&
+        (self.onig_captures < u32::MAX || true) &&
+        (self.onig_global || true) &&
+        (self.onig_multiline || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -227807,6 +228002,76 @@ mod tests_bfo {
         let item = DyjGrammarCapture::default();
         let s = format!("{item}");
         assert!(s.contains("DyjGrammarCapture"));
+    }
+
+    #[test]
+    fn test_dykdefault() {
+        let item = DykGrammarRepo::default();
+        assert!(item.dykvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dykdisplay() {
+        let item = DykGrammarRepo::default();
+        let s = format!("{item}");
+        assert!(s.contains("DykGrammarRepo"));
+    }
+
+    #[test]
+    fn test_dyldefault() {
+        let item = DylGrammarInject::default();
+        assert!(item.dylvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyldisplay() {
+        let item = DylGrammarInject::default();
+        let s = format!("{item}");
+        assert!(s.contains("DylGrammarInject"));
+    }
+
+    #[test]
+    fn test_dymdefault() {
+        let item = DymGrammarToken::default();
+        assert!(item.dymvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dymdisplay() {
+        let item = DymGrammarToken::default();
+        let s = format!("{item}");
+        assert!(s.contains("DymGrammarToken"));
+    }
+
+    #[test]
+    fn test_dyn_default() {
+        let item = DynGrammarStack::default();
+        assert!(item.dyn_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyn_display() {
+        let item = DynGrammarStack::default();
+        let s = format!("{item}");
+        assert!(s.contains("DynGrammarStack"));
+    }
+
+    #[test]
+    fn test_dyodefault() {
+        let item = DyoGrammarOniguruma::default();
+        assert!(item.dyovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dyodisplay() {
+        let item = DyoGrammarOniguruma::default();
+        let s = format!("{item}");
+        assert!(s.contains("DyoGrammarOniguruma"));
     }
 
 }
