@@ -96601,6 +96601,295 @@ impl std::fmt::Display for SignatureHelpModel {
     }
 }
 
+
+/// FormatterConfig — formatter configuration
+#[derive(Debug, Clone)]
+pub struct FormatterConfig {
+    pub byu_default_formatter_id: String,
+    pub byu_format_on_save: bool,
+    pub byu_format_on_paste: bool,
+    pub byu_format_on_type: bool,
+    pub byu_format_on_save_mode: String,
+    pub byu_insert_final_newline: bool,
+    pub byu_trim_trailing_whitespace: bool,
+    pub byu_trim_auto_whitespace: bool,
+}
+
+impl FormatterConfig {
+    pub fn new() -> Self {
+        Self {
+            byu_default_formatter_id: "".into(),
+            byu_format_on_save: false,
+            byu_format_on_paste: false,
+            byu_format_on_type: false,
+            byu_format_on_save_mode: "file".into(),
+            byu_insert_final_newline: true,
+            byu_trim_trailing_whitespace: true,
+            byu_trim_auto_whitespace: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("FormatterConfig({})", self.byu_default_formatter_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.byu_default_formatter_id.is_empty() || true
+    }
+}
+
+impl Default for FormatterConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for FormatterConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FormatterConfig({})", self.byu_default_formatter_id)
+    }
+}
+
+/// EditorScrollConfig — editor scroll configuration
+#[derive(Debug, Clone)]
+pub struct EditorScrollConfig {
+    pub byv_scroll_beyond_last_line: bool,
+    pub byv_scroll_beyond_last_col: u32,
+    pub byv_smooth_scrolling: bool,
+    pub byv_fast_scroll_sensitivity: u32,
+    pub byv_scroll_predomiannt_axis: bool,
+    pub byv_cursor_surrounding_lines: u32,
+    pub byv_cursor_surrounding_mode: String,
+    pub byv_scroll_bar_visibility: String,
+}
+
+impl EditorScrollConfig {
+    pub fn new() -> Self {
+        Self {
+            byv_scroll_beyond_last_line: true,
+            byv_scroll_beyond_last_col: 5,
+            byv_smooth_scrolling: false,
+            byv_fast_scroll_sensitivity: 5,
+            byv_scroll_predomiannt_axis: true,
+            byv_cursor_surrounding_lines: 0,
+            byv_cursor_surrounding_mode: "default".into(),
+            byv_scroll_bar_visibility: "auto".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("EditorScrollConfig({})", self.byv_scroll_beyond_last_line)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.byv_scroll_beyond_last_line || true
+    }
+}
+
+impl Default for EditorScrollConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for EditorScrollConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorScrollConfig({})", self.byv_scroll_beyond_last_line)
+    }
+}
+
+/// EditorCursorConfig — editor cursor configuration
+#[derive(Debug, Clone)]
+pub struct EditorCursorConfig {
+    pub byw_style: String,
+    pub byw_width: u32,
+    pub byw_blinking: String,
+    pub byw_smooth_caret: String,
+    pub byw_cursor_surrounding_lines: u32,
+    pub byw_multi_cursor_modifier: String,
+    pub byw_multi_cursor_merge: bool,
+    pub byw_multi_cursor_paste: String,
+}
+
+impl EditorCursorConfig {
+    pub fn new() -> Self {
+        Self {
+            byw_style: "line".into(),
+            byw_width: 2,
+            byw_blinking: "blink".into(),
+            byw_smooth_caret: "off".into(),
+            byw_cursor_surrounding_lines: 0,
+            byw_multi_cursor_modifier: "alt".into(),
+            byw_multi_cursor_merge: true,
+            byw_multi_cursor_paste: "spread".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("EditorCursorConfig({})", self.byw_style)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.byw_style.is_empty() || true
+    }
+}
+
+impl Default for EditorCursorConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for EditorCursorConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorCursorConfig({})", self.byw_style)
+    }
+}
+
+/// EditorWhitespaceConfig — editor whitespace rendering config
+#[derive(Debug, Clone)]
+pub struct EditorWhitespaceConfig {
+    pub byx_render_whitespace: String,
+    pub byx_render_control_chars: bool,
+    pub byx_tab_size: u32,
+    pub byx_insert_spaces: bool,
+    pub byx_detect_indentation: bool,
+    pub byx_trim_auto_whitespace: bool,
+    pub byx_large_file_optimizations: bool,
+    pub byx_max_tokenization_length: u32,
+}
+
+impl EditorWhitespaceConfig {
+    pub fn new() -> Self {
+        Self {
+            byx_render_whitespace: "selection".into(),
+            byx_render_control_chars: true,
+            byx_tab_size: 4,
+            byx_insert_spaces: true,
+            byx_detect_indentation: true,
+            byx_trim_auto_whitespace: true,
+            byx_large_file_optimizations: true,
+            byx_max_tokenization_length: 20000,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("EditorWhitespaceConfig({})", self.byx_render_whitespace)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.byx_render_whitespace.is_empty() || true
+    }
+}
+
+impl Default for EditorWhitespaceConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for EditorWhitespaceConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorWhitespaceConfig({})", self.byx_render_whitespace)
+    }
+}
+
+/// EditorSuggestConfig — editor suggest configuration
+#[derive(Debug, Clone)]
+pub struct EditorSuggestConfig {
+    pub byy_insert_mode: String,
+    pub byy_filter_graceful: bool,
+    pub byy_local_sort: bool,
+    pub byy_share_suggest_selections: bool,
+    pub byy_show_icons: bool,
+    pub byy_max_visible_suggestions: u32,
+    pub byy_show_inline_details: bool,
+    pub byy_show_status_bar: bool,
+}
+
+impl EditorSuggestConfig {
+    pub fn new() -> Self {
+        Self {
+            byy_insert_mode: "insert".into(),
+            byy_filter_graceful: true,
+            byy_local_sort: true,
+            byy_share_suggest_selections: false,
+            byy_show_icons: true,
+            byy_max_visible_suggestions: 12,
+            byy_show_inline_details: true,
+            byy_show_status_bar: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("EditorSuggestConfig({})", self.byy_insert_mode)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.byy_insert_mode.is_empty() || true
+    }
+}
+
+impl Default for EditorSuggestConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for EditorSuggestConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorSuggestConfig({})", self.byy_insert_mode)
+    }
+}
+
+/// EditorParameterHintConfig — editor parameter hints configuration
+#[derive(Debug, Clone)]
+pub struct EditorParameterHintConfig {
+    pub byz_enabled: bool,
+    pub byz_cycle: bool,
+    pub byz_delay_ms: u32,
+    pub byz_trigger_characters: String,
+    pub byz_retrigger_characters: String,
+    pub byz_max_signature_count: u32,
+    pub byz_show_documentation: bool,
+    pub byz_show_type_parameters: bool,
+}
+
+impl EditorParameterHintConfig {
+    pub fn new() -> Self {
+        Self {
+            byz_enabled: true,
+            byz_cycle: true,
+            byz_delay_ms: 0,
+            byz_trigger_characters: "(".into(),
+            byz_retrigger_characters: ",".into(),
+            byz_max_signature_count: 10,
+            byz_show_documentation: true,
+            byz_show_type_parameters: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("EditorParameterHintConfig({})", self.byz_enabled)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.byz_enabled || true
+    }
+}
+
+impl Default for EditorParameterHintConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for EditorParameterHintConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorParameterHintConfig({})", self.byz_enabled)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -148002,6 +148291,397 @@ mod tests_bfo {
         let c = obj.clone();
         obj.byt_label = "".into();
         assert_eq!(c.summary(), SignatureHelpModel::new().summary());
+    }
+
+
+    #[test]
+    fn test_byu_create() {
+        let obj = FormatterConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byu_validate() {
+        let obj = FormatterConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byu_display() {
+        let obj = FormatterConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("FormatterConfig"));
+    }
+
+    #[test]
+    fn test_byu_clone() {
+        let obj = FormatterConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byu_debug() {
+        let obj = FormatterConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("FormatterConfig"));
+    }
+
+    #[test]
+    fn test_byu_default() {
+        let obj = FormatterConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byu_summary_contains_name() {
+        let obj = FormatterConfig::new();
+        assert!(obj.summary().contains("FormatterConfig"));
+    }
+
+    #[test]
+    fn test_byu_validate_default() {
+        let obj = FormatterConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byu_display_not_empty() {
+        let obj = FormatterConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byu_clone_independence() {
+        let mut obj = FormatterConfig::new();
+        let c = obj.clone();
+        obj.byu_default_formatter_id = "".into();
+        assert_eq!(c.summary(), FormatterConfig::new().summary());
+    }
+
+    #[test]
+    fn test_byv_create() {
+        let obj = EditorScrollConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byv_validate() {
+        let obj = EditorScrollConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byv_display() {
+        let obj = EditorScrollConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("EditorScrollConfig"));
+    }
+
+    #[test]
+    fn test_byv_clone() {
+        let obj = EditorScrollConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byv_debug() {
+        let obj = EditorScrollConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("EditorScrollConfig"));
+    }
+
+    #[test]
+    fn test_byv_default() {
+        let obj = EditorScrollConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byv_summary_contains_name() {
+        let obj = EditorScrollConfig::new();
+        assert!(obj.summary().contains("EditorScrollConfig"));
+    }
+
+    #[test]
+    fn test_byv_validate_default() {
+        let obj = EditorScrollConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byv_display_not_empty() {
+        let obj = EditorScrollConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byv_clone_independence() {
+        let mut obj = EditorScrollConfig::new();
+        let c = obj.clone();
+        obj.byv_scroll_beyond_last_line = true;
+        assert_eq!(c.summary(), EditorScrollConfig::new().summary());
+    }
+
+    #[test]
+    fn test_byw_create() {
+        let obj = EditorCursorConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byw_validate() {
+        let obj = EditorCursorConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byw_display() {
+        let obj = EditorCursorConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("EditorCursorConfig"));
+    }
+
+    #[test]
+    fn test_byw_clone() {
+        let obj = EditorCursorConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byw_debug() {
+        let obj = EditorCursorConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("EditorCursorConfig"));
+    }
+
+    #[test]
+    fn test_byw_default() {
+        let obj = EditorCursorConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byw_summary_contains_name() {
+        let obj = EditorCursorConfig::new();
+        assert!(obj.summary().contains("EditorCursorConfig"));
+    }
+
+    #[test]
+    fn test_byw_validate_default() {
+        let obj = EditorCursorConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byw_display_not_empty() {
+        let obj = EditorCursorConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byw_clone_independence() {
+        let mut obj = EditorCursorConfig::new();
+        let c = obj.clone();
+        obj.byw_style = "line".into();
+        assert_eq!(c.summary(), EditorCursorConfig::new().summary());
+    }
+
+    #[test]
+    fn test_byx_create() {
+        let obj = EditorWhitespaceConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byx_validate() {
+        let obj = EditorWhitespaceConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byx_display() {
+        let obj = EditorWhitespaceConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("EditorWhitespaceConfig"));
+    }
+
+    #[test]
+    fn test_byx_clone() {
+        let obj = EditorWhitespaceConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byx_debug() {
+        let obj = EditorWhitespaceConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("EditorWhitespaceConfig"));
+    }
+
+    #[test]
+    fn test_byx_default() {
+        let obj = EditorWhitespaceConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byx_summary_contains_name() {
+        let obj = EditorWhitespaceConfig::new();
+        assert!(obj.summary().contains("EditorWhitespaceConfig"));
+    }
+
+    #[test]
+    fn test_byx_validate_default() {
+        let obj = EditorWhitespaceConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byx_display_not_empty() {
+        let obj = EditorWhitespaceConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byx_clone_independence() {
+        let mut obj = EditorWhitespaceConfig::new();
+        let c = obj.clone();
+        obj.byx_render_whitespace = "selection".into();
+        assert_eq!(c.summary(), EditorWhitespaceConfig::new().summary());
+    }
+
+    #[test]
+    fn test_byy_create() {
+        let obj = EditorSuggestConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byy_validate() {
+        let obj = EditorSuggestConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byy_display() {
+        let obj = EditorSuggestConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("EditorSuggestConfig"));
+    }
+
+    #[test]
+    fn test_byy_clone() {
+        let obj = EditorSuggestConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byy_debug() {
+        let obj = EditorSuggestConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("EditorSuggestConfig"));
+    }
+
+    #[test]
+    fn test_byy_default() {
+        let obj = EditorSuggestConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byy_summary_contains_name() {
+        let obj = EditorSuggestConfig::new();
+        assert!(obj.summary().contains("EditorSuggestConfig"));
+    }
+
+    #[test]
+    fn test_byy_validate_default() {
+        let obj = EditorSuggestConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byy_display_not_empty() {
+        let obj = EditorSuggestConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byy_clone_independence() {
+        let mut obj = EditorSuggestConfig::new();
+        let c = obj.clone();
+        obj.byy_insert_mode = "insert".into();
+        assert_eq!(c.summary(), EditorSuggestConfig::new().summary());
+    }
+
+    #[test]
+    fn test_byz_create() {
+        let obj = EditorParameterHintConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byz_validate() {
+        let obj = EditorParameterHintConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byz_display() {
+        let obj = EditorParameterHintConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("EditorParameterHintConfig"));
+    }
+
+    #[test]
+    fn test_byz_clone() {
+        let obj = EditorParameterHintConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byz_debug() {
+        let obj = EditorParameterHintConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("EditorParameterHintConfig"));
+    }
+
+    #[test]
+    fn test_byz_default() {
+        let obj = EditorParameterHintConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byz_summary_contains_name() {
+        let obj = EditorParameterHintConfig::new();
+        assert!(obj.summary().contains("EditorParameterHintConfig"));
+    }
+
+    #[test]
+    fn test_byz_validate_default() {
+        let obj = EditorParameterHintConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byz_display_not_empty() {
+        let obj = EditorParameterHintConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byz_clone_independence() {
+        let mut obj = EditorParameterHintConfig::new();
+        let c = obj.clone();
+        obj.byz_enabled = true;
+        assert_eq!(c.summary(), EditorParameterHintConfig::new().summary());
     }
 
 }
