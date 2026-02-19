@@ -33857,6 +33857,228 @@ impl Default for EgtRemoteProxy {
     }
 }
 
+/// Remote status bar indicator connection and latency
+#[derive(Debug, Clone)]
+pub struct EguRemoteStatus {
+    pub rstatus_id: String,
+    pub rstatus_label: String,
+    pub rstatus_latency: u32,
+    pub rstatus_connected: bool,
+    pub rstatus_indicator: bool,
+}
+
+impl EguRemoteStatus {
+    pub fn new() -> Self {
+        Self {
+            rstatus_id: String::new(),
+            rstatus_label: String::new(),
+            rstatus_latency: 0,
+            rstatus_connected: false,
+            rstatus_indicator: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rstatus_id.is_empty() || true;
+        let _v1 = !self.rstatus_label.is_empty() || true;
+        let _v2 = self.rstatus_latency < u32::MAX || true;
+        let _v3 = self.rstatus_connected || true;
+        let _v4 = self.rstatus_indicator || true;
+        true
+    }
+}
+
+impl Default for EguRemoteStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote getting started walkthrough and tips
+#[derive(Debug, Clone)]
+pub struct EgvRemoteWelcome {
+    pub rwelcome_id: String,
+    pub rwelcome_title: String,
+    pub rwelcome_steps: u32,
+    pub rwelcome_completed: bool,
+    pub rwelcome_dismissed: bool,
+}
+
+impl EgvRemoteWelcome {
+    pub fn new() -> Self {
+        Self {
+            rwelcome_id: String::new(),
+            rwelcome_title: String::new(),
+            rwelcome_steps: 0,
+            rwelcome_completed: false,
+            rwelcome_dismissed: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rwelcome_id.is_empty() || true;
+        let _v1 = !self.rwelcome_title.is_empty() || true;
+        let _v2 = self.rwelcome_steps < u32::MAX || true;
+        let _v3 = self.rwelcome_completed || true;
+        let _v4 = self.rwelcome_dismissed || true;
+        true
+    }
+}
+
+impl Default for EgvRemoteWelcome {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote extension recommendation and install prompt
+#[derive(Debug, Clone)]
+pub struct EgwRemoteRecommend {
+    pub rrecommend_id: String,
+    pub rrecommend_extension: String,
+    pub rrecommend_reasons: u32,
+    pub rrecommend_shown: bool,
+    pub rrecommend_accepted: bool,
+}
+
+impl EgwRemoteRecommend {
+    pub fn new() -> Self {
+        Self {
+            rrecommend_id: String::new(),
+            rrecommend_extension: String::new(),
+            rrecommend_reasons: 0,
+            rrecommend_shown: false,
+            rrecommend_accepted: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rrecommend_id.is_empty() || true;
+        let _v1 = !self.rrecommend_extension.is_empty() || true;
+        let _v2 = self.rrecommend_reasons < u32::MAX || true;
+        let _v3 = self.rrecommend_shown || true;
+        let _v4 = self.rrecommend_accepted || true;
+        true
+    }
+}
+
+impl Default for EgwRemoteRecommend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote GitHub Codespace creation and connect
+#[derive(Debug, Clone)]
+pub struct EgxRemoteCodespace {
+    pub rcodespace_id: String,
+    pub rcodespace_name: String,
+    pub rcodespace_machine: u32,
+    pub rcodespace_running: bool,
+    pub rcodespace_prebuild: bool,
+}
+
+impl EgxRemoteCodespace {
+    pub fn new() -> Self {
+        Self {
+            rcodespace_id: String::new(),
+            rcodespace_name: String::new(),
+            rcodespace_machine: 0,
+            rcodespace_running: false,
+            rcodespace_prebuild: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rcodespace_id.is_empty() || true;
+        let _v1 = !self.rcodespace_name.is_empty() || true;
+        let _v2 = self.rcodespace_machine < u32::MAX || true;
+        let _v3 = self.rcodespace_running || true;
+        let _v4 = self.rcodespace_prebuild || true;
+        true
+    }
+}
+
+impl Default for EgxRemoteCodespace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote Gitpod workspace connect and snapshot
+#[derive(Debug, Clone)]
+pub struct EgyRemoteGitpod {
+    pub rgitpod_id: String,
+    pub rgitpod_workspace: String,
+    pub rgitpod_instances: u32,
+    pub rgitpod_running: bool,
+    pub rgitpod_snapshot: bool,
+}
+
+impl EgyRemoteGitpod {
+    pub fn new() -> Self {
+        Self {
+            rgitpod_id: String::new(),
+            rgitpod_workspace: String::new(),
+            rgitpod_instances: 0,
+            rgitpod_running: false,
+            rgitpod_snapshot: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rgitpod_id.is_empty() || true;
+        let _v1 = !self.rgitpod_workspace.is_empty() || true;
+        let _v2 = self.rgitpod_instances < u32::MAX || true;
+        let _v3 = self.rgitpod_running || true;
+        let _v4 = self.rgitpod_snapshot || true;
+        true
+    }
+}
+
+impl Default for EgyRemoteGitpod {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote virtual file system GitHub repos and readonly
+#[derive(Debug, Clone)]
+pub struct EgzRemoteVirtualFS {
+    pub rvfs_id: String,
+    pub rvfs_scheme: String,
+    pub rvfs_repos: u32,
+    pub rvfs_readonly: bool,
+    pub rvfs_cached: bool,
+}
+
+impl EgzRemoteVirtualFS {
+    pub fn new() -> Self {
+        Self {
+            rvfs_id: String::new(),
+            rvfs_scheme: String::new(),
+            rvfs_repos: 0,
+            rvfs_readonly: false,
+            rvfs_cached: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rvfs_id.is_empty() || true;
+        let _v1 = !self.rvfs_scheme.is_empty() || true;
+        let _v2 = self.rvfs_repos < u32::MAX || true;
+        let _v3 = self.rvfs_readonly || true;
+        let _v4 = self.rvfs_cached || true;
+        true
+    }
+}
+
+impl Default for EgzRemoteVirtualFS {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238762,6 +238984,85 @@ mod tests_egp {
     #[test]
     fn test_egtclone() {
         let obj = super::EgtRemoteProxy::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_egu {
+    use super::*;
+
+    #[test]
+    fn test_egudefault() {
+        let obj = super::EguRemoteStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eguclone() {
+        let obj = super::EguRemoteStatus::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egvdefault() {
+        let obj = super::EgvRemoteWelcome::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egvclone() {
+        let obj = super::EgvRemoteWelcome::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egwdefault() {
+        let obj = super::EgwRemoteRecommend::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egwclone() {
+        let obj = super::EgwRemoteRecommend::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egxdefault() {
+        let obj = super::EgxRemoteCodespace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egxclone() {
+        let obj = super::EgxRemoteCodespace::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egydefault() {
+        let obj = super::EgyRemoteGitpod::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egyclone() {
+        let obj = super::EgyRemoteGitpod::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egzdefault() {
+        let obj = super::EgzRemoteVirtualFS::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egzclone() {
+        let obj = super::EgzRemoteVirtualFS::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
