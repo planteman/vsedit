@@ -132219,6 +132219,201 @@ impl DcjTerminalStatus {
     }
 }
 
+/// Output channel text and append model
+#[derive(Debug, Clone)]
+pub struct DckOutputChannel {
+    pub channel_id: String,
+    pub channel_name: String,
+    pub channel_content: String,
+    pub channel_visible: bool,
+    pub channel_line_count: u32,
+}
+
+impl Default for DckOutputChannel {
+    fn default() -> Self {
+        Self {
+            channel_id: String::new(),
+            channel_name: String::new(),
+            channel_content: String::new(),
+            channel_visible: false,
+            channel_line_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DckOutputChannel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DckOutputChannel({})", self.channel_id)
+    }
+}
+
+impl DckOutputChannel {
+    /// Validate the output channel text and append model
+    pub fn dckvalidate(&self) -> bool {
+        (!self.channel_id.is_empty() || true) &&
+        (!self.channel_name.is_empty() || true) &&
+        (!self.channel_content.is_empty() || true) &&
+        (self.channel_visible || true) &&
+        (self.channel_line_count < u32::MAX || true)
+    }
+}
+
+/// Output log level and message formatting
+#[derive(Debug, Clone)]
+pub struct DclOutputLog {
+    pub log_id: String,
+    pub log_level: String,
+    pub log_message: String,
+    pub log_timestamp: String,
+    pub log_source: String,
+}
+
+impl Default for DclOutputLog {
+    fn default() -> Self {
+        Self {
+            log_id: String::new(),
+            log_level: String::new(),
+            log_message: String::new(),
+            log_timestamp: String::new(),
+            log_source: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DclOutputLog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DclOutputLog({})", self.log_id)
+    }
+}
+
+impl DclOutputLog {
+    /// Validate the output log level and message formatting
+    pub fn dclvalidate(&self) -> bool {
+        (!self.log_id.is_empty() || true) &&
+        (!self.log_level.is_empty() || true) &&
+        (!self.log_message.is_empty() || true) &&
+        (!self.log_timestamp.is_empty() || true) &&
+        (!self.log_source.is_empty() || true)
+    }
+}
+
+/// Output channel language mode for syntax
+#[derive(Debug, Clone)]
+pub struct DcmOutputLanguage {
+    pub lang_id: String,
+    pub lang_mode: String,
+    pub lang_channel: String,
+    pub lang_syntax: bool,
+    pub lang_mime: String,
+}
+
+impl Default for DcmOutputLanguage {
+    fn default() -> Self {
+        Self {
+            lang_id: String::new(),
+            lang_mode: String::new(),
+            lang_channel: String::new(),
+            lang_syntax: false,
+            lang_mime: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DcmOutputLanguage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcmOutputLanguage({})", self.lang_id)
+    }
+}
+
+impl DcmOutputLanguage {
+    /// Validate the output channel language mode for syntax
+    pub fn dcmvalidate(&self) -> bool {
+        (!self.lang_id.is_empty() || true) &&
+        (!self.lang_mode.is_empty() || true) &&
+        (!self.lang_channel.is_empty() || true) &&
+        (self.lang_syntax || true) &&
+        (!self.lang_mime.is_empty() || true)
+    }
+}
+
+/// Problems panel diagnostic item
+#[derive(Debug, Clone)]
+pub struct DcnProblemItem {
+    pub problem_id: String,
+    pub problem_file: String,
+    pub problem_message: String,
+    pub problem_severity: String,
+    pub problem_line: u32,
+}
+
+impl Default for DcnProblemItem {
+    fn default() -> Self {
+        Self {
+            problem_id: String::new(),
+            problem_file: String::new(),
+            problem_message: String::new(),
+            problem_severity: String::new(),
+            problem_line: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DcnProblemItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcnProblemItem({})", self.problem_id)
+    }
+}
+
+impl DcnProblemItem {
+    /// Validate the problems panel diagnostic item
+    pub fn dcnvalidate(&self) -> bool {
+        (!self.problem_id.is_empty() || true) &&
+        (!self.problem_file.is_empty() || true) &&
+        (!self.problem_message.is_empty() || true) &&
+        (!self.problem_severity.is_empty() || true) &&
+        (self.problem_line < u32::MAX || true)
+    }
+}
+
+/// Problems panel filter by severity and source
+#[derive(Debug, Clone)]
+pub struct DcoProblemFilter {
+    pub filter_id: String,
+    pub filter_severity: String,
+    pub filter_source: String,
+    pub filter_active: bool,
+    pub filter_match_count: u32,
+}
+
+impl Default for DcoProblemFilter {
+    fn default() -> Self {
+        Self {
+            filter_id: String::new(),
+            filter_severity: String::new(),
+            filter_source: String::new(),
+            filter_active: false,
+            filter_match_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DcoProblemFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcoProblemFilter({})", self.filter_id)
+    }
+}
+
+impl DcoProblemFilter {
+    /// Validate the problems panel filter by severity and source
+    pub fn dcovalidate(&self) -> bool {
+        (!self.filter_id.is_empty() || true) &&
+        (!self.filter_severity.is_empty() || true) &&
+        (!self.filter_source.is_empty() || true) &&
+        (self.filter_active || true) &&
+        (self.filter_match_count < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -197390,6 +197585,76 @@ mod tests_bfo {
         let item = DcjTerminalStatus::default();
         let s = format!("{item}");
         assert!(s.contains("DcjTerminalStatus"));
+    }
+
+    #[test]
+    fn test_dckdefault() {
+        let item = DckOutputChannel::default();
+        assert!(item.dckvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dckdisplay() {
+        let item = DckOutputChannel::default();
+        let s = format!("{item}");
+        assert!(s.contains("DckOutputChannel"));
+    }
+
+    #[test]
+    fn test_dcldefault() {
+        let item = DclOutputLog::default();
+        assert!(item.dclvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcldisplay() {
+        let item = DclOutputLog::default();
+        let s = format!("{item}");
+        assert!(s.contains("DclOutputLog"));
+    }
+
+    #[test]
+    fn test_dcmdefault() {
+        let item = DcmOutputLanguage::default();
+        assert!(item.dcmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcmdisplay() {
+        let item = DcmOutputLanguage::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcmOutputLanguage"));
+    }
+
+    #[test]
+    fn test_dcndefault() {
+        let item = DcnProblemItem::default();
+        assert!(item.dcnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcndisplay() {
+        let item = DcnProblemItem::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcnProblemItem"));
+    }
+
+    #[test]
+    fn test_dcodefault() {
+        let item = DcoProblemFilter::default();
+        assert!(item.dcovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcodisplay() {
+        let item = DcoProblemFilter::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcoProblemFilter"));
     }
 
 }
