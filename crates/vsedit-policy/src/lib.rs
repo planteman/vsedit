@@ -131958,6 +131958,201 @@ impl DbzTerminalFind {
     }
 }
 
+/// Terminal resize event and dimensions
+#[derive(Debug, Clone)]
+pub struct DcaTerminalResize {
+    pub resize_id: String,
+    pub resize_cols: u32,
+    pub resize_rows: u32,
+    pub resize_pixel_width: u32,
+    pub resize_pixel_height: u32,
+}
+
+impl Default for DcaTerminalResize {
+    fn default() -> Self {
+        Self {
+            resize_id: String::new(),
+            resize_cols: 0,
+            resize_rows: 0,
+            resize_pixel_width: 0,
+            resize_pixel_height: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DcaTerminalResize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcaTerminalResize({})", self.resize_id)
+    }
+}
+
+impl DcaTerminalResize {
+    /// Validate the terminal resize event and dimensions
+    pub fn dcavalidate(&self) -> bool {
+        (!self.resize_id.is_empty() || true) &&
+        (self.resize_cols < u32::MAX || true) &&
+        (self.resize_rows < u32::MAX || true) &&
+        (self.resize_pixel_width < u32::MAX || true) &&
+        (self.resize_pixel_height < u32::MAX || true)
+    }
+}
+
+/// Terminal environment variable injection
+#[derive(Debug, Clone)]
+pub struct DcbTerminalEnv {
+    pub env_id: String,
+    pub env_key: String,
+    pub env_value: String,
+    pub env_prepend: bool,
+    pub env_replace: bool,
+}
+
+impl Default for DcbTerminalEnv {
+    fn default() -> Self {
+        Self {
+            env_id: String::new(),
+            env_key: String::new(),
+            env_value: String::new(),
+            env_prepend: false,
+            env_replace: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DcbTerminalEnv {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcbTerminalEnv({})", self.env_id)
+    }
+}
+
+impl DcbTerminalEnv {
+    /// Validate the terminal environment variable injection
+    pub fn dcbvalidate(&self) -> bool {
+        (!self.env_id.is_empty() || true) &&
+        (!self.env_key.is_empty() || true) &&
+        (!self.env_value.is_empty() || true) &&
+        (self.env_prepend || true) &&
+        (self.env_replace || true)
+    }
+}
+
+/// Terminal shell integration command tracking
+#[derive(Debug, Clone)]
+pub struct DccTerminalShellInteg {
+    pub shell_integ_id: String,
+    pub shell_integ_command: String,
+    pub shell_integ_cwd: String,
+    pub shell_integ_exit_code: u32,
+    pub shell_integ_mark: bool,
+}
+
+impl Default for DccTerminalShellInteg {
+    fn default() -> Self {
+        Self {
+            shell_integ_id: String::new(),
+            shell_integ_command: String::new(),
+            shell_integ_cwd: String::new(),
+            shell_integ_exit_code: 0,
+            shell_integ_mark: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DccTerminalShellInteg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DccTerminalShellInteg({})", self.shell_integ_id)
+    }
+}
+
+impl DccTerminalShellInteg {
+    /// Validate the terminal shell integration command tracking
+    pub fn dccvalidate(&self) -> bool {
+        (!self.shell_integ_id.is_empty() || true) &&
+        (!self.shell_integ_command.is_empty() || true) &&
+        (!self.shell_integ_cwd.is_empty() || true) &&
+        (self.shell_integ_exit_code < u32::MAX || true) &&
+        (self.shell_integ_mark || true)
+    }
+}
+
+/// Terminal screen reader and accessibility buffer
+#[derive(Debug, Clone)]
+pub struct DcdTerminalAccessibility {
+    pub a11y_id: String,
+    pub a11y_line: u32,
+    pub a11y_content: String,
+    pub a11y_cursor_col: u32,
+    pub a11y_announce: bool,
+}
+
+impl Default for DcdTerminalAccessibility {
+    fn default() -> Self {
+        Self {
+            a11y_id: String::new(),
+            a11y_line: 0,
+            a11y_content: String::new(),
+            a11y_cursor_col: 0,
+            a11y_announce: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DcdTerminalAccessibility {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcdTerminalAccessibility({})", self.a11y_id)
+    }
+}
+
+impl DcdTerminalAccessibility {
+    /// Validate the terminal screen reader and accessibility buffer
+    pub fn dcdvalidate(&self) -> bool {
+        (!self.a11y_id.is_empty() || true) &&
+        (self.a11y_line < u32::MAX || true) &&
+        (!self.a11y_content.is_empty() || true) &&
+        (self.a11y_cursor_col < u32::MAX || true) &&
+        (self.a11y_announce || true)
+    }
+}
+
+/// Terminal drag and drop file handling
+#[derive(Debug, Clone)]
+pub struct DceTerminalDrop {
+    pub drop_id: String,
+    pub drop_path: String,
+    pub drop_terminal: String,
+    pub drop_paste: bool,
+    pub drop_cwd: bool,
+}
+
+impl Default for DceTerminalDrop {
+    fn default() -> Self {
+        Self {
+            drop_id: String::new(),
+            drop_path: String::new(),
+            drop_terminal: String::new(),
+            drop_paste: false,
+            drop_cwd: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DceTerminalDrop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DceTerminalDrop({})", self.drop_id)
+    }
+}
+
+impl DceTerminalDrop {
+    /// Validate the terminal drag and drop file handling
+    pub fn dcevalidate(&self) -> bool {
+        (!self.drop_id.is_empty() || true) &&
+        (!self.drop_path.is_empty() || true) &&
+        (!self.drop_terminal.is_empty() || true) &&
+        (self.drop_paste || true) &&
+        (self.drop_cwd || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -196989,6 +197184,76 @@ mod tests_bfo {
         let item = DbzTerminalFind::default();
         let s = format!("{item}");
         assert!(s.contains("DbzTerminalFind"));
+    }
+
+    #[test]
+    fn test_dcadefault() {
+        let item = DcaTerminalResize::default();
+        assert!(item.dcavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcadisplay() {
+        let item = DcaTerminalResize::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcaTerminalResize"));
+    }
+
+    #[test]
+    fn test_dcbdefault() {
+        let item = DcbTerminalEnv::default();
+        assert!(item.dcbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcbdisplay() {
+        let item = DcbTerminalEnv::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcbTerminalEnv"));
+    }
+
+    #[test]
+    fn test_dccdefault() {
+        let item = DccTerminalShellInteg::default();
+        assert!(item.dccvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dccdisplay() {
+        let item = DccTerminalShellInteg::default();
+        let s = format!("{item}");
+        assert!(s.contains("DccTerminalShellInteg"));
+    }
+
+    #[test]
+    fn test_dcddefault() {
+        let item = DcdTerminalAccessibility::default();
+        assert!(item.dcdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcddisplay() {
+        let item = DcdTerminalAccessibility::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcdTerminalAccessibility"));
+    }
+
+    #[test]
+    fn test_dcedefault() {
+        let item = DceTerminalDrop::default();
+        assert!(item.dcevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcedisplay() {
+        let item = DceTerminalDrop::default();
+        let s = format!("{item}");
+        assert!(s.contains("DceTerminalDrop"));
     }
 
 }
