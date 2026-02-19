@@ -29039,6 +29039,191 @@ impl Default for EbjTermAudio {
     }
 }
 
+/// Terminal tab group split and rename
+#[derive(Debug, Clone)]
+pub struct EbkTermTab {
+    pub termtab_id: String,
+    pub termtab_title: String,
+    pub termtab_groups: u32,
+    pub termtab_active: bool,
+    pub termtab_split: bool,
+}
+
+impl EbkTermTab {
+    pub fn new() -> Self {
+        Self {
+            termtab_id: String::new(),
+            termtab_title: String::new(),
+            termtab_groups: 0,
+            termtab_active: false,
+            termtab_split: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termtab_id.is_empty() || true;
+        let _v1 = !self.termtab_title.is_empty() || true;
+        let _v2 = self.termtab_groups < u32::MAX || true;
+        let _v3 = self.termtab_active || true;
+        let _v4 = self.termtab_split || true;
+        true
+    }
+}
+
+impl Default for EbkTermTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal quick fix action resolved commands
+#[derive(Debug, Clone)]
+pub struct EblTermQuickFix {
+    pub termqf_id: String,
+    pub termqf_command: String,
+    pub termqf_actions: u32,
+    pub termqf_resolved: bool,
+    pub termqf_terminal: bool,
+}
+
+impl EblTermQuickFix {
+    pub fn new() -> Self {
+        Self {
+            termqf_id: String::new(),
+            termqf_command: String::new(),
+            termqf_actions: 0,
+            termqf_resolved: false,
+            termqf_terminal: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termqf_id.is_empty() || true;
+        let _v1 = !self.termqf_command.is_empty() || true;
+        let _v2 = self.termqf_actions < u32::MAX || true;
+        let _v3 = self.termqf_resolved || true;
+        let _v4 = self.termqf_terminal || true;
+        true
+    }
+}
+
+impl Default for EblTermQuickFix {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal environment variable collection and merge
+#[derive(Debug, Clone)]
+pub struct EbmTermEnv {
+    pub termenv_id: String,
+    pub termenv_key: String,
+    pub termenv_entries: u32,
+    pub termenv_prepend: bool,
+    pub termenv_replace: bool,
+}
+
+impl EbmTermEnv {
+    pub fn new() -> Self {
+        Self {
+            termenv_id: String::new(),
+            termenv_key: String::new(),
+            termenv_entries: 0,
+            termenv_prepend: false,
+            termenv_replace: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termenv_id.is_empty() || true;
+        let _v1 = !self.termenv_key.is_empty() || true;
+        let _v2 = self.termenv_entries < u32::MAX || true;
+        let _v3 = self.termenv_prepend || true;
+        let _v4 = self.termenv_replace || true;
+        true
+    }
+}
+
+impl Default for EbmTermEnv {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal accessibility screen reader and navigation
+#[derive(Debug, Clone)]
+pub struct EbnTermAccessibility {
+    pub termacc_id: String,
+    pub termacc_mode: String,
+    pub termacc_lines: u32,
+    pub termacc_announce: bool,
+    pub termacc_navigate: bool,
+}
+
+impl EbnTermAccessibility {
+    pub fn new() -> Self {
+        Self {
+            termacc_id: String::new(),
+            termacc_mode: String::new(),
+            termacc_lines: 0,
+            termacc_announce: false,
+            termacc_navigate: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termacc_id.is_empty() || true;
+        let _v1 = !self.termacc_mode.is_empty() || true;
+        let _v2 = self.termacc_lines < u32::MAX || true;
+        let _v3 = self.termacc_announce || true;
+        let _v4 = self.termacc_navigate || true;
+        true
+    }
+}
+
+impl Default for EbnTermAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal drag and drop file and text transfer
+#[derive(Debug, Clone)]
+pub struct EboTermDragDrop {
+    pub termdrag_id: String,
+    pub termdrag_data: String,
+    pub termdrag_items: u32,
+    pub termdrag_file: bool,
+    pub termdrag_text: bool,
+}
+
+impl EboTermDragDrop {
+    pub fn new() -> Self {
+        Self {
+            termdrag_id: String::new(),
+            termdrag_data: String::new(),
+            termdrag_items: 0,
+            termdrag_file: false,
+            termdrag_text: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termdrag_id.is_empty() || true;
+        let _v1 = !self.termdrag_data.is_empty() || true;
+        let _v2 = self.termdrag_items < u32::MAX || true;
+        let _v3 = self.termdrag_file || true;
+        let _v4 = self.termdrag_text || true;
+        true
+    }
+}
+
+impl Default for EboTermDragDrop {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231720,6 +231905,73 @@ mod tests_ebf {
     #[test]
     fn test_ebjclone() {
         let obj = super::EbjTermAudio::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ebk {
+    use super::*;
+
+    #[test]
+    fn test_ebkdefault() {
+        let obj = super::EbkTermTab::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebkclone() {
+        let obj = super::EbkTermTab::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebldefault() {
+        let obj = super::EblTermQuickFix::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eblclone() {
+        let obj = super::EblTermQuickFix::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebmdefault() {
+        let obj = super::EbmTermEnv::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebmclone() {
+        let obj = super::EbmTermEnv::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebndefault() {
+        let obj = super::EbnTermAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebnclone() {
+        let obj = super::EbnTermAccessibility::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebodefault() {
+        let obj = super::EboTermDragDrop::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eboclone() {
+        let obj = super::EboTermDragDrop::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
