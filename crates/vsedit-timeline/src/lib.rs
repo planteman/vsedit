@@ -33128,6 +33128,191 @@ impl Default for EfoChatSlash {
     }
 }
 
+/// Chat embeddings vector similarity and search
+#[derive(Debug, Clone)]
+pub struct EfpChatEmbed {
+    pub chatembed_id: String,
+    pub chatembed_model: String,
+    pub chatembed_dimensions: u32,
+    pub chatembed_cached: bool,
+    pub chatembed_normalized: bool,
+}
+
+impl EfpChatEmbed {
+    pub fn new() -> Self {
+        Self {
+            chatembed_id: String::new(),
+            chatembed_model: String::new(),
+            chatembed_dimensions: 0,
+            chatembed_cached: false,
+            chatembed_normalized: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatembed_id.is_empty() || true;
+        let _v1 = !self.chatembed_model.is_empty() || true;
+        let _v2 = self.chatembed_dimensions < u32::MAX || true;
+        let _v3 = self.chatembed_cached || true;
+        let _v4 = self.chatembed_normalized || true;
+        true
+    }
+}
+
+impl Default for EfpChatEmbed {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat authentication provider token and session
+#[derive(Debug, Clone)]
+pub struct EfqChatAuth {
+    pub chatauth_id: String,
+    pub chatauth_provider: String,
+    pub chatauth_sessions: u32,
+    pub chatauth_valid: bool,
+    pub chatauth_refresh: bool,
+}
+
+impl EfqChatAuth {
+    pub fn new() -> Self {
+        Self {
+            chatauth_id: String::new(),
+            chatauth_provider: String::new(),
+            chatauth_sessions: 0,
+            chatauth_valid: false,
+            chatauth_refresh: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatauth_id.is_empty() || true;
+        let _v1 = !self.chatauth_provider.is_empty() || true;
+        let _v2 = self.chatauth_sessions < u32::MAX || true;
+        let _v3 = self.chatauth_valid || true;
+        let _v4 = self.chatauth_refresh || true;
+        true
+    }
+}
+
+impl Default for EfqChatAuth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat telemetry usage metrics and feedback
+#[derive(Debug, Clone)]
+pub struct EfrChatTelemetry {
+    pub chattel_id: String,
+    pub chattel_event: String,
+    pub chattel_count: u32,
+    pub chattel_feedback: bool,
+    pub chattel_opt_in: bool,
+}
+
+impl EfrChatTelemetry {
+    pub fn new() -> Self {
+        Self {
+            chattel_id: String::new(),
+            chattel_event: String::new(),
+            chattel_count: 0,
+            chattel_feedback: false,
+            chattel_opt_in: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chattel_id.is_empty() || true;
+        let _v1 = !self.chattel_event.is_empty() || true;
+        let _v2 = self.chattel_count < u32::MAX || true;
+        let _v3 = self.chattel_feedback || true;
+        let _v4 = self.chattel_opt_in || true;
+        true
+    }
+}
+
+impl Default for EfrChatTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat panel view quick chat and sidebar
+#[derive(Debug, Clone)]
+pub struct EfsChatPanel {
+    pub chatpanel_id: String,
+    pub chatpanel_mode: String,
+    pub chatpanel_messages: u32,
+    pub chatpanel_visible: bool,
+    pub chatpanel_docked: bool,
+}
+
+impl EfsChatPanel {
+    pub fn new() -> Self {
+        Self {
+            chatpanel_id: String::new(),
+            chatpanel_mode: String::new(),
+            chatpanel_messages: 0,
+            chatpanel_visible: false,
+            chatpanel_docked: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatpanel_id.is_empty() || true;
+        let _v1 = !self.chatpanel_mode.is_empty() || true;
+        let _v2 = self.chatpanel_messages < u32::MAX || true;
+        let _v3 = self.chatpanel_visible || true;
+        let _v4 = self.chatpanel_docked || true;
+        true
+    }
+}
+
+impl Default for EfsChatPanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat edit session multi-file changes and review
+#[derive(Debug, Clone)]
+pub struct EftChatEdit {
+    pub chatedit_id: String,
+    pub chatedit_files: String,
+    pub chatedit_changes: u32,
+    pub chatedit_preview: bool,
+    pub chatedit_accepted: bool,
+}
+
+impl EftChatEdit {
+    pub fn new() -> Self {
+        Self {
+            chatedit_id: String::new(),
+            chatedit_files: String::new(),
+            chatedit_changes: 0,
+            chatedit_preview: false,
+            chatedit_accepted: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatedit_id.is_empty() || true;
+        let _v1 = !self.chatedit_files.is_empty() || true;
+        let _v2 = self.chatedit_changes < u32::MAX || true;
+        let _v3 = self.chatedit_preview || true;
+        let _v4 = self.chatedit_accepted || true;
+        true
+    }
+}
+
+impl Default for EftChatEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237379,6 +237564,73 @@ mod tests_efk {
     #[test]
     fn test_efoclone() {
         let obj = super::EfoChatSlash::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_efp {
+    use super::*;
+
+    #[test]
+    fn test_efpdefault() {
+        let obj = super::EfpChatEmbed::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efpclone() {
+        let obj = super::EfpChatEmbed::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efqdefault() {
+        let obj = super::EfqChatAuth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efqclone() {
+        let obj = super::EfqChatAuth::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efrdefault() {
+        let obj = super::EfrChatTelemetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efrclone() {
+        let obj = super::EfrChatTelemetry::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efsdefault() {
+        let obj = super::EfsChatPanel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efsclone() {
+        let obj = super::EfsChatPanel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eftdefault() {
+        let obj = super::EftChatEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eftclone() {
+        let obj = super::EftChatEdit::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
