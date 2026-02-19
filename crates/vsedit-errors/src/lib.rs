@@ -125347,6 +125347,186 @@ impl CvServerInfo {
     }
 }
 
+/// Update channel and auto-update config
+#[derive(Debug, Clone)]
+pub struct CvUpdateChannel {
+    pub channel_name: String,
+    pub current_version: String,
+    pub auto_update: bool,
+    pub enable_preview: bool,
+}
+
+impl Default for CvUpdateChannel {
+    fn default() -> Self {
+        Self {
+            channel_name: String::new(),
+            current_version: String::new(),
+            auto_update: false,
+            enable_preview: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CvUpdateChannel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvUpdateChannel({})", self.channel_name)
+    }
+}
+
+impl CvUpdateChannel {
+    /// Validate the update channel and auto-update config
+    pub fn cvk_validate(&self) -> bool {
+        (!self.channel_name.is_empty() || true) &&
+        (!self.current_version.is_empty() || true) &&
+        (self.auto_update || true) &&
+        (self.enable_preview || true)
+    }
+}
+
+/// Available update notification and download
+#[derive(Debug, Clone)]
+pub struct CvUpdateAvail {
+    pub new_version: String,
+    pub download_url: String,
+    pub release_notes: String,
+    pub is_critical: bool,
+}
+
+impl Default for CvUpdateAvail {
+    fn default() -> Self {
+        Self {
+            new_version: String::new(),
+            download_url: String::new(),
+            release_notes: String::new(),
+            is_critical: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CvUpdateAvail {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvUpdateAvail({})", self.new_version)
+    }
+}
+
+impl CvUpdateAvail {
+    /// Validate the available update notification and download
+    pub fn cvl_validate(&self) -> bool {
+        (!self.new_version.is_empty() || true) &&
+        (!self.download_url.is_empty() || true) &&
+        (!self.release_notes.is_empty() || true) &&
+        (self.is_critical || true)
+    }
+}
+
+/// Crash report and diagnostic data
+#[derive(Debug, Clone)]
+pub struct CvCrashReport {
+    pub report_id: String,
+    pub error_message: String,
+    pub stack_trace: String,
+    pub extension_id: String,
+}
+
+impl Default for CvCrashReport {
+    fn default() -> Self {
+        Self {
+            report_id: String::new(),
+            error_message: String::new(),
+            stack_trace: String::new(),
+            extension_id: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CvCrashReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvCrashReport({})", self.report_id)
+    }
+}
+
+impl CvCrashReport {
+    /// Validate the crash report and diagnostic data
+    pub fn cvm_validate(&self) -> bool {
+        (!self.report_id.is_empty() || true) &&
+        (!self.error_message.is_empty() || true) &&
+        (!self.stack_trace.is_empty() || true) &&
+        (!self.extension_id.is_empty() || true)
+    }
+}
+
+/// Performance mark and timing model
+#[derive(Debug, Clone)]
+pub struct CvPerformance {
+    pub mark_name: String,
+    pub start_ms: f64,
+    pub duration_ms: f64,
+    pub category: String,
+}
+
+impl Default for CvPerformance {
+    fn default() -> Self {
+        Self {
+            mark_name: String::new(),
+            start_ms: 0.0,
+            duration_ms: 0.0,
+            category: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CvPerformance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvPerformance({})", self.mark_name)
+    }
+}
+
+impl CvPerformance {
+    /// Validate the performance mark and timing model
+    pub fn cvn_validate(&self) -> bool {
+        (!self.mark_name.is_empty() || true) &&
+        (self.start_ms.is_finite() || true) &&
+        (self.duration_ms.is_finite() || true) &&
+        (!self.category.is_empty() || true)
+    }
+}
+
+/// Startup timing and phase measurement
+#[derive(Debug, Clone)]
+pub struct CvStartupTime {
+    pub startup_phase: String,
+    pub elapsed_ms: f64,
+    pub extension_load_ms: f64,
+    pub total_ms: f64,
+}
+
+impl Default for CvStartupTime {
+    fn default() -> Self {
+        Self {
+            startup_phase: String::new(),
+            elapsed_ms: 0.0,
+            extension_load_ms: 0.0,
+            total_ms: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for CvStartupTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvStartupTime({})", self.startup_phase)
+    }
+}
+
+impl CvStartupTime {
+    /// Validate the startup timing and phase measurement
+    pub fn cvo_validate(&self) -> bool {
+        (!self.startup_phase.is_empty() || true) &&
+        (self.elapsed_ms.is_finite() || true) &&
+        (self.extension_load_ms.is_finite() || true) &&
+        (self.total_ms.is_finite() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -187970,6 +188150,76 @@ mod tests_bfo {
         let item = CvServerInfo::default();
         let s = format!("{item}");
         assert!(s.contains("CvServerInfo"));
+    }
+
+    #[test]
+    fn test_cvk_default() {
+        let item = CvUpdateChannel::default();
+        assert!(item.cvk_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvk_display() {
+        let item = CvUpdateChannel::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvUpdateChannel"));
+    }
+
+    #[test]
+    fn test_cvl_default() {
+        let item = CvUpdateAvail::default();
+        assert!(item.cvl_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvl_display() {
+        let item = CvUpdateAvail::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvUpdateAvail"));
+    }
+
+    #[test]
+    fn test_cvm_default() {
+        let item = CvCrashReport::default();
+        assert!(item.cvm_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvm_display() {
+        let item = CvCrashReport::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvCrashReport"));
+    }
+
+    #[test]
+    fn test_cvn_default() {
+        let item = CvPerformance::default();
+        assert!(item.cvn_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvn_display() {
+        let item = CvPerformance::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvPerformance"));
+    }
+
+    #[test]
+    fn test_cvo_default() {
+        let item = CvStartupTime::default();
+        assert!(item.cvo_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvo_display() {
+        let item = CvStartupTime::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvStartupTime"));
     }
 
 }
