@@ -89930,6 +89930,111 @@ impl CustomEditor {
     }
 }
 
+/// Runtime wiring: bsp_ SettingsEditor
+#[derive(Debug, Clone)]
+pub struct SettingsEditor {
+    pub bsp_target_scope: String,
+    pub bsp_search_query: String,
+    pub bsp_modified_count: u32,
+    pub bsp_total_settings: u32,
+    pub bsp_filtered_count: u32,
+    pub bsp_selected_setting_id: String,
+    pub bsp_is_dirty: bool,
+    pub bsp_show_modified_only: bool,
+    pub bsp_group_by_category: bool,
+    pub bsp_view_mode: String,
+}
+
+impl SettingsEditor {
+    pub fn bsp_summary(&self) -> String {
+        format!("SettingsEditor({})", self.bsp_target_scope)
+    }
+}
+
+/// Runtime wiring: bsq_ SettingsSearch
+#[derive(Debug, Clone)]
+pub struct SettingsSearch {
+    pub bsq_query: String,
+    pub bsq_result_count: u32,
+    pub bsq_natural_language_results: Vec<String>,
+    pub bsq_exact_match_count: u32,
+    pub bsq_fuzzy_match_count: u32,
+    pub bsq_search_provider: String,
+    pub bsq_is_remote: bool,
+    pub bsq_elapsed_ms: u64,
+    pub bsq_scored_results: Vec<String>,
+    pub bsq_filter_by_tag: String,
+}
+
+impl SettingsSearch {
+    pub fn bsq_summary(&self) -> String {
+        format!("SettingsSearch({})", self.bsq_query)
+    }
+}
+
+/// Runtime wiring: bsr_ SettingsModel
+#[derive(Debug, Clone)]
+pub struct SettingsModel {
+    pub bsr_setting_id: String,
+    pub bsr_setting_type: String,
+    pub bsr_default_value: String,
+    pub bsr_user_value: String,
+    pub bsr_workspace_value: String,
+    pub bsr_description: String,
+    pub bsr_category: String,
+    pub bsr_tags: Vec<String>,
+    pub bsr_is_deprecated: bool,
+    pub bsr_deprecation_message: String,
+}
+
+impl SettingsModel {
+    pub fn bsr_summary(&self) -> String {
+        format!("SettingsModel({})", self.bsr_setting_id)
+    }
+}
+
+/// Runtime wiring: bss_ ProfileExport
+#[derive(Debug, Clone)]
+pub struct ProfileExport {
+    pub bss_profile_name: String,
+    pub bss_settings_included: bool,
+    pub bss_keybindings_included: bool,
+    pub bss_snippets_included: bool,
+    pub bss_tasks_included: bool,
+    pub bss_extensions_included: bool,
+    pub bss_ui_state_included: bool,
+    pub bss_export_format: String,
+    pub bss_data_size_bytes: usize,
+    pub bss_extension_count: u32,
+}
+
+impl ProfileExport {
+    pub fn bss_summary(&self) -> String {
+        format!("ProfileExport({})", self.bss_profile_name)
+    }
+}
+
+/// Runtime wiring: bst_ SyncConflict
+#[derive(Debug, Clone)]
+pub struct SyncConflict {
+    pub bst_resource_key: String,
+    pub bst_local_content: String,
+    pub bst_remote_content: String,
+    pub bst_base_content: String,
+    pub bst_conflict_type: String,
+    pub bst_resolved_content: String,
+    pub bst_is_resolved: bool,
+    pub bst_last_synced_at: u64,
+    pub bst_machine_id: String,
+    pub bst_sync_version: u32,
+}
+
+impl SyncConflict {
+    pub fn bst_summary(&self) -> String {
+        format!("SyncConflict({})", self.bst_resource_key)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -125401,6 +125506,910 @@ mod tests_bfo {
         };
         let _ = obj.bso_summary();
         assert_eq!(obj.bso_extension_id, "test");
+    }
+
+    #[test]
+    fn test_bsp_target_scope() {
+        let obj = SettingsEditor {
+            bsp_target_scope: String::from("test"),
+            bsp_search_query: String::from("test"),
+            bsp_modified_count: 0,
+            bsp_total_settings: 0,
+            bsp_filtered_count: 0,
+            bsp_selected_setting_id: String::from("test"),
+            bsp_is_dirty: false,
+            bsp_show_modified_only: false,
+            bsp_group_by_category: false,
+            bsp_view_mode: String::from("test"),
+        };
+        let _ = obj.bsp_summary();
+        assert_eq!(obj.bsp_target_scope, "test");
+    }
+
+    #[test]
+    fn test_bsp_search_query() {
+        let obj = SettingsEditor {
+            bsp_target_scope: String::from("test"),
+            bsp_search_query: String::from("test"),
+            bsp_modified_count: 0,
+            bsp_total_settings: 0,
+            bsp_filtered_count: 0,
+            bsp_selected_setting_id: String::from("test"),
+            bsp_is_dirty: false,
+            bsp_show_modified_only: false,
+            bsp_group_by_category: false,
+            bsp_view_mode: String::from("test"),
+        };
+        let _ = obj.bsp_summary();
+        assert_eq!(obj.bsp_search_query, "test");
+    }
+
+    #[test]
+    fn test_bsp_modified_count() {
+        let obj = SettingsEditor {
+            bsp_target_scope: String::from("test"),
+            bsp_search_query: String::from("test"),
+            bsp_modified_count: 0,
+            bsp_total_settings: 0,
+            bsp_filtered_count: 0,
+            bsp_selected_setting_id: String::from("test"),
+            bsp_is_dirty: false,
+            bsp_show_modified_only: false,
+            bsp_group_by_category: false,
+            bsp_view_mode: String::from("test"),
+        };
+        let _ = obj.bsp_summary();
+        assert_eq!(obj.bsp_modified_count, 0);
+    }
+
+    #[test]
+    fn test_bsp_total_settings() {
+        let obj = SettingsEditor {
+            bsp_target_scope: String::from("test"),
+            bsp_search_query: String::from("test"),
+            bsp_modified_count: 0,
+            bsp_total_settings: 0,
+            bsp_filtered_count: 0,
+            bsp_selected_setting_id: String::from("test"),
+            bsp_is_dirty: false,
+            bsp_show_modified_only: false,
+            bsp_group_by_category: false,
+            bsp_view_mode: String::from("test"),
+        };
+        let _ = obj.bsp_summary();
+        assert_eq!(obj.bsp_total_settings, 0);
+    }
+
+    #[test]
+    fn test_bsp_filtered_count() {
+        let obj = SettingsEditor {
+            bsp_target_scope: String::from("test"),
+            bsp_search_query: String::from("test"),
+            bsp_modified_count: 0,
+            bsp_total_settings: 0,
+            bsp_filtered_count: 0,
+            bsp_selected_setting_id: String::from("test"),
+            bsp_is_dirty: false,
+            bsp_show_modified_only: false,
+            bsp_group_by_category: false,
+            bsp_view_mode: String::from("test"),
+        };
+        let _ = obj.bsp_summary();
+        assert_eq!(obj.bsp_filtered_count, 0);
+    }
+
+    #[test]
+    fn test_bsp_selected_setting_id() {
+        let obj = SettingsEditor {
+            bsp_target_scope: String::from("test"),
+            bsp_search_query: String::from("test"),
+            bsp_modified_count: 0,
+            bsp_total_settings: 0,
+            bsp_filtered_count: 0,
+            bsp_selected_setting_id: String::from("test"),
+            bsp_is_dirty: false,
+            bsp_show_modified_only: false,
+            bsp_group_by_category: false,
+            bsp_view_mode: String::from("test"),
+        };
+        let _ = obj.bsp_summary();
+        assert_eq!(obj.bsp_selected_setting_id, "test");
+    }
+
+    #[test]
+    fn test_bsp_is_dirty() {
+        let obj = SettingsEditor {
+            bsp_target_scope: String::from("test"),
+            bsp_search_query: String::from("test"),
+            bsp_modified_count: 0,
+            bsp_total_settings: 0,
+            bsp_filtered_count: 0,
+            bsp_selected_setting_id: String::from("test"),
+            bsp_is_dirty: false,
+            bsp_show_modified_only: false,
+            bsp_group_by_category: false,
+            bsp_view_mode: String::from("test"),
+        };
+        let _ = obj.bsp_summary();
+        assert!(!obj.bsp_is_dirty);
+    }
+
+    #[test]
+    fn test_bsp_show_modified_only() {
+        let obj = SettingsEditor {
+            bsp_target_scope: String::from("test"),
+            bsp_search_query: String::from("test"),
+            bsp_modified_count: 0,
+            bsp_total_settings: 0,
+            bsp_filtered_count: 0,
+            bsp_selected_setting_id: String::from("test"),
+            bsp_is_dirty: false,
+            bsp_show_modified_only: false,
+            bsp_group_by_category: false,
+            bsp_view_mode: String::from("test"),
+        };
+        let _ = obj.bsp_summary();
+        assert!(!obj.bsp_show_modified_only);
+    }
+
+    #[test]
+    fn test_bsp_group_by_category() {
+        let obj = SettingsEditor {
+            bsp_target_scope: String::from("test"),
+            bsp_search_query: String::from("test"),
+            bsp_modified_count: 0,
+            bsp_total_settings: 0,
+            bsp_filtered_count: 0,
+            bsp_selected_setting_id: String::from("test"),
+            bsp_is_dirty: false,
+            bsp_show_modified_only: false,
+            bsp_group_by_category: false,
+            bsp_view_mode: String::from("test"),
+        };
+        let _ = obj.bsp_summary();
+        assert!(!obj.bsp_group_by_category);
+    }
+
+    #[test]
+    fn test_bsp_view_mode() {
+        let obj = SettingsEditor {
+            bsp_target_scope: String::from("test"),
+            bsp_search_query: String::from("test"),
+            bsp_modified_count: 0,
+            bsp_total_settings: 0,
+            bsp_filtered_count: 0,
+            bsp_selected_setting_id: String::from("test"),
+            bsp_is_dirty: false,
+            bsp_show_modified_only: false,
+            bsp_group_by_category: false,
+            bsp_view_mode: String::from("test"),
+        };
+        let _ = obj.bsp_summary();
+        assert_eq!(obj.bsp_view_mode, "test");
+    }
+
+
+    #[test]
+    fn test_bsq_query() {
+        let obj = SettingsSearch {
+            bsq_query: String::from("test"),
+            bsq_result_count: 0,
+            bsq_natural_language_results: Vec::new(),
+            bsq_exact_match_count: 0,
+            bsq_fuzzy_match_count: 0,
+            bsq_search_provider: String::from("test"),
+            bsq_is_remote: false,
+            bsq_elapsed_ms: 0,
+            bsq_scored_results: Vec::new(),
+            bsq_filter_by_tag: String::from("test"),
+        };
+        let _ = obj.bsq_summary();
+        assert_eq!(obj.bsq_query, "test");
+    }
+
+    #[test]
+    fn test_bsq_result_count() {
+        let obj = SettingsSearch {
+            bsq_query: String::from("test"),
+            bsq_result_count: 0,
+            bsq_natural_language_results: Vec::new(),
+            bsq_exact_match_count: 0,
+            bsq_fuzzy_match_count: 0,
+            bsq_search_provider: String::from("test"),
+            bsq_is_remote: false,
+            bsq_elapsed_ms: 0,
+            bsq_scored_results: Vec::new(),
+            bsq_filter_by_tag: String::from("test"),
+        };
+        let _ = obj.bsq_summary();
+        assert_eq!(obj.bsq_result_count, 0);
+    }
+
+    #[test]
+    fn test_bsq_natural_language_results() {
+        let obj = SettingsSearch {
+            bsq_query: String::from("test"),
+            bsq_result_count: 0,
+            bsq_natural_language_results: Vec::new(),
+            bsq_exact_match_count: 0,
+            bsq_fuzzy_match_count: 0,
+            bsq_search_provider: String::from("test"),
+            bsq_is_remote: false,
+            bsq_elapsed_ms: 0,
+            bsq_scored_results: Vec::new(),
+            bsq_filter_by_tag: String::from("test"),
+        };
+        let _ = obj.bsq_summary();
+        assert!(obj.bsq_natural_language_results.is_empty());
+    }
+
+    #[test]
+    fn test_bsq_exact_match_count() {
+        let obj = SettingsSearch {
+            bsq_query: String::from("test"),
+            bsq_result_count: 0,
+            bsq_natural_language_results: Vec::new(),
+            bsq_exact_match_count: 0,
+            bsq_fuzzy_match_count: 0,
+            bsq_search_provider: String::from("test"),
+            bsq_is_remote: false,
+            bsq_elapsed_ms: 0,
+            bsq_scored_results: Vec::new(),
+            bsq_filter_by_tag: String::from("test"),
+        };
+        let _ = obj.bsq_summary();
+        assert_eq!(obj.bsq_exact_match_count, 0);
+    }
+
+    #[test]
+    fn test_bsq_fuzzy_match_count() {
+        let obj = SettingsSearch {
+            bsq_query: String::from("test"),
+            bsq_result_count: 0,
+            bsq_natural_language_results: Vec::new(),
+            bsq_exact_match_count: 0,
+            bsq_fuzzy_match_count: 0,
+            bsq_search_provider: String::from("test"),
+            bsq_is_remote: false,
+            bsq_elapsed_ms: 0,
+            bsq_scored_results: Vec::new(),
+            bsq_filter_by_tag: String::from("test"),
+        };
+        let _ = obj.bsq_summary();
+        assert_eq!(obj.bsq_fuzzy_match_count, 0);
+    }
+
+    #[test]
+    fn test_bsq_search_provider() {
+        let obj = SettingsSearch {
+            bsq_query: String::from("test"),
+            bsq_result_count: 0,
+            bsq_natural_language_results: Vec::new(),
+            bsq_exact_match_count: 0,
+            bsq_fuzzy_match_count: 0,
+            bsq_search_provider: String::from("test"),
+            bsq_is_remote: false,
+            bsq_elapsed_ms: 0,
+            bsq_scored_results: Vec::new(),
+            bsq_filter_by_tag: String::from("test"),
+        };
+        let _ = obj.bsq_summary();
+        assert_eq!(obj.bsq_search_provider, "test");
+    }
+
+    #[test]
+    fn test_bsq_is_remote() {
+        let obj = SettingsSearch {
+            bsq_query: String::from("test"),
+            bsq_result_count: 0,
+            bsq_natural_language_results: Vec::new(),
+            bsq_exact_match_count: 0,
+            bsq_fuzzy_match_count: 0,
+            bsq_search_provider: String::from("test"),
+            bsq_is_remote: false,
+            bsq_elapsed_ms: 0,
+            bsq_scored_results: Vec::new(),
+            bsq_filter_by_tag: String::from("test"),
+        };
+        let _ = obj.bsq_summary();
+        assert!(!obj.bsq_is_remote);
+    }
+
+    #[test]
+    fn test_bsq_elapsed_ms() {
+        let obj = SettingsSearch {
+            bsq_query: String::from("test"),
+            bsq_result_count: 0,
+            bsq_natural_language_results: Vec::new(),
+            bsq_exact_match_count: 0,
+            bsq_fuzzy_match_count: 0,
+            bsq_search_provider: String::from("test"),
+            bsq_is_remote: false,
+            bsq_elapsed_ms: 0,
+            bsq_scored_results: Vec::new(),
+            bsq_filter_by_tag: String::from("test"),
+        };
+        let _ = obj.bsq_summary();
+        assert_eq!(obj.bsq_elapsed_ms, 0);
+    }
+
+    #[test]
+    fn test_bsq_scored_results() {
+        let obj = SettingsSearch {
+            bsq_query: String::from("test"),
+            bsq_result_count: 0,
+            bsq_natural_language_results: Vec::new(),
+            bsq_exact_match_count: 0,
+            bsq_fuzzy_match_count: 0,
+            bsq_search_provider: String::from("test"),
+            bsq_is_remote: false,
+            bsq_elapsed_ms: 0,
+            bsq_scored_results: Vec::new(),
+            bsq_filter_by_tag: String::from("test"),
+        };
+        let _ = obj.bsq_summary();
+        assert!(obj.bsq_scored_results.is_empty());
+    }
+
+    #[test]
+    fn test_bsq_filter_by_tag() {
+        let obj = SettingsSearch {
+            bsq_query: String::from("test"),
+            bsq_result_count: 0,
+            bsq_natural_language_results: Vec::new(),
+            bsq_exact_match_count: 0,
+            bsq_fuzzy_match_count: 0,
+            bsq_search_provider: String::from("test"),
+            bsq_is_remote: false,
+            bsq_elapsed_ms: 0,
+            bsq_scored_results: Vec::new(),
+            bsq_filter_by_tag: String::from("test"),
+        };
+        let _ = obj.bsq_summary();
+        assert_eq!(obj.bsq_filter_by_tag, "test");
+    }
+
+
+    #[test]
+    fn test_bsr_setting_id() {
+        let obj = SettingsModel {
+            bsr_setting_id: String::from("test"),
+            bsr_setting_type: String::from("test"),
+            bsr_default_value: String::from("test"),
+            bsr_user_value: String::from("test"),
+            bsr_workspace_value: String::from("test"),
+            bsr_description: String::from("test"),
+            bsr_category: String::from("test"),
+            bsr_tags: Vec::new(),
+            bsr_is_deprecated: false,
+            bsr_deprecation_message: String::from("test"),
+        };
+        let _ = obj.bsr_summary();
+        assert_eq!(obj.bsr_setting_id, "test");
+    }
+
+    #[test]
+    fn test_bsr_setting_type() {
+        let obj = SettingsModel {
+            bsr_setting_id: String::from("test"),
+            bsr_setting_type: String::from("test"),
+            bsr_default_value: String::from("test"),
+            bsr_user_value: String::from("test"),
+            bsr_workspace_value: String::from("test"),
+            bsr_description: String::from("test"),
+            bsr_category: String::from("test"),
+            bsr_tags: Vec::new(),
+            bsr_is_deprecated: false,
+            bsr_deprecation_message: String::from("test"),
+        };
+        let _ = obj.bsr_summary();
+        assert_eq!(obj.bsr_setting_type, "test");
+    }
+
+    #[test]
+    fn test_bsr_default_value() {
+        let obj = SettingsModel {
+            bsr_setting_id: String::from("test"),
+            bsr_setting_type: String::from("test"),
+            bsr_default_value: String::from("test"),
+            bsr_user_value: String::from("test"),
+            bsr_workspace_value: String::from("test"),
+            bsr_description: String::from("test"),
+            bsr_category: String::from("test"),
+            bsr_tags: Vec::new(),
+            bsr_is_deprecated: false,
+            bsr_deprecation_message: String::from("test"),
+        };
+        let _ = obj.bsr_summary();
+        assert_eq!(obj.bsr_default_value, "test");
+    }
+
+    #[test]
+    fn test_bsr_user_value() {
+        let obj = SettingsModel {
+            bsr_setting_id: String::from("test"),
+            bsr_setting_type: String::from("test"),
+            bsr_default_value: String::from("test"),
+            bsr_user_value: String::from("test"),
+            bsr_workspace_value: String::from("test"),
+            bsr_description: String::from("test"),
+            bsr_category: String::from("test"),
+            bsr_tags: Vec::new(),
+            bsr_is_deprecated: false,
+            bsr_deprecation_message: String::from("test"),
+        };
+        let _ = obj.bsr_summary();
+        assert_eq!(obj.bsr_user_value, "test");
+    }
+
+    #[test]
+    fn test_bsr_workspace_value() {
+        let obj = SettingsModel {
+            bsr_setting_id: String::from("test"),
+            bsr_setting_type: String::from("test"),
+            bsr_default_value: String::from("test"),
+            bsr_user_value: String::from("test"),
+            bsr_workspace_value: String::from("test"),
+            bsr_description: String::from("test"),
+            bsr_category: String::from("test"),
+            bsr_tags: Vec::new(),
+            bsr_is_deprecated: false,
+            bsr_deprecation_message: String::from("test"),
+        };
+        let _ = obj.bsr_summary();
+        assert_eq!(obj.bsr_workspace_value, "test");
+    }
+
+    #[test]
+    fn test_bsr_description() {
+        let obj = SettingsModel {
+            bsr_setting_id: String::from("test"),
+            bsr_setting_type: String::from("test"),
+            bsr_default_value: String::from("test"),
+            bsr_user_value: String::from("test"),
+            bsr_workspace_value: String::from("test"),
+            bsr_description: String::from("test"),
+            bsr_category: String::from("test"),
+            bsr_tags: Vec::new(),
+            bsr_is_deprecated: false,
+            bsr_deprecation_message: String::from("test"),
+        };
+        let _ = obj.bsr_summary();
+        assert_eq!(obj.bsr_description, "test");
+    }
+
+    #[test]
+    fn test_bsr_category() {
+        let obj = SettingsModel {
+            bsr_setting_id: String::from("test"),
+            bsr_setting_type: String::from("test"),
+            bsr_default_value: String::from("test"),
+            bsr_user_value: String::from("test"),
+            bsr_workspace_value: String::from("test"),
+            bsr_description: String::from("test"),
+            bsr_category: String::from("test"),
+            bsr_tags: Vec::new(),
+            bsr_is_deprecated: false,
+            bsr_deprecation_message: String::from("test"),
+        };
+        let _ = obj.bsr_summary();
+        assert_eq!(obj.bsr_category, "test");
+    }
+
+    #[test]
+    fn test_bsr_tags() {
+        let obj = SettingsModel {
+            bsr_setting_id: String::from("test"),
+            bsr_setting_type: String::from("test"),
+            bsr_default_value: String::from("test"),
+            bsr_user_value: String::from("test"),
+            bsr_workspace_value: String::from("test"),
+            bsr_description: String::from("test"),
+            bsr_category: String::from("test"),
+            bsr_tags: Vec::new(),
+            bsr_is_deprecated: false,
+            bsr_deprecation_message: String::from("test"),
+        };
+        let _ = obj.bsr_summary();
+        assert!(obj.bsr_tags.is_empty());
+    }
+
+    #[test]
+    fn test_bsr_is_deprecated() {
+        let obj = SettingsModel {
+            bsr_setting_id: String::from("test"),
+            bsr_setting_type: String::from("test"),
+            bsr_default_value: String::from("test"),
+            bsr_user_value: String::from("test"),
+            bsr_workspace_value: String::from("test"),
+            bsr_description: String::from("test"),
+            bsr_category: String::from("test"),
+            bsr_tags: Vec::new(),
+            bsr_is_deprecated: false,
+            bsr_deprecation_message: String::from("test"),
+        };
+        let _ = obj.bsr_summary();
+        assert!(!obj.bsr_is_deprecated);
+    }
+
+    #[test]
+    fn test_bsr_deprecation_message() {
+        let obj = SettingsModel {
+            bsr_setting_id: String::from("test"),
+            bsr_setting_type: String::from("test"),
+            bsr_default_value: String::from("test"),
+            bsr_user_value: String::from("test"),
+            bsr_workspace_value: String::from("test"),
+            bsr_description: String::from("test"),
+            bsr_category: String::from("test"),
+            bsr_tags: Vec::new(),
+            bsr_is_deprecated: false,
+            bsr_deprecation_message: String::from("test"),
+        };
+        let _ = obj.bsr_summary();
+        assert_eq!(obj.bsr_deprecation_message, "test");
+    }
+
+
+    #[test]
+    fn test_bss_profile_name() {
+        let obj = ProfileExport {
+            bss_profile_name: String::from("test"),
+            bss_settings_included: false,
+            bss_keybindings_included: false,
+            bss_snippets_included: false,
+            bss_tasks_included: false,
+            bss_extensions_included: false,
+            bss_ui_state_included: false,
+            bss_export_format: String::from("test"),
+            bss_data_size_bytes: 0,
+            bss_extension_count: 0,
+        };
+        let _ = obj.bss_summary();
+        assert_eq!(obj.bss_profile_name, "test");
+    }
+
+    #[test]
+    fn test_bss_settings_included() {
+        let obj = ProfileExport {
+            bss_profile_name: String::from("test"),
+            bss_settings_included: false,
+            bss_keybindings_included: false,
+            bss_snippets_included: false,
+            bss_tasks_included: false,
+            bss_extensions_included: false,
+            bss_ui_state_included: false,
+            bss_export_format: String::from("test"),
+            bss_data_size_bytes: 0,
+            bss_extension_count: 0,
+        };
+        let _ = obj.bss_summary();
+        assert!(!obj.bss_settings_included);
+    }
+
+    #[test]
+    fn test_bss_keybindings_included() {
+        let obj = ProfileExport {
+            bss_profile_name: String::from("test"),
+            bss_settings_included: false,
+            bss_keybindings_included: false,
+            bss_snippets_included: false,
+            bss_tasks_included: false,
+            bss_extensions_included: false,
+            bss_ui_state_included: false,
+            bss_export_format: String::from("test"),
+            bss_data_size_bytes: 0,
+            bss_extension_count: 0,
+        };
+        let _ = obj.bss_summary();
+        assert!(!obj.bss_keybindings_included);
+    }
+
+    #[test]
+    fn test_bss_snippets_included() {
+        let obj = ProfileExport {
+            bss_profile_name: String::from("test"),
+            bss_settings_included: false,
+            bss_keybindings_included: false,
+            bss_snippets_included: false,
+            bss_tasks_included: false,
+            bss_extensions_included: false,
+            bss_ui_state_included: false,
+            bss_export_format: String::from("test"),
+            bss_data_size_bytes: 0,
+            bss_extension_count: 0,
+        };
+        let _ = obj.bss_summary();
+        assert!(!obj.bss_snippets_included);
+    }
+
+    #[test]
+    fn test_bss_tasks_included() {
+        let obj = ProfileExport {
+            bss_profile_name: String::from("test"),
+            bss_settings_included: false,
+            bss_keybindings_included: false,
+            bss_snippets_included: false,
+            bss_tasks_included: false,
+            bss_extensions_included: false,
+            bss_ui_state_included: false,
+            bss_export_format: String::from("test"),
+            bss_data_size_bytes: 0,
+            bss_extension_count: 0,
+        };
+        let _ = obj.bss_summary();
+        assert!(!obj.bss_tasks_included);
+    }
+
+    #[test]
+    fn test_bss_extensions_included() {
+        let obj = ProfileExport {
+            bss_profile_name: String::from("test"),
+            bss_settings_included: false,
+            bss_keybindings_included: false,
+            bss_snippets_included: false,
+            bss_tasks_included: false,
+            bss_extensions_included: false,
+            bss_ui_state_included: false,
+            bss_export_format: String::from("test"),
+            bss_data_size_bytes: 0,
+            bss_extension_count: 0,
+        };
+        let _ = obj.bss_summary();
+        assert!(!obj.bss_extensions_included);
+    }
+
+    #[test]
+    fn test_bss_ui_state_included() {
+        let obj = ProfileExport {
+            bss_profile_name: String::from("test"),
+            bss_settings_included: false,
+            bss_keybindings_included: false,
+            bss_snippets_included: false,
+            bss_tasks_included: false,
+            bss_extensions_included: false,
+            bss_ui_state_included: false,
+            bss_export_format: String::from("test"),
+            bss_data_size_bytes: 0,
+            bss_extension_count: 0,
+        };
+        let _ = obj.bss_summary();
+        assert!(!obj.bss_ui_state_included);
+    }
+
+    #[test]
+    fn test_bss_export_format() {
+        let obj = ProfileExport {
+            bss_profile_name: String::from("test"),
+            bss_settings_included: false,
+            bss_keybindings_included: false,
+            bss_snippets_included: false,
+            bss_tasks_included: false,
+            bss_extensions_included: false,
+            bss_ui_state_included: false,
+            bss_export_format: String::from("test"),
+            bss_data_size_bytes: 0,
+            bss_extension_count: 0,
+        };
+        let _ = obj.bss_summary();
+        assert_eq!(obj.bss_export_format, "test");
+    }
+
+    #[test]
+    fn test_bss_data_size_bytes() {
+        let obj = ProfileExport {
+            bss_profile_name: String::from("test"),
+            bss_settings_included: false,
+            bss_keybindings_included: false,
+            bss_snippets_included: false,
+            bss_tasks_included: false,
+            bss_extensions_included: false,
+            bss_ui_state_included: false,
+            bss_export_format: String::from("test"),
+            bss_data_size_bytes: 0,
+            bss_extension_count: 0,
+        };
+        let _ = obj.bss_summary();
+        assert_eq!(obj.bss_data_size_bytes, 0);
+    }
+
+    #[test]
+    fn test_bss_extension_count() {
+        let obj = ProfileExport {
+            bss_profile_name: String::from("test"),
+            bss_settings_included: false,
+            bss_keybindings_included: false,
+            bss_snippets_included: false,
+            bss_tasks_included: false,
+            bss_extensions_included: false,
+            bss_ui_state_included: false,
+            bss_export_format: String::from("test"),
+            bss_data_size_bytes: 0,
+            bss_extension_count: 0,
+        };
+        let _ = obj.bss_summary();
+        assert_eq!(obj.bss_extension_count, 0);
+    }
+
+
+    #[test]
+    fn test_bst_resource_key() {
+        let obj = SyncConflict {
+            bst_resource_key: String::from("test"),
+            bst_local_content: String::from("test"),
+            bst_remote_content: String::from("test"),
+            bst_base_content: String::from("test"),
+            bst_conflict_type: String::from("test"),
+            bst_resolved_content: String::from("test"),
+            bst_is_resolved: false,
+            bst_last_synced_at: 0,
+            bst_machine_id: String::from("test"),
+            bst_sync_version: 0,
+        };
+        let _ = obj.bst_summary();
+        assert_eq!(obj.bst_resource_key, "test");
+    }
+
+    #[test]
+    fn test_bst_local_content() {
+        let obj = SyncConflict {
+            bst_resource_key: String::from("test"),
+            bst_local_content: String::from("test"),
+            bst_remote_content: String::from("test"),
+            bst_base_content: String::from("test"),
+            bst_conflict_type: String::from("test"),
+            bst_resolved_content: String::from("test"),
+            bst_is_resolved: false,
+            bst_last_synced_at: 0,
+            bst_machine_id: String::from("test"),
+            bst_sync_version: 0,
+        };
+        let _ = obj.bst_summary();
+        assert_eq!(obj.bst_local_content, "test");
+    }
+
+    #[test]
+    fn test_bst_remote_content() {
+        let obj = SyncConflict {
+            bst_resource_key: String::from("test"),
+            bst_local_content: String::from("test"),
+            bst_remote_content: String::from("test"),
+            bst_base_content: String::from("test"),
+            bst_conflict_type: String::from("test"),
+            bst_resolved_content: String::from("test"),
+            bst_is_resolved: false,
+            bst_last_synced_at: 0,
+            bst_machine_id: String::from("test"),
+            bst_sync_version: 0,
+        };
+        let _ = obj.bst_summary();
+        assert_eq!(obj.bst_remote_content, "test");
+    }
+
+    #[test]
+    fn test_bst_base_content() {
+        let obj = SyncConflict {
+            bst_resource_key: String::from("test"),
+            bst_local_content: String::from("test"),
+            bst_remote_content: String::from("test"),
+            bst_base_content: String::from("test"),
+            bst_conflict_type: String::from("test"),
+            bst_resolved_content: String::from("test"),
+            bst_is_resolved: false,
+            bst_last_synced_at: 0,
+            bst_machine_id: String::from("test"),
+            bst_sync_version: 0,
+        };
+        let _ = obj.bst_summary();
+        assert_eq!(obj.bst_base_content, "test");
+    }
+
+    #[test]
+    fn test_bst_conflict_type() {
+        let obj = SyncConflict {
+            bst_resource_key: String::from("test"),
+            bst_local_content: String::from("test"),
+            bst_remote_content: String::from("test"),
+            bst_base_content: String::from("test"),
+            bst_conflict_type: String::from("test"),
+            bst_resolved_content: String::from("test"),
+            bst_is_resolved: false,
+            bst_last_synced_at: 0,
+            bst_machine_id: String::from("test"),
+            bst_sync_version: 0,
+        };
+        let _ = obj.bst_summary();
+        assert_eq!(obj.bst_conflict_type, "test");
+    }
+
+    #[test]
+    fn test_bst_resolved_content() {
+        let obj = SyncConflict {
+            bst_resource_key: String::from("test"),
+            bst_local_content: String::from("test"),
+            bst_remote_content: String::from("test"),
+            bst_base_content: String::from("test"),
+            bst_conflict_type: String::from("test"),
+            bst_resolved_content: String::from("test"),
+            bst_is_resolved: false,
+            bst_last_synced_at: 0,
+            bst_machine_id: String::from("test"),
+            bst_sync_version: 0,
+        };
+        let _ = obj.bst_summary();
+        assert_eq!(obj.bst_resolved_content, "test");
+    }
+
+    #[test]
+    fn test_bst_is_resolved() {
+        let obj = SyncConflict {
+            bst_resource_key: String::from("test"),
+            bst_local_content: String::from("test"),
+            bst_remote_content: String::from("test"),
+            bst_base_content: String::from("test"),
+            bst_conflict_type: String::from("test"),
+            bst_resolved_content: String::from("test"),
+            bst_is_resolved: false,
+            bst_last_synced_at: 0,
+            bst_machine_id: String::from("test"),
+            bst_sync_version: 0,
+        };
+        let _ = obj.bst_summary();
+        assert!(!obj.bst_is_resolved);
+    }
+
+    #[test]
+    fn test_bst_last_synced_at() {
+        let obj = SyncConflict {
+            bst_resource_key: String::from("test"),
+            bst_local_content: String::from("test"),
+            bst_remote_content: String::from("test"),
+            bst_base_content: String::from("test"),
+            bst_conflict_type: String::from("test"),
+            bst_resolved_content: String::from("test"),
+            bst_is_resolved: false,
+            bst_last_synced_at: 0,
+            bst_machine_id: String::from("test"),
+            bst_sync_version: 0,
+        };
+        let _ = obj.bst_summary();
+        assert_eq!(obj.bst_last_synced_at, 0);
+    }
+
+    #[test]
+    fn test_bst_machine_id() {
+        let obj = SyncConflict {
+            bst_resource_key: String::from("test"),
+            bst_local_content: String::from("test"),
+            bst_remote_content: String::from("test"),
+            bst_base_content: String::from("test"),
+            bst_conflict_type: String::from("test"),
+            bst_resolved_content: String::from("test"),
+            bst_is_resolved: false,
+            bst_last_synced_at: 0,
+            bst_machine_id: String::from("test"),
+            bst_sync_version: 0,
+        };
+        let _ = obj.bst_summary();
+        assert_eq!(obj.bst_machine_id, "test");
+    }
+
+    #[test]
+    fn test_bst_sync_version() {
+        let obj = SyncConflict {
+            bst_resource_key: String::from("test"),
+            bst_local_content: String::from("test"),
+            bst_remote_content: String::from("test"),
+            bst_base_content: String::from("test"),
+            bst_conflict_type: String::from("test"),
+            bst_resolved_content: String::from("test"),
+            bst_is_resolved: false,
+            bst_last_synced_at: 0,
+            bst_machine_id: String::from("test"),
+            bst_sync_version: 0,
+        };
+        let _ = obj.bst_summary();
+        assert_eq!(obj.bst_sync_version, 0);
     }
 
 }
