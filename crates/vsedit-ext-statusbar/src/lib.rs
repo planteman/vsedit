@@ -86620,6 +86620,67 @@ pub struct BloWebviewState { pub panel_id: String, pub active: bool, pub visible
 #[derive(Debug, Clone)]
 pub struct BloWebviewPersistence { pub state_json: Option<String>, pub view_type: String }
 
+
+// Terminal widget model — terminal instances, shell integration, links, buffer scrollback
+#[derive(Debug, Clone)]
+pub struct BlpTerminalInstance { pub id: String, pub title: String, pub shell_type: u8, pub cwd: String, pub pid: Option<u32> }
+#[derive(Debug, Clone)]
+pub struct BlpTerminalBuffer { pub lines: Vec<String>, pub scrollback_limit: usize, pub cursor_x: usize, pub cursor_y: usize }
+#[derive(Debug, Clone)]
+pub struct BlpTerminalLink { pub start_col: usize, pub end_col: usize, pub line: usize, pub uri: String }
+#[derive(Debug, Clone)]
+pub struct BlpShellIntegration { pub command_start_line: Option<usize>, pub command_end_line: Option<usize>, pub exit_code: Option<i32> }
+#[derive(Debug, Clone)]
+pub struct BlpTerminalProfile { pub name: String, pub path: String, pub args: Vec<String>, pub env: Vec<String> }
+
+// Output channel model — output channels, append/replace, language mode, reveal behavior
+#[derive(Debug, Clone)]
+pub struct BlqOutputChannel { pub id: String, pub name: String, pub language_id: Option<String>, pub visible: bool }
+#[derive(Debug, Clone)]
+pub struct BlqOutputAppend { pub channel_id: String, pub text: String, pub preserve_focus: bool }
+#[derive(Debug, Clone)]
+pub struct BlqOutputReplace { pub channel_id: String, pub text: String }
+#[derive(Debug, Clone)]
+pub struct BlqOutputClear { pub channel_id: String }
+#[derive(Debug, Clone)]
+pub struct BlqOutputChannelState { pub channels: Vec<BlqOutputChannel>, pub active_channel: Option<String> }
+
+// Debug console model — debug output, REPL evaluation, variable inspection, expression watch
+#[derive(Debug, Clone)]
+pub struct BlrDebugOutput { pub text: String, pub category: u8, pub source: Option<String>, pub line: Option<usize> }
+#[derive(Debug, Clone)]
+pub struct BlrReplInput { pub expression: String, pub frame_id: Option<u64> }
+#[derive(Debug, Clone)]
+pub struct BlrReplResult { pub value: String, pub variable_ref: Option<u64>, pub success: bool }
+#[derive(Debug, Clone)]
+pub struct BlrWatchExpression { pub id: String, pub expression: String, pub value: Option<String>, pub error: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BlrDebugConsoleState { pub entries: Vec<BlrDebugOutput>, pub watch_expressions: Vec<BlrWatchExpression> }
+
+// Problems panel model — problem markers, severity filters, file grouping, quick fix navigation
+#[derive(Debug, Clone)]
+pub struct BlsMarker { pub file: String, pub line: usize, pub col: usize, pub message: String, pub severity: u8, pub source: Option<String>, pub code: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BlsMarkerFilter { pub severity_mask: u8, pub source_filter: Option<String>, pub file_pattern: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BlsMarkerStats { pub errors: usize, pub warnings: usize, pub infos: usize }
+#[derive(Debug, Clone)]
+pub struct BlsFileGroup { pub file: String, pub markers: Vec<BlsMarker> }
+#[derive(Debug, Clone)]
+pub struct BlsProblemsState { pub groups: Vec<BlsFileGroup>, pub stats: BlsMarkerStats, pub active_marker: Option<usize> }
+
+// Search results model — search matches, file matches, replace preview, result navigation
+#[derive(Debug, Clone)]
+pub struct BltSearchMatch { pub line: usize, pub col: usize, pub length: usize, pub preview_text: String }
+#[derive(Debug, Clone)]
+pub struct BltFileMatch { pub file: String, pub matches: Vec<BltSearchMatch>, pub collapsed: bool }
+#[derive(Debug, Clone)]
+pub struct BltSearchQuery { pub pattern: String, pub is_regex: bool, pub case_sensitive: bool, pub whole_word: bool, pub include_pattern: Option<String>, pub exclude_pattern: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BltReplacePreview { pub file: String, pub line: usize, pub original: String, pub replaced: String }
+#[derive(Debug, Clone)]
+pub struct BltSearchResultState { pub files: Vec<BltFileMatch>, pub total_matches: usize, pub searching: bool }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -95940,4 +96001,104 @@ mod tests_bfo {
     fn test_blo_persistence_no_state() { let p = BloWebviewPersistence { state_json: None, view_type: "welcome".into() }; assert!(p.state_json.is_none()); }
     #[test]
     fn test_blo_message_complex() { let m = BloWebviewMessage { command: "navigate".into(), payload: "{\"url\": \"https://example.com\"}".into() }; assert!(m.payload.contains("url")); }
+    #[test]
+    fn test_blp_instance_basic() { let t = BlpTerminalInstance { id: "t1".into(), title: "bash".into(), shell_type: 0, cwd: "/home".into(), pid: Some(1234) }; assert!(t.pid.is_some()); }
+    #[test]
+    fn test_blp_instance_no_pid() { let t = BlpTerminalInstance { id: "t2".into(), title: "zsh".into(), shell_type: 1, cwd: "/".into(), pid: None }; assert!(t.pid.is_none()); }
+    #[test]
+    fn test_blp_buffer_empty() { let b = BlpTerminalBuffer { lines: vec![], scrollback_limit: 1000, cursor_x: 0, cursor_y: 0 }; assert!(b.lines.is_empty()); }
+    #[test]
+    fn test_blp_buffer_with_content() { let b = BlpTerminalBuffer { lines: vec!["$ ls".into(), "file.rs".into()], scrollback_limit: 1000, cursor_x: 0, cursor_y: 2 }; assert_eq!(b.lines.len(), 2); }
+    #[test]
+    fn test_blp_link_basic() { let l = BlpTerminalLink { start_col: 5, end_col: 20, line: 3, uri: "file:///a.rs".into() }; assert_eq!(l.line, 3); }
+    #[test]
+    fn test_blp_shell_integration() { let s = BlpShellIntegration { command_start_line: Some(5), command_end_line: Some(10), exit_code: Some(0) }; assert_eq!(s.exit_code, Some(0)); }
+    #[test]
+    fn test_blp_shell_no_command() { let s = BlpShellIntegration { command_start_line: None, command_end_line: None, exit_code: None }; assert!(s.command_start_line.is_none()); }
+    #[test]
+    fn test_blp_profile_basic() { let p = BlpTerminalProfile { name: "bash".into(), path: "/bin/bash".into(), args: vec![], env: vec![] }; assert_eq!(p.path, "/bin/bash"); }
+    #[test]
+    fn test_blp_profile_with_args() { let p = BlpTerminalProfile { name: "zsh".into(), path: "/bin/zsh".into(), args: vec!["-l".into()], env: vec!["TERM=xterm".into()] }; assert_eq!(p.args.len(), 1); }
+    #[test]
+    fn test_blp_scrollback_limit() { let b = BlpTerminalBuffer { lines: vec![], scrollback_limit: 5000, cursor_x: 0, cursor_y: 0 }; assert_eq!(b.scrollback_limit, 5000); }
+    #[test]
+    fn test_blq_channel_basic() { let c = BlqOutputChannel { id: "git".into(), name: "Git".into(), language_id: None, visible: true }; assert!(c.visible); }
+    #[test]
+    fn test_blq_channel_with_lang() { let c = BlqOutputChannel { id: "ts".into(), name: "TypeScript".into(), language_id: Some("log".into()), visible: false }; assert!(c.language_id.is_some()); }
+    #[test]
+    fn test_blq_append() { let a = BlqOutputAppend { channel_id: "git".into(), text: "fetching...".into(), preserve_focus: true }; assert!(a.preserve_focus); }
+    #[test]
+    fn test_blq_append_steal_focus() { let a = BlqOutputAppend { channel_id: "x".into(), text: "error".into(), preserve_focus: false }; assert!(!a.preserve_focus); }
+    #[test]
+    fn test_blq_replace() { let r = BlqOutputReplace { channel_id: "log".into(), text: "new content".into() }; assert_eq!(r.text, "new content"); }
+    #[test]
+    fn test_blq_clear() { let c = BlqOutputClear { channel_id: "git".into() }; assert_eq!(c.channel_id, "git"); }
+    #[test]
+    fn test_blq_state_empty() { let s = BlqOutputChannelState { channels: vec![], active_channel: None }; assert!(s.channels.is_empty()); }
+    #[test]
+    fn test_blq_state_active() { let c = BlqOutputChannel { id: "x".into(), name: "X".into(), language_id: None, visible: true }; let s = BlqOutputChannelState { channels: vec![c], active_channel: Some("x".into()) }; assert!(s.active_channel.is_some()); }
+    #[test]
+    fn test_blq_state_no_active() { let s = BlqOutputChannelState { channels: vec![], active_channel: None }; assert!(s.active_channel.is_none()); }
+    #[test]
+    fn test_blq_multi_channel() { let chs: Vec<BlqOutputChannel> = (0..3).map(|i| BlqOutputChannel { id: format!("c{i}"), name: format!("Ch{i}"), language_id: None, visible: true }).collect(); let s = BlqOutputChannelState { channels: chs, active_channel: Some("c0".into()) }; assert_eq!(s.channels.len(), 3); }
+    #[test]
+    fn test_blr_stdout_output() { let o = BlrDebugOutput { text: "Hello".into(), category: 0, source: None, line: None }; assert_eq!(o.category, 0); }
+    #[test]
+    fn test_blr_stderr_output() { let o = BlrDebugOutput { text: "Error".into(), category: 1, source: Some("program".into()), line: Some(10) }; assert_eq!(o.category, 1); }
+    #[test]
+    fn test_blr_repl_input() { let r = BlrReplInput { expression: "x + 1".into(), frame_id: Some(1) }; assert!(r.frame_id.is_some()); }
+    #[test]
+    fn test_blr_repl_no_frame() { let r = BlrReplInput { expression: "print()".into(), frame_id: None }; assert!(r.frame_id.is_none()); }
+    #[test]
+    fn test_blr_repl_success() { let r = BlrReplResult { value: "42".into(), variable_ref: None, success: true }; assert!(r.success); }
+    #[test]
+    fn test_blr_repl_error() { let r = BlrReplResult { value: String::new(), variable_ref: None, success: false }; assert!(!r.success); }
+    #[test]
+    fn test_blr_watch_with_value() { let w = BlrWatchExpression { id: "w1".into(), expression: "x".into(), value: Some("5".into()), error: None }; assert!(w.value.is_some()); }
+    #[test]
+    fn test_blr_watch_error() { let w = BlrWatchExpression { id: "w2".into(), expression: "bad".into(), value: None, error: Some("not found".into()) }; assert!(w.error.is_some()); }
+    #[test]
+    fn test_blr_empty_console() { let s = BlrDebugConsoleState { entries: vec![], watch_expressions: vec![] }; assert!(s.entries.is_empty()); }
+    #[test]
+    fn test_blr_console_with_entries() { let o = BlrDebugOutput { text: "log".into(), category: 0, source: None, line: None }; let s = BlrDebugConsoleState { entries: vec![o], watch_expressions: vec![] }; assert_eq!(s.entries.len(), 1); }
+    #[test]
+    fn test_bls_error_marker() { let m = BlsMarker { file: "a.rs".into(), line: 5, col: 10, message: "type error".into(), severity: 0, source: Some("rustc".into()), code: Some("E0308".into()) }; assert_eq!(m.severity, 0); }
+    #[test]
+    fn test_bls_warning_marker() { let m = BlsMarker { file: "b.rs".into(), line: 3, col: 0, message: "unused".into(), severity: 1, source: None, code: None }; assert_eq!(m.severity, 1); }
+    #[test]
+    fn test_bls_filter_errors_only() { let f = BlsMarkerFilter { severity_mask: 1, source_filter: None, file_pattern: None }; assert_eq!(f.severity_mask, 1); }
+    #[test]
+    fn test_bls_filter_by_source() { let f = BlsMarkerFilter { severity_mask: 0xFF, source_filter: Some("clippy".into()), file_pattern: None }; assert!(f.source_filter.is_some()); }
+    #[test]
+    fn test_bls_stats() { let s = BlsMarkerStats { errors: 3, warnings: 10, infos: 2 }; assert_eq!(s.errors, 3); }
+    #[test]
+    fn test_bls_stats_clean() { let s = BlsMarkerStats { errors: 0, warnings: 0, infos: 0 }; assert_eq!(s.errors + s.warnings + s.infos, 0); }
+    #[test]
+    fn test_bls_file_group() { let m = BlsMarker { file: "c.rs".into(), line: 1, col: 0, message: "x".into(), severity: 1, source: None, code: None }; let g = BlsFileGroup { file: "c.rs".into(), markers: vec![m] }; assert_eq!(g.markers.len(), 1); }
+    #[test]
+    fn test_bls_problems_state() { let st = BlsMarkerStats { errors: 0, warnings: 0, infos: 0 }; let s = BlsProblemsState { groups: vec![], stats: st, active_marker: None }; assert!(s.groups.is_empty()); }
+    #[test]
+    fn test_bls_active_marker() { let st = BlsMarkerStats { errors: 1, warnings: 0, infos: 0 }; let s = BlsProblemsState { groups: vec![], stats: st, active_marker: Some(0) }; assert_eq!(s.active_marker, Some(0)); }
+    #[test]
+    fn test_bls_filter_by_file() { let f = BlsMarkerFilter { severity_mask: 0xFF, source_filter: None, file_pattern: Some("*.rs".into()) }; assert!(f.file_pattern.is_some()); }
+    #[test]
+    fn test_blt_match_basic() { let m = BltSearchMatch { line: 10, col: 5, length: 3, preview_text: "let foo = 1;".into() }; assert_eq!(m.length, 3); }
+    #[test]
+    fn test_blt_file_match() { let m = BltSearchMatch { line: 1, col: 0, length: 5, preview_text: "hello".into() }; let f = BltFileMatch { file: "a.rs".into(), matches: vec![m], collapsed: false }; assert_eq!(f.matches.len(), 1); }
+    #[test]
+    fn test_blt_file_collapsed() { let f = BltFileMatch { file: "b.rs".into(), matches: vec![], collapsed: true }; assert!(f.collapsed); }
+    #[test]
+    fn test_blt_query_simple() { let q = BltSearchQuery { pattern: "TODO".into(), is_regex: false, case_sensitive: true, whole_word: false, include_pattern: None, exclude_pattern: None }; assert!(q.case_sensitive); }
+    #[test]
+    fn test_blt_query_regex() { let q = BltSearchQuery { pattern: "fn\\s+\\w+".into(), is_regex: true, case_sensitive: false, whole_word: false, include_pattern: Some("*.rs".into()), exclude_pattern: Some("target/**".into()) }; assert!(q.is_regex); }
+    #[test]
+    fn test_blt_replace_preview() { let p = BltReplacePreview { file: "a.rs".into(), line: 5, original: "foo".into(), replaced: "bar".into() }; assert_eq!(p.replaced, "bar"); }
+    #[test]
+    fn test_blt_state_idle() { let s = BltSearchResultState { files: vec![], total_matches: 0, searching: false }; assert!(!s.searching); }
+    #[test]
+    fn test_blt_state_searching() { let s = BltSearchResultState { files: vec![], total_matches: 0, searching: true }; assert!(s.searching); }
+    #[test]
+    fn test_blt_state_with_results() { let m = BltSearchMatch { line: 0, col: 0, length: 1, preview_text: "x".into() }; let f = BltFileMatch { file: "f.rs".into(), matches: vec![m], collapsed: false }; let s = BltSearchResultState { files: vec![f], total_matches: 1, searching: false }; assert_eq!(s.total_matches, 1); }
+    #[test]
+    fn test_blt_query_whole_word() { let q = BltSearchQuery { pattern: "fn".into(), is_regex: false, case_sensitive: true, whole_word: true, include_pattern: None, exclude_pattern: None }; assert!(q.whole_word); }
 }
