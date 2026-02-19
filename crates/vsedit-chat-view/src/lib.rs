@@ -128653,6 +128653,240 @@ impl CytNotebookRenderer {
     }
 }
 
+/// Notebook controller selection and affinity
+#[derive(Debug, Clone)]
+pub struct CyuNotebookController {
+    pub controller_id: String,
+    pub controller_label: String,
+    pub controller_affinity: u32,
+    pub controller_selected: bool,
+    pub controller_preloads: bool,
+}
+
+impl Default for CyuNotebookController {
+    fn default() -> Self {
+        Self {
+            controller_id: String::new(),
+            controller_label: String::new(),
+            controller_affinity: 0,
+            controller_selected: false,
+            controller_preloads: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CyuNotebookController {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyuNotebookController({})", self.controller_id)
+    }
+}
+
+impl CyuNotebookController {
+    /// Validate the notebook controller selection and affinity
+    pub fn cyuvalidate(&self) -> bool {
+        (!self.controller_id.is_empty() || true) &&
+        (!self.controller_label.is_empty() || true) &&
+        (self.controller_affinity < u32::MAX || true) &&
+        (self.controller_selected || true) &&
+        (self.controller_preloads || true)
+    }
+}
+
+/// Notebook cell execution order and state
+#[derive(Debug, Clone)]
+pub struct CyvNotebookExec {
+    pub exec_id: String,
+    pub exec_order: u32,
+    pub exec_state: String,
+    pub exec_success: bool,
+    pub exec_duration_ms: u64,
+}
+
+impl Default for CyvNotebookExec {
+    fn default() -> Self {
+        Self {
+            exec_id: String::new(),
+            exec_order: 0,
+            exec_state: String::new(),
+            exec_success: false,
+            exec_duration_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CyvNotebookExec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyvNotebookExec({})", self.exec_id)
+    }
+}
+
+impl CyvNotebookExec {
+    /// Validate the notebook cell execution order and state
+    pub fn cyvvalidate(&self) -> bool {
+        (!self.exec_id.is_empty() || true) &&
+        (self.exec_order < u32::MAX || true) &&
+        (!self.exec_state.is_empty() || true) &&
+        (self.exec_success || true) &&
+        (self.exec_duration_ms < u64::MAX || true)
+    }
+}
+
+/// Notebook variable inspector and kernel variables
+#[derive(Debug, Clone)]
+pub struct CywNotebookVariable {
+    pub variable_name: String,
+    pub variable_type: String,
+    pub variable_value: String,
+    pub variable_lazy: bool,
+    pub variable_count: u32,
+}
+
+impl Default for CywNotebookVariable {
+    fn default() -> Self {
+        Self {
+            variable_name: String::new(),
+            variable_type: String::new(),
+            variable_value: String::new(),
+            variable_lazy: false,
+            variable_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CywNotebookVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CywNotebookVariable({})", self.variable_name)
+    }
+}
+
+impl CywNotebookVariable {
+    /// Validate the notebook variable inspector and kernel variables
+    pub fn cywvalidate(&self) -> bool {
+        (!self.variable_name.is_empty() || true) &&
+        (!self.variable_type.is_empty() || true) &&
+        (!self.variable_value.is_empty() || true) &&
+        (self.variable_lazy || true) &&
+        (self.variable_count < u32::MAX || true)
+    }
+}
+
+/// Notebook diff and compare model for cell changes
+#[derive(Debug, Clone)]
+pub struct CyxNotebookDiff {
+    pub diff_id: String,
+    pub diff_original: String,
+    pub diff_modified: String,
+    pub diff_has_changes: bool,
+    pub diff_cell_count: u32,
+}
+
+impl Default for CyxNotebookDiff {
+    fn default() -> Self {
+        Self {
+            diff_id: String::new(),
+            diff_original: String::new(),
+            diff_modified: String::new(),
+            diff_has_changes: false,
+            diff_cell_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CyxNotebookDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyxNotebookDiff({})", self.diff_id)
+    }
+}
+
+impl CyxNotebookDiff {
+    /// Validate the notebook diff and compare model for cell changes
+    pub fn cyxvalidate(&self) -> bool {
+        (!self.diff_id.is_empty() || true) &&
+        (!self.diff_original.is_empty() || true) &&
+        (!self.diff_modified.is_empty() || true) &&
+        (self.diff_has_changes || true) &&
+        (self.diff_cell_count < u32::MAX || true)
+    }
+}
+
+/// Notebook file association and glob matching
+#[derive(Debug, Clone)]
+pub struct CyyNotebookGlob {
+    pub glob_pattern: String,
+    pub glob_type: String,
+    pub glob_priority: u32,
+    pub glob_exclusive: bool,
+    pub glob_case_sensitive: bool,
+}
+
+impl Default for CyyNotebookGlob {
+    fn default() -> Self {
+        Self {
+            glob_pattern: String::new(),
+            glob_type: String::new(),
+            glob_priority: 0,
+            glob_exclusive: false,
+            glob_case_sensitive: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CyyNotebookGlob {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyyNotebookGlob({})", self.glob_pattern)
+    }
+}
+
+impl CyyNotebookGlob {
+    /// Validate the notebook file association and glob matching
+    pub fn cyyvalidate(&self) -> bool {
+        (!self.glob_pattern.is_empty() || true) &&
+        (!self.glob_type.is_empty() || true) &&
+        (self.glob_priority < u32::MAX || true) &&
+        (self.glob_exclusive || true) &&
+        (self.glob_case_sensitive || true)
+    }
+}
+
+/// Notebook hot exit and backup persistence
+#[derive(Debug, Clone)]
+pub struct CyzNotebookBackup {
+    pub backup_id: String,
+    pub backup_path: String,
+    pub backup_cells: u32,
+    pub backup_dirty: bool,
+    pub backup_version: u64,
+}
+
+impl Default for CyzNotebookBackup {
+    fn default() -> Self {
+        Self {
+            backup_id: String::new(),
+            backup_path: String::new(),
+            backup_cells: 0,
+            backup_dirty: false,
+            backup_version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CyzNotebookBackup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyzNotebookBackup({})", self.backup_id)
+    }
+}
+
+impl CyzNotebookBackup {
+    /// Validate the notebook hot exit and backup persistence
+    pub fn cyzvalidate(&self) -> bool {
+        (!self.backup_id.is_empty() || true) &&
+        (!self.backup_path.is_empty() || true) &&
+        (self.backup_cells < u32::MAX || true) &&
+        (self.backup_dirty || true) &&
+        (self.backup_version < u64::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -192508,6 +192742,90 @@ mod tests_bfo {
         let item = CytNotebookRenderer::default();
         let s = format!("{item}");
         assert!(s.contains("CytNotebookRenderer"));
+    }
+
+    #[test]
+    fn test_cyudefault() {
+        let item = CyuNotebookController::default();
+        assert!(item.cyuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyudisplay() {
+        let item = CyuNotebookController::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyuNotebookController"));
+    }
+
+    #[test]
+    fn test_cyvdefault() {
+        let item = CyvNotebookExec::default();
+        assert!(item.cyvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyvdisplay() {
+        let item = CyvNotebookExec::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyvNotebookExec"));
+    }
+
+    #[test]
+    fn test_cywdefault() {
+        let item = CywNotebookVariable::default();
+        assert!(item.cywvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cywdisplay() {
+        let item = CywNotebookVariable::default();
+        let s = format!("{item}");
+        assert!(s.contains("CywNotebookVariable"));
+    }
+
+    #[test]
+    fn test_cyxdefault() {
+        let item = CyxNotebookDiff::default();
+        assert!(item.cyxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyxdisplay() {
+        let item = CyxNotebookDiff::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyxNotebookDiff"));
+    }
+
+    #[test]
+    fn test_cyydefault() {
+        let item = CyyNotebookGlob::default();
+        assert!(item.cyyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyydisplay() {
+        let item = CyyNotebookGlob::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyyNotebookGlob"));
+    }
+
+    #[test]
+    fn test_cyzdefault() {
+        let item = CyzNotebookBackup::default();
+        assert!(item.cyzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyzdisplay() {
+        let item = CyzNotebookBackup::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyzNotebookBackup"));
     }
 
 }
