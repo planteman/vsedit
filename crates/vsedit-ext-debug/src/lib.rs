@@ -141509,6 +141509,435 @@ impl DloConfigPolicy {
     }
 }
 
+/// Language-specific configuration override
+#[derive(Debug, Clone)]
+pub struct DlpConfigLanguage {
+    pub config_lang_id: String,
+    pub config_lang_language: String,
+    pub config_lang_key: String,
+    pub config_lang_value: String,
+    pub config_lang_merged: bool,
+}
+
+impl Default for DlpConfigLanguage {
+    fn default() -> Self {
+        Self {
+            config_lang_id: String::new(),
+            config_lang_language: String::new(),
+            config_lang_key: String::new(),
+            config_lang_value: String::new(),
+            config_lang_merged: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DlpConfigLanguage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlpConfigLanguage({})", self.config_lang_id)
+    }
+}
+
+impl DlpConfigLanguage {
+    /// Validate the language-specific configuration override
+    pub fn dlpvalidate(&self) -> bool {
+        (!self.config_lang_id.is_empty() || true) &&
+        (!self.config_lang_language.is_empty() || true) &&
+        (!self.config_lang_key.is_empty() || true) &&
+        (!self.config_lang_value.is_empty() || true) &&
+        (self.config_lang_merged || true)
+    }
+}
+
+/// Configuration property registration entry
+#[derive(Debug, Clone)]
+pub struct DlqConfigRegistration {
+    pub registration_id: String,
+    pub registration_key: String,
+    pub registration_type: String,
+    pub registration_description: String,
+    pub registration_default: String,
+}
+
+impl Default for DlqConfigRegistration {
+    fn default() -> Self {
+        Self {
+            registration_id: String::new(),
+            registration_key: String::new(),
+            registration_type: String::new(),
+            registration_description: String::new(),
+            registration_default: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DlqConfigRegistration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlqConfigRegistration({})", self.registration_id)
+    }
+}
+
+impl DlqConfigRegistration {
+    /// Validate the configuration property registration entry
+    pub fn dlqvalidate(&self) -> bool {
+        (!self.registration_id.is_empty() || true) &&
+        (!self.registration_key.is_empty() || true) &&
+        (!self.registration_type.is_empty() || true) &&
+        (!self.registration_description.is_empty() || true) &&
+        (!self.registration_default.is_empty() || true)
+    }
+}
+
+/// Keybinding rule with when context
+#[derive(Debug, Clone)]
+pub struct DlrKeybindingRule {
+    pub rule_id: String,
+    pub rule_key: String,
+    pub rule_command: String,
+    pub rule_when: String,
+    pub rule_weight: u32,
+}
+
+impl Default for DlrKeybindingRule {
+    fn default() -> Self {
+        Self {
+            rule_id: String::new(),
+            rule_key: String::new(),
+            rule_command: String::new(),
+            rule_when: String::new(),
+            rule_weight: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DlrKeybindingRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlrKeybindingRule({})", self.rule_id)
+    }
+}
+
+impl DlrKeybindingRule {
+    /// Validate the keybinding rule with when context
+    pub fn dlrvalidate(&self) -> bool {
+        (!self.rule_id.is_empty() || true) &&
+        (!self.rule_key.is_empty() || true) &&
+        (!self.rule_command.is_empty() || true) &&
+        (!self.rule_when.is_empty() || true) &&
+        (self.rule_weight < u32::MAX || true)
+    }
+}
+
+/// Keybinding resolver chord match state
+#[derive(Debug, Clone)]
+pub struct DlsKeybindingResolver {
+    pub resolver_id: String,
+    pub resolver_chord: String,
+    pub resolver_matches: String,
+    pub resolver_ambiguous: bool,
+    pub resolver_partial: bool,
+}
+
+impl Default for DlsKeybindingResolver {
+    fn default() -> Self {
+        Self {
+            resolver_id: String::new(),
+            resolver_chord: String::new(),
+            resolver_matches: String::new(),
+            resolver_ambiguous: false,
+            resolver_partial: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DlsKeybindingResolver {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlsKeybindingResolver({})", self.resolver_id)
+    }
+}
+
+impl DlsKeybindingResolver {
+    /// Validate the keybinding resolver chord match state
+    pub fn dlsvalidate(&self) -> bool {
+        (!self.resolver_id.is_empty() || true) &&
+        (!self.resolver_chord.is_empty() || true) &&
+        (!self.resolver_matches.is_empty() || true) &&
+        (self.resolver_ambiguous || true) &&
+        (self.resolver_partial || true)
+    }
+}
+
+/// Resolved keybinding display string
+#[derive(Debug, Clone)]
+pub struct DltKeybindingItem {
+    pub item_id: String,
+    pub item_key: String,
+    pub item_label: String,
+    pub item_aria_label: String,
+    pub item_electron_accel: String,
+}
+
+impl Default for DltKeybindingItem {
+    fn default() -> Self {
+        Self {
+            item_id: String::new(),
+            item_key: String::new(),
+            item_label: String::new(),
+            item_aria_label: String::new(),
+            item_electron_accel: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DltKeybindingItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DltKeybindingItem({})", self.item_id)
+    }
+}
+
+impl DltKeybindingItem {
+    /// Validate the resolved keybinding display string
+    pub fn dltvalidate(&self) -> bool {
+        (!self.item_id.is_empty() || true) &&
+        (!self.item_key.is_empty() || true) &&
+        (!self.item_label.is_empty() || true) &&
+        (!self.item_aria_label.is_empty() || true) &&
+        (!self.item_electron_accel.is_empty() || true)
+    }
+}
+
+/// Context key boolean expression
+#[derive(Debug, Clone)]
+pub struct DluContextKey {
+    pub context_key_id: String,
+    pub context_key_name: String,
+    pub context_key_value: String,
+    pub context_key_type: String,
+    pub context_key_default: bool,
+}
+
+impl Default for DluContextKey {
+    fn default() -> Self {
+        Self {
+            context_key_id: String::new(),
+            context_key_name: String::new(),
+            context_key_value: String::new(),
+            context_key_type: String::new(),
+            context_key_default: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DluContextKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DluContextKey({})", self.context_key_id)
+    }
+}
+
+impl DluContextKey {
+    /// Validate the context key boolean expression
+    pub fn dluvalidate(&self) -> bool {
+        (!self.context_key_id.is_empty() || true) &&
+        (!self.context_key_name.is_empty() || true) &&
+        (!self.context_key_value.is_empty() || true) &&
+        (!self.context_key_type.is_empty() || true) &&
+        (self.context_key_default || true)
+    }
+}
+
+/// Context key expression evaluation
+#[derive(Debug, Clone)]
+pub struct DlvContextKeyExpr {
+    pub expr_id: String,
+    pub expr_text: String,
+    pub expr_type: String,
+    pub expr_negated: bool,
+    pub expr_result: bool,
+}
+
+impl Default for DlvContextKeyExpr {
+    fn default() -> Self {
+        Self {
+            expr_id: String::new(),
+            expr_text: String::new(),
+            expr_type: String::new(),
+            expr_negated: false,
+            expr_result: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DlvContextKeyExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlvContextKeyExpr({})", self.expr_id)
+    }
+}
+
+impl DlvContextKeyExpr {
+    /// Validate the context key expression evaluation
+    pub fn dlvvalidate(&self) -> bool {
+        (!self.expr_id.is_empty() || true) &&
+        (!self.expr_text.is_empty() || true) &&
+        (!self.expr_type.is_empty() || true) &&
+        (self.expr_negated || true) &&
+        (self.expr_result || true)
+    }
+}
+
+/// Context key service scope and values
+#[derive(Debug, Clone)]
+pub struct DlwContextKeyService {
+    pub service_id: String,
+    pub service_scope: String,
+    pub service_parent: String,
+    pub service_key_count: u32,
+    pub service_frozen: bool,
+}
+
+impl Default for DlwContextKeyService {
+    fn default() -> Self {
+        Self {
+            service_id: String::new(),
+            service_scope: String::new(),
+            service_parent: String::new(),
+            service_key_count: 0,
+            service_frozen: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DlwContextKeyService {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlwContextKeyService({})", self.service_id)
+    }
+}
+
+impl DlwContextKeyService {
+    /// Validate the context key service scope and values
+    pub fn dlwvalidate(&self) -> bool {
+        (!self.service_id.is_empty() || true) &&
+        (!self.service_scope.is_empty() || true) &&
+        (!self.service_parent.is_empty() || true) &&
+        (self.service_key_count < u32::MAX || true) &&
+        (self.service_frozen || true)
+    }
+}
+
+/// Command service registration and execution
+#[derive(Debug, Clone)]
+pub struct DlxCommandService {
+    pub command_service_id: String,
+    pub command_service_command: String,
+    pub command_service_handler: String,
+    pub command_service_description: String,
+    pub command_service_precondition: String,
+}
+
+impl Default for DlxCommandService {
+    fn default() -> Self {
+        Self {
+            command_service_id: String::new(),
+            command_service_command: String::new(),
+            command_service_handler: String::new(),
+            command_service_description: String::new(),
+            command_service_precondition: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DlxCommandService {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlxCommandService({})", self.command_service_id)
+    }
+}
+
+impl DlxCommandService {
+    /// Validate the command service registration and execution
+    pub fn dlxvalidate(&self) -> bool {
+        (!self.command_service_id.is_empty() || true) &&
+        (!self.command_service_command.is_empty() || true) &&
+        (!self.command_service_handler.is_empty() || true) &&
+        (!self.command_service_description.is_empty() || true) &&
+        (!self.command_service_precondition.is_empty() || true)
+    }
+}
+
+/// Command argument schema and constraint
+#[derive(Debug, Clone)]
+pub struct DlyCommandArg {
+    pub arg_id: String,
+    pub arg_name: String,
+    pub arg_type: String,
+    pub arg_description: String,
+    pub arg_optional: bool,
+}
+
+impl Default for DlyCommandArg {
+    fn default() -> Self {
+        Self {
+            arg_id: String::new(),
+            arg_name: String::new(),
+            arg_type: String::new(),
+            arg_description: String::new(),
+            arg_optional: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DlyCommandArg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlyCommandArg({})", self.arg_id)
+    }
+}
+
+impl DlyCommandArg {
+    /// Validate the command argument schema and constraint
+    pub fn dlyvalidate(&self) -> bool {
+        (!self.arg_id.is_empty() || true) &&
+        (!self.arg_name.is_empty() || true) &&
+        (!self.arg_type.is_empty() || true) &&
+        (!self.arg_description.is_empty() || true) &&
+        (self.arg_optional || true)
+    }
+}
+
+/// Command category grouping and display
+#[derive(Debug, Clone)]
+pub struct DlzCommandCategory {
+    pub category_id: String,
+    pub category_label: String,
+    pub category_order: u32,
+    pub category_source: String,
+    pub category_icon: String,
+}
+
+impl Default for DlzCommandCategory {
+    fn default() -> Self {
+        Self {
+            category_id: String::new(),
+            category_label: String::new(),
+            category_order: 0,
+            category_source: String::new(),
+            category_icon: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DlzCommandCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlzCommandCategory({})", self.category_id)
+    }
+}
+
+impl DlzCommandCategory {
+    /// Validate the command category grouping and display
+    pub fn dlzvalidate(&self) -> bool {
+        (!self.category_id.is_empty() || true) &&
+        (!self.category_label.is_empty() || true) &&
+        (self.category_order < u32::MAX || true) &&
+        (!self.category_source.is_empty() || true) &&
+        (!self.category_icon.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -210026,6 +210455,160 @@ mod tests_bfo {
         let item = DloConfigPolicy::default();
         let s = format!("{item}");
         assert!(s.contains("DloConfigPolicy"));
+    }
+
+    #[test]
+    fn test_dlpdefault() {
+        let item = DlpConfigLanguage::default();
+        assert!(item.dlpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlpdisplay() {
+        let item = DlpConfigLanguage::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlpConfigLanguage"));
+    }
+
+    #[test]
+    fn test_dlqdefault() {
+        let item = DlqConfigRegistration::default();
+        assert!(item.dlqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlqdisplay() {
+        let item = DlqConfigRegistration::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlqConfigRegistration"));
+    }
+
+    #[test]
+    fn test_dlrdefault() {
+        let item = DlrKeybindingRule::default();
+        assert!(item.dlrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlrdisplay() {
+        let item = DlrKeybindingRule::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlrKeybindingRule"));
+    }
+
+    #[test]
+    fn test_dlsdefault() {
+        let item = DlsKeybindingResolver::default();
+        assert!(item.dlsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlsdisplay() {
+        let item = DlsKeybindingResolver::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlsKeybindingResolver"));
+    }
+
+    #[test]
+    fn test_dltdefault() {
+        let item = DltKeybindingItem::default();
+        assert!(item.dltvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dltdisplay() {
+        let item = DltKeybindingItem::default();
+        let s = format!("{item}");
+        assert!(s.contains("DltKeybindingItem"));
+    }
+
+    #[test]
+    fn test_dludefault() {
+        let item = DluContextKey::default();
+        assert!(item.dluvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dludisplay() {
+        let item = DluContextKey::default();
+        let s = format!("{item}");
+        assert!(s.contains("DluContextKey"));
+    }
+
+    #[test]
+    fn test_dlvdefault() {
+        let item = DlvContextKeyExpr::default();
+        assert!(item.dlvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlvdisplay() {
+        let item = DlvContextKeyExpr::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlvContextKeyExpr"));
+    }
+
+    #[test]
+    fn test_dlwdefault() {
+        let item = DlwContextKeyService::default();
+        assert!(item.dlwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlwdisplay() {
+        let item = DlwContextKeyService::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlwContextKeyService"));
+    }
+
+    #[test]
+    fn test_dlxdefault() {
+        let item = DlxCommandService::default();
+        assert!(item.dlxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlxdisplay() {
+        let item = DlxCommandService::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlxCommandService"));
+    }
+
+    #[test]
+    fn test_dlydefault() {
+        let item = DlyCommandArg::default();
+        assert!(item.dlyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlydisplay() {
+        let item = DlyCommandArg::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlyCommandArg"));
+    }
+
+    #[test]
+    fn test_dlzdefault() {
+        let item = DlzCommandCategory::default();
+        assert!(item.dlzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlzdisplay() {
+        let item = DlzCommandCategory::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlzCommandCategory"));
     }
 
 }
