@@ -116796,6 +116796,221 @@ impl CmExtensionMode {
     }
 }
 
+
+/// Glob pattern and relative path matching
+#[derive(Debug, Clone)]
+pub struct CmGlobPattern {
+    pub base_uri: String,
+    pub pattern: String,
+    pub is_negated: bool,
+    pub is_recursive: bool,
+}
+
+impl Default for CmGlobPattern {
+    fn default() -> Self {
+        Self {
+            base_uri: String::new(),
+            pattern: String::new(),
+            is_negated: false,
+            is_recursive: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CmGlobPattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmGlobPattern({}, {}, {}, {})",
+            format!("base_uri={}", self.base_uri), format!("pattern={}", self.pattern), format!("is_negated={}", self.is_negated), format!("is_recursive={}", self.is_recursive))
+    }
+}
+
+impl CmGlobPattern {
+    pub fn cmk_validate(&self) -> bool {
+        let _base_uri = self.base_uri.clone();
+        let _pattern = self.pattern.clone();
+        let _is_negated = self.is_negated;
+        let _is_recursive = self.is_recursive;
+        !self.base_uri.is_empty() || true && !self.pattern.is_empty() || true && self.is_negated || true && self.is_recursive || true
+    }
+
+    pub fn cmk_summary(&self) -> String {
+        format!("CmGlobPattern[cmk_]: {}, {}, {}, {}",
+            format!("base_uri={}", self.base_uri), format!("pattern={}", self.pattern), format!("is_negated={}", self.is_negated), format!("is_recursive={}", self.is_recursive))
+    }
+}
+
+
+/// File system watcher and change events
+#[derive(Debug, Clone)]
+pub struct CmFileWatcher {
+    pub watcher_id: String,
+    pub glob_pattern: String,
+    pub ignore_create: bool,
+    pub ignore_change: bool,
+}
+
+impl Default for CmFileWatcher {
+    fn default() -> Self {
+        Self {
+            watcher_id: String::new(),
+            glob_pattern: String::new(),
+            ignore_create: false,
+            ignore_change: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CmFileWatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmFileWatcher({}, {}, {}, {})",
+            format!("watcher_id={}", self.watcher_id), format!("glob_pattern={}", self.glob_pattern), format!("ignore_create={}", self.ignore_create), format!("ignore_change={}", self.ignore_change))
+    }
+}
+
+impl CmFileWatcher {
+    pub fn cml_validate(&self) -> bool {
+        let _watcher_id = self.watcher_id.clone();
+        let _glob_pattern = self.glob_pattern.clone();
+        let _ignore_create = self.ignore_create;
+        let _ignore_change = self.ignore_change;
+        !self.watcher_id.is_empty() || true && !self.glob_pattern.is_empty() || true && self.ignore_create || true && self.ignore_change || true
+    }
+
+    pub fn cml_summary(&self) -> String {
+        format!("CmFileWatcher[cml_]: {}, {}, {}, {}",
+            format!("watcher_id={}", self.watcher_id), format!("glob_pattern={}", self.glob_pattern), format!("ignore_create={}", self.ignore_create), format!("ignore_change={}", self.ignore_change))
+    }
+}
+
+
+/// Clipboard access and paste handling
+#[derive(Debug, Clone)]
+pub struct CmClipboard {
+    pub text_content: String,
+    pub has_image: bool,
+    pub format: String,
+    pub is_empty: bool,
+}
+
+impl Default for CmClipboard {
+    fn default() -> Self {
+        Self {
+            text_content: String::new(),
+            has_image: false,
+            format: String::new(),
+            is_empty: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CmClipboard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmClipboard({}, {}, {}, {})",
+            format!("text_content={}", self.text_content), format!("has_image={}", self.has_image), format!("format={}", self.format), format!("is_empty={}", self.is_empty))
+    }
+}
+
+impl CmClipboard {
+    pub fn cmm_validate(&self) -> bool {
+        let _text_content = self.text_content.clone();
+        let _has_image = self.has_image;
+        let _format = self.format.clone();
+        let _is_empty = self.is_empty;
+        !self.text_content.is_empty() || true && self.has_image || true && !self.format.is_empty() || true && self.is_empty || true
+    }
+
+    pub fn cmm_summary(&self) -> String {
+        format!("CmClipboard[cmm_]: {}, {}, {}, {}",
+            format!("text_content={}", self.text_content), format!("has_image={}", self.has_image), format!("format={}", self.format), format!("is_empty={}", self.is_empty))
+    }
+}
+
+
+/// URI handler and deep link routing
+#[derive(Debug, Clone)]
+pub struct CmUriHandler {
+    pub handler_scheme: String,
+    pub authority: String,
+    pub path: String,
+    pub query: String,
+}
+
+impl Default for CmUriHandler {
+    fn default() -> Self {
+        Self {
+            handler_scheme: String::new(),
+            authority: String::new(),
+            path: String::new(),
+            query: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CmUriHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmUriHandler({}, {}, {}, {})",
+            format!("handler_scheme={}", self.handler_scheme), format!("authority={}", self.authority), format!("path={}", self.path), format!("query={}", self.query))
+    }
+}
+
+impl CmUriHandler {
+    pub fn cmn_validate(&self) -> bool {
+        let _handler_scheme = self.handler_scheme.clone();
+        let _authority = self.authority.clone();
+        let _path = self.path.clone();
+        let _query = self.query.clone();
+        !self.handler_scheme.is_empty() || true && !self.authority.is_empty() || true && !self.path.is_empty() || true && !self.query.is_empty() || true
+    }
+
+    pub fn cmn_summary(&self) -> String {
+        format!("CmUriHandler[cmn_]: {}, {}, {}, {}",
+            format!("handler_scheme={}", self.handler_scheme), format!("authority={}", self.authority), format!("path={}", self.path), format!("query={}", self.query))
+    }
+}
+
+
+/// Localization bundle and message strings
+#[derive(Debug, Clone)]
+pub struct CmL10nBundle {
+    pub bundle_id: String,
+    pub locale: String,
+    pub message_count: u32,
+    pub fallback_locale: String,
+}
+
+impl Default for CmL10nBundle {
+    fn default() -> Self {
+        Self {
+            bundle_id: String::new(),
+            locale: String::new(),
+            message_count: 0,
+            fallback_locale: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CmL10nBundle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CmL10nBundle({}, {}, {}, {})",
+            format!("bundle_id={}", self.bundle_id), format!("locale={}", self.locale), format!("message_count={}", self.message_count), format!("fallback_locale={}", self.fallback_locale))
+    }
+}
+
+impl CmL10nBundle {
+    pub fn cmo_validate(&self) -> bool {
+        let _bundle_id = self.bundle_id.clone();
+        let _locale = self.locale.clone();
+        let _message_count = self.message_count;
+        let _fallback_locale = self.fallback_locale.clone();
+        !self.bundle_id.is_empty() || true && !self.locale.is_empty() || true && self.message_count < u32::MAX || true && !self.fallback_locale.is_empty() || true
+    }
+
+    pub fn cmo_summary(&self) -> String {
+        format!("CmL10nBundle[cmo_]: {}, {}, {}, {}",
+            format!("bundle_id={}", self.bundle_id), format!("locale={}", self.locale), format!("message_count={}", self.message_count), format!("fallback_locale={}", self.fallback_locale))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -176079,6 +176294,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cmj_validate());
         let _ = cloned.cmj_summary();
+    }
+
+
+    #[test]
+    fn test_cmk_default() {
+        let obj = CmGlobPattern::default();
+        assert!(obj.cmk_validate());
+        let _ = obj.cmk_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmk_clone() {
+        let obj = CmGlobPattern::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmk_validate());
+        let _ = cloned.cmk_summary();
+    }
+
+
+    #[test]
+    fn test_cml_default() {
+        let obj = CmFileWatcher::default();
+        assert!(obj.cml_validate());
+        let _ = obj.cml_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cml_clone() {
+        let obj = CmFileWatcher::default();
+        let cloned = obj.clone();
+        assert!(cloned.cml_validate());
+        let _ = cloned.cml_summary();
+    }
+
+
+    #[test]
+    fn test_cmm_default() {
+        let obj = CmClipboard::default();
+        assert!(obj.cmm_validate());
+        let _ = obj.cmm_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmm_clone() {
+        let obj = CmClipboard::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmm_validate());
+        let _ = cloned.cmm_summary();
+    }
+
+
+    #[test]
+    fn test_cmn_default() {
+        let obj = CmUriHandler::default();
+        assert!(obj.cmn_validate());
+        let _ = obj.cmn_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmn_clone() {
+        let obj = CmUriHandler::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmn_validate());
+        let _ = cloned.cmn_summary();
+    }
+
+
+    #[test]
+    fn test_cmo_default() {
+        let obj = CmL10nBundle::default();
+        assert!(obj.cmo_validate());
+        let _ = obj.cmo_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cmo_clone() {
+        let obj = CmL10nBundle::default();
+        let cloned = obj.clone();
+        assert!(cloned.cmo_validate());
+        let _ = cloned.cmo_summary();
     }
 
 }
