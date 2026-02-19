@@ -57550,3 +57550,211 @@ mod bbf_tests {
         assert_eq!(occs[0].kind, BbfWhitespaceChar::Tab);
     }
 }
+
+
+// --- bbg_: Editor line numbers model ---
+
+/// Line number display mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbgLineNumberMode {
+    Off,
+    On,
+    Relative,
+    Interval,
+}
+
+impl BbgLineNumberMode {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Off => "Off", Self::On => "On",
+            Self::Relative => "Relative", Self::Interval => "Interval",
+        }
+    }
+
+    pub fn shows_numbers(&self) -> bool { !matches!(self, Self::Off) }
+}
+
+/// Configuration for line numbers.
+#[derive(Debug, Clone)]
+pub struct BbgLineNumberConfig {
+    pub mode: BbgLineNumberMode,
+    pub interval: u32,
+    pub min_width: u32,
+}
+
+impl BbgLineNumberConfig {
+    pub fn new(mode: BbgLineNumberMode) -> Self {
+        Self { mode, interval: 10, min_width: 2 }
+    }
+
+    pub fn gutter_width(&self, total_lines: u32) -> u32 {
+        if !self.mode.shows_numbers() { return 0; }
+        let digits = if total_lines == 0 { 1 } else { (total_lines as f64).log10().floor() as u32 + 1 };
+        digits.max(self.min_width)
+    }
+}
+
+/// A line number to display.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BbgLineNumber {
+    pub line: u32,
+    pub display: String,
+    pub is_current: bool,
+    pub is_modified: bool,
+}
+
+impl BbgLineNumber {
+    pub fn new(line: u32, display: &str) -> Self {
+        Self { line, display: display.to_string(), is_current: false, is_modified: false }
+    }
+
+    pub fn absolute(line: u32) -> Self { Self::new(line, &(line + 1).to_string()) }
+
+    pub fn relative(line: u32, cursor_line: u32) -> Self {
+        let dist = if line == cursor_line { line + 1 } else { line.abs_diff(cursor_line) };
+        Self::new(line, &dist.to_string())
+    }
+}
+
+/// The line numbers model.
+#[derive(Debug)]
+pub struct BbgLineNumberModel {
+    config: BbgLineNumberConfig,
+    cursor_line: u32,
+    total_lines: u32,
+    modified_lines: Vec<u32>,
+}
+
+impl BbgLineNumberModel {
+    pub fn new(config: BbgLineNumberConfig) -> Self {
+        Self { config, cursor_line: 0, total_lines: 0, modified_lines: Vec::new() }
+    }
+
+    pub fn set_cursor_line(&mut self, line: u32) { self.cursor_line = line; }
+    pub fn set_total_lines(&mut self, total: u32) { self.total_lines = total; }
+
+    pub fn gutter_width(&self) -> u32 { self.config.gutter_width(self.total_lines) }
+
+    pub fn line_number_for(&self, line: u32) -> Option<BbgLineNumber> {
+        if !self.config.mode.shows_numbers() { return None; }
+        let mut ln = match self.config.mode {
+            BbgLineNumberMode::Off => return None,
+            BbgLineNumberMode::On => BbgLineNumber::absolute(line),
+            BbgLineNumberMode::Relative => BbgLineNumber::relative(line, self.cursor_line),
+            BbgLineNumberMode::Interval => {
+                if line == self.cursor_line || (line + 1) % self.config.interval == 0 {
+                    BbgLineNumber::absolute(line)
+                } else {
+                    BbgLineNumber::new(line, "")
+                }
+            }
+        };
+        ln.is_current = line == self.cursor_line;
+        ln.is_modified = self.modified_lines.contains(&line);
+        Some(ln)
+    }
+
+    pub fn mark_modified(&mut self, line: u32) {
+        if !self.modified_lines.contains(&line) { self.modified_lines.push(line); }
+    }
+
+    pub fn clear_modified(&mut self) { self.modified_lines.clear(); }
+
+    pub fn visible_range(&self, first: u32, count: u32) -> Vec<BbgLineNumber> {
+        (first..first + count).filter_map(|l| self.line_number_for(l)).collect()
+    }
+
+    pub fn config(&self) -> &BbgLineNumberConfig { &self.config }
+    pub fn set_config(&mut self, c: BbgLineNumberConfig) { self.config = c; }
+}
+
+#[cfg(test)]
+mod bbg_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbg_mode() {
+        assert!(BbgLineNumberMode::On.shows_numbers());
+        assert!(!BbgLineNumberMode::Off.shows_numbers());
+        assert_eq!(BbgLineNumberMode::Relative.label(), "Relative");
+    }
+
+    #[test]
+    fn test_bbg_gutter_width() {
+        let c = BbgLineNumberConfig::new(BbgLineNumberMode::On);
+        assert_eq!(c.gutter_width(1), 2); // min width
+        assert_eq!(c.gutter_width(999), 3);
+        assert_eq!(c.gutter_width(10000), 5);
+    }
+
+    #[test]
+    fn test_bbg_gutter_off() {
+        let c = BbgLineNumberConfig::new(BbgLineNumberMode::Off);
+        assert_eq!(c.gutter_width(1000), 0);
+    }
+
+    #[test]
+    fn test_bbg_absolute() {
+        let ln = BbgLineNumber::absolute(0);
+        assert_eq!(ln.display, "1");
+    }
+
+    #[test]
+    fn test_bbg_relative() {
+        assert_eq!(BbgLineNumber::relative(5, 5).display, "6"); // current line shows absolute
+        assert_eq!(BbgLineNumber::relative(3, 5).display, "2");
+        assert_eq!(BbgLineNumber::relative(8, 5).display, "3");
+    }
+
+    #[test]
+    fn test_bbg_model_absolute() {
+        let mut m = BbgLineNumberModel::new(BbgLineNumberConfig::new(BbgLineNumberMode::On));
+        m.set_total_lines(100);
+        m.set_cursor_line(5);
+        let ln = m.line_number_for(5).unwrap();
+        assert_eq!(ln.display, "6");
+        assert!(ln.is_current);
+    }
+
+    #[test]
+    fn test_bbg_model_relative() {
+        let mut m = BbgLineNumberModel::new(BbgLineNumberConfig::new(BbgLineNumberMode::Relative));
+        m.set_cursor_line(10);
+        let ln = m.line_number_for(7).unwrap();
+        assert_eq!(ln.display, "3");
+    }
+
+    #[test]
+    fn test_bbg_model_off() {
+        let m = BbgLineNumberModel::new(BbgLineNumberConfig::new(BbgLineNumberMode::Off));
+        assert!(m.line_number_for(0).is_none());
+    }
+
+    #[test]
+    fn test_bbg_model_interval() {
+        let mut c = BbgLineNumberConfig::new(BbgLineNumberMode::Interval);
+        c.interval = 5;
+        let mut m = BbgLineNumberModel::new(c);
+        m.set_cursor_line(0);
+        let ln = m.line_number_for(4).unwrap(); // line 5 (0-indexed 4)
+        assert_eq!(ln.display, "5");
+        let ln2 = m.line_number_for(2).unwrap();
+        assert_eq!(ln2.display, ""); // not interval, not cursor
+    }
+
+    #[test]
+    fn test_bbg_model_modified() {
+        let mut m = BbgLineNumberModel::new(BbgLineNumberConfig::new(BbgLineNumberMode::On));
+        m.mark_modified(5);
+        let ln = m.line_number_for(5).unwrap();
+        assert!(ln.is_modified);
+    }
+
+    #[test]
+    fn test_bbg_visible_range() {
+        let mut m = BbgLineNumberModel::new(BbgLineNumberConfig::new(BbgLineNumberMode::On));
+        m.set_total_lines(100);
+        let nums = m.visible_range(0, 5);
+        assert_eq!(nums.len(), 5);
+    }
+}
