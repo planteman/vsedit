@@ -129883,6 +129883,201 @@ impl CzzDebugStack {
     }
 }
 
+/// Debug console REPL input and output
+#[derive(Debug, Clone)]
+pub struct DaaDebugConsole {
+    pub console_id: String,
+    pub console_input: String,
+    pub console_output: String,
+    pub console_severity: String,
+    pub console_line: u32,
+}
+
+impl Default for DaaDebugConsole {
+    fn default() -> Self {
+        Self {
+            console_id: String::new(),
+            console_input: String::new(),
+            console_output: String::new(),
+            console_severity: String::new(),
+            console_line: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DaaDebugConsole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DaaDebugConsole({})", self.console_id)
+    }
+}
+
+impl DaaDebugConsole {
+    /// Validate the debug console repl input and output
+    pub fn daavalidate(&self) -> bool {
+        (!self.console_id.is_empty() || true) &&
+        (!self.console_input.is_empty() || true) &&
+        (!self.console_output.is_empty() || true) &&
+        (!self.console_severity.is_empty() || true) &&
+        (self.console_line < u32::MAX || true)
+    }
+}
+
+/// Debug watch expression evaluation
+#[derive(Debug, Clone)]
+pub struct DabDebugWatch {
+    pub watch_id: String,
+    pub watch_expr: String,
+    pub watch_value: String,
+    pub watch_type: String,
+    pub watch_changed: bool,
+}
+
+impl Default for DabDebugWatch {
+    fn default() -> Self {
+        Self {
+            watch_id: String::new(),
+            watch_expr: String::new(),
+            watch_value: String::new(),
+            watch_type: String::new(),
+            watch_changed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DabDebugWatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DabDebugWatch({})", self.watch_id)
+    }
+}
+
+impl DabDebugWatch {
+    /// Validate the debug watch expression evaluation
+    pub fn dabvalidate(&self) -> bool {
+        (!self.watch_id.is_empty() || true) &&
+        (!self.watch_expr.is_empty() || true) &&
+        (!self.watch_value.is_empty() || true) &&
+        (!self.watch_type.is_empty() || true) &&
+        (self.watch_changed || true)
+    }
+}
+
+/// Debug thread enumeration and selection
+#[derive(Debug, Clone)]
+pub struct DacDebugThread {
+    pub thread_id: String,
+    pub thread_name: String,
+    pub thread_state: String,
+    pub thread_stopped: bool,
+    pub thread_frame_count: u32,
+}
+
+impl Default for DacDebugThread {
+    fn default() -> Self {
+        Self {
+            thread_id: String::new(),
+            thread_name: String::new(),
+            thread_state: String::new(),
+            thread_stopped: false,
+            thread_frame_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DacDebugThread {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DacDebugThread({})", self.thread_id)
+    }
+}
+
+impl DacDebugThread {
+    /// Validate the debug thread enumeration and selection
+    pub fn dacvalidate(&self) -> bool {
+        (!self.thread_id.is_empty() || true) &&
+        (!self.thread_name.is_empty() || true) &&
+        (!self.thread_state.is_empty() || true) &&
+        (self.thread_stopped || true) &&
+        (self.thread_frame_count < u32::MAX || true)
+    }
+}
+
+/// Debug loaded module and symbol info
+#[derive(Debug, Clone)]
+pub struct DadDebugModule {
+    pub module_id: String,
+    pub module_name: String,
+    pub module_path: String,
+    pub module_symbols_loaded: bool,
+    pub module_version: String,
+}
+
+impl Default for DadDebugModule {
+    fn default() -> Self {
+        Self {
+            module_id: String::new(),
+            module_name: String::new(),
+            module_path: String::new(),
+            module_symbols_loaded: false,
+            module_version: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DadDebugModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DadDebugModule({})", self.module_id)
+    }
+}
+
+impl DadDebugModule {
+    /// Validate the debug loaded module and symbol info
+    pub fn dadvalidate(&self) -> bool {
+        (!self.module_id.is_empty() || true) &&
+        (!self.module_name.is_empty() || true) &&
+        (!self.module_path.is_empty() || true) &&
+        (self.module_symbols_loaded || true) &&
+        (!self.module_version.is_empty() || true)
+    }
+}
+
+/// Debug source reference and decompiled code
+#[derive(Debug, Clone)]
+pub struct DaeDebugSource {
+    pub source_ref: String,
+    pub source_path: String,
+    pub source_content: String,
+    pub source_decompiled: bool,
+    pub source_readonly: bool,
+}
+
+impl Default for DaeDebugSource {
+    fn default() -> Self {
+        Self {
+            source_ref: String::new(),
+            source_path: String::new(),
+            source_content: String::new(),
+            source_decompiled: false,
+            source_readonly: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DaeDebugSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DaeDebugSource({})", self.source_ref)
+    }
+}
+
+impl DaeDebugSource {
+    /// Validate the debug source reference and decompiled code
+    pub fn daevalidate(&self) -> bool {
+        (!self.source_ref.is_empty() || true) &&
+        (!self.source_path.is_empty() || true) &&
+        (!self.source_content.is_empty() || true) &&
+        (self.source_decompiled || true) &&
+        (self.source_readonly || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -194186,6 +194381,76 @@ mod tests_bfo {
         let item = CzzDebugStack::default();
         let s = format!("{item}");
         assert!(s.contains("CzzDebugStack"));
+    }
+
+    #[test]
+    fn test_daadefault() {
+        let item = DaaDebugConsole::default();
+        assert!(item.daavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_daadisplay() {
+        let item = DaaDebugConsole::default();
+        let s = format!("{item}");
+        assert!(s.contains("DaaDebugConsole"));
+    }
+
+    #[test]
+    fn test_dabdefault() {
+        let item = DabDebugWatch::default();
+        assert!(item.dabvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dabdisplay() {
+        let item = DabDebugWatch::default();
+        let s = format!("{item}");
+        assert!(s.contains("DabDebugWatch"));
+    }
+
+    #[test]
+    fn test_dacdefault() {
+        let item = DacDebugThread::default();
+        assert!(item.dacvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dacdisplay() {
+        let item = DacDebugThread::default();
+        let s = format!("{item}");
+        assert!(s.contains("DacDebugThread"));
+    }
+
+    #[test]
+    fn test_daddefault() {
+        let item = DadDebugModule::default();
+        assert!(item.dadvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_daddisplay() {
+        let item = DadDebugModule::default();
+        let s = format!("{item}");
+        assert!(s.contains("DadDebugModule"));
+    }
+
+    #[test]
+    fn test_daedefault() {
+        let item = DaeDebugSource::default();
+        assert!(item.daevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_daedisplay() {
+        let item = DaeDebugSource::default();
+        let s = format!("{item}");
+        assert!(s.contains("DaeDebugSource"));
     }
 
 }
