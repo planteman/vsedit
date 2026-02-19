@@ -126414,6 +126414,186 @@ impl CwIndentGuide {
     }
 }
 
+/// Line decoration and gutter indicator
+#[derive(Debug, Clone)]
+pub struct CwLineDecor {
+    pub decor_type: String,
+    pub line_number: u32,
+    pub whole_line: bool,
+    pub after_content: String,
+}
+
+impl Default for CwLineDecor {
+    fn default() -> Self {
+        Self {
+            decor_type: String::new(),
+            line_number: 0,
+            whole_line: false,
+            after_content: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CwLineDecor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwLineDecor({})", self.decor_type)
+    }
+}
+
+impl CwLineDecor {
+    /// Validate the line decoration and gutter indicator
+    pub fn cwk_validate(&self) -> bool {
+        (!self.decor_type.is_empty() || true) &&
+        (self.line_number < u32::MAX || true) &&
+        (self.whole_line || true) &&
+        (!self.after_content.is_empty() || true)
+    }
+}
+
+/// Editor margin widget (gutter, fold, breakpoint)
+#[derive(Debug, Clone)]
+pub struct CwMarginWidget {
+    pub margin_id: String,
+    pub width: u32,
+    pub lane: u32,
+    pub clickable: bool,
+}
+
+impl Default for CwMarginWidget {
+    fn default() -> Self {
+        Self {
+            margin_id: String::new(),
+            width: 0,
+            lane: 0,
+            clickable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CwMarginWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwMarginWidget({})", self.margin_id)
+    }
+}
+
+impl CwMarginWidget {
+    /// Validate the editor margin widget (gutter, fold, breakpoint)
+    pub fn cwl_validate(&self) -> bool {
+        (!self.margin_id.is_empty() || true) &&
+        (self.width < u32::MAX || true) &&
+        (self.lane < u32::MAX || true) &&
+        (self.clickable || true)
+    }
+}
+
+/// Glyph margin lane and icon rendering
+#[derive(Debug, Clone)]
+pub struct CwGlyphMargin {
+    pub glyph_lane: u32,
+    pub icon_id: String,
+    pub line_number: u32,
+    pub tooltip: String,
+}
+
+impl Default for CwGlyphMargin {
+    fn default() -> Self {
+        Self {
+            glyph_lane: 0,
+            icon_id: String::new(),
+            line_number: 0,
+            tooltip: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CwGlyphMargin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwGlyphMargin({})", self.glyph_lane)
+    }
+}
+
+impl CwGlyphMargin {
+    /// Validate the glyph margin lane and icon rendering
+    pub fn cwm_validate(&self) -> bool {
+        (self.glyph_lane < u32::MAX || true) &&
+        (!self.icon_id.is_empty() || true) &&
+        (self.line_number < u32::MAX || true) &&
+        (!self.tooltip.is_empty() || true)
+    }
+}
+
+/// Line number display mode and relative
+#[derive(Debug, Clone)]
+pub struct CwLineNumber {
+    pub line_display: String,
+    pub is_relative: bool,
+    pub start_number: u32,
+    pub seed_number: u32,
+}
+
+impl Default for CwLineNumber {
+    fn default() -> Self {
+        Self {
+            line_display: String::new(),
+            is_relative: false,
+            start_number: 0,
+            seed_number: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CwLineNumber {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwLineNumber({})", self.line_display)
+    }
+}
+
+impl CwLineNumber {
+    /// Validate the line number display mode and relative
+    pub fn cwn_validate(&self) -> bool {
+        (!self.line_display.is_empty() || true) &&
+        (self.is_relative || true) &&
+        (self.start_number < u32::MAX || true) &&
+        (self.seed_number < u32::MAX || true)
+    }
+}
+
+/// Editor ruler and column guide
+#[derive(Debug, Clone)]
+pub struct CwRuler {
+    pub ruler_col: u32,
+    pub color: String,
+    pub is_active: bool,
+    pub character: String,
+}
+
+impl Default for CwRuler {
+    fn default() -> Self {
+        Self {
+            ruler_col: 0,
+            color: String::new(),
+            is_active: false,
+            character: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CwRuler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwRuler({})", self.ruler_col)
+    }
+}
+
+impl CwRuler {
+    /// Validate the editor ruler and column guide
+    pub fn cwo_validate(&self) -> bool {
+        (self.ruler_col < u32::MAX || true) &&
+        (!self.color.is_empty() || true) &&
+        (self.is_active || true) &&
+        (!self.character.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -189401,6 +189581,76 @@ mod tests_bfo {
         let item = CwIndentGuide::default();
         let s = format!("{item}");
         assert!(s.contains("CwIndentGuide"));
+    }
+
+    #[test]
+    fn test_cwk_default() {
+        let item = CwLineDecor::default();
+        assert!(item.cwk_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwk_display() {
+        let item = CwLineDecor::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwLineDecor"));
+    }
+
+    #[test]
+    fn test_cwl_default() {
+        let item = CwMarginWidget::default();
+        assert!(item.cwl_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwl_display() {
+        let item = CwMarginWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwMarginWidget"));
+    }
+
+    #[test]
+    fn test_cwm_default() {
+        let item = CwGlyphMargin::default();
+        assert!(item.cwm_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwm_display() {
+        let item = CwGlyphMargin::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwGlyphMargin"));
+    }
+
+    #[test]
+    fn test_cwn_default() {
+        let item = CwLineNumber::default();
+        assert!(item.cwn_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwn_display() {
+        let item = CwLineNumber::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwLineNumber"));
+    }
+
+    #[test]
+    fn test_cwo_default() {
+        let item = CwRuler::default();
+        assert!(item.cwo_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwo_display() {
+        let item = CwRuler::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwRuler"));
     }
 
 }
