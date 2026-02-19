@@ -79952,6 +79952,611 @@ impl BftWatchPanel {
 }
 
 
+
+// bfu_ Variable Inspector Model
+
+/// Scope kind for debug variable inspection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfuScopeKind {
+    Local,
+    Global,
+    Closure,
+    Catch,
+    Block,
+    Module,
+    Register,
+}
+
+/// A debug variable in the variables pane.
+#[derive(Debug, Clone)]
+pub struct BfuVariable {
+    pub name: String,
+    pub value: String,
+    pub var_type: Option<String>,
+    pub evaluatable_name: Option<String>,
+    pub children: Vec<BfuVariable>,
+    pub has_children: bool,
+    pub is_expanded: bool,
+}
+
+/// A scope containing variables.
+#[derive(Debug, Clone)]
+pub struct BfuScope {
+    pub name: String,
+    pub kind: BfuScopeKind,
+    pub variables: Vec<BfuVariable>,
+    pub expensive: bool,
+    pub is_expanded: bool,
+}
+
+/// Variable inspector panel model.
+#[derive(Debug, Clone)]
+pub struct BfuVariableInspector {
+    scopes: Vec<BfuScope>,
+    selected_path: Vec<usize>,
+}
+
+impl BfuVariableInspector {
+    pub fn new() -> Self {
+        Self { scopes: Vec::new(), selected_path: Vec::new() }
+    }
+
+    pub fn set_scopes(&mut self, scopes: Vec<BfuScope>) {
+        self.scopes = scopes;
+        self.selected_path.clear();
+    }
+
+    pub fn scope_count(&self) -> usize {
+        self.scopes.len()
+    }
+
+    pub fn toggle_scope(&mut self, index: usize) {
+        if let Some(s) = self.scopes.get_mut(index) {
+            s.is_expanded = !s.is_expanded;
+        }
+    }
+
+    pub fn variable_count(&self, scope_index: usize) -> usize {
+        self.scopes.get(scope_index).map(|s| s.variables.len()).unwrap_or(0)
+    }
+
+    pub fn get_variable(&self, scope_index: usize, var_index: usize) -> Option<&BfuVariable> {
+        self.scopes.get(scope_index).and_then(|s| s.variables.get(var_index))
+    }
+
+    pub fn set_variable_value(&mut self, scope_index: usize, var_index: usize, new_value: &str) {
+        if let Some(scope) = self.scopes.get_mut(scope_index) {
+            if let Some(var) = scope.variables.get_mut(var_index) {
+                var.value = new_value.to_string();
+            }
+        }
+    }
+
+    pub fn expand_variable(&mut self, scope_index: usize, var_index: usize) {
+        if let Some(scope) = self.scopes.get_mut(scope_index) {
+            if let Some(var) = scope.variables.get_mut(var_index) {
+                var.is_expanded = true;
+            }
+        }
+    }
+
+    pub fn collapse_variable(&mut self, scope_index: usize, var_index: usize) {
+        if let Some(scope) = self.scopes.get_mut(scope_index) {
+            if let Some(var) = scope.variables.get_mut(var_index) {
+                var.is_expanded = false;
+            }
+        }
+    }
+
+    pub fn total_variables(&self) -> usize {
+        self.scopes.iter().map(|s| s.variables.len()).sum()
+    }
+
+    pub fn scopes(&self) -> &[BfuScope] {
+        &self.scopes
+    }
+}
+
+
+// bfv_ Terminal Instance Model
+
+/// Terminal shell type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfvShellKind {
+    Bash,
+    Zsh,
+    Fish,
+    PowerShell,
+    Cmd,
+    Custom,
+}
+
+/// Terminal process state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfvTerminalState {
+    Starting,
+    Running,
+    Exited,
+    Failed,
+}
+
+/// A terminal instance in the integrated terminal.
+#[derive(Debug, Clone)]
+pub struct BfvTerminalInstance {
+    pub id: u64,
+    pub title: String,
+    pub shell_kind: BfvShellKind,
+    pub state: BfvTerminalState,
+    pub cwd: String,
+    pub exit_code: Option<i32>,
+    pub pid: Option<u32>,
+    pub cols: u16,
+    pub rows: u16,
+    pub is_active: bool,
+}
+
+/// Terminal instance manager.
+#[derive(Debug, Clone)]
+pub struct BfvTerminalManager {
+    instances: Vec<BfvTerminalInstance>,
+    next_id: u64,
+    active_id: Option<u64>,
+}
+
+impl BfvTerminalManager {
+    pub fn new() -> Self {
+        Self { instances: Vec::new(), next_id: 1, active_id: None }
+    }
+
+    pub fn create_terminal(&mut self, title: &str, shell: BfvShellKind, cwd: &str) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.instances.push(BfvTerminalInstance {
+            id, title: title.to_string(), shell_kind: shell,
+            state: BfvTerminalState::Starting, cwd: cwd.to_string(),
+            exit_code: None, pid: None, cols: 80, rows: 24, is_active: false,
+        });
+        if self.active_id.is_none() {
+            self.set_active(id);
+        }
+        id
+    }
+
+    pub fn set_active(&mut self, id: u64) {
+        for inst in &mut self.instances {
+            inst.is_active = inst.id == id;
+        }
+        self.active_id = Some(id);
+    }
+
+    pub fn mark_running(&mut self, id: u64, pid: u32) {
+        if let Some(inst) = self.instances.iter_mut().find(|i| i.id == id) {
+            inst.state = BfvTerminalState::Running;
+            inst.pid = Some(pid);
+        }
+    }
+
+    pub fn mark_exited(&mut self, id: u64, code: i32) {
+        if let Some(inst) = self.instances.iter_mut().find(|i| i.id == id) {
+            inst.state = BfvTerminalState::Exited;
+            inst.exit_code = Some(code);
+        }
+    }
+
+    pub fn destroy(&mut self, id: u64) -> bool {
+        if let Some(pos) = self.instances.iter().position(|i| i.id == id) {
+            self.instances.remove(pos);
+            if self.active_id == Some(id) {
+                self.active_id = self.instances.first().map(|i| i.id);
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn resize(&mut self, id: u64, cols: u16, rows: u16) {
+        if let Some(inst) = self.instances.iter_mut().find(|i| i.id == id) {
+            inst.cols = cols;
+            inst.rows = rows;
+        }
+    }
+
+    pub fn rename(&mut self, id: u64, title: &str) {
+        if let Some(inst) = self.instances.iter_mut().find(|i| i.id == id) {
+            inst.title = title.to_string();
+        }
+    }
+
+    pub fn active(&self) -> Option<&BfvTerminalInstance> {
+        self.active_id.and_then(|id| self.instances.iter().find(|i| i.id == id))
+    }
+
+    pub fn count(&self) -> usize {
+        self.instances.len()
+    }
+
+    pub fn instances(&self) -> &[BfvTerminalInstance] {
+        &self.instances
+    }
+}
+
+
+// bfw_ Workspace Edit Model
+
+/// Kind of workspace edit operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BfwEditKind {
+    TextEdit { file: String, offset: usize, length: usize, new_text: String },
+    CreateFile { path: String, overwrite: bool },
+    DeleteFile { path: String, recursive: bool },
+    RenameFile { old_path: String, new_path: String, overwrite: bool },
+}
+
+/// A workspace edit containing multiple operations.
+#[derive(Debug, Clone)]
+pub struct BfwWorkspaceEdit {
+    edits: Vec<BfwEditKind>,
+    label: Option<String>,
+    needs_confirmation: bool,
+}
+
+impl BfwWorkspaceEdit {
+    pub fn new() -> Self {
+        Self { edits: Vec::new(), label: None, needs_confirmation: false }
+    }
+
+    pub fn with_label(label: &str) -> Self {
+        Self { edits: Vec::new(), label: Some(label.to_string()), needs_confirmation: false }
+    }
+
+    pub fn add_text_edit(&mut self, file: &str, offset: usize, length: usize, new_text: &str) {
+        self.edits.push(BfwEditKind::TextEdit {
+            file: file.to_string(), offset, length, new_text: new_text.to_string(),
+        });
+    }
+
+    pub fn add_create_file(&mut self, path: &str, overwrite: bool) {
+        self.edits.push(BfwEditKind::CreateFile { path: path.to_string(), overwrite });
+    }
+
+    pub fn add_delete_file(&mut self, path: &str, recursive: bool) {
+        self.edits.push(BfwEditKind::DeleteFile { path: path.to_string(), recursive });
+    }
+
+    pub fn add_rename_file(&mut self, old: &str, new: &str, overwrite: bool) {
+        self.edits.push(BfwEditKind::RenameFile {
+            old_path: old.to_string(), new_path: new.to_string(), overwrite,
+        });
+    }
+
+    pub fn set_needs_confirmation(&mut self, val: bool) {
+        self.needs_confirmation = val;
+    }
+
+    pub fn edit_count(&self) -> usize {
+        self.edits.len()
+    }
+
+    pub fn text_edit_count(&self) -> usize {
+        self.edits.iter().filter(|e| matches!(e, BfwEditKind::TextEdit { .. })).count()
+    }
+
+    pub fn file_operation_count(&self) -> usize {
+        self.edits.iter().filter(|e| !matches!(e, BfwEditKind::TextEdit { .. })).count()
+    }
+
+    pub fn affected_files(&self) -> Vec<String> {
+        let mut files = Vec::new();
+        for edit in &self.edits {
+            match edit {
+                BfwEditKind::TextEdit { file, .. } => { if !files.contains(file) { files.push(file.clone()); } }
+                BfwEditKind::CreateFile { path, .. } => { if !files.contains(path) { files.push(path.clone()); } }
+                BfwEditKind::DeleteFile { path, .. } => { if !files.contains(path) { files.push(path.clone()); } }
+                BfwEditKind::RenameFile { old_path, new_path, .. } => {
+                    if !files.contains(old_path) { files.push(old_path.clone()); }
+                    if !files.contains(new_path) { files.push(new_path.clone()); }
+                }
+            }
+        }
+        files
+    }
+
+    pub fn edits(&self) -> &[BfwEditKind] {
+        &self.edits
+    }
+
+    pub fn label(&self) -> Option<&str> {
+        self.label.as_deref()
+    }
+
+    pub fn needs_confirmation(&self) -> bool {
+        self.needs_confirmation
+    }
+}
+
+
+// bfx_ Refactoring Preview Model
+
+/// State of a refactoring preview.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfxPreviewState {
+    Pending,
+    Computing,
+    Ready,
+    Applied,
+    Cancelled,
+}
+
+/// A change in the refactoring preview.
+#[derive(Debug, Clone)]
+pub struct BfxPreviewChange {
+    pub file: String,
+    pub original_text: String,
+    pub new_text: String,
+    pub line: usize,
+    pub is_checked: bool,
+}
+
+/// Refactoring preview model.
+#[derive(Debug, Clone)]
+pub struct BfxRefactoringPreview {
+    pub title: String,
+    pub state: BfxPreviewState,
+    pub changes: Vec<BfxPreviewChange>,
+    pub selected_index: Option<usize>,
+}
+
+impl BfxRefactoringPreview {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            state: BfxPreviewState::Pending,
+            changes: Vec::new(),
+            selected_index: None,
+        }
+    }
+
+    pub fn set_computing(&mut self) {
+        self.state = BfxPreviewState::Computing;
+    }
+
+    pub fn set_changes(&mut self, changes: Vec<BfxPreviewChange>) {
+        self.changes = changes;
+        self.state = BfxPreviewState::Ready;
+    }
+
+    pub fn toggle_change(&mut self, index: usize) {
+        if let Some(c) = self.changes.get_mut(index) {
+            c.is_checked = !c.is_checked;
+        }
+    }
+
+    pub fn check_all(&mut self) {
+        for c in &mut self.changes { c.is_checked = true; }
+    }
+
+    pub fn uncheck_all(&mut self) {
+        for c in &mut self.changes { c.is_checked = false; }
+    }
+
+    pub fn checked_changes(&self) -> Vec<&BfxPreviewChange> {
+        self.changes.iter().filter(|c| c.is_checked).collect()
+    }
+
+    pub fn apply(&mut self) {
+        self.state = BfxPreviewState::Applied;
+    }
+
+    pub fn cancel(&mut self) {
+        self.state = BfxPreviewState::Cancelled;
+    }
+
+    pub fn affected_file_count(&self) -> usize {
+        let mut files: Vec<&str> = self.changes.iter().map(|c| c.file.as_str()).collect();
+        files.sort();
+        files.dedup();
+        files.len()
+    }
+
+    pub fn total_changes(&self) -> usize {
+        self.changes.len()
+    }
+
+    pub fn select(&mut self, index: usize) {
+        if index < self.changes.len() {
+            self.selected_index = Some(index);
+        }
+    }
+}
+
+
+// bfy_ Inline Values Model
+
+/// Kind of inline value displayed in the editor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfyInlineValueKind {
+    Variable,
+    Expression,
+    Evaluation,
+    Text,
+}
+
+/// An inline value decoration in the editor during debugging.
+#[derive(Debug, Clone)]
+pub struct BfyInlineValue {
+    pub line: usize,
+    pub column: usize,
+    pub end_column: usize,
+    pub kind: BfyInlineValueKind,
+    pub text: String,
+    pub variable_name: Option<String>,
+}
+
+/// Inline values provider model.
+#[derive(Debug, Clone)]
+pub struct BfyInlineValuesModel {
+    values: Vec<BfyInlineValue>,
+    is_enabled: bool,
+    stopped_at_line: Option<usize>,
+}
+
+impl BfyInlineValuesModel {
+    pub fn new() -> Self {
+        Self { values: Vec::new(), is_enabled: true, stopped_at_line: None }
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.is_enabled = enabled;
+        if !enabled { self.values.clear(); }
+    }
+
+    pub fn set_stopped_line(&mut self, line: usize) {
+        self.stopped_at_line = Some(line);
+    }
+
+    pub fn add_value(&mut self, line: usize, col: usize, end_col: usize, kind: BfyInlineValueKind, text: &str) {
+        self.values.push(BfyInlineValue {
+            line, column: col, end_column: end_col, kind,
+            text: text.to_string(), variable_name: None,
+        });
+    }
+
+    pub fn add_variable_value(&mut self, line: usize, col: usize, end_col: usize, name: &str, value: &str) {
+        self.values.push(BfyInlineValue {
+            line, column: col, end_column: end_col, kind: BfyInlineValueKind::Variable,
+            text: value.to_string(), variable_name: Some(name.to_string()),
+        });
+    }
+
+    pub fn values_at_line(&self, line: usize) -> Vec<&BfyInlineValue> {
+        self.values.iter().filter(|v| v.line == line).collect()
+    }
+
+    pub fn clear(&mut self) {
+        self.values.clear();
+        self.stopped_at_line = None;
+    }
+
+    pub fn count(&self) -> usize {
+        self.values.len()
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.is_enabled
+    }
+
+    pub fn stopped_at_line(&self) -> Option<usize> {
+        self.stopped_at_line
+    }
+
+    pub fn values(&self) -> &[BfyInlineValue] {
+        &self.values
+    }
+}
+
+
+// bfz_ Type Hierarchy Model
+
+/// Kind of type in a hierarchy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfzTypeKind {
+    Class,
+    Interface,
+    Struct,
+    Enum,
+    TypeAlias,
+    Trait,
+}
+
+/// Direction of type hierarchy traversal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BfzHierarchyDirection {
+    Supertypes,
+    Subtypes,
+}
+
+/// A type in the hierarchy tree.
+#[derive(Debug, Clone)]
+pub struct BfzTypeItem {
+    pub name: String,
+    pub kind: BfzTypeKind,
+    pub uri: String,
+    pub line: usize,
+    pub detail: Option<String>,
+    pub children: Vec<BfzTypeItem>,
+    pub is_expanded: bool,
+}
+
+/// Type hierarchy model for displaying super/sub-type relationships.
+#[derive(Debug, Clone)]
+pub struct BfzTypeHierarchy {
+    pub root: Option<BfzTypeItem>,
+    pub direction: BfzHierarchyDirection,
+    pub is_visible: bool,
+}
+
+impl BfzTypeHierarchy {
+    pub fn new() -> Self {
+        Self { root: None, direction: BfzHierarchyDirection::Supertypes, is_visible: false }
+    }
+
+    pub fn set_root(&mut self, item: BfzTypeItem) {
+        self.root = Some(item);
+        self.is_visible = true;
+    }
+
+    pub fn set_direction(&mut self, dir: BfzHierarchyDirection) {
+        self.direction = dir;
+    }
+
+    pub fn clear(&mut self) {
+        self.root = None;
+        self.is_visible = false;
+    }
+
+    pub fn depth(&self) -> usize {
+        fn measure(item: &BfzTypeItem) -> usize {
+            if item.children.is_empty() {
+                1
+            } else {
+                1 + item.children.iter().map(|c| measure(c)).max().unwrap_or(0)
+            }
+        }
+        self.root.as_ref().map(|r| measure(r)).unwrap_or(0)
+    }
+
+    pub fn total_items(&self) -> usize {
+        fn count(item: &BfzTypeItem) -> usize {
+            1 + item.children.iter().map(|c| count(c)).sum::<usize>()
+        }
+        self.root.as_ref().map(|r| count(r)).unwrap_or(0)
+    }
+
+    pub fn toggle_expand(&mut self, path: &[usize]) {
+        if let Some(root) = &mut self.root {
+            let mut current = root;
+            for &idx in path {
+                if idx < current.children.len() {
+                    current = &mut current.children[idx];
+                } else {
+                    return;
+                }
+            }
+            current.is_expanded = !current.is_expanded;
+        }
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.is_visible
+    }
+
+    pub fn root_name(&self) -> Option<&str> {
+        self.root.as_ref().map(|r| r.name.as_str())
+    }
+}
+
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -80529,6 +81134,626 @@ mod tests_bfo {
             BftValueKind::Error, BftValueKind::Undefined,
         ];
         assert_eq!(kinds.len(), 8);
+    }
+
+
+
+    // bfu_ tests
+
+    #[test]
+    fn test_bfu_inspector_creation() {
+        let vi = BfuVariableInspector::new();
+        assert_eq!(vi.scope_count(), 0);
+        assert_eq!(vi.total_variables(), 0);
+    }
+
+    #[test]
+    fn test_bfu_set_scopes() {
+        let mut vi = BfuVariableInspector::new();
+        vi.set_scopes(vec![BfuScope {
+            name: "Local".into(), kind: BfuScopeKind::Local,
+            variables: vec![BfuVariable {
+                name: "x".into(), value: "42".into(), var_type: Some("i32".into()),
+                evaluatable_name: None, children: vec![], has_children: false, is_expanded: false,
+            }],
+            expensive: false, is_expanded: true,
+        }]);
+        assert_eq!(vi.scope_count(), 1);
+        assert_eq!(vi.total_variables(), 1);
+    }
+
+    #[test]
+    fn test_bfu_toggle_scope() {
+        let mut vi = BfuVariableInspector::new();
+        vi.set_scopes(vec![BfuScope {
+            name: "Local".into(), kind: BfuScopeKind::Local,
+            variables: vec![], expensive: false, is_expanded: true,
+        }]);
+        vi.toggle_scope(0);
+        assert!(!vi.scopes()[0].is_expanded);
+        vi.toggle_scope(0);
+        assert!(vi.scopes()[0].is_expanded);
+    }
+
+    #[test]
+    fn test_bfu_get_variable() {
+        let mut vi = BfuVariableInspector::new();
+        vi.set_scopes(vec![BfuScope {
+            name: "Local".into(), kind: BfuScopeKind::Local,
+            variables: vec![BfuVariable {
+                name: "y".into(), value: "hello".into(), var_type: None,
+                evaluatable_name: None, children: vec![], has_children: false, is_expanded: false,
+            }],
+            expensive: false, is_expanded: true,
+        }]);
+        assert_eq!(vi.get_variable(0, 0).unwrap().name, "y");
+        assert!(vi.get_variable(0, 1).is_none());
+    }
+
+    #[test]
+    fn test_bfu_set_variable_value() {
+        let mut vi = BfuVariableInspector::new();
+        vi.set_scopes(vec![BfuScope {
+            name: "Local".into(), kind: BfuScopeKind::Local,
+            variables: vec![BfuVariable {
+                name: "z".into(), value: "0".into(), var_type: None,
+                evaluatable_name: None, children: vec![], has_children: false, is_expanded: false,
+            }],
+            expensive: false, is_expanded: true,
+        }]);
+        vi.set_variable_value(0, 0, "99");
+        assert_eq!(vi.get_variable(0, 0).unwrap().value, "99");
+    }
+
+    #[test]
+    fn test_bfu_expand_collapse() {
+        let mut vi = BfuVariableInspector::new();
+        vi.set_scopes(vec![BfuScope {
+            name: "Local".into(), kind: BfuScopeKind::Local,
+            variables: vec![BfuVariable {
+                name: "arr".into(), value: "[...]".into(), var_type: None,
+                evaluatable_name: None, children: vec![], has_children: true, is_expanded: false,
+            }],
+            expensive: false, is_expanded: true,
+        }]);
+        vi.expand_variable(0, 0);
+        assert!(vi.get_variable(0, 0).unwrap().is_expanded);
+        vi.collapse_variable(0, 0);
+        assert!(!vi.get_variable(0, 0).unwrap().is_expanded);
+    }
+
+    #[test]
+    fn test_bfu_scope_kind_variants() {
+        let kinds = [
+            BfuScopeKind::Local, BfuScopeKind::Global, BfuScopeKind::Closure,
+            BfuScopeKind::Catch, BfuScopeKind::Block, BfuScopeKind::Module,
+            BfuScopeKind::Register,
+        ];
+        assert_eq!(kinds.len(), 7);
+    }
+
+    #[test]
+    fn test_bfu_multiple_scopes() {
+        let mut vi = BfuVariableInspector::new();
+        vi.set_scopes(vec![
+            BfuScope { name: "Local".into(), kind: BfuScopeKind::Local, variables: vec![], expensive: false, is_expanded: true },
+            BfuScope { name: "Global".into(), kind: BfuScopeKind::Global, variables: vec![], expensive: true, is_expanded: false },
+            BfuScope { name: "Closure".into(), kind: BfuScopeKind::Closure, variables: vec![], expensive: false, is_expanded: false },
+        ]);
+        assert_eq!(vi.scope_count(), 3);
+    }
+
+    #[test]
+    fn test_bfu_variable_count() {
+        let mut vi = BfuVariableInspector::new();
+        vi.set_scopes(vec![BfuScope {
+            name: "Local".into(), kind: BfuScopeKind::Local,
+            variables: vec![
+                BfuVariable { name: "a".into(), value: "1".into(), var_type: None, evaluatable_name: None, children: vec![], has_children: false, is_expanded: false },
+                BfuVariable { name: "b".into(), value: "2".into(), var_type: None, evaluatable_name: None, children: vec![], has_children: false, is_expanded: false },
+            ],
+            expensive: false, is_expanded: true,
+        }]);
+        assert_eq!(vi.variable_count(0), 2);
+    }
+
+    #[test]
+    fn test_bfu_expensive_scope() {
+        let mut vi = BfuVariableInspector::new();
+        vi.set_scopes(vec![BfuScope {
+            name: "Global".into(), kind: BfuScopeKind::Global,
+            variables: vec![], expensive: true, is_expanded: false,
+        }]);
+        assert!(vi.scopes()[0].expensive);
+    }
+
+
+    // bfv_ tests
+
+    #[test]
+    fn test_bfv_terminal_creation() {
+        let mut mgr = BfvTerminalManager::new();
+        let id = mgr.create_terminal("bash", BfvShellKind::Bash, "/home");
+        assert_eq!(mgr.count(), 1);
+        assert_eq!(mgr.active().unwrap().id, id);
+    }
+
+    #[test]
+    fn test_bfv_running_state() {
+        let mut mgr = BfvTerminalManager::new();
+        let id = mgr.create_terminal("zsh", BfvShellKind::Zsh, "/");
+        mgr.mark_running(id, 1234);
+        assert_eq!(mgr.active().unwrap().state, BfvTerminalState::Running);
+        assert_eq!(mgr.active().unwrap().pid, Some(1234));
+    }
+
+    #[test]
+    fn test_bfv_exit_state() {
+        let mut mgr = BfvTerminalManager::new();
+        let id = mgr.create_terminal("sh", BfvShellKind::Bash, "/");
+        mgr.mark_exited(id, 0);
+        assert_eq!(mgr.active().unwrap().state, BfvTerminalState::Exited);
+        assert_eq!(mgr.active().unwrap().exit_code, Some(0));
+    }
+
+    #[test]
+    fn test_bfv_switch_active() {
+        let mut mgr = BfvTerminalManager::new();
+        let id1 = mgr.create_terminal("t1", BfvShellKind::Bash, "/");
+        let id2 = mgr.create_terminal("t2", BfvShellKind::Zsh, "/");
+        mgr.set_active(id2);
+        assert_eq!(mgr.active().unwrap().id, id2);
+        assert!(!mgr.instances().iter().find(|i| i.id == id1).unwrap().is_active);
+    }
+
+    #[test]
+    fn test_bfv_destroy() {
+        let mut mgr = BfvTerminalManager::new();
+        let id1 = mgr.create_terminal("t1", BfvShellKind::Bash, "/");
+        let id2 = mgr.create_terminal("t2", BfvShellKind::Zsh, "/");
+        mgr.set_active(id1);
+        assert!(mgr.destroy(id1));
+        assert_eq!(mgr.count(), 1);
+        assert_eq!(mgr.active().unwrap().id, id2);
+    }
+
+    #[test]
+    fn test_bfv_resize() {
+        let mut mgr = BfvTerminalManager::new();
+        let id = mgr.create_terminal("t", BfvShellKind::Bash, "/");
+        mgr.resize(id, 120, 40);
+        assert_eq!(mgr.active().unwrap().cols, 120);
+        assert_eq!(mgr.active().unwrap().rows, 40);
+    }
+
+    #[test]
+    fn test_bfv_rename() {
+        let mut mgr = BfvTerminalManager::new();
+        let id = mgr.create_terminal("old", BfvShellKind::Bash, "/");
+        mgr.rename(id, "new_name");
+        assert_eq!(mgr.active().unwrap().title, "new_name");
+    }
+
+    #[test]
+    fn test_bfv_shell_kind_variants() {
+        let kinds = [
+            BfvShellKind::Bash, BfvShellKind::Zsh, BfvShellKind::Fish,
+            BfvShellKind::PowerShell, BfvShellKind::Cmd, BfvShellKind::Custom,
+        ];
+        assert_eq!(kinds.len(), 6);
+    }
+
+    #[test]
+    fn test_bfv_terminal_state_variants() {
+        let states = [
+            BfvTerminalState::Starting, BfvTerminalState::Running,
+            BfvTerminalState::Exited, BfvTerminalState::Failed,
+        ];
+        assert_eq!(states.len(), 4);
+    }
+
+    #[test]
+    fn test_bfv_default_dimensions() {
+        let mut mgr = BfvTerminalManager::new();
+        let id = mgr.create_terminal("t", BfvShellKind::Bash, "/");
+        let inst = mgr.instances().iter().find(|i| i.id == id).unwrap();
+        assert_eq!(inst.cols, 80);
+        assert_eq!(inst.rows, 24);
+    }
+
+
+    // bfw_ tests
+
+    #[test]
+    fn test_bfw_workspace_edit_creation() {
+        let edit = BfwWorkspaceEdit::new();
+        assert_eq!(edit.edit_count(), 0);
+        assert!(edit.label().is_none());
+    }
+
+    #[test]
+    fn test_bfw_text_edits() {
+        let mut edit = BfwWorkspaceEdit::new();
+        edit.add_text_edit("main.rs", 10, 5, "hello");
+        edit.add_text_edit("main.rs", 20, 0, "world");
+        assert_eq!(edit.text_edit_count(), 2);
+        assert_eq!(edit.file_operation_count(), 0);
+    }
+
+    #[test]
+    fn test_bfw_file_operations() {
+        let mut edit = BfwWorkspaceEdit::new();
+        edit.add_create_file("new.rs", false);
+        edit.add_delete_file("old.rs", false);
+        edit.add_rename_file("a.rs", "b.rs", true);
+        assert_eq!(edit.file_operation_count(), 3);
+        assert_eq!(edit.text_edit_count(), 0);
+    }
+
+    #[test]
+    fn test_bfw_affected_files() {
+        let mut edit = BfwWorkspaceEdit::new();
+        edit.add_text_edit("a.rs", 0, 0, "x");
+        edit.add_text_edit("a.rs", 5, 1, "y");
+        edit.add_create_file("b.rs", false);
+        let files = edit.affected_files();
+        assert_eq!(files.len(), 2);
+    }
+
+    #[test]
+    fn test_bfw_label() {
+        let edit = BfwWorkspaceEdit::with_label("Rename symbol");
+        assert_eq!(edit.label(), Some("Rename symbol"));
+    }
+
+    #[test]
+    fn test_bfw_confirmation() {
+        let mut edit = BfwWorkspaceEdit::new();
+        assert!(!edit.needs_confirmation());
+        edit.set_needs_confirmation(true);
+        assert!(edit.needs_confirmation());
+    }
+
+    #[test]
+    fn test_bfw_rename_file() {
+        let mut edit = BfwWorkspaceEdit::new();
+        edit.add_rename_file("old.rs", "new.rs", false);
+        let files = edit.affected_files();
+        assert!(files.contains(&"old.rs".to_string()));
+        assert!(files.contains(&"new.rs".to_string()));
+    }
+
+    #[test]
+    fn test_bfw_mixed_edits() {
+        let mut edit = BfwWorkspaceEdit::new();
+        edit.add_text_edit("a.rs", 0, 5, "new");
+        edit.add_create_file("b.rs", true);
+        edit.add_delete_file("c.rs", true);
+        assert_eq!(edit.edit_count(), 3);
+        assert_eq!(edit.text_edit_count(), 1);
+        assert_eq!(edit.file_operation_count(), 2);
+    }
+
+    #[test]
+    fn test_bfw_edits_access() {
+        let mut edit = BfwWorkspaceEdit::new();
+        edit.add_text_edit("x.rs", 0, 0, "hi");
+        assert_eq!(edit.edits().len(), 1);
+    }
+
+    #[test]
+    fn test_bfw_overwrite_flags() {
+        let mut edit = BfwWorkspaceEdit::new();
+        edit.add_create_file("test.rs", true);
+        match &edit.edits()[0] {
+            BfwEditKind::CreateFile { overwrite, .. } => assert!(overwrite),
+            _ => panic!("wrong kind"),
+        }
+    }
+
+
+    // bfx_ tests
+
+    #[test]
+    fn test_bfx_preview_creation() {
+        let p = BfxRefactoringPreview::new("Rename foo");
+        assert_eq!(p.title, "Rename foo");
+        assert_eq!(p.state, BfxPreviewState::Pending);
+        assert_eq!(p.total_changes(), 0);
+    }
+
+    #[test]
+    fn test_bfx_set_changes() {
+        let mut p = BfxRefactoringPreview::new("test");
+        p.set_computing();
+        assert_eq!(p.state, BfxPreviewState::Computing);
+        p.set_changes(vec![BfxPreviewChange {
+            file: "a.rs".into(), original_text: "foo".into(),
+            new_text: "bar".into(), line: 10, is_checked: true,
+        }]);
+        assert_eq!(p.state, BfxPreviewState::Ready);
+        assert_eq!(p.total_changes(), 1);
+    }
+
+    #[test]
+    fn test_bfx_toggle_change() {
+        let mut p = BfxRefactoringPreview::new("test");
+        p.set_changes(vec![BfxPreviewChange {
+            file: "a.rs".into(), original_text: "x".into(),
+            new_text: "y".into(), line: 1, is_checked: true,
+        }]);
+        p.toggle_change(0);
+        assert!(!p.changes[0].is_checked);
+        p.toggle_change(0);
+        assert!(p.changes[0].is_checked);
+    }
+
+    #[test]
+    fn test_bfx_check_uncheck_all() {
+        let mut p = BfxRefactoringPreview::new("test");
+        p.set_changes(vec![
+            BfxPreviewChange { file: "a.rs".into(), original_text: "".into(), new_text: "".into(), line: 1, is_checked: false },
+            BfxPreviewChange { file: "b.rs".into(), original_text: "".into(), new_text: "".into(), line: 2, is_checked: false },
+        ]);
+        p.check_all();
+        assert_eq!(p.checked_changes().len(), 2);
+        p.uncheck_all();
+        assert_eq!(p.checked_changes().len(), 0);
+    }
+
+    #[test]
+    fn test_bfx_apply_cancel() {
+        let mut p = BfxRefactoringPreview::new("test");
+        p.apply();
+        assert_eq!(p.state, BfxPreviewState::Applied);
+        let mut p2 = BfxRefactoringPreview::new("test2");
+        p2.cancel();
+        assert_eq!(p2.state, BfxPreviewState::Cancelled);
+    }
+
+    #[test]
+    fn test_bfx_affected_file_count() {
+        let mut p = BfxRefactoringPreview::new("test");
+        p.set_changes(vec![
+            BfxPreviewChange { file: "a.rs".into(), original_text: "".into(), new_text: "".into(), line: 1, is_checked: true },
+            BfxPreviewChange { file: "a.rs".into(), original_text: "".into(), new_text: "".into(), line: 5, is_checked: true },
+            BfxPreviewChange { file: "b.rs".into(), original_text: "".into(), new_text: "".into(), line: 1, is_checked: true },
+        ]);
+        assert_eq!(p.affected_file_count(), 2);
+    }
+
+    #[test]
+    fn test_bfx_select() {
+        let mut p = BfxRefactoringPreview::new("test");
+        p.set_changes(vec![
+            BfxPreviewChange { file: "a.rs".into(), original_text: "".into(), new_text: "".into(), line: 1, is_checked: true },
+        ]);
+        p.select(0);
+        assert_eq!(p.selected_index, Some(0));
+    }
+
+    #[test]
+    fn test_bfx_preview_state_variants() {
+        let states = [
+            BfxPreviewState::Pending, BfxPreviewState::Computing,
+            BfxPreviewState::Ready, BfxPreviewState::Applied,
+            BfxPreviewState::Cancelled,
+        ];
+        assert_eq!(states.len(), 5);
+    }
+
+    #[test]
+    fn test_bfx_checked_changes_filter() {
+        let mut p = BfxRefactoringPreview::new("test");
+        p.set_changes(vec![
+            BfxPreviewChange { file: "a.rs".into(), original_text: "".into(), new_text: "".into(), line: 1, is_checked: true },
+            BfxPreviewChange { file: "b.rs".into(), original_text: "".into(), new_text: "".into(), line: 2, is_checked: false },
+        ]);
+        assert_eq!(p.checked_changes().len(), 1);
+    }
+
+    #[test]
+    fn test_bfx_empty_preview() {
+        let p = BfxRefactoringPreview::new("empty");
+        assert_eq!(p.affected_file_count(), 0);
+        assert_eq!(p.checked_changes().len(), 0);
+    }
+
+
+    // bfy_ tests
+
+    #[test]
+    fn test_bfy_model_creation() {
+        let m = BfyInlineValuesModel::new();
+        assert!(m.is_enabled());
+        assert_eq!(m.count(), 0);
+    }
+
+    #[test]
+    fn test_bfy_add_values() {
+        let mut m = BfyInlineValuesModel::new();
+        m.add_value(10, 5, 10, BfyInlineValueKind::Expression, "x + 1 = 42");
+        m.add_variable_value(10, 0, 3, "x", "41");
+        assert_eq!(m.count(), 2);
+        assert_eq!(m.values_at_line(10).len(), 2);
+    }
+
+    #[test]
+    fn test_bfy_values_at_line() {
+        let mut m = BfyInlineValuesModel::new();
+        m.add_value(5, 0, 5, BfyInlineValueKind::Variable, "10");
+        m.add_value(6, 0, 5, BfyInlineValueKind::Variable, "20");
+        m.add_value(5, 10, 15, BfyInlineValueKind::Expression, "30");
+        assert_eq!(m.values_at_line(5).len(), 2);
+        assert_eq!(m.values_at_line(6).len(), 1);
+        assert_eq!(m.values_at_line(7).len(), 0);
+    }
+
+    #[test]
+    fn test_bfy_disable_clears() {
+        let mut m = BfyInlineValuesModel::new();
+        m.add_value(1, 0, 5, BfyInlineValueKind::Text, "val");
+        m.set_enabled(false);
+        assert_eq!(m.count(), 0);
+        assert!(!m.is_enabled());
+    }
+
+    #[test]
+    fn test_bfy_clear() {
+        let mut m = BfyInlineValuesModel::new();
+        m.set_stopped_line(42);
+        m.add_value(42, 0, 5, BfyInlineValueKind::Evaluation, "result");
+        m.clear();
+        assert_eq!(m.count(), 0);
+        assert!(m.stopped_at_line().is_none());
+    }
+
+    #[test]
+    fn test_bfy_stopped_line() {
+        let mut m = BfyInlineValuesModel::new();
+        m.set_stopped_line(100);
+        assert_eq!(m.stopped_at_line(), Some(100));
+    }
+
+    #[test]
+    fn test_bfy_kind_variants() {
+        let kinds = [
+            BfyInlineValueKind::Variable, BfyInlineValueKind::Expression,
+            BfyInlineValueKind::Evaluation, BfyInlineValueKind::Text,
+        ];
+        assert_eq!(kinds.len(), 4);
+    }
+
+    #[test]
+    fn test_bfy_variable_name() {
+        let mut m = BfyInlineValuesModel::new();
+        m.add_variable_value(1, 0, 3, "counter", "99");
+        assert_eq!(m.values()[0].variable_name.as_deref(), Some("counter"));
+    }
+
+    #[test]
+    fn test_bfy_enable_after_disable() {
+        let mut m = BfyInlineValuesModel::new();
+        m.set_enabled(false);
+        m.set_enabled(true);
+        assert!(m.is_enabled());
+        m.add_value(1, 0, 5, BfyInlineValueKind::Text, "hi");
+        assert_eq!(m.count(), 1);
+    }
+
+    #[test]
+    fn test_bfy_values_access() {
+        let mut m = BfyInlineValuesModel::new();
+        m.add_value(1, 0, 5, BfyInlineValueKind::Text, "test");
+        assert_eq!(m.values().len(), 1);
+        assert_eq!(m.values()[0].text, "test");
+    }
+
+
+    // bfz_ tests
+
+    #[test]
+    fn test_bfz_hierarchy_creation() {
+        let h = BfzTypeHierarchy::new();
+        assert!(!h.is_visible());
+        assert_eq!(h.total_items(), 0);
+        assert_eq!(h.depth(), 0);
+    }
+
+    #[test]
+    fn test_bfz_set_root() {
+        let mut h = BfzTypeHierarchy::new();
+        h.set_root(BfzTypeItem {
+            name: "MyClass".into(), kind: BfzTypeKind::Class,
+            uri: "file:///a.rs".into(), line: 10, detail: None,
+            children: vec![], is_expanded: true,
+        });
+        assert!(h.is_visible());
+        assert_eq!(h.root_name(), Some("MyClass"));
+        assert_eq!(h.total_items(), 1);
+    }
+
+    #[test]
+    fn test_bfz_hierarchy_depth() {
+        let mut h = BfzTypeHierarchy::new();
+        h.set_root(BfzTypeItem {
+            name: "A".into(), kind: BfzTypeKind::Class, uri: "".into(), line: 0, detail: None, is_expanded: true,
+            children: vec![BfzTypeItem {
+                name: "B".into(), kind: BfzTypeKind::Class, uri: "".into(), line: 0, detail: None, is_expanded: false,
+                children: vec![BfzTypeItem {
+                    name: "C".into(), kind: BfzTypeKind::Class, uri: "".into(), line: 0, detail: None, is_expanded: false, children: vec![],
+                }],
+            }],
+        });
+        assert_eq!(h.depth(), 3);
+        assert_eq!(h.total_items(), 3);
+    }
+
+    #[test]
+    fn test_bfz_direction() {
+        let mut h = BfzTypeHierarchy::new();
+        assert_eq!(h.direction, BfzHierarchyDirection::Supertypes);
+        h.set_direction(BfzHierarchyDirection::Subtypes);
+        assert_eq!(h.direction, BfzHierarchyDirection::Subtypes);
+    }
+
+    #[test]
+    fn test_bfz_clear() {
+        let mut h = BfzTypeHierarchy::new();
+        h.set_root(BfzTypeItem {
+            name: "X".into(), kind: BfzTypeKind::Interface, uri: "".into(),
+            line: 0, detail: None, children: vec![], is_expanded: false,
+        });
+        h.clear();
+        assert!(!h.is_visible());
+        assert!(h.root.is_none());
+    }
+
+    #[test]
+    fn test_bfz_toggle_expand() {
+        let mut h = BfzTypeHierarchy::new();
+        h.set_root(BfzTypeItem {
+            name: "A".into(), kind: BfzTypeKind::Struct, uri: "".into(), line: 0, detail: None, is_expanded: true,
+            children: vec![BfzTypeItem {
+                name: "B".into(), kind: BfzTypeKind::Struct, uri: "".into(), line: 0, detail: None, is_expanded: false, children: vec![],
+            }],
+        });
+        h.toggle_expand(&[0]);
+        assert!(h.root.as_ref().unwrap().children[0].is_expanded);
+        h.toggle_expand(&[0]);
+        assert!(!h.root.as_ref().unwrap().children[0].is_expanded);
+    }
+
+    #[test]
+    fn test_bfz_type_kind_variants() {
+        let kinds = [
+            BfzTypeKind::Class, BfzTypeKind::Interface, BfzTypeKind::Struct,
+            BfzTypeKind::Enum, BfzTypeKind::TypeAlias, BfzTypeKind::Trait,
+        ];
+        assert_eq!(kinds.len(), 6);
+    }
+
+    #[test]
+    fn test_bfz_direction_variants() {
+        let dirs = [BfzHierarchyDirection::Supertypes, BfzHierarchyDirection::Subtypes];
+        assert_eq!(dirs.len(), 2);
+    }
+
+    #[test]
+    fn test_bfz_single_node() {
+        let mut h = BfzTypeHierarchy::new();
+        h.set_root(BfzTypeItem {
+            name: "Solo".into(), kind: BfzTypeKind::Enum, uri: "".into(),
+            line: 5, detail: Some("desc".into()), children: vec![], is_expanded: false,
+        });
+        assert_eq!(h.depth(), 1);
+        assert_eq!(h.total_items(), 1);
+    }
+
+    #[test]
+    fn test_bfz_root_name_empty() {
+        let h = BfzTypeHierarchy::new();
+        assert!(h.root_name().is_none());
     }
 
 
