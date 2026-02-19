@@ -51788,3 +51788,375 @@ mod ban_tests {
         assert_eq!(panel.file_count(), 0);
     }
 }
+
+
+// --- bao_: Editor timeline/local history model ---
+
+/// Source of a timeline entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BaoTimelineSource {
+    LocalHistory,
+    Git,
+    Extension,
+}
+
+impl BaoTimelineSource {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::LocalHistory => "Local History",
+            Self::Git => "Git History",
+            Self::Extension => "Extension",
+        }
+    }
+}
+
+/// A single timeline entry.
+#[derive(Debug, Clone)]
+pub struct BaoTimelineEntry {
+    pub id: String,
+    pub timestamp_ms: u64,
+    pub label: String,
+    pub description: Option<String>,
+    pub source: BaoTimelineSource,
+    pub icon: Option<String>,
+    pub is_current: bool,
+}
+
+impl BaoTimelineEntry {
+    pub fn new(id: &str, label: &str, timestamp_ms: u64, source: BaoTimelineSource) -> Self {
+        Self {
+            id: id.to_string(),
+            timestamp_ms,
+            label: label.to_string(),
+            description: None,
+            source,
+            icon: None,
+            is_current: false,
+        }
+    }
+
+    pub fn with_description(mut self, desc: &str) -> Self {
+        self.description = Some(desc.to_string());
+        self
+    }
+
+    pub fn relative_time(&self, now_ms: u64) -> String {
+        let diff = now_ms.saturating_sub(self.timestamp_ms);
+        let secs = diff / 1000;
+        if secs < 60 {
+            "just now".to_string()
+        } else if secs < 3600 {
+            format!("{} min ago", secs / 60)
+        } else if secs < 86400 {
+            format!("{} hours ago", secs / 3600)
+        } else {
+            format!("{} days ago", secs / 86400)
+        }
+    }
+}
+
+/// Local history entry with content snapshot.
+#[derive(Debug, Clone)]
+pub struct BaoLocalHistoryEntry {
+    pub id: String,
+    pub file_path: String,
+    pub timestamp_ms: u64,
+    pub content_hash: String,
+    pub size_bytes: u64,
+    pub label: Option<String>,
+}
+
+impl BaoLocalHistoryEntry {
+    pub fn new(id: &str, path: &str, timestamp_ms: u64, hash: &str, size: u64) -> Self {
+        Self {
+            id: id.to_string(),
+            file_path: path.to_string(),
+            timestamp_ms,
+            content_hash: hash.to_string(),
+            size_bytes: size,
+            label: None,
+        }
+    }
+
+    pub fn with_label(mut self, label: &str) -> Self {
+        self.label = Some(label.to_string());
+        self
+    }
+
+    pub fn display_label(&self) -> String {
+        match &self.label {
+            Some(l) => l.clone(),
+            None => {
+                let secs = self.timestamp_ms / 1000;
+                format!("Save at {}", secs)
+            }
+        }
+    }
+}
+
+/// Manages local history entries for files.
+#[derive(Debug, Clone)]
+pub struct BaoLocalHistory {
+    entries: Vec<BaoLocalHistoryEntry>,
+    max_entries_per_file: usize,
+    max_total_entries: usize,
+    is_enabled: bool,
+}
+
+impl BaoLocalHistory {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries_per_file: 50,
+            max_total_entries: 5000,
+            is_enabled: true,
+        }
+    }
+
+    pub fn add_entry(&mut self, entry: BaoLocalHistoryEntry) {
+        if !self.is_enabled {
+            return;
+        }
+        self.entries.push(entry);
+        self.trim();
+    }
+
+    fn trim(&mut self) {
+        if self.entries.len() > self.max_total_entries {
+            let excess = self.entries.len() - self.max_total_entries;
+            self.entries.drain(0..excess);
+        }
+    }
+
+    pub fn entries_for_file(&self, path: &str) -> Vec<&BaoLocalHistoryEntry> {
+        self.entries.iter().filter(|e| e.file_path == path).collect()
+    }
+
+    pub fn latest_for_file(&self, path: &str) -> Option<&BaoLocalHistoryEntry> {
+        self.entries.iter().rev().find(|e| e.file_path == path)
+    }
+
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn file_count(&self) -> usize {
+        let mut paths: Vec<&str> = self.entries.iter().map(|e| e.file_path.as_str()).collect();
+        paths.sort();
+        paths.dedup();
+        paths.len()
+    }
+
+    pub fn remove_entries_for(&mut self, path: &str) {
+        self.entries.retain(|e| e.file_path != path);
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.is_enabled = enabled;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.is_enabled
+    }
+
+    pub fn total_size_bytes(&self) -> u64 {
+        self.entries.iter().map(|e| e.size_bytes).sum()
+    }
+}
+
+/// The timeline view model combining multiple sources.
+#[derive(Debug, Clone)]
+pub struct BaoTimelineView {
+    pub entries: Vec<BaoTimelineEntry>,
+    pub file_path: Option<String>,
+    pub enabled_sources: Vec<BaoTimelineSource>,
+    pub is_loading: bool,
+}
+
+impl BaoTimelineView {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            file_path: None,
+            enabled_sources: vec![BaoTimelineSource::LocalHistory, BaoTimelineSource::Git],
+            is_loading: false,
+        }
+    }
+
+    pub fn set_file(&mut self, path: &str) {
+        self.file_path = Some(path.to_string());
+        self.entries.clear();
+    }
+
+    pub fn add_entries(&mut self, entries: Vec<BaoTimelineEntry>) {
+        self.entries.extend(entries);
+        self.entries.sort_by(|a, b| b.timestamp_ms.cmp(&a.timestamp_ms));
+    }
+
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn entries_from_source(&self, source: BaoTimelineSource) -> Vec<&BaoTimelineEntry> {
+        self.entries.iter().filter(|e| e.source == source).collect()
+    }
+
+    pub fn is_source_enabled(&self, source: BaoTimelineSource) -> bool {
+        self.enabled_sources.contains(&source)
+    }
+
+    pub fn toggle_source(&mut self, source: BaoTimelineSource) {
+        if let Some(idx) = self.enabled_sources.iter().position(|s| *s == source) {
+            self.enabled_sources.remove(idx);
+        } else {
+            self.enabled_sources.push(source);
+        }
+    }
+
+    pub fn filtered_entries(&self) -> Vec<&BaoTimelineEntry> {
+        self.entries.iter()
+            .filter(|e| self.enabled_sources.contains(&e.source))
+            .collect()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+#[cfg(test)]
+mod bao_tests {
+    use super::*;
+
+    #[test]
+    fn test_bao_timeline_source() {
+        assert_eq!(BaoTimelineSource::Git.label(), "Git History");
+        assert_eq!(BaoTimelineSource::LocalHistory.label(), "Local History");
+    }
+
+    #[test]
+    fn test_bao_timeline_entry() {
+        let e = BaoTimelineEntry::new("e1", "Initial commit", 1000, BaoTimelineSource::Git)
+            .with_description("First commit");
+        assert_eq!(e.relative_time(2000), "just now");
+        assert_eq!(e.relative_time(100_000), "1 min ago");
+    }
+
+    #[test]
+    fn test_bao_relative_time() {
+        let e = BaoTimelineEntry::new("e1", "test", 0, BaoTimelineSource::Git);
+        assert_eq!(e.relative_time(30_000), "just now");
+        assert_eq!(e.relative_time(120_000), "2 min ago");
+        assert_eq!(e.relative_time(7_200_000), "2 hours ago");
+        assert_eq!(e.relative_time(172_800_000), "2 days ago");
+    }
+
+    #[test]
+    fn test_bao_local_history_entry() {
+        let e = BaoLocalHistoryEntry::new("h1", "src/main.rs", 5000, "abc123", 1024)
+            .with_label("Before refactor");
+        assert_eq!(e.display_label(), "Before refactor");
+
+        let e2 = BaoLocalHistoryEntry::new("h2", "src/main.rs", 5000, "def456", 512);
+        assert!(e2.display_label().contains("5"));
+    }
+
+    #[test]
+    fn test_bao_local_history_add() {
+        let mut hist = BaoLocalHistory::new();
+        hist.add_entry(BaoLocalHistoryEntry::new("1", "a.rs", 1000, "h1", 100));
+        hist.add_entry(BaoLocalHistoryEntry::new("2", "a.rs", 2000, "h2", 200));
+        hist.add_entry(BaoLocalHistoryEntry::new("3", "b.rs", 3000, "h3", 300));
+
+        assert_eq!(hist.entry_count(), 3);
+        assert_eq!(hist.file_count(), 2);
+        assert_eq!(hist.entries_for_file("a.rs").len(), 2);
+    }
+
+    #[test]
+    fn test_bao_local_history_latest() {
+        let mut hist = BaoLocalHistory::new();
+        hist.add_entry(BaoLocalHistoryEntry::new("1", "a.rs", 1000, "h1", 100));
+        hist.add_entry(BaoLocalHistoryEntry::new("2", "a.rs", 2000, "h2", 200));
+        let latest = hist.latest_for_file("a.rs");
+        assert_eq!(latest.unwrap().id, "2");
+    }
+
+    #[test]
+    fn test_bao_local_history_remove() {
+        let mut hist = BaoLocalHistory::new();
+        hist.add_entry(BaoLocalHistoryEntry::new("1", "a.rs", 1000, "h1", 100));
+        hist.add_entry(BaoLocalHistoryEntry::new("2", "b.rs", 2000, "h2", 200));
+        hist.remove_entries_for("a.rs");
+        assert_eq!(hist.entry_count(), 1);
+    }
+
+    #[test]
+    fn test_bao_local_history_disabled() {
+        let mut hist = BaoLocalHistory::new();
+        hist.set_enabled(false);
+        hist.add_entry(BaoLocalHistoryEntry::new("1", "a.rs", 1000, "h1", 100));
+        assert_eq!(hist.entry_count(), 0);
+    }
+
+    #[test]
+    fn test_bao_local_history_size() {
+        let mut hist = BaoLocalHistory::new();
+        hist.add_entry(BaoLocalHistoryEntry::new("1", "a.rs", 1000, "h1", 100));
+        hist.add_entry(BaoLocalHistoryEntry::new("2", "b.rs", 2000, "h2", 200));
+        assert_eq!(hist.total_size_bytes(), 300);
+    }
+
+    #[test]
+    fn test_bao_timeline_view() {
+        let mut view = BaoTimelineView::new();
+        view.set_file("src/main.rs");
+        view.add_entries(vec![
+            BaoTimelineEntry::new("1", "commit A", 2000, BaoTimelineSource::Git),
+            BaoTimelineEntry::new("2", "save", 1000, BaoTimelineSource::LocalHistory),
+            BaoTimelineEntry::new("3", "commit B", 3000, BaoTimelineSource::Git),
+        ]);
+        assert_eq!(view.entry_count(), 3);
+        // Sorted by timestamp desc
+        assert_eq!(view.entries[0].label, "commit B");
+    }
+
+    #[test]
+    fn test_bao_timeline_filter_source() {
+        let mut view = BaoTimelineView::new();
+        view.add_entries(vec![
+            BaoTimelineEntry::new("1", "commit", 2000, BaoTimelineSource::Git),
+            BaoTimelineEntry::new("2", "save", 1000, BaoTimelineSource::LocalHistory),
+        ]);
+        assert_eq!(view.filtered_entries().len(), 2);
+
+        view.toggle_source(BaoTimelineSource::Git);
+        assert_eq!(view.filtered_entries().len(), 1);
+        assert_eq!(view.filtered_entries()[0].source, BaoTimelineSource::LocalHistory);
+    }
+
+    #[test]
+    fn test_bao_timeline_entries_from_source() {
+        let mut view = BaoTimelineView::new();
+        view.add_entries(vec![
+            BaoTimelineEntry::new("1", "a", 1000, BaoTimelineSource::Git),
+            BaoTimelineEntry::new("2", "b", 2000, BaoTimelineSource::Git),
+            BaoTimelineEntry::new("3", "c", 3000, BaoTimelineSource::LocalHistory),
+        ]);
+        assert_eq!(view.entries_from_source(BaoTimelineSource::Git).len(), 2);
+    }
+
+    #[test]
+    fn test_bao_timeline_clear() {
+        let mut view = BaoTimelineView::new();
+        view.add_entries(vec![
+            BaoTimelineEntry::new("1", "a", 1000, BaoTimelineSource::Git),
+        ]);
+        view.clear();
+        assert_eq!(view.entry_count(), 0);
+    }
+}
