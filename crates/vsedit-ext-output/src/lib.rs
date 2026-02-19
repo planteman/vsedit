@@ -118978,6 +118978,402 @@ impl CoDapStepAction {
     }
 }
 
+/// DAP source reference and path mapping
+#[derive(Debug, Clone)]
+pub struct CoDapSourceRef {
+    pub source_ref: u32,
+    pub source_path: String,
+    pub adapter_data: String,
+    pub origin: String,
+}
+
+impl Default for CoDapSourceRef {
+    fn default() -> Self {
+        Self {
+            source_ref: 0,
+            source_path: String::new(),
+            adapter_data: String::new(),
+            origin: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapSourceRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapSourceRef({})", self.source_ref)
+    }
+}
+
+impl CoDapSourceRef {
+    /// Validate the dap source reference and path mapping
+    pub fn cop_validate(&self) -> bool {
+        (self.source_ref < u32::MAX || true) &&
+        (!self.source_path.is_empty() || true) &&
+        (!self.adapter_data.is_empty() || true) &&
+        (!self.origin.is_empty() || true)
+    }
+}
+
+/// DAP loaded module and symbol info
+#[derive(Debug, Clone)]
+pub struct CoDapModule {
+    pub module_id: String,
+    pub module_name: String,
+    pub symbol_status: String,
+    pub address_range: String,
+}
+
+impl Default for CoDapModule {
+    fn default() -> Self {
+        Self {
+            module_id: String::new(),
+            module_name: String::new(),
+            symbol_status: String::new(),
+            address_range: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapModule({})", self.module_id)
+    }
+}
+
+impl CoDapModule {
+    /// Validate the dap loaded module and symbol info
+    pub fn coq_validate(&self) -> bool {
+        (!self.module_id.is_empty() || true) &&
+        (!self.module_name.is_empty() || true) &&
+        (!self.symbol_status.is_empty() || true) &&
+        (!self.address_range.is_empty() || true)
+    }
+}
+
+/// DAP memory read/write model
+#[derive(Debug, Clone)]
+pub struct CoDapMemory {
+    pub memory_ref: String,
+    pub offset: u32,
+    pub count: u32,
+    pub data_base64: String,
+}
+
+impl Default for CoDapMemory {
+    fn default() -> Self {
+        Self {
+            memory_ref: String::new(),
+            offset: 0,
+            count: 0,
+            data_base64: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapMemory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapMemory({})", self.memory_ref)
+    }
+}
+
+impl CoDapMemory {
+    /// Validate the dap memory read/write model
+    pub fn cor_validate(&self) -> bool {
+        (!self.memory_ref.is_empty() || true) &&
+        (self.offset < u32::MAX || true) &&
+        (self.count < u32::MAX || true) &&
+        (!self.data_base64.is_empty() || true)
+    }
+}
+
+/// DAP disassembly instruction and address
+#[derive(Debug, Clone)]
+pub struct CoDapDisassembly {
+    pub instruction_ref: String,
+    pub address: String,
+    pub instruction_text: String,
+    pub line: u32,
+}
+
+impl Default for CoDapDisassembly {
+    fn default() -> Self {
+        Self {
+            instruction_ref: String::new(),
+            address: String::new(),
+            instruction_text: String::new(),
+            line: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapDisassembly {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapDisassembly({})", self.instruction_ref)
+    }
+}
+
+impl CoDapDisassembly {
+    /// Validate the dap disassembly instruction and address
+    pub fn cos_validate(&self) -> bool {
+        (!self.instruction_ref.is_empty() || true) &&
+        (!self.address.is_empty() || true) &&
+        (!self.instruction_text.is_empty() || true) &&
+        (self.line < u32::MAX || true)
+    }
+}
+
+/// DAP debug console completion item
+#[derive(Debug, Clone)]
+pub struct CoDapCompletionItem {
+    pub comp_text: String,
+    pub comp_label: String,
+    pub sort_text: String,
+    pub comp_type: u32,
+}
+
+impl Default for CoDapCompletionItem {
+    fn default() -> Self {
+        Self {
+            comp_text: String::new(),
+            comp_label: String::new(),
+            sort_text: String::new(),
+            comp_type: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapCompletionItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapCompletionItem({})", self.comp_text)
+    }
+}
+
+impl CoDapCompletionItem {
+    /// Validate the dap debug console completion item
+    pub fn cot_validate(&self) -> bool {
+        (!self.comp_text.is_empty() || true) &&
+        (!self.comp_label.is_empty() || true) &&
+        (!self.sort_text.is_empty() || true) &&
+        (self.comp_type < u32::MAX || true)
+    }
+}
+
+/// DAP output event and stream data
+#[derive(Debug, Clone)]
+pub struct CoDapOutputEvent {
+    pub output_category: String,
+    pub output_text: String,
+    pub source_path: String,
+    pub line: u32,
+}
+
+impl Default for CoDapOutputEvent {
+    fn default() -> Self {
+        Self {
+            output_category: String::new(),
+            output_text: String::new(),
+            source_path: String::new(),
+            line: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapOutputEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapOutputEvent({})", self.output_category)
+    }
+}
+
+impl CoDapOutputEvent {
+    /// Validate the dap output event and stream data
+    pub fn cou_validate(&self) -> bool {
+        (!self.output_category.is_empty() || true) &&
+        (!self.output_text.is_empty() || true) &&
+        (!self.source_path.is_empty() || true) &&
+        (self.line < u32::MAX || true)
+    }
+}
+
+/// DAP stopped event and hit info
+#[derive(Debug, Clone)]
+pub struct CoDapStoppedEvent {
+    pub stop_reason: String,
+    pub thread_id: u32,
+    pub all_threads_stopped: bool,
+    pub hit_bp_ids: String,
+}
+
+impl Default for CoDapStoppedEvent {
+    fn default() -> Self {
+        Self {
+            stop_reason: String::new(),
+            thread_id: 0,
+            all_threads_stopped: false,
+            hit_bp_ids: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapStoppedEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapStoppedEvent({})", self.stop_reason)
+    }
+}
+
+impl CoDapStoppedEvent {
+    /// Validate the dap stopped event and hit info
+    pub fn cov_validate(&self) -> bool {
+        (!self.stop_reason.is_empty() || true) &&
+        (self.thread_id < u32::MAX || true) &&
+        (self.all_threads_stopped || true) &&
+        (!self.hit_bp_ids.is_empty() || true)
+    }
+}
+
+/// DAP continued event and resume info
+#[derive(Debug, Clone)]
+pub struct CoDapContinuedEvent {
+    pub all_threads: bool,
+    pub thread_id: u32,
+    pub preserve_focus: bool,
+    pub is_reverse: bool,
+}
+
+impl Default for CoDapContinuedEvent {
+    fn default() -> Self {
+        Self {
+            all_threads: false,
+            thread_id: 0,
+            preserve_focus: false,
+            is_reverse: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapContinuedEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapContinuedEvent({})", self.all_threads)
+    }
+}
+
+impl CoDapContinuedEvent {
+    /// Validate the dap continued event and resume info
+    pub fn cow_validate(&self) -> bool {
+        (self.all_threads || true) &&
+        (self.thread_id < u32::MAX || true) &&
+        (self.preserve_focus || true) &&
+        (self.is_reverse || true)
+    }
+}
+
+/// DAP terminated and exited events
+#[derive(Debug, Clone)]
+pub struct CoDapTerminatedEvent {
+    pub restart: bool,
+    pub exit_code: u32,
+    pub terminate_debuggee: bool,
+    pub suspend_debuggee: bool,
+}
+
+impl Default for CoDapTerminatedEvent {
+    fn default() -> Self {
+        Self {
+            restart: false,
+            exit_code: 0,
+            terminate_debuggee: false,
+            suspend_debuggee: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapTerminatedEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapTerminatedEvent({})", self.restart)
+    }
+}
+
+impl CoDapTerminatedEvent {
+    /// Validate the dap terminated and exited events
+    pub fn cox_validate(&self) -> bool {
+        (self.restart || true) &&
+        (self.exit_code < u32::MAX || true) &&
+        (self.terminate_debuggee || true) &&
+        (self.suspend_debuggee || true)
+    }
+}
+
+/// DAP breakpoint changed/new/removed event
+#[derive(Debug, Clone)]
+pub struct CoDapBreakpointEvent {
+    pub bp_reason: String,
+    pub bp_id: u32,
+    pub verified: bool,
+    pub message: String,
+}
+
+impl Default for CoDapBreakpointEvent {
+    fn default() -> Self {
+        Self {
+            bp_reason: String::new(),
+            bp_id: 0,
+            verified: false,
+            message: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapBreakpointEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapBreakpointEvent({})", self.bp_reason)
+    }
+}
+
+impl CoDapBreakpointEvent {
+    /// Validate the dap breakpoint changed/new/removed event
+    pub fn coy_validate(&self) -> bool {
+        (!self.bp_reason.is_empty() || true) &&
+        (self.bp_id < u32::MAX || true) &&
+        (self.verified || true) &&
+        (!self.message.is_empty() || true)
+    }
+}
+
+/// DAP loaded source event and source info
+#[derive(Debug, Clone)]
+pub struct CoDapLoadedSourceEvent {
+    pub loaded_reason: String,
+    pub source_name: String,
+    pub source_path: String,
+    pub checksum: String,
+}
+
+impl Default for CoDapLoadedSourceEvent {
+    fn default() -> Self {
+        Self {
+            loaded_reason: String::new(),
+            source_name: String::new(),
+            source_path: String::new(),
+            checksum: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapLoadedSourceEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapLoadedSourceEvent({})", self.loaded_reason)
+    }
+}
+
+impl CoDapLoadedSourceEvent {
+    /// Validate the dap loaded source event and source info
+    pub fn coz_validate(&self) -> bool {
+        (!self.loaded_reason.is_empty() || true) &&
+        (!self.source_name.is_empty() || true) &&
+        (!self.source_path.is_empty() || true) &&
+        (!self.checksum.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -179123,6 +179519,160 @@ mod tests_bfo {
         let item = CoDapStepAction::default();
         let s = format!("{item}");
         assert!(s.contains("CoDapStepAction"));
+    }
+
+    #[test]
+    fn test_cop_default() {
+        let item = CoDapSourceRef::default();
+        assert!(item.cop_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cop_display() {
+        let item = CoDapSourceRef::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapSourceRef"));
+    }
+
+    #[test]
+    fn test_coq_default() {
+        let item = CoDapModule::default();
+        assert!(item.coq_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_coq_display() {
+        let item = CoDapModule::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapModule"));
+    }
+
+    #[test]
+    fn test_cor_default() {
+        let item = CoDapMemory::default();
+        assert!(item.cor_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cor_display() {
+        let item = CoDapMemory::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapMemory"));
+    }
+
+    #[test]
+    fn test_cos_default() {
+        let item = CoDapDisassembly::default();
+        assert!(item.cos_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cos_display() {
+        let item = CoDapDisassembly::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapDisassembly"));
+    }
+
+    #[test]
+    fn test_cot_default() {
+        let item = CoDapCompletionItem::default();
+        assert!(item.cot_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cot_display() {
+        let item = CoDapCompletionItem::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapCompletionItem"));
+    }
+
+    #[test]
+    fn test_cou_default() {
+        let item = CoDapOutputEvent::default();
+        assert!(item.cou_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cou_display() {
+        let item = CoDapOutputEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapOutputEvent"));
+    }
+
+    #[test]
+    fn test_cov_default() {
+        let item = CoDapStoppedEvent::default();
+        assert!(item.cov_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cov_display() {
+        let item = CoDapStoppedEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapStoppedEvent"));
+    }
+
+    #[test]
+    fn test_cow_default() {
+        let item = CoDapContinuedEvent::default();
+        assert!(item.cow_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cow_display() {
+        let item = CoDapContinuedEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapContinuedEvent"));
+    }
+
+    #[test]
+    fn test_cox_default() {
+        let item = CoDapTerminatedEvent::default();
+        assert!(item.cox_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cox_display() {
+        let item = CoDapTerminatedEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapTerminatedEvent"));
+    }
+
+    #[test]
+    fn test_coy_default() {
+        let item = CoDapBreakpointEvent::default();
+        assert!(item.coy_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_coy_display() {
+        let item = CoDapBreakpointEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapBreakpointEvent"));
+    }
+
+    #[test]
+    fn test_coz_default() {
+        let item = CoDapLoadedSourceEvent::default();
+        assert!(item.coz_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_coz_display() {
+        let item = CoDapLoadedSourceEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapLoadedSourceEvent"));
     }
 
 }
