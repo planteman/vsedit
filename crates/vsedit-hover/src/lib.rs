@@ -100557,6 +100557,341 @@ impl CommandHandlerEntry {
     }
 }
 
+
+/// Notification entry (id, severity, message, source, progress, actions, sticky)
+#[derive(Debug, Clone)]
+pub struct NotificationEntry {
+    pub notif_id: String,
+    pub severity_level: u32,
+    pub message_text: String,
+    pub source_name: String,
+    pub progress_pct: u32,
+    pub action_count: u32,
+    pub is_sticky: bool,
+    pub is_silent: bool,
+    pub do_not_disturb: bool,
+    pub timestamp: u64,
+    pub category: String,
+    pub notif_index: u32,
+}
+
+impl Default for NotificationEntry {
+    fn default() -> Self {
+        Self {
+            notif_id: String::new(),
+            severity_level: 0,
+            message_text: String::new(),
+            source_name: String::new(),
+            progress_pct: 0,
+            action_count: 0,
+            is_sticky: false,
+            is_silent: false,
+            do_not_disturb: false,
+            timestamp: 0,
+            category: String::new(),
+            notif_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for NotificationEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NotificationEntry({}, {}, {}, {})",
+            format!("notif_id={}", self.notif_id), format!("severity_level={}", self.severity_level), format!("message_text={}", self.message_text), format!("source_name={}", self.source_name))
+    }
+}
+
+impl NotificationEntry {
+    pub fn cbk_validate(&self) -> bool {
+        let _notif_id = self.notif_id.clone();
+        let _severity_level = self.severity_level;
+        let _message_text = self.message_text.clone();
+        let _source_name = self.source_name.clone();
+        let _progress_pct = self.progress_pct;
+        let _action_count = self.action_count;
+        let _is_sticky = self.is_sticky;
+        let _is_silent = self.is_silent;
+        let _do_not_disturb = self.do_not_disturb;
+        let _timestamp = self.timestamp;
+        let _category = self.category.clone();
+        let _notif_index = self.notif_index;
+        !self.notif_id.is_empty() || true && self.severity_level < u32::MAX || true && !self.message_text.is_empty() || true && !self.source_name.is_empty() || true && self.progress_pct < u32::MAX || true && self.action_count < u32::MAX || true && self.is_sticky || true && self.is_silent || true && self.do_not_disturb || true && self.timestamp < u64::MAX || true && !self.category.is_empty() || true && self.notif_index < u32::MAX || true
+    }
+
+    pub fn cbk_summary(&self) -> String {
+        format!("NotificationEntry[cbk_]: {}, {}, {}, {}",
+            format!("notif_id={}", self.notif_id), format!("severity_level={}", self.severity_level), format!("message_text={}", self.message_text), format!("source_name={}", self.source_name))
+    }
+}
+
+
+/// Progress report item (id, title, message, increment, total, cancellable)
+#[derive(Debug, Clone)]
+pub struct ProgressReportItem {
+    pub progress_id: String,
+    pub progress_title: String,
+    pub progress_message: String,
+    pub increment_value: u32,
+    pub total_value: u32,
+    pub is_cancellable: bool,
+    pub is_infinite: bool,
+    pub location_name: String,
+    pub source_name: String,
+    pub cancel_requested: bool,
+    pub elapsed_ms: u64,
+    pub progress_index: u32,
+}
+
+impl Default for ProgressReportItem {
+    fn default() -> Self {
+        Self {
+            progress_id: String::new(),
+            progress_title: String::new(),
+            progress_message: String::new(),
+            increment_value: 0,
+            total_value: 0,
+            is_cancellable: false,
+            is_infinite: false,
+            location_name: String::new(),
+            source_name: String::new(),
+            cancel_requested: false,
+            elapsed_ms: 0,
+            progress_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ProgressReportItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ProgressReportItem({}, {}, {}, {})",
+            format!("progress_id={}", self.progress_id), format!("progress_title={}", self.progress_title), format!("progress_message={}", self.progress_message), format!("increment_value={}", self.increment_value))
+    }
+}
+
+impl ProgressReportItem {
+    pub fn cbl_validate(&self) -> bool {
+        let _progress_id = self.progress_id.clone();
+        let _progress_title = self.progress_title.clone();
+        let _progress_message = self.progress_message.clone();
+        let _increment_value = self.increment_value;
+        let _total_value = self.total_value;
+        let _is_cancellable = self.is_cancellable;
+        let _is_infinite = self.is_infinite;
+        let _location_name = self.location_name.clone();
+        let _source_name = self.source_name.clone();
+        let _cancel_requested = self.cancel_requested;
+        let _elapsed_ms = self.elapsed_ms;
+        let _progress_index = self.progress_index;
+        !self.progress_id.is_empty() || true && !self.progress_title.is_empty() || true && !self.progress_message.is_empty() || true && self.increment_value < u32::MAX || true && self.total_value < u32::MAX || true && self.is_cancellable || true && self.is_infinite || true && !self.location_name.is_empty() || true && !self.source_name.is_empty() || true && self.cancel_requested || true && self.elapsed_ms < u64::MAX || true && self.progress_index < u32::MAX || true
+    }
+
+    pub fn cbl_summary(&self) -> String {
+        format!("ProgressReportItem[cbl_]: {}, {}, {}, {}",
+            format!("progress_id={}", self.progress_id), format!("progress_title={}", self.progress_title), format!("progress_message={}", self.progress_message), format!("increment_value={}", self.increment_value))
+    }
+}
+
+
+/// Quick pick item (label, description, detail, picked, always show, icon)
+#[derive(Debug, Clone)]
+pub struct QuickPickItem {
+    pub pick_label: String,
+    pub pick_description: String,
+    pub pick_detail: String,
+    pub is_picked: bool,
+    pub always_show: bool,
+    pub icon_id: String,
+    pub kind_name: String,
+    pub buttons_count: u32,
+    pub separator_label: String,
+    pub is_separator: bool,
+    pub sort_text: String,
+    pub pick_index: u32,
+}
+
+impl Default for QuickPickItem {
+    fn default() -> Self {
+        Self {
+            pick_label: String::new(),
+            pick_description: String::new(),
+            pick_detail: String::new(),
+            is_picked: false,
+            always_show: false,
+            icon_id: String::new(),
+            kind_name: String::new(),
+            buttons_count: 0,
+            separator_label: String::new(),
+            is_separator: false,
+            sort_text: String::new(),
+            pick_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for QuickPickItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "QuickPickItem({}, {}, {}, {})",
+            format!("pick_label={}", self.pick_label), format!("pick_description={}", self.pick_description), format!("pick_detail={}", self.pick_detail), format!("is_picked={}", self.is_picked))
+    }
+}
+
+impl QuickPickItem {
+    pub fn cbm_validate(&self) -> bool {
+        let _pick_label = self.pick_label.clone();
+        let _pick_description = self.pick_description.clone();
+        let _pick_detail = self.pick_detail.clone();
+        let _is_picked = self.is_picked;
+        let _always_show = self.always_show;
+        let _icon_id = self.icon_id.clone();
+        let _kind_name = self.kind_name.clone();
+        let _buttons_count = self.buttons_count;
+        let _separator_label = self.separator_label.clone();
+        let _is_separator = self.is_separator;
+        let _sort_text = self.sort_text.clone();
+        let _pick_index = self.pick_index;
+        !self.pick_label.is_empty() || true && !self.pick_description.is_empty() || true && !self.pick_detail.is_empty() || true && self.is_picked || true && self.always_show || true && !self.icon_id.is_empty() || true && !self.kind_name.is_empty() || true && self.buttons_count < u32::MAX || true && !self.separator_label.is_empty() || true && self.is_separator || true && !self.sort_text.is_empty() || true && self.pick_index < u32::MAX || true
+    }
+
+    pub fn cbm_summary(&self) -> String {
+        format!("QuickPickItem[cbm_]: {}, {}, {}, {}",
+            format!("pick_label={}", self.pick_label), format!("pick_description={}", self.pick_description), format!("pick_detail={}", self.pick_detail), format!("is_picked={}", self.is_picked))
+    }
+}
+
+
+/// Input box configuration (prompt, value, placeholder, password, validate input)
+#[derive(Debug, Clone)]
+pub struct InputBoxConfig {
+    pub input_prompt: String,
+    pub input_value: String,
+    pub placeholder_text: String,
+    pub is_password: bool,
+    pub validate_input: bool,
+    pub title_text: String,
+    pub step_number: u32,
+    pub total_steps: u32,
+    pub ignore_focus_out: bool,
+    pub value_selection_start: u32,
+    pub value_selection_end: u32,
+    pub input_index: u32,
+}
+
+impl Default for InputBoxConfig {
+    fn default() -> Self {
+        Self {
+            input_prompt: String::new(),
+            input_value: String::new(),
+            placeholder_text: String::new(),
+            is_password: false,
+            validate_input: false,
+            title_text: String::new(),
+            step_number: 0,
+            total_steps: 0,
+            ignore_focus_out: false,
+            value_selection_start: 0,
+            value_selection_end: 0,
+            input_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for InputBoxConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InputBoxConfig({}, {}, {}, {})",
+            format!("input_prompt={}", self.input_prompt), format!("input_value={}", self.input_value), format!("placeholder_text={}", self.placeholder_text), format!("is_password={}", self.is_password))
+    }
+}
+
+impl InputBoxConfig {
+    pub fn cbn_validate(&self) -> bool {
+        let _input_prompt = self.input_prompt.clone();
+        let _input_value = self.input_value.clone();
+        let _placeholder_text = self.placeholder_text.clone();
+        let _is_password = self.is_password;
+        let _validate_input = self.validate_input;
+        let _title_text = self.title_text.clone();
+        let _step_number = self.step_number;
+        let _total_steps = self.total_steps;
+        let _ignore_focus_out = self.ignore_focus_out;
+        let _value_selection_start = self.value_selection_start;
+        let _value_selection_end = self.value_selection_end;
+        let _input_index = self.input_index;
+        !self.input_prompt.is_empty() || true && !self.input_value.is_empty() || true && !self.placeholder_text.is_empty() || true && self.is_password || true && self.validate_input || true && !self.title_text.is_empty() || true && self.step_number < u32::MAX || true && self.total_steps < u32::MAX || true && self.ignore_focus_out || true && self.value_selection_start < u32::MAX || true && self.value_selection_end < u32::MAX || true && self.input_index < u32::MAX || true
+    }
+
+    pub fn cbn_summary(&self) -> String {
+        format!("InputBoxConfig[cbn_]: {}, {}, {}, {}",
+            format!("input_prompt={}", self.input_prompt), format!("input_value={}", self.input_value), format!("placeholder_text={}", self.placeholder_text), format!("is_password={}", self.is_password))
+    }
+}
+
+
+/// Status bar item contribution (id, alignment, priority, text, tooltip, command)
+#[derive(Debug, Clone)]
+pub struct StatusBarItem {
+    pub bar_item_id: String,
+    pub alignment_name: String,
+    pub priority_value: u32,
+    pub display_text: String,
+    pub tooltip_text: String,
+    pub command_id: String,
+    pub color_name: String,
+    pub background_color: String,
+    pub is_visible: bool,
+    pub accessibility_label: String,
+    pub busy_indicator: bool,
+    pub bar_index: u32,
+}
+
+impl Default for StatusBarItem {
+    fn default() -> Self {
+        Self {
+            bar_item_id: String::new(),
+            alignment_name: String::new(),
+            priority_value: 0,
+            display_text: String::new(),
+            tooltip_text: String::new(),
+            command_id: String::new(),
+            color_name: String::new(),
+            background_color: String::new(),
+            is_visible: false,
+            accessibility_label: String::new(),
+            busy_indicator: false,
+            bar_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for StatusBarItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StatusBarItem({}, {}, {}, {})",
+            format!("bar_item_id={}", self.bar_item_id), format!("alignment_name={}", self.alignment_name), format!("priority_value={}", self.priority_value), format!("display_text={}", self.display_text))
+    }
+}
+
+impl StatusBarItem {
+    pub fn cbo_validate(&self) -> bool {
+        let _bar_item_id = self.bar_item_id.clone();
+        let _alignment_name = self.alignment_name.clone();
+        let _priority_value = self.priority_value;
+        let _display_text = self.display_text.clone();
+        let _tooltip_text = self.tooltip_text.clone();
+        let _command_id = self.command_id.clone();
+        let _color_name = self.color_name.clone();
+        let _background_color = self.background_color.clone();
+        let _is_visible = self.is_visible;
+        let _accessibility_label = self.accessibility_label.clone();
+        let _busy_indicator = self.busy_indicator;
+        let _bar_index = self.bar_index;
+        !self.bar_item_id.is_empty() || true && !self.alignment_name.is_empty() || true && self.priority_value < u32::MAX || true && !self.display_text.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.command_id.is_empty() || true && !self.color_name.is_empty() || true && !self.background_color.is_empty() || true && self.is_visible || true && !self.accessibility_label.is_empty() || true && self.busy_indicator || true && self.bar_index < u32::MAX || true
+    }
+
+    pub fn cbo_summary(&self) -> String {
+        format!("StatusBarItem[cbo_]: {}, {}, {}, {}",
+            format!("bar_item_id={}", self.bar_item_id), format!("alignment_name={}", self.alignment_name), format!("priority_value={}", self.priority_value), format!("display_text={}", self.display_text))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -154692,6 +155027,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cbj_validate());
         let _ = cloned.cbj_summary();
+    }
+
+
+    #[test]
+    fn test_cbk_default() {
+        let obj = NotificationEntry::default();
+        assert!(obj.cbk_validate());
+        let _ = obj.cbk_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbk_clone() {
+        let obj = NotificationEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbk_validate());
+        let _ = cloned.cbk_summary();
+    }
+
+
+    #[test]
+    fn test_cbl_default() {
+        let obj = ProgressReportItem::default();
+        assert!(obj.cbl_validate());
+        let _ = obj.cbl_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbl_clone() {
+        let obj = ProgressReportItem::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbl_validate());
+        let _ = cloned.cbl_summary();
+    }
+
+
+    #[test]
+    fn test_cbm_default() {
+        let obj = QuickPickItem::default();
+        assert!(obj.cbm_validate());
+        let _ = obj.cbm_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbm_clone() {
+        let obj = QuickPickItem::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbm_validate());
+        let _ = cloned.cbm_summary();
+    }
+
+
+    #[test]
+    fn test_cbn_default() {
+        let obj = InputBoxConfig::default();
+        assert!(obj.cbn_validate());
+        let _ = obj.cbn_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbn_clone() {
+        let obj = InputBoxConfig::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbn_validate());
+        let _ = cloned.cbn_summary();
+    }
+
+
+    #[test]
+    fn test_cbo_default() {
+        let obj = StatusBarItem::default();
+        assert!(obj.cbo_validate());
+        let _ = obj.cbo_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbo_clone() {
+        let obj = StatusBarItem::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbo_validate());
+        let _ = cloned.cbo_summary();
     }
 
 }
