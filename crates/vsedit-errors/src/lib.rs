@@ -61347,3 +61347,278 @@ mod bbx_tests {
         assert_eq!(op.display_text(), "Delete old.rs");
     }
 }
+
+
+// --- bby_: Editor keybinding model ---
+
+/// Modifier keys.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BbyModifiers {
+    pub ctrl: bool,
+    pub shift: bool,
+    pub alt: bool,
+    pub meta: bool,
+}
+
+impl BbyModifiers {
+    pub fn none() -> Self { Self { ctrl: false, shift: false, alt: false, meta: false } }
+    pub fn ctrl() -> Self { Self { ctrl: true, ..Self::none() } }
+    pub fn ctrl_shift() -> Self { Self { ctrl: true, shift: true, ..Self::none() } }
+    pub fn alt() -> Self { Self { alt: true, ..Self::none() } }
+
+    pub fn display(&self) -> String {
+        let mut parts = Vec::new();
+        if self.ctrl { parts.push("Ctrl"); }
+        if self.shift { parts.push("Shift"); }
+        if self.alt { parts.push("Alt"); }
+        if self.meta { parts.push("Meta"); }
+        parts.join("+")
+    }
+
+    pub fn has_any(&self) -> bool { self.ctrl || self.shift || self.alt || self.meta }
+}
+
+/// A key chord (modifier + key).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BbyKeyChord {
+    pub modifiers: BbyModifiers,
+    pub key: String,
+}
+
+impl BbyKeyChord {
+    pub fn new(mods: BbyModifiers, key: &str) -> Self {
+        Self { modifiers: mods, key: key.to_string() }
+    }
+
+    pub fn simple(key: &str) -> Self { Self::new(BbyModifiers::none(), key) }
+
+    pub fn display(&self) -> String {
+        if self.modifiers.has_any() {
+            format!("{}+{}", self.modifiers.display(), self.key)
+        } else {
+            self.key.clone()
+        }
+    }
+}
+
+/// A keybinding (one or two chords).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BbyKeybinding {
+    pub first: BbyKeyChord,
+    pub second: Option<BbyKeyChord>,
+}
+
+impl BbyKeybinding {
+    pub fn single(chord: BbyKeyChord) -> Self { Self { first: chord, second: None } }
+    pub fn two_part(first: BbyKeyChord, second: BbyKeyChord) -> Self {
+        Self { first, second: Some(second) }
+    }
+
+    pub fn is_chord(&self) -> bool { self.second.is_some() }
+
+    pub fn display(&self) -> String {
+        match &self.second {
+            Some(s) => format!("{} {}", self.first.display(), s.display()),
+            None => self.first.display(),
+        }
+    }
+}
+
+/// A keybinding rule.
+#[derive(Debug, Clone)]
+pub struct BbyKeybindingRule {
+    pub keybinding: BbyKeybinding,
+    pub command: String,
+    pub when: Option<String>,
+    pub args: Option<String>,
+    pub source: BbyKeybindingSource,
+}
+
+/// Source of a keybinding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BbyKeybindingSource { Default, User, Extension }
+
+impl BbyKeybindingRule {
+    pub fn new(kb: BbyKeybinding, command: &str) -> Self {
+        Self { keybinding: kb, command: command.to_string(), when: None, args: None, source: BbyKeybindingSource::Default }
+    }
+
+    pub fn with_when(mut self, w: &str) -> Self { self.when = Some(w.to_string()); self }
+    pub fn from_user(mut self) -> Self { self.source = BbyKeybindingSource::User; self }
+
+    pub fn matches_key(&self, chord: &BbyKeyChord) -> bool {
+        self.keybinding.first == *chord && self.keybinding.second.is_none()
+    }
+}
+
+/// The keybinding resolver.
+#[derive(Debug)]
+pub struct BbyKeybindingResolver {
+    rules: Vec<BbyKeybindingRule>,
+    pending_chord: Option<BbyKeyChord>,
+}
+
+impl BbyKeybindingResolver {
+    pub fn new() -> Self { Self { rules: Vec::new(), pending_chord: None } }
+
+    pub fn add_rule(&mut self, rule: BbyKeybindingRule) { self.rules.push(rule); }
+    pub fn rule_count(&self) -> usize { self.rules.len() }
+
+    pub fn resolve(&mut self, chord: &BbyKeyChord) -> Option<String> {
+        if let Some(first) = &self.pending_chord {
+            // Two-chord resolution
+            for rule in self.rules.iter().rev() {
+                if rule.keybinding.first == *first {
+                    if let Some(second) = &rule.keybinding.second {
+                        if second == chord {
+                            self.pending_chord = None;
+                            return Some(rule.command.clone());
+                        }
+                    }
+                }
+            }
+            self.pending_chord = None;
+            return None;
+        }
+
+        // Check for chord starters
+        let has_chord = self.rules.iter().any(|r| r.keybinding.first == *chord && r.keybinding.second.is_some());
+        if has_chord {
+            self.pending_chord = Some(chord.clone());
+            return None; // Wait for second chord
+        }
+
+        // Single chord resolution (last match wins — user overrides default)
+        self.rules.iter().rev().find(|r| r.matches_key(chord)).map(|r| r.command.clone())
+    }
+
+    pub fn is_waiting_chord(&self) -> bool { self.pending_chord.is_some() }
+    pub fn cancel_chord(&mut self) { self.pending_chord = None; }
+
+    pub fn bindings_for_command(&self, cmd: &str) -> Vec<&BbyKeybinding> {
+        self.rules.iter().filter(|r| r.command == cmd).map(|r| &r.keybinding).collect()
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&BbyKeybindingRule> {
+        let ql = query.to_lowercase();
+        self.rules.iter().filter(|r| {
+            r.command.to_lowercase().contains(&ql) || r.keybinding.display().to_lowercase().contains(&ql)
+        }).collect()
+    }
+}
+
+#[cfg(test)]
+mod bby_tests {
+    use super::*;
+
+    #[test]
+    fn test_bby_modifiers() {
+        let m = BbyModifiers::ctrl_shift();
+        assert_eq!(m.display(), "Ctrl+Shift");
+        assert!(m.has_any());
+        assert!(!BbyModifiers::none().has_any());
+    }
+
+    #[test]
+    fn test_bby_chord() {
+        let c = BbyKeyChord::new(BbyModifiers::ctrl(), "S");
+        assert_eq!(c.display(), "Ctrl+S");
+    }
+
+    #[test]
+    fn test_bby_keybinding_single() {
+        let kb = BbyKeybinding::single(BbyKeyChord::new(BbyModifiers::ctrl(), "P"));
+        assert!(!kb.is_chord());
+        assert_eq!(kb.display(), "Ctrl+P");
+    }
+
+    #[test]
+    fn test_bby_keybinding_two_part() {
+        let kb = BbyKeybinding::two_part(
+            BbyKeyChord::new(BbyModifiers::ctrl(), "K"),
+            BbyKeyChord::new(BbyModifiers::ctrl(), "S"),
+        );
+        assert!(kb.is_chord());
+        assert_eq!(kb.display(), "Ctrl+K Ctrl+S");
+    }
+
+    #[test]
+    fn test_bby_resolve_single() {
+        let mut r = BbyKeybindingResolver::new();
+        r.add_rule(BbyKeybindingRule::new(
+            BbyKeybinding::single(BbyKeyChord::new(BbyModifiers::ctrl(), "S")),
+            "workbench.action.files.save"
+        ));
+        let cmd = r.resolve(&BbyKeyChord::new(BbyModifiers::ctrl(), "S"));
+        assert_eq!(cmd, Some("workbench.action.files.save".to_string()));
+    }
+
+    #[test]
+    fn test_bby_resolve_two_part() {
+        let mut r = BbyKeybindingResolver::new();
+        r.add_rule(BbyKeybindingRule::new(
+            BbyKeybinding::two_part(
+                BbyKeyChord::new(BbyModifiers::ctrl(), "K"),
+                BbyKeyChord::new(BbyModifiers::ctrl(), "S"),
+            ),
+            "workbench.action.keybindings"
+        ));
+        // First chord — returns None, waiting
+        let cmd = r.resolve(&BbyKeyChord::new(BbyModifiers::ctrl(), "K"));
+        assert!(cmd.is_none());
+        assert!(r.is_waiting_chord());
+        // Second chord — resolves
+        let cmd = r.resolve(&BbyKeyChord::new(BbyModifiers::ctrl(), "S"));
+        assert_eq!(cmd, Some("workbench.action.keybindings".to_string()));
+    }
+
+    #[test]
+    fn test_bby_user_override() {
+        let mut r = BbyKeybindingResolver::new();
+        r.add_rule(BbyKeybindingRule::new(
+            BbyKeybinding::single(BbyKeyChord::new(BbyModifiers::ctrl(), "S")),
+            "default.save"
+        ));
+        r.add_rule(BbyKeybindingRule::new(
+            BbyKeybinding::single(BbyKeyChord::new(BbyModifiers::ctrl(), "S")),
+            "custom.save"
+        ).from_user());
+        let cmd = r.resolve(&BbyKeyChord::new(BbyModifiers::ctrl(), "S"));
+        assert_eq!(cmd, Some("custom.save".to_string())); // User wins
+    }
+
+    #[test]
+    fn test_bby_bindings_for_command() {
+        let mut r = BbyKeybindingResolver::new();
+        r.add_rule(BbyKeybindingRule::new(
+            BbyKeybinding::single(BbyKeyChord::new(BbyModifiers::ctrl(), "S")),
+            "save"
+        ));
+        assert_eq!(r.bindings_for_command("save").len(), 1);
+    }
+
+    #[test]
+    fn test_bby_search() {
+        let mut r = BbyKeybindingResolver::new();
+        r.add_rule(BbyKeybindingRule::new(
+            BbyKeybinding::single(BbyKeyChord::new(BbyModifiers::ctrl(), "P")),
+            "workbench.quickOpen"
+        ));
+        assert_eq!(r.search("quickOpen").len(), 1);
+    }
+
+    #[test]
+    fn test_bby_cancel_chord() {
+        let mut r = BbyKeybindingResolver::new();
+        r.add_rule(BbyKeybindingRule::new(
+            BbyKeybinding::two_part(
+                BbyKeyChord::new(BbyModifiers::ctrl(), "K"),
+                BbyKeyChord::new(BbyModifiers::ctrl(), "S"),
+            ),
+            "x"
+        ));
+        r.resolve(&BbyKeyChord::new(BbyModifiers::ctrl(), "K"));
+        r.cancel_chord();
+        assert!(!r.is_waiting_chord());
+    }
+}
