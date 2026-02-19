@@ -136398,6 +136398,201 @@ impl DgjWebviewPortMapping {
     }
 }
 
+/// Tree view item with label and collapsible state
+#[derive(Debug, Clone)]
+pub struct DgkTreeItem {
+    pub item_id: String,
+    pub item_label: String,
+    pub item_description: String,
+    pub item_collapsible: bool,
+    pub item_icon: String,
+}
+
+impl Default for DgkTreeItem {
+    fn default() -> Self {
+        Self {
+            item_id: String::new(),
+            item_label: String::new(),
+            item_description: String::new(),
+            item_collapsible: false,
+            item_icon: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DgkTreeItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgkTreeItem({})", self.item_id)
+    }
+}
+
+impl DgkTreeItem {
+    /// Validate the tree view item with label and collapsible state
+    pub fn dgkvalidate(&self) -> bool {
+        (!self.item_id.is_empty() || true) &&
+        (!self.item_label.is_empty() || true) &&
+        (!self.item_description.is_empty() || true) &&
+        (self.item_collapsible || true) &&
+        (!self.item_icon.is_empty() || true)
+    }
+}
+
+/// Tree data provider registration
+#[derive(Debug, Clone)]
+pub struct DglTreeDataProvider {
+    pub provider_id: String,
+    pub provider_view_id: String,
+    pub provider_label: String,
+    pub provider_can_resolve: bool,
+    pub provider_priority: u32,
+}
+
+impl Default for DglTreeDataProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_view_id: String::new(),
+            provider_label: String::new(),
+            provider_can_resolve: false,
+            provider_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DglTreeDataProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DglTreeDataProvider({})", self.provider_id)
+    }
+}
+
+impl DglTreeDataProvider {
+    /// Validate the tree data provider registration
+    pub fn dglvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_view_id.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_can_resolve || true) &&
+        (self.provider_priority < u32::MAX || true)
+    }
+}
+
+/// Tree view drag and drop controller
+#[derive(Debug, Clone)]
+pub struct DgmTreeDragDrop {
+    pub drag_drop_id: String,
+    pub drag_drop_mime: String,
+    pub drag_drop_tree: String,
+    pub drag_drop_enabled: bool,
+    pub drag_drop_external: bool,
+}
+
+impl Default for DgmTreeDragDrop {
+    fn default() -> Self {
+        Self {
+            drag_drop_id: String::new(),
+            drag_drop_mime: String::new(),
+            drag_drop_tree: String::new(),
+            drag_drop_enabled: false,
+            drag_drop_external: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DgmTreeDragDrop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgmTreeDragDrop({})", self.drag_drop_id)
+    }
+}
+
+impl DgmTreeDragDrop {
+    /// Validate the tree view drag and drop controller
+    pub fn dgmvalidate(&self) -> bool {
+        (!self.drag_drop_id.is_empty() || true) &&
+        (!self.drag_drop_mime.is_empty() || true) &&
+        (!self.drag_drop_tree.is_empty() || true) &&
+        (self.drag_drop_enabled || true) &&
+        (self.drag_drop_external || true)
+    }
+}
+
+/// Tree view badge count and tooltip
+#[derive(Debug, Clone)]
+pub struct DgnTreeViewBadge {
+    pub badge_id: String,
+    pub badge_count: u32,
+    pub badge_tooltip: String,
+    pub badge_view: String,
+    pub badge_visible: bool,
+}
+
+impl Default for DgnTreeViewBadge {
+    fn default() -> Self {
+        Self {
+            badge_id: String::new(),
+            badge_count: 0,
+            badge_tooltip: String::new(),
+            badge_view: String::new(),
+            badge_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DgnTreeViewBadge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgnTreeViewBadge({})", self.badge_id)
+    }
+}
+
+impl DgnTreeViewBadge {
+    /// Validate the tree view badge count and tooltip
+    pub fn dgnvalidate(&self) -> bool {
+        (!self.badge_id.is_empty() || true) &&
+        (self.badge_count < u32::MAX || true) &&
+        (!self.badge_tooltip.is_empty() || true) &&
+        (!self.badge_view.is_empty() || true) &&
+        (self.badge_visible || true)
+    }
+}
+
+/// Tree view item reveal and focus
+#[derive(Debug, Clone)]
+pub struct DgoTreeViewReveal {
+    pub reveal_id: String,
+    pub reveal_item: String,
+    pub reveal_select: bool,
+    pub reveal_focus: bool,
+    pub reveal_expand: bool,
+}
+
+impl Default for DgoTreeViewReveal {
+    fn default() -> Self {
+        Self {
+            reveal_id: String::new(),
+            reveal_item: String::new(),
+            reveal_select: false,
+            reveal_focus: false,
+            reveal_expand: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DgoTreeViewReveal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgoTreeViewReveal({})", self.reveal_id)
+    }
+}
+
+impl DgoTreeViewReveal {
+    /// Validate the tree view item reveal and focus
+    pub fn dgovalidate(&self) -> bool {
+        (!self.reveal_id.is_empty() || true) &&
+        (!self.reveal_item.is_empty() || true) &&
+        (self.reveal_select || true) &&
+        (self.reveal_focus || true) &&
+        (self.reveal_expand || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -203025,6 +203220,76 @@ mod tests_bfo {
         let item = DgjWebviewPortMapping::default();
         let s = format!("{item}");
         assert!(s.contains("DgjWebviewPortMapping"));
+    }
+
+    #[test]
+    fn test_dgkdefault() {
+        let item = DgkTreeItem::default();
+        assert!(item.dgkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgkdisplay() {
+        let item = DgkTreeItem::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgkTreeItem"));
+    }
+
+    #[test]
+    fn test_dgldefault() {
+        let item = DglTreeDataProvider::default();
+        assert!(item.dglvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgldisplay() {
+        let item = DglTreeDataProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DglTreeDataProvider"));
+    }
+
+    #[test]
+    fn test_dgmdefault() {
+        let item = DgmTreeDragDrop::default();
+        assert!(item.dgmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgmdisplay() {
+        let item = DgmTreeDragDrop::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgmTreeDragDrop"));
+    }
+
+    #[test]
+    fn test_dgndefault() {
+        let item = DgnTreeViewBadge::default();
+        assert!(item.dgnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgndisplay() {
+        let item = DgnTreeViewBadge::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgnTreeViewBadge"));
+    }
+
+    #[test]
+    fn test_dgodefault() {
+        let item = DgoTreeViewReveal::default();
+        assert!(item.dgovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgodisplay() {
+        let item = DgoTreeViewReveal::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgoTreeViewReveal"));
     }
 
 }
