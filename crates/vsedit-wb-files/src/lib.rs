@@ -88440,6 +88440,132 @@ impl SelectionRange {
     }
 }
 
+/// Runtime wiring: bpu_ SignatureHelpContext
+#[derive(Debug, Clone)]
+pub struct SignatureHelpContext {
+    pub bpu_trigger_kind: u8,
+    pub bpu_trigger_character: String,
+    pub bpu_is_retrigger: bool,
+    pub bpu_active_signature_index: u32,
+    pub bpu_active_parameter_index: u32,
+    pub bpu_signature_count: u32,
+    pub bpu_documentation_format: String,
+    pub bpu_label_offset_support: bool,
+    pub bpu_context_value: String,
+    pub bpu_provider_id: String,
+}
+
+impl SignatureHelpContext {
+    pub fn bpu_summary(&self) -> String {
+        format!("SignatureHelpContext({})", self.bpu_trigger_kind)
+    }
+}
+
+/// Runtime wiring: bpv_ CompletionResolve
+#[derive(Debug, Clone)]
+pub struct CompletionResolve {
+    pub bpv_label: String,
+    pub bpv_kind: u8,
+    pub bpv_detail: String,
+    pub bpv_documentation: String,
+    pub bpv_sort_text: String,
+    pub bpv_filter_text: String,
+    pub bpv_insert_text: String,
+    pub bpv_insert_text_format: u8,
+    pub bpv_preselect: bool,
+    pub bpv_commit_characters: Vec<String>,
+}
+
+impl CompletionResolve {
+    pub fn bpv_summary(&self) -> String {
+        format!("CompletionResolve({})", self.bpv_label)
+    }
+}
+
+/// Runtime wiring: bpw_ HoverInfo
+#[derive(Debug, Clone)]
+pub struct HoverInfo {
+    pub bpw_contents_count: usize,
+    pub bpw_range_start_line: u32,
+    pub bpw_range_start_col: u32,
+    pub bpw_range_end_line: u32,
+    pub bpw_range_end_col: u32,
+    pub bpw_is_trusted: bool,
+    pub bpw_support_html: bool,
+    pub bpw_markdown_strings: Vec<String>,
+    pub bpw_language_id: String,
+    pub bpw_verbosity_level: u8,
+}
+
+impl HoverInfo {
+    pub fn bpw_summary(&self) -> String {
+        format!("HoverInfo({})", self.bpw_contents_count)
+    }
+}
+
+/// Runtime wiring: bpx_ DefinitionResult
+#[derive(Debug, Clone)]
+pub struct DefinitionResult {
+    pub bpx_target_uri: String,
+    pub bpx_target_start_line: u32,
+    pub bpx_target_start_col: u32,
+    pub bpx_target_end_line: u32,
+    pub bpx_target_end_col: u32,
+    pub bpx_origin_start_line: u32,
+    pub bpx_origin_end_line: u32,
+    pub bpx_is_declaration: bool,
+    pub bpx_result_count: u32,
+    pub bpx_provider_id: String,
+}
+
+impl DefinitionResult {
+    pub fn bpx_summary(&self) -> String {
+        format!("DefinitionResult({})", self.bpx_target_uri)
+    }
+}
+
+/// Runtime wiring: bpy_ ImplementationResult
+#[derive(Debug, Clone)]
+pub struct ImplementationResult {
+    pub bpy_target_uri: String,
+    pub bpy_target_start_line: u32,
+    pub bpy_target_start_col: u32,
+    pub bpy_target_end_line: u32,
+    pub bpy_target_end_col: u32,
+    pub bpy_result_count: u32,
+    pub bpy_is_partial: bool,
+    pub bpy_provider_id: String,
+    pub bpy_interface_name: String,
+    pub bpy_class_name: String,
+}
+
+impl ImplementationResult {
+    pub fn bpy_summary(&self) -> String {
+        format!("ImplementationResult({})", self.bpy_target_uri)
+    }
+}
+
+/// Runtime wiring: bpz_ ReferenceResult
+#[derive(Debug, Clone)]
+pub struct ReferenceResult {
+    pub bpz_target_uri: String,
+    pub bpz_target_start_line: u32,
+    pub bpz_target_start_col: u32,
+    pub bpz_target_end_line: u32,
+    pub bpz_target_end_col: u32,
+    pub bpz_result_count: u32,
+    pub bpz_include_declaration: bool,
+    pub bpz_provider_id: String,
+    pub bpz_symbol_name: String,
+    pub bpz_context_kind: String,
+}
+
+impl ReferenceResult {
+    pub fn bpz_summary(&self) -> String {
+        format!("ReferenceResult({})", self.bpz_target_uri)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -110712,6 +110838,1091 @@ mod tests_bfo {
         };
         let _ = obj.bpt_summary();
         assert!(!obj.bpt_is_block);
+    }
+
+    #[test]
+    fn test_bpu_trigger_kind() {
+        let obj = SignatureHelpContext {
+            bpu_trigger_kind: 0,
+            bpu_trigger_character: String::from("test"),
+            bpu_is_retrigger: false,
+            bpu_active_signature_index: 0,
+            bpu_active_parameter_index: 0,
+            bpu_signature_count: 0,
+            bpu_documentation_format: String::from("test"),
+            bpu_label_offset_support: false,
+            bpu_context_value: String::from("test"),
+            bpu_provider_id: String::from("test"),
+        };
+        let _ = obj.bpu_summary();
+        assert_eq!(obj.bpu_trigger_kind, 0);
+    }
+
+    #[test]
+    fn test_bpu_trigger_character() {
+        let obj = SignatureHelpContext {
+            bpu_trigger_kind: 0,
+            bpu_trigger_character: String::from("test"),
+            bpu_is_retrigger: false,
+            bpu_active_signature_index: 0,
+            bpu_active_parameter_index: 0,
+            bpu_signature_count: 0,
+            bpu_documentation_format: String::from("test"),
+            bpu_label_offset_support: false,
+            bpu_context_value: String::from("test"),
+            bpu_provider_id: String::from("test"),
+        };
+        let _ = obj.bpu_summary();
+        assert_eq!(obj.bpu_trigger_character, "test");
+    }
+
+    #[test]
+    fn test_bpu_is_retrigger() {
+        let obj = SignatureHelpContext {
+            bpu_trigger_kind: 0,
+            bpu_trigger_character: String::from("test"),
+            bpu_is_retrigger: false,
+            bpu_active_signature_index: 0,
+            bpu_active_parameter_index: 0,
+            bpu_signature_count: 0,
+            bpu_documentation_format: String::from("test"),
+            bpu_label_offset_support: false,
+            bpu_context_value: String::from("test"),
+            bpu_provider_id: String::from("test"),
+        };
+        let _ = obj.bpu_summary();
+        assert!(!obj.bpu_is_retrigger);
+    }
+
+    #[test]
+    fn test_bpu_active_signature_index() {
+        let obj = SignatureHelpContext {
+            bpu_trigger_kind: 0,
+            bpu_trigger_character: String::from("test"),
+            bpu_is_retrigger: false,
+            bpu_active_signature_index: 0,
+            bpu_active_parameter_index: 0,
+            bpu_signature_count: 0,
+            bpu_documentation_format: String::from("test"),
+            bpu_label_offset_support: false,
+            bpu_context_value: String::from("test"),
+            bpu_provider_id: String::from("test"),
+        };
+        let _ = obj.bpu_summary();
+        assert_eq!(obj.bpu_active_signature_index, 0);
+    }
+
+    #[test]
+    fn test_bpu_active_parameter_index() {
+        let obj = SignatureHelpContext {
+            bpu_trigger_kind: 0,
+            bpu_trigger_character: String::from("test"),
+            bpu_is_retrigger: false,
+            bpu_active_signature_index: 0,
+            bpu_active_parameter_index: 0,
+            bpu_signature_count: 0,
+            bpu_documentation_format: String::from("test"),
+            bpu_label_offset_support: false,
+            bpu_context_value: String::from("test"),
+            bpu_provider_id: String::from("test"),
+        };
+        let _ = obj.bpu_summary();
+        assert_eq!(obj.bpu_active_parameter_index, 0);
+    }
+
+    #[test]
+    fn test_bpu_signature_count() {
+        let obj = SignatureHelpContext {
+            bpu_trigger_kind: 0,
+            bpu_trigger_character: String::from("test"),
+            bpu_is_retrigger: false,
+            bpu_active_signature_index: 0,
+            bpu_active_parameter_index: 0,
+            bpu_signature_count: 0,
+            bpu_documentation_format: String::from("test"),
+            bpu_label_offset_support: false,
+            bpu_context_value: String::from("test"),
+            bpu_provider_id: String::from("test"),
+        };
+        let _ = obj.bpu_summary();
+        assert_eq!(obj.bpu_signature_count, 0);
+    }
+
+    #[test]
+    fn test_bpu_documentation_format() {
+        let obj = SignatureHelpContext {
+            bpu_trigger_kind: 0,
+            bpu_trigger_character: String::from("test"),
+            bpu_is_retrigger: false,
+            bpu_active_signature_index: 0,
+            bpu_active_parameter_index: 0,
+            bpu_signature_count: 0,
+            bpu_documentation_format: String::from("test"),
+            bpu_label_offset_support: false,
+            bpu_context_value: String::from("test"),
+            bpu_provider_id: String::from("test"),
+        };
+        let _ = obj.bpu_summary();
+        assert_eq!(obj.bpu_documentation_format, "test");
+    }
+
+    #[test]
+    fn test_bpu_label_offset_support() {
+        let obj = SignatureHelpContext {
+            bpu_trigger_kind: 0,
+            bpu_trigger_character: String::from("test"),
+            bpu_is_retrigger: false,
+            bpu_active_signature_index: 0,
+            bpu_active_parameter_index: 0,
+            bpu_signature_count: 0,
+            bpu_documentation_format: String::from("test"),
+            bpu_label_offset_support: false,
+            bpu_context_value: String::from("test"),
+            bpu_provider_id: String::from("test"),
+        };
+        let _ = obj.bpu_summary();
+        assert!(!obj.bpu_label_offset_support);
+    }
+
+    #[test]
+    fn test_bpu_context_value() {
+        let obj = SignatureHelpContext {
+            bpu_trigger_kind: 0,
+            bpu_trigger_character: String::from("test"),
+            bpu_is_retrigger: false,
+            bpu_active_signature_index: 0,
+            bpu_active_parameter_index: 0,
+            bpu_signature_count: 0,
+            bpu_documentation_format: String::from("test"),
+            bpu_label_offset_support: false,
+            bpu_context_value: String::from("test"),
+            bpu_provider_id: String::from("test"),
+        };
+        let _ = obj.bpu_summary();
+        assert_eq!(obj.bpu_context_value, "test");
+    }
+
+    #[test]
+    fn test_bpu_provider_id() {
+        let obj = SignatureHelpContext {
+            bpu_trigger_kind: 0,
+            bpu_trigger_character: String::from("test"),
+            bpu_is_retrigger: false,
+            bpu_active_signature_index: 0,
+            bpu_active_parameter_index: 0,
+            bpu_signature_count: 0,
+            bpu_documentation_format: String::from("test"),
+            bpu_label_offset_support: false,
+            bpu_context_value: String::from("test"),
+            bpu_provider_id: String::from("test"),
+        };
+        let _ = obj.bpu_summary();
+        assert_eq!(obj.bpu_provider_id, "test");
+    }
+
+
+    #[test]
+    fn test_bpv_label() {
+        let obj = CompletionResolve {
+            bpv_label: String::from("test"),
+            bpv_kind: 0,
+            bpv_detail: String::from("test"),
+            bpv_documentation: String::from("test"),
+            bpv_sort_text: String::from("test"),
+            bpv_filter_text: String::from("test"),
+            bpv_insert_text: String::from("test"),
+            bpv_insert_text_format: 0,
+            bpv_preselect: false,
+            bpv_commit_characters: Vec::new(),
+        };
+        let _ = obj.bpv_summary();
+        assert_eq!(obj.bpv_label, "test");
+    }
+
+    #[test]
+    fn test_bpv_kind() {
+        let obj = CompletionResolve {
+            bpv_label: String::from("test"),
+            bpv_kind: 0,
+            bpv_detail: String::from("test"),
+            bpv_documentation: String::from("test"),
+            bpv_sort_text: String::from("test"),
+            bpv_filter_text: String::from("test"),
+            bpv_insert_text: String::from("test"),
+            bpv_insert_text_format: 0,
+            bpv_preselect: false,
+            bpv_commit_characters: Vec::new(),
+        };
+        let _ = obj.bpv_summary();
+        assert_eq!(obj.bpv_kind, 0);
+    }
+
+    #[test]
+    fn test_bpv_detail() {
+        let obj = CompletionResolve {
+            bpv_label: String::from("test"),
+            bpv_kind: 0,
+            bpv_detail: String::from("test"),
+            bpv_documentation: String::from("test"),
+            bpv_sort_text: String::from("test"),
+            bpv_filter_text: String::from("test"),
+            bpv_insert_text: String::from("test"),
+            bpv_insert_text_format: 0,
+            bpv_preselect: false,
+            bpv_commit_characters: Vec::new(),
+        };
+        let _ = obj.bpv_summary();
+        assert_eq!(obj.bpv_detail, "test");
+    }
+
+    #[test]
+    fn test_bpv_documentation() {
+        let obj = CompletionResolve {
+            bpv_label: String::from("test"),
+            bpv_kind: 0,
+            bpv_detail: String::from("test"),
+            bpv_documentation: String::from("test"),
+            bpv_sort_text: String::from("test"),
+            bpv_filter_text: String::from("test"),
+            bpv_insert_text: String::from("test"),
+            bpv_insert_text_format: 0,
+            bpv_preselect: false,
+            bpv_commit_characters: Vec::new(),
+        };
+        let _ = obj.bpv_summary();
+        assert_eq!(obj.bpv_documentation, "test");
+    }
+
+    #[test]
+    fn test_bpv_sort_text() {
+        let obj = CompletionResolve {
+            bpv_label: String::from("test"),
+            bpv_kind: 0,
+            bpv_detail: String::from("test"),
+            bpv_documentation: String::from("test"),
+            bpv_sort_text: String::from("test"),
+            bpv_filter_text: String::from("test"),
+            bpv_insert_text: String::from("test"),
+            bpv_insert_text_format: 0,
+            bpv_preselect: false,
+            bpv_commit_characters: Vec::new(),
+        };
+        let _ = obj.bpv_summary();
+        assert_eq!(obj.bpv_sort_text, "test");
+    }
+
+    #[test]
+    fn test_bpv_filter_text() {
+        let obj = CompletionResolve {
+            bpv_label: String::from("test"),
+            bpv_kind: 0,
+            bpv_detail: String::from("test"),
+            bpv_documentation: String::from("test"),
+            bpv_sort_text: String::from("test"),
+            bpv_filter_text: String::from("test"),
+            bpv_insert_text: String::from("test"),
+            bpv_insert_text_format: 0,
+            bpv_preselect: false,
+            bpv_commit_characters: Vec::new(),
+        };
+        let _ = obj.bpv_summary();
+        assert_eq!(obj.bpv_filter_text, "test");
+    }
+
+    #[test]
+    fn test_bpv_insert_text() {
+        let obj = CompletionResolve {
+            bpv_label: String::from("test"),
+            bpv_kind: 0,
+            bpv_detail: String::from("test"),
+            bpv_documentation: String::from("test"),
+            bpv_sort_text: String::from("test"),
+            bpv_filter_text: String::from("test"),
+            bpv_insert_text: String::from("test"),
+            bpv_insert_text_format: 0,
+            bpv_preselect: false,
+            bpv_commit_characters: Vec::new(),
+        };
+        let _ = obj.bpv_summary();
+        assert_eq!(obj.bpv_insert_text, "test");
+    }
+
+    #[test]
+    fn test_bpv_insert_text_format() {
+        let obj = CompletionResolve {
+            bpv_label: String::from("test"),
+            bpv_kind: 0,
+            bpv_detail: String::from("test"),
+            bpv_documentation: String::from("test"),
+            bpv_sort_text: String::from("test"),
+            bpv_filter_text: String::from("test"),
+            bpv_insert_text: String::from("test"),
+            bpv_insert_text_format: 0,
+            bpv_preselect: false,
+            bpv_commit_characters: Vec::new(),
+        };
+        let _ = obj.bpv_summary();
+        assert_eq!(obj.bpv_insert_text_format, 0);
+    }
+
+    #[test]
+    fn test_bpv_preselect() {
+        let obj = CompletionResolve {
+            bpv_label: String::from("test"),
+            bpv_kind: 0,
+            bpv_detail: String::from("test"),
+            bpv_documentation: String::from("test"),
+            bpv_sort_text: String::from("test"),
+            bpv_filter_text: String::from("test"),
+            bpv_insert_text: String::from("test"),
+            bpv_insert_text_format: 0,
+            bpv_preselect: false,
+            bpv_commit_characters: Vec::new(),
+        };
+        let _ = obj.bpv_summary();
+        assert!(!obj.bpv_preselect);
+    }
+
+    #[test]
+    fn test_bpv_commit_characters() {
+        let obj = CompletionResolve {
+            bpv_label: String::from("test"),
+            bpv_kind: 0,
+            bpv_detail: String::from("test"),
+            bpv_documentation: String::from("test"),
+            bpv_sort_text: String::from("test"),
+            bpv_filter_text: String::from("test"),
+            bpv_insert_text: String::from("test"),
+            bpv_insert_text_format: 0,
+            bpv_preselect: false,
+            bpv_commit_characters: Vec::new(),
+        };
+        let _ = obj.bpv_summary();
+        assert!(obj.bpv_commit_characters.is_empty());
+    }
+
+
+    #[test]
+    fn test_bpw_contents_count() {
+        let obj = HoverInfo {
+            bpw_contents_count: 0,
+            bpw_range_start_line: 0,
+            bpw_range_start_col: 0,
+            bpw_range_end_line: 0,
+            bpw_range_end_col: 0,
+            bpw_is_trusted: false,
+            bpw_support_html: false,
+            bpw_markdown_strings: Vec::new(),
+            bpw_language_id: String::from("test"),
+            bpw_verbosity_level: 0,
+        };
+        let _ = obj.bpw_summary();
+        assert_eq!(obj.bpw_contents_count, 0);
+    }
+
+    #[test]
+    fn test_bpw_range_start_line() {
+        let obj = HoverInfo {
+            bpw_contents_count: 0,
+            bpw_range_start_line: 0,
+            bpw_range_start_col: 0,
+            bpw_range_end_line: 0,
+            bpw_range_end_col: 0,
+            bpw_is_trusted: false,
+            bpw_support_html: false,
+            bpw_markdown_strings: Vec::new(),
+            bpw_language_id: String::from("test"),
+            bpw_verbosity_level: 0,
+        };
+        let _ = obj.bpw_summary();
+        assert_eq!(obj.bpw_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_bpw_range_start_col() {
+        let obj = HoverInfo {
+            bpw_contents_count: 0,
+            bpw_range_start_line: 0,
+            bpw_range_start_col: 0,
+            bpw_range_end_line: 0,
+            bpw_range_end_col: 0,
+            bpw_is_trusted: false,
+            bpw_support_html: false,
+            bpw_markdown_strings: Vec::new(),
+            bpw_language_id: String::from("test"),
+            bpw_verbosity_level: 0,
+        };
+        let _ = obj.bpw_summary();
+        assert_eq!(obj.bpw_range_start_col, 0);
+    }
+
+    #[test]
+    fn test_bpw_range_end_line() {
+        let obj = HoverInfo {
+            bpw_contents_count: 0,
+            bpw_range_start_line: 0,
+            bpw_range_start_col: 0,
+            bpw_range_end_line: 0,
+            bpw_range_end_col: 0,
+            bpw_is_trusted: false,
+            bpw_support_html: false,
+            bpw_markdown_strings: Vec::new(),
+            bpw_language_id: String::from("test"),
+            bpw_verbosity_level: 0,
+        };
+        let _ = obj.bpw_summary();
+        assert_eq!(obj.bpw_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_bpw_range_end_col() {
+        let obj = HoverInfo {
+            bpw_contents_count: 0,
+            bpw_range_start_line: 0,
+            bpw_range_start_col: 0,
+            bpw_range_end_line: 0,
+            bpw_range_end_col: 0,
+            bpw_is_trusted: false,
+            bpw_support_html: false,
+            bpw_markdown_strings: Vec::new(),
+            bpw_language_id: String::from("test"),
+            bpw_verbosity_level: 0,
+        };
+        let _ = obj.bpw_summary();
+        assert_eq!(obj.bpw_range_end_col, 0);
+    }
+
+    #[test]
+    fn test_bpw_is_trusted() {
+        let obj = HoverInfo {
+            bpw_contents_count: 0,
+            bpw_range_start_line: 0,
+            bpw_range_start_col: 0,
+            bpw_range_end_line: 0,
+            bpw_range_end_col: 0,
+            bpw_is_trusted: false,
+            bpw_support_html: false,
+            bpw_markdown_strings: Vec::new(),
+            bpw_language_id: String::from("test"),
+            bpw_verbosity_level: 0,
+        };
+        let _ = obj.bpw_summary();
+        assert!(!obj.bpw_is_trusted);
+    }
+
+    #[test]
+    fn test_bpw_support_html() {
+        let obj = HoverInfo {
+            bpw_contents_count: 0,
+            bpw_range_start_line: 0,
+            bpw_range_start_col: 0,
+            bpw_range_end_line: 0,
+            bpw_range_end_col: 0,
+            bpw_is_trusted: false,
+            bpw_support_html: false,
+            bpw_markdown_strings: Vec::new(),
+            bpw_language_id: String::from("test"),
+            bpw_verbosity_level: 0,
+        };
+        let _ = obj.bpw_summary();
+        assert!(!obj.bpw_support_html);
+    }
+
+    #[test]
+    fn test_bpw_markdown_strings() {
+        let obj = HoverInfo {
+            bpw_contents_count: 0,
+            bpw_range_start_line: 0,
+            bpw_range_start_col: 0,
+            bpw_range_end_line: 0,
+            bpw_range_end_col: 0,
+            bpw_is_trusted: false,
+            bpw_support_html: false,
+            bpw_markdown_strings: Vec::new(),
+            bpw_language_id: String::from("test"),
+            bpw_verbosity_level: 0,
+        };
+        let _ = obj.bpw_summary();
+        assert!(obj.bpw_markdown_strings.is_empty());
+    }
+
+    #[test]
+    fn test_bpw_language_id() {
+        let obj = HoverInfo {
+            bpw_contents_count: 0,
+            bpw_range_start_line: 0,
+            bpw_range_start_col: 0,
+            bpw_range_end_line: 0,
+            bpw_range_end_col: 0,
+            bpw_is_trusted: false,
+            bpw_support_html: false,
+            bpw_markdown_strings: Vec::new(),
+            bpw_language_id: String::from("test"),
+            bpw_verbosity_level: 0,
+        };
+        let _ = obj.bpw_summary();
+        assert_eq!(obj.bpw_language_id, "test");
+    }
+
+    #[test]
+    fn test_bpw_verbosity_level() {
+        let obj = HoverInfo {
+            bpw_contents_count: 0,
+            bpw_range_start_line: 0,
+            bpw_range_start_col: 0,
+            bpw_range_end_line: 0,
+            bpw_range_end_col: 0,
+            bpw_is_trusted: false,
+            bpw_support_html: false,
+            bpw_markdown_strings: Vec::new(),
+            bpw_language_id: String::from("test"),
+            bpw_verbosity_level: 0,
+        };
+        let _ = obj.bpw_summary();
+        assert_eq!(obj.bpw_verbosity_level, 0);
+    }
+
+
+    #[test]
+    fn test_bpx_target_uri() {
+        let obj = DefinitionResult {
+            bpx_target_uri: String::from("test"),
+            bpx_target_start_line: 0,
+            bpx_target_start_col: 0,
+            bpx_target_end_line: 0,
+            bpx_target_end_col: 0,
+            bpx_origin_start_line: 0,
+            bpx_origin_end_line: 0,
+            bpx_is_declaration: false,
+            bpx_result_count: 0,
+            bpx_provider_id: String::from("test"),
+        };
+        let _ = obj.bpx_summary();
+        assert_eq!(obj.bpx_target_uri, "test");
+    }
+
+    #[test]
+    fn test_bpx_target_start_line() {
+        let obj = DefinitionResult {
+            bpx_target_uri: String::from("test"),
+            bpx_target_start_line: 0,
+            bpx_target_start_col: 0,
+            bpx_target_end_line: 0,
+            bpx_target_end_col: 0,
+            bpx_origin_start_line: 0,
+            bpx_origin_end_line: 0,
+            bpx_is_declaration: false,
+            bpx_result_count: 0,
+            bpx_provider_id: String::from("test"),
+        };
+        let _ = obj.bpx_summary();
+        assert_eq!(obj.bpx_target_start_line, 0);
+    }
+
+    #[test]
+    fn test_bpx_target_start_col() {
+        let obj = DefinitionResult {
+            bpx_target_uri: String::from("test"),
+            bpx_target_start_line: 0,
+            bpx_target_start_col: 0,
+            bpx_target_end_line: 0,
+            bpx_target_end_col: 0,
+            bpx_origin_start_line: 0,
+            bpx_origin_end_line: 0,
+            bpx_is_declaration: false,
+            bpx_result_count: 0,
+            bpx_provider_id: String::from("test"),
+        };
+        let _ = obj.bpx_summary();
+        assert_eq!(obj.bpx_target_start_col, 0);
+    }
+
+    #[test]
+    fn test_bpx_target_end_line() {
+        let obj = DefinitionResult {
+            bpx_target_uri: String::from("test"),
+            bpx_target_start_line: 0,
+            bpx_target_start_col: 0,
+            bpx_target_end_line: 0,
+            bpx_target_end_col: 0,
+            bpx_origin_start_line: 0,
+            bpx_origin_end_line: 0,
+            bpx_is_declaration: false,
+            bpx_result_count: 0,
+            bpx_provider_id: String::from("test"),
+        };
+        let _ = obj.bpx_summary();
+        assert_eq!(obj.bpx_target_end_line, 0);
+    }
+
+    #[test]
+    fn test_bpx_target_end_col() {
+        let obj = DefinitionResult {
+            bpx_target_uri: String::from("test"),
+            bpx_target_start_line: 0,
+            bpx_target_start_col: 0,
+            bpx_target_end_line: 0,
+            bpx_target_end_col: 0,
+            bpx_origin_start_line: 0,
+            bpx_origin_end_line: 0,
+            bpx_is_declaration: false,
+            bpx_result_count: 0,
+            bpx_provider_id: String::from("test"),
+        };
+        let _ = obj.bpx_summary();
+        assert_eq!(obj.bpx_target_end_col, 0);
+    }
+
+    #[test]
+    fn test_bpx_origin_start_line() {
+        let obj = DefinitionResult {
+            bpx_target_uri: String::from("test"),
+            bpx_target_start_line: 0,
+            bpx_target_start_col: 0,
+            bpx_target_end_line: 0,
+            bpx_target_end_col: 0,
+            bpx_origin_start_line: 0,
+            bpx_origin_end_line: 0,
+            bpx_is_declaration: false,
+            bpx_result_count: 0,
+            bpx_provider_id: String::from("test"),
+        };
+        let _ = obj.bpx_summary();
+        assert_eq!(obj.bpx_origin_start_line, 0);
+    }
+
+    #[test]
+    fn test_bpx_origin_end_line() {
+        let obj = DefinitionResult {
+            bpx_target_uri: String::from("test"),
+            bpx_target_start_line: 0,
+            bpx_target_start_col: 0,
+            bpx_target_end_line: 0,
+            bpx_target_end_col: 0,
+            bpx_origin_start_line: 0,
+            bpx_origin_end_line: 0,
+            bpx_is_declaration: false,
+            bpx_result_count: 0,
+            bpx_provider_id: String::from("test"),
+        };
+        let _ = obj.bpx_summary();
+        assert_eq!(obj.bpx_origin_end_line, 0);
+    }
+
+    #[test]
+    fn test_bpx_is_declaration() {
+        let obj = DefinitionResult {
+            bpx_target_uri: String::from("test"),
+            bpx_target_start_line: 0,
+            bpx_target_start_col: 0,
+            bpx_target_end_line: 0,
+            bpx_target_end_col: 0,
+            bpx_origin_start_line: 0,
+            bpx_origin_end_line: 0,
+            bpx_is_declaration: false,
+            bpx_result_count: 0,
+            bpx_provider_id: String::from("test"),
+        };
+        let _ = obj.bpx_summary();
+        assert!(!obj.bpx_is_declaration);
+    }
+
+    #[test]
+    fn test_bpx_result_count() {
+        let obj = DefinitionResult {
+            bpx_target_uri: String::from("test"),
+            bpx_target_start_line: 0,
+            bpx_target_start_col: 0,
+            bpx_target_end_line: 0,
+            bpx_target_end_col: 0,
+            bpx_origin_start_line: 0,
+            bpx_origin_end_line: 0,
+            bpx_is_declaration: false,
+            bpx_result_count: 0,
+            bpx_provider_id: String::from("test"),
+        };
+        let _ = obj.bpx_summary();
+        assert_eq!(obj.bpx_result_count, 0);
+    }
+
+    #[test]
+    fn test_bpx_provider_id() {
+        let obj = DefinitionResult {
+            bpx_target_uri: String::from("test"),
+            bpx_target_start_line: 0,
+            bpx_target_start_col: 0,
+            bpx_target_end_line: 0,
+            bpx_target_end_col: 0,
+            bpx_origin_start_line: 0,
+            bpx_origin_end_line: 0,
+            bpx_is_declaration: false,
+            bpx_result_count: 0,
+            bpx_provider_id: String::from("test"),
+        };
+        let _ = obj.bpx_summary();
+        assert_eq!(obj.bpx_provider_id, "test");
+    }
+
+
+    #[test]
+    fn test_bpy_target_uri() {
+        let obj = ImplementationResult {
+            bpy_target_uri: String::from("test"),
+            bpy_target_start_line: 0,
+            bpy_target_start_col: 0,
+            bpy_target_end_line: 0,
+            bpy_target_end_col: 0,
+            bpy_result_count: 0,
+            bpy_is_partial: false,
+            bpy_provider_id: String::from("test"),
+            bpy_interface_name: String::from("test"),
+            bpy_class_name: String::from("test"),
+        };
+        let _ = obj.bpy_summary();
+        assert_eq!(obj.bpy_target_uri, "test");
+    }
+
+    #[test]
+    fn test_bpy_target_start_line() {
+        let obj = ImplementationResult {
+            bpy_target_uri: String::from("test"),
+            bpy_target_start_line: 0,
+            bpy_target_start_col: 0,
+            bpy_target_end_line: 0,
+            bpy_target_end_col: 0,
+            bpy_result_count: 0,
+            bpy_is_partial: false,
+            bpy_provider_id: String::from("test"),
+            bpy_interface_name: String::from("test"),
+            bpy_class_name: String::from("test"),
+        };
+        let _ = obj.bpy_summary();
+        assert_eq!(obj.bpy_target_start_line, 0);
+    }
+
+    #[test]
+    fn test_bpy_target_start_col() {
+        let obj = ImplementationResult {
+            bpy_target_uri: String::from("test"),
+            bpy_target_start_line: 0,
+            bpy_target_start_col: 0,
+            bpy_target_end_line: 0,
+            bpy_target_end_col: 0,
+            bpy_result_count: 0,
+            bpy_is_partial: false,
+            bpy_provider_id: String::from("test"),
+            bpy_interface_name: String::from("test"),
+            bpy_class_name: String::from("test"),
+        };
+        let _ = obj.bpy_summary();
+        assert_eq!(obj.bpy_target_start_col, 0);
+    }
+
+    #[test]
+    fn test_bpy_target_end_line() {
+        let obj = ImplementationResult {
+            bpy_target_uri: String::from("test"),
+            bpy_target_start_line: 0,
+            bpy_target_start_col: 0,
+            bpy_target_end_line: 0,
+            bpy_target_end_col: 0,
+            bpy_result_count: 0,
+            bpy_is_partial: false,
+            bpy_provider_id: String::from("test"),
+            bpy_interface_name: String::from("test"),
+            bpy_class_name: String::from("test"),
+        };
+        let _ = obj.bpy_summary();
+        assert_eq!(obj.bpy_target_end_line, 0);
+    }
+
+    #[test]
+    fn test_bpy_target_end_col() {
+        let obj = ImplementationResult {
+            bpy_target_uri: String::from("test"),
+            bpy_target_start_line: 0,
+            bpy_target_start_col: 0,
+            bpy_target_end_line: 0,
+            bpy_target_end_col: 0,
+            bpy_result_count: 0,
+            bpy_is_partial: false,
+            bpy_provider_id: String::from("test"),
+            bpy_interface_name: String::from("test"),
+            bpy_class_name: String::from("test"),
+        };
+        let _ = obj.bpy_summary();
+        assert_eq!(obj.bpy_target_end_col, 0);
+    }
+
+    #[test]
+    fn test_bpy_result_count() {
+        let obj = ImplementationResult {
+            bpy_target_uri: String::from("test"),
+            bpy_target_start_line: 0,
+            bpy_target_start_col: 0,
+            bpy_target_end_line: 0,
+            bpy_target_end_col: 0,
+            bpy_result_count: 0,
+            bpy_is_partial: false,
+            bpy_provider_id: String::from("test"),
+            bpy_interface_name: String::from("test"),
+            bpy_class_name: String::from("test"),
+        };
+        let _ = obj.bpy_summary();
+        assert_eq!(obj.bpy_result_count, 0);
+    }
+
+    #[test]
+    fn test_bpy_is_partial() {
+        let obj = ImplementationResult {
+            bpy_target_uri: String::from("test"),
+            bpy_target_start_line: 0,
+            bpy_target_start_col: 0,
+            bpy_target_end_line: 0,
+            bpy_target_end_col: 0,
+            bpy_result_count: 0,
+            bpy_is_partial: false,
+            bpy_provider_id: String::from("test"),
+            bpy_interface_name: String::from("test"),
+            bpy_class_name: String::from("test"),
+        };
+        let _ = obj.bpy_summary();
+        assert!(!obj.bpy_is_partial);
+    }
+
+    #[test]
+    fn test_bpy_provider_id() {
+        let obj = ImplementationResult {
+            bpy_target_uri: String::from("test"),
+            bpy_target_start_line: 0,
+            bpy_target_start_col: 0,
+            bpy_target_end_line: 0,
+            bpy_target_end_col: 0,
+            bpy_result_count: 0,
+            bpy_is_partial: false,
+            bpy_provider_id: String::from("test"),
+            bpy_interface_name: String::from("test"),
+            bpy_class_name: String::from("test"),
+        };
+        let _ = obj.bpy_summary();
+        assert_eq!(obj.bpy_provider_id, "test");
+    }
+
+    #[test]
+    fn test_bpy_interface_name() {
+        let obj = ImplementationResult {
+            bpy_target_uri: String::from("test"),
+            bpy_target_start_line: 0,
+            bpy_target_start_col: 0,
+            bpy_target_end_line: 0,
+            bpy_target_end_col: 0,
+            bpy_result_count: 0,
+            bpy_is_partial: false,
+            bpy_provider_id: String::from("test"),
+            bpy_interface_name: String::from("test"),
+            bpy_class_name: String::from("test"),
+        };
+        let _ = obj.bpy_summary();
+        assert_eq!(obj.bpy_interface_name, "test");
+    }
+
+    #[test]
+    fn test_bpy_class_name() {
+        let obj = ImplementationResult {
+            bpy_target_uri: String::from("test"),
+            bpy_target_start_line: 0,
+            bpy_target_start_col: 0,
+            bpy_target_end_line: 0,
+            bpy_target_end_col: 0,
+            bpy_result_count: 0,
+            bpy_is_partial: false,
+            bpy_provider_id: String::from("test"),
+            bpy_interface_name: String::from("test"),
+            bpy_class_name: String::from("test"),
+        };
+        let _ = obj.bpy_summary();
+        assert_eq!(obj.bpy_class_name, "test");
+    }
+
+
+    #[test]
+    fn test_bpz_target_uri() {
+        let obj = ReferenceResult {
+            bpz_target_uri: String::from("test"),
+            bpz_target_start_line: 0,
+            bpz_target_start_col: 0,
+            bpz_target_end_line: 0,
+            bpz_target_end_col: 0,
+            bpz_result_count: 0,
+            bpz_include_declaration: false,
+            bpz_provider_id: String::from("test"),
+            bpz_symbol_name: String::from("test"),
+            bpz_context_kind: String::from("test"),
+        };
+        let _ = obj.bpz_summary();
+        assert_eq!(obj.bpz_target_uri, "test");
+    }
+
+    #[test]
+    fn test_bpz_target_start_line() {
+        let obj = ReferenceResult {
+            bpz_target_uri: String::from("test"),
+            bpz_target_start_line: 0,
+            bpz_target_start_col: 0,
+            bpz_target_end_line: 0,
+            bpz_target_end_col: 0,
+            bpz_result_count: 0,
+            bpz_include_declaration: false,
+            bpz_provider_id: String::from("test"),
+            bpz_symbol_name: String::from("test"),
+            bpz_context_kind: String::from("test"),
+        };
+        let _ = obj.bpz_summary();
+        assert_eq!(obj.bpz_target_start_line, 0);
+    }
+
+    #[test]
+    fn test_bpz_target_start_col() {
+        let obj = ReferenceResult {
+            bpz_target_uri: String::from("test"),
+            bpz_target_start_line: 0,
+            bpz_target_start_col: 0,
+            bpz_target_end_line: 0,
+            bpz_target_end_col: 0,
+            bpz_result_count: 0,
+            bpz_include_declaration: false,
+            bpz_provider_id: String::from("test"),
+            bpz_symbol_name: String::from("test"),
+            bpz_context_kind: String::from("test"),
+        };
+        let _ = obj.bpz_summary();
+        assert_eq!(obj.bpz_target_start_col, 0);
+    }
+
+    #[test]
+    fn test_bpz_target_end_line() {
+        let obj = ReferenceResult {
+            bpz_target_uri: String::from("test"),
+            bpz_target_start_line: 0,
+            bpz_target_start_col: 0,
+            bpz_target_end_line: 0,
+            bpz_target_end_col: 0,
+            bpz_result_count: 0,
+            bpz_include_declaration: false,
+            bpz_provider_id: String::from("test"),
+            bpz_symbol_name: String::from("test"),
+            bpz_context_kind: String::from("test"),
+        };
+        let _ = obj.bpz_summary();
+        assert_eq!(obj.bpz_target_end_line, 0);
+    }
+
+    #[test]
+    fn test_bpz_target_end_col() {
+        let obj = ReferenceResult {
+            bpz_target_uri: String::from("test"),
+            bpz_target_start_line: 0,
+            bpz_target_start_col: 0,
+            bpz_target_end_line: 0,
+            bpz_target_end_col: 0,
+            bpz_result_count: 0,
+            bpz_include_declaration: false,
+            bpz_provider_id: String::from("test"),
+            bpz_symbol_name: String::from("test"),
+            bpz_context_kind: String::from("test"),
+        };
+        let _ = obj.bpz_summary();
+        assert_eq!(obj.bpz_target_end_col, 0);
+    }
+
+    #[test]
+    fn test_bpz_result_count() {
+        let obj = ReferenceResult {
+            bpz_target_uri: String::from("test"),
+            bpz_target_start_line: 0,
+            bpz_target_start_col: 0,
+            bpz_target_end_line: 0,
+            bpz_target_end_col: 0,
+            bpz_result_count: 0,
+            bpz_include_declaration: false,
+            bpz_provider_id: String::from("test"),
+            bpz_symbol_name: String::from("test"),
+            bpz_context_kind: String::from("test"),
+        };
+        let _ = obj.bpz_summary();
+        assert_eq!(obj.bpz_result_count, 0);
+    }
+
+    #[test]
+    fn test_bpz_include_declaration() {
+        let obj = ReferenceResult {
+            bpz_target_uri: String::from("test"),
+            bpz_target_start_line: 0,
+            bpz_target_start_col: 0,
+            bpz_target_end_line: 0,
+            bpz_target_end_col: 0,
+            bpz_result_count: 0,
+            bpz_include_declaration: false,
+            bpz_provider_id: String::from("test"),
+            bpz_symbol_name: String::from("test"),
+            bpz_context_kind: String::from("test"),
+        };
+        let _ = obj.bpz_summary();
+        assert!(!obj.bpz_include_declaration);
+    }
+
+    #[test]
+    fn test_bpz_provider_id() {
+        let obj = ReferenceResult {
+            bpz_target_uri: String::from("test"),
+            bpz_target_start_line: 0,
+            bpz_target_start_col: 0,
+            bpz_target_end_line: 0,
+            bpz_target_end_col: 0,
+            bpz_result_count: 0,
+            bpz_include_declaration: false,
+            bpz_provider_id: String::from("test"),
+            bpz_symbol_name: String::from("test"),
+            bpz_context_kind: String::from("test"),
+        };
+        let _ = obj.bpz_summary();
+        assert_eq!(obj.bpz_provider_id, "test");
+    }
+
+    #[test]
+    fn test_bpz_symbol_name() {
+        let obj = ReferenceResult {
+            bpz_target_uri: String::from("test"),
+            bpz_target_start_line: 0,
+            bpz_target_start_col: 0,
+            bpz_target_end_line: 0,
+            bpz_target_end_col: 0,
+            bpz_result_count: 0,
+            bpz_include_declaration: false,
+            bpz_provider_id: String::from("test"),
+            bpz_symbol_name: String::from("test"),
+            bpz_context_kind: String::from("test"),
+        };
+        let _ = obj.bpz_summary();
+        assert_eq!(obj.bpz_symbol_name, "test");
+    }
+
+    #[test]
+    fn test_bpz_context_kind() {
+        let obj = ReferenceResult {
+            bpz_target_uri: String::from("test"),
+            bpz_target_start_line: 0,
+            bpz_target_start_col: 0,
+            bpz_target_end_line: 0,
+            bpz_target_end_col: 0,
+            bpz_result_count: 0,
+            bpz_include_declaration: false,
+            bpz_provider_id: String::from("test"),
+            bpz_symbol_name: String::from("test"),
+            bpz_context_kind: String::from("test"),
+        };
+        let _ = obj.bpz_summary();
+        assert_eq!(obj.bpz_context_kind, "test");
     }
 
 }
