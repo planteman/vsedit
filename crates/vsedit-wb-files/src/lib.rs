@@ -65028,3 +65028,197 @@ mod bcq_tests {
         assert_eq!(panel.visible_problems()[0].severity, BcqProblemSeverity::Error);
     }
 }
+
+
+// --- bcr_: Editor debug console model ---
+
+/// Debug console entry type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcrConsoleKind { Output, Error, Warning, Input, Info }
+
+/// A debug console entry.
+#[derive(Debug, Clone)]
+pub struct BcrConsoleEntry {
+    pub kind: BcrConsoleKind,
+    pub text: String,
+    pub source: Option<String>,
+    pub group_depth: usize,
+}
+
+impl BcrConsoleEntry {
+    pub fn output(text: &str) -> Self { Self { kind: BcrConsoleKind::Output, text: text.to_string(), source: None, group_depth: 0 } }
+    pub fn error(text: &str) -> Self { Self { kind: BcrConsoleKind::Error, text: text.to_string(), source: None, group_depth: 0 } }
+    pub fn input(text: &str) -> Self { Self { kind: BcrConsoleKind::Input, text: text.to_string(), source: None, group_depth: 0 } }
+    pub fn with_source(mut self, s: &str) -> Self { self.source = Some(s.to_string()); self }
+    pub fn with_depth(mut self, d: usize) -> Self { self.group_depth = d; self }
+
+    pub fn render(&self) -> String {
+        let indent = "  ".repeat(self.group_depth);
+        let prefix = match self.kind {
+            BcrConsoleKind::Output => "",
+            BcrConsoleKind::Error => "❌ ",
+            BcrConsoleKind::Warning => "⚠ ",
+            BcrConsoleKind::Input => "> ",
+            BcrConsoleKind::Info => "ℹ ",
+        };
+        format!("{}{}{}", indent, prefix, self.text)
+    }
+}
+
+/// The debug console model.
+#[derive(Debug)]
+pub struct BcrDebugConsole {
+    entries: Vec<BcrConsoleEntry>,
+    input_buffer: String,
+    input_history: Vec<String>,
+    history_cursor: Option<usize>,
+    scroll_offset: usize,
+    word_wrap: bool,
+    filter: String,
+}
+
+impl BcrDebugConsole {
+    pub fn new() -> Self {
+        Self { entries: Vec::new(), input_buffer: String::new(), input_history: Vec::new(), history_cursor: None, scroll_offset: 0, word_wrap: true, filter: String::new() }
+    }
+
+    pub fn append(&mut self, entry: BcrConsoleEntry) { self.entries.push(entry); }
+    pub fn clear(&mut self) { self.entries.clear(); self.scroll_offset = 0; }
+
+    pub fn set_input(&mut self, text: &str) { self.input_buffer = text.to_string(); }
+    pub fn input(&self) -> &str { &self.input_buffer }
+
+    pub fn submit_input(&mut self) -> Option<String> {
+        if self.input_buffer.is_empty() { return None; }
+        let text = self.input_buffer.clone();
+        self.entries.push(BcrConsoleEntry::input(&text));
+        self.input_history.push(text.clone());
+        self.input_buffer.clear();
+        self.history_cursor = None;
+        Some(text)
+    }
+
+    pub fn history_up(&mut self) {
+        if self.input_history.is_empty() { return; }
+        let idx = match self.history_cursor {
+            Some(i) => i.saturating_sub(1),
+            None => self.input_history.len() - 1,
+        };
+        self.history_cursor = Some(idx);
+        self.input_buffer = self.input_history[idx].clone();
+    }
+
+    pub fn history_down(&mut self) {
+        if let Some(i) = self.history_cursor {
+            if i + 1 < self.input_history.len() {
+                self.history_cursor = Some(i + 1);
+                self.input_buffer = self.input_history[i + 1].clone();
+            } else {
+                self.history_cursor = None;
+                self.input_buffer.clear();
+            }
+        }
+    }
+
+    pub fn set_filter(&mut self, f: &str) { self.filter = f.to_string(); }
+
+    pub fn visible_entries(&self) -> Vec<&BcrConsoleEntry> {
+        if self.filter.is_empty() { self.entries.iter().collect() }
+        else { let f = self.filter.to_lowercase(); self.entries.iter().filter(|e| e.text.to_lowercase().contains(&f)).collect() }
+    }
+
+    pub fn entry_count(&self) -> usize { self.entries.len() }
+    pub fn scroll(&mut self, delta: i32) { self.scroll_offset = (self.scroll_offset as i32 + delta).max(0) as usize; }
+
+    pub fn render(&self, max_lines: usize) -> Vec<String> {
+        let visible = self.visible_entries();
+        let skip = visible.len().saturating_sub(max_lines + self.scroll_offset);
+        visible.iter().skip(skip).take(max_lines).map(|e| e.render()).collect()
+    }
+}
+
+#[cfg(test)]
+mod bcr_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcr_entry_output() {
+        let e = BcrConsoleEntry::output("hello");
+        assert_eq!(e.render(), "hello");
+    }
+
+    #[test]
+    fn test_bcr_entry_error() {
+        let e = BcrConsoleEntry::error("fail");
+        assert!(e.render().contains("❌"));
+    }
+
+    #[test]
+    fn test_bcr_entry_depth() {
+        let e = BcrConsoleEntry::output("nested").with_depth(2);
+        assert!(e.render().starts_with("    "));
+    }
+
+    #[test]
+    fn test_bcr_console_append() {
+        let mut c = BcrDebugConsole::new();
+        c.append(BcrConsoleEntry::output("hi"));
+        assert_eq!(c.entry_count(), 1);
+    }
+
+    #[test]
+    fn test_bcr_submit_input() {
+        let mut c = BcrDebugConsole::new();
+        c.set_input("x = 5");
+        let r = c.submit_input();
+        assert_eq!(r, Some("x = 5".to_string()));
+        assert!(c.input().is_empty());
+    }
+
+    #[test]
+    fn test_bcr_history() {
+        let mut c = BcrDebugConsole::new();
+        c.set_input("first");
+        c.submit_input();
+        c.set_input("second");
+        c.submit_input();
+        c.history_up();
+        assert_eq!(c.input(), "second");
+        c.history_up();
+        assert_eq!(c.input(), "first");
+    }
+
+    #[test]
+    fn test_bcr_history_down() {
+        let mut c = BcrDebugConsole::new();
+        c.set_input("a");
+        c.submit_input();
+        c.history_up();
+        c.history_down();
+        assert!(c.input().is_empty());
+    }
+
+    #[test]
+    fn test_bcr_filter() {
+        let mut c = BcrDebugConsole::new();
+        c.append(BcrConsoleEntry::output("hello world"));
+        c.append(BcrConsoleEntry::output("goodbye"));
+        c.set_filter("hello");
+        assert_eq!(c.visible_entries().len(), 1);
+    }
+
+    #[test]
+    fn test_bcr_clear() {
+        let mut c = BcrDebugConsole::new();
+        c.append(BcrConsoleEntry::output("x"));
+        c.clear();
+        assert_eq!(c.entry_count(), 0);
+    }
+
+    #[test]
+    fn test_bcr_render() {
+        let mut c = BcrDebugConsole::new();
+        for i in 0..20 { c.append(BcrConsoleEntry::output(&format!("line {}", i))); }
+        assert_eq!(c.render(5).len(), 5);
+    }
+}
