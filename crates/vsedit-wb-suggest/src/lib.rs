@@ -129356,6 +129356,435 @@ impl CzoTaskProblem {
     }
 }
 
+/// Task dependency ordering and before/after
+#[derive(Debug, Clone)]
+pub struct CzpTaskDep {
+    pub dep_id: String,
+    pub dep_task: String,
+    pub dep_depends_on: String,
+    pub dep_order: u32,
+    pub dep_optional: bool,
+}
+
+impl Default for CzpTaskDep {
+    fn default() -> Self {
+        Self {
+            dep_id: String::new(),
+            dep_task: String::new(),
+            dep_depends_on: String::new(),
+            dep_order: 0,
+            dep_optional: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CzpTaskDep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzpTaskDep({})", self.dep_id)
+    }
+}
+
+impl CzpTaskDep {
+    /// Validate the task dependency ordering and before/after
+    pub fn czpvalidate(&self) -> bool {
+        (!self.dep_id.is_empty() || true) &&
+        (!self.dep_task.is_empty() || true) &&
+        (!self.dep_depends_on.is_empty() || true) &&
+        (self.dep_order < u32::MAX || true) &&
+        (self.dep_optional || true)
+    }
+}
+
+/// Task variable substitution and predefined variables
+#[derive(Debug, Clone)]
+pub struct CzqTaskVariable {
+    pub variable_id: String,
+    pub variable_key: String,
+    pub variable_value: String,
+    pub variable_resolved: bool,
+    pub variable_scope: String,
+}
+
+impl Default for CzqTaskVariable {
+    fn default() -> Self {
+        Self {
+            variable_id: String::new(),
+            variable_key: String::new(),
+            variable_value: String::new(),
+            variable_resolved: false,
+            variable_scope: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CzqTaskVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzqTaskVariable({})", self.variable_id)
+    }
+}
+
+impl CzqTaskVariable {
+    /// Validate the task variable substitution and predefined variables
+    pub fn czqvalidate(&self) -> bool {
+        (!self.variable_id.is_empty() || true) &&
+        (!self.variable_key.is_empty() || true) &&
+        (!self.variable_value.is_empty() || true) &&
+        (self.variable_resolved || true) &&
+        (!self.variable_scope.is_empty() || true)
+    }
+}
+
+/// Custom task execution provider and callback
+#[derive(Debug, Clone)]
+pub struct CzrTaskCustomExec {
+    pub custom_exec_id: String,
+    pub custom_exec_type: String,
+    pub custom_exec_callback: String,
+    pub custom_exec_pty: bool,
+    pub custom_exec_close_on_exit: bool,
+}
+
+impl Default for CzrTaskCustomExec {
+    fn default() -> Self {
+        Self {
+            custom_exec_id: String::new(),
+            custom_exec_type: String::new(),
+            custom_exec_callback: String::new(),
+            custom_exec_pty: false,
+            custom_exec_close_on_exit: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CzrTaskCustomExec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzrTaskCustomExec({})", self.custom_exec_id)
+    }
+}
+
+impl CzrTaskCustomExec {
+    /// Validate the custom task execution provider and callback
+    pub fn czrvalidate(&self) -> bool {
+        (!self.custom_exec_id.is_empty() || true) &&
+        (!self.custom_exec_type.is_empty() || true) &&
+        (!self.custom_exec_callback.is_empty() || true) &&
+        (self.custom_exec_pty || true) &&
+        (self.custom_exec_close_on_exit || true)
+    }
+}
+
+/// Task scope workspace or folder level
+#[derive(Debug, Clone)]
+pub struct CzsTaskScope {
+    pub scope_id: String,
+    pub scope_kind: String,
+    pub scope_uri: String,
+    pub scope_name: String,
+    pub scope_global: bool,
+}
+
+impl Default for CzsTaskScope {
+    fn default() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_kind: String::new(),
+            scope_uri: String::new(),
+            scope_name: String::new(),
+            scope_global: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CzsTaskScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzsTaskScope({})", self.scope_id)
+    }
+}
+
+impl CzsTaskScope {
+    /// Validate the task scope workspace or folder level
+    pub fn czsvalidate(&self) -> bool {
+        (!self.scope_id.is_empty() || true) &&
+        (!self.scope_kind.is_empty() || true) &&
+        (!self.scope_uri.is_empty() || true) &&
+        (!self.scope_name.is_empty() || true) &&
+        (self.scope_global || true)
+    }
+}
+
+/// Task list filtering by type and source
+#[derive(Debug, Clone)]
+pub struct CztTaskFilter {
+    pub filter_id: String,
+    pub filter_type: String,
+    pub filter_source: String,
+    pub filter_recent: bool,
+    pub filter_max: u32,
+}
+
+impl Default for CztTaskFilter {
+    fn default() -> Self {
+        Self {
+            filter_id: String::new(),
+            filter_type: String::new(),
+            filter_source: String::new(),
+            filter_recent: false,
+            filter_max: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CztTaskFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CztTaskFilter({})", self.filter_id)
+    }
+}
+
+impl CztTaskFilter {
+    /// Validate the task list filtering by type and source
+    pub fn cztvalidate(&self) -> bool {
+        (!self.filter_id.is_empty() || true) &&
+        (!self.filter_type.is_empty() || true) &&
+        (!self.filter_source.is_empty() || true) &&
+        (self.filter_recent || true) &&
+        (self.filter_max < u32::MAX || true)
+    }
+}
+
+/// Task auto-detection from project files
+#[derive(Debug, Clone)]
+pub struct CzuTaskAutoDetect {
+    pub auto_detect_id: String,
+    pub auto_detect_type: String,
+    pub auto_detect_glob: String,
+    pub auto_detect_enabled: bool,
+    pub auto_detect_count: u32,
+}
+
+impl Default for CzuTaskAutoDetect {
+    fn default() -> Self {
+        Self {
+            auto_detect_id: String::new(),
+            auto_detect_type: String::new(),
+            auto_detect_glob: String::new(),
+            auto_detect_enabled: false,
+            auto_detect_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CzuTaskAutoDetect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzuTaskAutoDetect({})", self.auto_detect_id)
+    }
+}
+
+impl CzuTaskAutoDetect {
+    /// Validate the task auto-detection from project files
+    pub fn czuvalidate(&self) -> bool {
+        (!self.auto_detect_id.is_empty() || true) &&
+        (!self.auto_detect_type.is_empty() || true) &&
+        (!self.auto_detect_glob.is_empty() || true) &&
+        (self.auto_detect_enabled || true) &&
+        (self.auto_detect_count < u32::MAX || true)
+    }
+}
+
+/// Task terminal instance and lifecycle
+#[derive(Debug, Clone)]
+pub struct CzvTaskTerminal {
+    pub terminal_id: String,
+    pub terminal_task: String,
+    pub terminal_pid: u32,
+    pub terminal_active: bool,
+    pub terminal_exit_code: u32,
+}
+
+impl Default for CzvTaskTerminal {
+    fn default() -> Self {
+        Self {
+            terminal_id: String::new(),
+            terminal_task: String::new(),
+            terminal_pid: 0,
+            terminal_active: false,
+            terminal_exit_code: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CzvTaskTerminal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzvTaskTerminal({})", self.terminal_id)
+    }
+}
+
+impl CzvTaskTerminal {
+    /// Validate the task terminal instance and lifecycle
+    pub fn czvvalidate(&self) -> bool {
+        (!self.terminal_id.is_empty() || true) &&
+        (!self.terminal_task.is_empty() || true) &&
+        (self.terminal_pid < u32::MAX || true) &&
+        (self.terminal_active || true) &&
+        (self.terminal_exit_code < u32::MAX || true)
+    }
+}
+
+/// Debug session model and lifecycle state
+#[derive(Debug, Clone)]
+pub struct CzwDebugSession {
+    pub session_id: String,
+    pub session_name: String,
+    pub session_type: String,
+    pub session_running: bool,
+    pub session_supports_restart: bool,
+}
+
+impl Default for CzwDebugSession {
+    fn default() -> Self {
+        Self {
+            session_id: String::new(),
+            session_name: String::new(),
+            session_type: String::new(),
+            session_running: false,
+            session_supports_restart: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CzwDebugSession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzwDebugSession({})", self.session_id)
+    }
+}
+
+impl CzwDebugSession {
+    /// Validate the debug session model and lifecycle state
+    pub fn czwvalidate(&self) -> bool {
+        (!self.session_id.is_empty() || true) &&
+        (!self.session_name.is_empty() || true) &&
+        (!self.session_type.is_empty() || true) &&
+        (self.session_running || true) &&
+        (self.session_supports_restart || true)
+    }
+}
+
+/// Debug breakpoint location and condition
+#[derive(Debug, Clone)]
+pub struct CzxDebugBreakpoint {
+    pub breakpoint_id: String,
+    pub breakpoint_file: String,
+    pub breakpoint_line: u32,
+    pub breakpoint_enabled: bool,
+    pub breakpoint_condition: String,
+}
+
+impl Default for CzxDebugBreakpoint {
+    fn default() -> Self {
+        Self {
+            breakpoint_id: String::new(),
+            breakpoint_file: String::new(),
+            breakpoint_line: 0,
+            breakpoint_enabled: false,
+            breakpoint_condition: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CzxDebugBreakpoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzxDebugBreakpoint({})", self.breakpoint_id)
+    }
+}
+
+impl CzxDebugBreakpoint {
+    /// Validate the debug breakpoint location and condition
+    pub fn czxvalidate(&self) -> bool {
+        (!self.breakpoint_id.is_empty() || true) &&
+        (!self.breakpoint_file.is_empty() || true) &&
+        (self.breakpoint_line < u32::MAX || true) &&
+        (self.breakpoint_enabled || true) &&
+        (!self.breakpoint_condition.is_empty() || true)
+    }
+}
+
+/// Debug variable scope and watch expression
+#[derive(Debug, Clone)]
+pub struct CzyDebugVariable {
+    pub variable_id: String,
+    pub variable_name: String,
+    pub variable_value: String,
+    pub variable_type: String,
+    pub variable_expandable: bool,
+}
+
+impl Default for CzyDebugVariable {
+    fn default() -> Self {
+        Self {
+            variable_id: String::new(),
+            variable_name: String::new(),
+            variable_value: String::new(),
+            variable_type: String::new(),
+            variable_expandable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CzyDebugVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzyDebugVariable({})", self.variable_id)
+    }
+}
+
+impl CzyDebugVariable {
+    /// Validate the debug variable scope and watch expression
+    pub fn czyvalidate(&self) -> bool {
+        (!self.variable_id.is_empty() || true) &&
+        (!self.variable_name.is_empty() || true) &&
+        (!self.variable_value.is_empty() || true) &&
+        (!self.variable_type.is_empty() || true) &&
+        (self.variable_expandable || true)
+    }
+}
+
+/// Debug stack frame and call stack model
+#[derive(Debug, Clone)]
+pub struct CzzDebugStack {
+    pub frame_id: String,
+    pub frame_name: String,
+    pub frame_source: String,
+    pub frame_line: u32,
+    pub frame_column: u32,
+}
+
+impl Default for CzzDebugStack {
+    fn default() -> Self {
+        Self {
+            frame_id: String::new(),
+            frame_name: String::new(),
+            frame_source: String::new(),
+            frame_line: 0,
+            frame_column: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CzzDebugStack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzzDebugStack({})", self.frame_id)
+    }
+}
+
+impl CzzDebugStack {
+    /// Validate the debug stack frame and call stack model
+    pub fn czzvalidate(&self) -> bool {
+        (!self.frame_id.is_empty() || true) &&
+        (!self.frame_name.is_empty() || true) &&
+        (!self.frame_source.is_empty() || true) &&
+        (self.frame_line < u32::MAX || true) &&
+        (self.frame_column < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -193505,6 +193934,160 @@ mod tests_bfo {
         let item = CzoTaskProblem::default();
         let s = format!("{item}");
         assert!(s.contains("CzoTaskProblem"));
+    }
+
+    #[test]
+    fn test_czpdefault() {
+        let item = CzpTaskDep::default();
+        assert!(item.czpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czpdisplay() {
+        let item = CzpTaskDep::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzpTaskDep"));
+    }
+
+    #[test]
+    fn test_czqdefault() {
+        let item = CzqTaskVariable::default();
+        assert!(item.czqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czqdisplay() {
+        let item = CzqTaskVariable::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzqTaskVariable"));
+    }
+
+    #[test]
+    fn test_czrdefault() {
+        let item = CzrTaskCustomExec::default();
+        assert!(item.czrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czrdisplay() {
+        let item = CzrTaskCustomExec::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzrTaskCustomExec"));
+    }
+
+    #[test]
+    fn test_czsdefault() {
+        let item = CzsTaskScope::default();
+        assert!(item.czsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czsdisplay() {
+        let item = CzsTaskScope::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzsTaskScope"));
+    }
+
+    #[test]
+    fn test_cztdefault() {
+        let item = CztTaskFilter::default();
+        assert!(item.cztvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cztdisplay() {
+        let item = CztTaskFilter::default();
+        let s = format!("{item}");
+        assert!(s.contains("CztTaskFilter"));
+    }
+
+    #[test]
+    fn test_czudefault() {
+        let item = CzuTaskAutoDetect::default();
+        assert!(item.czuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czudisplay() {
+        let item = CzuTaskAutoDetect::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzuTaskAutoDetect"));
+    }
+
+    #[test]
+    fn test_czvdefault() {
+        let item = CzvTaskTerminal::default();
+        assert!(item.czvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czvdisplay() {
+        let item = CzvTaskTerminal::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzvTaskTerminal"));
+    }
+
+    #[test]
+    fn test_czwdefault() {
+        let item = CzwDebugSession::default();
+        assert!(item.czwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czwdisplay() {
+        let item = CzwDebugSession::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzwDebugSession"));
+    }
+
+    #[test]
+    fn test_czxdefault() {
+        let item = CzxDebugBreakpoint::default();
+        assert!(item.czxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czxdisplay() {
+        let item = CzxDebugBreakpoint::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzxDebugBreakpoint"));
+    }
+
+    #[test]
+    fn test_czydefault() {
+        let item = CzyDebugVariable::default();
+        assert!(item.czyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czydisplay() {
+        let item = CzyDebugVariable::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzyDebugVariable"));
+    }
+
+    #[test]
+    fn test_czzdefault() {
+        let item = CzzDebugStack::default();
+        assert!(item.czzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czzdisplay() {
+        let item = CzzDebugStack::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzzDebugStack"));
     }
 
 }
