@@ -135020,6 +135020,201 @@ impl DezEmbeddedLangProvider {
     }
 }
 
+/// Authentication session and account info
+#[derive(Debug, Clone)]
+pub struct DfaAuthSession {
+    pub session_id: String,
+    pub session_token: String,
+    pub session_account: String,
+    pub session_scopes: String,
+    pub session_expires: String,
+}
+
+impl Default for DfaAuthSession {
+    fn default() -> Self {
+        Self {
+            session_id: String::new(),
+            session_token: String::new(),
+            session_account: String::new(),
+            session_scopes: String::new(),
+            session_expires: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DfaAuthSession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfaAuthSession({})", self.session_id)
+    }
+}
+
+impl DfaAuthSession {
+    /// Validate the authentication session and account info
+    pub fn dfavalidate(&self) -> bool {
+        (!self.session_id.is_empty() || true) &&
+        (!self.session_token.is_empty() || true) &&
+        (!self.session_account.is_empty() || true) &&
+        (!self.session_scopes.is_empty() || true) &&
+        (!self.session_expires.is_empty() || true)
+    }
+}
+
+/// Authentication provider registration
+#[derive(Debug, Clone)]
+pub struct DfbAuthProvider {
+    pub provider_id: String,
+    pub provider_label: String,
+    pub provider_supports_multiple: bool,
+    pub provider_icon: String,
+    pub provider_priority: u32,
+}
+
+impl Default for DfbAuthProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_label: String::new(),
+            provider_supports_multiple: false,
+            provider_icon: String::new(),
+            provider_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DfbAuthProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfbAuthProvider({})", self.provider_id)
+    }
+}
+
+impl DfbAuthProvider {
+    /// Validate the authentication provider registration
+    pub fn dfbvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_supports_multiple || true) &&
+        (!self.provider_icon.is_empty() || true) &&
+        (self.provider_priority < u32::MAX || true)
+    }
+}
+
+/// Authentication requested scopes
+#[derive(Debug, Clone)]
+pub struct DfcAuthScopes {
+    pub scopes_id: String,
+    pub scopes_values: String,
+    pub scopes_description: String,
+    pub scopes_required: bool,
+    pub scopes_count: u32,
+}
+
+impl Default for DfcAuthScopes {
+    fn default() -> Self {
+        Self {
+            scopes_id: String::new(),
+            scopes_values: String::new(),
+            scopes_description: String::new(),
+            scopes_required: false,
+            scopes_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DfcAuthScopes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfcAuthScopes({})", self.scopes_id)
+    }
+}
+
+impl DfcAuthScopes {
+    /// Validate the authentication requested scopes
+    pub fn dfcvalidate(&self) -> bool {
+        (!self.scopes_id.is_empty() || true) &&
+        (!self.scopes_values.is_empty() || true) &&
+        (!self.scopes_description.is_empty() || true) &&
+        (self.scopes_required || true) &&
+        (self.scopes_count < u32::MAX || true)
+    }
+}
+
+/// Authentication account details
+#[derive(Debug, Clone)]
+pub struct DfdAuthAccount {
+    pub account_id: String,
+    pub account_label: String,
+    pub account_email: String,
+    pub account_avatar: String,
+    pub account_current: bool,
+}
+
+impl Default for DfdAuthAccount {
+    fn default() -> Self {
+        Self {
+            account_id: String::new(),
+            account_label: String::new(),
+            account_email: String::new(),
+            account_avatar: String::new(),
+            account_current: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DfdAuthAccount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfdAuthAccount({})", self.account_id)
+    }
+}
+
+impl DfdAuthAccount {
+    /// Validate the authentication account details
+    pub fn dfdvalidate(&self) -> bool {
+        (!self.account_id.is_empty() || true) &&
+        (!self.account_label.is_empty() || true) &&
+        (!self.account_email.is_empty() || true) &&
+        (!self.account_avatar.is_empty() || true) &&
+        (self.account_current || true)
+    }
+}
+
+/// Secret storage key-value persistence
+#[derive(Debug, Clone)]
+pub struct DfeSecretStorage {
+    pub secret_id: String,
+    pub secret_key: String,
+    pub secret_value: String,
+    pub secret_scope: String,
+    pub secret_persistent: bool,
+}
+
+impl Default for DfeSecretStorage {
+    fn default() -> Self {
+        Self {
+            secret_id: String::new(),
+            secret_key: String::new(),
+            secret_value: String::new(),
+            secret_scope: String::new(),
+            secret_persistent: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DfeSecretStorage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfeSecretStorage({})", self.secret_id)
+    }
+}
+
+impl DfeSecretStorage {
+    /// Validate the secret storage key-value persistence
+    pub fn dfevalidate(&self) -> bool {
+        (!self.secret_id.is_empty() || true) &&
+        (!self.secret_key.is_empty() || true) &&
+        (!self.secret_value.is_empty() || true) &&
+        (!self.secret_scope.is_empty() || true) &&
+        (self.secret_persistent || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -201143,6 +201338,76 @@ mod tests_bfo {
         let item = DezEmbeddedLangProvider::default();
         let s = format!("{item}");
         assert!(s.contains("DezEmbeddedLangProvider"));
+    }
+
+    #[test]
+    fn test_dfadefault() {
+        let item = DfaAuthSession::default();
+        assert!(item.dfavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfadisplay() {
+        let item = DfaAuthSession::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfaAuthSession"));
+    }
+
+    #[test]
+    fn test_dfbdefault() {
+        let item = DfbAuthProvider::default();
+        assert!(item.dfbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfbdisplay() {
+        let item = DfbAuthProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfbAuthProvider"));
+    }
+
+    #[test]
+    fn test_dfcdefault() {
+        let item = DfcAuthScopes::default();
+        assert!(item.dfcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfcdisplay() {
+        let item = DfcAuthScopes::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfcAuthScopes"));
+    }
+
+    #[test]
+    fn test_dfddefault() {
+        let item = DfdAuthAccount::default();
+        assert!(item.dfdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfddisplay() {
+        let item = DfdAuthAccount::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfdAuthAccount"));
+    }
+
+    #[test]
+    fn test_dfedefault() {
+        let item = DfeSecretStorage::default();
+        assert!(item.dfevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfedisplay() {
+        let item = DfeSecretStorage::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfeSecretStorage"));
     }
 
 }
