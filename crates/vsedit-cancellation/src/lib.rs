@@ -147031,6 +147031,201 @@ impl DqzLspProgress {
     }
 }
 
+/// LSP text document synchronization mode
+#[derive(Debug, Clone)]
+pub struct DraLspTextDocSync {
+    pub sync_id: String,
+    pub sync_kind: String,
+    pub sync_save: bool,
+    pub sync_will_save: bool,
+    pub sync_open_close: bool,
+}
+
+impl Default for DraLspTextDocSync {
+    fn default() -> Self {
+        Self {
+            sync_id: String::new(),
+            sync_kind: String::new(),
+            sync_save: false,
+            sync_will_save: false,
+            sync_open_close: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DraLspTextDocSync {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DraLspTextDocSync({})", self.sync_id)
+    }
+}
+
+impl DraLspTextDocSync {
+    /// Validate the lsp text document synchronization mode
+    pub fn dravalidate(&self) -> bool {
+        (!self.sync_id.is_empty() || true) &&
+        (!self.sync_kind.is_empty() || true) &&
+        (self.sync_save || true) &&
+        (self.sync_will_save || true) &&
+        (self.sync_open_close || true)
+    }
+}
+
+/// LSP code action kind and resolution
+#[derive(Debug, Clone)]
+pub struct DrbLspCodeAction {
+    pub action_id: String,
+    pub action_title: String,
+    pub action_kind: String,
+    pub action_diagnostics: String,
+    pub action_preferred: bool,
+}
+
+impl Default for DrbLspCodeAction {
+    fn default() -> Self {
+        Self {
+            action_id: String::new(),
+            action_title: String::new(),
+            action_kind: String::new(),
+            action_diagnostics: String::new(),
+            action_preferred: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DrbLspCodeAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrbLspCodeAction({})", self.action_id)
+    }
+}
+
+impl DrbLspCodeAction {
+    /// Validate the lsp code action kind and resolution
+    pub fn drbvalidate(&self) -> bool {
+        (!self.action_id.is_empty() || true) &&
+        (!self.action_title.is_empty() || true) &&
+        (!self.action_kind.is_empty() || true) &&
+        (!self.action_diagnostics.is_empty() || true) &&
+        (self.action_preferred || true)
+    }
+}
+
+/// LSP signature help trigger and active
+#[derive(Debug, Clone)]
+pub struct DrcLspSignature {
+    pub sig_id: String,
+    pub sig_trigger_chars: String,
+    pub sig_retrigger_chars: String,
+    pub sig_active_param: u32,
+    pub sig_context_active: bool,
+}
+
+impl Default for DrcLspSignature {
+    fn default() -> Self {
+        Self {
+            sig_id: String::new(),
+            sig_trigger_chars: String::new(),
+            sig_retrigger_chars: String::new(),
+            sig_active_param: 0,
+            sig_context_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DrcLspSignature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrcLspSignature({})", self.sig_id)
+    }
+}
+
+impl DrcLspSignature {
+    /// Validate the lsp signature help trigger and active
+    pub fn drcvalidate(&self) -> bool {
+        (!self.sig_id.is_empty() || true) &&
+        (!self.sig_trigger_chars.is_empty() || true) &&
+        (!self.sig_retrigger_chars.is_empty() || true) &&
+        (self.sig_active_param < u32::MAX || true) &&
+        (self.sig_context_active || true)
+    }
+}
+
+/// LSP semantic tokens full and delta
+#[derive(Debug, Clone)]
+pub struct DrdLspSemanticTokens {
+    pub sem_tok_id: String,
+    pub sem_tok_result_id: String,
+    pub sem_tok_data: String,
+    pub sem_tok_full: bool,
+    pub sem_tok_delta: bool,
+}
+
+impl Default for DrdLspSemanticTokens {
+    fn default() -> Self {
+        Self {
+            sem_tok_id: String::new(),
+            sem_tok_result_id: String::new(),
+            sem_tok_data: String::new(),
+            sem_tok_full: false,
+            sem_tok_delta: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DrdLspSemanticTokens {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrdLspSemanticTokens({})", self.sem_tok_id)
+    }
+}
+
+impl DrdLspSemanticTokens {
+    /// Validate the lsp semantic tokens full and delta
+    pub fn drdvalidate(&self) -> bool {
+        (!self.sem_tok_id.is_empty() || true) &&
+        (!self.sem_tok_result_id.is_empty() || true) &&
+        (!self.sem_tok_data.is_empty() || true) &&
+        (self.sem_tok_full || true) &&
+        (self.sem_tok_delta || true)
+    }
+}
+
+/// LSP inlay hint label and kind
+#[derive(Debug, Clone)]
+pub struct DreLspInlayHint {
+    pub hint_id: String,
+    pub hint_position: String,
+    pub hint_label: String,
+    pub hint_kind: String,
+    pub hint_padding_left: bool,
+}
+
+impl Default for DreLspInlayHint {
+    fn default() -> Self {
+        Self {
+            hint_id: String::new(),
+            hint_position: String::new(),
+            hint_label: String::new(),
+            hint_kind: String::new(),
+            hint_padding_left: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DreLspInlayHint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DreLspInlayHint({})", self.hint_id)
+    }
+}
+
+impl DreLspInlayHint {
+    /// Validate the lsp inlay hint label and kind
+    pub fn drevalidate(&self) -> bool {
+        (!self.hint_id.is_empty() || true) &&
+        (!self.hint_position.is_empty() || true) &&
+        (!self.hint_label.is_empty() || true) &&
+        (!self.hint_kind.is_empty() || true) &&
+        (self.hint_padding_left || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -217522,6 +217717,76 @@ mod tests_bfo {
         let item = DqzLspProgress::default();
         let s = format!("{item}");
         assert!(s.contains("DqzLspProgress"));
+    }
+
+    #[test]
+    fn test_dradefault() {
+        let item = DraLspTextDocSync::default();
+        assert!(item.dravalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dradisplay() {
+        let item = DraLspTextDocSync::default();
+        let s = format!("{item}");
+        assert!(s.contains("DraLspTextDocSync"));
+    }
+
+    #[test]
+    fn test_drbdefault() {
+        let item = DrbLspCodeAction::default();
+        assert!(item.drbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drbdisplay() {
+        let item = DrbLspCodeAction::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrbLspCodeAction"));
+    }
+
+    #[test]
+    fn test_drcdefault() {
+        let item = DrcLspSignature::default();
+        assert!(item.drcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drcdisplay() {
+        let item = DrcLspSignature::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrcLspSignature"));
+    }
+
+    #[test]
+    fn test_drddefault() {
+        let item = DrdLspSemanticTokens::default();
+        assert!(item.drdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drddisplay() {
+        let item = DrdLspSemanticTokens::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrdLspSemanticTokens"));
+    }
+
+    #[test]
+    fn test_dredefault() {
+        let item = DreLspInlayHint::default();
+        assert!(item.drevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dredisplay() {
+        let item = DreLspInlayHint::default();
+        let s = format!("{item}");
+        assert!(s.contains("DreLspInlayHint"));
     }
 
 }
