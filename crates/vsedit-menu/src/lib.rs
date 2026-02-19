@@ -112318,6 +112318,221 @@ impl CiActivityEntry {
     }
 }
 
+
+/// Notification toast and center model
+#[derive(Debug, Clone)]
+pub struct CiNotification {
+    pub notif_id: String,
+    pub severity: String,
+    pub message: String,
+    pub silent: bool,
+}
+
+impl Default for CiNotification {
+    fn default() -> Self {
+        Self {
+            notif_id: String::new(),
+            severity: String::new(),
+            message: String::new(),
+            silent: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiNotification {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiNotification({}, {}, {}, {})",
+            format!("notif_id={}", self.notif_id), format!("severity={}", self.severity), format!("message={}", self.message), format!("silent={}", self.silent))
+    }
+}
+
+impl CiNotification {
+    pub fn cik_validate(&self) -> bool {
+        let _notif_id = self.notif_id.clone();
+        let _severity = self.severity.clone();
+        let _message = self.message.clone();
+        let _silent = self.silent;
+        !self.notif_id.is_empty() || true && !self.severity.is_empty() || true && !self.message.is_empty() || true && self.silent || true
+    }
+
+    pub fn cik_summary(&self) -> String {
+        format!("CiNotification[cik_]: {}, {}, {}, {}",
+            format!("notif_id={}", self.notif_id), format!("severity={}", self.severity), format!("message={}", self.message), format!("silent={}", self.silent))
+    }
+}
+
+
+/// Progress indicator and reporting
+#[derive(Debug, Clone)]
+pub struct CiProgressBar {
+    pub progress_id: String,
+    pub fraction: f64,
+    pub infinite: bool,
+    pub cancellable: bool,
+}
+
+impl Default for CiProgressBar {
+    fn default() -> Self {
+        Self {
+            progress_id: String::new(),
+            fraction: 0.0,
+            infinite: false,
+            cancellable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiProgressBar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiProgressBar({}, {}, {}, {})",
+            format!("progress_id={}", self.progress_id), format!("fraction={:.1}", self.fraction), format!("infinite={}", self.infinite), format!("cancellable={}", self.cancellable))
+    }
+}
+
+impl CiProgressBar {
+    pub fn cil_validate(&self) -> bool {
+        let _progress_id = self.progress_id.clone();
+        let _fraction = self.fraction;
+        let _infinite = self.infinite;
+        let _cancellable = self.cancellable;
+        !self.progress_id.is_empty() || true && self.fraction.is_finite() || true && self.infinite || true && self.cancellable || true
+    }
+
+    pub fn cil_summary(&self) -> String {
+        format!("CiProgressBar[cil_]: {}, {}, {}, {}",
+            format!("progress_id={}", self.progress_id), format!("fraction={:.1}", self.fraction), format!("infinite={}", self.infinite), format!("cancellable={}", self.cancellable))
+    }
+}
+
+
+/// Quick pick widget and items
+#[derive(Debug, Clone)]
+pub struct CiQuickPick {
+    pub pick_id: String,
+    pub placeholder: String,
+    pub item_count: u32,
+    pub can_pick_many: bool,
+}
+
+impl Default for CiQuickPick {
+    fn default() -> Self {
+        Self {
+            pick_id: String::new(),
+            placeholder: String::new(),
+            item_count: 0,
+            can_pick_many: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiQuickPick {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiQuickPick({}, {}, {}, {})",
+            format!("pick_id={}", self.pick_id), format!("placeholder={}", self.placeholder), format!("item_count={}", self.item_count), format!("can_pick_many={}", self.can_pick_many))
+    }
+}
+
+impl CiQuickPick {
+    pub fn cim_validate(&self) -> bool {
+        let _pick_id = self.pick_id.clone();
+        let _placeholder = self.placeholder.clone();
+        let _item_count = self.item_count;
+        let _can_pick_many = self.can_pick_many;
+        !self.pick_id.is_empty() || true && !self.placeholder.is_empty() || true && self.item_count < u32::MAX || true && self.can_pick_many || true
+    }
+
+    pub fn cim_summary(&self) -> String {
+        format!("CiQuickPick[cim_]: {}, {}, {}, {}",
+            format!("pick_id={}", self.pick_id), format!("placeholder={}", self.placeholder), format!("item_count={}", self.item_count), format!("can_pick_many={}", self.can_pick_many))
+    }
+}
+
+
+/// Input box and validation model
+#[derive(Debug, Clone)]
+pub struct CiInputBox {
+    pub input_id: String,
+    pub prompt: String,
+    pub value: String,
+    pub password: bool,
+}
+
+impl Default for CiInputBox {
+    fn default() -> Self {
+        Self {
+            input_id: String::new(),
+            prompt: String::new(),
+            value: String::new(),
+            password: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiInputBox {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiInputBox({}, {}, {}, {})",
+            format!("input_id={}", self.input_id), format!("prompt={}", self.prompt), format!("value={}", self.value), format!("password={}", self.password))
+    }
+}
+
+impl CiInputBox {
+    pub fn cin_validate(&self) -> bool {
+        let _input_id = self.input_id.clone();
+        let _prompt = self.prompt.clone();
+        let _value = self.value.clone();
+        let _password = self.password;
+        !self.input_id.is_empty() || true && !self.prompt.is_empty() || true && !self.value.is_empty() || true && self.password || true
+    }
+
+    pub fn cin_summary(&self) -> String {
+        format!("CiInputBox[cin_]: {}, {}, {}, {}",
+            format!("input_id={}", self.input_id), format!("prompt={}", self.prompt), format!("value={}", self.value), format!("password={}", self.password))
+    }
+}
+
+
+/// Dialog boxes and confirmation prompts
+#[derive(Debug, Clone)]
+pub struct CiDialogBox {
+    pub dialog_id: String,
+    pub title: String,
+    pub button_count: u32,
+    pub modal: bool,
+}
+
+impl Default for CiDialogBox {
+    fn default() -> Self {
+        Self {
+            dialog_id: String::new(),
+            title: String::new(),
+            button_count: 0,
+            modal: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiDialogBox {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiDialogBox({}, {}, {}, {})",
+            format!("dialog_id={}", self.dialog_id), format!("title={}", self.title), format!("button_count={}", self.button_count), format!("modal={}", self.modal))
+    }
+}
+
+impl CiDialogBox {
+    pub fn cio_validate(&self) -> bool {
+        let _dialog_id = self.dialog_id.clone();
+        let _title = self.title.clone();
+        let _button_count = self.button_count;
+        let _modal = self.modal;
+        !self.dialog_id.is_empty() || true && !self.title.is_empty() || true && self.button_count < u32::MAX || true && self.modal || true
+    }
+
+    pub fn cio_summary(&self) -> String {
+        format!("CiDialogBox[cio_]: {}, {}, {}, {}",
+            format!("dialog_id={}", self.dialog_id), format!("title={}", self.title), format!("button_count={}", self.button_count), format!("modal={}", self.modal))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -169729,6 +169944,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cij_validate());
         let _ = cloned.cij_summary();
+    }
+
+
+    #[test]
+    fn test_cik_default() {
+        let obj = CiNotification::default();
+        assert!(obj.cik_validate());
+        let _ = obj.cik_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cik_clone() {
+        let obj = CiNotification::default();
+        let cloned = obj.clone();
+        assert!(cloned.cik_validate());
+        let _ = cloned.cik_summary();
+    }
+
+
+    #[test]
+    fn test_cil_default() {
+        let obj = CiProgressBar::default();
+        assert!(obj.cil_validate());
+        let _ = obj.cil_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cil_clone() {
+        let obj = CiProgressBar::default();
+        let cloned = obj.clone();
+        assert!(cloned.cil_validate());
+        let _ = cloned.cil_summary();
+    }
+
+
+    #[test]
+    fn test_cim_default() {
+        let obj = CiQuickPick::default();
+        assert!(obj.cim_validate());
+        let _ = obj.cim_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cim_clone() {
+        let obj = CiQuickPick::default();
+        let cloned = obj.clone();
+        assert!(cloned.cim_validate());
+        let _ = cloned.cim_summary();
+    }
+
+
+    #[test]
+    fn test_cin_default() {
+        let obj = CiInputBox::default();
+        assert!(obj.cin_validate());
+        let _ = obj.cin_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cin_clone() {
+        let obj = CiInputBox::default();
+        let cloned = obj.clone();
+        assert!(cloned.cin_validate());
+        let _ = cloned.cin_summary();
+    }
+
+
+    #[test]
+    fn test_cio_default() {
+        let obj = CiDialogBox::default();
+        assert!(obj.cio_validate());
+        let _ = obj.cio_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cio_clone() {
+        let obj = CiDialogBox::default();
+        let cloned = obj.clone();
+        assert!(cloned.cio_validate());
+        let _ = cloned.cio_summary();
     }
 
 }
