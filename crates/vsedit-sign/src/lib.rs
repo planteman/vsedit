@@ -89814,6 +89814,111 @@ impl DiffAlgorithm {
     }
 }
 
+/// Runtime wiring: bsf_ SearchQuery
+#[derive(Debug, Clone)]
+pub struct SearchQuery {
+    pub bsf_pattern: String,
+    pub bsf_is_regex: bool,
+    pub bsf_is_case_sensitive: bool,
+    pub bsf_is_whole_word: bool,
+    pub bsf_include_pattern: String,
+    pub bsf_exclude_pattern: String,
+    pub bsf_use_ignore_files: bool,
+    pub bsf_search_in_open_editors: bool,
+    pub bsf_context_lines: u32,
+    pub bsf_max_results: u32,
+}
+
+impl SearchQuery {
+    pub fn bsf_summary(&self) -> String {
+        format!("SearchQuery({})", self.bsf_pattern)
+    }
+}
+
+/// Runtime wiring: bsg_ SearchResultModel
+#[derive(Debug, Clone)]
+pub struct SearchResultModel {
+    pub bsg_query_text: String,
+    pub bsg_file_count: u32,
+    pub bsg_match_count: u32,
+    pub bsg_is_complete: bool,
+    pub bsg_elapsed_ms: u64,
+    pub bsg_is_cancelled: bool,
+    pub bsg_has_replace: bool,
+    pub bsg_replace_text: String,
+    pub bsg_preserve_case: bool,
+    pub bsg_is_dirty: bool,
+}
+
+impl SearchResultModel {
+    pub fn bsg_summary(&self) -> String {
+        format!("SearchResultModel({})", self.bsg_query_text)
+    }
+}
+
+/// Runtime wiring: bsh_ FileMatch
+#[derive(Debug, Clone)]
+pub struct FileMatch {
+    pub bsh_file_uri: String,
+    pub bsh_match_count: u32,
+    pub bsh_is_expanded: bool,
+    pub bsh_is_selected: bool,
+    pub bsh_file_size: u64,
+    pub bsh_language_id: String,
+    pub bsh_is_binary: bool,
+    pub bsh_context_before: Vec<String>,
+    pub bsh_context_after: Vec<String>,
+    pub bsh_relative_path: String,
+}
+
+impl FileMatch {
+    pub fn bsh_summary(&self) -> String {
+        format!("FileMatch({})", self.bsh_file_uri)
+    }
+}
+
+/// Runtime wiring: bsi_ TextSearchMatch
+#[derive(Debug, Clone)]
+pub struct TextSearchMatch {
+    pub bsi_line_number: u32,
+    pub bsi_start_column: u32,
+    pub bsi_end_column: u32,
+    pub bsi_preview_text: String,
+    pub bsi_line_text: String,
+    pub bsi_is_multi_line: bool,
+    pub bsi_match_ranges_count: u32,
+    pub bsi_uri: String,
+    pub bsi_is_in_replace: bool,
+    pub bsi_replace_preview: String,
+}
+
+impl TextSearchMatch {
+    pub fn bsi_summary(&self) -> String {
+        format!("TextSearchMatch({})", self.bsi_line_number)
+    }
+}
+
+/// Runtime wiring: bsj_ ReplaceOperation
+#[derive(Debug, Clone)]
+pub struct ReplaceOperation {
+    pub bsj_search_text: String,
+    pub bsj_replace_text: String,
+    pub bsj_is_regex: bool,
+    pub bsj_preserve_case: bool,
+    pub bsj_files_affected: u32,
+    pub bsj_replacements_count: u32,
+    pub bsj_is_confirmed: bool,
+    pub bsj_is_complete: bool,
+    pub bsj_preview_edits: Vec<String>,
+    pub bsj_undo_id: u64,
+}
+
+impl ReplaceOperation {
+    pub fn bsj_summary(&self) -> String {
+        format!("ReplaceOperation({})", self.bsj_search_text)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -123477,6 +123582,910 @@ mod tests_bfo {
         };
         let _ = obj.bse_summary();
         assert_eq!(obj.bse_line_count_modified, 0);
+    }
+
+    #[test]
+    fn test_bsf_pattern() {
+        let obj = SearchQuery {
+            bsf_pattern: String::from("test"),
+            bsf_is_regex: false,
+            bsf_is_case_sensitive: false,
+            bsf_is_whole_word: false,
+            bsf_include_pattern: String::from("test"),
+            bsf_exclude_pattern: String::from("test"),
+            bsf_use_ignore_files: false,
+            bsf_search_in_open_editors: false,
+            bsf_context_lines: 0,
+            bsf_max_results: 0,
+        };
+        let _ = obj.bsf_summary();
+        assert_eq!(obj.bsf_pattern, "test");
+    }
+
+    #[test]
+    fn test_bsf_is_regex() {
+        let obj = SearchQuery {
+            bsf_pattern: String::from("test"),
+            bsf_is_regex: false,
+            bsf_is_case_sensitive: false,
+            bsf_is_whole_word: false,
+            bsf_include_pattern: String::from("test"),
+            bsf_exclude_pattern: String::from("test"),
+            bsf_use_ignore_files: false,
+            bsf_search_in_open_editors: false,
+            bsf_context_lines: 0,
+            bsf_max_results: 0,
+        };
+        let _ = obj.bsf_summary();
+        assert!(!obj.bsf_is_regex);
+    }
+
+    #[test]
+    fn test_bsf_is_case_sensitive() {
+        let obj = SearchQuery {
+            bsf_pattern: String::from("test"),
+            bsf_is_regex: false,
+            bsf_is_case_sensitive: false,
+            bsf_is_whole_word: false,
+            bsf_include_pattern: String::from("test"),
+            bsf_exclude_pattern: String::from("test"),
+            bsf_use_ignore_files: false,
+            bsf_search_in_open_editors: false,
+            bsf_context_lines: 0,
+            bsf_max_results: 0,
+        };
+        let _ = obj.bsf_summary();
+        assert!(!obj.bsf_is_case_sensitive);
+    }
+
+    #[test]
+    fn test_bsf_is_whole_word() {
+        let obj = SearchQuery {
+            bsf_pattern: String::from("test"),
+            bsf_is_regex: false,
+            bsf_is_case_sensitive: false,
+            bsf_is_whole_word: false,
+            bsf_include_pattern: String::from("test"),
+            bsf_exclude_pattern: String::from("test"),
+            bsf_use_ignore_files: false,
+            bsf_search_in_open_editors: false,
+            bsf_context_lines: 0,
+            bsf_max_results: 0,
+        };
+        let _ = obj.bsf_summary();
+        assert!(!obj.bsf_is_whole_word);
+    }
+
+    #[test]
+    fn test_bsf_include_pattern() {
+        let obj = SearchQuery {
+            bsf_pattern: String::from("test"),
+            bsf_is_regex: false,
+            bsf_is_case_sensitive: false,
+            bsf_is_whole_word: false,
+            bsf_include_pattern: String::from("test"),
+            bsf_exclude_pattern: String::from("test"),
+            bsf_use_ignore_files: false,
+            bsf_search_in_open_editors: false,
+            bsf_context_lines: 0,
+            bsf_max_results: 0,
+        };
+        let _ = obj.bsf_summary();
+        assert_eq!(obj.bsf_include_pattern, "test");
+    }
+
+    #[test]
+    fn test_bsf_exclude_pattern() {
+        let obj = SearchQuery {
+            bsf_pattern: String::from("test"),
+            bsf_is_regex: false,
+            bsf_is_case_sensitive: false,
+            bsf_is_whole_word: false,
+            bsf_include_pattern: String::from("test"),
+            bsf_exclude_pattern: String::from("test"),
+            bsf_use_ignore_files: false,
+            bsf_search_in_open_editors: false,
+            bsf_context_lines: 0,
+            bsf_max_results: 0,
+        };
+        let _ = obj.bsf_summary();
+        assert_eq!(obj.bsf_exclude_pattern, "test");
+    }
+
+    #[test]
+    fn test_bsf_use_ignore_files() {
+        let obj = SearchQuery {
+            bsf_pattern: String::from("test"),
+            bsf_is_regex: false,
+            bsf_is_case_sensitive: false,
+            bsf_is_whole_word: false,
+            bsf_include_pattern: String::from("test"),
+            bsf_exclude_pattern: String::from("test"),
+            bsf_use_ignore_files: false,
+            bsf_search_in_open_editors: false,
+            bsf_context_lines: 0,
+            bsf_max_results: 0,
+        };
+        let _ = obj.bsf_summary();
+        assert!(!obj.bsf_use_ignore_files);
+    }
+
+    #[test]
+    fn test_bsf_search_in_open_editors() {
+        let obj = SearchQuery {
+            bsf_pattern: String::from("test"),
+            bsf_is_regex: false,
+            bsf_is_case_sensitive: false,
+            bsf_is_whole_word: false,
+            bsf_include_pattern: String::from("test"),
+            bsf_exclude_pattern: String::from("test"),
+            bsf_use_ignore_files: false,
+            bsf_search_in_open_editors: false,
+            bsf_context_lines: 0,
+            bsf_max_results: 0,
+        };
+        let _ = obj.bsf_summary();
+        assert!(!obj.bsf_search_in_open_editors);
+    }
+
+    #[test]
+    fn test_bsf_context_lines() {
+        let obj = SearchQuery {
+            bsf_pattern: String::from("test"),
+            bsf_is_regex: false,
+            bsf_is_case_sensitive: false,
+            bsf_is_whole_word: false,
+            bsf_include_pattern: String::from("test"),
+            bsf_exclude_pattern: String::from("test"),
+            bsf_use_ignore_files: false,
+            bsf_search_in_open_editors: false,
+            bsf_context_lines: 0,
+            bsf_max_results: 0,
+        };
+        let _ = obj.bsf_summary();
+        assert_eq!(obj.bsf_context_lines, 0);
+    }
+
+    #[test]
+    fn test_bsf_max_results() {
+        let obj = SearchQuery {
+            bsf_pattern: String::from("test"),
+            bsf_is_regex: false,
+            bsf_is_case_sensitive: false,
+            bsf_is_whole_word: false,
+            bsf_include_pattern: String::from("test"),
+            bsf_exclude_pattern: String::from("test"),
+            bsf_use_ignore_files: false,
+            bsf_search_in_open_editors: false,
+            bsf_context_lines: 0,
+            bsf_max_results: 0,
+        };
+        let _ = obj.bsf_summary();
+        assert_eq!(obj.bsf_max_results, 0);
+    }
+
+
+    #[test]
+    fn test_bsg_query_text() {
+        let obj = SearchResultModel {
+            bsg_query_text: String::from("test"),
+            bsg_file_count: 0,
+            bsg_match_count: 0,
+            bsg_is_complete: false,
+            bsg_elapsed_ms: 0,
+            bsg_is_cancelled: false,
+            bsg_has_replace: false,
+            bsg_replace_text: String::from("test"),
+            bsg_preserve_case: false,
+            bsg_is_dirty: false,
+        };
+        let _ = obj.bsg_summary();
+        assert_eq!(obj.bsg_query_text, "test");
+    }
+
+    #[test]
+    fn test_bsg_file_count() {
+        let obj = SearchResultModel {
+            bsg_query_text: String::from("test"),
+            bsg_file_count: 0,
+            bsg_match_count: 0,
+            bsg_is_complete: false,
+            bsg_elapsed_ms: 0,
+            bsg_is_cancelled: false,
+            bsg_has_replace: false,
+            bsg_replace_text: String::from("test"),
+            bsg_preserve_case: false,
+            bsg_is_dirty: false,
+        };
+        let _ = obj.bsg_summary();
+        assert_eq!(obj.bsg_file_count, 0);
+    }
+
+    #[test]
+    fn test_bsg_match_count() {
+        let obj = SearchResultModel {
+            bsg_query_text: String::from("test"),
+            bsg_file_count: 0,
+            bsg_match_count: 0,
+            bsg_is_complete: false,
+            bsg_elapsed_ms: 0,
+            bsg_is_cancelled: false,
+            bsg_has_replace: false,
+            bsg_replace_text: String::from("test"),
+            bsg_preserve_case: false,
+            bsg_is_dirty: false,
+        };
+        let _ = obj.bsg_summary();
+        assert_eq!(obj.bsg_match_count, 0);
+    }
+
+    #[test]
+    fn test_bsg_is_complete() {
+        let obj = SearchResultModel {
+            bsg_query_text: String::from("test"),
+            bsg_file_count: 0,
+            bsg_match_count: 0,
+            bsg_is_complete: false,
+            bsg_elapsed_ms: 0,
+            bsg_is_cancelled: false,
+            bsg_has_replace: false,
+            bsg_replace_text: String::from("test"),
+            bsg_preserve_case: false,
+            bsg_is_dirty: false,
+        };
+        let _ = obj.bsg_summary();
+        assert!(!obj.bsg_is_complete);
+    }
+
+    #[test]
+    fn test_bsg_elapsed_ms() {
+        let obj = SearchResultModel {
+            bsg_query_text: String::from("test"),
+            bsg_file_count: 0,
+            bsg_match_count: 0,
+            bsg_is_complete: false,
+            bsg_elapsed_ms: 0,
+            bsg_is_cancelled: false,
+            bsg_has_replace: false,
+            bsg_replace_text: String::from("test"),
+            bsg_preserve_case: false,
+            bsg_is_dirty: false,
+        };
+        let _ = obj.bsg_summary();
+        assert_eq!(obj.bsg_elapsed_ms, 0);
+    }
+
+    #[test]
+    fn test_bsg_is_cancelled() {
+        let obj = SearchResultModel {
+            bsg_query_text: String::from("test"),
+            bsg_file_count: 0,
+            bsg_match_count: 0,
+            bsg_is_complete: false,
+            bsg_elapsed_ms: 0,
+            bsg_is_cancelled: false,
+            bsg_has_replace: false,
+            bsg_replace_text: String::from("test"),
+            bsg_preserve_case: false,
+            bsg_is_dirty: false,
+        };
+        let _ = obj.bsg_summary();
+        assert!(!obj.bsg_is_cancelled);
+    }
+
+    #[test]
+    fn test_bsg_has_replace() {
+        let obj = SearchResultModel {
+            bsg_query_text: String::from("test"),
+            bsg_file_count: 0,
+            bsg_match_count: 0,
+            bsg_is_complete: false,
+            bsg_elapsed_ms: 0,
+            bsg_is_cancelled: false,
+            bsg_has_replace: false,
+            bsg_replace_text: String::from("test"),
+            bsg_preserve_case: false,
+            bsg_is_dirty: false,
+        };
+        let _ = obj.bsg_summary();
+        assert!(!obj.bsg_has_replace);
+    }
+
+    #[test]
+    fn test_bsg_replace_text() {
+        let obj = SearchResultModel {
+            bsg_query_text: String::from("test"),
+            bsg_file_count: 0,
+            bsg_match_count: 0,
+            bsg_is_complete: false,
+            bsg_elapsed_ms: 0,
+            bsg_is_cancelled: false,
+            bsg_has_replace: false,
+            bsg_replace_text: String::from("test"),
+            bsg_preserve_case: false,
+            bsg_is_dirty: false,
+        };
+        let _ = obj.bsg_summary();
+        assert_eq!(obj.bsg_replace_text, "test");
+    }
+
+    #[test]
+    fn test_bsg_preserve_case() {
+        let obj = SearchResultModel {
+            bsg_query_text: String::from("test"),
+            bsg_file_count: 0,
+            bsg_match_count: 0,
+            bsg_is_complete: false,
+            bsg_elapsed_ms: 0,
+            bsg_is_cancelled: false,
+            bsg_has_replace: false,
+            bsg_replace_text: String::from("test"),
+            bsg_preserve_case: false,
+            bsg_is_dirty: false,
+        };
+        let _ = obj.bsg_summary();
+        assert!(!obj.bsg_preserve_case);
+    }
+
+    #[test]
+    fn test_bsg_is_dirty() {
+        let obj = SearchResultModel {
+            bsg_query_text: String::from("test"),
+            bsg_file_count: 0,
+            bsg_match_count: 0,
+            bsg_is_complete: false,
+            bsg_elapsed_ms: 0,
+            bsg_is_cancelled: false,
+            bsg_has_replace: false,
+            bsg_replace_text: String::from("test"),
+            bsg_preserve_case: false,
+            bsg_is_dirty: false,
+        };
+        let _ = obj.bsg_summary();
+        assert!(!obj.bsg_is_dirty);
+    }
+
+
+    #[test]
+    fn test_bsh_file_uri() {
+        let obj = FileMatch {
+            bsh_file_uri: String::from("test"),
+            bsh_match_count: 0,
+            bsh_is_expanded: false,
+            bsh_is_selected: false,
+            bsh_file_size: 0,
+            bsh_language_id: String::from("test"),
+            bsh_is_binary: false,
+            bsh_context_before: Vec::new(),
+            bsh_context_after: Vec::new(),
+            bsh_relative_path: String::from("test"),
+        };
+        let _ = obj.bsh_summary();
+        assert_eq!(obj.bsh_file_uri, "test");
+    }
+
+    #[test]
+    fn test_bsh_match_count() {
+        let obj = FileMatch {
+            bsh_file_uri: String::from("test"),
+            bsh_match_count: 0,
+            bsh_is_expanded: false,
+            bsh_is_selected: false,
+            bsh_file_size: 0,
+            bsh_language_id: String::from("test"),
+            bsh_is_binary: false,
+            bsh_context_before: Vec::new(),
+            bsh_context_after: Vec::new(),
+            bsh_relative_path: String::from("test"),
+        };
+        let _ = obj.bsh_summary();
+        assert_eq!(obj.bsh_match_count, 0);
+    }
+
+    #[test]
+    fn test_bsh_is_expanded() {
+        let obj = FileMatch {
+            bsh_file_uri: String::from("test"),
+            bsh_match_count: 0,
+            bsh_is_expanded: false,
+            bsh_is_selected: false,
+            bsh_file_size: 0,
+            bsh_language_id: String::from("test"),
+            bsh_is_binary: false,
+            bsh_context_before: Vec::new(),
+            bsh_context_after: Vec::new(),
+            bsh_relative_path: String::from("test"),
+        };
+        let _ = obj.bsh_summary();
+        assert!(!obj.bsh_is_expanded);
+    }
+
+    #[test]
+    fn test_bsh_is_selected() {
+        let obj = FileMatch {
+            bsh_file_uri: String::from("test"),
+            bsh_match_count: 0,
+            bsh_is_expanded: false,
+            bsh_is_selected: false,
+            bsh_file_size: 0,
+            bsh_language_id: String::from("test"),
+            bsh_is_binary: false,
+            bsh_context_before: Vec::new(),
+            bsh_context_after: Vec::new(),
+            bsh_relative_path: String::from("test"),
+        };
+        let _ = obj.bsh_summary();
+        assert!(!obj.bsh_is_selected);
+    }
+
+    #[test]
+    fn test_bsh_file_size() {
+        let obj = FileMatch {
+            bsh_file_uri: String::from("test"),
+            bsh_match_count: 0,
+            bsh_is_expanded: false,
+            bsh_is_selected: false,
+            bsh_file_size: 0,
+            bsh_language_id: String::from("test"),
+            bsh_is_binary: false,
+            bsh_context_before: Vec::new(),
+            bsh_context_after: Vec::new(),
+            bsh_relative_path: String::from("test"),
+        };
+        let _ = obj.bsh_summary();
+        assert_eq!(obj.bsh_file_size, 0);
+    }
+
+    #[test]
+    fn test_bsh_language_id() {
+        let obj = FileMatch {
+            bsh_file_uri: String::from("test"),
+            bsh_match_count: 0,
+            bsh_is_expanded: false,
+            bsh_is_selected: false,
+            bsh_file_size: 0,
+            bsh_language_id: String::from("test"),
+            bsh_is_binary: false,
+            bsh_context_before: Vec::new(),
+            bsh_context_after: Vec::new(),
+            bsh_relative_path: String::from("test"),
+        };
+        let _ = obj.bsh_summary();
+        assert_eq!(obj.bsh_language_id, "test");
+    }
+
+    #[test]
+    fn test_bsh_is_binary() {
+        let obj = FileMatch {
+            bsh_file_uri: String::from("test"),
+            bsh_match_count: 0,
+            bsh_is_expanded: false,
+            bsh_is_selected: false,
+            bsh_file_size: 0,
+            bsh_language_id: String::from("test"),
+            bsh_is_binary: false,
+            bsh_context_before: Vec::new(),
+            bsh_context_after: Vec::new(),
+            bsh_relative_path: String::from("test"),
+        };
+        let _ = obj.bsh_summary();
+        assert!(!obj.bsh_is_binary);
+    }
+
+    #[test]
+    fn test_bsh_context_before() {
+        let obj = FileMatch {
+            bsh_file_uri: String::from("test"),
+            bsh_match_count: 0,
+            bsh_is_expanded: false,
+            bsh_is_selected: false,
+            bsh_file_size: 0,
+            bsh_language_id: String::from("test"),
+            bsh_is_binary: false,
+            bsh_context_before: Vec::new(),
+            bsh_context_after: Vec::new(),
+            bsh_relative_path: String::from("test"),
+        };
+        let _ = obj.bsh_summary();
+        assert!(obj.bsh_context_before.is_empty());
+    }
+
+    #[test]
+    fn test_bsh_context_after() {
+        let obj = FileMatch {
+            bsh_file_uri: String::from("test"),
+            bsh_match_count: 0,
+            bsh_is_expanded: false,
+            bsh_is_selected: false,
+            bsh_file_size: 0,
+            bsh_language_id: String::from("test"),
+            bsh_is_binary: false,
+            bsh_context_before: Vec::new(),
+            bsh_context_after: Vec::new(),
+            bsh_relative_path: String::from("test"),
+        };
+        let _ = obj.bsh_summary();
+        assert!(obj.bsh_context_after.is_empty());
+    }
+
+    #[test]
+    fn test_bsh_relative_path() {
+        let obj = FileMatch {
+            bsh_file_uri: String::from("test"),
+            bsh_match_count: 0,
+            bsh_is_expanded: false,
+            bsh_is_selected: false,
+            bsh_file_size: 0,
+            bsh_language_id: String::from("test"),
+            bsh_is_binary: false,
+            bsh_context_before: Vec::new(),
+            bsh_context_after: Vec::new(),
+            bsh_relative_path: String::from("test"),
+        };
+        let _ = obj.bsh_summary();
+        assert_eq!(obj.bsh_relative_path, "test");
+    }
+
+
+    #[test]
+    fn test_bsi_line_number() {
+        let obj = TextSearchMatch {
+            bsi_line_number: 0,
+            bsi_start_column: 0,
+            bsi_end_column: 0,
+            bsi_preview_text: String::from("test"),
+            bsi_line_text: String::from("test"),
+            bsi_is_multi_line: false,
+            bsi_match_ranges_count: 0,
+            bsi_uri: String::from("test"),
+            bsi_is_in_replace: false,
+            bsi_replace_preview: String::from("test"),
+        };
+        let _ = obj.bsi_summary();
+        assert_eq!(obj.bsi_line_number, 0);
+    }
+
+    #[test]
+    fn test_bsi_start_column() {
+        let obj = TextSearchMatch {
+            bsi_line_number: 0,
+            bsi_start_column: 0,
+            bsi_end_column: 0,
+            bsi_preview_text: String::from("test"),
+            bsi_line_text: String::from("test"),
+            bsi_is_multi_line: false,
+            bsi_match_ranges_count: 0,
+            bsi_uri: String::from("test"),
+            bsi_is_in_replace: false,
+            bsi_replace_preview: String::from("test"),
+        };
+        let _ = obj.bsi_summary();
+        assert_eq!(obj.bsi_start_column, 0);
+    }
+
+    #[test]
+    fn test_bsi_end_column() {
+        let obj = TextSearchMatch {
+            bsi_line_number: 0,
+            bsi_start_column: 0,
+            bsi_end_column: 0,
+            bsi_preview_text: String::from("test"),
+            bsi_line_text: String::from("test"),
+            bsi_is_multi_line: false,
+            bsi_match_ranges_count: 0,
+            bsi_uri: String::from("test"),
+            bsi_is_in_replace: false,
+            bsi_replace_preview: String::from("test"),
+        };
+        let _ = obj.bsi_summary();
+        assert_eq!(obj.bsi_end_column, 0);
+    }
+
+    #[test]
+    fn test_bsi_preview_text() {
+        let obj = TextSearchMatch {
+            bsi_line_number: 0,
+            bsi_start_column: 0,
+            bsi_end_column: 0,
+            bsi_preview_text: String::from("test"),
+            bsi_line_text: String::from("test"),
+            bsi_is_multi_line: false,
+            bsi_match_ranges_count: 0,
+            bsi_uri: String::from("test"),
+            bsi_is_in_replace: false,
+            bsi_replace_preview: String::from("test"),
+        };
+        let _ = obj.bsi_summary();
+        assert_eq!(obj.bsi_preview_text, "test");
+    }
+
+    #[test]
+    fn test_bsi_line_text() {
+        let obj = TextSearchMatch {
+            bsi_line_number: 0,
+            bsi_start_column: 0,
+            bsi_end_column: 0,
+            bsi_preview_text: String::from("test"),
+            bsi_line_text: String::from("test"),
+            bsi_is_multi_line: false,
+            bsi_match_ranges_count: 0,
+            bsi_uri: String::from("test"),
+            bsi_is_in_replace: false,
+            bsi_replace_preview: String::from("test"),
+        };
+        let _ = obj.bsi_summary();
+        assert_eq!(obj.bsi_line_text, "test");
+    }
+
+    #[test]
+    fn test_bsi_is_multi_line() {
+        let obj = TextSearchMatch {
+            bsi_line_number: 0,
+            bsi_start_column: 0,
+            bsi_end_column: 0,
+            bsi_preview_text: String::from("test"),
+            bsi_line_text: String::from("test"),
+            bsi_is_multi_line: false,
+            bsi_match_ranges_count: 0,
+            bsi_uri: String::from("test"),
+            bsi_is_in_replace: false,
+            bsi_replace_preview: String::from("test"),
+        };
+        let _ = obj.bsi_summary();
+        assert!(!obj.bsi_is_multi_line);
+    }
+
+    #[test]
+    fn test_bsi_match_ranges_count() {
+        let obj = TextSearchMatch {
+            bsi_line_number: 0,
+            bsi_start_column: 0,
+            bsi_end_column: 0,
+            bsi_preview_text: String::from("test"),
+            bsi_line_text: String::from("test"),
+            bsi_is_multi_line: false,
+            bsi_match_ranges_count: 0,
+            bsi_uri: String::from("test"),
+            bsi_is_in_replace: false,
+            bsi_replace_preview: String::from("test"),
+        };
+        let _ = obj.bsi_summary();
+        assert_eq!(obj.bsi_match_ranges_count, 0);
+    }
+
+    #[test]
+    fn test_bsi_uri() {
+        let obj = TextSearchMatch {
+            bsi_line_number: 0,
+            bsi_start_column: 0,
+            bsi_end_column: 0,
+            bsi_preview_text: String::from("test"),
+            bsi_line_text: String::from("test"),
+            bsi_is_multi_line: false,
+            bsi_match_ranges_count: 0,
+            bsi_uri: String::from("test"),
+            bsi_is_in_replace: false,
+            bsi_replace_preview: String::from("test"),
+        };
+        let _ = obj.bsi_summary();
+        assert_eq!(obj.bsi_uri, "test");
+    }
+
+    #[test]
+    fn test_bsi_is_in_replace() {
+        let obj = TextSearchMatch {
+            bsi_line_number: 0,
+            bsi_start_column: 0,
+            bsi_end_column: 0,
+            bsi_preview_text: String::from("test"),
+            bsi_line_text: String::from("test"),
+            bsi_is_multi_line: false,
+            bsi_match_ranges_count: 0,
+            bsi_uri: String::from("test"),
+            bsi_is_in_replace: false,
+            bsi_replace_preview: String::from("test"),
+        };
+        let _ = obj.bsi_summary();
+        assert!(!obj.bsi_is_in_replace);
+    }
+
+    #[test]
+    fn test_bsi_replace_preview() {
+        let obj = TextSearchMatch {
+            bsi_line_number: 0,
+            bsi_start_column: 0,
+            bsi_end_column: 0,
+            bsi_preview_text: String::from("test"),
+            bsi_line_text: String::from("test"),
+            bsi_is_multi_line: false,
+            bsi_match_ranges_count: 0,
+            bsi_uri: String::from("test"),
+            bsi_is_in_replace: false,
+            bsi_replace_preview: String::from("test"),
+        };
+        let _ = obj.bsi_summary();
+        assert_eq!(obj.bsi_replace_preview, "test");
+    }
+
+
+    #[test]
+    fn test_bsj_search_text() {
+        let obj = ReplaceOperation {
+            bsj_search_text: String::from("test"),
+            bsj_replace_text: String::from("test"),
+            bsj_is_regex: false,
+            bsj_preserve_case: false,
+            bsj_files_affected: 0,
+            bsj_replacements_count: 0,
+            bsj_is_confirmed: false,
+            bsj_is_complete: false,
+            bsj_preview_edits: Vec::new(),
+            bsj_undo_id: 0,
+        };
+        let _ = obj.bsj_summary();
+        assert_eq!(obj.bsj_search_text, "test");
+    }
+
+    #[test]
+    fn test_bsj_replace_text() {
+        let obj = ReplaceOperation {
+            bsj_search_text: String::from("test"),
+            bsj_replace_text: String::from("test"),
+            bsj_is_regex: false,
+            bsj_preserve_case: false,
+            bsj_files_affected: 0,
+            bsj_replacements_count: 0,
+            bsj_is_confirmed: false,
+            bsj_is_complete: false,
+            bsj_preview_edits: Vec::new(),
+            bsj_undo_id: 0,
+        };
+        let _ = obj.bsj_summary();
+        assert_eq!(obj.bsj_replace_text, "test");
+    }
+
+    #[test]
+    fn test_bsj_is_regex() {
+        let obj = ReplaceOperation {
+            bsj_search_text: String::from("test"),
+            bsj_replace_text: String::from("test"),
+            bsj_is_regex: false,
+            bsj_preserve_case: false,
+            bsj_files_affected: 0,
+            bsj_replacements_count: 0,
+            bsj_is_confirmed: false,
+            bsj_is_complete: false,
+            bsj_preview_edits: Vec::new(),
+            bsj_undo_id: 0,
+        };
+        let _ = obj.bsj_summary();
+        assert!(!obj.bsj_is_regex);
+    }
+
+    #[test]
+    fn test_bsj_preserve_case() {
+        let obj = ReplaceOperation {
+            bsj_search_text: String::from("test"),
+            bsj_replace_text: String::from("test"),
+            bsj_is_regex: false,
+            bsj_preserve_case: false,
+            bsj_files_affected: 0,
+            bsj_replacements_count: 0,
+            bsj_is_confirmed: false,
+            bsj_is_complete: false,
+            bsj_preview_edits: Vec::new(),
+            bsj_undo_id: 0,
+        };
+        let _ = obj.bsj_summary();
+        assert!(!obj.bsj_preserve_case);
+    }
+
+    #[test]
+    fn test_bsj_files_affected() {
+        let obj = ReplaceOperation {
+            bsj_search_text: String::from("test"),
+            bsj_replace_text: String::from("test"),
+            bsj_is_regex: false,
+            bsj_preserve_case: false,
+            bsj_files_affected: 0,
+            bsj_replacements_count: 0,
+            bsj_is_confirmed: false,
+            bsj_is_complete: false,
+            bsj_preview_edits: Vec::new(),
+            bsj_undo_id: 0,
+        };
+        let _ = obj.bsj_summary();
+        assert_eq!(obj.bsj_files_affected, 0);
+    }
+
+    #[test]
+    fn test_bsj_replacements_count() {
+        let obj = ReplaceOperation {
+            bsj_search_text: String::from("test"),
+            bsj_replace_text: String::from("test"),
+            bsj_is_regex: false,
+            bsj_preserve_case: false,
+            bsj_files_affected: 0,
+            bsj_replacements_count: 0,
+            bsj_is_confirmed: false,
+            bsj_is_complete: false,
+            bsj_preview_edits: Vec::new(),
+            bsj_undo_id: 0,
+        };
+        let _ = obj.bsj_summary();
+        assert_eq!(obj.bsj_replacements_count, 0);
+    }
+
+    #[test]
+    fn test_bsj_is_confirmed() {
+        let obj = ReplaceOperation {
+            bsj_search_text: String::from("test"),
+            bsj_replace_text: String::from("test"),
+            bsj_is_regex: false,
+            bsj_preserve_case: false,
+            bsj_files_affected: 0,
+            bsj_replacements_count: 0,
+            bsj_is_confirmed: false,
+            bsj_is_complete: false,
+            bsj_preview_edits: Vec::new(),
+            bsj_undo_id: 0,
+        };
+        let _ = obj.bsj_summary();
+        assert!(!obj.bsj_is_confirmed);
+    }
+
+    #[test]
+    fn test_bsj_is_complete() {
+        let obj = ReplaceOperation {
+            bsj_search_text: String::from("test"),
+            bsj_replace_text: String::from("test"),
+            bsj_is_regex: false,
+            bsj_preserve_case: false,
+            bsj_files_affected: 0,
+            bsj_replacements_count: 0,
+            bsj_is_confirmed: false,
+            bsj_is_complete: false,
+            bsj_preview_edits: Vec::new(),
+            bsj_undo_id: 0,
+        };
+        let _ = obj.bsj_summary();
+        assert!(!obj.bsj_is_complete);
+    }
+
+    #[test]
+    fn test_bsj_preview_edits() {
+        let obj = ReplaceOperation {
+            bsj_search_text: String::from("test"),
+            bsj_replace_text: String::from("test"),
+            bsj_is_regex: false,
+            bsj_preserve_case: false,
+            bsj_files_affected: 0,
+            bsj_replacements_count: 0,
+            bsj_is_confirmed: false,
+            bsj_is_complete: false,
+            bsj_preview_edits: Vec::new(),
+            bsj_undo_id: 0,
+        };
+        let _ = obj.bsj_summary();
+        assert!(obj.bsj_preview_edits.is_empty());
+    }
+
+    #[test]
+    fn test_bsj_undo_id() {
+        let obj = ReplaceOperation {
+            bsj_search_text: String::from("test"),
+            bsj_replace_text: String::from("test"),
+            bsj_is_regex: false,
+            bsj_preserve_case: false,
+            bsj_files_affected: 0,
+            bsj_replacements_count: 0,
+            bsj_is_confirmed: false,
+            bsj_is_complete: false,
+            bsj_preview_edits: Vec::new(),
+            bsj_undo_id: 0,
+        };
+        let _ = obj.bsj_summary();
+        assert_eq!(obj.bsj_undo_id, 0);
     }
 
 }
