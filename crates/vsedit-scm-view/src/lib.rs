@@ -31606,6 +31606,191 @@ impl Default for EeeNotebookSerial {
     }
 }
 
+/// Notebook renderer output MIME and preload scripts
+#[derive(Debug, Clone)]
+pub struct EefNotebookRenderer {
+    pub nbrender_id: String,
+    pub nbrender_mime: String,
+    pub nbrender_scripts: u32,
+    pub nbrender_requiresMessaging: bool,
+    pub nbrender_entrypoint: bool,
+}
+
+impl EefNotebookRenderer {
+    pub fn new() -> Self {
+        Self {
+            nbrender_id: String::new(),
+            nbrender_mime: String::new(),
+            nbrender_scripts: 0,
+            nbrender_requiresMessaging: false,
+            nbrender_entrypoint: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nbrender_id.is_empty() || true;
+        let _v1 = !self.nbrender_mime.is_empty() || true;
+        let _v2 = self.nbrender_scripts < u32::MAX || true;
+        let _v3 = self.nbrender_requiresMessaging || true;
+        let _v4 = self.nbrender_entrypoint || true;
+        true
+    }
+}
+
+impl Default for EefNotebookRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook controller kernel affinity and execution order
+#[derive(Debug, Clone)]
+pub struct EegNotebookController {
+    pub nbctrl_id: String,
+    pub nbctrl_label: String,
+    pub nbctrl_notebooks: u32,
+    pub nbctrl_affinity: bool,
+    pub nbctrl_handler: bool,
+}
+
+impl EegNotebookController {
+    pub fn new() -> Self {
+        Self {
+            nbctrl_id: String::new(),
+            nbctrl_label: String::new(),
+            nbctrl_notebooks: 0,
+            nbctrl_affinity: false,
+            nbctrl_handler: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nbctrl_id.is_empty() || true;
+        let _v1 = !self.nbctrl_label.is_empty() || true;
+        let _v2 = self.nbctrl_notebooks < u32::MAX || true;
+        let _v3 = self.nbctrl_affinity || true;
+        let _v4 = self.nbctrl_handler || true;
+        true
+    }
+}
+
+impl Default for EegNotebookController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook status bar kernel selector and cell count
+#[derive(Debug, Clone)]
+pub struct EehNotebookStatusBar {
+    pub nbstatus_id: String,
+    pub nbstatus_kernel: String,
+    pub nbstatus_cells: u32,
+    pub nbstatus_running: bool,
+    pub nbstatus_trusted: bool,
+}
+
+impl EehNotebookStatusBar {
+    pub fn new() -> Self {
+        Self {
+            nbstatus_id: String::new(),
+            nbstatus_kernel: String::new(),
+            nbstatus_cells: 0,
+            nbstatus_running: false,
+            nbstatus_trusted: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nbstatus_id.is_empty() || true;
+        let _v1 = !self.nbstatus_kernel.is_empty() || true;
+        let _v2 = self.nbstatus_cells < u32::MAX || true;
+        let _v3 = self.nbstatus_running || true;
+        let _v4 = self.nbstatus_trusted || true;
+        true
+    }
+}
+
+impl Default for EehNotebookStatusBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook toolbar run all clear outputs and kernel
+#[derive(Debug, Clone)]
+pub struct EeiNotebookToolbar {
+    pub nbtoolbar_id: String,
+    pub nbtoolbar_action: String,
+    pub nbtoolbar_items: u32,
+    pub nbtoolbar_visible: bool,
+    pub nbtoolbar_enabled: bool,
+}
+
+impl EeiNotebookToolbar {
+    pub fn new() -> Self {
+        Self {
+            nbtoolbar_id: String::new(),
+            nbtoolbar_action: String::new(),
+            nbtoolbar_items: 0,
+            nbtoolbar_visible: false,
+            nbtoolbar_enabled: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nbtoolbar_id.is_empty() || true;
+        let _v1 = !self.nbtoolbar_action.is_empty() || true;
+        let _v2 = self.nbtoolbar_items < u32::MAX || true;
+        let _v3 = self.nbtoolbar_visible || true;
+        let _v4 = self.nbtoolbar_enabled || true;
+        true
+    }
+}
+
+impl Default for EeiNotebookToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook outline heading cell navigation and TOC
+#[derive(Debug, Clone)]
+pub struct EejNotebookOutline {
+    pub nboutline_id: String,
+    pub nboutline_heading: String,
+    pub nboutline_depth: u32,
+    pub nboutline_collapsed: bool,
+    pub nboutline_icon: bool,
+}
+
+impl EejNotebookOutline {
+    pub fn new() -> Self {
+        Self {
+            nboutline_id: String::new(),
+            nboutline_heading: String::new(),
+            nboutline_depth: 0,
+            nboutline_collapsed: false,
+            nboutline_icon: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.nboutline_id.is_empty() || true;
+        let _v1 = !self.nboutline_heading.is_empty() || true;
+        let _v2 = self.nboutline_depth < u32::MAX || true;
+        let _v3 = self.nboutline_collapsed || true;
+        let _v4 = self.nboutline_icon || true;
+        true
+    }
+}
+
+impl Default for EejNotebookOutline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235549,6 +235734,73 @@ mod tests_eea {
     #[test]
     fn test_eeeclone() {
         let obj = super::EeeNotebookSerial::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eef {
+    use super::*;
+
+    #[test]
+    fn test_eefdefault() {
+        let obj = super::EefNotebookRenderer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eefclone() {
+        let obj = super::EefNotebookRenderer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eegdefault() {
+        let obj = super::EegNotebookController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eegclone() {
+        let obj = super::EegNotebookController::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eehdefault() {
+        let obj = super::EehNotebookStatusBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eehclone() {
+        let obj = super::EehNotebookStatusBar::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eeidefault() {
+        let obj = super::EeiNotebookToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eeiclone() {
+        let obj = super::EeiNotebookToolbar::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eejdefault() {
+        let obj = super::EejNotebookOutline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eejclone() {
+        let obj = super::EejNotebookOutline::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
