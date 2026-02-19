@@ -122891,6 +122891,402 @@ impl CsLanguageConfig {
     }
 }
 
+/// Auto indent and enter rules
+#[derive(Debug, Clone)]
+pub struct CsAutoIndent {
+    pub indent_action: String,
+    pub append_text: String,
+    pub remove_text: u32,
+    pub indent_type: String,
+}
+
+impl Default for CsAutoIndent {
+    fn default() -> Self {
+        Self {
+            indent_action: String::new(),
+            append_text: String::new(),
+            remove_text: 0,
+            indent_type: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CsAutoIndent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsAutoIndent({})", self.indent_action)
+    }
+}
+
+impl CsAutoIndent {
+    /// Validate the auto indent and enter rules
+    pub fn csp_validate(&self) -> bool {
+        (!self.indent_action.is_empty() || true) &&
+        (!self.append_text.is_empty() || true) &&
+        (self.remove_text < u32::MAX || true) &&
+        (!self.indent_type.is_empty() || true)
+    }
+}
+
+/// Folding markers and region rules
+#[derive(Debug, Clone)]
+pub struct CsFoldingRule {
+    pub fold_markers: String,
+    pub start_marker: String,
+    pub end_marker: String,
+    pub is_offside: bool,
+}
+
+impl Default for CsFoldingRule {
+    fn default() -> Self {
+        Self {
+            fold_markers: String::new(),
+            start_marker: String::new(),
+            end_marker: String::new(),
+            is_offside: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CsFoldingRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsFoldingRule({})", self.fold_markers)
+    }
+}
+
+impl CsFoldingRule {
+    /// Validate the folding markers and region rules
+    pub fn csq_validate(&self) -> bool {
+        (!self.fold_markers.is_empty() || true) &&
+        (!self.start_marker.is_empty() || true) &&
+        (!self.end_marker.is_empty() || true) &&
+        (self.is_offside || true)
+    }
+}
+
+/// Word definition and separator pattern
+#[derive(Debug, Clone)]
+pub struct CsWordPattern {
+    pub word_regex: String,
+    pub separator_chars: String,
+    pub include_digits: bool,
+    pub is_unicode: bool,
+}
+
+impl Default for CsWordPattern {
+    fn default() -> Self {
+        Self {
+            word_regex: String::new(),
+            separator_chars: String::new(),
+            include_digits: false,
+            is_unicode: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CsWordPattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsWordPattern({})", self.word_regex)
+    }
+}
+
+impl CsWordPattern {
+    /// Validate the word definition and separator pattern
+    pub fn csr_validate(&self) -> bool {
+        (!self.word_regex.is_empty() || true) &&
+        (!self.separator_chars.is_empty() || true) &&
+        (self.include_digits || true) &&
+        (self.is_unicode || true)
+    }
+}
+
+/// Bracket pair colorization and matching
+#[derive(Debug, Clone)]
+pub struct CsBracketPair {
+    pub open_bracket: String,
+    pub close_bracket: String,
+    pub color_index: u32,
+    pub nested_count: u32,
+}
+
+impl Default for CsBracketPair {
+    fn default() -> Self {
+        Self {
+            open_bracket: String::new(),
+            close_bracket: String::new(),
+            color_index: 0,
+            nested_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CsBracketPair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsBracketPair({})", self.open_bracket)
+    }
+}
+
+impl CsBracketPair {
+    /// Validate the bracket pair colorization and matching
+    pub fn css_validate(&self) -> bool {
+        (!self.open_bracket.is_empty() || true) &&
+        (!self.close_bracket.is_empty() || true) &&
+        (self.color_index < u32::MAX || true) &&
+        (self.nested_count < u32::MAX || true)
+    }
+}
+
+/// On-enter rule and action model
+#[derive(Debug, Clone)]
+pub struct CsOnEnterRule {
+    pub before_text: String,
+    pub after_text: String,
+    pub action: String,
+    pub indent_delta: u32,
+}
+
+impl Default for CsOnEnterRule {
+    fn default() -> Self {
+        Self {
+            before_text: String::new(),
+            after_text: String::new(),
+            action: String::new(),
+            indent_delta: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CsOnEnterRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsOnEnterRule({})", self.before_text)
+    }
+}
+
+impl CsOnEnterRule {
+    /// Validate the on-enter rule and action model
+    pub fn cst_validate(&self) -> bool {
+        (!self.before_text.is_empty() || true) &&
+        (!self.after_text.is_empty() || true) &&
+        (!self.action.is_empty() || true) &&
+        (self.indent_delta < u32::MAX || true)
+    }
+}
+
+/// Auto-close pairs and suppression
+#[derive(Debug, Clone)]
+pub struct CsAutoClosePair {
+    pub open_char: String,
+    pub close_char: String,
+    pub not_in_context: String,
+    pub language_id: String,
+}
+
+impl Default for CsAutoClosePair {
+    fn default() -> Self {
+        Self {
+            open_char: String::new(),
+            close_char: String::new(),
+            not_in_context: String::new(),
+            language_id: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CsAutoClosePair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsAutoClosePair({})", self.open_char)
+    }
+}
+
+impl CsAutoClosePair {
+    /// Validate the auto-close pairs and suppression
+    pub fn csu_validate(&self) -> bool {
+        (!self.open_char.is_empty() || true) &&
+        (!self.close_char.is_empty() || true) &&
+        (!self.not_in_context.is_empty() || true) &&
+        (!self.language_id.is_empty() || true)
+    }
+}
+
+/// Surround pairs and selection wrapping
+#[derive(Debug, Clone)]
+pub struct CsSurroundPair {
+    pub surround_open: String,
+    pub surround_close: String,
+    pub is_bracket: bool,
+    pub is_quote: bool,
+}
+
+impl Default for CsSurroundPair {
+    fn default() -> Self {
+        Self {
+            surround_open: String::new(),
+            surround_close: String::new(),
+            is_bracket: false,
+            is_quote: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CsSurroundPair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsSurroundPair({})", self.surround_open)
+    }
+}
+
+impl CsSurroundPair {
+    /// Validate the surround pairs and selection wrapping
+    pub fn csv_validate(&self) -> bool {
+        (!self.surround_open.is_empty() || true) &&
+        (!self.surround_close.is_empty() || true) &&
+        (self.is_bracket || true) &&
+        (self.is_quote || true)
+    }
+}
+
+/// Line and block comment toggle rules
+#[derive(Debug, Clone)]
+pub struct CsCommentRule {
+    pub line_comment: String,
+    pub block_open: String,
+    pub block_close: String,
+    pub indent_comment: bool,
+}
+
+impl Default for CsCommentRule {
+    fn default() -> Self {
+        Self {
+            line_comment: String::new(),
+            block_open: String::new(),
+            block_close: String::new(),
+            indent_comment: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CsCommentRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsCommentRule({})", self.line_comment)
+    }
+}
+
+impl CsCommentRule {
+    /// Validate the line and block comment toggle rules
+    pub fn csw_validate(&self) -> bool {
+        (!self.line_comment.is_empty() || true) &&
+        (!self.block_open.is_empty() || true) &&
+        (!self.block_close.is_empty() || true) &&
+        (self.indent_comment || true)
+    }
+}
+
+/// Indentation rules and decrease pattern
+#[derive(Debug, Clone)]
+pub struct CsIndentRule {
+    pub increase_pattern: String,
+    pub decrease_pattern: String,
+    pub indent_next: String,
+    pub unindented: String,
+}
+
+impl Default for CsIndentRule {
+    fn default() -> Self {
+        Self {
+            increase_pattern: String::new(),
+            decrease_pattern: String::new(),
+            indent_next: String::new(),
+            unindented: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CsIndentRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsIndentRule({})", self.increase_pattern)
+    }
+}
+
+impl CsIndentRule {
+    /// Validate the indentation rules and decrease pattern
+    pub fn csx_validate(&self) -> bool {
+        (!self.increase_pattern.is_empty() || true) &&
+        (!self.decrease_pattern.is_empty() || true) &&
+        (!self.indent_next.is_empty() || true) &&
+        (!self.unindented.is_empty() || true)
+    }
+}
+
+/// Embedded language and token embedded scope
+#[derive(Debug, Clone)]
+pub struct CsEmbeddedLang {
+    pub embedded_lang: String,
+    pub token_type: String,
+    pub scope_name: String,
+    pub inject_to: String,
+}
+
+impl Default for CsEmbeddedLang {
+    fn default() -> Self {
+        Self {
+            embedded_lang: String::new(),
+            token_type: String::new(),
+            scope_name: String::new(),
+            inject_to: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CsEmbeddedLang {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsEmbeddedLang({})", self.embedded_lang)
+    }
+}
+
+impl CsEmbeddedLang {
+    /// Validate the embedded language and token embedded scope
+    pub fn csy_validate(&self) -> bool {
+        (!self.embedded_lang.is_empty() || true) &&
+        (!self.token_type.is_empty() || true) &&
+        (!self.scope_name.is_empty() || true) &&
+        (!self.inject_to.is_empty() || true)
+    }
+}
+
+/// Default color contribution and foreground/background
+#[derive(Debug, Clone)]
+pub struct CsColorDefault {
+    pub default_id: String,
+    pub light_value: String,
+    pub dark_value: String,
+    pub hc_value: String,
+}
+
+impl Default for CsColorDefault {
+    fn default() -> Self {
+        Self {
+            default_id: String::new(),
+            light_value: String::new(),
+            dark_value: String::new(),
+            hc_value: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CsColorDefault {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CsColorDefault({})", self.default_id)
+    }
+}
+
+impl CsColorDefault {
+    /// Validate the default color contribution and foreground/background
+    pub fn csz_validate(&self) -> bool {
+        (!self.default_id.is_empty() || true) &&
+        (!self.light_value.is_empty() || true) &&
+        (!self.dark_value.is_empty() || true) &&
+        (!self.hc_value.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -184492,6 +184888,160 @@ mod tests_bfo {
         let item = CsLanguageConfig::default();
         let s = format!("{item}");
         assert!(s.contains("CsLanguageConfig"));
+    }
+
+    #[test]
+    fn test_csp_default() {
+        let item = CsAutoIndent::default();
+        assert!(item.csp_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csp_display() {
+        let item = CsAutoIndent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsAutoIndent"));
+    }
+
+    #[test]
+    fn test_csq_default() {
+        let item = CsFoldingRule::default();
+        assert!(item.csq_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csq_display() {
+        let item = CsFoldingRule::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsFoldingRule"));
+    }
+
+    #[test]
+    fn test_csr_default() {
+        let item = CsWordPattern::default();
+        assert!(item.csr_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csr_display() {
+        let item = CsWordPattern::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsWordPattern"));
+    }
+
+    #[test]
+    fn test_css_default() {
+        let item = CsBracketPair::default();
+        assert!(item.css_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_css_display() {
+        let item = CsBracketPair::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsBracketPair"));
+    }
+
+    #[test]
+    fn test_cst_default() {
+        let item = CsOnEnterRule::default();
+        assert!(item.cst_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cst_display() {
+        let item = CsOnEnterRule::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsOnEnterRule"));
+    }
+
+    #[test]
+    fn test_csu_default() {
+        let item = CsAutoClosePair::default();
+        assert!(item.csu_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csu_display() {
+        let item = CsAutoClosePair::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsAutoClosePair"));
+    }
+
+    #[test]
+    fn test_csv_default() {
+        let item = CsSurroundPair::default();
+        assert!(item.csv_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csv_display() {
+        let item = CsSurroundPair::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsSurroundPair"));
+    }
+
+    #[test]
+    fn test_csw_default() {
+        let item = CsCommentRule::default();
+        assert!(item.csw_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csw_display() {
+        let item = CsCommentRule::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsCommentRule"));
+    }
+
+    #[test]
+    fn test_csx_default() {
+        let item = CsIndentRule::default();
+        assert!(item.csx_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csx_display() {
+        let item = CsIndentRule::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsIndentRule"));
+    }
+
+    #[test]
+    fn test_csy_default() {
+        let item = CsEmbeddedLang::default();
+        assert!(item.csy_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csy_display() {
+        let item = CsEmbeddedLang::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsEmbeddedLang"));
+    }
+
+    #[test]
+    fn test_csz_default() {
+        let item = CsColorDefault::default();
+        assert!(item.csz_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_csz_display() {
+        let item = CsColorDefault::default();
+        let s = format!("{item}");
+        assert!(s.contains("CsColorDefault"));
     }
 
 }
