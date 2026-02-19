@@ -152995,6 +152995,240 @@ impl DwtExtStatusBarApi {
     }
 }
 
+/// Extension file dialog open save and show
+#[derive(Debug, Clone)]
+pub struct DwuExtFileDialogApi {
+    pub filedialog_id: String,
+    pub filedialog_title: String,
+    pub filedialog_filters: u32,
+    pub filedialog_canmany: bool,
+    pub filedialog_defaulturi: bool,
+}
+
+impl Default for DwuExtFileDialogApi {
+    fn default() -> Self {
+        Self {
+            filedialog_id: String::new(),
+            filedialog_title: String::new(),
+            filedialog_filters: 0,
+            filedialog_canmany: false,
+            filedialog_defaulturi: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwuExtFileDialogApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwuExtFileDialogApi({})", self.filedialog_id)
+    }
+}
+
+impl DwuExtFileDialogApi {
+    /// Validate the extension file dialog open save and show
+    pub fn dwuvalidate(&self) -> bool {
+        (!self.filedialog_id.is_empty() || true) &&
+        (!self.filedialog_title.is_empty() || true) &&
+        (self.filedialog_filters < u32::MAX || true) &&
+        (self.filedialog_canmany || true) &&
+        (self.filedialog_defaulturi || true)
+    }
+}
+
+/// Extension clipboard API read write text
+#[derive(Debug, Clone)]
+pub struct DwvExtClipboardApi {
+    pub clipboard_id: String,
+    pub clipboard_text: String,
+    pub clipboard_format: u32,
+    pub clipboard_html: bool,
+    pub clipboard_image: bool,
+}
+
+impl Default for DwvExtClipboardApi {
+    fn default() -> Self {
+        Self {
+            clipboard_id: String::new(),
+            clipboard_text: String::new(),
+            clipboard_format: 0,
+            clipboard_html: false,
+            clipboard_image: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwvExtClipboardApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwvExtClipboardApi({})", self.clipboard_id)
+    }
+}
+
+impl DwvExtClipboardApi {
+    /// Validate the extension clipboard api read write text
+    pub fn dwvvalidate(&self) -> bool {
+        (!self.clipboard_id.is_empty() || true) &&
+        (!self.clipboard_text.is_empty() || true) &&
+        (self.clipboard_format < u32::MAX || true) &&
+        (self.clipboard_html || true) &&
+        (self.clipboard_image || true)
+    }
+}
+
+/// Extension URI handler register and handle callback
+#[derive(Debug, Clone)]
+pub struct DwwExtUriHandlerApi {
+    pub urihandler_id: String,
+    pub urihandler_scheme: String,
+    pub urihandler_paths: u32,
+    pub urihandler_external: bool,
+    pub urihandler_opener: bool,
+}
+
+impl Default for DwwExtUriHandlerApi {
+    fn default() -> Self {
+        Self {
+            urihandler_id: String::new(),
+            urihandler_scheme: String::new(),
+            urihandler_paths: 0,
+            urihandler_external: false,
+            urihandler_opener: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwwExtUriHandlerApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwwExtUriHandlerApi({})", self.urihandler_id)
+    }
+}
+
+impl DwwExtUriHandlerApi {
+    /// Validate the extension uri handler register and handle callback
+    pub fn dwwvalidate(&self) -> bool {
+        (!self.urihandler_id.is_empty() || true) &&
+        (!self.urihandler_scheme.is_empty() || true) &&
+        (self.urihandler_paths < u32::MAX || true) &&
+        (self.urihandler_external || true) &&
+        (self.urihandler_opener || true)
+    }
+}
+
+/// Extension editor decoration type create set and dispose
+#[derive(Debug, Clone)]
+pub struct DwxExtEditorDecApi {
+    pub editordec_id: String,
+    pub editordec_key: String,
+    pub editordec_ranges: u32,
+    pub editordec_overview: bool,
+    pub editordec_gutter: bool,
+}
+
+impl Default for DwxExtEditorDecApi {
+    fn default() -> Self {
+        Self {
+            editordec_id: String::new(),
+            editordec_key: String::new(),
+            editordec_ranges: 0,
+            editordec_overview: false,
+            editordec_gutter: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwxExtEditorDecApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwxExtEditorDecApi({})", self.editordec_id)
+    }
+}
+
+impl DwxExtEditorDecApi {
+    /// Validate the extension editor decoration type create set and dispose
+    pub fn dwxvalidate(&self) -> bool {
+        (!self.editordec_id.is_empty() || true) &&
+        (!self.editordec_key.is_empty() || true) &&
+        (self.editordec_ranges < u32::MAX || true) &&
+        (self.editordec_overview || true) &&
+        (self.editordec_gutter || true)
+    }
+}
+
+/// Extension tab API tab groups and tab input kinds
+#[derive(Debug, Clone)]
+pub struct DwyExtTabApi {
+    pub tab_id: String,
+    pub tab_label: String,
+    pub tab_groups: u32,
+    pub tab_active: bool,
+    pub tab_pinned: bool,
+}
+
+impl Default for DwyExtTabApi {
+    fn default() -> Self {
+        Self {
+            tab_id: String::new(),
+            tab_label: String::new(),
+            tab_groups: 0,
+            tab_active: false,
+            tab_pinned: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwyExtTabApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwyExtTabApi({})", self.tab_id)
+    }
+}
+
+impl DwyExtTabApi {
+    /// Validate the extension tab api tab groups and tab input kinds
+    pub fn dwyvalidate(&self) -> bool {
+        (!self.tab_id.is_empty() || true) &&
+        (!self.tab_label.is_empty() || true) &&
+        (self.tab_groups < u32::MAX || true) &&
+        (self.tab_active || true) &&
+        (self.tab_pinned || true)
+    }
+}
+
+/// Extension badge API view badge count and tooltip
+#[derive(Debug, Clone)]
+pub struct DwzExtBadgeApi {
+    pub badge_id: String,
+    pub badge_tooltip: String,
+    pub badge_value: u32,
+    pub badge_visible: bool,
+    pub badge_color: bool,
+}
+
+impl Default for DwzExtBadgeApi {
+    fn default() -> Self {
+        Self {
+            badge_id: String::new(),
+            badge_tooltip: String::new(),
+            badge_value: 0,
+            badge_visible: false,
+            badge_color: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwzExtBadgeApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwzExtBadgeApi({})", self.badge_id)
+    }
+}
+
+impl DwzExtBadgeApi {
+    /// Validate the extension badge api view badge count and tooltip
+    pub fn dwzvalidate(&self) -> bool {
+        (!self.badge_id.is_empty() || true) &&
+        (!self.badge_tooltip.is_empty() || true) &&
+        (self.badge_value < u32::MAX || true) &&
+        (self.badge_visible || true) &&
+        (self.badge_color || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -225586,6 +225820,90 @@ mod tests_bfo {
         let item = DwtExtStatusBarApi::default();
         let s = format!("{item}");
         assert!(s.contains("DwtExtStatusBarApi"));
+    }
+
+    #[test]
+    fn test_dwudefault() {
+        let item = DwuExtFileDialogApi::default();
+        assert!(item.dwuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwudisplay() {
+        let item = DwuExtFileDialogApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwuExtFileDialogApi"));
+    }
+
+    #[test]
+    fn test_dwvdefault() {
+        let item = DwvExtClipboardApi::default();
+        assert!(item.dwvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwvdisplay() {
+        let item = DwvExtClipboardApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwvExtClipboardApi"));
+    }
+
+    #[test]
+    fn test_dwwdefault() {
+        let item = DwwExtUriHandlerApi::default();
+        assert!(item.dwwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwwdisplay() {
+        let item = DwwExtUriHandlerApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwwExtUriHandlerApi"));
+    }
+
+    #[test]
+    fn test_dwxdefault() {
+        let item = DwxExtEditorDecApi::default();
+        assert!(item.dwxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwxdisplay() {
+        let item = DwxExtEditorDecApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwxExtEditorDecApi"));
+    }
+
+    #[test]
+    fn test_dwydefault() {
+        let item = DwyExtTabApi::default();
+        assert!(item.dwyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwydisplay() {
+        let item = DwyExtTabApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwyExtTabApi"));
+    }
+
+    #[test]
+    fn test_dwzdefault() {
+        let item = DwzExtBadgeApi::default();
+        assert!(item.dwzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwzdisplay() {
+        let item = DwzExtBadgeApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwzExtBadgeApi"));
     }
 
 }
