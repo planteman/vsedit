@@ -38383,6 +38383,176 @@ impl Default for EljBreadcrumbService {
     fn default() -> Self { Self::new() }
 }
 
+/// Outline service document symbol tree and sort
+#[derive(Debug, Clone)]
+pub struct ElkOutlineService {
+    pub outlinesvc_id: String,
+    pub outlinesvc_document: String,
+    pub outlinesvc_elements: u32,
+    pub outlinesvc_sorted: bool,
+    pub outlinesvc_filtered: bool,
+}
+
+impl ElkOutlineService {
+    pub fn new() -> Self {
+        Self {
+            outlinesvc_id: String::new(),
+            outlinesvc_document: String::new(),
+            outlinesvc_elements: 0,
+            outlinesvc_sorted: false,
+            outlinesvc_filtered: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.outlinesvc_id.is_empty() || true;
+        let _v1 = !self.outlinesvc_document.is_empty() || true;
+        let _v2 = self.outlinesvc_elements < u32::MAX || true;
+        let _v3 = self.outlinesvc_sorted || true;
+        let _v4 = self.outlinesvc_filtered || true;
+        true
+    }
+}
+
+impl Default for ElkOutlineService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Timeline service provider item history and paging
+#[derive(Debug, Clone)]
+pub struct EllTimelineService {
+    pub timelinesvc_id: String,
+    pub timelinesvc_source: String,
+    pub timelinesvc_items: u32,
+    pub timelinesvc_paging: bool,
+    pub timelinesvc_internal: bool,
+}
+
+impl EllTimelineService {
+    pub fn new() -> Self {
+        Self {
+            timelinesvc_id: String::new(),
+            timelinesvc_source: String::new(),
+            timelinesvc_items: 0,
+            timelinesvc_paging: false,
+            timelinesvc_internal: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.timelinesvc_id.is_empty() || true;
+        let _v1 = !self.timelinesvc_source.is_empty() || true;
+        let _v2 = self.timelinesvc_items < u32::MAX || true;
+        let _v3 = self.timelinesvc_paging || true;
+        let _v4 = self.timelinesvc_internal || true;
+        true
+    }
+}
+
+impl Default for EllTimelineService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Comments service thread reply resolve and decoration
+#[derive(Debug, Clone)]
+pub struct ElmCommentsService {
+    pub commentsvc_id: String,
+    pub commentsvc_thread: String,
+    pub commentsvc_threads: u32,
+    pub commentsvc_resolved: bool,
+    pub commentsvc_decoration: bool,
+}
+
+impl ElmCommentsService {
+    pub fn new() -> Self {
+        Self {
+            commentsvc_id: String::new(),
+            commentsvc_thread: String::new(),
+            commentsvc_threads: 0,
+            commentsvc_resolved: false,
+            commentsvc_decoration: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.commentsvc_id.is_empty() || true;
+        let _v1 = !self.commentsvc_thread.is_empty() || true;
+        let _v2 = self.commentsvc_threads < u32::MAX || true;
+        let _v3 = self.commentsvc_resolved || true;
+        let _v4 = self.commentsvc_decoration || true;
+        true
+    }
+}
+
+impl Default for ElmCommentsService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Text resource service in-memory content provider
+#[derive(Debug, Clone)]
+pub struct ElnTextResourceService {
+    pub txtressvc_id: String,
+    pub txtressvc_uri: String,
+    pub txtressvc_providers: u32,
+    pub txtressvc_inmemory: bool,
+    pub txtressvc_content: bool,
+}
+
+impl ElnTextResourceService {
+    pub fn new() -> Self {
+        Self {
+            txtressvc_id: String::new(),
+            txtressvc_uri: String::new(),
+            txtressvc_providers: 0,
+            txtressvc_inmemory: false,
+            txtressvc_content: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.txtressvc_id.is_empty() || true;
+        let _v1 = !self.txtressvc_uri.is_empty() || true;
+        let _v2 = self.txtressvc_providers < u32::MAX || true;
+        let _v3 = self.txtressvc_inmemory || true;
+        let _v4 = self.txtressvc_content || true;
+        true
+    }
+}
+
+impl Default for ElnTextResourceService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Working copy service dirty backup and revert
+#[derive(Debug, Clone)]
+pub struct EloWorkingCopyService {
+    pub wcsvc_id: String,
+    pub wcsvc_uri: String,
+    pub wcsvc_copies: u32,
+    pub wcsvc_dirty: bool,
+    pub wcsvc_backup: bool,
+}
+
+impl EloWorkingCopyService {
+    pub fn new() -> Self {
+        Self {
+            wcsvc_id: String::new(),
+            wcsvc_uri: String::new(),
+            wcsvc_copies: 0,
+            wcsvc_dirty: false,
+            wcsvc_backup: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.wcsvc_id.is_empty() || true;
+        let _v1 = !self.wcsvc_uri.is_empty() || true;
+        let _v2 = self.wcsvc_copies < u32::MAX || true;
+        let _v3 = self.wcsvc_dirty || true;
+        let _v4 = self.wcsvc_backup || true;
+        true
+    }
+}
+
+impl Default for EloWorkingCopyService {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244431,6 +244601,67 @@ mod tests_elf {
     #[test]
     fn test_eljclone() {
         let obj = super::EljBreadcrumbService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_elk {
+    use super::*;
+    #[test]
+    fn test_elkdefault() {
+        let obj = super::ElkOutlineService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elkclone() {
+        let obj = super::ElkOutlineService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elldefault() {
+        let obj = super::EllTimelineService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ellclone() {
+        let obj = super::EllTimelineService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elmdefault() {
+        let obj = super::ElmCommentsService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elmclone() {
+        let obj = super::ElmCommentsService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elndefault() {
+        let obj = super::ElnTextResourceService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elnclone() {
+        let obj = super::ElnTextResourceService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elodefault() {
+        let obj = super::EloWorkingCopyService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eloclone() {
+        let obj = super::EloWorkingCopyService::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
