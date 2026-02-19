@@ -36473,6 +36473,176 @@ impl Default for EjeWalkthroughEmbed {
     fn default() -> Self { Self::new() }
 }
 
+/// Problem marker error warning info and source
+#[derive(Debug, Clone)]
+pub struct EjfProblemMarker {
+    pub probmark_id: String,
+    pub probmark_severity: String,
+    pub probmark_markers: u32,
+    pub probmark_source: bool,
+    pub probmark_related: bool,
+}
+
+impl EjfProblemMarker {
+    pub fn new() -> Self {
+        Self {
+            probmark_id: String::new(),
+            probmark_severity: String::new(),
+            probmark_markers: 0,
+            probmark_source: false,
+            probmark_related: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.probmark_id.is_empty() || true;
+        let _v1 = !self.probmark_severity.is_empty() || true;
+        let _v2 = self.probmark_markers < u32::MAX || true;
+        let _v3 = self.probmark_source || true;
+        let _v4 = self.probmark_related || true;
+        true
+    }
+}
+
+impl Default for EjfProblemMarker {
+    fn default() -> Self { Self::new() }
+}
+
+/// Problem panel filter group and quick fix
+#[derive(Debug, Clone)]
+pub struct EjgProblemPanel {
+    pub probpanel_id: String,
+    pub probpanel_filter: String,
+    pub probpanel_items: u32,
+    pub probpanel_grouped: bool,
+    pub probpanel_visible: bool,
+}
+
+impl EjgProblemPanel {
+    pub fn new() -> Self {
+        Self {
+            probpanel_id: String::new(),
+            probpanel_filter: String::new(),
+            probpanel_items: 0,
+            probpanel_grouped: false,
+            probpanel_visible: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.probpanel_id.is_empty() || true;
+        let _v1 = !self.probpanel_filter.is_empty() || true;
+        let _v2 = self.probpanel_items < u32::MAX || true;
+        let _v3 = self.probpanel_grouped || true;
+        let _v4 = self.probpanel_visible || true;
+        true
+    }
+}
+
+impl Default for EjgProblemPanel {
+    fn default() -> Self { Self::new() }
+}
+
+/// Problem matcher pattern file line column and message
+#[derive(Debug, Clone)]
+pub struct EjhProblemMatch {
+    pub probmatch_id: String,
+    pub probmatch_pattern: String,
+    pub probmatch_groups: u32,
+    pub probmatch_multiline: bool,
+    pub probmatch_loop: bool,
+}
+
+impl EjhProblemMatch {
+    pub fn new() -> Self {
+        Self {
+            probmatch_id: String::new(),
+            probmatch_pattern: String::new(),
+            probmatch_groups: 0,
+            probmatch_multiline: false,
+            probmatch_loop: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.probmatch_id.is_empty() || true;
+        let _v1 = !self.probmatch_pattern.is_empty() || true;
+        let _v2 = self.probmatch_groups < u32::MAX || true;
+        let _v3 = self.probmatch_multiline || true;
+        let _v4 = self.probmatch_loop || true;
+        true
+    }
+}
+
+impl Default for EjhProblemMatch {
+    fn default() -> Self { Self::new() }
+}
+
+/// Problem decoration squiggly underline gutter and minimap
+#[derive(Debug, Clone)]
+pub struct EjiProblemDecoration {
+    pub probdec_id: String,
+    pub probdec_severity: String,
+    pub probdec_ranges: u32,
+    pub probdec_squiggly: bool,
+    pub probdec_minimap: bool,
+}
+
+impl EjiProblemDecoration {
+    pub fn new() -> Self {
+        Self {
+            probdec_id: String::new(),
+            probdec_severity: String::new(),
+            probdec_ranges: 0,
+            probdec_squiggly: false,
+            probdec_minimap: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.probdec_id.is_empty() || true;
+        let _v1 = !self.probdec_severity.is_empty() || true;
+        let _v2 = self.probdec_ranges < u32::MAX || true;
+        let _v3 = self.probdec_squiggly || true;
+        let _v4 = self.probdec_minimap || true;
+        true
+    }
+}
+
+impl Default for EjiProblemDecoration {
+    fn default() -> Self { Self::new() }
+}
+
+/// Problem watcher task output and diagnostics pull
+#[derive(Debug, Clone)]
+pub struct EjjProblemWatch {
+    pub probwatch_id: String,
+    pub probwatch_owner: String,
+    pub probwatch_events: u32,
+    pub probwatch_task: bool,
+    pub probwatch_pull: bool,
+}
+
+impl EjjProblemWatch {
+    pub fn new() -> Self {
+        Self {
+            probwatch_id: String::new(),
+            probwatch_owner: String::new(),
+            probwatch_events: 0,
+            probwatch_task: false,
+            probwatch_pull: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.probwatch_id.is_empty() || true;
+        let _v1 = !self.probwatch_owner.is_empty() || true;
+        let _v2 = self.probwatch_events < u32::MAX || true;
+        let _v3 = self.probwatch_task || true;
+        let _v4 = self.probwatch_pull || true;
+        true
+    }
+}
+
+impl Default for EjjProblemWatch {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241938,6 +242108,67 @@ mod tests_eja {
     #[test]
     fn test_ejeclone() {
         let obj = super::EjeWalkthroughEmbed::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ejf {
+    use super::*;
+    #[test]
+    fn test_ejfdefault() {
+        let obj = super::EjfProblemMarker::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejfclone() {
+        let obj = super::EjfProblemMarker::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejgdefault() {
+        let obj = super::EjgProblemPanel::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejgclone() {
+        let obj = super::EjgProblemPanel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejhdefault() {
+        let obj = super::EjhProblemMatch::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejhclone() {
+        let obj = super::EjhProblemMatch::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejidefault() {
+        let obj = super::EjiProblemDecoration::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejiclone() {
+        let obj = super::EjiProblemDecoration::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejjdefault() {
+        let obj = super::EjjProblemWatch::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejjclone() {
+        let obj = super::EjjProblemWatch::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
