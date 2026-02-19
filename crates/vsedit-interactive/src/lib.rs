@@ -66436,3 +66436,181 @@ mod bcy_tests {
         assert!(lines.iter().any(|l| l.contains("Extensions")));
     }
 }
+
+
+// --- bcz_: Editor settings sync model ---
+
+/// Sync resource kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BczSyncResource { Settings, Keybindings, Snippets, Extensions, UIState, Profiles }
+
+/// Sync status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BczSyncStatus { Idle, Syncing, Conflict, Error, Disabled }
+
+/// A sync conflict.
+#[derive(Debug, Clone)]
+pub struct BczSyncConflict {
+    pub resource: BczSyncResource,
+    pub local_value: String,
+    pub remote_value: String,
+}
+
+impl BczSyncConflict {
+    pub fn new(res: BczSyncResource, local: &str, remote: &str) -> Self {
+        Self { resource: res, local_value: local.to_string(), remote_value: remote.to_string() }
+    }
+}
+
+/// Settings sync model.
+#[derive(Debug)]
+pub struct BczSettingsSync {
+    enabled: bool,
+    status: BczSyncStatus,
+    synced_resources: Vec<BczSyncResource>,
+    conflicts: Vec<BczSyncConflict>,
+    last_sync: Option<u64>,
+    account: Option<String>,
+}
+
+impl BczSettingsSync {
+    pub fn new() -> Self {
+        Self { enabled: false, status: BczSyncStatus::Disabled, synced_resources: Vec::new(), conflicts: Vec::new(), last_sync: None, account: None }
+    }
+
+    pub fn enable(&mut self) { self.enabled = true; self.status = BczSyncStatus::Idle; }
+    pub fn disable(&mut self) { self.enabled = false; self.status = BczSyncStatus::Disabled; }
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn status(&self) -> BczSyncStatus { self.status }
+
+    pub fn sign_in(&mut self, account: &str) { self.account = Some(account.to_string()); self.enable(); }
+    pub fn sign_out(&mut self) { self.account = None; self.disable(); }
+    pub fn account(&self) -> Option<&str> { self.account.as_deref() }
+
+    pub fn add_resource(&mut self, r: BczSyncResource) {
+        if !self.synced_resources.contains(&r) { self.synced_resources.push(r); }
+    }
+
+    pub fn remove_resource(&mut self, r: BczSyncResource) { self.synced_resources.retain(|x| *x != r); }
+
+    pub fn is_resource_synced(&self, r: BczSyncResource) -> bool { self.synced_resources.contains(&r) }
+    pub fn synced_resources(&self) -> &[BczSyncResource] { &self.synced_resources }
+
+    pub fn start_sync(&mut self) { if self.enabled { self.status = BczSyncStatus::Syncing; } }
+    pub fn finish_sync(&mut self) { self.status = BczSyncStatus::Idle; self.last_sync = Some(0); }
+    pub fn set_error(&mut self) { self.status = BczSyncStatus::Error; }
+
+    pub fn add_conflict(&mut self, c: BczSyncConflict) {
+        self.conflicts.push(c);
+        self.status = BczSyncStatus::Conflict;
+    }
+
+    pub fn resolve_conflict(&mut self, resource: BczSyncResource) {
+        self.conflicts.retain(|c| c.resource != resource);
+        if self.conflicts.is_empty() { self.status = BczSyncStatus::Idle; }
+    }
+
+    pub fn conflicts(&self) -> &[BczSyncConflict] { &self.conflicts }
+    pub fn has_conflicts(&self) -> bool { !self.conflicts.is_empty() }
+    pub fn last_sync(&self) -> Option<u64> { self.last_sync }
+
+    pub fn status_label(&self) -> &str {
+        match self.status {
+            BczSyncStatus::Idle => "Up to date",
+            BczSyncStatus::Syncing => "Syncing...",
+            BczSyncStatus::Conflict => "Conflicts",
+            BczSyncStatus::Error => "Error",
+            BczSyncStatus::Disabled => "Disabled",
+        }
+    }
+}
+
+#[cfg(test)]
+mod bcz_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcz_new() {
+        let s = BczSettingsSync::new();
+        assert!(!s.is_enabled());
+        assert_eq!(s.status(), BczSyncStatus::Disabled);
+    }
+
+    #[test]
+    fn test_bcz_enable() {
+        let mut s = BczSettingsSync::new();
+        s.enable();
+        assert!(s.is_enabled());
+        assert_eq!(s.status(), BczSyncStatus::Idle);
+    }
+
+    #[test]
+    fn test_bcz_sign_in() {
+        let mut s = BczSettingsSync::new();
+        s.sign_in("user@github.com");
+        assert_eq!(s.account(), Some("user@github.com"));
+        assert!(s.is_enabled());
+    }
+
+    #[test]
+    fn test_bcz_sign_out() {
+        let mut s = BczSettingsSync::new();
+        s.sign_in("user@github.com");
+        s.sign_out();
+        assert!(s.account().is_none());
+        assert!(!s.is_enabled());
+    }
+
+    #[test]
+    fn test_bcz_resources() {
+        let mut s = BczSettingsSync::new();
+        s.add_resource(BczSyncResource::Settings);
+        s.add_resource(BczSyncResource::Keybindings);
+        assert_eq!(s.synced_resources().len(), 2);
+        assert!(s.is_resource_synced(BczSyncResource::Settings));
+    }
+
+    #[test]
+    fn test_bcz_remove_resource() {
+        let mut s = BczSettingsSync::new();
+        s.add_resource(BczSyncResource::Snippets);
+        s.remove_resource(BczSyncResource::Snippets);
+        assert!(!s.is_resource_synced(BczSyncResource::Snippets));
+    }
+
+    #[test]
+    fn test_bcz_sync_cycle() {
+        let mut s = BczSettingsSync::new();
+        s.enable();
+        s.start_sync();
+        assert_eq!(s.status(), BczSyncStatus::Syncing);
+        s.finish_sync();
+        assert_eq!(s.status(), BczSyncStatus::Idle);
+    }
+
+    #[test]
+    fn test_bcz_conflict() {
+        let mut s = BczSettingsSync::new();
+        s.enable();
+        s.add_conflict(BczSyncConflict::new(BczSyncResource::Settings, "local", "remote"));
+        assert!(s.has_conflicts());
+        assert_eq!(s.status(), BczSyncStatus::Conflict);
+    }
+
+    #[test]
+    fn test_bcz_resolve() {
+        let mut s = BczSettingsSync::new();
+        s.enable();
+        s.add_conflict(BczSyncConflict::new(BczSyncResource::Settings, "l", "r"));
+        s.resolve_conflict(BczSyncResource::Settings);
+        assert!(!s.has_conflicts());
+    }
+
+    #[test]
+    fn test_bcz_status_label() {
+        let mut s = BczSettingsSync::new();
+        assert_eq!(s.status_label(), "Disabled");
+        s.enable();
+        assert_eq!(s.status_label(), "Up to date");
+    }
+}
