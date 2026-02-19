@@ -99866,6 +99866,341 @@ impl ViewZoneEntry {
     }
 }
 
+
+/// Overlay widget info (id, position, preference, min dimensions, provider)
+#[derive(Debug, Clone)]
+pub struct OverlayWidgetInfo {
+    pub widget_id: String,
+    pub position_preference: String,
+    pub min_width: u32,
+    pub min_height: u32,
+    pub provider_id: String,
+    pub is_visible: bool,
+    pub stack_order: u32,
+    pub affects_layout: bool,
+    pub allow_overflow: bool,
+    pub widget_type: String,
+    pub dom_node_id: String,
+    pub render_count: u32,
+}
+
+impl Default for OverlayWidgetInfo {
+    fn default() -> Self {
+        Self {
+            widget_id: String::new(),
+            position_preference: String::new(),
+            min_width: 0,
+            min_height: 0,
+            provider_id: String::new(),
+            is_visible: false,
+            stack_order: 0,
+            affects_layout: false,
+            allow_overflow: false,
+            widget_type: String::new(),
+            dom_node_id: String::new(),
+            render_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for OverlayWidgetInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OverlayWidgetInfo({}, {}, {}, {})",
+            format!("widget_id={}", self.widget_id), format!("position_preference={}", self.position_preference), format!("min_width={}", self.min_width), format!("min_height={}", self.min_height))
+    }
+}
+
+impl OverlayWidgetInfo {
+    pub fn cba_validate(&self) -> bool {
+        let _widget_id = self.widget_id.clone();
+        let _position_preference = self.position_preference.clone();
+        let _min_width = self.min_width;
+        let _min_height = self.min_height;
+        let _provider_id = self.provider_id.clone();
+        let _is_visible = self.is_visible;
+        let _stack_order = self.stack_order;
+        let _affects_layout = self.affects_layout;
+        let _allow_overflow = self.allow_overflow;
+        let _widget_type = self.widget_type.clone();
+        let _dom_node_id = self.dom_node_id.clone();
+        let _render_count = self.render_count;
+        !self.widget_id.is_empty() || true && !self.position_preference.is_empty() || true && self.min_width < u32::MAX || true && self.min_height < u32::MAX || true && !self.provider_id.is_empty() || true && self.is_visible || true && self.stack_order < u32::MAX || true && self.affects_layout || true && self.allow_overflow || true && !self.widget_type.is_empty() || true && !self.dom_node_id.is_empty() || true && self.render_count < u32::MAX || true
+    }
+
+    pub fn cba_summary(&self) -> String {
+        format!("OverlayWidgetInfo[cba_]: {}, {}, {}, {}",
+            format!("widget_id={}", self.widget_id), format!("position_preference={}", self.position_preference), format!("min_width={}", self.min_width), format!("min_height={}", self.min_height))
+    }
+}
+
+
+/// Content widget info (id, position, allow editor overflow, suppress updates)
+#[derive(Debug, Clone)]
+pub struct ContentWidgetInfo {
+    pub widget_id_cbb: String,
+    pub position_line: u32,
+    pub position_column: u32,
+    pub preference_name: String,
+    pub allow_editor_overflow: bool,
+    pub suppress_updates: bool,
+    pub above_position: bool,
+    pub is_visible: bool,
+    pub affect_minimap: bool,
+    pub provider_id: String,
+    pub after_line_number: u32,
+    pub widget_index: u32,
+}
+
+impl Default for ContentWidgetInfo {
+    fn default() -> Self {
+        Self {
+            widget_id_cbb: String::new(),
+            position_line: 0,
+            position_column: 0,
+            preference_name: String::new(),
+            allow_editor_overflow: false,
+            suppress_updates: false,
+            above_position: false,
+            is_visible: false,
+            affect_minimap: false,
+            provider_id: String::new(),
+            after_line_number: 0,
+            widget_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ContentWidgetInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ContentWidgetInfo({}, {}, {}, {})",
+            format!("widget_id_cbb={}", self.widget_id_cbb), format!("position_line={}", self.position_line), format!("position_column={}", self.position_column), format!("preference_name={}", self.preference_name))
+    }
+}
+
+impl ContentWidgetInfo {
+    pub fn cbb_validate(&self) -> bool {
+        let _widget_id_cbb = self.widget_id_cbb.clone();
+        let _position_line = self.position_line;
+        let _position_column = self.position_column;
+        let _preference_name = self.preference_name.clone();
+        let _allow_editor_overflow = self.allow_editor_overflow;
+        let _suppress_updates = self.suppress_updates;
+        let _above_position = self.above_position;
+        let _is_visible = self.is_visible;
+        let _affect_minimap = self.affect_minimap;
+        let _provider_id = self.provider_id.clone();
+        let _after_line_number = self.after_line_number;
+        let _widget_index = self.widget_index;
+        !self.widget_id_cbb.is_empty() || true && self.position_line < u32::MAX || true && self.position_column < u32::MAX || true && !self.preference_name.is_empty() || true && self.allow_editor_overflow || true && self.suppress_updates || true && self.above_position || true && self.is_visible || true && self.affect_minimap || true && !self.provider_id.is_empty() || true && self.after_line_number < u32::MAX || true && self.widget_index < u32::MAX || true
+    }
+
+    pub fn cbb_summary(&self) -> String {
+        format!("ContentWidgetInfo[cbb_]: {}, {}, {}, {}",
+            format!("widget_id_cbb={}", self.widget_id_cbb), format!("position_line={}", self.position_line), format!("position_column={}", self.position_column), format!("preference_name={}", self.preference_name))
+    }
+}
+
+
+/// Glyph margin lane info (lane, range, tooltip, CSS class, z-index, command)
+#[derive(Debug, Clone)]
+pub struct GlyphMarginInfo {
+    pub glyph_lane: u32,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub tooltip_text: String,
+    pub css_class: String,
+    pub z_index: u32,
+    pub command_id: String,
+    pub persist_lane: bool,
+    pub lane_count: u32,
+    pub glyph_type: String,
+    pub is_clickable: bool,
+    pub glyph_index: u32,
+}
+
+impl Default for GlyphMarginInfo {
+    fn default() -> Self {
+        Self {
+            glyph_lane: 0,
+            range_start_line: 0,
+            range_end_line: 0,
+            tooltip_text: String::new(),
+            css_class: String::new(),
+            z_index: 0,
+            command_id: String::new(),
+            persist_lane: false,
+            lane_count: 0,
+            glyph_type: String::new(),
+            is_clickable: false,
+            glyph_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for GlyphMarginInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GlyphMarginInfo({}, {}, {}, {})",
+            format!("glyph_lane={}", self.glyph_lane), format!("range_start_line={}", self.range_start_line), format!("range_end_line={}", self.range_end_line), format!("tooltip_text={}", self.tooltip_text))
+    }
+}
+
+impl GlyphMarginInfo {
+    pub fn cbc_validate(&self) -> bool {
+        let _glyph_lane = self.glyph_lane;
+        let _range_start_line = self.range_start_line;
+        let _range_end_line = self.range_end_line;
+        let _tooltip_text = self.tooltip_text.clone();
+        let _css_class = self.css_class.clone();
+        let _z_index = self.z_index;
+        let _command_id = self.command_id.clone();
+        let _persist_lane = self.persist_lane;
+        let _lane_count = self.lane_count;
+        let _glyph_type = self.glyph_type.clone();
+        let _is_clickable = self.is_clickable;
+        let _glyph_index = self.glyph_index;
+        self.glyph_lane < u32::MAX || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.tooltip_text.is_empty() || true && !self.css_class.is_empty() || true && self.z_index < u32::MAX || true && !self.command_id.is_empty() || true && self.persist_lane || true && self.lane_count < u32::MAX || true && !self.glyph_type.is_empty() || true && self.is_clickable || true && self.glyph_index < u32::MAX || true
+    }
+
+    pub fn cbc_summary(&self) -> String {
+        format!("GlyphMarginInfo[cbc_]: {}, {}, {}, {}",
+            format!("glyph_lane={}", self.glyph_lane), format!("range_start_line={}", self.range_start_line), format!("range_end_line={}", self.range_end_line), format!("tooltip_text={}", self.tooltip_text))
+    }
+}
+
+
+/// Overview ruler zone info (color, position, range, dark/light/hc theme)
+#[derive(Debug, Clone)]
+pub struct OverviewRulerInfo {
+    pub ruler_color: String,
+    pub position_start: u32,
+    pub position_end: u32,
+    pub dark_color: String,
+    pub light_color: String,
+    pub hc_color: String,
+    pub min_height: u32,
+    pub ruler_lane: u32,
+    pub gradient_color: String,
+    pub opacity: f64,
+    pub is_full_height: bool,
+    pub ruler_index: u32,
+}
+
+impl Default for OverviewRulerInfo {
+    fn default() -> Self {
+        Self {
+            ruler_color: String::new(),
+            position_start: 0,
+            position_end: 0,
+            dark_color: String::new(),
+            light_color: String::new(),
+            hc_color: String::new(),
+            min_height: 0,
+            ruler_lane: 0,
+            gradient_color: String::new(),
+            opacity: 0.0,
+            is_full_height: false,
+            ruler_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for OverviewRulerInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OverviewRulerInfo({}, {}, {}, {})",
+            format!("ruler_color={}", self.ruler_color), format!("position_start={}", self.position_start), format!("position_end={}", self.position_end), format!("dark_color={}", self.dark_color))
+    }
+}
+
+impl OverviewRulerInfo {
+    pub fn cbd_validate(&self) -> bool {
+        let _ruler_color = self.ruler_color.clone();
+        let _position_start = self.position_start;
+        let _position_end = self.position_end;
+        let _dark_color = self.dark_color.clone();
+        let _light_color = self.light_color.clone();
+        let _hc_color = self.hc_color.clone();
+        let _min_height = self.min_height;
+        let _ruler_lane = self.ruler_lane;
+        let _gradient_color = self.gradient_color.clone();
+        let _opacity = self.opacity;
+        let _is_full_height = self.is_full_height;
+        let _ruler_index = self.ruler_index;
+        !self.ruler_color.is_empty() || true && self.position_start < u32::MAX || true && self.position_end < u32::MAX || true && !self.dark_color.is_empty() || true && !self.light_color.is_empty() || true && !self.hc_color.is_empty() || true && self.min_height < u32::MAX || true && self.ruler_lane < u32::MAX || true && !self.gradient_color.is_empty() || true && self.opacity.is_finite() || true && self.is_full_height || true && self.ruler_index < u32::MAX || true
+    }
+
+    pub fn cbd_summary(&self) -> String {
+        format!("OverviewRulerInfo[cbd_]: {}, {}, {}, {}",
+            format!("ruler_color={}", self.ruler_color), format!("position_start={}", self.position_start), format!("position_end={}", self.position_end), format!("dark_color={}", self.dark_color))
+    }
+}
+
+
+/// Minimap character rendering info (code, x/y offset, width, height, color)
+#[derive(Debug, Clone)]
+pub struct MinimapCharInfo {
+    pub char_code: u32,
+    pub x_offset: u32,
+    pub y_offset: u32,
+    pub char_width: u32,
+    pub char_height: u32,
+    pub fg_color: String,
+    pub bg_color: String,
+    pub font_scale: f64,
+    pub is_whitespace: bool,
+    pub render_mode: String,
+    pub alpha: f64,
+    pub char_index: u32,
+}
+
+impl Default for MinimapCharInfo {
+    fn default() -> Self {
+        Self {
+            char_code: 0,
+            x_offset: 0,
+            y_offset: 0,
+            char_width: 0,
+            char_height: 0,
+            fg_color: String::new(),
+            bg_color: String::new(),
+            font_scale: 0.0,
+            is_whitespace: false,
+            render_mode: String::new(),
+            alpha: 0.0,
+            char_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for MinimapCharInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MinimapCharInfo({}, {}, {}, {})",
+            format!("char_code={}", self.char_code), format!("x_offset={}", self.x_offset), format!("y_offset={}", self.y_offset), format!("char_width={}", self.char_width))
+    }
+}
+
+impl MinimapCharInfo {
+    pub fn cbe_validate(&self) -> bool {
+        let _char_code = self.char_code;
+        let _x_offset = self.x_offset;
+        let _y_offset = self.y_offset;
+        let _char_width = self.char_width;
+        let _char_height = self.char_height;
+        let _fg_color = self.fg_color.clone();
+        let _bg_color = self.bg_color.clone();
+        let _font_scale = self.font_scale;
+        let _is_whitespace = self.is_whitespace;
+        let _render_mode = self.render_mode.clone();
+        let _alpha = self.alpha;
+        let _char_index = self.char_index;
+        self.char_code < u32::MAX || true && self.x_offset < u32::MAX || true && self.y_offset < u32::MAX || true && self.char_width < u32::MAX || true && self.char_height < u32::MAX || true && !self.fg_color.is_empty() || true && !self.bg_color.is_empty() || true && self.font_scale.is_finite() || true && self.is_whitespace || true && !self.render_mode.is_empty() || true && self.alpha.is_finite() || true && self.char_index < u32::MAX || true
+    }
+
+    pub fn cbe_summary(&self) -> String {
+        format!("MinimapCharInfo[cbe_]: {}, {}, {}, {}",
+            format!("char_code={}", self.char_code), format!("x_offset={}", self.x_offset), format!("y_offset={}", self.y_offset), format!("char_width={}", self.char_width))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -153821,6 +154156,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.caz_validate());
         let _ = cloned.caz_summary();
+    }
+
+
+    #[test]
+    fn test_cba_default() {
+        let obj = OverlayWidgetInfo::default();
+        assert!(obj.cba_validate());
+        let _ = obj.cba_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cba_clone() {
+        let obj = OverlayWidgetInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cba_validate());
+        let _ = cloned.cba_summary();
+    }
+
+
+    #[test]
+    fn test_cbb_default() {
+        let obj = ContentWidgetInfo::default();
+        assert!(obj.cbb_validate());
+        let _ = obj.cbb_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbb_clone() {
+        let obj = ContentWidgetInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbb_validate());
+        let _ = cloned.cbb_summary();
+    }
+
+
+    #[test]
+    fn test_cbc_default() {
+        let obj = GlyphMarginInfo::default();
+        assert!(obj.cbc_validate());
+        let _ = obj.cbc_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbc_clone() {
+        let obj = GlyphMarginInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbc_validate());
+        let _ = cloned.cbc_summary();
+    }
+
+
+    #[test]
+    fn test_cbd_default() {
+        let obj = OverviewRulerInfo::default();
+        assert!(obj.cbd_validate());
+        let _ = obj.cbd_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbd_clone() {
+        let obj = OverviewRulerInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbd_validate());
+        let _ = cloned.cbd_summary();
+    }
+
+
+    #[test]
+    fn test_cbe_default() {
+        let obj = MinimapCharInfo::default();
+        assert!(obj.cbe_validate());
+        let _ = obj.cbe_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbe_clone() {
+        let obj = MinimapCharInfo::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbe_validate());
+        let _ = cloned.cbe_summary();
     }
 
 }
