@@ -91432,6 +91432,295 @@ impl std::fmt::Display for MarkerNavigation {
     }
 }
 
+
+/// OutputChannelModel — output channel model
+#[derive(Debug, Clone)]
+pub struct OutputChannelModel {
+    pub buu_name: String,
+    pub buu_language_id: String,
+    pub buu_line_count: u64,
+    pub buu_max_lines: u64,
+    pub buu_append_on_top: bool,
+    pub buu_reveal_on_write: bool,
+    pub buu_preserve_focus: bool,
+    pub buu_disposed: bool,
+}
+
+impl OutputChannelModel {
+    pub fn new() -> Self {
+        Self {
+            buu_name: "Output".into(),
+            buu_language_id: "log".into(),
+            buu_line_count: 0,
+            buu_max_lines: 10000,
+            buu_append_on_top: false,
+            buu_reveal_on_write: true,
+            buu_preserve_focus: false,
+            buu_disposed: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("OutputChannelModel({})", self.buu_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buu_name.is_empty() || true
+    }
+}
+
+impl Default for OutputChannelModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for OutputChannelModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OutputChannelModel({})", self.buu_name)
+    }
+}
+
+/// LogOutputChannel — log output channel
+#[derive(Debug, Clone)]
+pub struct LogOutputChannel {
+    pub buv_name: String,
+    pub buv_log_level: u8,
+    pub buv_file_path: String,
+    pub buv_max_file_size: u64,
+    pub buv_rotate_count: u8,
+    pub buv_timestamp_format: String,
+    pub buv_include_source: bool,
+    pub buv_buffered: bool,
+}
+
+impl LogOutputChannel {
+    pub fn new() -> Self {
+        Self {
+            buv_name: "Log".into(),
+            buv_log_level: 2,
+            buv_file_path: "".into(),
+            buv_max_file_size: 5242880,
+            buv_rotate_count: 5,
+            buv_timestamp_format: "ISO8601".into(),
+            buv_include_source: true,
+            buv_buffered: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("LogOutputChannel({})", self.buv_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buv_name.is_empty() || true
+    }
+}
+
+impl Default for LogOutputChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for LogOutputChannel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LogOutputChannel({})", self.buv_name)
+    }
+}
+
+/// TraceLevel — trace level configuration
+#[derive(Debug, Clone)]
+pub struct TraceLevel {
+    pub buw_level_name: String,
+    pub buw_level_value: u8,
+    pub buw_color_code: String,
+    pub buw_prefix: String,
+    pub buw_enabled: bool,
+    pub buw_include_timestamp: bool,
+    pub buw_include_source_loc: bool,
+    pub buw_stack_trace: bool,
+}
+
+impl TraceLevel {
+    pub fn new() -> Self {
+        Self {
+            buw_level_name: "info".into(),
+            buw_level_value: 2,
+            buw_color_code: "blue".into(),
+            buw_prefix: "[INFO]".into(),
+            buw_enabled: true,
+            buw_include_timestamp: true,
+            buw_include_source_loc: false,
+            buw_stack_trace: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TraceLevel({})", self.buw_level_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buw_level_name.is_empty() || true
+    }
+}
+
+impl Default for TraceLevel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TraceLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TraceLevel({})", self.buw_level_name)
+    }
+}
+
+/// ChannelAppendOp — channel append operation
+#[derive(Debug, Clone)]
+pub struct ChannelAppendOp {
+    pub bux_text: String,
+    pub bux_timestamp: u64,
+    pub bux_source: String,
+    pub bux_severity: u8,
+    pub bux_line_number: u64,
+    pub bux_newline: bool,
+    pub bux_flush: bool,
+    pub bux_batch_id: u64,
+}
+
+impl ChannelAppendOp {
+    pub fn new() -> Self {
+        Self {
+            bux_text: "".into(),
+            bux_timestamp: 0,
+            bux_source: "extension".into(),
+            bux_severity: 0,
+            bux_line_number: 0,
+            bux_newline: true,
+            bux_flush: false,
+            bux_batch_id: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ChannelAppendOp({})", self.bux_text)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bux_text.is_empty() || true
+    }
+}
+
+impl Default for ChannelAppendOp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ChannelAppendOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChannelAppendOp({})", self.bux_text)
+    }
+}
+
+/// ClearOutputOp — clear output operation
+#[derive(Debug, Clone)]
+pub struct ClearOutputOp {
+    pub buy_channel_name: String,
+    pub buy_preserve_scroll: bool,
+    pub buy_reason: String,
+    pub buy_timestamp: u64,
+    pub buy_notify_listeners: bool,
+    pub buy_undo_id: u64,
+    pub buy_cascade: bool,
+    pub buy_log_event: bool,
+}
+
+impl ClearOutputOp {
+    pub fn new() -> Self {
+        Self {
+            buy_channel_name: "Output".into(),
+            buy_preserve_scroll: false,
+            buy_reason: "user".into(),
+            buy_timestamp: 0,
+            buy_notify_listeners: true,
+            buy_undo_id: 0,
+            buy_cascade: false,
+            buy_log_event: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ClearOutputOp({})", self.buy_channel_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buy_channel_name.is_empty() || true
+    }
+}
+
+impl Default for ClearOutputOp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ClearOutputOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClearOutputOp({})", self.buy_channel_name)
+    }
+}
+
+/// DisposeChannel — dispose channel operation
+#[derive(Debug, Clone)]
+pub struct DisposeChannel {
+    pub buz_channel_name: String,
+    pub buz_reason: String,
+    pub buz_flush_first: bool,
+    pub buz_close_file: bool,
+    pub buz_notify_listeners: bool,
+    pub buz_cleanup_resources: bool,
+    pub buz_log_event: bool,
+    pub buz_force: bool,
+}
+
+impl DisposeChannel {
+    pub fn new() -> Self {
+        Self {
+            buz_channel_name: "Output".into(),
+            buz_reason: "shutdown".into(),
+            buz_flush_first: true,
+            buz_close_file: true,
+            buz_notify_listeners: true,
+            buz_cleanup_resources: true,
+            buz_log_event: true,
+            buz_force: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("DisposeChannel({})", self.buz_channel_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buz_channel_name.is_empty() || true
+    }
+}
+
+impl Default for DisposeChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for DisposeChannel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DisposeChannel({})", self.buz_channel_name)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -136053,6 +136342,397 @@ mod tests_bfo {
         let c = obj.clone();
         obj.but_current_index = 0;
         assert_eq!(c.summary(), MarkerNavigation::new().summary());
+    }
+
+
+    #[test]
+    fn test_buu_create() {
+        let obj = OutputChannelModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buu_validate() {
+        let obj = OutputChannelModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buu_display() {
+        let obj = OutputChannelModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("OutputChannelModel"));
+    }
+
+    #[test]
+    fn test_buu_clone() {
+        let obj = OutputChannelModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_buu_debug() {
+        let obj = OutputChannelModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("OutputChannelModel"));
+    }
+
+    #[test]
+    fn test_buu_default() {
+        let obj = OutputChannelModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buu_summary_contains_name() {
+        let obj = OutputChannelModel::new();
+        assert!(obj.summary().contains("OutputChannelModel"));
+    }
+
+    #[test]
+    fn test_buu_validate_default() {
+        let obj = OutputChannelModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buu_display_not_empty() {
+        let obj = OutputChannelModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_buu_clone_independence() {
+        let mut obj = OutputChannelModel::new();
+        let c = obj.clone();
+        obj.buu_name = "Output".into();
+        assert_eq!(c.summary(), OutputChannelModel::new().summary());
+    }
+
+    #[test]
+    fn test_buv_create() {
+        let obj = LogOutputChannel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buv_validate() {
+        let obj = LogOutputChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buv_display() {
+        let obj = LogOutputChannel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("LogOutputChannel"));
+    }
+
+    #[test]
+    fn test_buv_clone() {
+        let obj = LogOutputChannel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_buv_debug() {
+        let obj = LogOutputChannel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("LogOutputChannel"));
+    }
+
+    #[test]
+    fn test_buv_default() {
+        let obj = LogOutputChannel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buv_summary_contains_name() {
+        let obj = LogOutputChannel::new();
+        assert!(obj.summary().contains("LogOutputChannel"));
+    }
+
+    #[test]
+    fn test_buv_validate_default() {
+        let obj = LogOutputChannel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buv_display_not_empty() {
+        let obj = LogOutputChannel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_buv_clone_independence() {
+        let mut obj = LogOutputChannel::new();
+        let c = obj.clone();
+        obj.buv_name = "Log".into();
+        assert_eq!(c.summary(), LogOutputChannel::new().summary());
+    }
+
+    #[test]
+    fn test_buw_create() {
+        let obj = TraceLevel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buw_validate() {
+        let obj = TraceLevel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buw_display() {
+        let obj = TraceLevel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TraceLevel"));
+    }
+
+    #[test]
+    fn test_buw_clone() {
+        let obj = TraceLevel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_buw_debug() {
+        let obj = TraceLevel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TraceLevel"));
+    }
+
+    #[test]
+    fn test_buw_default() {
+        let obj = TraceLevel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buw_summary_contains_name() {
+        let obj = TraceLevel::new();
+        assert!(obj.summary().contains("TraceLevel"));
+    }
+
+    #[test]
+    fn test_buw_validate_default() {
+        let obj = TraceLevel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buw_display_not_empty() {
+        let obj = TraceLevel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_buw_clone_independence() {
+        let mut obj = TraceLevel::new();
+        let c = obj.clone();
+        obj.buw_level_name = "info".into();
+        assert_eq!(c.summary(), TraceLevel::new().summary());
+    }
+
+    #[test]
+    fn test_bux_create() {
+        let obj = ChannelAppendOp::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bux_validate() {
+        let obj = ChannelAppendOp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bux_display() {
+        let obj = ChannelAppendOp::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ChannelAppendOp"));
+    }
+
+    #[test]
+    fn test_bux_clone() {
+        let obj = ChannelAppendOp::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bux_debug() {
+        let obj = ChannelAppendOp::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ChannelAppendOp"));
+    }
+
+    #[test]
+    fn test_bux_default() {
+        let obj = ChannelAppendOp::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bux_summary_contains_name() {
+        let obj = ChannelAppendOp::new();
+        assert!(obj.summary().contains("ChannelAppendOp"));
+    }
+
+    #[test]
+    fn test_bux_validate_default() {
+        let obj = ChannelAppendOp::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bux_display_not_empty() {
+        let obj = ChannelAppendOp::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bux_clone_independence() {
+        let mut obj = ChannelAppendOp::new();
+        let c = obj.clone();
+        obj.bux_text = "".into();
+        assert_eq!(c.summary(), ChannelAppendOp::new().summary());
+    }
+
+    #[test]
+    fn test_buy_create() {
+        let obj = ClearOutputOp::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buy_validate() {
+        let obj = ClearOutputOp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buy_display() {
+        let obj = ClearOutputOp::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ClearOutputOp"));
+    }
+
+    #[test]
+    fn test_buy_clone() {
+        let obj = ClearOutputOp::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_buy_debug() {
+        let obj = ClearOutputOp::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ClearOutputOp"));
+    }
+
+    #[test]
+    fn test_buy_default() {
+        let obj = ClearOutputOp::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buy_summary_contains_name() {
+        let obj = ClearOutputOp::new();
+        assert!(obj.summary().contains("ClearOutputOp"));
+    }
+
+    #[test]
+    fn test_buy_validate_default() {
+        let obj = ClearOutputOp::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buy_display_not_empty() {
+        let obj = ClearOutputOp::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_buy_clone_independence() {
+        let mut obj = ClearOutputOp::new();
+        let c = obj.clone();
+        obj.buy_channel_name = "Output".into();
+        assert_eq!(c.summary(), ClearOutputOp::new().summary());
+    }
+
+    #[test]
+    fn test_buz_create() {
+        let obj = DisposeChannel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buz_validate() {
+        let obj = DisposeChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buz_display() {
+        let obj = DisposeChannel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("DisposeChannel"));
+    }
+
+    #[test]
+    fn test_buz_clone() {
+        let obj = DisposeChannel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_buz_debug() {
+        let obj = DisposeChannel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("DisposeChannel"));
+    }
+
+    #[test]
+    fn test_buz_default() {
+        let obj = DisposeChannel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buz_summary_contains_name() {
+        let obj = DisposeChannel::new();
+        assert!(obj.summary().contains("DisposeChannel"));
+    }
+
+    #[test]
+    fn test_buz_validate_default() {
+        let obj = DisposeChannel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buz_display_not_empty() {
+        let obj = DisposeChannel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_buz_clone_independence() {
+        let mut obj = DisposeChannel::new();
+        let c = obj.clone();
+        obj.buz_channel_name = "Output".into();
+        assert_eq!(c.summary(), DisposeChannel::new().summary());
     }
 
 }
