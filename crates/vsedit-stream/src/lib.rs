@@ -86764,6 +86764,67 @@ pub struct BlzWelcomeButton { pub label: String, pub command: String, pub descri
 #[derive(Debug, Clone)]
 pub struct BlzWelcomeState { pub walkthroughs: Vec<BlzWalkthrough>, pub recent_items: Vec<BlzRecentItem>, pub show_on_startup: bool }
 
+
+// File system provider — virtual file systems, stat, read/write, watch, directory traversal
+#[derive(Debug, Clone)]
+pub struct BmaFileStat { pub file_type: u8, pub ctime: u64, pub mtime: u64, pub size: u64, pub permissions: Option<u16> }
+#[derive(Debug, Clone)]
+pub struct BmaFileChange { pub uri: String, pub change_type: u8 }
+#[derive(Debug, Clone)]
+pub struct BmaFileSystemProvider { pub scheme: String, pub readonly: bool, pub case_sensitive: bool }
+#[derive(Debug, Clone)]
+pub struct BmaDirectoryEntry { pub name: String, pub file_type: u8 }
+#[derive(Debug, Clone)]
+pub struct BmaFileWatchRequest { pub uri: String, pub recursive: bool, pub excludes: Vec<String> }
+
+// Workspace folders — multi-root workspace, folder add/remove, folder search, workspace file
+#[derive(Debug, Clone)]
+pub struct BmbWorkspaceFolder { pub uri: String, pub name: String, pub index: usize }
+#[derive(Debug, Clone)]
+pub struct BmbWorkspaceFolderChange { pub added: Vec<BmbWorkspaceFolder>, pub removed: Vec<BmbWorkspaceFolder> }
+#[derive(Debug, Clone)]
+pub struct BmbWorkspaceFile { pub path: String, pub folders: Vec<BmbWorkspaceFolder>, pub settings: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmbFolderSearch { pub query: String, pub folder_uri: String, pub include_pattern: Option<String>, pub exclude_pattern: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmbWorkspaceState { pub folders: Vec<BmbWorkspaceFolder>, pub is_workspace: bool, pub workspace_file: Option<String> }
+
+// Workspace trust — trust state, trust request, restricted mode, extension trust requirements
+#[derive(Debug, Clone)]
+pub struct BmcTrustState { pub trusted: bool, pub uri: Option<String>, pub reason: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmcTrustRequest { pub uri: String, pub modal: bool, pub message: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmcRestrictedMode { pub active: bool, pub restricted_features: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BmcExtensionTrust { pub extension_id: String, pub requires_trust: bool, pub trust_kind: u8 }
+#[derive(Debug, Clone)]
+pub struct BmcTrustConfig { pub enabled: bool, pub untrusted_files: u8, pub empty_window_trusted: bool }
+
+// File encoding detection — encoding names, BOM detection, encoding confidence, auto-detect fallback
+#[derive(Debug, Clone)]
+pub struct BmdEncoding { pub name: String, pub label: String, pub bom: bool }
+#[derive(Debug, Clone)]
+pub struct BmdEncodingDetection { pub detected: String, pub confidence: f64, pub has_bom: bool, pub byte_sample: Vec<u8> }
+#[derive(Debug, Clone)]
+pub struct BmdEncodingConfig { pub auto_detect: bool, pub default_encoding: String, pub candidates: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BmdEncodingChange { pub from_encoding: String, pub to_encoding: String, pub file: String }
+#[derive(Debug, Clone)]
+pub struct BmdBomInfo { pub present: bool, pub encoding: Option<String>, pub byte_length: usize }
+
+// File EOL handling — line ending detection, normalization, mixed EOL warning, EOL configuration
+#[derive(Debug, Clone)]
+pub struct BmeEolSequence { pub value: u8, pub label: String }
+#[derive(Debug, Clone)]
+pub struct BmeEolDetection { pub dominant: u8, pub has_mixed: bool, pub crlf_count: usize, pub lf_count: usize, pub cr_count: usize }
+#[derive(Debug, Clone)]
+pub struct BmeEolConfig { pub default_eol: u8, pub auto_detect: bool, pub normalize_on_save: bool }
+#[derive(Debug, Clone)]
+pub struct BmeEolChange { pub file: String, pub from_eol: u8, pub to_eol: u8 }
+#[derive(Debug, Clone)]
+pub struct BmeEolWarning { pub file: String, pub mixed: bool, pub message: String }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -96304,4 +96365,104 @@ mod tests_bfo {
     fn test_blz_state_hide_startup() { let s = BlzWelcomeState { walkthroughs: vec![], recent_items: vec![], show_on_startup: false }; assert!(!s.show_on_startup); }
     #[test]
     fn test_blz_state_with_recent() { let r = BlzRecentItem { uri: "f".into(), label: "f".into(), workspace: false, timestamp: 0 }; let s = BlzWelcomeState { walkthroughs: vec![], recent_items: vec![r], show_on_startup: true }; assert_eq!(s.recent_items.len(), 1); }
+    #[test]
+    fn test_bma_stat_file() { let s = BmaFileStat { file_type: 1, ctime: 1000, mtime: 2000, size: 4096, permissions: None }; assert_eq!(s.file_type, 1); }
+    #[test]
+    fn test_bma_stat_dir() { let s = BmaFileStat { file_type: 2, ctime: 500, mtime: 500, size: 0, permissions: Some(0o755) }; assert_eq!(s.file_type, 2); }
+    #[test]
+    fn test_bma_change_created() { let c = BmaFileChange { uri: "file:///a.rs".into(), change_type: 1 }; assert_eq!(c.change_type, 1); }
+    #[test]
+    fn test_bma_change_deleted() { let c = BmaFileChange { uri: "file:///b.rs".into(), change_type: 3 }; assert_eq!(c.change_type, 3); }
+    #[test]
+    fn test_bma_provider_local() { let p = BmaFileSystemProvider { scheme: "file".into(), readonly: false, case_sensitive: true }; assert!(!p.readonly); }
+    #[test]
+    fn test_bma_provider_readonly() { let p = BmaFileSystemProvider { scheme: "git".into(), readonly: true, case_sensitive: true }; assert!(p.readonly); }
+    #[test]
+    fn test_bma_dir_entry_file() { let e = BmaDirectoryEntry { name: "main.rs".into(), file_type: 1 }; assert_eq!(e.file_type, 1); }
+    #[test]
+    fn test_bma_dir_entry_dir() { let e = BmaDirectoryEntry { name: "src".into(), file_type: 2 }; assert_eq!(e.name, "src"); }
+    #[test]
+    fn test_bma_watch_recursive() { let w = BmaFileWatchRequest { uri: "file:///project".into(), recursive: true, excludes: vec!["**/target/**".into()] }; assert!(w.recursive); }
+    #[test]
+    fn test_bma_watch_non_recursive() { let w = BmaFileWatchRequest { uri: "file:///file.rs".into(), recursive: false, excludes: vec![] }; assert!(!w.recursive); }
+    #[test]
+    fn test_bmb_single_folder() { let f = BmbWorkspaceFolder { uri: "file:///project".into(), name: "project".into(), index: 0 }; assert_eq!(f.index, 0); }
+    #[test]
+    fn test_bmb_multi_root() { let f1 = BmbWorkspaceFolder { uri: "file:///a".into(), name: "a".into(), index: 0 }; let f2 = BmbWorkspaceFolder { uri: "file:///b".into(), name: "b".into(), index: 1 }; let s = BmbWorkspaceState { folders: vec![f1, f2], is_workspace: true, workspace_file: Some("ws.code-workspace".into()) }; assert!(s.is_workspace); }
+    #[test]
+    fn test_bmb_folder_change_add() { let f = BmbWorkspaceFolder { uri: "file:///new".into(), name: "new".into(), index: 1 }; let ch = BmbWorkspaceFolderChange { added: vec![f], removed: vec![] }; assert_eq!(ch.added.len(), 1); }
+    #[test]
+    fn test_bmb_folder_change_remove() { let f = BmbWorkspaceFolder { uri: "file:///old".into(), name: "old".into(), index: 0 }; let ch = BmbWorkspaceFolderChange { added: vec![], removed: vec![f] }; assert_eq!(ch.removed.len(), 1); }
+    #[test]
+    fn test_bmb_workspace_file() { let f = BmbWorkspaceFolder { uri: "file:///a".into(), name: "a".into(), index: 0 }; let wf = BmbWorkspaceFile { path: "/ws.code-workspace".into(), folders: vec![f], settings: None }; assert_eq!(wf.folders.len(), 1); }
+    #[test]
+    fn test_bmb_folder_search() { let s = BmbFolderSearch { query: "TODO".into(), folder_uri: "file:///project".into(), include_pattern: Some("*.rs".into()), exclude_pattern: None }; assert!(s.include_pattern.is_some()); }
+    #[test]
+    fn test_bmb_state_single_folder() { let f = BmbWorkspaceFolder { uri: "file:///x".into(), name: "x".into(), index: 0 }; let s = BmbWorkspaceState { folders: vec![f], is_workspace: false, workspace_file: None }; assert!(!s.is_workspace); }
+    #[test]
+    fn test_bmb_search_no_filters() { let s = BmbFolderSearch { query: "fn".into(), folder_uri: "file:///".into(), include_pattern: None, exclude_pattern: None }; assert!(s.include_pattern.is_none()); }
+    #[test]
+    fn test_bmb_workspace_with_settings() { let wf = BmbWorkspaceFile { path: "/w.code-workspace".into(), folders: vec![], settings: Some("{}".into()) }; assert!(wf.settings.is_some()); }
+    #[test]
+    fn test_bmb_empty_state() { let s = BmbWorkspaceState { folders: vec![], is_workspace: false, workspace_file: None }; assert!(s.folders.is_empty()); }
+    #[test]
+    fn test_bmc_trusted() { let s = BmcTrustState { trusted: true, uri: Some("file:///project".into()), reason: None }; assert!(s.trusted); }
+    #[test]
+    fn test_bmc_untrusted() { let s = BmcTrustState { trusted: false, uri: None, reason: Some("unknown folder".into()) }; assert!(!s.trusted); }
+    #[test]
+    fn test_bmc_request_modal() { let r = BmcTrustRequest { uri: "file:///new".into(), modal: true, message: Some("Trust this folder?".into()) }; assert!(r.modal); }
+    #[test]
+    fn test_bmc_request_silent() { let r = BmcTrustRequest { uri: "file:///x".into(), modal: false, message: None }; assert!(!r.modal); }
+    #[test]
+    fn test_bmc_restricted_active() { let m = BmcRestrictedMode { active: true, restricted_features: vec!["tasks".into(), "debug".into()] }; assert_eq!(m.restricted_features.len(), 2); }
+    #[test]
+    fn test_bmc_restricted_inactive() { let m = BmcRestrictedMode { active: false, restricted_features: vec![] }; assert!(!m.active); }
+    #[test]
+    fn test_bmc_ext_requires_trust() { let e = BmcExtensionTrust { extension_id: "ext.git".into(), requires_trust: true, trust_kind: 1 }; assert!(e.requires_trust); }
+    #[test]
+    fn test_bmc_ext_no_trust() { let e = BmcExtensionTrust { extension_id: "ext.theme".into(), requires_trust: false, trust_kind: 0 }; assert!(!e.requires_trust); }
+    #[test]
+    fn test_bmc_config_enabled() { let c = BmcTrustConfig { enabled: true, untrusted_files: 1, empty_window_trusted: true }; assert!(c.enabled); }
+    #[test]
+    fn test_bmc_config_disabled() { let c = BmcTrustConfig { enabled: false, untrusted_files: 0, empty_window_trusted: false }; assert!(!c.enabled); }
+    #[test]
+    fn test_bmd_utf8() { let e = BmdEncoding { name: "utf-8".into(), label: "UTF-8".into(), bom: false }; assert_eq!(e.name, "utf-8"); }
+    #[test]
+    fn test_bmd_utf8_bom() { let e = BmdEncoding { name: "utf-8-bom".into(), label: "UTF-8 with BOM".into(), bom: true }; assert!(e.bom); }
+    #[test]
+    fn test_bmd_detection_high_conf() { let d = BmdEncodingDetection { detected: "utf-8".into(), confidence: 0.99, has_bom: false, byte_sample: vec![0x48, 0x65] }; assert!(d.confidence > 0.9); }
+    #[test]
+    fn test_bmd_detection_with_bom() { let d = BmdEncodingDetection { detected: "utf-16le".into(), confidence: 1.0, has_bom: true, byte_sample: vec![0xFF, 0xFE] }; assert!(d.has_bom); }
+    #[test]
+    fn test_bmd_config_auto() { let c = BmdEncodingConfig { auto_detect: true, default_encoding: "utf-8".into(), candidates: vec!["utf-8".into(), "shift-jis".into()] }; assert!(c.auto_detect); }
+    #[test]
+    fn test_bmd_config_fixed() { let c = BmdEncodingConfig { auto_detect: false, default_encoding: "iso-8859-1".into(), candidates: vec![] }; assert!(!c.auto_detect); }
+    #[test]
+    fn test_bmd_encoding_change() { let ch = BmdEncodingChange { from_encoding: "utf-8".into(), to_encoding: "utf-16le".into(), file: "a.txt".into() }; assert_eq!(ch.to_encoding, "utf-16le"); }
+    #[test]
+    fn test_bmd_bom_present() { let b = BmdBomInfo { present: true, encoding: Some("utf-8".into()), byte_length: 3 }; assert!(b.present); }
+    #[test]
+    fn test_bmd_bom_absent() { let b = BmdBomInfo { present: false, encoding: None, byte_length: 0 }; assert!(!b.present); }
+    #[test]
+    fn test_bmd_low_confidence() { let d = BmdEncodingDetection { detected: "windows-1252".into(), confidence: 0.4, has_bom: false, byte_sample: vec![] }; assert!(d.confidence < 0.5); }
+    #[test]
+    fn test_bme_lf_sequence() { let e = BmeEolSequence { value: 1, label: "LF".into() }; assert_eq!(e.value, 1); }
+    #[test]
+    fn test_bme_crlf_sequence() { let e = BmeEolSequence { value: 2, label: "CRLF".into() }; assert_eq!(e.value, 2); }
+    #[test]
+    fn test_bme_detection_lf_only() { let d = BmeEolDetection { dominant: 1, has_mixed: false, crlf_count: 0, lf_count: 100, cr_count: 0 }; assert!(!d.has_mixed); }
+    #[test]
+    fn test_bme_detection_mixed() { let d = BmeEolDetection { dominant: 1, has_mixed: true, crlf_count: 5, lf_count: 95, cr_count: 0 }; assert!(d.has_mixed); }
+    #[test]
+    fn test_bme_config_lf() { let c = BmeEolConfig { default_eol: 1, auto_detect: true, normalize_on_save: false }; assert!(c.auto_detect); }
+    #[test]
+    fn test_bme_config_crlf() { let c = BmeEolConfig { default_eol: 2, auto_detect: false, normalize_on_save: true }; assert!(c.normalize_on_save); }
+    #[test]
+    fn test_bme_eol_change() { let ch = BmeEolChange { file: "a.txt".into(), from_eol: 2, to_eol: 1 }; assert_eq!(ch.to_eol, 1); }
+    #[test]
+    fn test_bme_warning_mixed() { let w = BmeEolWarning { file: "b.txt".into(), mixed: true, message: "Mixed line endings".into() }; assert!(w.mixed); }
+    #[test]
+    fn test_bme_warning_none() { let w = BmeEolWarning { file: "c.txt".into(), mixed: false, message: String::new() }; assert!(!w.mixed); }
+    #[test]
+    fn test_bme_all_crlf() { let d = BmeEolDetection { dominant: 2, has_mixed: false, crlf_count: 200, lf_count: 0, cr_count: 0 }; assert_eq!(d.crlf_count, 200); }
 }
