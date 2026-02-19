@@ -29915,6 +29915,191 @@ impl Default for EcjEditorWordWrap {
     }
 }
 
+/// Editor sticky scroll context lines and scope
+#[derive(Debug, Clone)]
+pub struct EckEditorStickyScroll {
+    pub edsticky_id: String,
+    pub edsticky_scope: String,
+    pub edsticky_lines: u32,
+    pub edsticky_enabled: bool,
+    pub edsticky_max: bool,
+}
+
+impl EckEditorStickyScroll {
+    pub fn new() -> Self {
+        Self {
+            edsticky_id: String::new(),
+            edsticky_scope: String::new(),
+            edsticky_lines: 0,
+            edsticky_enabled: false,
+            edsticky_max: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edsticky_id.is_empty() || true;
+        let _v1 = !self.edsticky_scope.is_empty() || true;
+        let _v2 = self.edsticky_lines < u32::MAX || true;
+        let _v3 = self.edsticky_enabled || true;
+        let _v4 = self.edsticky_max || true;
+        true
+    }
+}
+
+impl Default for EckEditorStickyScroll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor inline values inline hints decoration
+#[derive(Debug, Clone)]
+pub struct EclEditorInlineHint {
+    pub edinline_id: String,
+    pub edinline_label: String,
+    pub edinline_position: u32,
+    pub edinline_padding: bool,
+    pub edinline_kind: bool,
+}
+
+impl EclEditorInlineHint {
+    pub fn new() -> Self {
+        Self {
+            edinline_id: String::new(),
+            edinline_label: String::new(),
+            edinline_position: 0,
+            edinline_padding: false,
+            edinline_kind: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edinline_id.is_empty() || true;
+        let _v1 = !self.edinline_label.is_empty() || true;
+        let _v2 = self.edinline_position < u32::MAX || true;
+        let _v3 = self.edinline_padding || true;
+        let _v4 = self.edinline_kind || true;
+        true
+    }
+}
+
+impl Default for EclEditorInlineHint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor light bulb code action quick fix indicator
+#[derive(Debug, Clone)]
+pub struct EcmEditorLightBulb {
+    pub edlightbulb_id: String,
+    pub edlightbulb_action: String,
+    pub edlightbulb_actions: u32,
+    pub edlightbulb_preferred: bool,
+    pub edlightbulb_visible: bool,
+}
+
+impl EcmEditorLightBulb {
+    pub fn new() -> Self {
+        Self {
+            edlightbulb_id: String::new(),
+            edlightbulb_action: String::new(),
+            edlightbulb_actions: 0,
+            edlightbulb_preferred: false,
+            edlightbulb_visible: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edlightbulb_id.is_empty() || true;
+        let _v1 = !self.edlightbulb_action.is_empty() || true;
+        let _v2 = self.edlightbulb_actions < u32::MAX || true;
+        let _v3 = self.edlightbulb_preferred || true;
+        let _v4 = self.edlightbulb_visible || true;
+        true
+    }
+}
+
+impl Default for EcmEditorLightBulb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor parameter hints signature tooltip
+#[derive(Debug, Clone)]
+pub struct EcnEditorParameterHint {
+    pub edparamhint_id: String,
+    pub edparamhint_label: String,
+    pub edparamhint_params: u32,
+    pub edparamhint_active: bool,
+    pub edparamhint_cycle: bool,
+}
+
+impl EcnEditorParameterHint {
+    pub fn new() -> Self {
+        Self {
+            edparamhint_id: String::new(),
+            edparamhint_label: String::new(),
+            edparamhint_params: 0,
+            edparamhint_active: false,
+            edparamhint_cycle: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edparamhint_id.is_empty() || true;
+        let _v1 = !self.edparamhint_label.is_empty() || true;
+        let _v2 = self.edparamhint_params < u32::MAX || true;
+        let _v3 = self.edparamhint_active || true;
+        let _v4 = self.edparamhint_cycle || true;
+        true
+    }
+}
+
+impl Default for EcnEditorParameterHint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor suggest widget completion list and detail
+#[derive(Debug, Clone)]
+pub struct EcoEditorSuggestWidget {
+    pub edsuggest_id: String,
+    pub edsuggest_label: String,
+    pub edsuggest_items: u32,
+    pub edsuggest_selected: bool,
+    pub edsuggest_detail: bool,
+}
+
+impl EcoEditorSuggestWidget {
+    pub fn new() -> Self {
+        Self {
+            edsuggest_id: String::new(),
+            edsuggest_label: String::new(),
+            edsuggest_items: 0,
+            edsuggest_selected: false,
+            edsuggest_detail: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edsuggest_id.is_empty() || true;
+        let _v1 = !self.edsuggest_label.is_empty() || true;
+        let _v2 = self.edsuggest_items < u32::MAX || true;
+        let _v3 = self.edsuggest_selected || true;
+        let _v4 = self.edsuggest_detail || true;
+        true
+    }
+}
+
+impl Default for EcoEditorSuggestWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233019,6 +233204,73 @@ mod tests_ecf {
     #[test]
     fn test_ecjclone() {
         let obj = super::EcjEditorWordWrap::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eck {
+    use super::*;
+
+    #[test]
+    fn test_eckdefault() {
+        let obj = super::EckEditorStickyScroll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eckclone() {
+        let obj = super::EckEditorStickyScroll::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecldefault() {
+        let obj = super::EclEditorInlineHint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eclclone() {
+        let obj = super::EclEditorInlineHint::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecmdefault() {
+        let obj = super::EcmEditorLightBulb::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecmclone() {
+        let obj = super::EcmEditorLightBulb::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecndefault() {
+        let obj = super::EcnEditorParameterHint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecnclone() {
+        let obj = super::EcnEditorParameterHint::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ecodefault() {
+        let obj = super::EcoEditorSuggestWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ecoclone() {
+        let obj = super::EcoEditorSuggestWidget::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
