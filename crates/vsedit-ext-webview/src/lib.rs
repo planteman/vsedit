@@ -87002,6 +87002,111 @@ pub struct BneToolDefinition { pub name: String, pub description: String, pub pa
 #[derive(Debug, Clone)]
 pub struct BneModelResponse { pub text: String, pub finish_reason: String, pub usage: BneTokenCount }
 
+/// Runtime wiring: bnf_ NotebookDocument
+#[derive(Debug, Clone)]
+pub struct NotebookDocument {
+    pub bnf_uri: String,
+    pub bnf_version: u64,
+    pub bnf_cell_count: usize,
+    pub bnf_metadata: Vec<(String, String)>,
+    pub bnf_is_dirty: bool,
+    pub bnf_notebook_type: String,
+    pub bnf_is_untitled: bool,
+    pub bnf_is_closed: bool,
+    pub bnf_save_count: u64,
+    pub bnf_language_id: String,
+}
+
+impl NotebookDocument {
+    pub fn bnf_summary(&self) -> String {
+        format!("NotebookDocument({})", self.bnf_uri)
+    }
+}
+
+/// Runtime wiring: bng_ NotebookCell
+#[derive(Debug, Clone)]
+pub struct NotebookCell {
+    pub bng_cell_kind: u8,
+    pub bng_source: String,
+    pub bng_language_id: String,
+    pub bng_outputs_count: usize,
+    pub bng_metadata_keys: Vec<String>,
+    pub bng_execution_order: Option<u64>,
+    pub bng_is_running: bool,
+    pub bng_mime_type: String,
+    pub bng_cell_index: usize,
+    pub bng_document_version: u64,
+}
+
+impl NotebookCell {
+    pub fn bng_summary(&self) -> String {
+        format!("NotebookCell({})", self.bng_cell_kind)
+    }
+}
+
+/// Runtime wiring: bnh_ NotebookKernel
+#[derive(Debug, Clone)]
+pub struct NotebookKernel {
+    pub bnh_kernel_id: String,
+    pub bnh_label: String,
+    pub bnh_description: String,
+    pub bnh_detail: String,
+    pub bnh_supported_languages: Vec<String>,
+    pub bnh_preload_uris: Vec<String>,
+    pub bnh_is_preferred: bool,
+    pub bnh_supports_interrupt: bool,
+    pub bnh_supports_execution_order: bool,
+    pub bnh_controller_id: String,
+}
+
+impl NotebookKernel {
+    pub fn bnh_summary(&self) -> String {
+        format!("NotebookKernel({})", self.bnh_kernel_id)
+    }
+}
+
+/// Runtime wiring: bni_ NotebookOutput
+#[derive(Debug, Clone)]
+pub struct NotebookOutput {
+    pub bni_output_id: String,
+    pub bni_mime_types: Vec<String>,
+    pub bni_data_length: usize,
+    pub bni_metadata_keys: Vec<String>,
+    pub bni_is_error: bool,
+    pub bni_error_name: String,
+    pub bni_error_message: String,
+    pub bni_error_stack: String,
+    pub bni_execution_count: Option<u64>,
+    pub bni_timestamp: u64,
+}
+
+impl NotebookOutput {
+    pub fn bni_summary(&self) -> String {
+        format!("NotebookOutput({})", self.bni_output_id)
+    }
+}
+
+/// Runtime wiring: bnj_ NotebookSerialization
+#[derive(Debug, Clone)]
+pub struct NotebookSerialization {
+    pub bnj_serializer_id: String,
+    pub bnj_priority: u8,
+    pub bnj_selector_notebook_type: String,
+    pub bnj_supports_save: bool,
+    pub bnj_supports_backup: bool,
+    pub bnj_supported_formats: Vec<String>,
+    pub bnj_encoding: String,
+    pub bnj_compress: bool,
+    pub bnj_max_buffer_size: usize,
+    pub bnj_version: u32,
+}
+
+impl NotebookSerialization {
+    pub fn bnj_summary(&self) -> String {
+        format!("NotebookSerialization({})", self.bnj_serializer_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -97162,4 +97267,908 @@ mod tests_bfo {
     fn test_bne_response_length() { let u = BneTokenCount { input_tokens: 100, output_tokens: 1000, total_tokens: 1100 }; let r = BneModelResponse { text: "long".into(), finish_reason: "length".into(), usage: u }; assert_eq!(r.finish_reason, "length"); }
     #[test]
     fn test_bne_large_request() { let r = BneModelRequest { messages: vec!["a".into(), "b".into(), "c".into()], model: "m".into(), max_tokens: 4096, temperature: 0.5 }; assert_eq!(r.messages.len(), 3); }
+    #[test]
+    fn test_bnf_uri() {
+        let obj = NotebookDocument {
+            bnf_uri: String::from("test"),
+            bnf_version: 0,
+            bnf_cell_count: 0,
+            bnf_metadata: Vec::new(),
+            bnf_is_dirty: false,
+            bnf_notebook_type: String::from("test"),
+            bnf_is_untitled: false,
+            bnf_is_closed: false,
+            bnf_save_count: 0,
+            bnf_language_id: String::from("test"),
+        };
+        let _ = obj.bnf_summary();
+        assert_eq!(obj.bnf_uri, "test");
+    }
+
+    #[test]
+    fn test_bnf_version() {
+        let obj = NotebookDocument {
+            bnf_uri: String::from("test"),
+            bnf_version: 0,
+            bnf_cell_count: 0,
+            bnf_metadata: Vec::new(),
+            bnf_is_dirty: false,
+            bnf_notebook_type: String::from("test"),
+            bnf_is_untitled: false,
+            bnf_is_closed: false,
+            bnf_save_count: 0,
+            bnf_language_id: String::from("test"),
+        };
+        let _ = obj.bnf_summary();
+        assert_eq!(obj.bnf_version, 0);
+    }
+
+    #[test]
+    fn test_bnf_cell_count() {
+        let obj = NotebookDocument {
+            bnf_uri: String::from("test"),
+            bnf_version: 0,
+            bnf_cell_count: 0,
+            bnf_metadata: Vec::new(),
+            bnf_is_dirty: false,
+            bnf_notebook_type: String::from("test"),
+            bnf_is_untitled: false,
+            bnf_is_closed: false,
+            bnf_save_count: 0,
+            bnf_language_id: String::from("test"),
+        };
+        let _ = obj.bnf_summary();
+        assert_eq!(obj.bnf_cell_count, 0);
+    }
+
+    #[test]
+    fn test_bnf_metadata() {
+        let obj = NotebookDocument {
+            bnf_uri: String::from("test"),
+            bnf_version: 0,
+            bnf_cell_count: 0,
+            bnf_metadata: Vec::new(),
+            bnf_is_dirty: false,
+            bnf_notebook_type: String::from("test"),
+            bnf_is_untitled: false,
+            bnf_is_closed: false,
+            bnf_save_count: 0,
+            bnf_language_id: String::from("test"),
+        };
+        let _ = obj.bnf_summary();
+        assert!(obj.bnf_metadata.is_empty());
+    }
+
+    #[test]
+    fn test_bnf_is_dirty() {
+        let obj = NotebookDocument {
+            bnf_uri: String::from("test"),
+            bnf_version: 0,
+            bnf_cell_count: 0,
+            bnf_metadata: Vec::new(),
+            bnf_is_dirty: false,
+            bnf_notebook_type: String::from("test"),
+            bnf_is_untitled: false,
+            bnf_is_closed: false,
+            bnf_save_count: 0,
+            bnf_language_id: String::from("test"),
+        };
+        let _ = obj.bnf_summary();
+        assert!(!obj.bnf_is_dirty);
+    }
+
+    #[test]
+    fn test_bnf_notebook_type() {
+        let obj = NotebookDocument {
+            bnf_uri: String::from("test"),
+            bnf_version: 0,
+            bnf_cell_count: 0,
+            bnf_metadata: Vec::new(),
+            bnf_is_dirty: false,
+            bnf_notebook_type: String::from("test"),
+            bnf_is_untitled: false,
+            bnf_is_closed: false,
+            bnf_save_count: 0,
+            bnf_language_id: String::from("test"),
+        };
+        let _ = obj.bnf_summary();
+        assert_eq!(obj.bnf_notebook_type, "test");
+    }
+
+    #[test]
+    fn test_bnf_is_untitled() {
+        let obj = NotebookDocument {
+            bnf_uri: String::from("test"),
+            bnf_version: 0,
+            bnf_cell_count: 0,
+            bnf_metadata: Vec::new(),
+            bnf_is_dirty: false,
+            bnf_notebook_type: String::from("test"),
+            bnf_is_untitled: false,
+            bnf_is_closed: false,
+            bnf_save_count: 0,
+            bnf_language_id: String::from("test"),
+        };
+        let _ = obj.bnf_summary();
+        assert!(!obj.bnf_is_untitled);
+    }
+
+    #[test]
+    fn test_bnf_is_closed() {
+        let obj = NotebookDocument {
+            bnf_uri: String::from("test"),
+            bnf_version: 0,
+            bnf_cell_count: 0,
+            bnf_metadata: Vec::new(),
+            bnf_is_dirty: false,
+            bnf_notebook_type: String::from("test"),
+            bnf_is_untitled: false,
+            bnf_is_closed: false,
+            bnf_save_count: 0,
+            bnf_language_id: String::from("test"),
+        };
+        let _ = obj.bnf_summary();
+        assert!(!obj.bnf_is_closed);
+    }
+
+    #[test]
+    fn test_bnf_save_count() {
+        let obj = NotebookDocument {
+            bnf_uri: String::from("test"),
+            bnf_version: 0,
+            bnf_cell_count: 0,
+            bnf_metadata: Vec::new(),
+            bnf_is_dirty: false,
+            bnf_notebook_type: String::from("test"),
+            bnf_is_untitled: false,
+            bnf_is_closed: false,
+            bnf_save_count: 0,
+            bnf_language_id: String::from("test"),
+        };
+        let _ = obj.bnf_summary();
+        assert_eq!(obj.bnf_save_count, 0);
+    }
+
+    #[test]
+    fn test_bnf_language_id() {
+        let obj = NotebookDocument {
+            bnf_uri: String::from("test"),
+            bnf_version: 0,
+            bnf_cell_count: 0,
+            bnf_metadata: Vec::new(),
+            bnf_is_dirty: false,
+            bnf_notebook_type: String::from("test"),
+            bnf_is_untitled: false,
+            bnf_is_closed: false,
+            bnf_save_count: 0,
+            bnf_language_id: String::from("test"),
+        };
+        let _ = obj.bnf_summary();
+        assert_eq!(obj.bnf_language_id, "test");
+    }
+
+
+    #[test]
+    fn test_bng_cell_kind() {
+        let obj = NotebookCell {
+            bng_cell_kind: 0,
+            bng_source: String::from("test"),
+            bng_language_id: String::from("test"),
+            bng_outputs_count: 0,
+            bng_metadata_keys: Vec::new(),
+            bng_execution_order: None,
+            bng_is_running: false,
+            bng_mime_type: String::from("test"),
+            bng_cell_index: 0,
+            bng_document_version: 0,
+        };
+        let _ = obj.bng_summary();
+        assert_eq!(obj.bng_cell_kind, 0);
+    }
+
+    #[test]
+    fn test_bng_source() {
+        let obj = NotebookCell {
+            bng_cell_kind: 0,
+            bng_source: String::from("test"),
+            bng_language_id: String::from("test"),
+            bng_outputs_count: 0,
+            bng_metadata_keys: Vec::new(),
+            bng_execution_order: None,
+            bng_is_running: false,
+            bng_mime_type: String::from("test"),
+            bng_cell_index: 0,
+            bng_document_version: 0,
+        };
+        let _ = obj.bng_summary();
+        assert_eq!(obj.bng_source, "test");
+    }
+
+    #[test]
+    fn test_bng_language_id() {
+        let obj = NotebookCell {
+            bng_cell_kind: 0,
+            bng_source: String::from("test"),
+            bng_language_id: String::from("test"),
+            bng_outputs_count: 0,
+            bng_metadata_keys: Vec::new(),
+            bng_execution_order: None,
+            bng_is_running: false,
+            bng_mime_type: String::from("test"),
+            bng_cell_index: 0,
+            bng_document_version: 0,
+        };
+        let _ = obj.bng_summary();
+        assert_eq!(obj.bng_language_id, "test");
+    }
+
+    #[test]
+    fn test_bng_outputs_count() {
+        let obj = NotebookCell {
+            bng_cell_kind: 0,
+            bng_source: String::from("test"),
+            bng_language_id: String::from("test"),
+            bng_outputs_count: 0,
+            bng_metadata_keys: Vec::new(),
+            bng_execution_order: None,
+            bng_is_running: false,
+            bng_mime_type: String::from("test"),
+            bng_cell_index: 0,
+            bng_document_version: 0,
+        };
+        let _ = obj.bng_summary();
+        assert_eq!(obj.bng_outputs_count, 0);
+    }
+
+    #[test]
+    fn test_bng_metadata_keys() {
+        let obj = NotebookCell {
+            bng_cell_kind: 0,
+            bng_source: String::from("test"),
+            bng_language_id: String::from("test"),
+            bng_outputs_count: 0,
+            bng_metadata_keys: Vec::new(),
+            bng_execution_order: None,
+            bng_is_running: false,
+            bng_mime_type: String::from("test"),
+            bng_cell_index: 0,
+            bng_document_version: 0,
+        };
+        let _ = obj.bng_summary();
+        assert!(obj.bng_metadata_keys.is_empty());
+    }
+
+    #[test]
+    fn test_bng_execution_order() {
+        let obj = NotebookCell {
+            bng_cell_kind: 0,
+            bng_source: String::from("test"),
+            bng_language_id: String::from("test"),
+            bng_outputs_count: 0,
+            bng_metadata_keys: Vec::new(),
+            bng_execution_order: None,
+            bng_is_running: false,
+            bng_mime_type: String::from("test"),
+            bng_cell_index: 0,
+            bng_document_version: 0,
+        };
+        let _ = obj.bng_summary();
+        assert!(obj.bng_execution_order.is_none());
+    }
+
+    #[test]
+    fn test_bng_is_running() {
+        let obj = NotebookCell {
+            bng_cell_kind: 0,
+            bng_source: String::from("test"),
+            bng_language_id: String::from("test"),
+            bng_outputs_count: 0,
+            bng_metadata_keys: Vec::new(),
+            bng_execution_order: None,
+            bng_is_running: false,
+            bng_mime_type: String::from("test"),
+            bng_cell_index: 0,
+            bng_document_version: 0,
+        };
+        let _ = obj.bng_summary();
+        assert!(!obj.bng_is_running);
+    }
+
+    #[test]
+    fn test_bng_mime_type() {
+        let obj = NotebookCell {
+            bng_cell_kind: 0,
+            bng_source: String::from("test"),
+            bng_language_id: String::from("test"),
+            bng_outputs_count: 0,
+            bng_metadata_keys: Vec::new(),
+            bng_execution_order: None,
+            bng_is_running: false,
+            bng_mime_type: String::from("test"),
+            bng_cell_index: 0,
+            bng_document_version: 0,
+        };
+        let _ = obj.bng_summary();
+        assert_eq!(obj.bng_mime_type, "test");
+    }
+
+    #[test]
+    fn test_bng_cell_index() {
+        let obj = NotebookCell {
+            bng_cell_kind: 0,
+            bng_source: String::from("test"),
+            bng_language_id: String::from("test"),
+            bng_outputs_count: 0,
+            bng_metadata_keys: Vec::new(),
+            bng_execution_order: None,
+            bng_is_running: false,
+            bng_mime_type: String::from("test"),
+            bng_cell_index: 0,
+            bng_document_version: 0,
+        };
+        let _ = obj.bng_summary();
+        assert_eq!(obj.bng_cell_index, 0);
+    }
+
+    #[test]
+    fn test_bng_document_version() {
+        let obj = NotebookCell {
+            bng_cell_kind: 0,
+            bng_source: String::from("test"),
+            bng_language_id: String::from("test"),
+            bng_outputs_count: 0,
+            bng_metadata_keys: Vec::new(),
+            bng_execution_order: None,
+            bng_is_running: false,
+            bng_mime_type: String::from("test"),
+            bng_cell_index: 0,
+            bng_document_version: 0,
+        };
+        let _ = obj.bng_summary();
+        assert_eq!(obj.bng_document_version, 0);
+    }
+
+
+    #[test]
+    fn test_bnh_kernel_id() {
+        let obj = NotebookKernel {
+            bnh_kernel_id: String::from("test"),
+            bnh_label: String::from("test"),
+            bnh_description: String::from("test"),
+            bnh_detail: String::from("test"),
+            bnh_supported_languages: Vec::new(),
+            bnh_preload_uris: Vec::new(),
+            bnh_is_preferred: false,
+            bnh_supports_interrupt: false,
+            bnh_supports_execution_order: false,
+            bnh_controller_id: String::from("test"),
+        };
+        let _ = obj.bnh_summary();
+        assert_eq!(obj.bnh_kernel_id, "test");
+    }
+
+    #[test]
+    fn test_bnh_label() {
+        let obj = NotebookKernel {
+            bnh_kernel_id: String::from("test"),
+            bnh_label: String::from("test"),
+            bnh_description: String::from("test"),
+            bnh_detail: String::from("test"),
+            bnh_supported_languages: Vec::new(),
+            bnh_preload_uris: Vec::new(),
+            bnh_is_preferred: false,
+            bnh_supports_interrupt: false,
+            bnh_supports_execution_order: false,
+            bnh_controller_id: String::from("test"),
+        };
+        let _ = obj.bnh_summary();
+        assert_eq!(obj.bnh_label, "test");
+    }
+
+    #[test]
+    fn test_bnh_description() {
+        let obj = NotebookKernel {
+            bnh_kernel_id: String::from("test"),
+            bnh_label: String::from("test"),
+            bnh_description: String::from("test"),
+            bnh_detail: String::from("test"),
+            bnh_supported_languages: Vec::new(),
+            bnh_preload_uris: Vec::new(),
+            bnh_is_preferred: false,
+            bnh_supports_interrupt: false,
+            bnh_supports_execution_order: false,
+            bnh_controller_id: String::from("test"),
+        };
+        let _ = obj.bnh_summary();
+        assert_eq!(obj.bnh_description, "test");
+    }
+
+    #[test]
+    fn test_bnh_detail() {
+        let obj = NotebookKernel {
+            bnh_kernel_id: String::from("test"),
+            bnh_label: String::from("test"),
+            bnh_description: String::from("test"),
+            bnh_detail: String::from("test"),
+            bnh_supported_languages: Vec::new(),
+            bnh_preload_uris: Vec::new(),
+            bnh_is_preferred: false,
+            bnh_supports_interrupt: false,
+            bnh_supports_execution_order: false,
+            bnh_controller_id: String::from("test"),
+        };
+        let _ = obj.bnh_summary();
+        assert_eq!(obj.bnh_detail, "test");
+    }
+
+    #[test]
+    fn test_bnh_supported_languages() {
+        let obj = NotebookKernel {
+            bnh_kernel_id: String::from("test"),
+            bnh_label: String::from("test"),
+            bnh_description: String::from("test"),
+            bnh_detail: String::from("test"),
+            bnh_supported_languages: Vec::new(),
+            bnh_preload_uris: Vec::new(),
+            bnh_is_preferred: false,
+            bnh_supports_interrupt: false,
+            bnh_supports_execution_order: false,
+            bnh_controller_id: String::from("test"),
+        };
+        let _ = obj.bnh_summary();
+        assert!(obj.bnh_supported_languages.is_empty());
+    }
+
+    #[test]
+    fn test_bnh_preload_uris() {
+        let obj = NotebookKernel {
+            bnh_kernel_id: String::from("test"),
+            bnh_label: String::from("test"),
+            bnh_description: String::from("test"),
+            bnh_detail: String::from("test"),
+            bnh_supported_languages: Vec::new(),
+            bnh_preload_uris: Vec::new(),
+            bnh_is_preferred: false,
+            bnh_supports_interrupt: false,
+            bnh_supports_execution_order: false,
+            bnh_controller_id: String::from("test"),
+        };
+        let _ = obj.bnh_summary();
+        assert!(obj.bnh_preload_uris.is_empty());
+    }
+
+    #[test]
+    fn test_bnh_is_preferred() {
+        let obj = NotebookKernel {
+            bnh_kernel_id: String::from("test"),
+            bnh_label: String::from("test"),
+            bnh_description: String::from("test"),
+            bnh_detail: String::from("test"),
+            bnh_supported_languages: Vec::new(),
+            bnh_preload_uris: Vec::new(),
+            bnh_is_preferred: false,
+            bnh_supports_interrupt: false,
+            bnh_supports_execution_order: false,
+            bnh_controller_id: String::from("test"),
+        };
+        let _ = obj.bnh_summary();
+        assert!(!obj.bnh_is_preferred);
+    }
+
+    #[test]
+    fn test_bnh_supports_interrupt() {
+        let obj = NotebookKernel {
+            bnh_kernel_id: String::from("test"),
+            bnh_label: String::from("test"),
+            bnh_description: String::from("test"),
+            bnh_detail: String::from("test"),
+            bnh_supported_languages: Vec::new(),
+            bnh_preload_uris: Vec::new(),
+            bnh_is_preferred: false,
+            bnh_supports_interrupt: false,
+            bnh_supports_execution_order: false,
+            bnh_controller_id: String::from("test"),
+        };
+        let _ = obj.bnh_summary();
+        assert!(!obj.bnh_supports_interrupt);
+    }
+
+    #[test]
+    fn test_bnh_supports_execution_order() {
+        let obj = NotebookKernel {
+            bnh_kernel_id: String::from("test"),
+            bnh_label: String::from("test"),
+            bnh_description: String::from("test"),
+            bnh_detail: String::from("test"),
+            bnh_supported_languages: Vec::new(),
+            bnh_preload_uris: Vec::new(),
+            bnh_is_preferred: false,
+            bnh_supports_interrupt: false,
+            bnh_supports_execution_order: false,
+            bnh_controller_id: String::from("test"),
+        };
+        let _ = obj.bnh_summary();
+        assert!(!obj.bnh_supports_execution_order);
+    }
+
+    #[test]
+    fn test_bnh_controller_id() {
+        let obj = NotebookKernel {
+            bnh_kernel_id: String::from("test"),
+            bnh_label: String::from("test"),
+            bnh_description: String::from("test"),
+            bnh_detail: String::from("test"),
+            bnh_supported_languages: Vec::new(),
+            bnh_preload_uris: Vec::new(),
+            bnh_is_preferred: false,
+            bnh_supports_interrupt: false,
+            bnh_supports_execution_order: false,
+            bnh_controller_id: String::from("test"),
+        };
+        let _ = obj.bnh_summary();
+        assert_eq!(obj.bnh_controller_id, "test");
+    }
+
+
+    #[test]
+    fn test_bni_output_id() {
+        let obj = NotebookOutput {
+            bni_output_id: String::from("test"),
+            bni_mime_types: Vec::new(),
+            bni_data_length: 0,
+            bni_metadata_keys: Vec::new(),
+            bni_is_error: false,
+            bni_error_name: String::from("test"),
+            bni_error_message: String::from("test"),
+            bni_error_stack: String::from("test"),
+            bni_execution_count: None,
+            bni_timestamp: 0,
+        };
+        let _ = obj.bni_summary();
+        assert_eq!(obj.bni_output_id, "test");
+    }
+
+    #[test]
+    fn test_bni_mime_types() {
+        let obj = NotebookOutput {
+            bni_output_id: String::from("test"),
+            bni_mime_types: Vec::new(),
+            bni_data_length: 0,
+            bni_metadata_keys: Vec::new(),
+            bni_is_error: false,
+            bni_error_name: String::from("test"),
+            bni_error_message: String::from("test"),
+            bni_error_stack: String::from("test"),
+            bni_execution_count: None,
+            bni_timestamp: 0,
+        };
+        let _ = obj.bni_summary();
+        assert!(obj.bni_mime_types.is_empty());
+    }
+
+    #[test]
+    fn test_bni_data_length() {
+        let obj = NotebookOutput {
+            bni_output_id: String::from("test"),
+            bni_mime_types: Vec::new(),
+            bni_data_length: 0,
+            bni_metadata_keys: Vec::new(),
+            bni_is_error: false,
+            bni_error_name: String::from("test"),
+            bni_error_message: String::from("test"),
+            bni_error_stack: String::from("test"),
+            bni_execution_count: None,
+            bni_timestamp: 0,
+        };
+        let _ = obj.bni_summary();
+        assert_eq!(obj.bni_data_length, 0);
+    }
+
+    #[test]
+    fn test_bni_metadata_keys() {
+        let obj = NotebookOutput {
+            bni_output_id: String::from("test"),
+            bni_mime_types: Vec::new(),
+            bni_data_length: 0,
+            bni_metadata_keys: Vec::new(),
+            bni_is_error: false,
+            bni_error_name: String::from("test"),
+            bni_error_message: String::from("test"),
+            bni_error_stack: String::from("test"),
+            bni_execution_count: None,
+            bni_timestamp: 0,
+        };
+        let _ = obj.bni_summary();
+        assert!(obj.bni_metadata_keys.is_empty());
+    }
+
+    #[test]
+    fn test_bni_is_error() {
+        let obj = NotebookOutput {
+            bni_output_id: String::from("test"),
+            bni_mime_types: Vec::new(),
+            bni_data_length: 0,
+            bni_metadata_keys: Vec::new(),
+            bni_is_error: false,
+            bni_error_name: String::from("test"),
+            bni_error_message: String::from("test"),
+            bni_error_stack: String::from("test"),
+            bni_execution_count: None,
+            bni_timestamp: 0,
+        };
+        let _ = obj.bni_summary();
+        assert!(!obj.bni_is_error);
+    }
+
+    #[test]
+    fn test_bni_error_name() {
+        let obj = NotebookOutput {
+            bni_output_id: String::from("test"),
+            bni_mime_types: Vec::new(),
+            bni_data_length: 0,
+            bni_metadata_keys: Vec::new(),
+            bni_is_error: false,
+            bni_error_name: String::from("test"),
+            bni_error_message: String::from("test"),
+            bni_error_stack: String::from("test"),
+            bni_execution_count: None,
+            bni_timestamp: 0,
+        };
+        let _ = obj.bni_summary();
+        assert_eq!(obj.bni_error_name, "test");
+    }
+
+    #[test]
+    fn test_bni_error_message() {
+        let obj = NotebookOutput {
+            bni_output_id: String::from("test"),
+            bni_mime_types: Vec::new(),
+            bni_data_length: 0,
+            bni_metadata_keys: Vec::new(),
+            bni_is_error: false,
+            bni_error_name: String::from("test"),
+            bni_error_message: String::from("test"),
+            bni_error_stack: String::from("test"),
+            bni_execution_count: None,
+            bni_timestamp: 0,
+        };
+        let _ = obj.bni_summary();
+        assert_eq!(obj.bni_error_message, "test");
+    }
+
+    #[test]
+    fn test_bni_error_stack() {
+        let obj = NotebookOutput {
+            bni_output_id: String::from("test"),
+            bni_mime_types: Vec::new(),
+            bni_data_length: 0,
+            bni_metadata_keys: Vec::new(),
+            bni_is_error: false,
+            bni_error_name: String::from("test"),
+            bni_error_message: String::from("test"),
+            bni_error_stack: String::from("test"),
+            bni_execution_count: None,
+            bni_timestamp: 0,
+        };
+        let _ = obj.bni_summary();
+        assert_eq!(obj.bni_error_stack, "test");
+    }
+
+    #[test]
+    fn test_bni_execution_count() {
+        let obj = NotebookOutput {
+            bni_output_id: String::from("test"),
+            bni_mime_types: Vec::new(),
+            bni_data_length: 0,
+            bni_metadata_keys: Vec::new(),
+            bni_is_error: false,
+            bni_error_name: String::from("test"),
+            bni_error_message: String::from("test"),
+            bni_error_stack: String::from("test"),
+            bni_execution_count: None,
+            bni_timestamp: 0,
+        };
+        let _ = obj.bni_summary();
+        assert!(obj.bni_execution_count.is_none());
+    }
+
+    #[test]
+    fn test_bni_timestamp() {
+        let obj = NotebookOutput {
+            bni_output_id: String::from("test"),
+            bni_mime_types: Vec::new(),
+            bni_data_length: 0,
+            bni_metadata_keys: Vec::new(),
+            bni_is_error: false,
+            bni_error_name: String::from("test"),
+            bni_error_message: String::from("test"),
+            bni_error_stack: String::from("test"),
+            bni_execution_count: None,
+            bni_timestamp: 0,
+        };
+        let _ = obj.bni_summary();
+        assert_eq!(obj.bni_timestamp, 0);
+    }
+
+
+    #[test]
+    fn test_bnj_serializer_id() {
+        let obj = NotebookSerialization {
+            bnj_serializer_id: String::from("test"),
+            bnj_priority: 0,
+            bnj_selector_notebook_type: String::from("test"),
+            bnj_supports_save: false,
+            bnj_supports_backup: false,
+            bnj_supported_formats: Vec::new(),
+            bnj_encoding: String::from("test"),
+            bnj_compress: false,
+            bnj_max_buffer_size: 0,
+            bnj_version: 0,
+        };
+        let _ = obj.bnj_summary();
+        assert_eq!(obj.bnj_serializer_id, "test");
+    }
+
+    #[test]
+    fn test_bnj_priority() {
+        let obj = NotebookSerialization {
+            bnj_serializer_id: String::from("test"),
+            bnj_priority: 0,
+            bnj_selector_notebook_type: String::from("test"),
+            bnj_supports_save: false,
+            bnj_supports_backup: false,
+            bnj_supported_formats: Vec::new(),
+            bnj_encoding: String::from("test"),
+            bnj_compress: false,
+            bnj_max_buffer_size: 0,
+            bnj_version: 0,
+        };
+        let _ = obj.bnj_summary();
+        assert_eq!(obj.bnj_priority, 0);
+    }
+
+    #[test]
+    fn test_bnj_selector_notebook_type() {
+        let obj = NotebookSerialization {
+            bnj_serializer_id: String::from("test"),
+            bnj_priority: 0,
+            bnj_selector_notebook_type: String::from("test"),
+            bnj_supports_save: false,
+            bnj_supports_backup: false,
+            bnj_supported_formats: Vec::new(),
+            bnj_encoding: String::from("test"),
+            bnj_compress: false,
+            bnj_max_buffer_size: 0,
+            bnj_version: 0,
+        };
+        let _ = obj.bnj_summary();
+        assert_eq!(obj.bnj_selector_notebook_type, "test");
+    }
+
+    #[test]
+    fn test_bnj_supports_save() {
+        let obj = NotebookSerialization {
+            bnj_serializer_id: String::from("test"),
+            bnj_priority: 0,
+            bnj_selector_notebook_type: String::from("test"),
+            bnj_supports_save: false,
+            bnj_supports_backup: false,
+            bnj_supported_formats: Vec::new(),
+            bnj_encoding: String::from("test"),
+            bnj_compress: false,
+            bnj_max_buffer_size: 0,
+            bnj_version: 0,
+        };
+        let _ = obj.bnj_summary();
+        assert!(!obj.bnj_supports_save);
+    }
+
+    #[test]
+    fn test_bnj_supports_backup() {
+        let obj = NotebookSerialization {
+            bnj_serializer_id: String::from("test"),
+            bnj_priority: 0,
+            bnj_selector_notebook_type: String::from("test"),
+            bnj_supports_save: false,
+            bnj_supports_backup: false,
+            bnj_supported_formats: Vec::new(),
+            bnj_encoding: String::from("test"),
+            bnj_compress: false,
+            bnj_max_buffer_size: 0,
+            bnj_version: 0,
+        };
+        let _ = obj.bnj_summary();
+        assert!(!obj.bnj_supports_backup);
+    }
+
+    #[test]
+    fn test_bnj_supported_formats() {
+        let obj = NotebookSerialization {
+            bnj_serializer_id: String::from("test"),
+            bnj_priority: 0,
+            bnj_selector_notebook_type: String::from("test"),
+            bnj_supports_save: false,
+            bnj_supports_backup: false,
+            bnj_supported_formats: Vec::new(),
+            bnj_encoding: String::from("test"),
+            bnj_compress: false,
+            bnj_max_buffer_size: 0,
+            bnj_version: 0,
+        };
+        let _ = obj.bnj_summary();
+        assert!(obj.bnj_supported_formats.is_empty());
+    }
+
+    #[test]
+    fn test_bnj_encoding() {
+        let obj = NotebookSerialization {
+            bnj_serializer_id: String::from("test"),
+            bnj_priority: 0,
+            bnj_selector_notebook_type: String::from("test"),
+            bnj_supports_save: false,
+            bnj_supports_backup: false,
+            bnj_supported_formats: Vec::new(),
+            bnj_encoding: String::from("test"),
+            bnj_compress: false,
+            bnj_max_buffer_size: 0,
+            bnj_version: 0,
+        };
+        let _ = obj.bnj_summary();
+        assert_eq!(obj.bnj_encoding, "test");
+    }
+
+    #[test]
+    fn test_bnj_compress() {
+        let obj = NotebookSerialization {
+            bnj_serializer_id: String::from("test"),
+            bnj_priority: 0,
+            bnj_selector_notebook_type: String::from("test"),
+            bnj_supports_save: false,
+            bnj_supports_backup: false,
+            bnj_supported_formats: Vec::new(),
+            bnj_encoding: String::from("test"),
+            bnj_compress: false,
+            bnj_max_buffer_size: 0,
+            bnj_version: 0,
+        };
+        let _ = obj.bnj_summary();
+        assert!(!obj.bnj_compress);
+    }
+
+    #[test]
+    fn test_bnj_max_buffer_size() {
+        let obj = NotebookSerialization {
+            bnj_serializer_id: String::from("test"),
+            bnj_priority: 0,
+            bnj_selector_notebook_type: String::from("test"),
+            bnj_supports_save: false,
+            bnj_supports_backup: false,
+            bnj_supported_formats: Vec::new(),
+            bnj_encoding: String::from("test"),
+            bnj_compress: false,
+            bnj_max_buffer_size: 0,
+            bnj_version: 0,
+        };
+        let _ = obj.bnj_summary();
+        assert_eq!(obj.bnj_max_buffer_size, 0);
+    }
+
+    #[test]
+    fn test_bnj_version() {
+        let obj = NotebookSerialization {
+            bnj_serializer_id: String::from("test"),
+            bnj_priority: 0,
+            bnj_selector_notebook_type: String::from("test"),
+            bnj_supports_save: false,
+            bnj_supports_backup: false,
+            bnj_supported_formats: Vec::new(),
+            bnj_encoding: String::from("test"),
+            bnj_compress: false,
+            bnj_max_buffer_size: 0,
+            bnj_version: 0,
+        };
+        let _ = obj.bnj_summary();
+        assert_eq!(obj.bnj_version, 0);
+    }
+
 }
