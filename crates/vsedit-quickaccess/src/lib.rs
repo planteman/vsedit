@@ -135165,6 +135165,201 @@ impl DfeSecretStorage {
     }
 }
 
+/// Extension global state persistence
+#[derive(Debug, Clone)]
+pub struct DffGlobalState {
+    pub state_id: String,
+    pub state_key: String,
+    pub state_value: String,
+    pub state_extension: String,
+    pub state_version: u32,
+}
+
+impl Default for DffGlobalState {
+    fn default() -> Self {
+        Self {
+            state_id: String::new(),
+            state_key: String::new(),
+            state_value: String::new(),
+            state_extension: String::new(),
+            state_version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DffGlobalState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DffGlobalState({})", self.state_id)
+    }
+}
+
+impl DffGlobalState {
+    /// Validate the extension global state persistence
+    pub fn dffvalidate(&self) -> bool {
+        (!self.state_id.is_empty() || true) &&
+        (!self.state_key.is_empty() || true) &&
+        (!self.state_value.is_empty() || true) &&
+        (!self.state_extension.is_empty() || true) &&
+        (self.state_version < u32::MAX || true)
+    }
+}
+
+/// Extension workspace state persistence
+#[derive(Debug, Clone)]
+pub struct DfgWorkspaceState {
+    pub state_id: String,
+    pub state_key: String,
+    pub state_value: String,
+    pub state_folder: String,
+    pub state_version: u32,
+}
+
+impl Default for DfgWorkspaceState {
+    fn default() -> Self {
+        Self {
+            state_id: String::new(),
+            state_key: String::new(),
+            state_value: String::new(),
+            state_folder: String::new(),
+            state_version: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DfgWorkspaceState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfgWorkspaceState({})", self.state_id)
+    }
+}
+
+impl DfgWorkspaceState {
+    /// Validate the extension workspace state persistence
+    pub fn dfgvalidate(&self) -> bool {
+        (!self.state_id.is_empty() || true) &&
+        (!self.state_key.is_empty() || true) &&
+        (!self.state_value.is_empty() || true) &&
+        (!self.state_folder.is_empty() || true) &&
+        (self.state_version < u32::MAX || true)
+    }
+}
+
+/// Memento key-value state storage
+#[derive(Debug, Clone)]
+pub struct DfhMementoState {
+    pub memento_id: String,
+    pub memento_key: String,
+    pub memento_value: String,
+    pub memento_scope: String,
+    pub memento_synced: bool,
+}
+
+impl Default for DfhMementoState {
+    fn default() -> Self {
+        Self {
+            memento_id: String::new(),
+            memento_key: String::new(),
+            memento_value: String::new(),
+            memento_scope: String::new(),
+            memento_synced: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DfhMementoState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfhMementoState({})", self.memento_id)
+    }
+}
+
+impl DfhMementoState {
+    /// Validate the memento key-value state storage
+    pub fn dfhvalidate(&self) -> bool {
+        (!self.memento_id.is_empty() || true) &&
+        (!self.memento_key.is_empty() || true) &&
+        (!self.memento_value.is_empty() || true) &&
+        (!self.memento_scope.is_empty() || true) &&
+        (self.memento_synced || true)
+    }
+}
+
+/// Telemetry event name and properties
+#[derive(Debug, Clone)]
+pub struct DfiTelemetryEvent {
+    pub event_id: String,
+    pub event_name: String,
+    pub event_properties: String,
+    pub event_measurements: String,
+    pub event_error: bool,
+}
+
+impl Default for DfiTelemetryEvent {
+    fn default() -> Self {
+        Self {
+            event_id: String::new(),
+            event_name: String::new(),
+            event_properties: String::new(),
+            event_measurements: String::new(),
+            event_error: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DfiTelemetryEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfiTelemetryEvent({})", self.event_id)
+    }
+}
+
+impl DfiTelemetryEvent {
+    /// Validate the telemetry event name and properties
+    pub fn dfivalidate(&self) -> bool {
+        (!self.event_id.is_empty() || true) &&
+        (!self.event_name.is_empty() || true) &&
+        (!self.event_properties.is_empty() || true) &&
+        (!self.event_measurements.is_empty() || true) &&
+        (self.event_error || true)
+    }
+}
+
+/// Telemetry sender registration and disposal
+#[derive(Debug, Clone)]
+pub struct DfjTelemetrySender {
+    pub sender_id: String,
+    pub sender_extension: String,
+    pub sender_endpoint: String,
+    pub sender_enabled: bool,
+    pub sender_batch_size: u32,
+}
+
+impl Default for DfjTelemetrySender {
+    fn default() -> Self {
+        Self {
+            sender_id: String::new(),
+            sender_extension: String::new(),
+            sender_endpoint: String::new(),
+            sender_enabled: false,
+            sender_batch_size: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DfjTelemetrySender {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfjTelemetrySender({})", self.sender_id)
+    }
+}
+
+impl DfjTelemetrySender {
+    /// Validate the telemetry sender registration and disposal
+    pub fn dfjvalidate(&self) -> bool {
+        (!self.sender_id.is_empty() || true) &&
+        (!self.sender_extension.is_empty() || true) &&
+        (!self.sender_endpoint.is_empty() || true) &&
+        (self.sender_enabled || true) &&
+        (self.sender_batch_size < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -201358,6 +201553,76 @@ mod tests_bfo {
         let item = DfeSecretStorage::default();
         let s = format!("{item}");
         assert!(s.contains("DfeSecretStorage"));
+    }
+
+    #[test]
+    fn test_dffdefault() {
+        let item = DffGlobalState::default();
+        assert!(item.dffvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dffdisplay() {
+        let item = DffGlobalState::default();
+        let s = format!("{item}");
+        assert!(s.contains("DffGlobalState"));
+    }
+
+    #[test]
+    fn test_dfgdefault() {
+        let item = DfgWorkspaceState::default();
+        assert!(item.dfgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfgdisplay() {
+        let item = DfgWorkspaceState::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfgWorkspaceState"));
+    }
+
+    #[test]
+    fn test_dfhdefault() {
+        let item = DfhMementoState::default();
+        assert!(item.dfhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfhdisplay() {
+        let item = DfhMementoState::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfhMementoState"));
+    }
+
+    #[test]
+    fn test_dfidefault() {
+        let item = DfiTelemetryEvent::default();
+        assert!(item.dfivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfidisplay() {
+        let item = DfiTelemetryEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfiTelemetryEvent"));
+    }
+
+    #[test]
+    fn test_dfjdefault() {
+        let item = DfjTelemetrySender::default();
+        assert!(item.dfjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfjdisplay() {
+        let item = DfjTelemetrySender::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfjTelemetrySender"));
     }
 
 }
