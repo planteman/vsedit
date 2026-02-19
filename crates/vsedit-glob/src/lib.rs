@@ -88165,6 +88165,111 @@ impl QuickFix {
     }
 }
 
+/// Runtime wiring: bpf_ FormatProvider
+#[derive(Debug, Clone)]
+pub struct FormatProvider {
+    pub bpf_provider_id: String,
+    pub bpf_language_id: String,
+    pub bpf_display_name: String,
+    pub bpf_supports_range: bool,
+    pub bpf_supports_on_type: bool,
+    pub bpf_trigger_characters: Vec<String>,
+    pub bpf_priority: u8,
+    pub bpf_is_default: bool,
+    pub bpf_tab_size: u32,
+    pub bpf_insert_spaces: bool,
+}
+
+impl FormatProvider {
+    pub fn bpf_summary(&self) -> String {
+        format!("FormatProvider({})", self.bpf_provider_id)
+    }
+}
+
+/// Runtime wiring: bpg_ OnTypeFormat
+#[derive(Debug, Clone)]
+pub struct OnTypeFormat {
+    pub bpg_trigger_char: String,
+    pub bpg_position_line: u32,
+    pub bpg_position_col: u32,
+    pub bpg_edits_count: u32,
+    pub bpg_uri: String,
+    pub bpg_format_on_paste: bool,
+    pub bpg_format_on_type: bool,
+    pub bpg_auto_indent: String,
+    pub bpg_trim_trailing: bool,
+    pub bpg_insert_final_newline: bool,
+}
+
+impl OnTypeFormat {
+    pub fn bpg_summary(&self) -> String {
+        format!("OnTypeFormat({})", self.bpg_trigger_char)
+    }
+}
+
+/// Runtime wiring: bph_ RangeFormat
+#[derive(Debug, Clone)]
+pub struct RangeFormat {
+    pub bph_range_start_line: u32,
+    pub bph_range_start_col: u32,
+    pub bph_range_end_line: u32,
+    pub bph_range_end_col: u32,
+    pub bph_edits_count: u32,
+    pub bph_uri: String,
+    pub bph_provider_id: String,
+    pub bph_tab_size: u32,
+    pub bph_insert_spaces: bool,
+    pub bph_is_selection: bool,
+}
+
+impl RangeFormat {
+    pub fn bph_summary(&self) -> String {
+        format!("RangeFormat({})", self.bph_range_start_line)
+    }
+}
+
+/// Runtime wiring: bpi_ OrganizeImports
+#[derive(Debug, Clone)]
+pub struct OrganizeImports {
+    pub bpi_uri: String,
+    pub bpi_added_imports: Vec<String>,
+    pub bpi_removed_imports: Vec<String>,
+    pub bpi_sorted_count: u32,
+    pub bpi_unused_count: u32,
+    pub bpi_missing_count: u32,
+    pub bpi_has_side_effects: bool,
+    pub bpi_is_on_save: bool,
+    pub bpi_language_id: String,
+    pub bpi_provider_id: String,
+}
+
+impl OrganizeImports {
+    pub fn bpi_summary(&self) -> String {
+        format!("OrganizeImports({})", self.bpi_uri)
+    }
+}
+
+/// Runtime wiring: bpj_ SourceFixAll
+#[derive(Debug, Clone)]
+pub struct SourceFixAll {
+    pub bpj_fix_count: u32,
+    pub bpj_diagnostics_fixed: u32,
+    pub bpj_files_modified: u32,
+    pub bpj_is_on_save: bool,
+    pub bpj_only_preferred: bool,
+    pub bpj_timeout_ms: u32,
+    pub bpj_applied_fixes: Vec<String>,
+    pub bpj_skipped_fixes: Vec<String>,
+    pub bpj_has_conflicts: bool,
+    pub bpj_source_action_kind: String,
+}
+
+impl SourceFixAll {
+    pub fn bpj_summary(&self) -> String {
+        format!("SourceFixAll({})", self.bpj_fix_count)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -107725,6 +107830,910 @@ mod tests_bfo {
         };
         let _ = obj.bpe_summary();
         assert_eq!(obj.bpe_command_id, "test");
+    }
+
+    #[test]
+    fn test_bpf_provider_id() {
+        let obj = FormatProvider {
+            bpf_provider_id: String::from("test"),
+            bpf_language_id: String::from("test"),
+            bpf_display_name: String::from("test"),
+            bpf_supports_range: false,
+            bpf_supports_on_type: false,
+            bpf_trigger_characters: Vec::new(),
+            bpf_priority: 0,
+            bpf_is_default: false,
+            bpf_tab_size: 0,
+            bpf_insert_spaces: false,
+        };
+        let _ = obj.bpf_summary();
+        assert_eq!(obj.bpf_provider_id, "test");
+    }
+
+    #[test]
+    fn test_bpf_language_id() {
+        let obj = FormatProvider {
+            bpf_provider_id: String::from("test"),
+            bpf_language_id: String::from("test"),
+            bpf_display_name: String::from("test"),
+            bpf_supports_range: false,
+            bpf_supports_on_type: false,
+            bpf_trigger_characters: Vec::new(),
+            bpf_priority: 0,
+            bpf_is_default: false,
+            bpf_tab_size: 0,
+            bpf_insert_spaces: false,
+        };
+        let _ = obj.bpf_summary();
+        assert_eq!(obj.bpf_language_id, "test");
+    }
+
+    #[test]
+    fn test_bpf_display_name() {
+        let obj = FormatProvider {
+            bpf_provider_id: String::from("test"),
+            bpf_language_id: String::from("test"),
+            bpf_display_name: String::from("test"),
+            bpf_supports_range: false,
+            bpf_supports_on_type: false,
+            bpf_trigger_characters: Vec::new(),
+            bpf_priority: 0,
+            bpf_is_default: false,
+            bpf_tab_size: 0,
+            bpf_insert_spaces: false,
+        };
+        let _ = obj.bpf_summary();
+        assert_eq!(obj.bpf_display_name, "test");
+    }
+
+    #[test]
+    fn test_bpf_supports_range() {
+        let obj = FormatProvider {
+            bpf_provider_id: String::from("test"),
+            bpf_language_id: String::from("test"),
+            bpf_display_name: String::from("test"),
+            bpf_supports_range: false,
+            bpf_supports_on_type: false,
+            bpf_trigger_characters: Vec::new(),
+            bpf_priority: 0,
+            bpf_is_default: false,
+            bpf_tab_size: 0,
+            bpf_insert_spaces: false,
+        };
+        let _ = obj.bpf_summary();
+        assert!(!obj.bpf_supports_range);
+    }
+
+    #[test]
+    fn test_bpf_supports_on_type() {
+        let obj = FormatProvider {
+            bpf_provider_id: String::from("test"),
+            bpf_language_id: String::from("test"),
+            bpf_display_name: String::from("test"),
+            bpf_supports_range: false,
+            bpf_supports_on_type: false,
+            bpf_trigger_characters: Vec::new(),
+            bpf_priority: 0,
+            bpf_is_default: false,
+            bpf_tab_size: 0,
+            bpf_insert_spaces: false,
+        };
+        let _ = obj.bpf_summary();
+        assert!(!obj.bpf_supports_on_type);
+    }
+
+    #[test]
+    fn test_bpf_trigger_characters() {
+        let obj = FormatProvider {
+            bpf_provider_id: String::from("test"),
+            bpf_language_id: String::from("test"),
+            bpf_display_name: String::from("test"),
+            bpf_supports_range: false,
+            bpf_supports_on_type: false,
+            bpf_trigger_characters: Vec::new(),
+            bpf_priority: 0,
+            bpf_is_default: false,
+            bpf_tab_size: 0,
+            bpf_insert_spaces: false,
+        };
+        let _ = obj.bpf_summary();
+        assert!(obj.bpf_trigger_characters.is_empty());
+    }
+
+    #[test]
+    fn test_bpf_priority() {
+        let obj = FormatProvider {
+            bpf_provider_id: String::from("test"),
+            bpf_language_id: String::from("test"),
+            bpf_display_name: String::from("test"),
+            bpf_supports_range: false,
+            bpf_supports_on_type: false,
+            bpf_trigger_characters: Vec::new(),
+            bpf_priority: 0,
+            bpf_is_default: false,
+            bpf_tab_size: 0,
+            bpf_insert_spaces: false,
+        };
+        let _ = obj.bpf_summary();
+        assert_eq!(obj.bpf_priority, 0);
+    }
+
+    #[test]
+    fn test_bpf_is_default() {
+        let obj = FormatProvider {
+            bpf_provider_id: String::from("test"),
+            bpf_language_id: String::from("test"),
+            bpf_display_name: String::from("test"),
+            bpf_supports_range: false,
+            bpf_supports_on_type: false,
+            bpf_trigger_characters: Vec::new(),
+            bpf_priority: 0,
+            bpf_is_default: false,
+            bpf_tab_size: 0,
+            bpf_insert_spaces: false,
+        };
+        let _ = obj.bpf_summary();
+        assert!(!obj.bpf_is_default);
+    }
+
+    #[test]
+    fn test_bpf_tab_size() {
+        let obj = FormatProvider {
+            bpf_provider_id: String::from("test"),
+            bpf_language_id: String::from("test"),
+            bpf_display_name: String::from("test"),
+            bpf_supports_range: false,
+            bpf_supports_on_type: false,
+            bpf_trigger_characters: Vec::new(),
+            bpf_priority: 0,
+            bpf_is_default: false,
+            bpf_tab_size: 0,
+            bpf_insert_spaces: false,
+        };
+        let _ = obj.bpf_summary();
+        assert_eq!(obj.bpf_tab_size, 0);
+    }
+
+    #[test]
+    fn test_bpf_insert_spaces() {
+        let obj = FormatProvider {
+            bpf_provider_id: String::from("test"),
+            bpf_language_id: String::from("test"),
+            bpf_display_name: String::from("test"),
+            bpf_supports_range: false,
+            bpf_supports_on_type: false,
+            bpf_trigger_characters: Vec::new(),
+            bpf_priority: 0,
+            bpf_is_default: false,
+            bpf_tab_size: 0,
+            bpf_insert_spaces: false,
+        };
+        let _ = obj.bpf_summary();
+        assert!(!obj.bpf_insert_spaces);
+    }
+
+
+    #[test]
+    fn test_bpg_trigger_char() {
+        let obj = OnTypeFormat {
+            bpg_trigger_char: String::from("test"),
+            bpg_position_line: 0,
+            bpg_position_col: 0,
+            bpg_edits_count: 0,
+            bpg_uri: String::from("test"),
+            bpg_format_on_paste: false,
+            bpg_format_on_type: false,
+            bpg_auto_indent: String::from("test"),
+            bpg_trim_trailing: false,
+            bpg_insert_final_newline: false,
+        };
+        let _ = obj.bpg_summary();
+        assert_eq!(obj.bpg_trigger_char, "test");
+    }
+
+    #[test]
+    fn test_bpg_position_line() {
+        let obj = OnTypeFormat {
+            bpg_trigger_char: String::from("test"),
+            bpg_position_line: 0,
+            bpg_position_col: 0,
+            bpg_edits_count: 0,
+            bpg_uri: String::from("test"),
+            bpg_format_on_paste: false,
+            bpg_format_on_type: false,
+            bpg_auto_indent: String::from("test"),
+            bpg_trim_trailing: false,
+            bpg_insert_final_newline: false,
+        };
+        let _ = obj.bpg_summary();
+        assert_eq!(obj.bpg_position_line, 0);
+    }
+
+    #[test]
+    fn test_bpg_position_col() {
+        let obj = OnTypeFormat {
+            bpg_trigger_char: String::from("test"),
+            bpg_position_line: 0,
+            bpg_position_col: 0,
+            bpg_edits_count: 0,
+            bpg_uri: String::from("test"),
+            bpg_format_on_paste: false,
+            bpg_format_on_type: false,
+            bpg_auto_indent: String::from("test"),
+            bpg_trim_trailing: false,
+            bpg_insert_final_newline: false,
+        };
+        let _ = obj.bpg_summary();
+        assert_eq!(obj.bpg_position_col, 0);
+    }
+
+    #[test]
+    fn test_bpg_edits_count() {
+        let obj = OnTypeFormat {
+            bpg_trigger_char: String::from("test"),
+            bpg_position_line: 0,
+            bpg_position_col: 0,
+            bpg_edits_count: 0,
+            bpg_uri: String::from("test"),
+            bpg_format_on_paste: false,
+            bpg_format_on_type: false,
+            bpg_auto_indent: String::from("test"),
+            bpg_trim_trailing: false,
+            bpg_insert_final_newline: false,
+        };
+        let _ = obj.bpg_summary();
+        assert_eq!(obj.bpg_edits_count, 0);
+    }
+
+    #[test]
+    fn test_bpg_uri() {
+        let obj = OnTypeFormat {
+            bpg_trigger_char: String::from("test"),
+            bpg_position_line: 0,
+            bpg_position_col: 0,
+            bpg_edits_count: 0,
+            bpg_uri: String::from("test"),
+            bpg_format_on_paste: false,
+            bpg_format_on_type: false,
+            bpg_auto_indent: String::from("test"),
+            bpg_trim_trailing: false,
+            bpg_insert_final_newline: false,
+        };
+        let _ = obj.bpg_summary();
+        assert_eq!(obj.bpg_uri, "test");
+    }
+
+    #[test]
+    fn test_bpg_format_on_paste() {
+        let obj = OnTypeFormat {
+            bpg_trigger_char: String::from("test"),
+            bpg_position_line: 0,
+            bpg_position_col: 0,
+            bpg_edits_count: 0,
+            bpg_uri: String::from("test"),
+            bpg_format_on_paste: false,
+            bpg_format_on_type: false,
+            bpg_auto_indent: String::from("test"),
+            bpg_trim_trailing: false,
+            bpg_insert_final_newline: false,
+        };
+        let _ = obj.bpg_summary();
+        assert!(!obj.bpg_format_on_paste);
+    }
+
+    #[test]
+    fn test_bpg_format_on_type() {
+        let obj = OnTypeFormat {
+            bpg_trigger_char: String::from("test"),
+            bpg_position_line: 0,
+            bpg_position_col: 0,
+            bpg_edits_count: 0,
+            bpg_uri: String::from("test"),
+            bpg_format_on_paste: false,
+            bpg_format_on_type: false,
+            bpg_auto_indent: String::from("test"),
+            bpg_trim_trailing: false,
+            bpg_insert_final_newline: false,
+        };
+        let _ = obj.bpg_summary();
+        assert!(!obj.bpg_format_on_type);
+    }
+
+    #[test]
+    fn test_bpg_auto_indent() {
+        let obj = OnTypeFormat {
+            bpg_trigger_char: String::from("test"),
+            bpg_position_line: 0,
+            bpg_position_col: 0,
+            bpg_edits_count: 0,
+            bpg_uri: String::from("test"),
+            bpg_format_on_paste: false,
+            bpg_format_on_type: false,
+            bpg_auto_indent: String::from("test"),
+            bpg_trim_trailing: false,
+            bpg_insert_final_newline: false,
+        };
+        let _ = obj.bpg_summary();
+        assert_eq!(obj.bpg_auto_indent, "test");
+    }
+
+    #[test]
+    fn test_bpg_trim_trailing() {
+        let obj = OnTypeFormat {
+            bpg_trigger_char: String::from("test"),
+            bpg_position_line: 0,
+            bpg_position_col: 0,
+            bpg_edits_count: 0,
+            bpg_uri: String::from("test"),
+            bpg_format_on_paste: false,
+            bpg_format_on_type: false,
+            bpg_auto_indent: String::from("test"),
+            bpg_trim_trailing: false,
+            bpg_insert_final_newline: false,
+        };
+        let _ = obj.bpg_summary();
+        assert!(!obj.bpg_trim_trailing);
+    }
+
+    #[test]
+    fn test_bpg_insert_final_newline() {
+        let obj = OnTypeFormat {
+            bpg_trigger_char: String::from("test"),
+            bpg_position_line: 0,
+            bpg_position_col: 0,
+            bpg_edits_count: 0,
+            bpg_uri: String::from("test"),
+            bpg_format_on_paste: false,
+            bpg_format_on_type: false,
+            bpg_auto_indent: String::from("test"),
+            bpg_trim_trailing: false,
+            bpg_insert_final_newline: false,
+        };
+        let _ = obj.bpg_summary();
+        assert!(!obj.bpg_insert_final_newline);
+    }
+
+
+    #[test]
+    fn test_bph_range_start_line() {
+        let obj = RangeFormat {
+            bph_range_start_line: 0,
+            bph_range_start_col: 0,
+            bph_range_end_line: 0,
+            bph_range_end_col: 0,
+            bph_edits_count: 0,
+            bph_uri: String::from("test"),
+            bph_provider_id: String::from("test"),
+            bph_tab_size: 0,
+            bph_insert_spaces: false,
+            bph_is_selection: false,
+        };
+        let _ = obj.bph_summary();
+        assert_eq!(obj.bph_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_bph_range_start_col() {
+        let obj = RangeFormat {
+            bph_range_start_line: 0,
+            bph_range_start_col: 0,
+            bph_range_end_line: 0,
+            bph_range_end_col: 0,
+            bph_edits_count: 0,
+            bph_uri: String::from("test"),
+            bph_provider_id: String::from("test"),
+            bph_tab_size: 0,
+            bph_insert_spaces: false,
+            bph_is_selection: false,
+        };
+        let _ = obj.bph_summary();
+        assert_eq!(obj.bph_range_start_col, 0);
+    }
+
+    #[test]
+    fn test_bph_range_end_line() {
+        let obj = RangeFormat {
+            bph_range_start_line: 0,
+            bph_range_start_col: 0,
+            bph_range_end_line: 0,
+            bph_range_end_col: 0,
+            bph_edits_count: 0,
+            bph_uri: String::from("test"),
+            bph_provider_id: String::from("test"),
+            bph_tab_size: 0,
+            bph_insert_spaces: false,
+            bph_is_selection: false,
+        };
+        let _ = obj.bph_summary();
+        assert_eq!(obj.bph_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_bph_range_end_col() {
+        let obj = RangeFormat {
+            bph_range_start_line: 0,
+            bph_range_start_col: 0,
+            bph_range_end_line: 0,
+            bph_range_end_col: 0,
+            bph_edits_count: 0,
+            bph_uri: String::from("test"),
+            bph_provider_id: String::from("test"),
+            bph_tab_size: 0,
+            bph_insert_spaces: false,
+            bph_is_selection: false,
+        };
+        let _ = obj.bph_summary();
+        assert_eq!(obj.bph_range_end_col, 0);
+    }
+
+    #[test]
+    fn test_bph_edits_count() {
+        let obj = RangeFormat {
+            bph_range_start_line: 0,
+            bph_range_start_col: 0,
+            bph_range_end_line: 0,
+            bph_range_end_col: 0,
+            bph_edits_count: 0,
+            bph_uri: String::from("test"),
+            bph_provider_id: String::from("test"),
+            bph_tab_size: 0,
+            bph_insert_spaces: false,
+            bph_is_selection: false,
+        };
+        let _ = obj.bph_summary();
+        assert_eq!(obj.bph_edits_count, 0);
+    }
+
+    #[test]
+    fn test_bph_uri() {
+        let obj = RangeFormat {
+            bph_range_start_line: 0,
+            bph_range_start_col: 0,
+            bph_range_end_line: 0,
+            bph_range_end_col: 0,
+            bph_edits_count: 0,
+            bph_uri: String::from("test"),
+            bph_provider_id: String::from("test"),
+            bph_tab_size: 0,
+            bph_insert_spaces: false,
+            bph_is_selection: false,
+        };
+        let _ = obj.bph_summary();
+        assert_eq!(obj.bph_uri, "test");
+    }
+
+    #[test]
+    fn test_bph_provider_id() {
+        let obj = RangeFormat {
+            bph_range_start_line: 0,
+            bph_range_start_col: 0,
+            bph_range_end_line: 0,
+            bph_range_end_col: 0,
+            bph_edits_count: 0,
+            bph_uri: String::from("test"),
+            bph_provider_id: String::from("test"),
+            bph_tab_size: 0,
+            bph_insert_spaces: false,
+            bph_is_selection: false,
+        };
+        let _ = obj.bph_summary();
+        assert_eq!(obj.bph_provider_id, "test");
+    }
+
+    #[test]
+    fn test_bph_tab_size() {
+        let obj = RangeFormat {
+            bph_range_start_line: 0,
+            bph_range_start_col: 0,
+            bph_range_end_line: 0,
+            bph_range_end_col: 0,
+            bph_edits_count: 0,
+            bph_uri: String::from("test"),
+            bph_provider_id: String::from("test"),
+            bph_tab_size: 0,
+            bph_insert_spaces: false,
+            bph_is_selection: false,
+        };
+        let _ = obj.bph_summary();
+        assert_eq!(obj.bph_tab_size, 0);
+    }
+
+    #[test]
+    fn test_bph_insert_spaces() {
+        let obj = RangeFormat {
+            bph_range_start_line: 0,
+            bph_range_start_col: 0,
+            bph_range_end_line: 0,
+            bph_range_end_col: 0,
+            bph_edits_count: 0,
+            bph_uri: String::from("test"),
+            bph_provider_id: String::from("test"),
+            bph_tab_size: 0,
+            bph_insert_spaces: false,
+            bph_is_selection: false,
+        };
+        let _ = obj.bph_summary();
+        assert!(!obj.bph_insert_spaces);
+    }
+
+    #[test]
+    fn test_bph_is_selection() {
+        let obj = RangeFormat {
+            bph_range_start_line: 0,
+            bph_range_start_col: 0,
+            bph_range_end_line: 0,
+            bph_range_end_col: 0,
+            bph_edits_count: 0,
+            bph_uri: String::from("test"),
+            bph_provider_id: String::from("test"),
+            bph_tab_size: 0,
+            bph_insert_spaces: false,
+            bph_is_selection: false,
+        };
+        let _ = obj.bph_summary();
+        assert!(!obj.bph_is_selection);
+    }
+
+
+    #[test]
+    fn test_bpi_uri() {
+        let obj = OrganizeImports {
+            bpi_uri: String::from("test"),
+            bpi_added_imports: Vec::new(),
+            bpi_removed_imports: Vec::new(),
+            bpi_sorted_count: 0,
+            bpi_unused_count: 0,
+            bpi_missing_count: 0,
+            bpi_has_side_effects: false,
+            bpi_is_on_save: false,
+            bpi_language_id: String::from("test"),
+            bpi_provider_id: String::from("test"),
+        };
+        let _ = obj.bpi_summary();
+        assert_eq!(obj.bpi_uri, "test");
+    }
+
+    #[test]
+    fn test_bpi_added_imports() {
+        let obj = OrganizeImports {
+            bpi_uri: String::from("test"),
+            bpi_added_imports: Vec::new(),
+            bpi_removed_imports: Vec::new(),
+            bpi_sorted_count: 0,
+            bpi_unused_count: 0,
+            bpi_missing_count: 0,
+            bpi_has_side_effects: false,
+            bpi_is_on_save: false,
+            bpi_language_id: String::from("test"),
+            bpi_provider_id: String::from("test"),
+        };
+        let _ = obj.bpi_summary();
+        assert!(obj.bpi_added_imports.is_empty());
+    }
+
+    #[test]
+    fn test_bpi_removed_imports() {
+        let obj = OrganizeImports {
+            bpi_uri: String::from("test"),
+            bpi_added_imports: Vec::new(),
+            bpi_removed_imports: Vec::new(),
+            bpi_sorted_count: 0,
+            bpi_unused_count: 0,
+            bpi_missing_count: 0,
+            bpi_has_side_effects: false,
+            bpi_is_on_save: false,
+            bpi_language_id: String::from("test"),
+            bpi_provider_id: String::from("test"),
+        };
+        let _ = obj.bpi_summary();
+        assert!(obj.bpi_removed_imports.is_empty());
+    }
+
+    #[test]
+    fn test_bpi_sorted_count() {
+        let obj = OrganizeImports {
+            bpi_uri: String::from("test"),
+            bpi_added_imports: Vec::new(),
+            bpi_removed_imports: Vec::new(),
+            bpi_sorted_count: 0,
+            bpi_unused_count: 0,
+            bpi_missing_count: 0,
+            bpi_has_side_effects: false,
+            bpi_is_on_save: false,
+            bpi_language_id: String::from("test"),
+            bpi_provider_id: String::from("test"),
+        };
+        let _ = obj.bpi_summary();
+        assert_eq!(obj.bpi_sorted_count, 0);
+    }
+
+    #[test]
+    fn test_bpi_unused_count() {
+        let obj = OrganizeImports {
+            bpi_uri: String::from("test"),
+            bpi_added_imports: Vec::new(),
+            bpi_removed_imports: Vec::new(),
+            bpi_sorted_count: 0,
+            bpi_unused_count: 0,
+            bpi_missing_count: 0,
+            bpi_has_side_effects: false,
+            bpi_is_on_save: false,
+            bpi_language_id: String::from("test"),
+            bpi_provider_id: String::from("test"),
+        };
+        let _ = obj.bpi_summary();
+        assert_eq!(obj.bpi_unused_count, 0);
+    }
+
+    #[test]
+    fn test_bpi_missing_count() {
+        let obj = OrganizeImports {
+            bpi_uri: String::from("test"),
+            bpi_added_imports: Vec::new(),
+            bpi_removed_imports: Vec::new(),
+            bpi_sorted_count: 0,
+            bpi_unused_count: 0,
+            bpi_missing_count: 0,
+            bpi_has_side_effects: false,
+            bpi_is_on_save: false,
+            bpi_language_id: String::from("test"),
+            bpi_provider_id: String::from("test"),
+        };
+        let _ = obj.bpi_summary();
+        assert_eq!(obj.bpi_missing_count, 0);
+    }
+
+    #[test]
+    fn test_bpi_has_side_effects() {
+        let obj = OrganizeImports {
+            bpi_uri: String::from("test"),
+            bpi_added_imports: Vec::new(),
+            bpi_removed_imports: Vec::new(),
+            bpi_sorted_count: 0,
+            bpi_unused_count: 0,
+            bpi_missing_count: 0,
+            bpi_has_side_effects: false,
+            bpi_is_on_save: false,
+            bpi_language_id: String::from("test"),
+            bpi_provider_id: String::from("test"),
+        };
+        let _ = obj.bpi_summary();
+        assert!(!obj.bpi_has_side_effects);
+    }
+
+    #[test]
+    fn test_bpi_is_on_save() {
+        let obj = OrganizeImports {
+            bpi_uri: String::from("test"),
+            bpi_added_imports: Vec::new(),
+            bpi_removed_imports: Vec::new(),
+            bpi_sorted_count: 0,
+            bpi_unused_count: 0,
+            bpi_missing_count: 0,
+            bpi_has_side_effects: false,
+            bpi_is_on_save: false,
+            bpi_language_id: String::from("test"),
+            bpi_provider_id: String::from("test"),
+        };
+        let _ = obj.bpi_summary();
+        assert!(!obj.bpi_is_on_save);
+    }
+
+    #[test]
+    fn test_bpi_language_id() {
+        let obj = OrganizeImports {
+            bpi_uri: String::from("test"),
+            bpi_added_imports: Vec::new(),
+            bpi_removed_imports: Vec::new(),
+            bpi_sorted_count: 0,
+            bpi_unused_count: 0,
+            bpi_missing_count: 0,
+            bpi_has_side_effects: false,
+            bpi_is_on_save: false,
+            bpi_language_id: String::from("test"),
+            bpi_provider_id: String::from("test"),
+        };
+        let _ = obj.bpi_summary();
+        assert_eq!(obj.bpi_language_id, "test");
+    }
+
+    #[test]
+    fn test_bpi_provider_id() {
+        let obj = OrganizeImports {
+            bpi_uri: String::from("test"),
+            bpi_added_imports: Vec::new(),
+            bpi_removed_imports: Vec::new(),
+            bpi_sorted_count: 0,
+            bpi_unused_count: 0,
+            bpi_missing_count: 0,
+            bpi_has_side_effects: false,
+            bpi_is_on_save: false,
+            bpi_language_id: String::from("test"),
+            bpi_provider_id: String::from("test"),
+        };
+        let _ = obj.bpi_summary();
+        assert_eq!(obj.bpi_provider_id, "test");
+    }
+
+
+    #[test]
+    fn test_bpj_fix_count() {
+        let obj = SourceFixAll {
+            bpj_fix_count: 0,
+            bpj_diagnostics_fixed: 0,
+            bpj_files_modified: 0,
+            bpj_is_on_save: false,
+            bpj_only_preferred: false,
+            bpj_timeout_ms: 0,
+            bpj_applied_fixes: Vec::new(),
+            bpj_skipped_fixes: Vec::new(),
+            bpj_has_conflicts: false,
+            bpj_source_action_kind: String::from("test"),
+        };
+        let _ = obj.bpj_summary();
+        assert_eq!(obj.bpj_fix_count, 0);
+    }
+
+    #[test]
+    fn test_bpj_diagnostics_fixed() {
+        let obj = SourceFixAll {
+            bpj_fix_count: 0,
+            bpj_diagnostics_fixed: 0,
+            bpj_files_modified: 0,
+            bpj_is_on_save: false,
+            bpj_only_preferred: false,
+            bpj_timeout_ms: 0,
+            bpj_applied_fixes: Vec::new(),
+            bpj_skipped_fixes: Vec::new(),
+            bpj_has_conflicts: false,
+            bpj_source_action_kind: String::from("test"),
+        };
+        let _ = obj.bpj_summary();
+        assert_eq!(obj.bpj_diagnostics_fixed, 0);
+    }
+
+    #[test]
+    fn test_bpj_files_modified() {
+        let obj = SourceFixAll {
+            bpj_fix_count: 0,
+            bpj_diagnostics_fixed: 0,
+            bpj_files_modified: 0,
+            bpj_is_on_save: false,
+            bpj_only_preferred: false,
+            bpj_timeout_ms: 0,
+            bpj_applied_fixes: Vec::new(),
+            bpj_skipped_fixes: Vec::new(),
+            bpj_has_conflicts: false,
+            bpj_source_action_kind: String::from("test"),
+        };
+        let _ = obj.bpj_summary();
+        assert_eq!(obj.bpj_files_modified, 0);
+    }
+
+    #[test]
+    fn test_bpj_is_on_save() {
+        let obj = SourceFixAll {
+            bpj_fix_count: 0,
+            bpj_diagnostics_fixed: 0,
+            bpj_files_modified: 0,
+            bpj_is_on_save: false,
+            bpj_only_preferred: false,
+            bpj_timeout_ms: 0,
+            bpj_applied_fixes: Vec::new(),
+            bpj_skipped_fixes: Vec::new(),
+            bpj_has_conflicts: false,
+            bpj_source_action_kind: String::from("test"),
+        };
+        let _ = obj.bpj_summary();
+        assert!(!obj.bpj_is_on_save);
+    }
+
+    #[test]
+    fn test_bpj_only_preferred() {
+        let obj = SourceFixAll {
+            bpj_fix_count: 0,
+            bpj_diagnostics_fixed: 0,
+            bpj_files_modified: 0,
+            bpj_is_on_save: false,
+            bpj_only_preferred: false,
+            bpj_timeout_ms: 0,
+            bpj_applied_fixes: Vec::new(),
+            bpj_skipped_fixes: Vec::new(),
+            bpj_has_conflicts: false,
+            bpj_source_action_kind: String::from("test"),
+        };
+        let _ = obj.bpj_summary();
+        assert!(!obj.bpj_only_preferred);
+    }
+
+    #[test]
+    fn test_bpj_timeout_ms() {
+        let obj = SourceFixAll {
+            bpj_fix_count: 0,
+            bpj_diagnostics_fixed: 0,
+            bpj_files_modified: 0,
+            bpj_is_on_save: false,
+            bpj_only_preferred: false,
+            bpj_timeout_ms: 0,
+            bpj_applied_fixes: Vec::new(),
+            bpj_skipped_fixes: Vec::new(),
+            bpj_has_conflicts: false,
+            bpj_source_action_kind: String::from("test"),
+        };
+        let _ = obj.bpj_summary();
+        assert_eq!(obj.bpj_timeout_ms, 0);
+    }
+
+    #[test]
+    fn test_bpj_applied_fixes() {
+        let obj = SourceFixAll {
+            bpj_fix_count: 0,
+            bpj_diagnostics_fixed: 0,
+            bpj_files_modified: 0,
+            bpj_is_on_save: false,
+            bpj_only_preferred: false,
+            bpj_timeout_ms: 0,
+            bpj_applied_fixes: Vec::new(),
+            bpj_skipped_fixes: Vec::new(),
+            bpj_has_conflicts: false,
+            bpj_source_action_kind: String::from("test"),
+        };
+        let _ = obj.bpj_summary();
+        assert!(obj.bpj_applied_fixes.is_empty());
+    }
+
+    #[test]
+    fn test_bpj_skipped_fixes() {
+        let obj = SourceFixAll {
+            bpj_fix_count: 0,
+            bpj_diagnostics_fixed: 0,
+            bpj_files_modified: 0,
+            bpj_is_on_save: false,
+            bpj_only_preferred: false,
+            bpj_timeout_ms: 0,
+            bpj_applied_fixes: Vec::new(),
+            bpj_skipped_fixes: Vec::new(),
+            bpj_has_conflicts: false,
+            bpj_source_action_kind: String::from("test"),
+        };
+        let _ = obj.bpj_summary();
+        assert!(obj.bpj_skipped_fixes.is_empty());
+    }
+
+    #[test]
+    fn test_bpj_has_conflicts() {
+        let obj = SourceFixAll {
+            bpj_fix_count: 0,
+            bpj_diagnostics_fixed: 0,
+            bpj_files_modified: 0,
+            bpj_is_on_save: false,
+            bpj_only_preferred: false,
+            bpj_timeout_ms: 0,
+            bpj_applied_fixes: Vec::new(),
+            bpj_skipped_fixes: Vec::new(),
+            bpj_has_conflicts: false,
+            bpj_source_action_kind: String::from("test"),
+        };
+        let _ = obj.bpj_summary();
+        assert!(!obj.bpj_has_conflicts);
+    }
+
+    #[test]
+    fn test_bpj_source_action_kind() {
+        let obj = SourceFixAll {
+            bpj_fix_count: 0,
+            bpj_diagnostics_fixed: 0,
+            bpj_files_modified: 0,
+            bpj_is_on_save: false,
+            bpj_only_preferred: false,
+            bpj_timeout_ms: 0,
+            bpj_applied_fixes: Vec::new(),
+            bpj_skipped_fixes: Vec::new(),
+            bpj_has_conflicts: false,
+            bpj_source_action_kind: String::from("test"),
+        };
+        let _ = obj.bpj_summary();
+        assert_eq!(obj.bpj_source_action_kind, "test");
     }
 
 }
