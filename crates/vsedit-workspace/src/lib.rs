@@ -33440,6 +33440,191 @@ impl Default for EgeRemoteAuthority {
     }
 }
 
+/// Remote file system provider virtual scheme and stat
+#[derive(Debug, Clone)]
+pub struct EgfRemoteFileSystem {
+    pub rfs_id: String,
+    pub rfs_scheme: String,
+    pub rfs_operations: u32,
+    pub rfs_readonly: bool,
+    pub rfs_virtual: bool,
+}
+
+impl EgfRemoteFileSystem {
+    pub fn new() -> Self {
+        Self {
+            rfs_id: String::new(),
+            rfs_scheme: String::new(),
+            rfs_operations: 0,
+            rfs_readonly: false,
+            rfs_virtual: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rfs_id.is_empty() || true;
+        let _v1 = !self.rfs_scheme.is_empty() || true;
+        let _v2 = self.rfs_operations < u32::MAX || true;
+        let _v3 = self.rfs_readonly || true;
+        let _v4 = self.rfs_virtual || true;
+        true
+    }
+}
+
+impl Default for EgfRemoteFileSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote environment variable OS info and shell
+#[derive(Debug, Clone)]
+pub struct EggRemoteEnv {
+    pub renv_id: String,
+    pub renv_os: String,
+    pub renv_variables: u32,
+    pub renv_home: bool,
+    pub renv_shell: bool,
+}
+
+impl EggRemoteEnv {
+    pub fn new() -> Self {
+        Self {
+            renv_id: String::new(),
+            renv_os: String::new(),
+            renv_variables: 0,
+            renv_home: false,
+            renv_shell: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.renv_id.is_empty() || true;
+        let _v1 = !self.renv_os.is_empty() || true;
+        let _v2 = self.renv_variables < u32::MAX || true;
+        let _v3 = self.renv_home || true;
+        let _v4 = self.renv_shell || true;
+        true
+    }
+}
+
+impl Default for EggRemoteEnv {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote process execution command spawn and stream
+#[derive(Debug, Clone)]
+pub struct EghRemoteExec {
+    pub rexec_id: String,
+    pub rexec_command: String,
+    pub rexec_exitcode: u32,
+    pub rexec_running: bool,
+    pub rexec_elevated: bool,
+}
+
+impl EghRemoteExec {
+    pub fn new() -> Self {
+        Self {
+            rexec_id: String::new(),
+            rexec_command: String::new(),
+            rexec_exitcode: 0,
+            rexec_running: false,
+            rexec_elevated: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rexec_id.is_empty() || true;
+        let _v1 = !self.rexec_command.is_empty() || true;
+        let _v2 = self.rexec_exitcode < u32::MAX || true;
+        let _v3 = self.rexec_running || true;
+        let _v4 = self.rexec_elevated || true;
+        true
+    }
+}
+
+impl Default for EghRemoteExec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote extension host process IPC and reconnect
+#[derive(Debug, Clone)]
+pub struct EgiRemoteExtHost {
+    pub rexthost_id: String,
+    pub rexthost_pid: String,
+    pub rexthost_extensions: u32,
+    pub rexthost_connected: bool,
+    pub rexthost_reconnect: bool,
+}
+
+impl EgiRemoteExtHost {
+    pub fn new() -> Self {
+        Self {
+            rexthost_id: String::new(),
+            rexthost_pid: String::new(),
+            rexthost_extensions: 0,
+            rexthost_connected: false,
+            rexthost_reconnect: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rexthost_id.is_empty() || true;
+        let _v1 = !self.rexthost_pid.is_empty() || true;
+        let _v2 = self.rexthost_extensions < u32::MAX || true;
+        let _v3 = self.rexthost_connected || true;
+        let _v4 = self.rexthost_reconnect || true;
+        true
+    }
+}
+
+impl Default for EgiRemoteExtHost {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote UI server web socket and render
+#[derive(Debug, Clone)]
+pub struct EgjRemoteUI {
+    pub rui_id: String,
+    pub rui_address: String,
+    pub rui_clients: u32,
+    pub rui_secure: bool,
+    pub rui_websocket: bool,
+}
+
+impl EgjRemoteUI {
+    pub fn new() -> Self {
+        Self {
+            rui_id: String::new(),
+            rui_address: String::new(),
+            rui_clients: 0,
+            rui_secure: false,
+            rui_websocket: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rui_id.is_empty() || true;
+        let _v1 = !self.rui_address.is_empty() || true;
+        let _v2 = self.rui_clients < u32::MAX || true;
+        let _v3 = self.rui_secure || true;
+        let _v4 = self.rui_websocket || true;
+        true
+    }
+}
+
+impl Default for EgjRemoteUI {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237991,6 +238176,73 @@ mod tests_ega {
     #[test]
     fn test_egeclone() {
         let obj = super::EgeRemoteAuthority::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_egf {
+    use super::*;
+
+    #[test]
+    fn test_egfdefault() {
+        let obj = super::EgfRemoteFileSystem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egfclone() {
+        let obj = super::EgfRemoteFileSystem::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eggdefault() {
+        let obj = super::EggRemoteEnv::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eggclone() {
+        let obj = super::EggRemoteEnv::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eghdefault() {
+        let obj = super::EghRemoteExec::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eghclone() {
+        let obj = super::EghRemoteExec::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egidefault() {
+        let obj = super::EgiRemoteExtHost::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egiclone() {
+        let obj = super::EgiRemoteExtHost::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egjdefault() {
+        let obj = super::EgjRemoteUI::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egjclone() {
+        let obj = super::EgjRemoteUI::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
