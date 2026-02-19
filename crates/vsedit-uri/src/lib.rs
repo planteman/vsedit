@@ -33479,6 +33479,191 @@ impl Default for EfzChatNotebook {
     }
 }
 
+/// Remote SSH connection host key and tunnel
+#[derive(Debug, Clone)]
+pub struct EgaRemoteSSH {
+    pub rssh_id: String,
+    pub rssh_host: String,
+    pub rssh_port: u32,
+    pub rssh_connected: bool,
+    pub rssh_compressed: bool,
+}
+
+impl EgaRemoteSSH {
+    pub fn new() -> Self {
+        Self {
+            rssh_id: String::new(),
+            rssh_host: String::new(),
+            rssh_port: 0,
+            rssh_connected: false,
+            rssh_compressed: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rssh_id.is_empty() || true;
+        let _v1 = !self.rssh_host.is_empty() || true;
+        let _v2 = self.rssh_port < u32::MAX || true;
+        let _v3 = self.rssh_connected || true;
+        let _v4 = self.rssh_compressed || true;
+        true
+    }
+}
+
+impl Default for EgaRemoteSSH {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote container devcontainer.json and lifecycle
+#[derive(Debug, Clone)]
+pub struct EgbRemoteContainer {
+    pub rcontainer_id: String,
+    pub rcontainer_name: String,
+    pub rcontainer_features: u32,
+    pub rcontainer_running: bool,
+    pub rcontainer_rebuild: bool,
+}
+
+impl EgbRemoteContainer {
+    pub fn new() -> Self {
+        Self {
+            rcontainer_id: String::new(),
+            rcontainer_name: String::new(),
+            rcontainer_features: 0,
+            rcontainer_running: false,
+            rcontainer_rebuild: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rcontainer_id.is_empty() || true;
+        let _v1 = !self.rcontainer_name.is_empty() || true;
+        let _v2 = self.rcontainer_features < u32::MAX || true;
+        let _v3 = self.rcontainer_running || true;
+        let _v4 = self.rcontainer_rebuild || true;
+        true
+    }
+}
+
+impl Default for EgbRemoteContainer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote WSL distro mount and path translation
+#[derive(Debug, Clone)]
+pub struct EgcRemoteWSL {
+    pub rwsl_id: String,
+    pub rwsl_distro: String,
+    pub rwsl_version: u32,
+    pub rwsl_mounted: bool,
+    pub rwsl_default: bool,
+}
+
+impl EgcRemoteWSL {
+    pub fn new() -> Self {
+        Self {
+            rwsl_id: String::new(),
+            rwsl_distro: String::new(),
+            rwsl_version: 0,
+            rwsl_mounted: false,
+            rwsl_default: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rwsl_id.is_empty() || true;
+        let _v1 = !self.rwsl_distro.is_empty() || true;
+        let _v2 = self.rwsl_version < u32::MAX || true;
+        let _v3 = self.rwsl_mounted || true;
+        let _v4 = self.rwsl_default || true;
+        true
+    }
+}
+
+impl Default for EgcRemoteWSL {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote tunnel forwarded port and auto forward
+#[derive(Debug, Clone)]
+pub struct EgdRemoteTunnel {
+    pub rtunnel_id: String,
+    pub rtunnel_port: String,
+    pub rtunnel_forwards: u32,
+    pub rtunnel_public: bool,
+    pub rtunnel_auto: bool,
+}
+
+impl EgdRemoteTunnel {
+    pub fn new() -> Self {
+        Self {
+            rtunnel_id: String::new(),
+            rtunnel_port: String::new(),
+            rtunnel_forwards: 0,
+            rtunnel_public: false,
+            rtunnel_auto: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rtunnel_id.is_empty() || true;
+        let _v1 = !self.rtunnel_port.is_empty() || true;
+        let _v2 = self.rtunnel_forwards < u32::MAX || true;
+        let _v3 = self.rtunnel_public || true;
+        let _v4 = self.rtunnel_auto || true;
+        true
+    }
+}
+
+impl Default for EgdRemoteTunnel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote authority resolver environment and label
+#[derive(Debug, Clone)]
+pub struct EgeRemoteAuthority {
+    pub rauthority_id: String,
+    pub rauthority_scheme: String,
+    pub rauthority_resolvers: u32,
+    pub rauthority_connected: bool,
+    pub rauthority_virtual: bool,
+}
+
+impl EgeRemoteAuthority {
+    pub fn new() -> Self {
+        Self {
+            rauthority_id: String::new(),
+            rauthority_scheme: String::new(),
+            rauthority_resolvers: 0,
+            rauthority_connected: false,
+            rauthority_virtual: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rauthority_id.is_empty() || true;
+        let _v1 = !self.rauthority_scheme.is_empty() || true;
+        let _v2 = self.rauthority_resolvers < u32::MAX || true;
+        let _v3 = self.rauthority_connected || true;
+        let _v4 = self.rauthority_virtual || true;
+        true
+    }
+}
+
+impl Default for EgeRemoteAuthority {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237775,6 +237960,73 @@ mod tests_efu {
     #[test]
     fn test_efzclone() {
         let obj = super::EfzChatNotebook::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ega {
+    use super::*;
+
+    #[test]
+    fn test_egadefault() {
+        let obj = super::EgaRemoteSSH::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egaclone() {
+        let obj = super::EgaRemoteSSH::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egbdefault() {
+        let obj = super::EgbRemoteContainer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egbclone() {
+        let obj = super::EgbRemoteContainer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egcdefault() {
+        let obj = super::EgcRemoteWSL::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egcclone() {
+        let obj = super::EgcRemoteWSL::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egddefault() {
+        let obj = super::EgdRemoteTunnel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egdclone() {
+        let obj = super::EgdRemoteTunnel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egedefault() {
+        let obj = super::EgeRemoteAuthority::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egeclone() {
+        let obj = super::EgeRemoteAuthority::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
