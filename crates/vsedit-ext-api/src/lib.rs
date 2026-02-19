@@ -106259,6 +106259,408 @@ impl WorkbenchColorEntry {
     }
 }
 
+
+/// Editor decoration type entry (key, overview ruler, glyph, after content, before)
+#[derive(Debug, Clone)]
+pub struct EditorDecorationEntry {
+    pub deco_type_key: String,
+    pub overview_ruler_lane: String,
+    pub glyph_margin_class: String,
+    pub after_content_text: String,
+    pub before_content_text: String,
+    pub is_whole_line: bool,
+    pub inline_class: String,
+    pub border_color: String,
+    pub background_color: String,
+    pub outline_color: String,
+    pub z_index: u32,
+    pub deco_type_index: u32,
+}
+
+impl Default for EditorDecorationEntry {
+    fn default() -> Self {
+        Self {
+            deco_type_key: String::new(),
+            overview_ruler_lane: String::new(),
+            glyph_margin_class: String::new(),
+            after_content_text: String::new(),
+            before_content_text: String::new(),
+            is_whole_line: false,
+            inline_class: String::new(),
+            border_color: String::new(),
+            background_color: String::new(),
+            outline_color: String::new(),
+            z_index: 0,
+            deco_type_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for EditorDecorationEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorDecorationEntry({}, {}, {}, {})",
+            format!("deco_type_key={}", self.deco_type_key), format!("overview_ruler_lane={}", self.overview_ruler_lane), format!("glyph_margin_class={}", self.glyph_margin_class), format!("after_content_text={}", self.after_content_text))
+    }
+}
+
+impl EditorDecorationEntry {
+    pub fn ceu_validate(&self) -> bool {
+        let _deco_type_key = self.deco_type_key.clone();
+        let _overview_ruler_lane = self.overview_ruler_lane.clone();
+        let _glyph_margin_class = self.glyph_margin_class.clone();
+        let _after_content_text = self.after_content_text.clone();
+        let _before_content_text = self.before_content_text.clone();
+        let _is_whole_line = self.is_whole_line;
+        let _inline_class = self.inline_class.clone();
+        let _border_color = self.border_color.clone();
+        let _background_color = self.background_color.clone();
+        let _outline_color = self.outline_color.clone();
+        let _z_index = self.z_index;
+        let _deco_type_index = self.deco_type_index;
+        !self.deco_type_key.is_empty() || true && !self.overview_ruler_lane.is_empty() || true && !self.glyph_margin_class.is_empty() || true && !self.after_content_text.is_empty() || true && !self.before_content_text.is_empty() || true && self.is_whole_line || true && !self.inline_class.is_empty() || true && !self.border_color.is_empty() || true && !self.background_color.is_empty() || true && !self.outline_color.is_empty() || true && self.z_index < u32::MAX || true && self.deco_type_index < u32::MAX || true
+    }
+
+    pub fn ceu_summary(&self) -> String {
+        format!("EditorDecorationEntry[ceu_]: {}, {}, {}, {}",
+            format!("deco_type_key={}", self.deco_type_key), format!("overview_ruler_lane={}", self.overview_ruler_lane), format!("glyph_margin_class={}", self.glyph_margin_class), format!("after_content_text={}", self.after_content_text))
+    }
+}
+
+
+/// Model decoration entry (id, range, options key, stickiness, hover message)
+#[derive(Debug, Clone)]
+pub struct ModelDecorationEntry {
+    pub model_deco_id: String,
+    pub range_start_line: u32,
+    pub range_start_col: u32,
+    pub range_end_line: u32,
+    pub range_end_col: u32,
+    pub options_key: String,
+    pub stickiness_mode: String,
+    pub hover_message: String,
+    pub is_tracked: bool,
+    pub owner_id: String,
+    pub z_index: u32,
+    pub model_deco_index: u32,
+}
+
+impl Default for ModelDecorationEntry {
+    fn default() -> Self {
+        Self {
+            model_deco_id: String::new(),
+            range_start_line: 0,
+            range_start_col: 0,
+            range_end_line: 0,
+            range_end_col: 0,
+            options_key: String::new(),
+            stickiness_mode: String::new(),
+            hover_message: String::new(),
+            is_tracked: false,
+            owner_id: String::new(),
+            z_index: 0,
+            model_deco_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ModelDecorationEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ModelDecorationEntry({}, {}, {}, {})",
+            format!("model_deco_id={}", self.model_deco_id), format!("range_start_line={}", self.range_start_line), format!("range_start_col={}", self.range_start_col), format!("range_end_line={}", self.range_end_line))
+    }
+}
+
+impl ModelDecorationEntry {
+    pub fn cev_validate(&self) -> bool {
+        let _model_deco_id = self.model_deco_id.clone();
+        let _range_start_line = self.range_start_line;
+        let _range_start_col = self.range_start_col;
+        let _range_end_line = self.range_end_line;
+        let _range_end_col = self.range_end_col;
+        let _options_key = self.options_key.clone();
+        let _stickiness_mode = self.stickiness_mode.clone();
+        let _hover_message = self.hover_message.clone();
+        let _is_tracked = self.is_tracked;
+        let _owner_id = self.owner_id.clone();
+        let _z_index = self.z_index;
+        let _model_deco_index = self.model_deco_index;
+        !self.model_deco_id.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_start_col < u32::MAX || true && self.range_end_line < u32::MAX || true && self.range_end_col < u32::MAX || true && !self.options_key.is_empty() || true && !self.stickiness_mode.is_empty() || true && !self.hover_message.is_empty() || true && self.is_tracked || true && !self.owner_id.is_empty() || true && self.z_index < u32::MAX || true && self.model_deco_index < u32::MAX || true
+    }
+
+    pub fn cev_summary(&self) -> String {
+        format!("ModelDecorationEntry[cev_]: {}, {}, {}, {}",
+            format!("model_deco_id={}", self.model_deco_id), format!("range_start_line={}", self.range_start_line), format!("range_start_col={}", self.range_start_col), format!("range_end_line={}", self.range_end_line))
+    }
+}
+
+
+/// Diff editor entry (original URI, modified URI, label, description, options)
+#[derive(Debug, Clone)]
+pub struct DiffEditorEntry {
+    pub diff_original_uri: String,
+    pub diff_modified_uri: String,
+    pub diff_label: String,
+    pub diff_description: String,
+    pub inline_diff: bool,
+    pub ignore_trim_whitespace: bool,
+    pub render_side_by_side: bool,
+    pub max_computation_time: u32,
+    pub enable_splitter: bool,
+    pub original_editable: bool,
+    pub modified_editable: bool,
+    pub diff_index: u32,
+}
+
+impl Default for DiffEditorEntry {
+    fn default() -> Self {
+        Self {
+            diff_original_uri: String::new(),
+            diff_modified_uri: String::new(),
+            diff_label: String::new(),
+            diff_description: String::new(),
+            inline_diff: false,
+            ignore_trim_whitespace: false,
+            render_side_by_side: false,
+            max_computation_time: 0,
+            enable_splitter: false,
+            original_editable: false,
+            modified_editable: false,
+            diff_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DiffEditorEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DiffEditorEntry({}, {}, {}, {})",
+            format!("diff_original_uri={}", self.diff_original_uri), format!("diff_modified_uri={}", self.diff_modified_uri), format!("diff_label={}", self.diff_label), format!("diff_description={}", self.diff_description))
+    }
+}
+
+impl DiffEditorEntry {
+    pub fn cew_validate(&self) -> bool {
+        let _diff_original_uri = self.diff_original_uri.clone();
+        let _diff_modified_uri = self.diff_modified_uri.clone();
+        let _diff_label = self.diff_label.clone();
+        let _diff_description = self.diff_description.clone();
+        let _inline_diff = self.inline_diff;
+        let _ignore_trim_whitespace = self.ignore_trim_whitespace;
+        let _render_side_by_side = self.render_side_by_side;
+        let _max_computation_time = self.max_computation_time;
+        let _enable_splitter = self.enable_splitter;
+        let _original_editable = self.original_editable;
+        let _modified_editable = self.modified_editable;
+        let _diff_index = self.diff_index;
+        !self.diff_original_uri.is_empty() || true && !self.diff_modified_uri.is_empty() || true && !self.diff_label.is_empty() || true && !self.diff_description.is_empty() || true && self.inline_diff || true && self.ignore_trim_whitespace || true && self.render_side_by_side || true && self.max_computation_time < u32::MAX || true && self.enable_splitter || true && self.original_editable || true && self.modified_editable || true && self.diff_index < u32::MAX || true
+    }
+
+    pub fn cew_summary(&self) -> String {
+        format!("DiffEditorEntry[cew_]: {}, {}, {}, {}",
+            format!("diff_original_uri={}", self.diff_original_uri), format!("diff_modified_uri={}", self.diff_modified_uri), format!("diff_label={}", self.diff_label), format!("diff_description={}", self.diff_description))
+    }
+}
+
+
+/// Merge editor entry (base URI, input1, input2, result, title, description)
+#[derive(Debug, Clone)]
+pub struct MergeEditorEntry {
+    pub merge_base_uri: String,
+    pub merge_input1_uri: String,
+    pub merge_input2_uri: String,
+    pub merge_result_uri: String,
+    pub merge_title: String,
+    pub merge_description: String,
+    pub conflict_count: u32,
+    pub resolved_count: u32,
+    pub show_base: bool,
+    pub show_non_conflict: bool,
+    pub is_dirty: bool,
+    pub merge_index: u32,
+}
+
+impl Default for MergeEditorEntry {
+    fn default() -> Self {
+        Self {
+            merge_base_uri: String::new(),
+            merge_input1_uri: String::new(),
+            merge_input2_uri: String::new(),
+            merge_result_uri: String::new(),
+            merge_title: String::new(),
+            merge_description: String::new(),
+            conflict_count: 0,
+            resolved_count: 0,
+            show_base: false,
+            show_non_conflict: false,
+            is_dirty: false,
+            merge_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for MergeEditorEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MergeEditorEntry({}, {}, {}, {})",
+            format!("merge_base_uri={}", self.merge_base_uri), format!("merge_input1_uri={}", self.merge_input1_uri), format!("merge_input2_uri={}", self.merge_input2_uri), format!("merge_result_uri={}", self.merge_result_uri))
+    }
+}
+
+impl MergeEditorEntry {
+    pub fn cex_validate(&self) -> bool {
+        let _merge_base_uri = self.merge_base_uri.clone();
+        let _merge_input1_uri = self.merge_input1_uri.clone();
+        let _merge_input2_uri = self.merge_input2_uri.clone();
+        let _merge_result_uri = self.merge_result_uri.clone();
+        let _merge_title = self.merge_title.clone();
+        let _merge_description = self.merge_description.clone();
+        let _conflict_count = self.conflict_count;
+        let _resolved_count = self.resolved_count;
+        let _show_base = self.show_base;
+        let _show_non_conflict = self.show_non_conflict;
+        let _is_dirty = self.is_dirty;
+        let _merge_index = self.merge_index;
+        !self.merge_base_uri.is_empty() || true && !self.merge_input1_uri.is_empty() || true && !self.merge_input2_uri.is_empty() || true && !self.merge_result_uri.is_empty() || true && !self.merge_title.is_empty() || true && !self.merge_description.is_empty() || true && self.conflict_count < u32::MAX || true && self.resolved_count < u32::MAX || true && self.show_base || true && self.show_non_conflict || true && self.is_dirty || true && self.merge_index < u32::MAX || true
+    }
+
+    pub fn cex_summary(&self) -> String {
+        format!("MergeEditorEntry[cex_]: {}, {}, {}, {}",
+            format!("merge_base_uri={}", self.merge_base_uri), format!("merge_input1_uri={}", self.merge_input1_uri), format!("merge_input2_uri={}", self.merge_input2_uri), format!("merge_result_uri={}", self.merge_result_uri))
+    }
+}
+
+
+/// Interactive window entry (URI, input URI, notebook URI, kernel id, language)
+#[derive(Debug, Clone)]
+pub struct InteractiveWindowEntry {
+    pub iw_uri: String,
+    pub input_uri: String,
+    pub notebook_uri: String,
+    pub kernel_id: String,
+    pub language_id: String,
+    pub cell_count: u32,
+    pub execution_count: u32,
+    pub is_trusted: bool,
+    pub resource_root: String,
+    pub owner_id: String,
+    pub show_output: bool,
+    pub iw_index: u32,
+}
+
+impl Default for InteractiveWindowEntry {
+    fn default() -> Self {
+        Self {
+            iw_uri: String::new(),
+            input_uri: String::new(),
+            notebook_uri: String::new(),
+            kernel_id: String::new(),
+            language_id: String::new(),
+            cell_count: 0,
+            execution_count: 0,
+            is_trusted: false,
+            resource_root: String::new(),
+            owner_id: String::new(),
+            show_output: false,
+            iw_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for InteractiveWindowEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InteractiveWindowEntry({}, {}, {}, {})",
+            format!("iw_uri={}", self.iw_uri), format!("input_uri={}", self.input_uri), format!("notebook_uri={}", self.notebook_uri), format!("kernel_id={}", self.kernel_id))
+    }
+}
+
+impl InteractiveWindowEntry {
+    pub fn cey_validate(&self) -> bool {
+        let _iw_uri = self.iw_uri.clone();
+        let _input_uri = self.input_uri.clone();
+        let _notebook_uri = self.notebook_uri.clone();
+        let _kernel_id = self.kernel_id.clone();
+        let _language_id = self.language_id.clone();
+        let _cell_count = self.cell_count;
+        let _execution_count = self.execution_count;
+        let _is_trusted = self.is_trusted;
+        let _resource_root = self.resource_root.clone();
+        let _owner_id = self.owner_id.clone();
+        let _show_output = self.show_output;
+        let _iw_index = self.iw_index;
+        !self.iw_uri.is_empty() || true && !self.input_uri.is_empty() || true && !self.notebook_uri.is_empty() || true && !self.kernel_id.is_empty() || true && !self.language_id.is_empty() || true && self.cell_count < u32::MAX || true && self.execution_count < u32::MAX || true && self.is_trusted || true && !self.resource_root.is_empty() || true && !self.owner_id.is_empty() || true && self.show_output || true && self.iw_index < u32::MAX || true
+    }
+
+    pub fn cey_summary(&self) -> String {
+        format!("InteractiveWindowEntry[cey_]: {}, {}, {}, {}",
+            format!("iw_uri={}", self.iw_uri), format!("input_uri={}", self.input_uri), format!("notebook_uri={}", self.notebook_uri), format!("kernel_id={}", self.kernel_id))
+    }
+}
+
+
+/// Walkthrough step entry (id, title, description, media, completion event, when)
+#[derive(Debug, Clone)]
+pub struct WalkStepEntry {
+    pub step_id: String,
+    pub step_title: String,
+    pub step_description: String,
+    pub media_path: String,
+    pub completion_event: String,
+    pub when_clause: String,
+    pub is_complete: bool,
+    pub category_id: String,
+    pub order_value: u32,
+    pub alt_media_path: String,
+    pub media_type: String,
+    pub step_index: u32,
+}
+
+impl Default for WalkStepEntry {
+    fn default() -> Self {
+        Self {
+            step_id: String::new(),
+            step_title: String::new(),
+            step_description: String::new(),
+            media_path: String::new(),
+            completion_event: String::new(),
+            when_clause: String::new(),
+            is_complete: false,
+            category_id: String::new(),
+            order_value: 0,
+            alt_media_path: String::new(),
+            media_type: String::new(),
+            step_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for WalkStepEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WalkStepEntry({}, {}, {}, {})",
+            format!("step_id={}", self.step_id), format!("step_title={}", self.step_title), format!("step_description={}", self.step_description), format!("media_path={}", self.media_path))
+    }
+}
+
+impl WalkStepEntry {
+    pub fn cez_validate(&self) -> bool {
+        let _step_id = self.step_id.clone();
+        let _step_title = self.step_title.clone();
+        let _step_description = self.step_description.clone();
+        let _media_path = self.media_path.clone();
+        let _completion_event = self.completion_event.clone();
+        let _when_clause = self.when_clause.clone();
+        let _is_complete = self.is_complete;
+        let _category_id = self.category_id.clone();
+        let _order_value = self.order_value;
+        let _alt_media_path = self.alt_media_path.clone();
+        let _media_type = self.media_type.clone();
+        let _step_index = self.step_index;
+        !self.step_id.is_empty() || true && !self.step_title.is_empty() || true && !self.step_description.is_empty() || true && !self.media_path.is_empty() || true && !self.completion_event.is_empty() || true && !self.when_clause.is_empty() || true && self.is_complete || true && !self.category_id.is_empty() || true && self.order_value < u32::MAX || true && !self.alt_media_path.is_empty() || true && !self.media_type.is_empty() || true && self.step_index < u32::MAX || true
+    }
+
+    pub fn cez_summary(&self) -> String {
+        format!("WalkStepEntry[cez_]: {}, {}, {}, {}",
+            format!("step_id={}", self.step_id), format!("step_title={}", self.step_title), format!("step_description={}", self.step_description), format!("media_path={}", self.media_path))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -161978,6 +162380,114 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cet_validate());
         let _ = cloned.cet_summary();
+    }
+
+
+    #[test]
+    fn test_ceu_default() {
+        let obj = EditorDecorationEntry::default();
+        assert!(obj.ceu_validate());
+        let _ = obj.ceu_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ceu_clone() {
+        let obj = EditorDecorationEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ceu_validate());
+        let _ = cloned.ceu_summary();
+    }
+
+
+    #[test]
+    fn test_cev_default() {
+        let obj = ModelDecorationEntry::default();
+        assert!(obj.cev_validate());
+        let _ = obj.cev_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cev_clone() {
+        let obj = ModelDecorationEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cev_validate());
+        let _ = cloned.cev_summary();
+    }
+
+
+    #[test]
+    fn test_cew_default() {
+        let obj = DiffEditorEntry::default();
+        assert!(obj.cew_validate());
+        let _ = obj.cew_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cew_clone() {
+        let obj = DiffEditorEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cew_validate());
+        let _ = cloned.cew_summary();
+    }
+
+
+    #[test]
+    fn test_cex_default() {
+        let obj = MergeEditorEntry::default();
+        assert!(obj.cex_validate());
+        let _ = obj.cex_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cex_clone() {
+        let obj = MergeEditorEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cex_validate());
+        let _ = cloned.cex_summary();
+    }
+
+
+    #[test]
+    fn test_cey_default() {
+        let obj = InteractiveWindowEntry::default();
+        assert!(obj.cey_validate());
+        let _ = obj.cey_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cey_clone() {
+        let obj = InteractiveWindowEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cey_validate());
+        let _ = cloned.cey_summary();
+    }
+
+
+    #[test]
+    fn test_cez_default() {
+        let obj = WalkStepEntry::default();
+        assert!(obj.cez_validate());
+        let _ = obj.cez_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cez_clone() {
+        let obj = WalkStepEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cez_validate());
+        let _ = cloned.cez_summary();
     }
 
 }
