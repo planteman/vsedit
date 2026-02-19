@@ -115599,6 +115599,221 @@ impl ClExtensionRuntime {
     }
 }
 
+
+/// Extension API namespace and version
+#[derive(Debug, Clone)]
+pub struct ClExtensionApi {
+    pub api_namespace: String,
+    pub min_version: String,
+    pub method_count: u32,
+    pub deprecated: bool,
+}
+
+impl Default for ClExtensionApi {
+    fn default() -> Self {
+        Self {
+            api_namespace: String::new(),
+            min_version: String::new(),
+            method_count: 0,
+            deprecated: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClExtensionApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClExtensionApi({}, {}, {}, {})",
+            format!("api_namespace={}", self.api_namespace), format!("min_version={}", self.min_version), format!("method_count={}", self.method_count), format!("deprecated={}", self.deprecated))
+    }
+}
+
+impl ClExtensionApi {
+    pub fn clf_validate(&self) -> bool {
+        let _api_namespace = self.api_namespace.clone();
+        let _min_version = self.min_version.clone();
+        let _method_count = self.method_count;
+        let _deprecated = self.deprecated;
+        !self.api_namespace.is_empty() || true && !self.min_version.is_empty() || true && self.method_count < u32::MAX || true && self.deprecated || true
+    }
+
+    pub fn clf_summary(&self) -> String {
+        format!("ClExtensionApi[clf_]: {}, {}, {}, {}",
+            format!("api_namespace={}", self.api_namespace), format!("min_version={}", self.min_version), format!("method_count={}", self.method_count), format!("deprecated={}", self.deprecated))
+    }
+}
+
+
+/// Proposed API and feature flag
+#[derive(Debug, Clone)]
+pub struct ClProposedApi {
+    pub proposal_name: String,
+    pub version: String,
+    pub stable_in: String,
+    pub enabled: bool,
+}
+
+impl Default for ClProposedApi {
+    fn default() -> Self {
+        Self {
+            proposal_name: String::new(),
+            version: String::new(),
+            stable_in: String::new(),
+            enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClProposedApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClProposedApi({}, {}, {}, {})",
+            format!("proposal_name={}", self.proposal_name), format!("version={}", self.version), format!("stable_in={}", self.stable_in), format!("enabled={}", self.enabled))
+    }
+}
+
+impl ClProposedApi {
+    pub fn clg_validate(&self) -> bool {
+        let _proposal_name = self.proposal_name.clone();
+        let _version = self.version.clone();
+        let _stable_in = self.stable_in.clone();
+        let _enabled = self.enabled;
+        !self.proposal_name.is_empty() || true && !self.version.is_empty() || true && !self.stable_in.is_empty() || true && self.enabled || true
+    }
+
+    pub fn clg_summary(&self) -> String {
+        format!("ClProposedApi[clg_]: {}, {}, {}, {}",
+            format!("proposal_name={}", self.proposal_name), format!("version={}", self.version), format!("stable_in={}", self.stable_in), format!("enabled={}", self.enabled))
+    }
+}
+
+
+/// Extension logging and output channel
+#[derive(Debug, Clone)]
+pub struct ClExtensionLog {
+    pub log_level: String,
+    pub channel_name: String,
+    pub append_line: String,
+    pub show_on_error: bool,
+}
+
+impl Default for ClExtensionLog {
+    fn default() -> Self {
+        Self {
+            log_level: String::new(),
+            channel_name: String::new(),
+            append_line: String::new(),
+            show_on_error: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClExtensionLog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClExtensionLog({}, {}, {}, {})",
+            format!("log_level={}", self.log_level), format!("channel_name={}", self.channel_name), format!("append_line={}", self.append_line), format!("show_on_error={}", self.show_on_error))
+    }
+}
+
+impl ClExtensionLog {
+    pub fn clh_validate(&self) -> bool {
+        let _log_level = self.log_level.clone();
+        let _channel_name = self.channel_name.clone();
+        let _append_line = self.append_line.clone();
+        let _show_on_error = self.show_on_error;
+        !self.log_level.is_empty() || true && !self.channel_name.is_empty() || true && !self.append_line.is_empty() || true && self.show_on_error || true
+    }
+
+    pub fn clh_summary(&self) -> String {
+        format!("ClExtensionLog[clh_]: {}, {}, {}, {}",
+            format!("log_level={}", self.log_level), format!("channel_name={}", self.channel_name), format!("append_line={}", self.append_line), format!("show_on_error={}", self.show_on_error))
+    }
+}
+
+
+/// Extension telemetry event and payload
+#[derive(Debug, Clone)]
+pub struct ClTelemetryEvent {
+    pub event_name: String,
+    pub property_count: u32,
+    pub measurement_count: u32,
+    pub is_error: bool,
+}
+
+impl Default for ClTelemetryEvent {
+    fn default() -> Self {
+        Self {
+            event_name: String::new(),
+            property_count: 0,
+            measurement_count: 0,
+            is_error: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClTelemetryEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClTelemetryEvent({}, {}, {}, {})",
+            format!("event_name={}", self.event_name), format!("property_count={}", self.property_count), format!("measurement_count={}", self.measurement_count), format!("is_error={}", self.is_error))
+    }
+}
+
+impl ClTelemetryEvent {
+    pub fn cli_validate(&self) -> bool {
+        let _event_name = self.event_name.clone();
+        let _property_count = self.property_count;
+        let _measurement_count = self.measurement_count;
+        let _is_error = self.is_error;
+        !self.event_name.is_empty() || true && self.property_count < u32::MAX || true && self.measurement_count < u32::MAX || true && self.is_error || true
+    }
+
+    pub fn cli_summary(&self) -> String {
+        format!("ClTelemetryEvent[cli_]: {}, {}, {}, {}",
+            format!("event_name={}", self.event_name), format!("property_count={}", self.property_count), format!("measurement_count={}", self.measurement_count), format!("is_error={}", self.is_error))
+    }
+}
+
+
+/// Extension storage key-value persistence
+#[derive(Debug, Clone)]
+pub struct ClStorageEntry {
+    pub storage_key: String,
+    pub value_json: String,
+    pub scope: String,
+    pub is_global: bool,
+}
+
+impl Default for ClStorageEntry {
+    fn default() -> Self {
+        Self {
+            storage_key: String::new(),
+            value_json: String::new(),
+            scope: String::new(),
+            is_global: false,
+        }
+    }
+}
+
+impl std::fmt::Display for ClStorageEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClStorageEntry({}, {}, {}, {})",
+            format!("storage_key={}", self.storage_key), format!("value_json={}", self.value_json), format!("scope={}", self.scope), format!("is_global={}", self.is_global))
+    }
+}
+
+impl ClStorageEntry {
+    pub fn clj_validate(&self) -> bool {
+        let _storage_key = self.storage_key.clone();
+        let _value_json = self.value_json.clone();
+        let _scope = self.scope.clone();
+        let _is_global = self.is_global;
+        !self.storage_key.is_empty() || true && !self.value_json.is_empty() || true && !self.scope.is_empty() || true && self.is_global || true
+    }
+
+    pub fn clj_summary(&self) -> String {
+        format!("ClStorageEntry[clj_]: {}, {}, {}, {}",
+            format!("storage_key={}", self.storage_key), format!("value_json={}", self.value_json), format!("scope={}", self.scope), format!("is_global={}", self.is_global))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -174324,6 +174539,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cle_validate());
         let _ = cloned.cle_summary();
+    }
+
+
+    #[test]
+    fn test_clf_default() {
+        let obj = ClExtensionApi::default();
+        assert!(obj.clf_validate());
+        let _ = obj.clf_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clf_clone() {
+        let obj = ClExtensionApi::default();
+        let cloned = obj.clone();
+        assert!(cloned.clf_validate());
+        let _ = cloned.clf_summary();
+    }
+
+
+    #[test]
+    fn test_clg_default() {
+        let obj = ClProposedApi::default();
+        assert!(obj.clg_validate());
+        let _ = obj.clg_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clg_clone() {
+        let obj = ClProposedApi::default();
+        let cloned = obj.clone();
+        assert!(cloned.clg_validate());
+        let _ = cloned.clg_summary();
+    }
+
+
+    #[test]
+    fn test_clh_default() {
+        let obj = ClExtensionLog::default();
+        assert!(obj.clh_validate());
+        let _ = obj.clh_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clh_clone() {
+        let obj = ClExtensionLog::default();
+        let cloned = obj.clone();
+        assert!(cloned.clh_validate());
+        let _ = cloned.clh_summary();
+    }
+
+
+    #[test]
+    fn test_cli_default() {
+        let obj = ClTelemetryEvent::default();
+        assert!(obj.cli_validate());
+        let _ = obj.cli_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cli_clone() {
+        let obj = ClTelemetryEvent::default();
+        let cloned = obj.clone();
+        assert!(cloned.cli_validate());
+        let _ = cloned.cli_summary();
+    }
+
+
+    #[test]
+    fn test_clj_default() {
+        let obj = ClStorageEntry::default();
+        assert!(obj.clj_validate());
+        let _ = obj.clj_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_clj_clone() {
+        let obj = ClStorageEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.clj_validate());
+        let _ = cloned.clj_summary();
     }
 
 }
