@@ -57677,3 +57677,228 @@ mod bbg_tests {
         assert_eq!(nums.len(), 5);
     }
 }
+
+
+// --- bbh_: Editor sticky scroll model ---
+
+/// A scope for sticky scroll display.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BbhStickyScope {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub text: String,
+    pub depth: u32,
+}
+
+impl BbhStickyScope {
+    pub fn new(start: u32, end: u32, text: &str, depth: u32) -> Self {
+        Self { start_line: start, end_line: end, text: text.to_string(), depth }
+    }
+
+    pub fn contains_line(&self, line: u32) -> bool {
+        line >= self.start_line && line <= self.end_line
+    }
+
+    pub fn line_count(&self) -> u32 { self.end_line - self.start_line + 1 }
+
+    pub fn is_visible_at(&self, viewport_top: u32) -> bool {
+        viewport_top > self.start_line && viewport_top <= self.end_line
+    }
+}
+
+/// Configuration for sticky scroll.
+#[derive(Debug, Clone)]
+pub struct BbhStickyConfig {
+    pub enabled: bool,
+    pub max_lines: u32,
+    pub default_model: BbhStickySource,
+}
+
+impl BbhStickyConfig {
+    pub fn new() -> Self {
+        Self { enabled: true, max_lines: 5, default_model: BbhStickySource::OutlineModel }
+    }
+}
+
+/// Source for sticky scroll scopes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BbhStickySource {
+    OutlineModel,
+    FoldingRanges,
+    IndentationGuides,
+}
+
+impl BbhStickySource {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::OutlineModel => "Outline Model",
+            Self::FoldingRanges => "Folding Ranges",
+            Self::IndentationGuides => "Indentation Guides",
+        }
+    }
+}
+
+/// The sticky scroll model.
+#[derive(Debug)]
+pub struct BbhStickyModel {
+    config: BbhStickyConfig,
+    scopes: Vec<BbhStickyScope>,
+    viewport_top: u32,
+    active_lines: Vec<BbhStickyScope>,
+}
+
+impl BbhStickyModel {
+    pub fn new(config: BbhStickyConfig) -> Self {
+        Self { config, scopes: Vec::new(), viewport_top: 0, active_lines: Vec::new() }
+    }
+
+    pub fn set_scopes(&mut self, scopes: Vec<BbhStickyScope>) {
+        self.scopes = scopes;
+        self.update_active();
+    }
+
+    pub fn set_viewport_top(&mut self, line: u32) {
+        self.viewport_top = line;
+        self.update_active();
+    }
+
+    fn update_active(&mut self) {
+        if !self.config.enabled {
+            self.active_lines.clear();
+            return;
+        }
+        let mut active: Vec<BbhStickyScope> = self.scopes.iter()
+            .filter(|s| s.is_visible_at(self.viewport_top))
+            .cloned()
+            .collect();
+        active.sort_by_key(|s| s.depth);
+        active.truncate(self.config.max_lines as usize);
+        self.active_lines = active;
+    }
+
+    pub fn active_lines(&self) -> &[BbhStickyScope] { &self.active_lines }
+    pub fn active_count(&self) -> usize { self.active_lines.len() }
+    pub fn is_active(&self) -> bool { !self.active_lines.is_empty() }
+
+    pub fn height(&self) -> u32 { self.active_lines.len() as u32 }
+
+    pub fn scope_at_depth(&self, depth: u32) -> Option<&BbhStickyScope> {
+        self.active_lines.iter().find(|s| s.depth == depth)
+    }
+
+    pub fn click_line(&self, sticky_idx: usize) -> Option<u32> {
+        self.active_lines.get(sticky_idx).map(|s| s.start_line)
+    }
+
+    pub fn is_enabled(&self) -> bool { self.config.enabled }
+    pub fn set_enabled(&mut self, v: bool) {
+        self.config.enabled = v;
+        self.update_active();
+    }
+
+    pub fn set_max_lines(&mut self, max: u32) {
+        self.config.max_lines = max;
+        self.update_active();
+    }
+
+    pub fn max_lines(&self) -> u32 { self.config.max_lines }
+}
+
+#[cfg(test)]
+mod bbh_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbh_scope() {
+        let s = BbhStickyScope::new(5, 20, "fn main()", 0);
+        assert!(s.contains_line(10));
+        assert!(!s.contains_line(21));
+        assert_eq!(s.line_count(), 16);
+    }
+
+    #[test]
+    fn test_bbh_scope_visibility() {
+        let s = BbhStickyScope::new(5, 20, "fn main()", 0);
+        assert!(s.is_visible_at(10)); // scrolled past start
+        assert!(!s.is_visible_at(5)); // at start, not past
+        assert!(!s.is_visible_at(21)); // past end
+    }
+
+    #[test]
+    fn test_bbh_source() {
+        assert_eq!(BbhStickySource::OutlineModel.label(), "Outline Model");
+    }
+
+    #[test]
+    fn test_bbh_model_basic() {
+        let mut m = BbhStickyModel::new(BbhStickyConfig::new());
+        m.set_scopes(vec![
+            BbhStickyScope::new(0, 50, "fn main()", 0),
+            BbhStickyScope::new(10, 30, "if x > 0", 1),
+            BbhStickyScope::new(15, 25, "for i in 0..10", 2),
+        ]);
+        m.set_viewport_top(20);
+        assert_eq!(m.active_count(), 3);
+    }
+
+    #[test]
+    fn test_bbh_model_max_lines() {
+        let mut c = BbhStickyConfig::new();
+        c.max_lines = 2;
+        let mut m = BbhStickyModel::new(c);
+        m.set_scopes(vec![
+            BbhStickyScope::new(0, 50, "a", 0),
+            BbhStickyScope::new(5, 40, "b", 1),
+            BbhStickyScope::new(10, 30, "c", 2),
+        ]);
+        m.set_viewport_top(15);
+        assert_eq!(m.active_count(), 2);
+    }
+
+    #[test]
+    fn test_bbh_model_disabled() {
+        let mut c = BbhStickyConfig::new();
+        c.enabled = false;
+        let mut m = BbhStickyModel::new(c);
+        m.set_scopes(vec![BbhStickyScope::new(0, 50, "a", 0)]);
+        m.set_viewport_top(10);
+        assert!(!m.is_active());
+    }
+
+    #[test]
+    fn test_bbh_model_click() {
+        let mut m = BbhStickyModel::new(BbhStickyConfig::new());
+        m.set_scopes(vec![BbhStickyScope::new(5, 30, "fn foo()", 0)]);
+        m.set_viewport_top(10);
+        assert_eq!(m.click_line(0), Some(5));
+    }
+
+    #[test]
+    fn test_bbh_model_scroll_out() {
+        let mut m = BbhStickyModel::new(BbhStickyConfig::new());
+        m.set_scopes(vec![BbhStickyScope::new(5, 10, "fn foo()", 0)]);
+        m.set_viewport_top(15); // scrolled past end
+        assert!(!m.is_active());
+    }
+
+    #[test]
+    fn test_bbh_toggle() {
+        let mut m = BbhStickyModel::new(BbhStickyConfig::new());
+        m.set_scopes(vec![BbhStickyScope::new(0, 50, "a", 0)]);
+        m.set_viewport_top(10);
+        assert!(m.is_active());
+        m.set_enabled(false);
+        assert!(!m.is_active());
+    }
+
+    #[test]
+    fn test_bbh_height() {
+        let mut m = BbhStickyModel::new(BbhStickyConfig::new());
+        m.set_scopes(vec![
+            BbhStickyScope::new(0, 50, "a", 0),
+            BbhStickyScope::new(5, 40, "b", 1),
+        ]);
+        m.set_viewport_top(10);
+        assert_eq!(m.height(), 2);
+    }
+}
