@@ -68721,3 +68721,170 @@ mod bdl_tests {
         assert_eq!(pv.kind(), BdlGotoKind::Implementation);
     }
 }
+
+
+// --- bdm_: Editor rename refactoring model ---
+
+/// A rename edit in a file.
+#[derive(Debug, Clone)]
+pub struct BdmRenameEdit {
+    pub uri: String,
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub new_text: String,
+}
+
+impl BdmRenameEdit {
+    pub fn new(uri: &str, line: u32, start: u32, end: u32, new_text: &str) -> Self {
+        Self { uri: uri.to_string(), line, start_col: start, end_col: end, new_text: new_text.to_string() }
+    }
+
+    pub fn filename(&self) -> &str { self.uri.rsplit('/').next().unwrap_or(&self.uri) }
+    pub fn display(&self) -> String { format!("{}:{}:{}-{} → {}", self.filename(), self.line, self.start_col, self.end_col, self.new_text) }
+}
+
+/// Rename operation state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BdmRenameState { Idle, InputActive, Computing, Preview, Applied, Error }
+
+/// The rename refactoring session.
+#[derive(Debug)]
+pub struct BdmRenameSession {
+    pub state: BdmRenameState,
+    pub old_name: String,
+    pub new_name: String,
+    pub edits: Vec<BdmRenameEdit>,
+    pub error: Option<String>,
+    pub cursor_line: u32,
+    pub cursor_col: u32,
+}
+
+impl BdmRenameSession {
+    pub fn new(old_name: &str, line: u32, col: u32) -> Self {
+        Self { state: BdmRenameState::InputActive, old_name: old_name.to_string(), new_name: old_name.to_string(), edits: Vec::new(), error: None, cursor_line: line, cursor_col: col }
+    }
+
+    pub fn set_new_name(&mut self, name: &str) { self.new_name = name.to_string(); }
+
+    pub fn compute_edits(&mut self, edits: Vec<BdmRenameEdit>) {
+        self.edits = edits;
+        self.state = BdmRenameState::Preview;
+    }
+
+    pub fn set_error(&mut self, msg: &str) {
+        self.error = Some(msg.to_string());
+        self.state = BdmRenameState::Error;
+    }
+
+    pub fn apply(&mut self) { self.state = BdmRenameState::Applied; }
+    pub fn cancel(&mut self) { self.state = BdmRenameState::Idle; }
+
+    pub fn edit_count(&self) -> usize { self.edits.len() }
+    pub fn files_affected(&self) -> usize {
+        let mut uris: Vec<_> = self.edits.iter().map(|e| &e.uri).collect();
+        uris.sort();
+        uris.dedup();
+        uris.len()
+    }
+
+    pub fn is_valid(&self) -> bool { !self.new_name.is_empty() && self.new_name != self.old_name }
+
+    pub fn summary(&self) -> String {
+        format!("Rename '{}' → '{}' ({} edits in {} files)", self.old_name, self.new_name, self.edit_count(), self.files_affected())
+    }
+
+    pub fn edits_in_file(&self, uri: &str) -> Vec<&BdmRenameEdit> {
+        self.edits.iter().filter(|e| e.uri == uri).collect()
+    }
+
+    pub fn render_preview(&self) -> Vec<String> {
+        let mut lines = vec![self.summary()];
+        let mut current_file = String::new();
+        for edit in &self.edits {
+            if edit.uri != current_file { current_file = edit.uri.clone(); lines.push(format!("  {}", edit.filename())); }
+            lines.push(format!("    {}", edit.display()));
+        }
+        lines
+    }
+}
+
+#[cfg(test)]
+mod bdm_tests {
+    use super::*;
+
+    #[test]
+    fn test_bdm_edit() {
+        let e = BdmRenameEdit::new("src/main.rs", 10, 5, 15, "newName");
+        assert_eq!(e.filename(), "main.rs");
+        assert!(e.display().contains("newName"));
+    }
+
+    #[test]
+    fn test_bdm_session_new() {
+        let s = BdmRenameSession::new("oldName", 5, 10);
+        assert_eq!(s.state, BdmRenameState::InputActive);
+        assert_eq!(s.old_name, "oldName");
+    }
+
+    #[test]
+    fn test_bdm_set_name() {
+        let mut s = BdmRenameSession::new("old", 0, 0);
+        s.set_new_name("new");
+        assert!(s.is_valid());
+    }
+
+    #[test]
+    fn test_bdm_invalid_same() {
+        let s = BdmRenameSession::new("x", 0, 0);
+        assert!(!s.is_valid()); // same name
+    }
+
+    #[test]
+    fn test_bdm_compute() {
+        let mut s = BdmRenameSession::new("old", 0, 0);
+        s.set_new_name("new");
+        s.compute_edits(vec![BdmRenameEdit::new("a.rs", 1, 0, 3, "new"), BdmRenameEdit::new("b.rs", 5, 0, 3, "new")]);
+        assert_eq!(s.state, BdmRenameState::Preview);
+        assert_eq!(s.edit_count(), 2);
+        assert_eq!(s.files_affected(), 2);
+    }
+
+    #[test]
+    fn test_bdm_apply() {
+        let mut s = BdmRenameSession::new("old", 0, 0);
+        s.apply();
+        assert_eq!(s.state, BdmRenameState::Applied);
+    }
+
+    #[test]
+    fn test_bdm_cancel() {
+        let mut s = BdmRenameSession::new("old", 0, 0);
+        s.cancel();
+        assert_eq!(s.state, BdmRenameState::Idle);
+    }
+
+    #[test]
+    fn test_bdm_error() {
+        let mut s = BdmRenameSession::new("old", 0, 0);
+        s.set_error("Cannot rename");
+        assert_eq!(s.state, BdmRenameState::Error);
+    }
+
+    #[test]
+    fn test_bdm_summary() {
+        let mut s = BdmRenameSession::new("old", 0, 0);
+        s.set_new_name("new");
+        s.compute_edits(vec![BdmRenameEdit::new("a.rs", 1, 0, 3, "new")]);
+        assert!(s.summary().contains("1 edits"));
+    }
+
+    #[test]
+    fn test_bdm_render() {
+        let mut s = BdmRenameSession::new("old", 0, 0);
+        s.set_new_name("new");
+        s.compute_edits(vec![BdmRenameEdit::new("a.rs", 1, 0, 3, "new")]);
+        let lines = s.render_preview();
+        assert!(lines.len() >= 2);
+    }
+}
