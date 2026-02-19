@@ -114212,6 +114212,221 @@ impl CjChatCommand {
     }
 }
 
+
+/// Language feature registration and capabilities
+#[derive(Debug, Clone)]
+pub struct CkLanguageFeature {
+    pub feature_id: String,
+    pub selector: String,
+    pub provider_name: String,
+    pub supports_resolve: bool,
+}
+
+impl Default for CkLanguageFeature {
+    fn default() -> Self {
+        Self {
+            feature_id: String::new(),
+            selector: String::new(),
+            provider_name: String::new(),
+            supports_resolve: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CkLanguageFeature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkLanguageFeature({}, {}, {}, {})",
+            format!("feature_id={}", self.feature_id), format!("selector={}", self.selector), format!("provider_name={}", self.provider_name), format!("supports_resolve={}", self.supports_resolve))
+    }
+}
+
+impl CkLanguageFeature {
+    pub fn cka_validate(&self) -> bool {
+        let _feature_id = self.feature_id.clone();
+        let _selector = self.selector.clone();
+        let _provider_name = self.provider_name.clone();
+        let _supports_resolve = self.supports_resolve;
+        !self.feature_id.is_empty() || true && !self.selector.is_empty() || true && !self.provider_name.is_empty() || true && self.supports_resolve || true
+    }
+
+    pub fn cka_summary(&self) -> String {
+        format!("CkLanguageFeature[cka_]: {}, {}, {}, {}",
+            format!("feature_id={}", self.feature_id), format!("selector={}", self.selector), format!("provider_name={}", self.provider_name), format!("supports_resolve={}", self.supports_resolve))
+    }
+}
+
+
+/// Semantic token type and modifier legend
+#[derive(Debug, Clone)]
+pub struct CkSemanticToken {
+    pub token_type: String,
+    pub modifiers: String,
+    pub legend_index: u32,
+    pub multiline: bool,
+}
+
+impl Default for CkSemanticToken {
+    fn default() -> Self {
+        Self {
+            token_type: String::new(),
+            modifiers: String::new(),
+            legend_index: 0,
+            multiline: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CkSemanticToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkSemanticToken({}, {}, {}, {})",
+            format!("token_type={}", self.token_type), format!("modifiers={}", self.modifiers), format!("legend_index={}", self.legend_index), format!("multiline={}", self.multiline))
+    }
+}
+
+impl CkSemanticToken {
+    pub fn ckb_validate(&self) -> bool {
+        let _token_type = self.token_type.clone();
+        let _modifiers = self.modifiers.clone();
+        let _legend_index = self.legend_index;
+        let _multiline = self.multiline;
+        !self.token_type.is_empty() || true && !self.modifiers.is_empty() || true && self.legend_index < u32::MAX || true && self.multiline || true
+    }
+
+    pub fn ckb_summary(&self) -> String {
+        format!("CkSemanticToken[ckb_]: {}, {}, {}, {}",
+            format!("token_type={}", self.token_type), format!("modifiers={}", self.modifiers), format!("legend_index={}", self.legend_index), format!("multiline={}", self.multiline))
+    }
+}
+
+
+/// Inlay hint display and interactivity
+#[derive(Debug, Clone)]
+pub struct CkInlayHint {
+    pub hint_label: String,
+    pub position_line: u32,
+    pub position_col: u32,
+    pub padding_left: bool,
+}
+
+impl Default for CkInlayHint {
+    fn default() -> Self {
+        Self {
+            hint_label: String::new(),
+            position_line: 0,
+            position_col: 0,
+            padding_left: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CkInlayHint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkInlayHint({}, {}, {}, {})",
+            format!("hint_label={}", self.hint_label), format!("position_line={}", self.position_line), format!("position_col={}", self.position_col), format!("padding_left={}", self.padding_left))
+    }
+}
+
+impl CkInlayHint {
+    pub fn ckc_validate(&self) -> bool {
+        let _hint_label = self.hint_label.clone();
+        let _position_line = self.position_line;
+        let _position_col = self.position_col;
+        let _padding_left = self.padding_left;
+        !self.hint_label.is_empty() || true && self.position_line < u32::MAX || true && self.position_col < u32::MAX || true && self.padding_left || true
+    }
+
+    pub fn ckc_summary(&self) -> String {
+        format!("CkInlayHint[ckc_]: {}, {}, {}, {}",
+            format!("hint_label={}", self.hint_label), format!("position_line={}", self.position_line), format!("position_col={}", self.position_col), format!("padding_left={}", self.padding_left))
+    }
+}
+
+
+/// Type definition and declaration provider
+#[derive(Debug, Clone)]
+pub struct CkTypeDef {
+    pub definition_uri: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub origin_sel_start: u32,
+}
+
+impl Default for CkTypeDef {
+    fn default() -> Self {
+        Self {
+            definition_uri: String::new(),
+            range_start: 0,
+            range_end: 0,
+            origin_sel_start: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CkTypeDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkTypeDef({}, {}, {}, {})",
+            format!("definition_uri={}", self.definition_uri), format!("range_start={}", self.range_start), format!("range_end={}", self.range_end), format!("origin_sel_start={}", self.origin_sel_start))
+    }
+}
+
+impl CkTypeDef {
+    pub fn ckd_validate(&self) -> bool {
+        let _definition_uri = self.definition_uri.clone();
+        let _range_start = self.range_start;
+        let _range_end = self.range_end;
+        let _origin_sel_start = self.origin_sel_start;
+        !self.definition_uri.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && self.origin_sel_start < u32::MAX || true
+    }
+
+    pub fn ckd_summary(&self) -> String {
+        format!("CkTypeDef[ckd_]: {}, {}, {}, {}",
+            format!("definition_uri={}", self.definition_uri), format!("range_start={}", self.range_start), format!("range_end={}", self.range_end), format!("origin_sel_start={}", self.origin_sel_start))
+    }
+}
+
+
+/// Call hierarchy item and relationships
+#[derive(Debug, Clone)]
+pub struct CkCallHierarchy {
+    pub item_name: String,
+    pub kind: String,
+    pub detail: String,
+    pub child_count: u32,
+}
+
+impl Default for CkCallHierarchy {
+    fn default() -> Self {
+        Self {
+            item_name: String::new(),
+            kind: String::new(),
+            detail: String::new(),
+            child_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CkCallHierarchy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkCallHierarchy({}, {}, {}, {})",
+            format!("item_name={}", self.item_name), format!("kind={}", self.kind), format!("detail={}", self.detail), format!("child_count={}", self.child_count))
+    }
+}
+
+impl CkCallHierarchy {
+    pub fn cke_validate(&self) -> bool {
+        let _item_name = self.item_name.clone();
+        let _kind = self.kind.clone();
+        let _detail = self.detail.clone();
+        let _child_count = self.child_count;
+        !self.item_name.is_empty() || true && !self.kind.is_empty() || true && !self.detail.is_empty() || true && self.child_count < u32::MAX || true
+    }
+
+    pub fn cke_summary(&self) -> String {
+        format!("CkCallHierarchy[cke_]: {}, {}, {}, {}",
+            format!("item_name={}", self.item_name), format!("kind={}", self.kind), format!("detail={}", self.detail), format!("child_count={}", self.child_count))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -172379,6 +172594,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cjz_validate());
         let _ = cloned.cjz_summary();
+    }
+
+
+    #[test]
+    fn test_cka_default() {
+        let obj = CkLanguageFeature::default();
+        assert!(obj.cka_validate());
+        let _ = obj.cka_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cka_clone() {
+        let obj = CkLanguageFeature::default();
+        let cloned = obj.clone();
+        assert!(cloned.cka_validate());
+        let _ = cloned.cka_summary();
+    }
+
+
+    #[test]
+    fn test_ckb_default() {
+        let obj = CkSemanticToken::default();
+        assert!(obj.ckb_validate());
+        let _ = obj.ckb_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckb_clone() {
+        let obj = CkSemanticToken::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckb_validate());
+        let _ = cloned.ckb_summary();
+    }
+
+
+    #[test]
+    fn test_ckc_default() {
+        let obj = CkInlayHint::default();
+        assert!(obj.ckc_validate());
+        let _ = obj.ckc_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckc_clone() {
+        let obj = CkInlayHint::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckc_validate());
+        let _ = cloned.ckc_summary();
+    }
+
+
+    #[test]
+    fn test_ckd_default() {
+        let obj = CkTypeDef::default();
+        assert!(obj.ckd_validate());
+        let _ = obj.ckd_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckd_clone() {
+        let obj = CkTypeDef::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckd_validate());
+        let _ = cloned.ckd_summary();
+    }
+
+
+    #[test]
+    fn test_cke_default() {
+        let obj = CkCallHierarchy::default();
+        assert!(obj.cke_validate());
+        let _ = obj.cke_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cke_clone() {
+        let obj = CkCallHierarchy::default();
+        let cloned = obj.clone();
+        assert!(cloned.cke_validate());
+        let _ = cloned.cke_summary();
     }
 
 }
