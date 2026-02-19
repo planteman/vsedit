@@ -87203,6 +87203,111 @@ impl CommentDecoration {
     }
 }
 
+/// Runtime wiring: bnp_ AuthenticationProvider
+#[derive(Debug, Clone)]
+pub struct AuthenticationProvider {
+    pub bnp_provider_id: String,
+    pub bnp_label: String,
+    pub bnp_supports_multiple_accounts: bool,
+    pub bnp_session_count: usize,
+    pub bnp_scopes: Vec<String>,
+    pub bnp_is_registered: bool,
+    pub bnp_icon_path: String,
+    pub bnp_priority: u8,
+    pub bnp_auto_login: bool,
+    pub bnp_trusted_extensions: Vec<String>,
+}
+
+impl AuthenticationProvider {
+    pub fn bnp_summary(&self) -> String {
+        format!("AuthenticationProvider({})", self.bnp_provider_id)
+    }
+}
+
+/// Runtime wiring: bnq_ SecretStorage
+#[derive(Debug, Clone)]
+pub struct SecretStorage {
+    pub bnq_storage_key: String,
+    pub bnq_encrypted: bool,
+    pub bnq_backend_type: String,
+    pub bnq_entry_count: usize,
+    pub bnq_max_value_size: usize,
+    pub bnq_namespace: String,
+    pub bnq_is_available: bool,
+    pub bnq_last_access_time: u64,
+    pub bnq_version: u32,
+    pub bnq_migration_needed: bool,
+}
+
+impl SecretStorage {
+    pub fn bnq_summary(&self) -> String {
+        format!("SecretStorage({})", self.bnq_storage_key)
+    }
+}
+
+/// Runtime wiring: bnr_ CredentialService
+#[derive(Debug, Clone)]
+pub struct CredentialService {
+    pub bnr_service_id: String,
+    pub bnr_account: String,
+    pub bnr_credential_type: String,
+    pub bnr_is_expired: bool,
+    pub bnr_expires_at: Option<u64>,
+    pub bnr_refresh_token: bool,
+    pub bnr_scope_list: Vec<String>,
+    pub bnr_issuer: String,
+    pub bnr_last_refreshed: u64,
+    pub bnr_auto_renew: bool,
+}
+
+impl CredentialService {
+    pub fn bnr_summary(&self) -> String {
+        format!("CredentialService({})", self.bnr_service_id)
+    }
+}
+
+/// Runtime wiring: bns_ CertificateTrust
+#[derive(Debug, Clone)]
+pub struct CertificateTrust {
+    pub bns_cert_fingerprint: String,
+    pub bns_subject_name: String,
+    pub bns_issuer_name: String,
+    pub bns_valid_from: u64,
+    pub bns_valid_to: u64,
+    pub bns_is_trusted: bool,
+    pub bns_trust_level: u8,
+    pub bns_key_usage: Vec<String>,
+    pub bns_serial_number: String,
+    pub bns_signature_algorithm: String,
+}
+
+impl CertificateTrust {
+    pub fn bns_summary(&self) -> String {
+        format!("CertificateTrust({})", self.bns_cert_fingerprint)
+    }
+}
+
+/// Runtime wiring: bnt_ ProxyConfig
+#[derive(Debug, Clone)]
+pub struct ProxyConfig {
+    pub bnt_proxy_url: String,
+    pub bnt_proxy_port: u16,
+    pub bnt_use_system_proxy: bool,
+    pub bnt_bypass_list: Vec<String>,
+    pub bnt_auth_required: bool,
+    pub bnt_proxy_username: String,
+    pub bnt_proxy_protocol: String,
+    pub bnt_strict_ssl: bool,
+    pub bnt_proxy_support: String,
+    pub bnt_connection_timeout: u32,
+}
+
+impl ProxyConfig {
+    pub fn bnt_summary(&self) -> String {
+        format!("ProxyConfig({})", self.bnt_proxy_url)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -99169,6 +99274,910 @@ mod tests_bfo {
         };
         let _ = obj.bno_summary();
         assert_eq!(obj.bno_background_color, "test");
+    }
+
+    #[test]
+    fn test_bnp_provider_id() {
+        let obj = AuthenticationProvider {
+            bnp_provider_id: String::from("test"),
+            bnp_label: String::from("test"),
+            bnp_supports_multiple_accounts: false,
+            bnp_session_count: 0,
+            bnp_scopes: Vec::new(),
+            bnp_is_registered: false,
+            bnp_icon_path: String::from("test"),
+            bnp_priority: 0,
+            bnp_auto_login: false,
+            bnp_trusted_extensions: Vec::new(),
+        };
+        let _ = obj.bnp_summary();
+        assert_eq!(obj.bnp_provider_id, "test");
+    }
+
+    #[test]
+    fn test_bnp_label() {
+        let obj = AuthenticationProvider {
+            bnp_provider_id: String::from("test"),
+            bnp_label: String::from("test"),
+            bnp_supports_multiple_accounts: false,
+            bnp_session_count: 0,
+            bnp_scopes: Vec::new(),
+            bnp_is_registered: false,
+            bnp_icon_path: String::from("test"),
+            bnp_priority: 0,
+            bnp_auto_login: false,
+            bnp_trusted_extensions: Vec::new(),
+        };
+        let _ = obj.bnp_summary();
+        assert_eq!(obj.bnp_label, "test");
+    }
+
+    #[test]
+    fn test_bnp_supports_multiple_accounts() {
+        let obj = AuthenticationProvider {
+            bnp_provider_id: String::from("test"),
+            bnp_label: String::from("test"),
+            bnp_supports_multiple_accounts: false,
+            bnp_session_count: 0,
+            bnp_scopes: Vec::new(),
+            bnp_is_registered: false,
+            bnp_icon_path: String::from("test"),
+            bnp_priority: 0,
+            bnp_auto_login: false,
+            bnp_trusted_extensions: Vec::new(),
+        };
+        let _ = obj.bnp_summary();
+        assert!(!obj.bnp_supports_multiple_accounts);
+    }
+
+    #[test]
+    fn test_bnp_session_count() {
+        let obj = AuthenticationProvider {
+            bnp_provider_id: String::from("test"),
+            bnp_label: String::from("test"),
+            bnp_supports_multiple_accounts: false,
+            bnp_session_count: 0,
+            bnp_scopes: Vec::new(),
+            bnp_is_registered: false,
+            bnp_icon_path: String::from("test"),
+            bnp_priority: 0,
+            bnp_auto_login: false,
+            bnp_trusted_extensions: Vec::new(),
+        };
+        let _ = obj.bnp_summary();
+        assert_eq!(obj.bnp_session_count, 0);
+    }
+
+    #[test]
+    fn test_bnp_scopes() {
+        let obj = AuthenticationProvider {
+            bnp_provider_id: String::from("test"),
+            bnp_label: String::from("test"),
+            bnp_supports_multiple_accounts: false,
+            bnp_session_count: 0,
+            bnp_scopes: Vec::new(),
+            bnp_is_registered: false,
+            bnp_icon_path: String::from("test"),
+            bnp_priority: 0,
+            bnp_auto_login: false,
+            bnp_trusted_extensions: Vec::new(),
+        };
+        let _ = obj.bnp_summary();
+        assert!(obj.bnp_scopes.is_empty());
+    }
+
+    #[test]
+    fn test_bnp_is_registered() {
+        let obj = AuthenticationProvider {
+            bnp_provider_id: String::from("test"),
+            bnp_label: String::from("test"),
+            bnp_supports_multiple_accounts: false,
+            bnp_session_count: 0,
+            bnp_scopes: Vec::new(),
+            bnp_is_registered: false,
+            bnp_icon_path: String::from("test"),
+            bnp_priority: 0,
+            bnp_auto_login: false,
+            bnp_trusted_extensions: Vec::new(),
+        };
+        let _ = obj.bnp_summary();
+        assert!(!obj.bnp_is_registered);
+    }
+
+    #[test]
+    fn test_bnp_icon_path() {
+        let obj = AuthenticationProvider {
+            bnp_provider_id: String::from("test"),
+            bnp_label: String::from("test"),
+            bnp_supports_multiple_accounts: false,
+            bnp_session_count: 0,
+            bnp_scopes: Vec::new(),
+            bnp_is_registered: false,
+            bnp_icon_path: String::from("test"),
+            bnp_priority: 0,
+            bnp_auto_login: false,
+            bnp_trusted_extensions: Vec::new(),
+        };
+        let _ = obj.bnp_summary();
+        assert_eq!(obj.bnp_icon_path, "test");
+    }
+
+    #[test]
+    fn test_bnp_priority() {
+        let obj = AuthenticationProvider {
+            bnp_provider_id: String::from("test"),
+            bnp_label: String::from("test"),
+            bnp_supports_multiple_accounts: false,
+            bnp_session_count: 0,
+            bnp_scopes: Vec::new(),
+            bnp_is_registered: false,
+            bnp_icon_path: String::from("test"),
+            bnp_priority: 0,
+            bnp_auto_login: false,
+            bnp_trusted_extensions: Vec::new(),
+        };
+        let _ = obj.bnp_summary();
+        assert_eq!(obj.bnp_priority, 0);
+    }
+
+    #[test]
+    fn test_bnp_auto_login() {
+        let obj = AuthenticationProvider {
+            bnp_provider_id: String::from("test"),
+            bnp_label: String::from("test"),
+            bnp_supports_multiple_accounts: false,
+            bnp_session_count: 0,
+            bnp_scopes: Vec::new(),
+            bnp_is_registered: false,
+            bnp_icon_path: String::from("test"),
+            bnp_priority: 0,
+            bnp_auto_login: false,
+            bnp_trusted_extensions: Vec::new(),
+        };
+        let _ = obj.bnp_summary();
+        assert!(!obj.bnp_auto_login);
+    }
+
+    #[test]
+    fn test_bnp_trusted_extensions() {
+        let obj = AuthenticationProvider {
+            bnp_provider_id: String::from("test"),
+            bnp_label: String::from("test"),
+            bnp_supports_multiple_accounts: false,
+            bnp_session_count: 0,
+            bnp_scopes: Vec::new(),
+            bnp_is_registered: false,
+            bnp_icon_path: String::from("test"),
+            bnp_priority: 0,
+            bnp_auto_login: false,
+            bnp_trusted_extensions: Vec::new(),
+        };
+        let _ = obj.bnp_summary();
+        assert!(obj.bnp_trusted_extensions.is_empty());
+    }
+
+
+    #[test]
+    fn test_bnq_storage_key() {
+        let obj = SecretStorage {
+            bnq_storage_key: String::from("test"),
+            bnq_encrypted: false,
+            bnq_backend_type: String::from("test"),
+            bnq_entry_count: 0,
+            bnq_max_value_size: 0,
+            bnq_namespace: String::from("test"),
+            bnq_is_available: false,
+            bnq_last_access_time: 0,
+            bnq_version: 0,
+            bnq_migration_needed: false,
+        };
+        let _ = obj.bnq_summary();
+        assert_eq!(obj.bnq_storage_key, "test");
+    }
+
+    #[test]
+    fn test_bnq_encrypted() {
+        let obj = SecretStorage {
+            bnq_storage_key: String::from("test"),
+            bnq_encrypted: false,
+            bnq_backend_type: String::from("test"),
+            bnq_entry_count: 0,
+            bnq_max_value_size: 0,
+            bnq_namespace: String::from("test"),
+            bnq_is_available: false,
+            bnq_last_access_time: 0,
+            bnq_version: 0,
+            bnq_migration_needed: false,
+        };
+        let _ = obj.bnq_summary();
+        assert!(!obj.bnq_encrypted);
+    }
+
+    #[test]
+    fn test_bnq_backend_type() {
+        let obj = SecretStorage {
+            bnq_storage_key: String::from("test"),
+            bnq_encrypted: false,
+            bnq_backend_type: String::from("test"),
+            bnq_entry_count: 0,
+            bnq_max_value_size: 0,
+            bnq_namespace: String::from("test"),
+            bnq_is_available: false,
+            bnq_last_access_time: 0,
+            bnq_version: 0,
+            bnq_migration_needed: false,
+        };
+        let _ = obj.bnq_summary();
+        assert_eq!(obj.bnq_backend_type, "test");
+    }
+
+    #[test]
+    fn test_bnq_entry_count() {
+        let obj = SecretStorage {
+            bnq_storage_key: String::from("test"),
+            bnq_encrypted: false,
+            bnq_backend_type: String::from("test"),
+            bnq_entry_count: 0,
+            bnq_max_value_size: 0,
+            bnq_namespace: String::from("test"),
+            bnq_is_available: false,
+            bnq_last_access_time: 0,
+            bnq_version: 0,
+            bnq_migration_needed: false,
+        };
+        let _ = obj.bnq_summary();
+        assert_eq!(obj.bnq_entry_count, 0);
+    }
+
+    #[test]
+    fn test_bnq_max_value_size() {
+        let obj = SecretStorage {
+            bnq_storage_key: String::from("test"),
+            bnq_encrypted: false,
+            bnq_backend_type: String::from("test"),
+            bnq_entry_count: 0,
+            bnq_max_value_size: 0,
+            bnq_namespace: String::from("test"),
+            bnq_is_available: false,
+            bnq_last_access_time: 0,
+            bnq_version: 0,
+            bnq_migration_needed: false,
+        };
+        let _ = obj.bnq_summary();
+        assert_eq!(obj.bnq_max_value_size, 0);
+    }
+
+    #[test]
+    fn test_bnq_namespace() {
+        let obj = SecretStorage {
+            bnq_storage_key: String::from("test"),
+            bnq_encrypted: false,
+            bnq_backend_type: String::from("test"),
+            bnq_entry_count: 0,
+            bnq_max_value_size: 0,
+            bnq_namespace: String::from("test"),
+            bnq_is_available: false,
+            bnq_last_access_time: 0,
+            bnq_version: 0,
+            bnq_migration_needed: false,
+        };
+        let _ = obj.bnq_summary();
+        assert_eq!(obj.bnq_namespace, "test");
+    }
+
+    #[test]
+    fn test_bnq_is_available() {
+        let obj = SecretStorage {
+            bnq_storage_key: String::from("test"),
+            bnq_encrypted: false,
+            bnq_backend_type: String::from("test"),
+            bnq_entry_count: 0,
+            bnq_max_value_size: 0,
+            bnq_namespace: String::from("test"),
+            bnq_is_available: false,
+            bnq_last_access_time: 0,
+            bnq_version: 0,
+            bnq_migration_needed: false,
+        };
+        let _ = obj.bnq_summary();
+        assert!(!obj.bnq_is_available);
+    }
+
+    #[test]
+    fn test_bnq_last_access_time() {
+        let obj = SecretStorage {
+            bnq_storage_key: String::from("test"),
+            bnq_encrypted: false,
+            bnq_backend_type: String::from("test"),
+            bnq_entry_count: 0,
+            bnq_max_value_size: 0,
+            bnq_namespace: String::from("test"),
+            bnq_is_available: false,
+            bnq_last_access_time: 0,
+            bnq_version: 0,
+            bnq_migration_needed: false,
+        };
+        let _ = obj.bnq_summary();
+        assert_eq!(obj.bnq_last_access_time, 0);
+    }
+
+    #[test]
+    fn test_bnq_version() {
+        let obj = SecretStorage {
+            bnq_storage_key: String::from("test"),
+            bnq_encrypted: false,
+            bnq_backend_type: String::from("test"),
+            bnq_entry_count: 0,
+            bnq_max_value_size: 0,
+            bnq_namespace: String::from("test"),
+            bnq_is_available: false,
+            bnq_last_access_time: 0,
+            bnq_version: 0,
+            bnq_migration_needed: false,
+        };
+        let _ = obj.bnq_summary();
+        assert_eq!(obj.bnq_version, 0);
+    }
+
+    #[test]
+    fn test_bnq_migration_needed() {
+        let obj = SecretStorage {
+            bnq_storage_key: String::from("test"),
+            bnq_encrypted: false,
+            bnq_backend_type: String::from("test"),
+            bnq_entry_count: 0,
+            bnq_max_value_size: 0,
+            bnq_namespace: String::from("test"),
+            bnq_is_available: false,
+            bnq_last_access_time: 0,
+            bnq_version: 0,
+            bnq_migration_needed: false,
+        };
+        let _ = obj.bnq_summary();
+        assert!(!obj.bnq_migration_needed);
+    }
+
+
+    #[test]
+    fn test_bnr_service_id() {
+        let obj = CredentialService {
+            bnr_service_id: String::from("test"),
+            bnr_account: String::from("test"),
+            bnr_credential_type: String::from("test"),
+            bnr_is_expired: false,
+            bnr_expires_at: None,
+            bnr_refresh_token: false,
+            bnr_scope_list: Vec::new(),
+            bnr_issuer: String::from("test"),
+            bnr_last_refreshed: 0,
+            bnr_auto_renew: false,
+        };
+        let _ = obj.bnr_summary();
+        assert_eq!(obj.bnr_service_id, "test");
+    }
+
+    #[test]
+    fn test_bnr_account() {
+        let obj = CredentialService {
+            bnr_service_id: String::from("test"),
+            bnr_account: String::from("test"),
+            bnr_credential_type: String::from("test"),
+            bnr_is_expired: false,
+            bnr_expires_at: None,
+            bnr_refresh_token: false,
+            bnr_scope_list: Vec::new(),
+            bnr_issuer: String::from("test"),
+            bnr_last_refreshed: 0,
+            bnr_auto_renew: false,
+        };
+        let _ = obj.bnr_summary();
+        assert_eq!(obj.bnr_account, "test");
+    }
+
+    #[test]
+    fn test_bnr_credential_type() {
+        let obj = CredentialService {
+            bnr_service_id: String::from("test"),
+            bnr_account: String::from("test"),
+            bnr_credential_type: String::from("test"),
+            bnr_is_expired: false,
+            bnr_expires_at: None,
+            bnr_refresh_token: false,
+            bnr_scope_list: Vec::new(),
+            bnr_issuer: String::from("test"),
+            bnr_last_refreshed: 0,
+            bnr_auto_renew: false,
+        };
+        let _ = obj.bnr_summary();
+        assert_eq!(obj.bnr_credential_type, "test");
+    }
+
+    #[test]
+    fn test_bnr_is_expired() {
+        let obj = CredentialService {
+            bnr_service_id: String::from("test"),
+            bnr_account: String::from("test"),
+            bnr_credential_type: String::from("test"),
+            bnr_is_expired: false,
+            bnr_expires_at: None,
+            bnr_refresh_token: false,
+            bnr_scope_list: Vec::new(),
+            bnr_issuer: String::from("test"),
+            bnr_last_refreshed: 0,
+            bnr_auto_renew: false,
+        };
+        let _ = obj.bnr_summary();
+        assert!(!obj.bnr_is_expired);
+    }
+
+    #[test]
+    fn test_bnr_expires_at() {
+        let obj = CredentialService {
+            bnr_service_id: String::from("test"),
+            bnr_account: String::from("test"),
+            bnr_credential_type: String::from("test"),
+            bnr_is_expired: false,
+            bnr_expires_at: None,
+            bnr_refresh_token: false,
+            bnr_scope_list: Vec::new(),
+            bnr_issuer: String::from("test"),
+            bnr_last_refreshed: 0,
+            bnr_auto_renew: false,
+        };
+        let _ = obj.bnr_summary();
+        assert!(obj.bnr_expires_at.is_none());
+    }
+
+    #[test]
+    fn test_bnr_refresh_token() {
+        let obj = CredentialService {
+            bnr_service_id: String::from("test"),
+            bnr_account: String::from("test"),
+            bnr_credential_type: String::from("test"),
+            bnr_is_expired: false,
+            bnr_expires_at: None,
+            bnr_refresh_token: false,
+            bnr_scope_list: Vec::new(),
+            bnr_issuer: String::from("test"),
+            bnr_last_refreshed: 0,
+            bnr_auto_renew: false,
+        };
+        let _ = obj.bnr_summary();
+        assert!(!obj.bnr_refresh_token);
+    }
+
+    #[test]
+    fn test_bnr_scope_list() {
+        let obj = CredentialService {
+            bnr_service_id: String::from("test"),
+            bnr_account: String::from("test"),
+            bnr_credential_type: String::from("test"),
+            bnr_is_expired: false,
+            bnr_expires_at: None,
+            bnr_refresh_token: false,
+            bnr_scope_list: Vec::new(),
+            bnr_issuer: String::from("test"),
+            bnr_last_refreshed: 0,
+            bnr_auto_renew: false,
+        };
+        let _ = obj.bnr_summary();
+        assert!(obj.bnr_scope_list.is_empty());
+    }
+
+    #[test]
+    fn test_bnr_issuer() {
+        let obj = CredentialService {
+            bnr_service_id: String::from("test"),
+            bnr_account: String::from("test"),
+            bnr_credential_type: String::from("test"),
+            bnr_is_expired: false,
+            bnr_expires_at: None,
+            bnr_refresh_token: false,
+            bnr_scope_list: Vec::new(),
+            bnr_issuer: String::from("test"),
+            bnr_last_refreshed: 0,
+            bnr_auto_renew: false,
+        };
+        let _ = obj.bnr_summary();
+        assert_eq!(obj.bnr_issuer, "test");
+    }
+
+    #[test]
+    fn test_bnr_last_refreshed() {
+        let obj = CredentialService {
+            bnr_service_id: String::from("test"),
+            bnr_account: String::from("test"),
+            bnr_credential_type: String::from("test"),
+            bnr_is_expired: false,
+            bnr_expires_at: None,
+            bnr_refresh_token: false,
+            bnr_scope_list: Vec::new(),
+            bnr_issuer: String::from("test"),
+            bnr_last_refreshed: 0,
+            bnr_auto_renew: false,
+        };
+        let _ = obj.bnr_summary();
+        assert_eq!(obj.bnr_last_refreshed, 0);
+    }
+
+    #[test]
+    fn test_bnr_auto_renew() {
+        let obj = CredentialService {
+            bnr_service_id: String::from("test"),
+            bnr_account: String::from("test"),
+            bnr_credential_type: String::from("test"),
+            bnr_is_expired: false,
+            bnr_expires_at: None,
+            bnr_refresh_token: false,
+            bnr_scope_list: Vec::new(),
+            bnr_issuer: String::from("test"),
+            bnr_last_refreshed: 0,
+            bnr_auto_renew: false,
+        };
+        let _ = obj.bnr_summary();
+        assert!(!obj.bnr_auto_renew);
+    }
+
+
+    #[test]
+    fn test_bns_cert_fingerprint() {
+        let obj = CertificateTrust {
+            bns_cert_fingerprint: String::from("test"),
+            bns_subject_name: String::from("test"),
+            bns_issuer_name: String::from("test"),
+            bns_valid_from: 0,
+            bns_valid_to: 0,
+            bns_is_trusted: false,
+            bns_trust_level: 0,
+            bns_key_usage: Vec::new(),
+            bns_serial_number: String::from("test"),
+            bns_signature_algorithm: String::from("test"),
+        };
+        let _ = obj.bns_summary();
+        assert_eq!(obj.bns_cert_fingerprint, "test");
+    }
+
+    #[test]
+    fn test_bns_subject_name() {
+        let obj = CertificateTrust {
+            bns_cert_fingerprint: String::from("test"),
+            bns_subject_name: String::from("test"),
+            bns_issuer_name: String::from("test"),
+            bns_valid_from: 0,
+            bns_valid_to: 0,
+            bns_is_trusted: false,
+            bns_trust_level: 0,
+            bns_key_usage: Vec::new(),
+            bns_serial_number: String::from("test"),
+            bns_signature_algorithm: String::from("test"),
+        };
+        let _ = obj.bns_summary();
+        assert_eq!(obj.bns_subject_name, "test");
+    }
+
+    #[test]
+    fn test_bns_issuer_name() {
+        let obj = CertificateTrust {
+            bns_cert_fingerprint: String::from("test"),
+            bns_subject_name: String::from("test"),
+            bns_issuer_name: String::from("test"),
+            bns_valid_from: 0,
+            bns_valid_to: 0,
+            bns_is_trusted: false,
+            bns_trust_level: 0,
+            bns_key_usage: Vec::new(),
+            bns_serial_number: String::from("test"),
+            bns_signature_algorithm: String::from("test"),
+        };
+        let _ = obj.bns_summary();
+        assert_eq!(obj.bns_issuer_name, "test");
+    }
+
+    #[test]
+    fn test_bns_valid_from() {
+        let obj = CertificateTrust {
+            bns_cert_fingerprint: String::from("test"),
+            bns_subject_name: String::from("test"),
+            bns_issuer_name: String::from("test"),
+            bns_valid_from: 0,
+            bns_valid_to: 0,
+            bns_is_trusted: false,
+            bns_trust_level: 0,
+            bns_key_usage: Vec::new(),
+            bns_serial_number: String::from("test"),
+            bns_signature_algorithm: String::from("test"),
+        };
+        let _ = obj.bns_summary();
+        assert_eq!(obj.bns_valid_from, 0);
+    }
+
+    #[test]
+    fn test_bns_valid_to() {
+        let obj = CertificateTrust {
+            bns_cert_fingerprint: String::from("test"),
+            bns_subject_name: String::from("test"),
+            bns_issuer_name: String::from("test"),
+            bns_valid_from: 0,
+            bns_valid_to: 0,
+            bns_is_trusted: false,
+            bns_trust_level: 0,
+            bns_key_usage: Vec::new(),
+            bns_serial_number: String::from("test"),
+            bns_signature_algorithm: String::from("test"),
+        };
+        let _ = obj.bns_summary();
+        assert_eq!(obj.bns_valid_to, 0);
+    }
+
+    #[test]
+    fn test_bns_is_trusted() {
+        let obj = CertificateTrust {
+            bns_cert_fingerprint: String::from("test"),
+            bns_subject_name: String::from("test"),
+            bns_issuer_name: String::from("test"),
+            bns_valid_from: 0,
+            bns_valid_to: 0,
+            bns_is_trusted: false,
+            bns_trust_level: 0,
+            bns_key_usage: Vec::new(),
+            bns_serial_number: String::from("test"),
+            bns_signature_algorithm: String::from("test"),
+        };
+        let _ = obj.bns_summary();
+        assert!(!obj.bns_is_trusted);
+    }
+
+    #[test]
+    fn test_bns_trust_level() {
+        let obj = CertificateTrust {
+            bns_cert_fingerprint: String::from("test"),
+            bns_subject_name: String::from("test"),
+            bns_issuer_name: String::from("test"),
+            bns_valid_from: 0,
+            bns_valid_to: 0,
+            bns_is_trusted: false,
+            bns_trust_level: 0,
+            bns_key_usage: Vec::new(),
+            bns_serial_number: String::from("test"),
+            bns_signature_algorithm: String::from("test"),
+        };
+        let _ = obj.bns_summary();
+        assert_eq!(obj.bns_trust_level, 0);
+    }
+
+    #[test]
+    fn test_bns_key_usage() {
+        let obj = CertificateTrust {
+            bns_cert_fingerprint: String::from("test"),
+            bns_subject_name: String::from("test"),
+            bns_issuer_name: String::from("test"),
+            bns_valid_from: 0,
+            bns_valid_to: 0,
+            bns_is_trusted: false,
+            bns_trust_level: 0,
+            bns_key_usage: Vec::new(),
+            bns_serial_number: String::from("test"),
+            bns_signature_algorithm: String::from("test"),
+        };
+        let _ = obj.bns_summary();
+        assert!(obj.bns_key_usage.is_empty());
+    }
+
+    #[test]
+    fn test_bns_serial_number() {
+        let obj = CertificateTrust {
+            bns_cert_fingerprint: String::from("test"),
+            bns_subject_name: String::from("test"),
+            bns_issuer_name: String::from("test"),
+            bns_valid_from: 0,
+            bns_valid_to: 0,
+            bns_is_trusted: false,
+            bns_trust_level: 0,
+            bns_key_usage: Vec::new(),
+            bns_serial_number: String::from("test"),
+            bns_signature_algorithm: String::from("test"),
+        };
+        let _ = obj.bns_summary();
+        assert_eq!(obj.bns_serial_number, "test");
+    }
+
+    #[test]
+    fn test_bns_signature_algorithm() {
+        let obj = CertificateTrust {
+            bns_cert_fingerprint: String::from("test"),
+            bns_subject_name: String::from("test"),
+            bns_issuer_name: String::from("test"),
+            bns_valid_from: 0,
+            bns_valid_to: 0,
+            bns_is_trusted: false,
+            bns_trust_level: 0,
+            bns_key_usage: Vec::new(),
+            bns_serial_number: String::from("test"),
+            bns_signature_algorithm: String::from("test"),
+        };
+        let _ = obj.bns_summary();
+        assert_eq!(obj.bns_signature_algorithm, "test");
+    }
+
+
+    #[test]
+    fn test_bnt_proxy_url() {
+        let obj = ProxyConfig {
+            bnt_proxy_url: String::from("test"),
+            bnt_proxy_port: 0,
+            bnt_use_system_proxy: false,
+            bnt_bypass_list: Vec::new(),
+            bnt_auth_required: false,
+            bnt_proxy_username: String::from("test"),
+            bnt_proxy_protocol: String::from("test"),
+            bnt_strict_ssl: false,
+            bnt_proxy_support: String::from("test"),
+            bnt_connection_timeout: 0,
+        };
+        let _ = obj.bnt_summary();
+        assert_eq!(obj.bnt_proxy_url, "test");
+    }
+
+    #[test]
+    fn test_bnt_proxy_port() {
+        let obj = ProxyConfig {
+            bnt_proxy_url: String::from("test"),
+            bnt_proxy_port: 0,
+            bnt_use_system_proxy: false,
+            bnt_bypass_list: Vec::new(),
+            bnt_auth_required: false,
+            bnt_proxy_username: String::from("test"),
+            bnt_proxy_protocol: String::from("test"),
+            bnt_strict_ssl: false,
+            bnt_proxy_support: String::from("test"),
+            bnt_connection_timeout: 0,
+        };
+        let _ = obj.bnt_summary();
+        assert_eq!(obj.bnt_proxy_port, 0);
+    }
+
+    #[test]
+    fn test_bnt_use_system_proxy() {
+        let obj = ProxyConfig {
+            bnt_proxy_url: String::from("test"),
+            bnt_proxy_port: 0,
+            bnt_use_system_proxy: false,
+            bnt_bypass_list: Vec::new(),
+            bnt_auth_required: false,
+            bnt_proxy_username: String::from("test"),
+            bnt_proxy_protocol: String::from("test"),
+            bnt_strict_ssl: false,
+            bnt_proxy_support: String::from("test"),
+            bnt_connection_timeout: 0,
+        };
+        let _ = obj.bnt_summary();
+        assert!(!obj.bnt_use_system_proxy);
+    }
+
+    #[test]
+    fn test_bnt_bypass_list() {
+        let obj = ProxyConfig {
+            bnt_proxy_url: String::from("test"),
+            bnt_proxy_port: 0,
+            bnt_use_system_proxy: false,
+            bnt_bypass_list: Vec::new(),
+            bnt_auth_required: false,
+            bnt_proxy_username: String::from("test"),
+            bnt_proxy_protocol: String::from("test"),
+            bnt_strict_ssl: false,
+            bnt_proxy_support: String::from("test"),
+            bnt_connection_timeout: 0,
+        };
+        let _ = obj.bnt_summary();
+        assert!(obj.bnt_bypass_list.is_empty());
+    }
+
+    #[test]
+    fn test_bnt_auth_required() {
+        let obj = ProxyConfig {
+            bnt_proxy_url: String::from("test"),
+            bnt_proxy_port: 0,
+            bnt_use_system_proxy: false,
+            bnt_bypass_list: Vec::new(),
+            bnt_auth_required: false,
+            bnt_proxy_username: String::from("test"),
+            bnt_proxy_protocol: String::from("test"),
+            bnt_strict_ssl: false,
+            bnt_proxy_support: String::from("test"),
+            bnt_connection_timeout: 0,
+        };
+        let _ = obj.bnt_summary();
+        assert!(!obj.bnt_auth_required);
+    }
+
+    #[test]
+    fn test_bnt_proxy_username() {
+        let obj = ProxyConfig {
+            bnt_proxy_url: String::from("test"),
+            bnt_proxy_port: 0,
+            bnt_use_system_proxy: false,
+            bnt_bypass_list: Vec::new(),
+            bnt_auth_required: false,
+            bnt_proxy_username: String::from("test"),
+            bnt_proxy_protocol: String::from("test"),
+            bnt_strict_ssl: false,
+            bnt_proxy_support: String::from("test"),
+            bnt_connection_timeout: 0,
+        };
+        let _ = obj.bnt_summary();
+        assert_eq!(obj.bnt_proxy_username, "test");
+    }
+
+    #[test]
+    fn test_bnt_proxy_protocol() {
+        let obj = ProxyConfig {
+            bnt_proxy_url: String::from("test"),
+            bnt_proxy_port: 0,
+            bnt_use_system_proxy: false,
+            bnt_bypass_list: Vec::new(),
+            bnt_auth_required: false,
+            bnt_proxy_username: String::from("test"),
+            bnt_proxy_protocol: String::from("test"),
+            bnt_strict_ssl: false,
+            bnt_proxy_support: String::from("test"),
+            bnt_connection_timeout: 0,
+        };
+        let _ = obj.bnt_summary();
+        assert_eq!(obj.bnt_proxy_protocol, "test");
+    }
+
+    #[test]
+    fn test_bnt_strict_ssl() {
+        let obj = ProxyConfig {
+            bnt_proxy_url: String::from("test"),
+            bnt_proxy_port: 0,
+            bnt_use_system_proxy: false,
+            bnt_bypass_list: Vec::new(),
+            bnt_auth_required: false,
+            bnt_proxy_username: String::from("test"),
+            bnt_proxy_protocol: String::from("test"),
+            bnt_strict_ssl: false,
+            bnt_proxy_support: String::from("test"),
+            bnt_connection_timeout: 0,
+        };
+        let _ = obj.bnt_summary();
+        assert!(!obj.bnt_strict_ssl);
+    }
+
+    #[test]
+    fn test_bnt_proxy_support() {
+        let obj = ProxyConfig {
+            bnt_proxy_url: String::from("test"),
+            bnt_proxy_port: 0,
+            bnt_use_system_proxy: false,
+            bnt_bypass_list: Vec::new(),
+            bnt_auth_required: false,
+            bnt_proxy_username: String::from("test"),
+            bnt_proxy_protocol: String::from("test"),
+            bnt_strict_ssl: false,
+            bnt_proxy_support: String::from("test"),
+            bnt_connection_timeout: 0,
+        };
+        let _ = obj.bnt_summary();
+        assert_eq!(obj.bnt_proxy_support, "test");
+    }
+
+    #[test]
+    fn test_bnt_connection_timeout() {
+        let obj = ProxyConfig {
+            bnt_proxy_url: String::from("test"),
+            bnt_proxy_port: 0,
+            bnt_use_system_proxy: false,
+            bnt_bypass_list: Vec::new(),
+            bnt_auth_required: false,
+            bnt_proxy_username: String::from("test"),
+            bnt_proxy_protocol: String::from("test"),
+            bnt_strict_ssl: false,
+            bnt_proxy_support: String::from("test"),
+            bnt_connection_timeout: 0,
+        };
+        let _ = obj.bnt_summary();
+        assert_eq!(obj.bnt_connection_timeout, 0);
     }
 
 }
