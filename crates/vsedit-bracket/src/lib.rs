@@ -86944,6 +86944,67 @@ pub struct BmzReleaseNote { pub version: String, pub notes: String, pub date: St
 #[derive(Debug, Clone)]
 pub struct BmzUpdateConfig { pub auto_check: bool, pub auto_download: bool, pub channel: u8 }
 
+
+// Chat model — chat messages, chat participants, chat history, slash commands, variables
+#[derive(Debug, Clone)]
+pub struct BnaChatMessage { pub role: u8, pub content: String, pub name: Option<String>, pub tool_calls: Vec<String> }
+#[derive(Debug, Clone)]
+pub struct BnaChatParticipant { pub id: String, pub name: String, pub description: String, pub is_default: bool }
+#[derive(Debug, Clone)]
+pub struct BnaChatHistory { pub messages: Vec<BnaChatMessage>, pub token_count: usize }
+#[derive(Debug, Clone)]
+pub struct BnaSlashCommand { pub name: String, pub description: String, pub participant_id: String }
+#[derive(Debug, Clone)]
+pub struct BnaChatVariable { pub name: String, pub value: String, pub is_dynamic: bool }
+
+// Inline chat — inline chat session, code actions from chat, diff preview, accept/reject
+#[derive(Debug, Clone)]
+pub struct BnbInlineChatSession { pub id: String, pub file: String, pub line: usize, pub col: usize, pub active: bool }
+#[derive(Debug, Clone)]
+pub struct BnbInlineChatRequest { pub prompt: String, pub selection_start: usize, pub selection_end: usize }
+#[derive(Debug, Clone)]
+pub struct BnbInlineChatResponse { pub text: String, pub edits: Vec<String>, pub accepted: Option<bool> }
+#[derive(Debug, Clone)]
+pub struct BnbInlineDiffPreview { pub original: String, pub modified: String, pub file: String, pub line: usize }
+#[derive(Debug, Clone)]
+pub struct BnbInlineChatConfig { pub enabled: bool, pub auto_accept: bool, pub show_diff: bool }
+
+// AI completions — inline completions, ghost text, completion context, accept/dismiss
+#[derive(Debug, Clone)]
+pub struct BncInlineCompletion { pub text: String, pub range_start: usize, pub range_end: usize, pub command: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BncGhostText { pub lines: Vec<String>, pub start_line: usize, pub start_col: usize, pub visible: bool }
+#[derive(Debug, Clone)]
+pub struct BncCompletionContext { pub trigger_kind: u8, pub selected_suggestion: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BncCompletionConfig { pub enabled: bool, pub auto_trigger: bool, pub delay_ms: u32 }
+#[derive(Debug, Clone)]
+pub struct BncCompletionState { pub active: bool, pub items: Vec<BncInlineCompletion>, pub selected_index: usize }
+
+// Copilot integration — copilot status, authentication, model selection, quota tracking
+#[derive(Debug, Clone)]
+pub struct BndCopilotStatus { pub signed_in: bool, pub enabled: bool, pub has_access: bool }
+#[derive(Debug, Clone)]
+pub struct BndCopilotAuth { pub token: Option<String>, pub user: Option<String>, pub expires_at: Option<u64> }
+#[derive(Debug, Clone)]
+pub struct BndModelSelection { pub model_id: String, pub model_family: String, pub max_tokens: usize }
+#[derive(Debug, Clone)]
+pub struct BndQuotaInfo { pub used: u64, pub limit: u64, pub reset_at: u64 }
+#[derive(Debug, Clone)]
+pub struct BndCopilotConfig { pub enabled: bool, pub inline_suggest: bool, pub chat_enabled: bool, pub model: String }
+
+// Language model API — model request, streaming response, token counting, tool use
+#[derive(Debug, Clone)]
+pub struct BneModelRequest { pub messages: Vec<String>, pub model: String, pub max_tokens: usize, pub temperature: f64 }
+#[derive(Debug, Clone)]
+pub struct BneStreamChunk { pub text: String, pub finish_reason: Option<String>, pub index: usize }
+#[derive(Debug, Clone)]
+pub struct BneTokenCount { pub input_tokens: usize, pub output_tokens: usize, pub total_tokens: usize }
+#[derive(Debug, Clone)]
+pub struct BneToolDefinition { pub name: String, pub description: String, pub parameters_schema: String }
+#[derive(Debug, Clone)]
+pub struct BneModelResponse { pub text: String, pub finish_reason: String, pub usage: BneTokenCount }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -97004,4 +97065,104 @@ mod tests_bfo {
     fn test_bmz_config_manual() { let c = BmzUpdateConfig { auto_check: false, auto_download: false, channel: 1 }; assert!(!c.auto_check); }
     #[test]
     fn test_bmz_insider_channel() { let c = BmzUpdateConfig { auto_check: true, auto_download: false, channel: 1 }; assert_eq!(c.channel, 1); }
+    #[test]
+    fn test_bna_user_message() { let m = BnaChatMessage { role: 0, content: "hello".into(), name: None, tool_calls: vec![] }; assert_eq!(m.role, 0); }
+    #[test]
+    fn test_bna_assistant_message() { let m = BnaChatMessage { role: 1, content: "hi".into(), name: Some("copilot".into()), tool_calls: vec![] }; assert_eq!(m.role, 1); }
+    #[test]
+    fn test_bna_with_tool_calls() { let m = BnaChatMessage { role: 1, content: String::new(), name: None, tool_calls: vec!["search".into()] }; assert_eq!(m.tool_calls.len(), 1); }
+    #[test]
+    fn test_bna_participant() { let p = BnaChatParticipant { id: "copilot".into(), name: "Copilot".into(), description: "AI assistant".into(), is_default: true }; assert!(p.is_default); }
+    #[test]
+    fn test_bna_custom_participant() { let p = BnaChatParticipant { id: "ext.chat".into(), name: "Custom".into(), description: "Custom chat".into(), is_default: false }; assert!(!p.is_default); }
+    #[test]
+    fn test_bna_empty_history() { let h = BnaChatHistory { messages: vec![], token_count: 0 }; assert!(h.messages.is_empty()); }
+    #[test]
+    fn test_bna_history_with_tokens() { let m = BnaChatMessage { role: 0, content: "test".into(), name: None, tool_calls: vec![] }; let h = BnaChatHistory { messages: vec![m], token_count: 10 }; assert_eq!(h.token_count, 10); }
+    #[test]
+    fn test_bna_slash_command() { let c = BnaSlashCommand { name: "explain".into(), description: "Explain code".into(), participant_id: "copilot".into() }; assert_eq!(c.name, "explain"); }
+    #[test]
+    fn test_bna_variable_static() { let v = BnaChatVariable { name: "selection".into(), value: "code".into(), is_dynamic: false }; assert!(!v.is_dynamic); }
+    #[test]
+    fn test_bna_variable_dynamic() { let v = BnaChatVariable { name: "file".into(), value: "main.rs".into(), is_dynamic: true }; assert!(v.is_dynamic); }
+    #[test]
+    fn test_bnb_session_active() { let s = BnbInlineChatSession { id: "s1".into(), file: "main.rs".into(), line: 10, col: 0, active: true }; assert!(s.active); }
+    #[test]
+    fn test_bnb_session_inactive() { let s = BnbInlineChatSession { id: "s2".into(), file: "lib.rs".into(), line: 0, col: 0, active: false }; assert!(!s.active); }
+    #[test]
+    fn test_bnb_request_basic() { let r = BnbInlineChatRequest { prompt: "add error handling".into(), selection_start: 100, selection_end: 200 }; assert_eq!(r.selection_end - r.selection_start, 100); }
+    #[test]
+    fn test_bnb_response_accepted() { let r = BnbInlineChatResponse { text: "result".into(), edits: vec!["edit1".into()], accepted: Some(true) }; assert_eq!(r.accepted, Some(true)); }
+    #[test]
+    fn test_bnb_response_rejected() { let r = BnbInlineChatResponse { text: "bad".into(), edits: vec![], accepted: Some(false) }; assert_eq!(r.accepted, Some(false)); }
+    #[test]
+    fn test_bnb_response_pending() { let r = BnbInlineChatResponse { text: "maybe".into(), edits: vec![], accepted: None }; assert!(r.accepted.is_none()); }
+    #[test]
+    fn test_bnb_diff_preview() { let d = BnbInlineDiffPreview { original: "old code".into(), modified: "new code".into(), file: "a.rs".into(), line: 5 }; assert_ne!(d.original, d.modified); }
+    #[test]
+    fn test_bnb_config_enabled() { let c = BnbInlineChatConfig { enabled: true, auto_accept: false, show_diff: true }; assert!(c.enabled); }
+    #[test]
+    fn test_bnb_config_auto() { let c = BnbInlineChatConfig { enabled: true, auto_accept: true, show_diff: false }; assert!(c.auto_accept); }
+    #[test]
+    fn test_bnb_config_disabled() { let c = BnbInlineChatConfig { enabled: false, auto_accept: false, show_diff: false }; assert!(!c.enabled); }
+    #[test]
+    fn test_bnc_completion_basic() { let c = BncInlineCompletion { text: "println!()".into(), range_start: 10, range_end: 10, command: None }; assert!(c.command.is_none()); }
+    #[test]
+    fn test_bnc_completion_with_cmd() { let c = BncInlineCompletion { text: "fn main()".into(), range_start: 0, range_end: 5, command: Some("accept".into()) }; assert!(c.command.is_some()); }
+    #[test]
+    fn test_bnc_ghost_text_visible() { let g = BncGhostText { lines: vec!["suggested code".into()], start_line: 5, start_col: 10, visible: true }; assert!(g.visible); }
+    #[test]
+    fn test_bnc_ghost_text_hidden() { let g = BncGhostText { lines: vec![], start_line: 0, start_col: 0, visible: false }; assert!(!g.visible); }
+    #[test]
+    fn test_bnc_context_auto() { let c = BncCompletionContext { trigger_kind: 0, selected_suggestion: None }; assert_eq!(c.trigger_kind, 0); }
+    #[test]
+    fn test_bnc_context_manual() { let c = BncCompletionContext { trigger_kind: 1, selected_suggestion: Some("item".into()) }; assert!(c.selected_suggestion.is_some()); }
+    #[test]
+    fn test_bnc_config_enabled() { let c = BncCompletionConfig { enabled: true, auto_trigger: true, delay_ms: 75 }; assert_eq!(c.delay_ms, 75); }
+    #[test]
+    fn test_bnc_config_disabled() { let c = BncCompletionConfig { enabled: false, auto_trigger: false, delay_ms: 0 }; assert!(!c.enabled); }
+    #[test]
+    fn test_bnc_state_active() { let s = BncCompletionState { active: true, items: vec![], selected_index: 0 }; assert!(s.active); }
+    #[test]
+    fn test_bnc_state_inactive() { let s = BncCompletionState { active: false, items: vec![], selected_index: 0 }; assert!(!s.active); }
+    #[test]
+    fn test_bnd_signed_in() { let s = BndCopilotStatus { signed_in: true, enabled: true, has_access: true }; assert!(s.signed_in); }
+    #[test]
+    fn test_bnd_signed_out() { let s = BndCopilotStatus { signed_in: false, enabled: false, has_access: false }; assert!(!s.signed_in); }
+    #[test]
+    fn test_bnd_auth_valid() { let a = BndCopilotAuth { token: Some("tk_123".into()), user: Some("user".into()), expires_at: Some(99999) }; assert!(a.token.is_some()); }
+    #[test]
+    fn test_bnd_auth_expired() { let a = BndCopilotAuth { token: None, user: None, expires_at: None }; assert!(a.token.is_none()); }
+    #[test]
+    fn test_bnd_model_gpt4() { let m = BndModelSelection { model_id: "gpt-4".into(), model_family: "gpt".into(), max_tokens: 8192 }; assert_eq!(m.max_tokens, 8192); }
+    #[test]
+    fn test_bnd_model_claude() { let m = BndModelSelection { model_id: "claude-sonnet".into(), model_family: "claude".into(), max_tokens: 200000 }; assert_eq!(m.model_family, "claude"); }
+    #[test]
+    fn test_bnd_quota_low() { let q = BndQuotaInfo { used: 90, limit: 100, reset_at: 1000 }; assert!(q.used > q.limit / 2); }
+    #[test]
+    fn test_bnd_quota_fresh() { let q = BndQuotaInfo { used: 0, limit: 100, reset_at: 2000 }; assert_eq!(q.used, 0); }
+    #[test]
+    fn test_bnd_config_all_on() { let c = BndCopilotConfig { enabled: true, inline_suggest: true, chat_enabled: true, model: "gpt-4".into() }; assert!(c.chat_enabled); }
+    #[test]
+    fn test_bnd_config_minimal() { let c = BndCopilotConfig { enabled: true, inline_suggest: true, chat_enabled: false, model: "default".into() }; assert!(!c.chat_enabled); }
+    #[test]
+    fn test_bne_request_basic() { let r = BneModelRequest { messages: vec!["hello".into()], model: "gpt-4".into(), max_tokens: 1000, temperature: 0.7 }; assert_eq!(r.temperature, 0.7); }
+    #[test]
+    fn test_bne_request_deterministic() { let r = BneModelRequest { messages: vec![], model: "m".into(), max_tokens: 100, temperature: 0.0 }; assert_eq!(r.temperature, 0.0); }
+    #[test]
+    fn test_bne_stream_chunk() { let c = BneStreamChunk { text: "Hello".into(), finish_reason: None, index: 0 }; assert!(c.finish_reason.is_none()); }
+    #[test]
+    fn test_bne_stream_done() { let c = BneStreamChunk { text: String::new(), finish_reason: Some("stop".into()), index: 5 }; assert!(c.finish_reason.is_some()); }
+    #[test]
+    fn test_bne_token_count() { let t = BneTokenCount { input_tokens: 100, output_tokens: 50, total_tokens: 150 }; assert_eq!(t.total_tokens, 150); }
+    #[test]
+    fn test_bne_zero_tokens() { let t = BneTokenCount { input_tokens: 0, output_tokens: 0, total_tokens: 0 }; assert_eq!(t.total_tokens, 0); }
+    #[test]
+    fn test_bne_tool_def() { let t = BneToolDefinition { name: "search".into(), description: "Search code".into(), parameters_schema: "{}".into() }; assert_eq!(t.name, "search"); }
+    #[test]
+    fn test_bne_response_complete() { let u = BneTokenCount { input_tokens: 10, output_tokens: 20, total_tokens: 30 }; let r = BneModelResponse { text: "result".into(), finish_reason: "stop".into(), usage: u }; assert_eq!(r.finish_reason, "stop"); }
+    #[test]
+    fn test_bne_response_length() { let u = BneTokenCount { input_tokens: 100, output_tokens: 1000, total_tokens: 1100 }; let r = BneModelResponse { text: "long".into(), finish_reason: "length".into(), usage: u }; assert_eq!(r.finish_reason, "length"); }
+    #[test]
+    fn test_bne_large_request() { let r = BneModelRequest { messages: vec!["a".into(), "b".into(), "c".into()], model: "m".into(), max_tokens: 4096, temperature: 0.5 }; assert_eq!(r.messages.len(), 3); }
 }
