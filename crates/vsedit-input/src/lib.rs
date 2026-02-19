@@ -90966,6 +90966,111 @@ impl TreeDropTarget {
     }
 }
 
+/// Runtime wiring: buf_ TableDataModel
+#[derive(Debug, Clone)]
+pub struct TableDataModel {
+    pub buf_table_id: String,
+    pub buf_row_count: u32,
+    pub buf_column_count: u32,
+    pub buf_page_size: u32,
+    pub buf_current_page: u32,
+    pub buf_total_pages: u32,
+    pub buf_is_loading: bool,
+    pub buf_sort_column: String,
+    pub buf_sort_direction: String,
+    pub buf_selection_mode: String,
+}
+
+impl TableDataModel {
+    pub fn buf_summary(&self) -> String {
+        format!("TableDataModel({})", self.buf_table_id)
+    }
+}
+
+/// Runtime wiring: bug_ TableColumn
+#[derive(Debug, Clone)]
+pub struct TableColumn {
+    pub bug_column_id: String,
+    pub bug_label: String,
+    pub bug_width: u32,
+    pub bug_min_width: u32,
+    pub bug_max_width: u32,
+    pub bug_is_sortable: bool,
+    pub bug_is_filterable: bool,
+    pub bug_is_resizable: bool,
+    pub bug_is_visible: bool,
+    pub bug_alignment: String,
+}
+
+impl TableColumn {
+    pub fn bug_summary(&self) -> String {
+        format!("TableColumn({})", self.bug_column_id)
+    }
+}
+
+/// Runtime wiring: buh_ TableCell
+#[derive(Debug, Clone)]
+pub struct TableCell {
+    pub buh_row_index: u32,
+    pub buh_column_id: String,
+    pub buh_value: String,
+    pub buh_display_value: String,
+    pub buh_tooltip: String,
+    pub buh_icon_id: String,
+    pub buh_is_editable: bool,
+    pub buh_is_selected: bool,
+    pub buh_cell_type: String,
+    pub buh_action_id: String,
+}
+
+impl TableCell {
+    pub fn buh_summary(&self) -> String {
+        format!("TableCell({})", self.buh_row_index)
+    }
+}
+
+/// Runtime wiring: bui_ TableSort
+#[derive(Debug, Clone)]
+pub struct TableSort {
+    pub bui_column_id: String,
+    pub bui_direction: String,
+    pub bui_sort_order: u32,
+    pub bui_is_multi_sort: bool,
+    pub bui_comparator_id: String,
+    pub bui_null_handling: String,
+    pub bui_case_sensitive: bool,
+    pub bui_numeric_sort: bool,
+    pub bui_stable_sort: bool,
+    pub bui_locale: String,
+}
+
+impl TableSort {
+    pub fn bui_summary(&self) -> String {
+        format!("TableSort({})", self.bui_column_id)
+    }
+}
+
+/// Runtime wiring: buj_ TableFilter
+#[derive(Debug, Clone)]
+pub struct TableFilter {
+    pub buj_column_id: String,
+    pub buj_filter_text: String,
+    pub buj_filter_type: String,
+    pub buj_is_regex: bool,
+    pub buj_is_case_sensitive: bool,
+    pub buj_is_inverted: bool,
+    pub buj_matched_rows: u32,
+    pub buj_total_rows: u32,
+    pub buj_is_active: bool,
+    pub buj_preset_name: String,
+}
+
+impl TableFilter {
+    pub fn buj_summary(&self) -> String {
+        format!("TableFilter({})", self.buj_column_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -134031,6 +134136,910 @@ mod tests_bfo {
         };
         let _ = obj.bue_summary();
         assert_eq!(obj.bue_drop_effect, "test");
+    }
+
+    #[test]
+    fn test_buf_table_id() {
+        let obj = TableDataModel {
+            buf_table_id: String::from("test"),
+            buf_row_count: 0,
+            buf_column_count: 0,
+            buf_page_size: 0,
+            buf_current_page: 0,
+            buf_total_pages: 0,
+            buf_is_loading: false,
+            buf_sort_column: String::from("test"),
+            buf_sort_direction: String::from("test"),
+            buf_selection_mode: String::from("test"),
+        };
+        let _ = obj.buf_summary();
+        assert_eq!(obj.buf_table_id, "test");
+    }
+
+    #[test]
+    fn test_buf_row_count() {
+        let obj = TableDataModel {
+            buf_table_id: String::from("test"),
+            buf_row_count: 0,
+            buf_column_count: 0,
+            buf_page_size: 0,
+            buf_current_page: 0,
+            buf_total_pages: 0,
+            buf_is_loading: false,
+            buf_sort_column: String::from("test"),
+            buf_sort_direction: String::from("test"),
+            buf_selection_mode: String::from("test"),
+        };
+        let _ = obj.buf_summary();
+        assert_eq!(obj.buf_row_count, 0);
+    }
+
+    #[test]
+    fn test_buf_column_count() {
+        let obj = TableDataModel {
+            buf_table_id: String::from("test"),
+            buf_row_count: 0,
+            buf_column_count: 0,
+            buf_page_size: 0,
+            buf_current_page: 0,
+            buf_total_pages: 0,
+            buf_is_loading: false,
+            buf_sort_column: String::from("test"),
+            buf_sort_direction: String::from("test"),
+            buf_selection_mode: String::from("test"),
+        };
+        let _ = obj.buf_summary();
+        assert_eq!(obj.buf_column_count, 0);
+    }
+
+    #[test]
+    fn test_buf_page_size() {
+        let obj = TableDataModel {
+            buf_table_id: String::from("test"),
+            buf_row_count: 0,
+            buf_column_count: 0,
+            buf_page_size: 0,
+            buf_current_page: 0,
+            buf_total_pages: 0,
+            buf_is_loading: false,
+            buf_sort_column: String::from("test"),
+            buf_sort_direction: String::from("test"),
+            buf_selection_mode: String::from("test"),
+        };
+        let _ = obj.buf_summary();
+        assert_eq!(obj.buf_page_size, 0);
+    }
+
+    #[test]
+    fn test_buf_current_page() {
+        let obj = TableDataModel {
+            buf_table_id: String::from("test"),
+            buf_row_count: 0,
+            buf_column_count: 0,
+            buf_page_size: 0,
+            buf_current_page: 0,
+            buf_total_pages: 0,
+            buf_is_loading: false,
+            buf_sort_column: String::from("test"),
+            buf_sort_direction: String::from("test"),
+            buf_selection_mode: String::from("test"),
+        };
+        let _ = obj.buf_summary();
+        assert_eq!(obj.buf_current_page, 0);
+    }
+
+    #[test]
+    fn test_buf_total_pages() {
+        let obj = TableDataModel {
+            buf_table_id: String::from("test"),
+            buf_row_count: 0,
+            buf_column_count: 0,
+            buf_page_size: 0,
+            buf_current_page: 0,
+            buf_total_pages: 0,
+            buf_is_loading: false,
+            buf_sort_column: String::from("test"),
+            buf_sort_direction: String::from("test"),
+            buf_selection_mode: String::from("test"),
+        };
+        let _ = obj.buf_summary();
+        assert_eq!(obj.buf_total_pages, 0);
+    }
+
+    #[test]
+    fn test_buf_is_loading() {
+        let obj = TableDataModel {
+            buf_table_id: String::from("test"),
+            buf_row_count: 0,
+            buf_column_count: 0,
+            buf_page_size: 0,
+            buf_current_page: 0,
+            buf_total_pages: 0,
+            buf_is_loading: false,
+            buf_sort_column: String::from("test"),
+            buf_sort_direction: String::from("test"),
+            buf_selection_mode: String::from("test"),
+        };
+        let _ = obj.buf_summary();
+        assert!(!obj.buf_is_loading);
+    }
+
+    #[test]
+    fn test_buf_sort_column() {
+        let obj = TableDataModel {
+            buf_table_id: String::from("test"),
+            buf_row_count: 0,
+            buf_column_count: 0,
+            buf_page_size: 0,
+            buf_current_page: 0,
+            buf_total_pages: 0,
+            buf_is_loading: false,
+            buf_sort_column: String::from("test"),
+            buf_sort_direction: String::from("test"),
+            buf_selection_mode: String::from("test"),
+        };
+        let _ = obj.buf_summary();
+        assert_eq!(obj.buf_sort_column, "test");
+    }
+
+    #[test]
+    fn test_buf_sort_direction() {
+        let obj = TableDataModel {
+            buf_table_id: String::from("test"),
+            buf_row_count: 0,
+            buf_column_count: 0,
+            buf_page_size: 0,
+            buf_current_page: 0,
+            buf_total_pages: 0,
+            buf_is_loading: false,
+            buf_sort_column: String::from("test"),
+            buf_sort_direction: String::from("test"),
+            buf_selection_mode: String::from("test"),
+        };
+        let _ = obj.buf_summary();
+        assert_eq!(obj.buf_sort_direction, "test");
+    }
+
+    #[test]
+    fn test_buf_selection_mode() {
+        let obj = TableDataModel {
+            buf_table_id: String::from("test"),
+            buf_row_count: 0,
+            buf_column_count: 0,
+            buf_page_size: 0,
+            buf_current_page: 0,
+            buf_total_pages: 0,
+            buf_is_loading: false,
+            buf_sort_column: String::from("test"),
+            buf_sort_direction: String::from("test"),
+            buf_selection_mode: String::from("test"),
+        };
+        let _ = obj.buf_summary();
+        assert_eq!(obj.buf_selection_mode, "test");
+    }
+
+
+    #[test]
+    fn test_bug_column_id() {
+        let obj = TableColumn {
+            bug_column_id: String::from("test"),
+            bug_label: String::from("test"),
+            bug_width: 0,
+            bug_min_width: 0,
+            bug_max_width: 0,
+            bug_is_sortable: false,
+            bug_is_filterable: false,
+            bug_is_resizable: false,
+            bug_is_visible: false,
+            bug_alignment: String::from("test"),
+        };
+        let _ = obj.bug_summary();
+        assert_eq!(obj.bug_column_id, "test");
+    }
+
+    #[test]
+    fn test_bug_label() {
+        let obj = TableColumn {
+            bug_column_id: String::from("test"),
+            bug_label: String::from("test"),
+            bug_width: 0,
+            bug_min_width: 0,
+            bug_max_width: 0,
+            bug_is_sortable: false,
+            bug_is_filterable: false,
+            bug_is_resizable: false,
+            bug_is_visible: false,
+            bug_alignment: String::from("test"),
+        };
+        let _ = obj.bug_summary();
+        assert_eq!(obj.bug_label, "test");
+    }
+
+    #[test]
+    fn test_bug_width() {
+        let obj = TableColumn {
+            bug_column_id: String::from("test"),
+            bug_label: String::from("test"),
+            bug_width: 0,
+            bug_min_width: 0,
+            bug_max_width: 0,
+            bug_is_sortable: false,
+            bug_is_filterable: false,
+            bug_is_resizable: false,
+            bug_is_visible: false,
+            bug_alignment: String::from("test"),
+        };
+        let _ = obj.bug_summary();
+        assert_eq!(obj.bug_width, 0);
+    }
+
+    #[test]
+    fn test_bug_min_width() {
+        let obj = TableColumn {
+            bug_column_id: String::from("test"),
+            bug_label: String::from("test"),
+            bug_width: 0,
+            bug_min_width: 0,
+            bug_max_width: 0,
+            bug_is_sortable: false,
+            bug_is_filterable: false,
+            bug_is_resizable: false,
+            bug_is_visible: false,
+            bug_alignment: String::from("test"),
+        };
+        let _ = obj.bug_summary();
+        assert_eq!(obj.bug_min_width, 0);
+    }
+
+    #[test]
+    fn test_bug_max_width() {
+        let obj = TableColumn {
+            bug_column_id: String::from("test"),
+            bug_label: String::from("test"),
+            bug_width: 0,
+            bug_min_width: 0,
+            bug_max_width: 0,
+            bug_is_sortable: false,
+            bug_is_filterable: false,
+            bug_is_resizable: false,
+            bug_is_visible: false,
+            bug_alignment: String::from("test"),
+        };
+        let _ = obj.bug_summary();
+        assert_eq!(obj.bug_max_width, 0);
+    }
+
+    #[test]
+    fn test_bug_is_sortable() {
+        let obj = TableColumn {
+            bug_column_id: String::from("test"),
+            bug_label: String::from("test"),
+            bug_width: 0,
+            bug_min_width: 0,
+            bug_max_width: 0,
+            bug_is_sortable: false,
+            bug_is_filterable: false,
+            bug_is_resizable: false,
+            bug_is_visible: false,
+            bug_alignment: String::from("test"),
+        };
+        let _ = obj.bug_summary();
+        assert!(!obj.bug_is_sortable);
+    }
+
+    #[test]
+    fn test_bug_is_filterable() {
+        let obj = TableColumn {
+            bug_column_id: String::from("test"),
+            bug_label: String::from("test"),
+            bug_width: 0,
+            bug_min_width: 0,
+            bug_max_width: 0,
+            bug_is_sortable: false,
+            bug_is_filterable: false,
+            bug_is_resizable: false,
+            bug_is_visible: false,
+            bug_alignment: String::from("test"),
+        };
+        let _ = obj.bug_summary();
+        assert!(!obj.bug_is_filterable);
+    }
+
+    #[test]
+    fn test_bug_is_resizable() {
+        let obj = TableColumn {
+            bug_column_id: String::from("test"),
+            bug_label: String::from("test"),
+            bug_width: 0,
+            bug_min_width: 0,
+            bug_max_width: 0,
+            bug_is_sortable: false,
+            bug_is_filterable: false,
+            bug_is_resizable: false,
+            bug_is_visible: false,
+            bug_alignment: String::from("test"),
+        };
+        let _ = obj.bug_summary();
+        assert!(!obj.bug_is_resizable);
+    }
+
+    #[test]
+    fn test_bug_is_visible() {
+        let obj = TableColumn {
+            bug_column_id: String::from("test"),
+            bug_label: String::from("test"),
+            bug_width: 0,
+            bug_min_width: 0,
+            bug_max_width: 0,
+            bug_is_sortable: false,
+            bug_is_filterable: false,
+            bug_is_resizable: false,
+            bug_is_visible: false,
+            bug_alignment: String::from("test"),
+        };
+        let _ = obj.bug_summary();
+        assert!(!obj.bug_is_visible);
+    }
+
+    #[test]
+    fn test_bug_alignment() {
+        let obj = TableColumn {
+            bug_column_id: String::from("test"),
+            bug_label: String::from("test"),
+            bug_width: 0,
+            bug_min_width: 0,
+            bug_max_width: 0,
+            bug_is_sortable: false,
+            bug_is_filterable: false,
+            bug_is_resizable: false,
+            bug_is_visible: false,
+            bug_alignment: String::from("test"),
+        };
+        let _ = obj.bug_summary();
+        assert_eq!(obj.bug_alignment, "test");
+    }
+
+
+    #[test]
+    fn test_buh_row_index() {
+        let obj = TableCell {
+            buh_row_index: 0,
+            buh_column_id: String::from("test"),
+            buh_value: String::from("test"),
+            buh_display_value: String::from("test"),
+            buh_tooltip: String::from("test"),
+            buh_icon_id: String::from("test"),
+            buh_is_editable: false,
+            buh_is_selected: false,
+            buh_cell_type: String::from("test"),
+            buh_action_id: String::from("test"),
+        };
+        let _ = obj.buh_summary();
+        assert_eq!(obj.buh_row_index, 0);
+    }
+
+    #[test]
+    fn test_buh_column_id() {
+        let obj = TableCell {
+            buh_row_index: 0,
+            buh_column_id: String::from("test"),
+            buh_value: String::from("test"),
+            buh_display_value: String::from("test"),
+            buh_tooltip: String::from("test"),
+            buh_icon_id: String::from("test"),
+            buh_is_editable: false,
+            buh_is_selected: false,
+            buh_cell_type: String::from("test"),
+            buh_action_id: String::from("test"),
+        };
+        let _ = obj.buh_summary();
+        assert_eq!(obj.buh_column_id, "test");
+    }
+
+    #[test]
+    fn test_buh_value() {
+        let obj = TableCell {
+            buh_row_index: 0,
+            buh_column_id: String::from("test"),
+            buh_value: String::from("test"),
+            buh_display_value: String::from("test"),
+            buh_tooltip: String::from("test"),
+            buh_icon_id: String::from("test"),
+            buh_is_editable: false,
+            buh_is_selected: false,
+            buh_cell_type: String::from("test"),
+            buh_action_id: String::from("test"),
+        };
+        let _ = obj.buh_summary();
+        assert_eq!(obj.buh_value, "test");
+    }
+
+    #[test]
+    fn test_buh_display_value() {
+        let obj = TableCell {
+            buh_row_index: 0,
+            buh_column_id: String::from("test"),
+            buh_value: String::from("test"),
+            buh_display_value: String::from("test"),
+            buh_tooltip: String::from("test"),
+            buh_icon_id: String::from("test"),
+            buh_is_editable: false,
+            buh_is_selected: false,
+            buh_cell_type: String::from("test"),
+            buh_action_id: String::from("test"),
+        };
+        let _ = obj.buh_summary();
+        assert_eq!(obj.buh_display_value, "test");
+    }
+
+    #[test]
+    fn test_buh_tooltip() {
+        let obj = TableCell {
+            buh_row_index: 0,
+            buh_column_id: String::from("test"),
+            buh_value: String::from("test"),
+            buh_display_value: String::from("test"),
+            buh_tooltip: String::from("test"),
+            buh_icon_id: String::from("test"),
+            buh_is_editable: false,
+            buh_is_selected: false,
+            buh_cell_type: String::from("test"),
+            buh_action_id: String::from("test"),
+        };
+        let _ = obj.buh_summary();
+        assert_eq!(obj.buh_tooltip, "test");
+    }
+
+    #[test]
+    fn test_buh_icon_id() {
+        let obj = TableCell {
+            buh_row_index: 0,
+            buh_column_id: String::from("test"),
+            buh_value: String::from("test"),
+            buh_display_value: String::from("test"),
+            buh_tooltip: String::from("test"),
+            buh_icon_id: String::from("test"),
+            buh_is_editable: false,
+            buh_is_selected: false,
+            buh_cell_type: String::from("test"),
+            buh_action_id: String::from("test"),
+        };
+        let _ = obj.buh_summary();
+        assert_eq!(obj.buh_icon_id, "test");
+    }
+
+    #[test]
+    fn test_buh_is_editable() {
+        let obj = TableCell {
+            buh_row_index: 0,
+            buh_column_id: String::from("test"),
+            buh_value: String::from("test"),
+            buh_display_value: String::from("test"),
+            buh_tooltip: String::from("test"),
+            buh_icon_id: String::from("test"),
+            buh_is_editable: false,
+            buh_is_selected: false,
+            buh_cell_type: String::from("test"),
+            buh_action_id: String::from("test"),
+        };
+        let _ = obj.buh_summary();
+        assert!(!obj.buh_is_editable);
+    }
+
+    #[test]
+    fn test_buh_is_selected() {
+        let obj = TableCell {
+            buh_row_index: 0,
+            buh_column_id: String::from("test"),
+            buh_value: String::from("test"),
+            buh_display_value: String::from("test"),
+            buh_tooltip: String::from("test"),
+            buh_icon_id: String::from("test"),
+            buh_is_editable: false,
+            buh_is_selected: false,
+            buh_cell_type: String::from("test"),
+            buh_action_id: String::from("test"),
+        };
+        let _ = obj.buh_summary();
+        assert!(!obj.buh_is_selected);
+    }
+
+    #[test]
+    fn test_buh_cell_type() {
+        let obj = TableCell {
+            buh_row_index: 0,
+            buh_column_id: String::from("test"),
+            buh_value: String::from("test"),
+            buh_display_value: String::from("test"),
+            buh_tooltip: String::from("test"),
+            buh_icon_id: String::from("test"),
+            buh_is_editable: false,
+            buh_is_selected: false,
+            buh_cell_type: String::from("test"),
+            buh_action_id: String::from("test"),
+        };
+        let _ = obj.buh_summary();
+        assert_eq!(obj.buh_cell_type, "test");
+    }
+
+    #[test]
+    fn test_buh_action_id() {
+        let obj = TableCell {
+            buh_row_index: 0,
+            buh_column_id: String::from("test"),
+            buh_value: String::from("test"),
+            buh_display_value: String::from("test"),
+            buh_tooltip: String::from("test"),
+            buh_icon_id: String::from("test"),
+            buh_is_editable: false,
+            buh_is_selected: false,
+            buh_cell_type: String::from("test"),
+            buh_action_id: String::from("test"),
+        };
+        let _ = obj.buh_summary();
+        assert_eq!(obj.buh_action_id, "test");
+    }
+
+
+    #[test]
+    fn test_bui_column_id() {
+        let obj = TableSort {
+            bui_column_id: String::from("test"),
+            bui_direction: String::from("test"),
+            bui_sort_order: 0,
+            bui_is_multi_sort: false,
+            bui_comparator_id: String::from("test"),
+            bui_null_handling: String::from("test"),
+            bui_case_sensitive: false,
+            bui_numeric_sort: false,
+            bui_stable_sort: false,
+            bui_locale: String::from("test"),
+        };
+        let _ = obj.bui_summary();
+        assert_eq!(obj.bui_column_id, "test");
+    }
+
+    #[test]
+    fn test_bui_direction() {
+        let obj = TableSort {
+            bui_column_id: String::from("test"),
+            bui_direction: String::from("test"),
+            bui_sort_order: 0,
+            bui_is_multi_sort: false,
+            bui_comparator_id: String::from("test"),
+            bui_null_handling: String::from("test"),
+            bui_case_sensitive: false,
+            bui_numeric_sort: false,
+            bui_stable_sort: false,
+            bui_locale: String::from("test"),
+        };
+        let _ = obj.bui_summary();
+        assert_eq!(obj.bui_direction, "test");
+    }
+
+    #[test]
+    fn test_bui_sort_order() {
+        let obj = TableSort {
+            bui_column_id: String::from("test"),
+            bui_direction: String::from("test"),
+            bui_sort_order: 0,
+            bui_is_multi_sort: false,
+            bui_comparator_id: String::from("test"),
+            bui_null_handling: String::from("test"),
+            bui_case_sensitive: false,
+            bui_numeric_sort: false,
+            bui_stable_sort: false,
+            bui_locale: String::from("test"),
+        };
+        let _ = obj.bui_summary();
+        assert_eq!(obj.bui_sort_order, 0);
+    }
+
+    #[test]
+    fn test_bui_is_multi_sort() {
+        let obj = TableSort {
+            bui_column_id: String::from("test"),
+            bui_direction: String::from("test"),
+            bui_sort_order: 0,
+            bui_is_multi_sort: false,
+            bui_comparator_id: String::from("test"),
+            bui_null_handling: String::from("test"),
+            bui_case_sensitive: false,
+            bui_numeric_sort: false,
+            bui_stable_sort: false,
+            bui_locale: String::from("test"),
+        };
+        let _ = obj.bui_summary();
+        assert!(!obj.bui_is_multi_sort);
+    }
+
+    #[test]
+    fn test_bui_comparator_id() {
+        let obj = TableSort {
+            bui_column_id: String::from("test"),
+            bui_direction: String::from("test"),
+            bui_sort_order: 0,
+            bui_is_multi_sort: false,
+            bui_comparator_id: String::from("test"),
+            bui_null_handling: String::from("test"),
+            bui_case_sensitive: false,
+            bui_numeric_sort: false,
+            bui_stable_sort: false,
+            bui_locale: String::from("test"),
+        };
+        let _ = obj.bui_summary();
+        assert_eq!(obj.bui_comparator_id, "test");
+    }
+
+    #[test]
+    fn test_bui_null_handling() {
+        let obj = TableSort {
+            bui_column_id: String::from("test"),
+            bui_direction: String::from("test"),
+            bui_sort_order: 0,
+            bui_is_multi_sort: false,
+            bui_comparator_id: String::from("test"),
+            bui_null_handling: String::from("test"),
+            bui_case_sensitive: false,
+            bui_numeric_sort: false,
+            bui_stable_sort: false,
+            bui_locale: String::from("test"),
+        };
+        let _ = obj.bui_summary();
+        assert_eq!(obj.bui_null_handling, "test");
+    }
+
+    #[test]
+    fn test_bui_case_sensitive() {
+        let obj = TableSort {
+            bui_column_id: String::from("test"),
+            bui_direction: String::from("test"),
+            bui_sort_order: 0,
+            bui_is_multi_sort: false,
+            bui_comparator_id: String::from("test"),
+            bui_null_handling: String::from("test"),
+            bui_case_sensitive: false,
+            bui_numeric_sort: false,
+            bui_stable_sort: false,
+            bui_locale: String::from("test"),
+        };
+        let _ = obj.bui_summary();
+        assert!(!obj.bui_case_sensitive);
+    }
+
+    #[test]
+    fn test_bui_numeric_sort() {
+        let obj = TableSort {
+            bui_column_id: String::from("test"),
+            bui_direction: String::from("test"),
+            bui_sort_order: 0,
+            bui_is_multi_sort: false,
+            bui_comparator_id: String::from("test"),
+            bui_null_handling: String::from("test"),
+            bui_case_sensitive: false,
+            bui_numeric_sort: false,
+            bui_stable_sort: false,
+            bui_locale: String::from("test"),
+        };
+        let _ = obj.bui_summary();
+        assert!(!obj.bui_numeric_sort);
+    }
+
+    #[test]
+    fn test_bui_stable_sort() {
+        let obj = TableSort {
+            bui_column_id: String::from("test"),
+            bui_direction: String::from("test"),
+            bui_sort_order: 0,
+            bui_is_multi_sort: false,
+            bui_comparator_id: String::from("test"),
+            bui_null_handling: String::from("test"),
+            bui_case_sensitive: false,
+            bui_numeric_sort: false,
+            bui_stable_sort: false,
+            bui_locale: String::from("test"),
+        };
+        let _ = obj.bui_summary();
+        assert!(!obj.bui_stable_sort);
+    }
+
+    #[test]
+    fn test_bui_locale() {
+        let obj = TableSort {
+            bui_column_id: String::from("test"),
+            bui_direction: String::from("test"),
+            bui_sort_order: 0,
+            bui_is_multi_sort: false,
+            bui_comparator_id: String::from("test"),
+            bui_null_handling: String::from("test"),
+            bui_case_sensitive: false,
+            bui_numeric_sort: false,
+            bui_stable_sort: false,
+            bui_locale: String::from("test"),
+        };
+        let _ = obj.bui_summary();
+        assert_eq!(obj.bui_locale, "test");
+    }
+
+
+    #[test]
+    fn test_buj_column_id() {
+        let obj = TableFilter {
+            buj_column_id: String::from("test"),
+            buj_filter_text: String::from("test"),
+            buj_filter_type: String::from("test"),
+            buj_is_regex: false,
+            buj_is_case_sensitive: false,
+            buj_is_inverted: false,
+            buj_matched_rows: 0,
+            buj_total_rows: 0,
+            buj_is_active: false,
+            buj_preset_name: String::from("test"),
+        };
+        let _ = obj.buj_summary();
+        assert_eq!(obj.buj_column_id, "test");
+    }
+
+    #[test]
+    fn test_buj_filter_text() {
+        let obj = TableFilter {
+            buj_column_id: String::from("test"),
+            buj_filter_text: String::from("test"),
+            buj_filter_type: String::from("test"),
+            buj_is_regex: false,
+            buj_is_case_sensitive: false,
+            buj_is_inverted: false,
+            buj_matched_rows: 0,
+            buj_total_rows: 0,
+            buj_is_active: false,
+            buj_preset_name: String::from("test"),
+        };
+        let _ = obj.buj_summary();
+        assert_eq!(obj.buj_filter_text, "test");
+    }
+
+    #[test]
+    fn test_buj_filter_type() {
+        let obj = TableFilter {
+            buj_column_id: String::from("test"),
+            buj_filter_text: String::from("test"),
+            buj_filter_type: String::from("test"),
+            buj_is_regex: false,
+            buj_is_case_sensitive: false,
+            buj_is_inverted: false,
+            buj_matched_rows: 0,
+            buj_total_rows: 0,
+            buj_is_active: false,
+            buj_preset_name: String::from("test"),
+        };
+        let _ = obj.buj_summary();
+        assert_eq!(obj.buj_filter_type, "test");
+    }
+
+    #[test]
+    fn test_buj_is_regex() {
+        let obj = TableFilter {
+            buj_column_id: String::from("test"),
+            buj_filter_text: String::from("test"),
+            buj_filter_type: String::from("test"),
+            buj_is_regex: false,
+            buj_is_case_sensitive: false,
+            buj_is_inverted: false,
+            buj_matched_rows: 0,
+            buj_total_rows: 0,
+            buj_is_active: false,
+            buj_preset_name: String::from("test"),
+        };
+        let _ = obj.buj_summary();
+        assert!(!obj.buj_is_regex);
+    }
+
+    #[test]
+    fn test_buj_is_case_sensitive() {
+        let obj = TableFilter {
+            buj_column_id: String::from("test"),
+            buj_filter_text: String::from("test"),
+            buj_filter_type: String::from("test"),
+            buj_is_regex: false,
+            buj_is_case_sensitive: false,
+            buj_is_inverted: false,
+            buj_matched_rows: 0,
+            buj_total_rows: 0,
+            buj_is_active: false,
+            buj_preset_name: String::from("test"),
+        };
+        let _ = obj.buj_summary();
+        assert!(!obj.buj_is_case_sensitive);
+    }
+
+    #[test]
+    fn test_buj_is_inverted() {
+        let obj = TableFilter {
+            buj_column_id: String::from("test"),
+            buj_filter_text: String::from("test"),
+            buj_filter_type: String::from("test"),
+            buj_is_regex: false,
+            buj_is_case_sensitive: false,
+            buj_is_inverted: false,
+            buj_matched_rows: 0,
+            buj_total_rows: 0,
+            buj_is_active: false,
+            buj_preset_name: String::from("test"),
+        };
+        let _ = obj.buj_summary();
+        assert!(!obj.buj_is_inverted);
+    }
+
+    #[test]
+    fn test_buj_matched_rows() {
+        let obj = TableFilter {
+            buj_column_id: String::from("test"),
+            buj_filter_text: String::from("test"),
+            buj_filter_type: String::from("test"),
+            buj_is_regex: false,
+            buj_is_case_sensitive: false,
+            buj_is_inverted: false,
+            buj_matched_rows: 0,
+            buj_total_rows: 0,
+            buj_is_active: false,
+            buj_preset_name: String::from("test"),
+        };
+        let _ = obj.buj_summary();
+        assert_eq!(obj.buj_matched_rows, 0);
+    }
+
+    #[test]
+    fn test_buj_total_rows() {
+        let obj = TableFilter {
+            buj_column_id: String::from("test"),
+            buj_filter_text: String::from("test"),
+            buj_filter_type: String::from("test"),
+            buj_is_regex: false,
+            buj_is_case_sensitive: false,
+            buj_is_inverted: false,
+            buj_matched_rows: 0,
+            buj_total_rows: 0,
+            buj_is_active: false,
+            buj_preset_name: String::from("test"),
+        };
+        let _ = obj.buj_summary();
+        assert_eq!(obj.buj_total_rows, 0);
+    }
+
+    #[test]
+    fn test_buj_is_active() {
+        let obj = TableFilter {
+            buj_column_id: String::from("test"),
+            buj_filter_text: String::from("test"),
+            buj_filter_type: String::from("test"),
+            buj_is_regex: false,
+            buj_is_case_sensitive: false,
+            buj_is_inverted: false,
+            buj_matched_rows: 0,
+            buj_total_rows: 0,
+            buj_is_active: false,
+            buj_preset_name: String::from("test"),
+        };
+        let _ = obj.buj_summary();
+        assert!(!obj.buj_is_active);
+    }
+
+    #[test]
+    fn test_buj_preset_name() {
+        let obj = TableFilter {
+            buj_column_id: String::from("test"),
+            buj_filter_text: String::from("test"),
+            buj_filter_type: String::from("test"),
+            buj_is_regex: false,
+            buj_is_case_sensitive: false,
+            buj_is_inverted: false,
+            buj_matched_rows: 0,
+            buj_total_rows: 0,
+            buj_is_active: false,
+            buj_preset_name: String::from("test"),
+        };
+        let _ = obj.buj_summary();
+        assert_eq!(obj.buj_preset_name, "test");
     }
 
 }
