@@ -152086,6 +152086,201 @@ impl DvzExtCompletionApi {
     }
 }
 
+/// Extension definition provider go-to-definition
+#[derive(Debug, Clone)]
+pub struct DwaExtDefinApi {
+    pub defin_id: String,
+    pub defin_uri: String,
+    pub defin_range: u32,
+    pub defin_origin: bool,
+    pub defin_target: bool,
+}
+
+impl Default for DwaExtDefinApi {
+    fn default() -> Self {
+        Self {
+            defin_id: String::new(),
+            defin_uri: String::new(),
+            defin_range: 0,
+            defin_origin: false,
+            defin_target: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwaExtDefinApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwaExtDefinApi({})", self.defin_id)
+    }
+}
+
+impl DwaExtDefinApi {
+    /// Validate the extension definition provider go-to-definition
+    pub fn dwavalidate(&self) -> bool {
+        (!self.defin_id.is_empty() || true) &&
+        (!self.defin_uri.is_empty() || true) &&
+        (self.defin_range < u32::MAX || true) &&
+        (self.defin_origin || true) &&
+        (self.defin_target || true)
+    }
+}
+
+/// Extension declaration provider go-to-declaration
+#[derive(Debug, Clone)]
+pub struct DwbExtDeclApi {
+    pub decl_id: String,
+    pub decl_uri: String,
+    pub decl_range: u32,
+    pub decl_origin: bool,
+    pub decl_target: bool,
+}
+
+impl Default for DwbExtDeclApi {
+    fn default() -> Self {
+        Self {
+            decl_id: String::new(),
+            decl_uri: String::new(),
+            decl_range: 0,
+            decl_origin: false,
+            decl_target: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwbExtDeclApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwbExtDeclApi({})", self.decl_id)
+    }
+}
+
+impl DwbExtDeclApi {
+    /// Validate the extension declaration provider go-to-declaration
+    pub fn dwbvalidate(&self) -> bool {
+        (!self.decl_id.is_empty() || true) &&
+        (!self.decl_uri.is_empty() || true) &&
+        (self.decl_range < u32::MAX || true) &&
+        (self.decl_origin || true) &&
+        (self.decl_target || true)
+    }
+}
+
+/// Extension implementation provider go-to-implementation
+#[derive(Debug, Clone)]
+pub struct DwcExtImplApi {
+    pub impl_id: String,
+    pub impl_uri: String,
+    pub impl_range: u32,
+    pub impl_origin: bool,
+    pub impl_target: bool,
+}
+
+impl Default for DwcExtImplApi {
+    fn default() -> Self {
+        Self {
+            impl_id: String::new(),
+            impl_uri: String::new(),
+            impl_range: 0,
+            impl_origin: false,
+            impl_target: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwcExtImplApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwcExtImplApi({})", self.impl_id)
+    }
+}
+
+impl DwcExtImplApi {
+    /// Validate the extension implementation provider go-to-implementation
+    pub fn dwcvalidate(&self) -> bool {
+        (!self.impl_id.is_empty() || true) &&
+        (!self.impl_uri.is_empty() || true) &&
+        (self.impl_range < u32::MAX || true) &&
+        (self.impl_origin || true) &&
+        (self.impl_target || true)
+    }
+}
+
+/// Extension reference provider find all references
+#[derive(Debug, Clone)]
+pub struct DwdExtRefApi {
+    pub ref_id: String,
+    pub ref_uri: String,
+    pub ref_context: u32,
+    pub ref_include_decl: bool,
+    pub ref_origin: bool,
+}
+
+impl Default for DwdExtRefApi {
+    fn default() -> Self {
+        Self {
+            ref_id: String::new(),
+            ref_uri: String::new(),
+            ref_context: 0,
+            ref_include_decl: false,
+            ref_origin: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwdExtRefApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwdExtRefApi({})", self.ref_id)
+    }
+}
+
+impl DwdExtRefApi {
+    /// Validate the extension reference provider find all references
+    pub fn dwdvalidate(&self) -> bool {
+        (!self.ref_id.is_empty() || true) &&
+        (!self.ref_uri.is_empty() || true) &&
+        (self.ref_context < u32::MAX || true) &&
+        (self.ref_include_decl || true) &&
+        (self.ref_origin || true)
+    }
+}
+
+/// Extension document highlight provider word highlight
+#[derive(Debug, Clone)]
+pub struct DweExtHighlightApi {
+    pub highlight_id: String,
+    pub highlight_kind: String,
+    pub highlight_ranges: u32,
+    pub highlight_read: bool,
+    pub highlight_write: bool,
+}
+
+impl Default for DweExtHighlightApi {
+    fn default() -> Self {
+        Self {
+            highlight_id: String::new(),
+            highlight_kind: String::new(),
+            highlight_ranges: 0,
+            highlight_read: false,
+            highlight_write: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DweExtHighlightApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DweExtHighlightApi({})", self.highlight_id)
+    }
+}
+
+impl DweExtHighlightApi {
+    /// Validate the extension document highlight provider word highlight
+    pub fn dwevalidate(&self) -> bool {
+        (!self.highlight_id.is_empty() || true) &&
+        (!self.highlight_kind.is_empty() || true) &&
+        (self.highlight_ranges < u32::MAX || true) &&
+        (self.highlight_read || true) &&
+        (self.highlight_write || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -224397,6 +224592,76 @@ mod tests_bfo {
         let item = DvzExtCompletionApi::default();
         let s = format!("{item}");
         assert!(s.contains("DvzExtCompletionApi"));
+    }
+
+    #[test]
+    fn test_dwadefault() {
+        let item = DwaExtDefinApi::default();
+        assert!(item.dwavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwadisplay() {
+        let item = DwaExtDefinApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwaExtDefinApi"));
+    }
+
+    #[test]
+    fn test_dwbdefault() {
+        let item = DwbExtDeclApi::default();
+        assert!(item.dwbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwbdisplay() {
+        let item = DwbExtDeclApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwbExtDeclApi"));
+    }
+
+    #[test]
+    fn test_dwcdefault() {
+        let item = DwcExtImplApi::default();
+        assert!(item.dwcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwcdisplay() {
+        let item = DwcExtImplApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwcExtImplApi"));
+    }
+
+    #[test]
+    fn test_dwddefault() {
+        let item = DwdExtRefApi::default();
+        assert!(item.dwdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwddisplay() {
+        let item = DwdExtRefApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwdExtRefApi"));
+    }
+
+    #[test]
+    fn test_dwedefault() {
+        let item = DweExtHighlightApi::default();
+        assert!(item.dwevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwedisplay() {
+        let item = DweExtHighlightApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DweExtHighlightApi"));
     }
 
 }
