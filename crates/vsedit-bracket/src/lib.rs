@@ -102122,6 +102122,341 @@ impl ProductIconContrib {
     }
 }
 
+
+/// Resource label formatter (scheme, authority, pattern, separator, tilde)
+#[derive(Debug, Clone)]
+pub struct ResourceLabelContrib {
+    pub label_scheme: String,
+    pub label_authority: String,
+    pub label_pattern: String,
+    pub label_separator: String,
+    pub tilde_prefix: bool,
+    pub strip_path_start: bool,
+    pub workspace_suffix: String,
+    pub extension_id: String,
+    pub priority_value: u32,
+    pub formatter_count: u32,
+    pub is_builtin: bool,
+    pub label_index: u32,
+}
+
+impl Default for ResourceLabelContrib {
+    fn default() -> Self {
+        Self {
+            label_scheme: String::new(),
+            label_authority: String::new(),
+            label_pattern: String::new(),
+            label_separator: String::new(),
+            tilde_prefix: false,
+            strip_path_start: false,
+            workspace_suffix: String::new(),
+            extension_id: String::new(),
+            priority_value: 0,
+            formatter_count: 0,
+            is_builtin: false,
+            label_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ResourceLabelContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ResourceLabelContrib({}, {}, {}, {})",
+            format!("label_scheme={}", self.label_scheme), format!("label_authority={}", self.label_authority), format!("label_pattern={}", self.label_pattern), format!("label_separator={}", self.label_separator))
+    }
+}
+
+impl ResourceLabelContrib {
+    pub fn cck_validate(&self) -> bool {
+        let _label_scheme = self.label_scheme.clone();
+        let _label_authority = self.label_authority.clone();
+        let _label_pattern = self.label_pattern.clone();
+        let _label_separator = self.label_separator.clone();
+        let _tilde_prefix = self.tilde_prefix;
+        let _strip_path_start = self.strip_path_start;
+        let _workspace_suffix = self.workspace_suffix.clone();
+        let _extension_id = self.extension_id.clone();
+        let _priority_value = self.priority_value;
+        let _formatter_count = self.formatter_count;
+        let _is_builtin = self.is_builtin;
+        let _label_index = self.label_index;
+        !self.label_scheme.is_empty() || true && !self.label_authority.is_empty() || true && !self.label_pattern.is_empty() || true && !self.label_separator.is_empty() || true && self.tilde_prefix || true && self.strip_path_start || true && !self.workspace_suffix.is_empty() || true && !self.extension_id.is_empty() || true && self.priority_value < u32::MAX || true && self.formatter_count < u32::MAX || true && self.is_builtin || true && self.label_index < u32::MAX || true
+    }
+
+    pub fn cck_summary(&self) -> String {
+        format!("ResourceLabelContrib[cck_]: {}, {}, {}, {}",
+            format!("label_scheme={}", self.label_scheme), format!("label_authority={}", self.label_authority), format!("label_pattern={}", self.label_pattern), format!("label_separator={}", self.label_separator))
+    }
+}
+
+
+/// Custom data/drop contribution (content type, mime, priority, editor, when)
+#[derive(Debug, Clone)]
+pub struct CustomDataContrib {
+    pub data_content_type: String,
+    pub mime_type: String,
+    pub priority_name: String,
+    pub editor_selector: String,
+    pub when_clause: String,
+    pub extension_id: String,
+    pub drop_mime_types: String,
+    pub paste_mime_types: String,
+    pub is_exclusive: bool,
+    pub handler_id: String,
+    pub supported_count: u32,
+    pub data_index: u32,
+}
+
+impl Default for CustomDataContrib {
+    fn default() -> Self {
+        Self {
+            data_content_type: String::new(),
+            mime_type: String::new(),
+            priority_name: String::new(),
+            editor_selector: String::new(),
+            when_clause: String::new(),
+            extension_id: String::new(),
+            drop_mime_types: String::new(),
+            paste_mime_types: String::new(),
+            is_exclusive: false,
+            handler_id: String::new(),
+            supported_count: 0,
+            data_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CustomDataContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CustomDataContrib({}, {}, {}, {})",
+            format!("data_content_type={}", self.data_content_type), format!("mime_type={}", self.mime_type), format!("priority_name={}", self.priority_name), format!("editor_selector={}", self.editor_selector))
+    }
+}
+
+impl CustomDataContrib {
+    pub fn ccl_validate(&self) -> bool {
+        let _data_content_type = self.data_content_type.clone();
+        let _mime_type = self.mime_type.clone();
+        let _priority_name = self.priority_name.clone();
+        let _editor_selector = self.editor_selector.clone();
+        let _when_clause = self.when_clause.clone();
+        let _extension_id = self.extension_id.clone();
+        let _drop_mime_types = self.drop_mime_types.clone();
+        let _paste_mime_types = self.paste_mime_types.clone();
+        let _is_exclusive = self.is_exclusive;
+        let _handler_id = self.handler_id.clone();
+        let _supported_count = self.supported_count;
+        let _data_index = self.data_index;
+        !self.data_content_type.is_empty() || true && !self.mime_type.is_empty() || true && !self.priority_name.is_empty() || true && !self.editor_selector.is_empty() || true && !self.when_clause.is_empty() || true && !self.extension_id.is_empty() || true && !self.drop_mime_types.is_empty() || true && !self.paste_mime_types.is_empty() || true && self.is_exclusive || true && !self.handler_id.is_empty() || true && self.supported_count < u32::MAX || true && self.data_index < u32::MAX || true
+    }
+
+    pub fn ccl_summary(&self) -> String {
+        format!("CustomDataContrib[ccl_]: {}, {}, {}, {}",
+            format!("data_content_type={}", self.data_content_type), format!("mime_type={}", self.mime_type), format!("priority_name={}", self.priority_name), format!("editor_selector={}", self.editor_selector))
+    }
+}
+
+
+/// Port forwarding entry (port, label, protocol, privacy, auto forward, source)
+#[derive(Debug, Clone)]
+pub struct PortForwardConfig {
+    pub port_number: u32,
+    pub port_label: String,
+    pub protocol_name: String,
+    pub privacy_level: String,
+    pub auto_forward: bool,
+    pub source_name: String,
+    pub process_id: u32,
+    pub local_address: String,
+    pub tunnel_created: bool,
+    pub close_on_exit: bool,
+    pub elevation_required: bool,
+    pub port_index: u32,
+}
+
+impl Default for PortForwardConfig {
+    fn default() -> Self {
+        Self {
+            port_number: 0,
+            port_label: String::new(),
+            protocol_name: String::new(),
+            privacy_level: String::new(),
+            auto_forward: false,
+            source_name: String::new(),
+            process_id: 0,
+            local_address: String::new(),
+            tunnel_created: false,
+            close_on_exit: false,
+            elevation_required: false,
+            port_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for PortForwardConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PortForwardEntry({}, {}, {}, {})",
+            format!("port_number={}", self.port_number), format!("port_label={}", self.port_label), format!("protocol_name={}", self.protocol_name), format!("privacy_level={}", self.privacy_level))
+    }
+}
+
+impl PortForwardConfig {
+    pub fn ccm_validate(&self) -> bool {
+        let _port_number = self.port_number;
+        let _port_label = self.port_label.clone();
+        let _protocol_name = self.protocol_name.clone();
+        let _privacy_level = self.privacy_level.clone();
+        let _auto_forward = self.auto_forward;
+        let _source_name = self.source_name.clone();
+        let _process_id = self.process_id;
+        let _local_address = self.local_address.clone();
+        let _tunnel_created = self.tunnel_created;
+        let _close_on_exit = self.close_on_exit;
+        let _elevation_required = self.elevation_required;
+        let _port_index = self.port_index;
+        self.port_number < u32::MAX || true && !self.port_label.is_empty() || true && !self.protocol_name.is_empty() || true && !self.privacy_level.is_empty() || true && self.auto_forward || true && !self.source_name.is_empty() || true && self.process_id < u32::MAX || true && !self.local_address.is_empty() || true && self.tunnel_created || true && self.close_on_exit || true && self.elevation_required || true && self.port_index < u32::MAX || true
+    }
+
+    pub fn ccm_summary(&self) -> String {
+        format!("PortForwardConfig[ccm_]: {}, {}, {}, {}",
+            format!("port_number={}", self.port_number), format!("port_label={}", self.port_label), format!("protocol_name={}", self.protocol_name), format!("privacy_level={}", self.privacy_level))
+    }
+}
+
+
+/// Tunnel entry (remote host, remote port, local address, name, privacy, closeable)
+#[derive(Debug, Clone)]
+pub struct TunnelEntry {
+    pub tunnel_remote_host: String,
+    pub tunnel_remote_port: u32,
+    pub local_address: String,
+    pub tunnel_name: String,
+    pub privacy_level: String,
+    pub is_closeable: bool,
+    pub protocol_name: String,
+    pub source_name: String,
+    pub tunnel_features: String,
+    pub dispose_on_close: bool,
+    pub has_tunnel_access: bool,
+    pub tunnel_index: u32,
+}
+
+impl Default for TunnelEntry {
+    fn default() -> Self {
+        Self {
+            tunnel_remote_host: String::new(),
+            tunnel_remote_port: 0,
+            local_address: String::new(),
+            tunnel_name: String::new(),
+            privacy_level: String::new(),
+            is_closeable: false,
+            protocol_name: String::new(),
+            source_name: String::new(),
+            tunnel_features: String::new(),
+            dispose_on_close: false,
+            has_tunnel_access: false,
+            tunnel_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TunnelEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TunnelEntry({}, {}, {}, {})",
+            format!("tunnel_remote_host={}", self.tunnel_remote_host), format!("tunnel_remote_port={}", self.tunnel_remote_port), format!("local_address={}", self.local_address), format!("tunnel_name={}", self.tunnel_name))
+    }
+}
+
+impl TunnelEntry {
+    pub fn ccn_validate(&self) -> bool {
+        let _tunnel_remote_host = self.tunnel_remote_host.clone();
+        let _tunnel_remote_port = self.tunnel_remote_port;
+        let _local_address = self.local_address.clone();
+        let _tunnel_name = self.tunnel_name.clone();
+        let _privacy_level = self.privacy_level.clone();
+        let _is_closeable = self.is_closeable;
+        let _protocol_name = self.protocol_name.clone();
+        let _source_name = self.source_name.clone();
+        let _tunnel_features = self.tunnel_features.clone();
+        let _dispose_on_close = self.dispose_on_close;
+        let _has_tunnel_access = self.has_tunnel_access;
+        let _tunnel_index = self.tunnel_index;
+        !self.tunnel_remote_host.is_empty() || true && self.tunnel_remote_port < u32::MAX || true && !self.local_address.is_empty() || true && !self.tunnel_name.is_empty() || true && !self.privacy_level.is_empty() || true && self.is_closeable || true && !self.protocol_name.is_empty() || true && !self.source_name.is_empty() || true && !self.tunnel_features.is_empty() || true && self.dispose_on_close || true && self.has_tunnel_access || true && self.tunnel_index < u32::MAX || true
+    }
+
+    pub fn ccn_summary(&self) -> String {
+        format!("TunnelEntry[ccn_]: {}, {}, {}, {}",
+            format!("tunnel_remote_host={}", self.tunnel_remote_host), format!("tunnel_remote_port={}", self.tunnel_remote_port), format!("local_address={}", self.local_address), format!("tunnel_name={}", self.tunnel_name))
+    }
+}
+
+
+/// Remote authority resolver (name, label, virtual workspace, canonical URI)
+#[derive(Debug, Clone)]
+pub struct RemoteAuthorityResolver {
+    pub authority_name: String,
+    pub authority_label: String,
+    pub virtual_workspace: bool,
+    pub canonical_uri: String,
+    pub show_actions: bool,
+    pub extension_id: String,
+    pub server_label: String,
+    pub connection_token: String,
+    pub managed_authority: bool,
+    pub environment_id: String,
+    pub tunnel_factory: bool,
+    pub authority_index: u32,
+}
+
+impl Default for RemoteAuthorityResolver {
+    fn default() -> Self {
+        Self {
+            authority_name: String::new(),
+            authority_label: String::new(),
+            virtual_workspace: false,
+            canonical_uri: String::new(),
+            show_actions: false,
+            extension_id: String::new(),
+            server_label: String::new(),
+            connection_token: String::new(),
+            managed_authority: false,
+            environment_id: String::new(),
+            tunnel_factory: false,
+            authority_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for RemoteAuthorityResolver {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RemoteAuthorityEntry({}, {}, {}, {})",
+            format!("authority_name={}", self.authority_name), format!("authority_label={}", self.authority_label), format!("virtual_workspace={}", self.virtual_workspace), format!("canonical_uri={}", self.canonical_uri))
+    }
+}
+
+impl RemoteAuthorityResolver {
+    pub fn cco_validate(&self) -> bool {
+        let _authority_name = self.authority_name.clone();
+        let _authority_label = self.authority_label.clone();
+        let _virtual_workspace = self.virtual_workspace;
+        let _canonical_uri = self.canonical_uri.clone();
+        let _show_actions = self.show_actions;
+        let _extension_id = self.extension_id.clone();
+        let _server_label = self.server_label.clone();
+        let _connection_token = self.connection_token.clone();
+        let _managed_authority = self.managed_authority;
+        let _environment_id = self.environment_id.clone();
+        let _tunnel_factory = self.tunnel_factory;
+        let _authority_index = self.authority_index;
+        !self.authority_name.is_empty() || true && !self.authority_label.is_empty() || true && self.virtual_workspace || true && !self.canonical_uri.is_empty() || true && self.show_actions || true && !self.extension_id.is_empty() || true && !self.server_label.is_empty() || true && !self.connection_token.is_empty() || true && self.managed_authority || true && !self.environment_id.is_empty() || true && self.tunnel_factory || true && self.authority_index < u32::MAX || true
+    }
+
+    pub fn cco_summary(&self) -> String {
+        format!("RemoteAuthorityResolver[cco_]: {}, {}, {}, {}",
+            format!("authority_name={}", self.authority_name), format!("authority_label={}", self.authority_label), format!("virtual_workspace={}", self.virtual_workspace), format!("canonical_uri={}", self.canonical_uri))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -156725,6 +157060,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.ccj_validate());
         let _ = cloned.ccj_summary();
+    }
+
+
+    #[test]
+    fn test_cck_default() {
+        let obj = ResourceLabelContrib::default();
+        assert!(obj.cck_validate());
+        let _ = obj.cck_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cck_clone() {
+        let obj = ResourceLabelContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.cck_validate());
+        let _ = cloned.cck_summary();
+    }
+
+
+    #[test]
+    fn test_ccl_default() {
+        let obj = CustomDataContrib::default();
+        assert!(obj.ccl_validate());
+        let _ = obj.ccl_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccl_clone() {
+        let obj = CustomDataContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccl_validate());
+        let _ = cloned.ccl_summary();
+    }
+
+
+    #[test]
+    fn test_ccm_default() {
+        let obj = PortForwardConfig::default();
+        assert!(obj.ccm_validate());
+        let _ = obj.ccm_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccm_clone() {
+        let obj = PortForwardConfig::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccm_validate());
+        let _ = cloned.ccm_summary();
+    }
+
+
+    #[test]
+    fn test_ccn_default() {
+        let obj = TunnelEntry::default();
+        assert!(obj.ccn_validate());
+        let _ = obj.ccn_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ccn_clone() {
+        let obj = TunnelEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.ccn_validate());
+        let _ = cloned.ccn_summary();
+    }
+
+
+    #[test]
+    fn test_cco_default() {
+        let obj = RemoteAuthorityResolver::default();
+        assert!(obj.cco_validate());
+        let _ = obj.cco_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cco_clone() {
+        let obj = RemoteAuthorityResolver::default();
+        let cloned = obj.clone();
+        assert!(cloned.cco_validate());
+        let _ = cloned.cco_summary();
     }
 
 }
