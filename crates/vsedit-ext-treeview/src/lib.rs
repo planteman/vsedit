@@ -48991,3 +48991,440 @@ mod bag_tests {
         assert!(opts.is_empty());
     }
 }
+
+
+// --- bah_: Editor marker/bookmark model ---
+
+/// Type of editor marker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BahMarkerType {
+    Bookmark,
+    Breakpoint,
+    ConditionalBreakpoint,
+    Logpoint,
+    Error,
+    Warning,
+    Info,
+    Hint,
+    Custom,
+}
+
+impl BahMarkerType {
+    pub fn glyph(&self) -> &'static str {
+        match self {
+            Self::Bookmark => "\u{1f4d6}",
+            Self::Breakpoint => "\u{1f534}",
+            Self::ConditionalBreakpoint => "\u{1f7e1}",
+            Self::Logpoint => "\u{25c7}",
+            Self::Error => "\u{2717}",
+            Self::Warning => "\u{26a0}",
+            Self::Info => "\u{2139}",
+            Self::Hint => "\u{1f4a1}",
+            Self::Custom => "\u{25cf}",
+        }
+    }
+
+    pub fn priority(&self) -> u8 {
+        match self {
+            Self::Error => 1,
+            Self::Breakpoint => 2,
+            Self::ConditionalBreakpoint => 3,
+            Self::Warning => 4,
+            Self::Logpoint => 5,
+            Self::Info => 6,
+            Self::Bookmark => 7,
+            Self::Hint => 8,
+            Self::Custom => 9,
+        }
+    }
+}
+
+/// A single editor marker on a line.
+#[derive(Debug, Clone)]
+pub struct BahMarker {
+    pub id: u64,
+    pub marker_type: BahMarkerType,
+    pub line: u32,
+    pub column: Option<u32>,
+    pub end_line: Option<u32>,
+    pub message: Option<String>,
+    pub condition: Option<String>,
+    pub is_enabled: bool,
+    pub source: Option<String>,
+}
+
+impl BahMarker {
+    pub fn new(id: u64, marker_type: BahMarkerType, line: u32) -> Self {
+        Self {
+            id,
+            marker_type,
+            line,
+            column: None,
+            end_line: None,
+            message: None,
+            condition: None,
+            is_enabled: true,
+            source: None,
+        }
+    }
+
+    pub fn bookmark(id: u64, line: u32) -> Self {
+        Self::new(id, BahMarkerType::Bookmark, line)
+    }
+
+    pub fn breakpoint(id: u64, line: u32) -> Self {
+        Self::new(id, BahMarkerType::Breakpoint, line)
+    }
+
+    pub fn conditional_breakpoint(id: u64, line: u32, condition: &str) -> Self {
+        let mut m = Self::new(id, BahMarkerType::ConditionalBreakpoint, line);
+        m.condition = Some(condition.to_string());
+        m
+    }
+
+    pub fn logpoint(id: u64, line: u32, message: &str) -> Self {
+        let mut m = Self::new(id, BahMarkerType::Logpoint, line);
+        m.message = Some(message.to_string());
+        m
+    }
+
+    pub fn with_message(mut self, msg: &str) -> Self {
+        self.message = Some(msg.to_string());
+        self
+    }
+
+    pub fn with_source(mut self, source: &str) -> Self {
+        self.source = Some(source.to_string());
+        self
+    }
+
+    pub fn with_range(mut self, end_line: u32) -> Self {
+        self.end_line = Some(end_line);
+        self
+    }
+
+    pub fn toggle_enabled(&mut self) {
+        self.is_enabled = !self.is_enabled;
+    }
+
+    pub fn is_on_line(&self, line: u32) -> bool {
+        if let Some(end) = self.end_line {
+            line >= self.line && line <= end
+        } else {
+            line == self.line
+        }
+    }
+
+    pub fn line_span(&self) -> u32 {
+        match self.end_line {
+            Some(end) => end.saturating_sub(self.line) + 1,
+            None => 1,
+        }
+    }
+
+    pub fn shift_line(&mut self, delta: i32) {
+        let new_line = (self.line as i64 + delta as i64).max(0) as u32;
+        if let Some(end) = self.end_line {
+            let end_delta = (end as i64 + delta as i64).max(new_line as i64) as u32;
+            self.end_line = Some(end_delta);
+        }
+        self.line = new_line;
+    }
+}
+
+/// Collection of markers for a file.
+#[derive(Debug, Clone)]
+pub struct BahMarkerCollection {
+    pub file_path: String,
+    markers: Vec<BahMarker>,
+    next_id: u64,
+}
+
+impl BahMarkerCollection {
+    pub fn new(path: &str) -> Self {
+        Self {
+            file_path: path.to_string(),
+            markers: Vec::new(),
+            next_id: 1,
+        }
+    }
+
+    fn alloc_id(&mut self) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        id
+    }
+
+    pub fn add_bookmark(&mut self, line: u32) -> u64 {
+        let id = self.alloc_id();
+        self.markers.push(BahMarker::bookmark(id, line));
+        id
+    }
+
+    pub fn add_breakpoint(&mut self, line: u32) -> u64 {
+        let id = self.alloc_id();
+        self.markers.push(BahMarker::breakpoint(id, line));
+        id
+    }
+
+    pub fn add_marker(&mut self, marker: BahMarker) -> u64 {
+        let id = marker.id;
+        self.markers.push(marker);
+        if id >= self.next_id {
+            self.next_id = id + 1;
+        }
+        id
+    }
+
+    pub fn remove(&mut self, id: u64) -> bool {
+        if let Some(idx) = self.markers.iter().position(|m| m.id == id) {
+            self.markers.remove(idx);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn get(&self, id: u64) -> Option<&BahMarker> {
+        self.markers.iter().find(|m| m.id == id)
+    }
+
+    pub fn get_mut(&mut self, id: u64) -> Option<&mut BahMarker> {
+        self.markers.iter_mut().find(|m| m.id == id)
+    }
+
+    pub fn markers_at_line(&self, line: u32) -> Vec<&BahMarker> {
+        self.markers.iter().filter(|m| m.is_on_line(line)).collect()
+    }
+
+    pub fn markers_of_type(&self, t: BahMarkerType) -> Vec<&BahMarker> {
+        self.markers.iter().filter(|m| m.marker_type == t).collect()
+    }
+
+    pub fn all_markers(&self) -> &[BahMarker] {
+        &self.markers
+    }
+
+    pub fn count(&self) -> usize {
+        self.markers.len()
+    }
+
+    pub fn bookmark_count(&self) -> usize {
+        self.markers.iter().filter(|m| m.marker_type == BahMarkerType::Bookmark).count()
+    }
+
+    pub fn breakpoint_count(&self) -> usize {
+        self.markers.iter().filter(|m| matches!(m.marker_type,
+            BahMarkerType::Breakpoint | BahMarkerType::ConditionalBreakpoint | BahMarkerType::Logpoint
+        )).count()
+    }
+
+    pub fn toggle_bookmark_at(&mut self, line: u32) -> Option<u64> {
+        if let Some(idx) = self.markers.iter().position(|m| m.marker_type == BahMarkerType::Bookmark && m.line == line) {
+            let id = self.markers[idx].id;
+            self.markers.remove(idx);
+            None // Removed
+        } else {
+            Some(self.add_bookmark(line)) // Added
+        }
+    }
+
+    pub fn clear_type(&mut self, t: BahMarkerType) {
+        self.markers.retain(|m| m.marker_type != t);
+    }
+
+    pub fn clear_all(&mut self) {
+        self.markers.clear();
+    }
+
+    pub fn next_marker_from(&self, line: u32) -> Option<&BahMarker> {
+        self.markers.iter().filter(|m| m.line > line).min_by_key(|m| m.line)
+    }
+
+    pub fn prev_marker_from(&self, line: u32) -> Option<&BahMarker> {
+        self.markers.iter().filter(|m| m.line < line).max_by_key(|m| m.line)
+    }
+
+    pub fn sort_by_line(&mut self) {
+        self.markers.sort_by_key(|m| (m.line, m.marker_type.priority()));
+    }
+
+    pub fn shift_markers_after(&mut self, after_line: u32, delta: i32) {
+        for m in &mut self.markers {
+            if m.line > after_line {
+                m.shift_line(delta);
+            }
+        }
+    }
+
+    pub fn highest_priority_at(&self, line: u32) -> Option<&BahMarker> {
+        self.markers_at_line(line).into_iter().min_by_key(|m| m.marker_type.priority())
+    }
+}
+
+#[cfg(test)]
+mod bah_tests {
+    use super::*;
+
+    #[test]
+    fn test_bah_marker_type_priority() {
+        assert!(BahMarkerType::Error.priority() < BahMarkerType::Bookmark.priority());
+        assert!(BahMarkerType::Breakpoint.priority() < BahMarkerType::Warning.priority());
+    }
+
+    #[test]
+    fn test_bah_marker_creation() {
+        let m = BahMarker::bookmark(1, 10);
+        assert_eq!(m.marker_type, BahMarkerType::Bookmark);
+        assert_eq!(m.line, 10);
+        assert!(m.is_enabled);
+    }
+
+    #[test]
+    fn test_bah_conditional_breakpoint() {
+        let m = BahMarker::conditional_breakpoint(1, 20, "x > 5");
+        assert_eq!(m.condition.as_deref(), Some("x > 5"));
+    }
+
+    #[test]
+    fn test_bah_logpoint() {
+        let m = BahMarker::logpoint(1, 15, "value={x}");
+        assert_eq!(m.message.as_deref(), Some("value={x}"));
+    }
+
+    #[test]
+    fn test_bah_marker_range() {
+        let m = BahMarker::new(1, BahMarkerType::Error, 5).with_range(10);
+        assert!(m.is_on_line(5));
+        assert!(m.is_on_line(7));
+        assert!(m.is_on_line(10));
+        assert!(!m.is_on_line(11));
+        assert_eq!(m.line_span(), 6);
+    }
+
+    #[test]
+    fn test_bah_marker_toggle() {
+        let mut m = BahMarker::breakpoint(1, 10);
+        assert!(m.is_enabled);
+        m.toggle_enabled();
+        assert!(!m.is_enabled);
+    }
+
+    #[test]
+    fn test_bah_shift_line() {
+        let mut m = BahMarker::bookmark(1, 10);
+        m.shift_line(5);
+        assert_eq!(m.line, 15);
+        m.shift_line(-20);
+        assert_eq!(m.line, 0);
+    }
+
+    #[test]
+    fn test_bah_collection_basic() {
+        let mut col = BahMarkerCollection::new("test.rs");
+        let id1 = col.add_bookmark(5);
+        let id2 = col.add_breakpoint(10);
+        assert_eq!(col.count(), 2);
+        assert_eq!(col.bookmark_count(), 1);
+        assert_eq!(col.breakpoint_count(), 1);
+        assert!(col.get(id1).is_some());
+        assert!(col.remove(id2));
+        assert_eq!(col.count(), 1);
+    }
+
+    #[test]
+    fn test_bah_markers_at_line() {
+        let mut col = BahMarkerCollection::new("test.rs");
+        col.add_bookmark(5);
+        col.add_breakpoint(5);
+        col.add_bookmark(10);
+        assert_eq!(col.markers_at_line(5).len(), 2);
+        assert_eq!(col.markers_at_line(10).len(), 1);
+        assert_eq!(col.markers_at_line(15).len(), 0);
+    }
+
+    #[test]
+    fn test_bah_toggle_bookmark() {
+        let mut col = BahMarkerCollection::new("test.rs");
+        let added = col.toggle_bookmark_at(10);
+        assert!(added.is_some());
+        assert_eq!(col.bookmark_count(), 1);
+
+        let removed = col.toggle_bookmark_at(10);
+        assert!(removed.is_none());
+        assert_eq!(col.bookmark_count(), 0);
+    }
+
+    #[test]
+    fn test_bah_clear_type() {
+        let mut col = BahMarkerCollection::new("test.rs");
+        col.add_bookmark(5);
+        col.add_bookmark(10);
+        col.add_breakpoint(15);
+        col.clear_type(BahMarkerType::Bookmark);
+        assert_eq!(col.count(), 1);
+    }
+
+    #[test]
+    fn test_bah_navigation() {
+        let mut col = BahMarkerCollection::new("test.rs");
+        col.add_bookmark(5);
+        col.add_bookmark(15);
+        col.add_bookmark(25);
+        let next = col.next_marker_from(10);
+        assert_eq!(next.unwrap().line, 15);
+        let prev = col.prev_marker_from(20);
+        assert_eq!(prev.unwrap().line, 15);
+    }
+
+    #[test]
+    fn test_bah_sort() {
+        let mut col = BahMarkerCollection::new("test.rs");
+        col.add_bookmark(20);
+        col.add_breakpoint(5);
+        col.add_bookmark(10);
+        col.sort_by_line();
+        assert_eq!(col.all_markers()[0].line, 5);
+        assert_eq!(col.all_markers()[1].line, 10);
+    }
+
+    #[test]
+    fn test_bah_shift_after() {
+        let mut col = BahMarkerCollection::new("test.rs");
+        col.add_bookmark(5);
+        col.add_bookmark(10);
+        col.add_bookmark(15);
+        col.shift_markers_after(8, 3);
+        // Line 5 unchanged, lines 10 and 15 shifted
+        assert_eq!(col.all_markers()[0].line, 5);
+        assert_eq!(col.all_markers()[1].line, 13);
+        assert_eq!(col.all_markers()[2].line, 18);
+    }
+
+    #[test]
+    fn test_bah_highest_priority() {
+        let mut col = BahMarkerCollection::new("test.rs");
+        col.add_bookmark(5);
+        col.add_breakpoint(5);
+        let top = col.highest_priority_at(5);
+        assert_eq!(top.unwrap().marker_type, BahMarkerType::Breakpoint);
+    }
+
+    #[test]
+    fn test_bah_markers_of_type() {
+        let mut col = BahMarkerCollection::new("test.rs");
+        col.add_bookmark(5);
+        col.add_bookmark(10);
+        col.add_breakpoint(15);
+        assert_eq!(col.markers_of_type(BahMarkerType::Bookmark).len(), 2);
+    }
+
+    #[test]
+    fn test_bah_with_builders() {
+        let m = BahMarker::new(1, BahMarkerType::Error, 42)
+            .with_message("syntax error")
+            .with_source("rustc");
+        assert_eq!(m.message.as_deref(), Some("syntax error"));
+        assert_eq!(m.source.as_deref(), Some("rustc"));
+    }
+}
