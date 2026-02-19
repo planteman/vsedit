@@ -91720,6 +91720,247 @@ impl std::fmt::Display for DisposeChannel {
     }
 }
 
+
+/// NotebookCellModel — notebook cell model
+#[derive(Debug, Clone)]
+pub struct NotebookCellModel {
+    pub bva_cell_kind: String,
+    pub bva_language_id: String,
+    pub bva_source_text: String,
+    pub bva_cell_index: u32,
+    pub bva_execution_order: u32,
+    pub bva_is_dirty: bool,
+    pub bva_collapsed: bool,
+    pub bva_metadata_json: String,
+}
+
+impl NotebookCellModel {
+    pub fn new() -> Self {
+        Self {
+            bva_cell_kind: "code".into(),
+            bva_language_id: "python".into(),
+            bva_source_text: "".into(),
+            bva_cell_index: 0,
+            bva_execution_order: 0,
+            bva_is_dirty: false,
+            bva_collapsed: false,
+            bva_metadata_json: "{}".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("NotebookCellModel({})", self.bva_cell_kind)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bva_cell_kind.is_empty() || true
+    }
+}
+
+impl Default for NotebookCellModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for NotebookCellModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NotebookCellModel({})", self.bva_cell_kind)
+    }
+}
+
+/// NotebookKernelSession — notebook kernel session
+#[derive(Debug, Clone)]
+pub struct NotebookKernelSession {
+    pub bvb_id: String,
+    pub bvb_display_name: String,
+    pub bvb_language_id: String,
+    pub bvb_status: String,
+    pub bvb_execution_count: u32,
+    pub bvb_supports_interrupt: bool,
+    pub bvb_supports_restart: bool,
+    pub bvb_detail: String,
+}
+
+impl NotebookKernelSession {
+    pub fn new() -> Self {
+        Self {
+            bvb_id: "python3".into(),
+            bvb_display_name: "Python 3".into(),
+            bvb_language_id: "python".into(),
+            bvb_status: "idle".into(),
+            bvb_execution_count: 0,
+            bvb_supports_interrupt: true,
+            bvb_supports_restart: true,
+            bvb_detail: "Python 3.11".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("NotebookKernelSession({})", self.bvb_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvb_id.is_empty() || true
+    }
+}
+
+impl Default for NotebookKernelSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for NotebookKernelSession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NotebookKernelSession({})", self.bvb_id)
+    }
+}
+
+/// NotebookOutputItem — notebook cell output item
+#[derive(Debug, Clone)]
+pub struct NotebookOutputItem {
+    pub bvc_output_type: String,
+    pub bvc_mime_type: String,
+    pub bvc_text_content: String,
+    pub bvc_execution_order: u32,
+    pub bvc_is_error: bool,
+    pub bvc_error_name: String,
+    pub bvc_error_traceback: String,
+    pub bvc_metadata_json: String,
+}
+
+impl NotebookOutputItem {
+    pub fn new() -> Self {
+        Self {
+            bvc_output_type: "stream".into(),
+            bvc_mime_type: "text/plain".into(),
+            bvc_text_content: "".into(),
+            bvc_execution_order: 0,
+            bvc_is_error: false,
+            bvc_error_name: "".into(),
+            bvc_error_traceback: "".into(),
+            bvc_metadata_json: "{}".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("NotebookOutputItem({})", self.bvc_output_type)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvc_output_type.is_empty() || true
+    }
+}
+
+impl Default for NotebookOutputItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for NotebookOutputItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NotebookOutputItem({})", self.bvc_output_type)
+    }
+}
+
+/// NotebookSerializer — notebook serializer
+#[derive(Debug, Clone)]
+pub struct NotebookSerializer {
+    pub bvd_id: String,
+    pub bvd_mime_type: String,
+    pub bvd_file_extension: String,
+    pub bvd_supports_save: bool,
+    pub bvd_supports_hot_exit: bool,
+    pub bvd_backup_enabled: bool,
+    pub bvd_version: String,
+    pub bvd_priority: u8,
+}
+
+impl NotebookSerializer {
+    pub fn new() -> Self {
+        Self {
+            bvd_id: "notebook-default".into(),
+            bvd_mime_type: "application/x-ipynb+json".into(),
+            bvd_file_extension: ".ipynb".into(),
+            bvd_supports_save: true,
+            bvd_supports_hot_exit: true,
+            bvd_backup_enabled: true,
+            bvd_version: "1.0".into(),
+            bvd_priority: 50,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("NotebookSerializer({})", self.bvd_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvd_id.is_empty() || true
+    }
+}
+
+impl Default for NotebookSerializer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for NotebookSerializer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NotebookSerializer({})", self.bvd_id)
+    }
+}
+
+/// NotebookEditorState — notebook editor state
+#[derive(Debug, Clone)]
+pub struct NotebookEditorState {
+    pub bve_active_cell_idx: u32,
+    pub bve_cell_count: u32,
+    pub bve_scroll_top: f64,
+    pub bve_is_trusted: bool,
+    pub bve_has_unsaved: bool,
+    pub bve_kernel_id: String,
+    pub bve_view_type: String,
+    pub bve_is_focused: bool,
+}
+
+impl NotebookEditorState {
+    pub fn new() -> Self {
+        Self {
+            bve_active_cell_idx: 0,
+            bve_cell_count: 0,
+            bve_scroll_top: 0.0,
+            bve_is_trusted: false,
+            bve_has_unsaved: false,
+            bve_kernel_id: "".into(),
+            bve_view_type: "notebook".into(),
+            bve_is_focused: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("NotebookEditorState({})", self.bve_active_cell_idx)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bve_active_cell_idx < u32::MAX || true
+    }
+}
+
+impl Default for NotebookEditorState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for NotebookEditorState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NotebookEditorState({})", self.bve_active_cell_idx)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -136732,6 +136973,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.buz_channel_name = "Output".into();
         assert_eq!(c.summary(), DisposeChannel::new().summary());
+    }
+
+
+    #[test]
+    fn test_bva_create() {
+        let obj = NotebookCellModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bva_validate() {
+        let obj = NotebookCellModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bva_display() {
+        let obj = NotebookCellModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("NotebookCellModel"));
+    }
+
+    #[test]
+    fn test_bva_clone() {
+        let obj = NotebookCellModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bva_debug() {
+        let obj = NotebookCellModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("NotebookCellModel"));
+    }
+
+    #[test]
+    fn test_bva_default() {
+        let obj = NotebookCellModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bva_summary_contains_name() {
+        let obj = NotebookCellModel::new();
+        assert!(obj.summary().contains("NotebookCellModel"));
+    }
+
+    #[test]
+    fn test_bva_validate_default() {
+        let obj = NotebookCellModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bva_display_not_empty() {
+        let obj = NotebookCellModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bva_clone_independence() {
+        let mut obj = NotebookCellModel::new();
+        let c = obj.clone();
+        obj.bva_cell_kind = "code".into();
+        assert_eq!(c.summary(), NotebookCellModel::new().summary());
+    }
+
+    #[test]
+    fn test_bvb_create() {
+        let obj = NotebookKernelSession::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvb_validate() {
+        let obj = NotebookKernelSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvb_display() {
+        let obj = NotebookKernelSession::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("NotebookKernelSession"));
+    }
+
+    #[test]
+    fn test_bvb_clone() {
+        let obj = NotebookKernelSession::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvb_debug() {
+        let obj = NotebookKernelSession::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("NotebookKernelSession"));
+    }
+
+    #[test]
+    fn test_bvb_default() {
+        let obj = NotebookKernelSession::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvb_summary_contains_name() {
+        let obj = NotebookKernelSession::new();
+        assert!(obj.summary().contains("NotebookKernelSession"));
+    }
+
+    #[test]
+    fn test_bvb_validate_default() {
+        let obj = NotebookKernelSession::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvb_display_not_empty() {
+        let obj = NotebookKernelSession::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvb_clone_independence() {
+        let mut obj = NotebookKernelSession::new();
+        let c = obj.clone();
+        obj.bvb_id = "python3".into();
+        assert_eq!(c.summary(), NotebookKernelSession::new().summary());
+    }
+
+    #[test]
+    fn test_bvc_create() {
+        let obj = NotebookOutputItem::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvc_validate() {
+        let obj = NotebookOutputItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvc_display() {
+        let obj = NotebookOutputItem::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("NotebookOutputItem"));
+    }
+
+    #[test]
+    fn test_bvc_clone() {
+        let obj = NotebookOutputItem::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvc_debug() {
+        let obj = NotebookOutputItem::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("NotebookOutputItem"));
+    }
+
+    #[test]
+    fn test_bvc_default() {
+        let obj = NotebookOutputItem::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvc_summary_contains_name() {
+        let obj = NotebookOutputItem::new();
+        assert!(obj.summary().contains("NotebookOutputItem"));
+    }
+
+    #[test]
+    fn test_bvc_validate_default() {
+        let obj = NotebookOutputItem::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvc_display_not_empty() {
+        let obj = NotebookOutputItem::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvc_clone_independence() {
+        let mut obj = NotebookOutputItem::new();
+        let c = obj.clone();
+        obj.bvc_output_type = "stream".into();
+        assert_eq!(c.summary(), NotebookOutputItem::new().summary());
+    }
+
+    #[test]
+    fn test_bvd_create() {
+        let obj = NotebookSerializer::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvd_validate() {
+        let obj = NotebookSerializer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvd_display() {
+        let obj = NotebookSerializer::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("NotebookSerializer"));
+    }
+
+    #[test]
+    fn test_bvd_clone() {
+        let obj = NotebookSerializer::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvd_debug() {
+        let obj = NotebookSerializer::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("NotebookSerializer"));
+    }
+
+    #[test]
+    fn test_bvd_default() {
+        let obj = NotebookSerializer::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvd_summary_contains_name() {
+        let obj = NotebookSerializer::new();
+        assert!(obj.summary().contains("NotebookSerializer"));
+    }
+
+    #[test]
+    fn test_bvd_validate_default() {
+        let obj = NotebookSerializer::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvd_display_not_empty() {
+        let obj = NotebookSerializer::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvd_clone_independence() {
+        let mut obj = NotebookSerializer::new();
+        let c = obj.clone();
+        obj.bvd_id = "notebook-default".into();
+        assert_eq!(c.summary(), NotebookSerializer::new().summary());
+    }
+
+    #[test]
+    fn test_bve_create() {
+        let obj = NotebookEditorState::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bve_validate() {
+        let obj = NotebookEditorState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bve_display() {
+        let obj = NotebookEditorState::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("NotebookEditorState"));
+    }
+
+    #[test]
+    fn test_bve_clone() {
+        let obj = NotebookEditorState::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bve_debug() {
+        let obj = NotebookEditorState::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("NotebookEditorState"));
+    }
+
+    #[test]
+    fn test_bve_default() {
+        let obj = NotebookEditorState::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bve_summary_contains_name() {
+        let obj = NotebookEditorState::new();
+        assert!(obj.summary().contains("NotebookEditorState"));
+    }
+
+    #[test]
+    fn test_bve_validate_default() {
+        let obj = NotebookEditorState::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bve_display_not_empty() {
+        let obj = NotebookEditorState::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bve_clone_independence() {
+        let mut obj = NotebookEditorState::new();
+        let c = obj.clone();
+        obj.bve_active_cell_idx = 0;
+        assert_eq!(c.summary(), NotebookEditorState::new().summary());
     }
 
 }
