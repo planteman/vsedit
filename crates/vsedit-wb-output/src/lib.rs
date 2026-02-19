@@ -84044,6 +84044,245 @@ impl BhzChatSession {
     pub fn clear(&mut self) { self.messages.clear(); self.inline_suggestion = None; self.is_streaming = false; }
 }
 
+
+/// Window state mode (bia_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BiaWindowMode {
+    Normal,
+    Maximized,
+    Fullscreen,
+    Minimized,
+}
+
+/// Window state (bia_)
+#[derive(Debug, Clone)]
+pub struct BiaWindowState {
+    pub id: usize,
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+    pub mode: BiaWindowMode,
+    pub is_focused: bool,
+    pub title: String,
+}
+
+impl BiaWindowState {
+    pub fn new(id: usize, width: u32, height: u32) -> Self {
+        Self { id, x: 0, y: 0, width, height, mode: BiaWindowMode::Normal, is_focused: true, title: String::new() }
+    }
+    pub fn set_position(&mut self, x: i32, y: i32) { self.x = x; self.y = y; }
+    pub fn resize(&mut self, w: u32, h: u32) { self.width = w; self.height = h; }
+    pub fn set_mode(&mut self, mode: BiaWindowMode) { self.mode = mode; }
+    pub fn focus(&mut self) { self.is_focused = true; }
+    pub fn blur(&mut self) { self.is_focused = false; }
+    pub fn set_title(&mut self, title: String) { self.title = title; }
+    pub fn area(&self) -> u64 { self.width as u64 * self.height as u64 }
+    pub fn is_normal(&self) -> bool { self.mode == BiaWindowMode::Normal }
+}
+
+
+/// Editor group orientation (bib_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BibGroupOrientation {
+    Horizontal,
+    Vertical,
+}
+
+/// Editor group (bib_)
+#[derive(Debug, Clone)]
+pub struct BibEditorGroup {
+    pub id: usize,
+    pub editors: Vec<String>,
+    pub active_editor: Option<usize>,
+    pub size_ratio: f64,
+}
+
+/// Editor group layout (bib_)
+#[derive(Debug, Clone)]
+pub struct BibGroupLayout {
+    pub groups: Vec<BibEditorGroup>,
+    pub orientation: BibGroupOrientation,
+    pub active_group: usize,
+}
+
+impl BibGroupLayout {
+    pub fn new() -> Self {
+        Self { groups: vec![BibEditorGroup { id: 0, editors: Vec::new(), active_editor: None, size_ratio: 1.0 }], orientation: BibGroupOrientation::Horizontal, active_group: 0 }
+    }
+    pub fn split(&mut self, orientation: BibGroupOrientation) {
+        let new_id = self.groups.len();
+        let ratio = 1.0 / (self.groups.len() + 1) as f64;
+        for g in &mut self.groups { g.size_ratio = ratio; }
+        self.groups.push(BibEditorGroup { id: new_id, editors: Vec::new(), active_editor: None, size_ratio: ratio });
+        self.orientation = orientation;
+    }
+    pub fn close_group(&mut self, id: usize) {
+        if self.groups.len() > 1 {
+            self.groups.retain(|g| g.id != id);
+            if self.active_group >= self.groups.len() { self.active_group = self.groups.len() - 1; }
+            let ratio = 1.0 / self.groups.len() as f64;
+            for g in &mut self.groups { g.size_ratio = ratio; }
+        }
+    }
+    pub fn open_in_group(&mut self, group_idx: usize, uri: String) {
+        if let Some(g) = self.groups.get_mut(group_idx) {
+            g.editors.push(uri);
+            g.active_editor = Some(g.editors.len() - 1);
+        }
+    }
+    pub fn set_active_group(&mut self, idx: usize) {
+        if idx < self.groups.len() { self.active_group = idx; }
+    }
+    pub fn group_count(&self) -> usize { self.groups.len() }
+}
+
+
+/// Tab state (bic_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BicTab {
+    pub uri: String,
+    pub label: String,
+    pub is_dirty: bool,
+    pub is_pinned: bool,
+    pub is_preview: bool,
+}
+
+/// Tab bar model (bic_)
+#[derive(Debug, Clone)]
+pub struct BicTabBar {
+    pub tabs: Vec<BicTab>,
+    pub active_tab: Option<usize>,
+    pub max_tabs: Option<usize>,
+}
+
+impl BicTabBar {
+    pub fn new() -> Self { Self { tabs: Vec::new(), active_tab: None, max_tabs: None } }
+    pub fn open_tab(&mut self, tab: BicTab) {
+        if let Some(idx) = self.tabs.iter().position(|t| t.uri == tab.uri) {
+            self.active_tab = Some(idx);
+            if self.tabs[idx].is_preview { self.tabs[idx].is_preview = false; }
+        } else {
+            // Replace preview tab if exists
+            if let Some(pidx) = self.tabs.iter().position(|t| t.is_preview) {
+                self.tabs[pidx] = tab;
+                self.active_tab = Some(pidx);
+            } else {
+                if let Some(max) = self.max_tabs {
+                    if self.tabs.len() >= max {
+                        // Close oldest non-pinned
+                        if let Some(idx) = self.tabs.iter().position(|t| !t.is_pinned && !t.is_dirty) {
+                            self.tabs.remove(idx);
+                        }
+                    }
+                }
+                self.tabs.push(tab);
+                self.active_tab = Some(self.tabs.len() - 1);
+            }
+        }
+    }
+    pub fn close_tab(&mut self, idx: usize) {
+        if idx < self.tabs.len() {
+            self.tabs.remove(idx);
+            if self.tabs.is_empty() { self.active_tab = None; }
+            else if let Some(a) = self.active_tab {
+                if a >= self.tabs.len() { self.active_tab = Some(self.tabs.len() - 1); }
+            }
+        }
+    }
+    pub fn pin_tab(&mut self, idx: usize) {
+        if let Some(t) = self.tabs.get_mut(idx) { t.is_pinned = true; }
+    }
+    pub fn unpin_tab(&mut self, idx: usize) {
+        if let Some(t) = self.tabs.get_mut(idx) { t.is_pinned = false; }
+    }
+    pub fn set_max_tabs(&mut self, max: usize) { self.max_tabs = Some(max); }
+    pub fn tab_count(&self) -> usize { self.tabs.len() }
+    pub fn dirty_count(&self) -> usize { self.tabs.iter().filter(|t| t.is_dirty).count() }
+}
+
+
+/// Storage scope (bid_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BidStorageScope {
+    Global,
+    Workspace,
+    Extension(String),
+}
+
+/// Workspace storage (bid_)
+#[derive(Debug, Clone)]
+pub struct BidWorkspaceStorage {
+    pub scope: BidStorageScope,
+    pub data: std::collections::HashMap<String, String>,
+}
+
+impl BidWorkspaceStorage {
+    pub fn new(scope: BidStorageScope) -> Self {
+        Self { scope, data: std::collections::HashMap::new() }
+    }
+    pub fn get(&self, key: &str) -> Option<&str> { self.data.get(key).map(|s| s.as_str()) }
+    pub fn set(&mut self, key: String, value: String) { self.data.insert(key, value); }
+    pub fn delete(&mut self, key: &str) -> bool { self.data.remove(key).is_some() }
+    pub fn has(&self, key: &str) -> bool { self.data.contains_key(key) }
+    pub fn keys(&self) -> Vec<&str> { self.data.keys().map(|k| k.as_str()).collect() }
+    pub fn len(&self) -> usize { self.data.len() }
+    pub fn is_empty(&self) -> bool { self.data.is_empty() }
+    pub fn clear(&mut self) { self.data.clear(); }
+    pub fn get_or_default<'a>(&'a self, key: &str, default: &'a str) -> &'a str {
+        self.data.get(key).map(|s| s.as_str()).unwrap_or(default)
+    }
+}
+
+
+/// Recent item type (bie_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BieRecentKind {
+    File,
+    Folder,
+    Workspace,
+}
+
+/// Recent item (bie_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BieRecentItem {
+    pub path: String,
+    pub kind: BieRecentKind,
+    pub timestamp: u64,
+    pub is_pinned: bool,
+}
+
+/// Recently opened model (bie_)
+#[derive(Debug, Clone)]
+pub struct BieRecentlyOpened {
+    pub items: Vec<BieRecentItem>,
+    pub max_items: usize,
+}
+
+impl BieRecentlyOpened {
+    pub fn new(max: usize) -> Self { Self { items: Vec::new(), max_items: max } }
+    pub fn add(&mut self, item: BieRecentItem) {
+        self.items.retain(|i| i.path != item.path);
+        self.items.insert(0, item);
+        while self.items.len() > self.max_items {
+            if let Some(idx) = self.items.iter().rposition(|i| !i.is_pinned) {
+                self.items.remove(idx);
+            } else { break; }
+        }
+    }
+    pub fn remove(&mut self, path: &str) { self.items.retain(|i| i.path != path); }
+    pub fn pin(&mut self, path: &str) {
+        if let Some(i) = self.items.iter_mut().find(|i| i.path == path) { i.is_pinned = true; }
+    }
+    pub fn unpin(&mut self, path: &str) {
+        if let Some(i) = self.items.iter_mut().find(|i| i.path == path) { i.is_pinned = false; }
+    }
+    pub fn clear(&mut self) { self.items.retain(|i| i.is_pinned); }
+    pub fn files(&self) -> Vec<&BieRecentItem> { self.items.iter().filter(|i| i.kind == BieRecentKind::File).collect() }
+    pub fn folders(&self) -> Vec<&BieRecentItem> { self.items.iter().filter(|i| i.kind == BieRecentKind::Folder).collect() }
+    pub fn len(&self) -> usize { self.items.len() }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -89664,6 +89903,359 @@ mod tests_bfo {
         let mut s = BhzChatSession::new("s1".into());
         s.add_message(BhzChatMessage { role: BhzChatRole::User, content: "q".into(), timestamp: 100 });
         assert!(s.last_assistant_message().is_none());
+    }
+
+
+    #[test]
+    fn test_bia_window_new() {
+        let w = BiaWindowState::new(1, 1920, 1080);
+        assert_eq!(w.width, 1920);
+        assert!(w.is_focused);
+        assert!(w.is_normal());
+    }
+    #[test]
+    fn test_bia_set_position() {
+        let mut w = BiaWindowState::new(1, 800, 600);
+        w.set_position(100, 200);
+        assert_eq!(w.x, 100);
+        assert_eq!(w.y, 200);
+    }
+    #[test]
+    fn test_bia_resize() {
+        let mut w = BiaWindowState::new(1, 800, 600);
+        w.resize(1024, 768);
+        assert_eq!(w.width, 1024);
+    }
+    #[test]
+    fn test_bia_set_mode() {
+        let mut w = BiaWindowState::new(1, 800, 600);
+        w.set_mode(BiaWindowMode::Fullscreen);
+        assert_eq!(w.mode, BiaWindowMode::Fullscreen);
+        assert!(!w.is_normal());
+    }
+    #[test]
+    fn test_bia_focus_blur() {
+        let mut w = BiaWindowState::new(1, 800, 600);
+        w.blur();
+        assert!(!w.is_focused);
+        w.focus();
+        assert!(w.is_focused);
+    }
+    #[test]
+    fn test_bia_title() {
+        let mut w = BiaWindowState::new(1, 800, 600);
+        w.set_title("vsedit - main.rs".into());
+        assert_eq!(w.title, "vsedit - main.rs");
+    }
+    #[test]
+    fn test_bia_area() {
+        let w = BiaWindowState::new(1, 1920, 1080);
+        assert_eq!(w.area(), 2_073_600);
+    }
+    #[test]
+    fn test_bia_minimized() {
+        let mut w = BiaWindowState::new(1, 800, 600);
+        w.set_mode(BiaWindowMode::Minimized);
+        assert_eq!(w.mode, BiaWindowMode::Minimized);
+    }
+    #[test]
+    fn test_bia_maximized() {
+        let mut w = BiaWindowState::new(1, 800, 600);
+        w.set_mode(BiaWindowMode::Maximized);
+        assert_eq!(w.mode, BiaWindowMode::Maximized);
+    }
+    #[test]
+    fn test_bia_id() {
+        let w = BiaWindowState::new(42, 800, 600);
+        assert_eq!(w.id, 42);
+    }
+
+
+    #[test]
+    fn test_bib_layout_new() {
+        let l = BibGroupLayout::new();
+        assert_eq!(l.group_count(), 1);
+        assert_eq!(l.active_group, 0);
+    }
+    #[test]
+    fn test_bib_split() {
+        let mut l = BibGroupLayout::new();
+        l.split(BibGroupOrientation::Horizontal);
+        assert_eq!(l.group_count(), 2);
+    }
+    #[test]
+    fn test_bib_close_group() {
+        let mut l = BibGroupLayout::new();
+        l.split(BibGroupOrientation::Vertical);
+        l.close_group(0);
+        assert_eq!(l.group_count(), 1);
+    }
+    #[test]
+    fn test_bib_open_in_group() {
+        let mut l = BibGroupLayout::new();
+        l.open_in_group(0, "file.rs".into());
+        assert_eq!(l.groups[0].editors.len(), 1);
+        assert_eq!(l.groups[0].active_editor, Some(0));
+    }
+    #[test]
+    fn test_bib_set_active_group() {
+        let mut l = BibGroupLayout::new();
+        l.split(BibGroupOrientation::Horizontal);
+        l.set_active_group(1);
+        assert_eq!(l.active_group, 1);
+    }
+    #[test]
+    fn test_bib_cannot_close_last() {
+        let mut l = BibGroupLayout::new();
+        l.close_group(0);
+        assert_eq!(l.group_count(), 1);
+    }
+    #[test]
+    fn test_bib_split_ratios() {
+        let mut l = BibGroupLayout::new();
+        l.split(BibGroupOrientation::Horizontal);
+        for g in &l.groups {
+            assert!((g.size_ratio - 0.5).abs() < 0.01);
+        }
+    }
+    #[test]
+    fn test_bib_vertical_split() {
+        let mut l = BibGroupLayout::new();
+        l.split(BibGroupOrientation::Vertical);
+        assert_eq!(l.orientation, BibGroupOrientation::Vertical);
+    }
+    #[test]
+    fn test_bib_multiple_editors() {
+        let mut l = BibGroupLayout::new();
+        l.open_in_group(0, "a.rs".into());
+        l.open_in_group(0, "b.rs".into());
+        assert_eq!(l.groups[0].editors.len(), 2);
+        assert_eq!(l.groups[0].active_editor, Some(1));
+    }
+    #[test]
+    fn test_bib_group_id() {
+        let g = BibEditorGroup { id: 7, editors: vec![], active_editor: None, size_ratio: 1.0 };
+        assert_eq!(g.id, 7);
+    }
+
+
+    #[test]
+    fn test_bic_tab_bar_new() {
+        let b = BicTabBar::new();
+        assert_eq!(b.tab_count(), 0);
+        assert!(b.active_tab.is_none());
+    }
+    #[test]
+    fn test_bic_open_tab() {
+        let mut b = BicTabBar::new();
+        b.open_tab(BicTab { uri: "f.rs".into(), label: "f.rs".into(), is_dirty: false, is_pinned: false, is_preview: false });
+        assert_eq!(b.tab_count(), 1);
+        assert_eq!(b.active_tab, Some(0));
+    }
+    #[test]
+    fn test_bic_close_tab() {
+        let mut b = BicTabBar::new();
+        b.open_tab(BicTab { uri: "a.rs".into(), label: "a.rs".into(), is_dirty: false, is_pinned: false, is_preview: false });
+        b.close_tab(0);
+        assert_eq!(b.tab_count(), 0);
+        assert!(b.active_tab.is_none());
+    }
+    #[test]
+    fn test_bic_reopen_existing() {
+        let mut b = BicTabBar::new();
+        b.open_tab(BicTab { uri: "a.rs".into(), label: "a.rs".into(), is_dirty: false, is_pinned: false, is_preview: false });
+        b.open_tab(BicTab { uri: "b.rs".into(), label: "b.rs".into(), is_dirty: false, is_pinned: false, is_preview: false });
+        b.open_tab(BicTab { uri: "a.rs".into(), label: "a.rs".into(), is_dirty: false, is_pinned: false, is_preview: false });
+        assert_eq!(b.tab_count(), 2);
+        assert_eq!(b.active_tab, Some(0));
+    }
+    #[test]
+    fn test_bic_pin_tab() {
+        let mut b = BicTabBar::new();
+        b.open_tab(BicTab { uri: "a.rs".into(), label: "a".into(), is_dirty: false, is_pinned: false, is_preview: false });
+        b.pin_tab(0);
+        assert!(b.tabs[0].is_pinned);
+        b.unpin_tab(0);
+        assert!(!b.tabs[0].is_pinned);
+    }
+    #[test]
+    fn test_bic_preview_tab_replaced() {
+        let mut b = BicTabBar::new();
+        b.open_tab(BicTab { uri: "a.rs".into(), label: "a".into(), is_dirty: false, is_pinned: false, is_preview: true });
+        b.open_tab(BicTab { uri: "b.rs".into(), label: "b".into(), is_dirty: false, is_pinned: false, is_preview: true });
+        assert_eq!(b.tab_count(), 1);
+        assert_eq!(b.tabs[0].uri, "b.rs");
+    }
+    #[test]
+    fn test_bic_dirty_count() {
+        let mut b = BicTabBar::new();
+        b.open_tab(BicTab { uri: "a.rs".into(), label: "a".into(), is_dirty: true, is_pinned: false, is_preview: false });
+        b.open_tab(BicTab { uri: "b.rs".into(), label: "b".into(), is_dirty: false, is_pinned: false, is_preview: false });
+        assert_eq!(b.dirty_count(), 1);
+    }
+    #[test]
+    fn test_bic_max_tabs() {
+        let mut b = BicTabBar::new();
+        b.set_max_tabs(2);
+        b.open_tab(BicTab { uri: "a.rs".into(), label: "a".into(), is_dirty: false, is_pinned: false, is_preview: false });
+        b.open_tab(BicTab { uri: "b.rs".into(), label: "b".into(), is_dirty: false, is_pinned: false, is_preview: false });
+        b.open_tab(BicTab { uri: "c.rs".into(), label: "c".into(), is_dirty: false, is_pinned: false, is_preview: false });
+        assert_eq!(b.tab_count(), 2);
+    }
+    #[test]
+    fn test_bic_tab_fields() {
+        let t = BicTab { uri: "file.rs".into(), label: "file.rs".into(), is_dirty: true, is_pinned: true, is_preview: false };
+        assert!(t.is_dirty);
+        assert!(t.is_pinned);
+    }
+    #[test]
+    fn test_bic_close_adjusts_active() {
+        let mut b = BicTabBar::new();
+        b.open_tab(BicTab { uri: "a.rs".into(), label: "a".into(), is_dirty: false, is_pinned: false, is_preview: false });
+        b.open_tab(BicTab { uri: "b.rs".into(), label: "b".into(), is_dirty: false, is_pinned: false, is_preview: false });
+        b.close_tab(1);
+        assert_eq!(b.active_tab, Some(0));
+    }
+
+
+    #[test]
+    fn test_bid_storage_new() {
+        let s = BidWorkspaceStorage::new(BidStorageScope::Global);
+        assert!(s.is_empty());
+        assert_eq!(s.scope, BidStorageScope::Global);
+    }
+    #[test]
+    fn test_bid_set_get() {
+        let mut s = BidWorkspaceStorage::new(BidStorageScope::Workspace);
+        s.set("key1".into(), "val1".into());
+        assert_eq!(s.get("key1"), Some("val1"));
+    }
+    #[test]
+    fn test_bid_delete() {
+        let mut s = BidWorkspaceStorage::new(BidStorageScope::Global);
+        s.set("k".into(), "v".into());
+        assert!(s.delete("k"));
+        assert!(!s.has("k"));
+    }
+    #[test]
+    fn test_bid_has() {
+        let mut s = BidWorkspaceStorage::new(BidStorageScope::Global);
+        assert!(!s.has("k"));
+        s.set("k".into(), "v".into());
+        assert!(s.has("k"));
+    }
+    #[test]
+    fn test_bid_keys() {
+        let mut s = BidWorkspaceStorage::new(BidStorageScope::Global);
+        s.set("a".into(), "1".into());
+        s.set("b".into(), "2".into());
+        let mut keys = s.keys();
+        keys.sort();
+        assert_eq!(keys, vec!["a", "b"]);
+    }
+    #[test]
+    fn test_bid_len() {
+        let mut s = BidWorkspaceStorage::new(BidStorageScope::Global);
+        s.set("a".into(), "1".into());
+        assert_eq!(s.len(), 1);
+    }
+    #[test]
+    fn test_bid_clear() {
+        let mut s = BidWorkspaceStorage::new(BidStorageScope::Global);
+        s.set("a".into(), "1".into());
+        s.clear();
+        assert!(s.is_empty());
+    }
+    #[test]
+    fn test_bid_get_or_default() {
+        let s = BidWorkspaceStorage::new(BidStorageScope::Global);
+        assert_eq!(s.get_or_default("missing", "fallback"), "fallback");
+    }
+    #[test]
+    fn test_bid_extension_scope() {
+        let s = BidWorkspaceStorage::new(BidStorageScope::Extension("my-ext".into()));
+        assert_eq!(s.scope, BidStorageScope::Extension("my-ext".into()));
+    }
+    #[test]
+    fn test_bid_overwrite() {
+        let mut s = BidWorkspaceStorage::new(BidStorageScope::Global);
+        s.set("k".into(), "old".into());
+        s.set("k".into(), "new".into());
+        assert_eq!(s.get("k"), Some("new"));
+    }
+
+
+    #[test]
+    fn test_bie_recently_opened_new() {
+        let r = BieRecentlyOpened::new(10);
+        assert_eq!(r.len(), 0);
+    }
+    #[test]
+    fn test_bie_add() {
+        let mut r = BieRecentlyOpened::new(10);
+        r.add(BieRecentItem { path: "/a.rs".into(), kind: BieRecentKind::File, timestamp: 100, is_pinned: false });
+        assert_eq!(r.len(), 1);
+    }
+    #[test]
+    fn test_bie_dedup() {
+        let mut r = BieRecentlyOpened::new(10);
+        r.add(BieRecentItem { path: "/a.rs".into(), kind: BieRecentKind::File, timestamp: 100, is_pinned: false });
+        r.add(BieRecentItem { path: "/a.rs".into(), kind: BieRecentKind::File, timestamp: 200, is_pinned: false });
+        assert_eq!(r.len(), 1);
+        assert_eq!(r.items[0].timestamp, 200);
+    }
+    #[test]
+    fn test_bie_max_items() {
+        let mut r = BieRecentlyOpened::new(3);
+        for i in 0..5 {
+            r.add(BieRecentItem { path: format!("/f{i}"), kind: BieRecentKind::File, timestamp: i as u64, is_pinned: false });
+        }
+        assert_eq!(r.len(), 3);
+    }
+    #[test]
+    fn test_bie_remove() {
+        let mut r = BieRecentlyOpened::new(10);
+        r.add(BieRecentItem { path: "/a.rs".into(), kind: BieRecentKind::File, timestamp: 100, is_pinned: false });
+        r.remove("/a.rs");
+        assert_eq!(r.len(), 0);
+    }
+    #[test]
+    fn test_bie_pin_unpin() {
+        let mut r = BieRecentlyOpened::new(10);
+        r.add(BieRecentItem { path: "/a.rs".into(), kind: BieRecentKind::File, timestamp: 100, is_pinned: false });
+        r.pin("/a.rs");
+        assert!(r.items[0].is_pinned);
+        r.unpin("/a.rs");
+        assert!(!r.items[0].is_pinned);
+    }
+    #[test]
+    fn test_bie_clear_keeps_pinned() {
+        let mut r = BieRecentlyOpened::new(10);
+        r.add(BieRecentItem { path: "/a.rs".into(), kind: BieRecentKind::File, timestamp: 100, is_pinned: true });
+        r.add(BieRecentItem { path: "/b.rs".into(), kind: BieRecentKind::File, timestamp: 200, is_pinned: false });
+        r.clear();
+        assert_eq!(r.len(), 1);
+        assert_eq!(r.items[0].path, "/a.rs");
+    }
+    #[test]
+    fn test_bie_files_folders() {
+        let mut r = BieRecentlyOpened::new(10);
+        r.add(BieRecentItem { path: "/a.rs".into(), kind: BieRecentKind::File, timestamp: 100, is_pinned: false });
+        r.add(BieRecentItem { path: "/dir".into(), kind: BieRecentKind::Folder, timestamp: 200, is_pinned: false });
+        assert_eq!(r.files().len(), 1);
+        assert_eq!(r.folders().len(), 1);
+    }
+    #[test]
+    fn test_bie_workspace_kind() {
+        let i = BieRecentItem { path: "/proj.code-workspace".into(), kind: BieRecentKind::Workspace, timestamp: 100, is_pinned: false };
+        assert_eq!(i.kind, BieRecentKind::Workspace);
+    }
+    #[test]
+    fn test_bie_most_recent_first() {
+        let mut r = BieRecentlyOpened::new(10);
+        r.add(BieRecentItem { path: "/old".into(), kind: BieRecentKind::File, timestamp: 100, is_pinned: false });
+        r.add(BieRecentItem { path: "/new".into(), kind: BieRecentKind::File, timestamp: 200, is_pinned: false });
+        assert_eq!(r.items[0].path, "/new");
     }
 
 }
