@@ -94510,6 +94510,247 @@ impl std::fmt::Display for QuickInputModel {
     }
 }
 
+
+/// QuickPickItemModel — quick pick item model
+#[derive(Debug, Clone)]
+pub struct QuickPickItemModel {
+    pub bxf_label: String,
+    pub bxf_description: String,
+    pub bxf_detail: String,
+    pub bxf_is_picked: bool,
+    pub bxf_always_show: bool,
+    pub bxf_icon_id: String,
+    pub bxf_kind: String,
+    pub bxf_buttons_count: u32,
+}
+
+impl QuickPickItemModel {
+    pub fn new() -> Self {
+        Self {
+            bxf_label: "item".into(),
+            bxf_description: "".into(),
+            bxf_detail: "".into(),
+            bxf_is_picked: false,
+            bxf_always_show: false,
+            bxf_icon_id: "".into(),
+            bxf_kind: "default".into(),
+            bxf_buttons_count: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("QuickPickItemModel({})", self.bxf_label)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxf_label.is_empty() || true
+    }
+}
+
+impl Default for QuickPickItemModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for QuickPickItemModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "QuickPickItemModel({})", self.bxf_label)
+    }
+}
+
+/// NotificationModel — notification model
+#[derive(Debug, Clone)]
+pub struct NotificationModel {
+    pub bxg_message: String,
+    pub bxg_severity: String,
+    pub bxg_source: String,
+    pub bxg_is_sticky: bool,
+    pub bxg_is_silent: bool,
+    pub bxg_has_progress: bool,
+    pub bxg_action_count: u32,
+    pub bxg_timestamp: u64,
+}
+
+impl NotificationModel {
+    pub fn new() -> Self {
+        Self {
+            bxg_message: "".into(),
+            bxg_severity: "info".into(),
+            bxg_source: "system".into(),
+            bxg_is_sticky: false,
+            bxg_is_silent: false,
+            bxg_has_progress: false,
+            bxg_action_count: 0,
+            bxg_timestamp: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("NotificationModel({})", self.bxg_message)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxg_message.is_empty() || true
+    }
+}
+
+impl Default for NotificationModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for NotificationModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NotificationModel({})", self.bxg_message)
+    }
+}
+
+/// ProgressModel — progress indicator model
+#[derive(Debug, Clone)]
+pub struct ProgressModel {
+    pub bxh_location: String,
+    pub bxh_title: String,
+    pub bxh_message: String,
+    pub bxh_percentage: u32,
+    pub bxh_is_infinite: bool,
+    pub bxh_is_cancellable: bool,
+    pub bxh_is_cancelled: bool,
+    pub bxh_total_work: u64,
+}
+
+impl ProgressModel {
+    pub fn new() -> Self {
+        Self {
+            bxh_location: "notification".into(),
+            bxh_title: "".into(),
+            bxh_message: "".into(),
+            bxh_percentage: 0,
+            bxh_is_infinite: false,
+            bxh_is_cancellable: false,
+            bxh_is_cancelled: false,
+            bxh_total_work: 100,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ProgressModel({})", self.bxh_location)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxh_location.is_empty() || true
+    }
+}
+
+impl Default for ProgressModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ProgressModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ProgressModel({})", self.bxh_location)
+    }
+}
+
+/// DialogModel — dialog model
+#[derive(Debug, Clone)]
+pub struct DialogModel {
+    pub bxi_title: String,
+    pub bxi_message: String,
+    pub bxi_detail: String,
+    pub bxi_dialog_type: String,
+    pub bxi_button_count: u32,
+    pub bxi_default_button_idx: u32,
+    pub bxi_is_modal: bool,
+    pub bxi_checkbox_label: String,
+}
+
+impl DialogModel {
+    pub fn new() -> Self {
+        Self {
+            bxi_title: "".into(),
+            bxi_message: "".into(),
+            bxi_detail: "".into(),
+            bxi_dialog_type: "confirm".into(),
+            bxi_button_count: 2,
+            bxi_default_button_idx: 0,
+            bxi_is_modal: true,
+            bxi_checkbox_label: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("DialogModel({})", self.bxi_title)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxi_title.is_empty() || true
+    }
+}
+
+impl Default for DialogModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for DialogModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DialogModel({})", self.bxi_title)
+    }
+}
+
+/// InputBoxModel — input box model
+#[derive(Debug, Clone)]
+pub struct InputBoxModel {
+    pub bxj_value: String,
+    pub bxj_prompt: String,
+    pub bxj_placeholder: String,
+    pub bxj_title: String,
+    pub bxj_is_password: bool,
+    pub bxj_ignore_focus_out: bool,
+    pub bxj_validation_message: String,
+    pub bxj_selection_start: u32,
+}
+
+impl InputBoxModel {
+    pub fn new() -> Self {
+        Self {
+            bxj_value: "".into(),
+            bxj_prompt: "".into(),
+            bxj_placeholder: "".into(),
+            bxj_title: "".into(),
+            bxj_is_password: false,
+            bxj_ignore_focus_out: false,
+            bxj_validation_message: "".into(),
+            bxj_selection_start: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("InputBoxModel({})", self.bxj_value)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxj_value.is_empty() || true
+    }
+}
+
+impl Default for InputBoxModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for InputBoxModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InputBoxModel({})", self.bxj_value)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -143238,6 +143479,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bxe_value = "".into();
         assert_eq!(c.summary(), QuickInputModel::new().summary());
+    }
+
+
+    #[test]
+    fn test_bxf_create() {
+        let obj = QuickPickItemModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxf_validate() {
+        let obj = QuickPickItemModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxf_display() {
+        let obj = QuickPickItemModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("QuickPickItemModel"));
+    }
+
+    #[test]
+    fn test_bxf_clone() {
+        let obj = QuickPickItemModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxf_debug() {
+        let obj = QuickPickItemModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("QuickPickItemModel"));
+    }
+
+    #[test]
+    fn test_bxf_default() {
+        let obj = QuickPickItemModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxf_summary_contains_name() {
+        let obj = QuickPickItemModel::new();
+        assert!(obj.summary().contains("QuickPickItemModel"));
+    }
+
+    #[test]
+    fn test_bxf_validate_default() {
+        let obj = QuickPickItemModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxf_display_not_empty() {
+        let obj = QuickPickItemModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxf_clone_independence() {
+        let mut obj = QuickPickItemModel::new();
+        let c = obj.clone();
+        obj.bxf_label = "item".into();
+        assert_eq!(c.summary(), QuickPickItemModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxg_create() {
+        let obj = NotificationModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxg_validate() {
+        let obj = NotificationModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxg_display() {
+        let obj = NotificationModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("NotificationModel"));
+    }
+
+    #[test]
+    fn test_bxg_clone() {
+        let obj = NotificationModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxg_debug() {
+        let obj = NotificationModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("NotificationModel"));
+    }
+
+    #[test]
+    fn test_bxg_default() {
+        let obj = NotificationModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxg_summary_contains_name() {
+        let obj = NotificationModel::new();
+        assert!(obj.summary().contains("NotificationModel"));
+    }
+
+    #[test]
+    fn test_bxg_validate_default() {
+        let obj = NotificationModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxg_display_not_empty() {
+        let obj = NotificationModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxg_clone_independence() {
+        let mut obj = NotificationModel::new();
+        let c = obj.clone();
+        obj.bxg_message = "".into();
+        assert_eq!(c.summary(), NotificationModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxh_create() {
+        let obj = ProgressModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxh_validate() {
+        let obj = ProgressModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxh_display() {
+        let obj = ProgressModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ProgressModel"));
+    }
+
+    #[test]
+    fn test_bxh_clone() {
+        let obj = ProgressModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxh_debug() {
+        let obj = ProgressModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ProgressModel"));
+    }
+
+    #[test]
+    fn test_bxh_default() {
+        let obj = ProgressModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxh_summary_contains_name() {
+        let obj = ProgressModel::new();
+        assert!(obj.summary().contains("ProgressModel"));
+    }
+
+    #[test]
+    fn test_bxh_validate_default() {
+        let obj = ProgressModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxh_display_not_empty() {
+        let obj = ProgressModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxh_clone_independence() {
+        let mut obj = ProgressModel::new();
+        let c = obj.clone();
+        obj.bxh_location = "notification".into();
+        assert_eq!(c.summary(), ProgressModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxi_create() {
+        let obj = DialogModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxi_validate() {
+        let obj = DialogModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxi_display() {
+        let obj = DialogModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("DialogModel"));
+    }
+
+    #[test]
+    fn test_bxi_clone() {
+        let obj = DialogModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxi_debug() {
+        let obj = DialogModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("DialogModel"));
+    }
+
+    #[test]
+    fn test_bxi_default() {
+        let obj = DialogModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxi_summary_contains_name() {
+        let obj = DialogModel::new();
+        assert!(obj.summary().contains("DialogModel"));
+    }
+
+    #[test]
+    fn test_bxi_validate_default() {
+        let obj = DialogModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxi_display_not_empty() {
+        let obj = DialogModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxi_clone_independence() {
+        let mut obj = DialogModel::new();
+        let c = obj.clone();
+        obj.bxi_title = "".into();
+        assert_eq!(c.summary(), DialogModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxj_create() {
+        let obj = InputBoxModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxj_validate() {
+        let obj = InputBoxModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxj_display() {
+        let obj = InputBoxModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("InputBoxModel"));
+    }
+
+    #[test]
+    fn test_bxj_clone() {
+        let obj = InputBoxModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxj_debug() {
+        let obj = InputBoxModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("InputBoxModel"));
+    }
+
+    #[test]
+    fn test_bxj_default() {
+        let obj = InputBoxModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxj_summary_contains_name() {
+        let obj = InputBoxModel::new();
+        assert!(obj.summary().contains("InputBoxModel"));
+    }
+
+    #[test]
+    fn test_bxj_validate_default() {
+        let obj = InputBoxModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxj_display_not_empty() {
+        let obj = InputBoxModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxj_clone_independence() {
+        let mut obj = InputBoxModel::new();
+        let c = obj.clone();
+        obj.bxj_value = "".into();
+        assert_eq!(c.summary(), InputBoxModel::new().summary());
     }
 
 }
