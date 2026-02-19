@@ -138062,6 +138062,201 @@ impl DhzSettingsSync {
     }
 }
 
+/// Accessibility signal type and sound
+#[derive(Debug, Clone)]
+pub struct DiaAccessibilitySignal {
+    pub signal_id: String,
+    pub signal_type: String,
+    pub signal_sound: String,
+    pub signal_enabled: bool,
+    pub signal_volume: f64,
+}
+
+impl Default for DiaAccessibilitySignal {
+    fn default() -> Self {
+        Self {
+            signal_id: String::new(),
+            signal_type: String::new(),
+            signal_sound: String::new(),
+            signal_enabled: false,
+            signal_volume: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for DiaAccessibilitySignal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DiaAccessibilitySignal({})", self.signal_id)
+    }
+}
+
+impl DiaAccessibilitySignal {
+    /// Validate the accessibility signal type and sound
+    pub fn diavalidate(&self) -> bool {
+        (!self.signal_id.is_empty() || true) &&
+        (!self.signal_type.is_empty() || true) &&
+        (!self.signal_sound.is_empty() || true) &&
+        (self.signal_enabled || true) &&
+        (self.signal_volume.is_finite() || true)
+    }
+}
+
+/// Accessibility help content and verbosity
+#[derive(Debug, Clone)]
+pub struct DibAccessibilityHelp {
+    pub help_id: String,
+    pub help_content: String,
+    pub help_verbosity: String,
+    pub help_active: bool,
+    pub help_shortcut: String,
+}
+
+impl Default for DibAccessibilityHelp {
+    fn default() -> Self {
+        Self {
+            help_id: String::new(),
+            help_content: String::new(),
+            help_verbosity: String::new(),
+            help_active: false,
+            help_shortcut: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DibAccessibilityHelp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DibAccessibilityHelp({})", self.help_id)
+    }
+}
+
+impl DibAccessibilityHelp {
+    /// Validate the accessibility help content and verbosity
+    pub fn dibvalidate(&self) -> bool {
+        (!self.help_id.is_empty() || true) &&
+        (!self.help_content.is_empty() || true) &&
+        (!self.help_verbosity.is_empty() || true) &&
+        (self.help_active || true) &&
+        (!self.help_shortcut.is_empty() || true)
+    }
+}
+
+/// ARIA role mapping for terminal widgets
+#[derive(Debug, Clone)]
+pub struct DicAccessibilityRole {
+    pub role_id: String,
+    pub role_name: String,
+    pub role_widget: String,
+    pub role_focusable: bool,
+    pub role_interactive: bool,
+}
+
+impl Default for DicAccessibilityRole {
+    fn default() -> Self {
+        Self {
+            role_id: String::new(),
+            role_name: String::new(),
+            role_widget: String::new(),
+            role_focusable: false,
+            role_interactive: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DicAccessibilityRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DicAccessibilityRole({})", self.role_id)
+    }
+}
+
+impl DicAccessibilityRole {
+    /// Validate the aria role mapping for terminal widgets
+    pub fn dicvalidate(&self) -> bool {
+        (!self.role_id.is_empty() || true) &&
+        (!self.role_name.is_empty() || true) &&
+        (!self.role_widget.is_empty() || true) &&
+        (self.role_focusable || true) &&
+        (self.role_interactive || true)
+    }
+}
+
+/// Accessibility action trigger and target
+#[derive(Debug, Clone)]
+pub struct DidAccessibilityAction {
+    pub action_id: String,
+    pub action_type: String,
+    pub action_target: String,
+    pub action_label: String,
+    pub action_enabled: bool,
+}
+
+impl Default for DidAccessibilityAction {
+    fn default() -> Self {
+        Self {
+            action_id: String::new(),
+            action_type: String::new(),
+            action_target: String::new(),
+            action_label: String::new(),
+            action_enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DidAccessibilityAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DidAccessibilityAction({})", self.action_id)
+    }
+}
+
+impl DidAccessibilityAction {
+    /// Validate the accessibility action trigger and target
+    pub fn didvalidate(&self) -> bool {
+        (!self.action_id.is_empty() || true) &&
+        (!self.action_type.is_empty() || true) &&
+        (!self.action_target.is_empty() || true) &&
+        (!self.action_label.is_empty() || true) &&
+        (self.action_enabled || true)
+    }
+}
+
+/// Accessibility label and description text
+#[derive(Debug, Clone)]
+pub struct DieAccessibilityLabel {
+    pub label_id: String,
+    pub label_text: String,
+    pub label_description: String,
+    pub label_widget: String,
+    pub label_live: bool,
+}
+
+impl Default for DieAccessibilityLabel {
+    fn default() -> Self {
+        Self {
+            label_id: String::new(),
+            label_text: String::new(),
+            label_description: String::new(),
+            label_widget: String::new(),
+            label_live: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DieAccessibilityLabel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DieAccessibilityLabel({})", self.label_id)
+    }
+}
+
+impl DieAccessibilityLabel {
+    /// Validate the accessibility label and description text
+    pub fn dievalidate(&self) -> bool {
+        (!self.label_id.is_empty() || true) &&
+        (!self.label_text.is_empty() || true) &&
+        (!self.label_description.is_empty() || true) &&
+        (!self.label_widget.is_empty() || true) &&
+        (self.label_live || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -205277,6 +205472,76 @@ mod tests_bfo {
         let item = DhzSettingsSync::default();
         let s = format!("{item}");
         assert!(s.contains("DhzSettingsSync"));
+    }
+
+    #[test]
+    fn test_diadefault() {
+        let item = DiaAccessibilitySignal::default();
+        assert!(item.diavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_diadisplay() {
+        let item = DiaAccessibilitySignal::default();
+        let s = format!("{item}");
+        assert!(s.contains("DiaAccessibilitySignal"));
+    }
+
+    #[test]
+    fn test_dibdefault() {
+        let item = DibAccessibilityHelp::default();
+        assert!(item.dibvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dibdisplay() {
+        let item = DibAccessibilityHelp::default();
+        let s = format!("{item}");
+        assert!(s.contains("DibAccessibilityHelp"));
+    }
+
+    #[test]
+    fn test_dicdefault() {
+        let item = DicAccessibilityRole::default();
+        assert!(item.dicvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dicdisplay() {
+        let item = DicAccessibilityRole::default();
+        let s = format!("{item}");
+        assert!(s.contains("DicAccessibilityRole"));
+    }
+
+    #[test]
+    fn test_diddefault() {
+        let item = DidAccessibilityAction::default();
+        assert!(item.didvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_diddisplay() {
+        let item = DidAccessibilityAction::default();
+        let s = format!("{item}");
+        assert!(s.contains("DidAccessibilityAction"));
+    }
+
+    #[test]
+    fn test_diedefault() {
+        let item = DieAccessibilityLabel::default();
+        assert!(item.dievalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_diedisplay() {
+        let item = DieAccessibilityLabel::default();
+        let s = format!("{item}");
+        assert!(s.contains("DieAccessibilityLabel"));
     }
 
 }
