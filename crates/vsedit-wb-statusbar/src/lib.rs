@@ -83328,6 +83328,280 @@ impl BhoKeybindingsEditor {
     pub fn binding_count(&self) -> usize { self.bindings.len() }
 }
 
+
+/// Walkthrough step state (bhp_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BhpStepState {
+    NotStarted,
+    InProgress,
+    Complete,
+}
+
+/// Walkthrough step (bhp_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhpWalkthroughStep {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub state: BhpStepState,
+    pub command: Option<String>,
+}
+
+/// Walkthrough category (bhp_)
+#[derive(Debug, Clone)]
+pub struct BhpWalkthroughCategory {
+    pub id: String,
+    pub title: String,
+    pub steps: Vec<BhpWalkthroughStep>,
+}
+
+impl BhpWalkthroughCategory {
+    pub fn new(id: String, title: String) -> Self {
+        Self { id, title, steps: Vec::new() }
+    }
+    pub fn add_step(&mut self, step: BhpWalkthroughStep) { self.steps.push(step); }
+    pub fn complete_step(&mut self, step_id: &str) {
+        if let Some(s) = self.steps.iter_mut().find(|s| s.id == step_id) {
+            s.state = BhpStepState::Complete;
+        }
+    }
+    pub fn progress(&self) -> (usize, usize) {
+        let done = self.steps.iter().filter(|s| s.state == BhpStepState::Complete).count();
+        (done, self.steps.len())
+    }
+    pub fn is_complete(&self) -> bool {
+        let (done, total) = self.progress();
+        total > 0 && done == total
+    }
+}
+
+/// Welcome view model (bhp_)
+#[derive(Debug, Clone)]
+pub struct BhpWelcomeView {
+    pub categories: Vec<BhpWalkthroughCategory>,
+    pub show_on_startup: bool,
+}
+
+impl BhpWelcomeView {
+    pub fn new() -> Self { Self { categories: Vec::new(), show_on_startup: true } }
+    pub fn add_category(&mut self, cat: BhpWalkthroughCategory) { self.categories.push(cat); }
+    pub fn toggle_startup(&mut self) { self.show_on_startup = !self.show_on_startup; }
+    pub fn all_complete(&self) -> bool { self.categories.iter().all(|c| c.is_complete()) }
+    pub fn category_count(&self) -> usize { self.categories.len() }
+}
+
+
+/// Diff hunk (bhq_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhqDiffHunk {
+    pub original_start: usize,
+    pub original_count: usize,
+    pub modified_start: usize,
+    pub modified_count: usize,
+}
+
+/// Diff view mode (bhq_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BhqDiffViewMode {
+    SideBySide,
+    Inline,
+}
+
+/// Diff editor model (bhq_)
+#[derive(Debug, Clone)]
+pub struct BhqDiffEditor {
+    pub original_path: String,
+    pub modified_path: String,
+    pub hunks: Vec<BhqDiffHunk>,
+    pub view_mode: BhqDiffViewMode,
+    pub ignore_whitespace: bool,
+    pub current_hunk: usize,
+}
+
+impl BhqDiffEditor {
+    pub fn new(orig: String, modified: String) -> Self {
+        Self { original_path: orig, modified_path: modified, hunks: Vec::new(), view_mode: BhqDiffViewMode::SideBySide, ignore_whitespace: false, current_hunk: 0 }
+    }
+    pub fn add_hunk(&mut self, h: BhqDiffHunk) { self.hunks.push(h); }
+    pub fn next_hunk(&mut self) {
+        if !self.hunks.is_empty() { self.current_hunk = (self.current_hunk + 1) % self.hunks.len(); }
+    }
+    pub fn prev_hunk(&mut self) {
+        if !self.hunks.is_empty() { self.current_hunk = if self.current_hunk == 0 { self.hunks.len() - 1 } else { self.current_hunk - 1 }; }
+    }
+    pub fn toggle_view_mode(&mut self) {
+        self.view_mode = match self.view_mode { BhqDiffViewMode::SideBySide => BhqDiffViewMode::Inline, BhqDiffViewMode::Inline => BhqDiffViewMode::SideBySide };
+    }
+    pub fn toggle_whitespace(&mut self) { self.ignore_whitespace = !self.ignore_whitespace; }
+    pub fn hunk_count(&self) -> usize { self.hunks.len() }
+    pub fn current(&self) -> Option<&BhqDiffHunk> { self.hunks.get(self.current_hunk) }
+    pub fn total_added(&self) -> usize { self.hunks.iter().map(|h| h.modified_count).sum() }
+    pub fn total_removed(&self) -> usize { self.hunks.iter().map(|h| h.original_count).sum() }
+}
+
+
+/// Merge conflict resolution (bhr_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BhrMergeResolution {
+    Unresolved,
+    AcceptCurrent,
+    AcceptIncoming,
+    AcceptBoth,
+    Custom(String),
+}
+
+/// Merge conflict region (bhr_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhrConflictRegion {
+    pub id: usize,
+    pub base_start: usize,
+    pub base_end: usize,
+    pub current_text: String,
+    pub incoming_text: String,
+    pub resolution: BhrMergeResolution,
+}
+
+/// Merge editor model (bhr_)
+#[derive(Debug, Clone)]
+pub struct BhrMergeEditor {
+    pub file_path: String,
+    pub conflicts: Vec<BhrConflictRegion>,
+    pub result_text: Option<String>,
+}
+
+impl BhrMergeEditor {
+    pub fn new(path: String) -> Self {
+        Self { file_path: path, conflicts: Vec::new(), result_text: None }
+    }
+    pub fn add_conflict(&mut self, c: BhrConflictRegion) { self.conflicts.push(c); }
+    pub fn resolve(&mut self, id: usize, res: BhrMergeResolution) {
+        if let Some(c) = self.conflicts.iter_mut().find(|c| c.id == id) {
+            c.resolution = res;
+        }
+    }
+    pub fn is_fully_resolved(&self) -> bool {
+        !self.conflicts.is_empty() && self.conflicts.iter().all(|c| c.resolution != BhrMergeResolution::Unresolved)
+    }
+    pub fn unresolved_count(&self) -> usize {
+        self.conflicts.iter().filter(|c| c.resolution == BhrMergeResolution::Unresolved).count()
+    }
+    pub fn conflict_count(&self) -> usize { self.conflicts.len() }
+    pub fn set_result(&mut self, text: String) { self.result_text = Some(text); }
+    pub fn resolved_text(&self, id: usize) -> Option<String> {
+        self.conflicts.iter().find(|c| c.id == id).map(|c| match &c.resolution {
+            BhrMergeResolution::AcceptCurrent => c.current_text.clone(),
+            BhrMergeResolution::AcceptIncoming => c.incoming_text.clone(),
+            BhrMergeResolution::AcceptBoth => format!("{}\n{}", c.current_text, c.incoming_text),
+            BhrMergeResolution::Custom(t) => t.clone(),
+            BhrMergeResolution::Unresolved => String::new(),
+        })
+    }
+}
+
+
+/// Playground language (bhs_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BhsPlaygroundLanguage {
+    JavaScript,
+    TypeScript,
+    Python,
+    Rust,
+    Other(String),
+}
+
+/// Playground output entry (bhs_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhsOutputEntry {
+    pub text: String,
+    pub is_error: bool,
+}
+
+/// Interactive playground model (bhs_)
+#[derive(Debug, Clone)]
+pub struct BhsPlayground {
+    pub language: BhsPlaygroundLanguage,
+    pub source_code: String,
+    pub output: Vec<BhsOutputEntry>,
+    pub is_running: bool,
+    pub samples: Vec<(String, String)>,
+}
+
+impl BhsPlayground {
+    pub fn new(lang: BhsPlaygroundLanguage) -> Self {
+        Self { language: lang, source_code: String::new(), output: Vec::new(), is_running: false, samples: Vec::new() }
+    }
+    pub fn set_code(&mut self, code: String) { self.source_code = code; }
+    pub fn run(&mut self) { self.is_running = true; self.output.clear(); }
+    pub fn add_output(&mut self, text: String, is_error: bool) {
+        self.output.push(BhsOutputEntry { text, is_error });
+    }
+    pub fn finish(&mut self) { self.is_running = false; }
+    pub fn reset(&mut self) {
+        self.source_code.clear();
+        self.output.clear();
+        self.is_running = false;
+    }
+    pub fn add_sample(&mut self, name: String, code: String) { self.samples.push((name, code)); }
+    pub fn load_sample(&mut self, name: &str) {
+        if let Some((_, code)) = self.samples.iter().find(|(n, _)| n == name) {
+            self.source_code = code.clone();
+        }
+    }
+    pub fn set_language(&mut self, lang: BhsPlaygroundLanguage) { self.language = lang; }
+    pub fn has_errors(&self) -> bool { self.output.iter().any(|o| o.is_error) }
+    pub fn output_text(&self) -> String { self.output.iter().map(|o| o.text.as_str()).collect::<Vec<_>>().join("\n") }
+}
+
+
+/// Webview options (bht_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhtWebviewOptions {
+    pub enable_scripts: bool,
+    pub enable_forms: bool,
+    pub retain_context_when_hidden: bool,
+    pub local_resource_roots: Vec<String>,
+}
+
+impl Default for BhtWebviewOptions {
+    fn default() -> Self {
+        Self { enable_scripts: false, enable_forms: false, retain_context_when_hidden: false, local_resource_roots: Vec::new() }
+    }
+}
+
+/// Webview message (bht_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhtWebviewMessage {
+    pub command: String,
+    pub payload: String,
+}
+
+/// Webview panel model (bht_)
+#[derive(Debug, Clone)]
+pub struct BhtWebviewPanel {
+    pub id: String,
+    pub title: String,
+    pub html: String,
+    pub options: BhtWebviewOptions,
+    pub messages: Vec<BhtWebviewMessage>,
+    pub is_visible: bool,
+    pub state: Option<String>,
+}
+
+impl BhtWebviewPanel {
+    pub fn new(id: String, title: String) -> Self {
+        Self { id, title, html: String::new(), options: BhtWebviewOptions::default(), messages: Vec::new(), is_visible: true, state: None }
+    }
+    pub fn set_html(&mut self, html: String) { self.html = html; }
+    pub fn post_message(&mut self, msg: BhtWebviewMessage) { self.messages.push(msg); }
+    pub fn set_options(&mut self, opts: BhtWebviewOptions) { self.options = opts; }
+    pub fn show(&mut self) { self.is_visible = true; }
+    pub fn hide(&mut self) { self.is_visible = false; }
+    pub fn save_state(&mut self, state: String) { self.state = Some(state); }
+    pub fn restore_state(&self) -> Option<&str> { self.state.as_deref() }
+    pub fn message_count(&self) -> usize { self.messages.len() }
+    pub fn clear_messages(&mut self) { self.messages.clear(); }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -88158,6 +88432,379 @@ mod tests_bfo {
     fn test_bho_extension_source() {
         let b = BhoKeybindingEntry { key: "ctrl+shift+t".into(), command: "ext.cmd".into(), when: None, source: BhoKeybindingSource::Extension("my-ext".into()) };
         assert!(matches!(b.source, BhoKeybindingSource::Extension(_)));
+    }
+
+
+    #[test]
+    fn test_bhp_welcome_new() {
+        let v = BhpWelcomeView::new();
+        assert!(v.show_on_startup);
+        assert_eq!(v.category_count(), 0);
+    }
+    #[test]
+    fn test_bhp_add_category() {
+        let mut v = BhpWelcomeView::new();
+        v.add_category(BhpWalkthroughCategory::new("get-started".into(), "Get Started".into()));
+        assert_eq!(v.category_count(), 1);
+    }
+    #[test]
+    fn test_bhp_walkthrough_progress() {
+        let mut cat = BhpWalkthroughCategory::new("c1".into(), "Cat".into());
+        cat.add_step(BhpWalkthroughStep { id: "s1".into(), title: "Step 1".into(), description: "Do thing".into(), state: BhpStepState::NotStarted, command: Some("cmd".into()) });
+        cat.add_step(BhpWalkthroughStep { id: "s2".into(), title: "Step 2".into(), description: "Do other".into(), state: BhpStepState::NotStarted, command: None });
+        assert_eq!(cat.progress(), (0, 2));
+        cat.complete_step("s1");
+        assert_eq!(cat.progress(), (1, 2));
+    }
+    #[test]
+    fn test_bhp_is_complete() {
+        let mut cat = BhpWalkthroughCategory::new("c1".into(), "Cat".into());
+        cat.add_step(BhpWalkthroughStep { id: "s1".into(), title: "T".into(), description: "D".into(), state: BhpStepState::NotStarted, command: None });
+        assert!(!cat.is_complete());
+        cat.complete_step("s1");
+        assert!(cat.is_complete());
+    }
+    #[test]
+    fn test_bhp_toggle_startup() {
+        let mut v = BhpWelcomeView::new();
+        assert!(v.show_on_startup);
+        v.toggle_startup();
+        assert!(!v.show_on_startup);
+    }
+    #[test]
+    fn test_bhp_all_complete() {
+        let mut v = BhpWelcomeView::new();
+        let mut cat = BhpWalkthroughCategory::new("c1".into(), "C".into());
+        cat.add_step(BhpWalkthroughStep { id: "s1".into(), title: "T".into(), description: "D".into(), state: BhpStepState::Complete, command: None });
+        v.add_category(cat);
+        assert!(v.all_complete());
+    }
+    #[test]
+    fn test_bhp_step_states() {
+        let s1 = BhpStepState::NotStarted;
+        let s2 = BhpStepState::InProgress;
+        let s3 = BhpStepState::Complete;
+        assert_ne!(s1, s2);
+        assert_ne!(s2, s3);
+    }
+    #[test]
+    fn test_bhp_step_command() {
+        let s = BhpWalkthroughStep { id: "s".into(), title: "T".into(), description: "D".into(), state: BhpStepState::NotStarted, command: Some("editor.action.formatDocument".into()) };
+        assert!(s.command.is_some());
+    }
+    #[test]
+    fn test_bhp_empty_category_not_complete() {
+        let cat = BhpWalkthroughCategory::new("empty".into(), "Empty".into());
+        assert!(!cat.is_complete());
+    }
+    #[test]
+    fn test_bhp_multiple_categories() {
+        let mut v = BhpWelcomeView::new();
+        for i in 0..3 {
+            v.add_category(BhpWalkthroughCategory::new(format!("c{i}"), format!("Cat {i}")));
+        }
+        assert_eq!(v.category_count(), 3);
+    }
+
+
+    #[test]
+    fn test_bhq_diff_editor_new() {
+        let d = BhqDiffEditor::new("a.rs".into(), "b.rs".into());
+        assert_eq!(d.original_path, "a.rs");
+        assert_eq!(d.hunk_count(), 0);
+        assert_eq!(d.view_mode, BhqDiffViewMode::SideBySide);
+    }
+    #[test]
+    fn test_bhq_add_hunk() {
+        let mut d = BhqDiffEditor::new("a".into(), "b".into());
+        d.add_hunk(BhqDiffHunk { original_start: 1, original_count: 3, modified_start: 1, modified_count: 5 });
+        assert_eq!(d.hunk_count(), 1);
+    }
+    #[test]
+    fn test_bhq_next_prev_hunk() {
+        let mut d = BhqDiffEditor::new("a".into(), "b".into());
+        d.add_hunk(BhqDiffHunk { original_start: 1, original_count: 1, modified_start: 1, modified_count: 1 });
+        d.add_hunk(BhqDiffHunk { original_start: 10, original_count: 2, modified_start: 12, modified_count: 3 });
+        assert_eq!(d.current_hunk, 0);
+        d.next_hunk();
+        assert_eq!(d.current_hunk, 1);
+        d.next_hunk();
+        assert_eq!(d.current_hunk, 0); // wraps
+        d.prev_hunk();
+        assert_eq!(d.current_hunk, 1); // wraps back
+    }
+    #[test]
+    fn test_bhq_toggle_view_mode() {
+        let mut d = BhqDiffEditor::new("a".into(), "b".into());
+        d.toggle_view_mode();
+        assert_eq!(d.view_mode, BhqDiffViewMode::Inline);
+        d.toggle_view_mode();
+        assert_eq!(d.view_mode, BhqDiffViewMode::SideBySide);
+    }
+    #[test]
+    fn test_bhq_toggle_whitespace() {
+        let mut d = BhqDiffEditor::new("a".into(), "b".into());
+        assert!(!d.ignore_whitespace);
+        d.toggle_whitespace();
+        assert!(d.ignore_whitespace);
+    }
+    #[test]
+    fn test_bhq_current_hunk() {
+        let mut d = BhqDiffEditor::new("a".into(), "b".into());
+        assert!(d.current().is_none());
+        d.add_hunk(BhqDiffHunk { original_start: 5, original_count: 2, modified_start: 5, modified_count: 4 });
+        assert_eq!(d.current().unwrap().original_start, 5);
+    }
+    #[test]
+    fn test_bhq_total_added_removed() {
+        let mut d = BhqDiffEditor::new("a".into(), "b".into());
+        d.add_hunk(BhqDiffHunk { original_start: 1, original_count: 3, modified_start: 1, modified_count: 5 });
+        d.add_hunk(BhqDiffHunk { original_start: 10, original_count: 2, modified_start: 13, modified_count: 1 });
+        assert_eq!(d.total_added(), 6);
+        assert_eq!(d.total_removed(), 5);
+    }
+    #[test]
+    fn test_bhq_hunk_fields() {
+        let h = BhqDiffHunk { original_start: 42, original_count: 10, modified_start: 45, modified_count: 15 };
+        assert_eq!(h.modified_start, 45);
+    }
+    #[test]
+    fn test_bhq_empty_next_prev() {
+        let mut d = BhqDiffEditor::new("a".into(), "b".into());
+        d.next_hunk();
+        d.prev_hunk();
+        assert_eq!(d.current_hunk, 0);
+    }
+    #[test]
+    fn test_bhq_many_hunks() {
+        let mut d = BhqDiffEditor::new("a".into(), "b".into());
+        for i in 0..20 {
+            d.add_hunk(BhqDiffHunk { original_start: i * 10, original_count: 1, modified_start: i * 10 + 1, modified_count: 2 });
+        }
+        assert_eq!(d.hunk_count(), 20);
+        assert_eq!(d.total_added(), 40);
+    }
+
+
+    #[test]
+    fn test_bhr_merge_editor_new() {
+        let m = BhrMergeEditor::new("file.rs".into());
+        assert_eq!(m.file_path, "file.rs");
+        assert_eq!(m.conflict_count(), 0);
+    }
+    #[test]
+    fn test_bhr_add_conflict() {
+        let mut m = BhrMergeEditor::new("f.rs".into());
+        m.add_conflict(BhrConflictRegion { id: 0, base_start: 10, base_end: 15, current_text: "cur".into(), incoming_text: "inc".into(), resolution: BhrMergeResolution::Unresolved });
+        assert_eq!(m.conflict_count(), 1);
+    }
+    #[test]
+    fn test_bhr_resolve_current() {
+        let mut m = BhrMergeEditor::new("f.rs".into());
+        m.add_conflict(BhrConflictRegion { id: 0, base_start: 0, base_end: 5, current_text: "AAA".into(), incoming_text: "BBB".into(), resolution: BhrMergeResolution::Unresolved });
+        m.resolve(0, BhrMergeResolution::AcceptCurrent);
+        assert_eq!(m.resolved_text(0).unwrap(), "AAA");
+    }
+    #[test]
+    fn test_bhr_resolve_incoming() {
+        let mut m = BhrMergeEditor::new("f.rs".into());
+        m.add_conflict(BhrConflictRegion { id: 0, base_start: 0, base_end: 5, current_text: "AAA".into(), incoming_text: "BBB".into(), resolution: BhrMergeResolution::Unresolved });
+        m.resolve(0, BhrMergeResolution::AcceptIncoming);
+        assert_eq!(m.resolved_text(0).unwrap(), "BBB");
+    }
+    #[test]
+    fn test_bhr_resolve_both() {
+        let mut m = BhrMergeEditor::new("f.rs".into());
+        m.add_conflict(BhrConflictRegion { id: 0, base_start: 0, base_end: 5, current_text: "AAA".into(), incoming_text: "BBB".into(), resolution: BhrMergeResolution::Unresolved });
+        m.resolve(0, BhrMergeResolution::AcceptBoth);
+        assert_eq!(m.resolved_text(0).unwrap(), "AAA\nBBB");
+    }
+    #[test]
+    fn test_bhr_resolve_custom() {
+        let mut m = BhrMergeEditor::new("f.rs".into());
+        m.add_conflict(BhrConflictRegion { id: 0, base_start: 0, base_end: 5, current_text: "A".into(), incoming_text: "B".into(), resolution: BhrMergeResolution::Unresolved });
+        m.resolve(0, BhrMergeResolution::Custom("merged".into()));
+        assert_eq!(m.resolved_text(0).unwrap(), "merged");
+    }
+    #[test]
+    fn test_bhr_is_fully_resolved() {
+        let mut m = BhrMergeEditor::new("f.rs".into());
+        m.add_conflict(BhrConflictRegion { id: 0, base_start: 0, base_end: 3, current_text: "a".into(), incoming_text: "b".into(), resolution: BhrMergeResolution::Unresolved });
+        assert!(!m.is_fully_resolved());
+        m.resolve(0, BhrMergeResolution::AcceptCurrent);
+        assert!(m.is_fully_resolved());
+    }
+    #[test]
+    fn test_bhr_unresolved_count() {
+        let mut m = BhrMergeEditor::new("f.rs".into());
+        m.add_conflict(BhrConflictRegion { id: 0, base_start: 0, base_end: 3, current_text: "a".into(), incoming_text: "b".into(), resolution: BhrMergeResolution::Unresolved });
+        m.add_conflict(BhrConflictRegion { id: 1, base_start: 10, base_end: 15, current_text: "c".into(), incoming_text: "d".into(), resolution: BhrMergeResolution::Unresolved });
+        assert_eq!(m.unresolved_count(), 2);
+        m.resolve(0, BhrMergeResolution::AcceptIncoming);
+        assert_eq!(m.unresolved_count(), 1);
+    }
+    #[test]
+    fn test_bhr_set_result() {
+        let mut m = BhrMergeEditor::new("f.rs".into());
+        m.set_result("final text".into());
+        assert_eq!(m.result_text.as_deref(), Some("final text"));
+    }
+    #[test]
+    fn test_bhr_empty_not_resolved() {
+        let m = BhrMergeEditor::new("f.rs".into());
+        assert!(!m.is_fully_resolved());
+    }
+    #[test]
+    fn test_bhr_conflict_fields() {
+        let c = BhrConflictRegion { id: 42, base_start: 100, base_end: 110, current_text: "current".into(), incoming_text: "incoming".into(), resolution: BhrMergeResolution::Unresolved };
+        assert_eq!(c.base_end - c.base_start, 10);
+    }
+
+
+    #[test]
+    fn test_bhs_playground_new() {
+        let p = BhsPlayground::new(BhsPlaygroundLanguage::Rust);
+        assert_eq!(p.language, BhsPlaygroundLanguage::Rust);
+        assert!(p.source_code.is_empty());
+    }
+    #[test]
+    fn test_bhs_set_code_and_run() {
+        let mut p = BhsPlayground::new(BhsPlaygroundLanguage::JavaScript);
+        p.set_code("console.log('hi')".into());
+        p.run();
+        assert!(p.is_running);
+        p.add_output("hi".into(), false);
+        p.finish();
+        assert!(!p.is_running);
+        assert_eq!(p.output.len(), 1);
+    }
+    #[test]
+    fn test_bhs_reset() {
+        let mut p = BhsPlayground::new(BhsPlaygroundLanguage::Python);
+        p.set_code("print(1)".into());
+        p.run();
+        p.add_output("1".into(), false);
+        p.finish();
+        p.reset();
+        assert!(p.source_code.is_empty());
+        assert!(p.output.is_empty());
+    }
+    #[test]
+    fn test_bhs_samples() {
+        let mut p = BhsPlayground::new(BhsPlaygroundLanguage::TypeScript);
+        p.add_sample("hello".into(), "console.log('hello')".into());
+        p.load_sample("hello");
+        assert_eq!(p.source_code, "console.log('hello')");
+    }
+    #[test]
+    fn test_bhs_has_errors() {
+        let mut p = BhsPlayground::new(BhsPlaygroundLanguage::Rust);
+        p.add_output("ok".into(), false);
+        assert!(!p.has_errors());
+        p.add_output("error: E0001".into(), true);
+        assert!(p.has_errors());
+    }
+    #[test]
+    fn test_bhs_output_text() {
+        let mut p = BhsPlayground::new(BhsPlaygroundLanguage::Python);
+        p.add_output("line1".into(), false);
+        p.add_output("line2".into(), false);
+        assert_eq!(p.output_text(), "line1\nline2");
+    }
+    #[test]
+    fn test_bhs_set_language() {
+        let mut p = BhsPlayground::new(BhsPlaygroundLanguage::JavaScript);
+        p.set_language(BhsPlaygroundLanguage::Other("Go".into()));
+        assert_eq!(p.language, BhsPlaygroundLanguage::Other("Go".into()));
+    }
+    #[test]
+    fn test_bhs_load_nonexistent_sample() {
+        let mut p = BhsPlayground::new(BhsPlaygroundLanguage::Rust);
+        p.set_code("existing".into());
+        p.load_sample("nope");
+        assert_eq!(p.source_code, "existing");
+    }
+    #[test]
+    fn test_bhs_error_output() {
+        let e = BhsOutputEntry { text: "panic!".into(), is_error: true };
+        assert!(e.is_error);
+    }
+    #[test]
+    fn test_bhs_run_clears_output() {
+        let mut p = BhsPlayground::new(BhsPlaygroundLanguage::Rust);
+        p.add_output("old".into(), false);
+        p.run();
+        assert!(p.output.is_empty());
+    }
+
+
+    #[test]
+    fn test_bht_webview_new() {
+        let p = BhtWebviewPanel::new("wv1".into(), "My View".into());
+        assert_eq!(p.title, "My View");
+        assert!(p.is_visible);
+        assert!(p.html.is_empty());
+    }
+    #[test]
+    fn test_bht_set_html() {
+        let mut p = BhtWebviewPanel::new("wv1".into(), "V".into());
+        p.set_html("<h1>Hello</h1>".into());
+        assert_eq!(p.html, "<h1>Hello</h1>");
+    }
+    #[test]
+    fn test_bht_post_message() {
+        let mut p = BhtWebviewPanel::new("wv1".into(), "V".into());
+        p.post_message(BhtWebviewMessage { command: "update".into(), payload: "{}".into() });
+        assert_eq!(p.message_count(), 1);
+    }
+    #[test]
+    fn test_bht_options() {
+        let mut p = BhtWebviewPanel::new("wv1".into(), "V".into());
+        p.set_options(BhtWebviewOptions { enable_scripts: true, enable_forms: true, retain_context_when_hidden: true, local_resource_roots: vec!["/ext".into()] });
+        assert!(p.options.enable_scripts);
+        assert!(p.options.retain_context_when_hidden);
+    }
+    #[test]
+    fn test_bht_show_hide() {
+        let mut p = BhtWebviewPanel::new("wv1".into(), "V".into());
+        p.hide();
+        assert!(!p.is_visible);
+        p.show();
+        assert!(p.is_visible);
+    }
+    #[test]
+    fn test_bht_state() {
+        let mut p = BhtWebviewPanel::new("wv1".into(), "V".into());
+        assert!(p.restore_state().is_none());
+        p.save_state(r#"{"scroll":42}"#.into());
+        assert_eq!(p.restore_state(), Some(r#"{"scroll":42}"#));
+    }
+    #[test]
+    fn test_bht_clear_messages() {
+        let mut p = BhtWebviewPanel::new("wv1".into(), "V".into());
+        p.post_message(BhtWebviewMessage { command: "a".into(), payload: "b".into() });
+        p.clear_messages();
+        assert_eq!(p.message_count(), 0);
+    }
+    #[test]
+    fn test_bht_default_options() {
+        let o = BhtWebviewOptions::default();
+        assert!(!o.enable_scripts);
+        assert!(!o.enable_forms);
+        assert!(o.local_resource_roots.is_empty());
+    }
+    #[test]
+    fn test_bht_message_fields() {
+        let m = BhtWebviewMessage { command: "getData".into(), payload: r#"{"id":1}"#.into() };
+        assert_eq!(m.command, "getData");
+    }
+    #[test]
+    fn test_bht_multiple_messages() {
+        let mut p = BhtWebviewPanel::new("wv1".into(), "V".into());
+        for i in 0..5 {
+            p.post_message(BhtWebviewMessage { command: format!("cmd{i}"), payload: "{}".into() });
+        }
+        assert_eq!(p.message_count(), 5);
     }
 
 }
