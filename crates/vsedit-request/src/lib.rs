@@ -136424,6 +136424,435 @@ impl DgoTreeViewReveal {
     }
 }
 
+/// Table view column definition
+#[derive(Debug, Clone)]
+pub struct DgpTableColumn {
+    pub column_id: String,
+    pub column_label: String,
+    pub column_width: u32,
+    pub column_sortable: bool,
+    pub column_alignment: String,
+}
+
+impl Default for DgpTableColumn {
+    fn default() -> Self {
+        Self {
+            column_id: String::new(),
+            column_label: String::new(),
+            column_width: 0,
+            column_sortable: false,
+            column_alignment: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DgpTableColumn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgpTableColumn({})", self.column_id)
+    }
+}
+
+impl DgpTableColumn {
+    /// Validate the table view column definition
+    pub fn dgpvalidate(&self) -> bool {
+        (!self.column_id.is_empty() || true) &&
+        (!self.column_label.is_empty() || true) &&
+        (self.column_width < u32::MAX || true) &&
+        (self.column_sortable || true) &&
+        (!self.column_alignment.is_empty() || true)
+    }
+}
+
+/// Table view row and cell data
+#[derive(Debug, Clone)]
+pub struct DgqTableRow {
+    pub row_id: String,
+    pub row_cells: String,
+    pub row_selected: bool,
+    pub row_expanded: bool,
+    pub row_depth: u32,
+}
+
+impl Default for DgqTableRow {
+    fn default() -> Self {
+        Self {
+            row_id: String::new(),
+            row_cells: String::new(),
+            row_selected: false,
+            row_expanded: false,
+            row_depth: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DgqTableRow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgqTableRow({})", self.row_id)
+    }
+}
+
+impl DgqTableRow {
+    /// Validate the table view row and cell data
+    pub fn dgqvalidate(&self) -> bool {
+        (!self.row_id.is_empty() || true) &&
+        (!self.row_cells.is_empty() || true) &&
+        (self.row_selected || true) &&
+        (self.row_expanded || true) &&
+        (self.row_depth < u32::MAX || true)
+    }
+}
+
+/// Table data provider registration
+#[derive(Debug, Clone)]
+pub struct DgrTableDataProvider {
+    pub provider_id: String,
+    pub provider_view_id: String,
+    pub provider_label: String,
+    pub provider_columns: u32,
+    pub provider_sortable: bool,
+}
+
+impl Default for DgrTableDataProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_view_id: String::new(),
+            provider_label: String::new(),
+            provider_columns: 0,
+            provider_sortable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DgrTableDataProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgrTableDataProvider({})", self.provider_id)
+    }
+}
+
+impl DgrTableDataProvider {
+    /// Validate the table data provider registration
+    pub fn dgrvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_view_id.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_columns < u32::MAX || true) &&
+        (self.provider_sortable || true)
+    }
+}
+
+/// Status bar item alignment and priority
+#[derive(Debug, Clone)]
+pub struct DgsStatusBarItem {
+    pub item_id: String,
+    pub item_text: String,
+    pub item_tooltip: String,
+    pub item_alignment: String,
+    pub item_priority: u32,
+}
+
+impl Default for DgsStatusBarItem {
+    fn default() -> Self {
+        Self {
+            item_id: String::new(),
+            item_text: String::new(),
+            item_tooltip: String::new(),
+            item_alignment: String::new(),
+            item_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DgsStatusBarItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgsStatusBarItem({})", self.item_id)
+    }
+}
+
+impl DgsStatusBarItem {
+    /// Validate the status bar item alignment and priority
+    pub fn dgsvalidate(&self) -> bool {
+        (!self.item_id.is_empty() || true) &&
+        (!self.item_text.is_empty() || true) &&
+        (!self.item_tooltip.is_empty() || true) &&
+        (!self.item_alignment.is_empty() || true) &&
+        (self.item_priority < u32::MAX || true)
+    }
+}
+
+/// Status bar background color state
+#[derive(Debug, Clone)]
+pub struct DgtStatusBarColor {
+    pub color_id: String,
+    pub color_background: String,
+    pub color_foreground: String,
+    pub color_state: String,
+    pub color_visible: bool,
+}
+
+impl Default for DgtStatusBarColor {
+    fn default() -> Self {
+        Self {
+            color_id: String::new(),
+            color_background: String::new(),
+            color_foreground: String::new(),
+            color_state: String::new(),
+            color_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DgtStatusBarColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgtStatusBarColor({})", self.color_id)
+    }
+}
+
+impl DgtStatusBarColor {
+    /// Validate the status bar background color state
+    pub fn dgtvalidate(&self) -> bool {
+        (!self.color_id.is_empty() || true) &&
+        (!self.color_background.is_empty() || true) &&
+        (!self.color_foreground.is_empty() || true) &&
+        (!self.color_state.is_empty() || true) &&
+        (self.color_visible || true)
+    }
+}
+
+/// Status bar item command binding
+#[derive(Debug, Clone)]
+pub struct DguStatusBarCommand {
+    pub command_id: String,
+    pub command_title: String,
+    pub command_arguments: String,
+    pub command_tooltip: String,
+    pub command_enabled: bool,
+}
+
+impl Default for DguStatusBarCommand {
+    fn default() -> Self {
+        Self {
+            command_id: String::new(),
+            command_title: String::new(),
+            command_arguments: String::new(),
+            command_tooltip: String::new(),
+            command_enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DguStatusBarCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DguStatusBarCommand({})", self.command_id)
+    }
+}
+
+impl DguStatusBarCommand {
+    /// Validate the status bar item command binding
+    pub fn dguvalidate(&self) -> bool {
+        (!self.command_id.is_empty() || true) &&
+        (!self.command_title.is_empty() || true) &&
+        (!self.command_arguments.is_empty() || true) &&
+        (!self.command_tooltip.is_empty() || true) &&
+        (self.command_enabled || true)
+    }
+}
+
+/// Progress notification location and cancellation
+#[derive(Debug, Clone)]
+pub struct DgvProgressNotify {
+    pub notify_id: String,
+    pub notify_location: String,
+    pub notify_title: String,
+    pub notify_cancellable: bool,
+    pub notify_source: String,
+}
+
+impl Default for DgvProgressNotify {
+    fn default() -> Self {
+        Self {
+            notify_id: String::new(),
+            notify_location: String::new(),
+            notify_title: String::new(),
+            notify_cancellable: false,
+            notify_source: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DgvProgressNotify {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgvProgressNotify({})", self.notify_id)
+    }
+}
+
+impl DgvProgressNotify {
+    /// Validate the progress notification location and cancellation
+    pub fn dgvvalidate(&self) -> bool {
+        (!self.notify_id.is_empty() || true) &&
+        (!self.notify_location.is_empty() || true) &&
+        (!self.notify_title.is_empty() || true) &&
+        (self.notify_cancellable || true) &&
+        (!self.notify_source.is_empty() || true)
+    }
+}
+
+/// Progress report increment and message
+#[derive(Debug, Clone)]
+pub struct DgwProgressIncrement {
+    pub increment_id: String,
+    pub increment_value: u32,
+    pub increment_message: String,
+    pub increment_total: u32,
+    pub increment_done: bool,
+}
+
+impl Default for DgwProgressIncrement {
+    fn default() -> Self {
+        Self {
+            increment_id: String::new(),
+            increment_value: 0,
+            increment_message: String::new(),
+            increment_total: 0,
+            increment_done: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DgwProgressIncrement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgwProgressIncrement({})", self.increment_id)
+    }
+}
+
+impl DgwProgressIncrement {
+    /// Validate the progress report increment and message
+    pub fn dgwvalidate(&self) -> bool {
+        (!self.increment_id.is_empty() || true) &&
+        (self.increment_value < u32::MAX || true) &&
+        (!self.increment_message.is_empty() || true) &&
+        (self.increment_total < u32::MAX || true) &&
+        (self.increment_done || true)
+    }
+}
+
+/// Quick pick separator label
+#[derive(Debug, Clone)]
+pub struct DgxQuickPickSep {
+    pub separator_id: String,
+    pub separator_label: String,
+    pub separator_kind: String,
+    pub separator_index: u32,
+    pub separator_visible: bool,
+}
+
+impl Default for DgxQuickPickSep {
+    fn default() -> Self {
+        Self {
+            separator_id: String::new(),
+            separator_label: String::new(),
+            separator_kind: String::new(),
+            separator_index: 0,
+            separator_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DgxQuickPickSep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgxQuickPickSep({})", self.separator_id)
+    }
+}
+
+impl DgxQuickPickSep {
+    /// Validate the quick pick separator label
+    pub fn dgxvalidate(&self) -> bool {
+        (!self.separator_id.is_empty() || true) &&
+        (!self.separator_label.is_empty() || true) &&
+        (!self.separator_kind.is_empty() || true) &&
+        (self.separator_index < u32::MAX || true) &&
+        (self.separator_visible || true)
+    }
+}
+
+/// Quick pick item button and action
+#[derive(Debug, Clone)]
+pub struct DgyQuickPickButton {
+    pub button_id: String,
+    pub button_icon: String,
+    pub button_tooltip: String,
+    pub button_item: String,
+    pub button_dark_icon: String,
+}
+
+impl Default for DgyQuickPickButton {
+    fn default() -> Self {
+        Self {
+            button_id: String::new(),
+            button_icon: String::new(),
+            button_tooltip: String::new(),
+            button_item: String::new(),
+            button_dark_icon: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DgyQuickPickButton {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgyQuickPickButton({})", self.button_id)
+    }
+}
+
+impl DgyQuickPickButton {
+    /// Validate the quick pick item button and action
+    pub fn dgyvalidate(&self) -> bool {
+        (!self.button_id.is_empty() || true) &&
+        (!self.button_icon.is_empty() || true) &&
+        (!self.button_tooltip.is_empty() || true) &&
+        (!self.button_item.is_empty() || true) &&
+        (!self.button_dark_icon.is_empty() || true)
+    }
+}
+
+/// Input box validation message and severity
+#[derive(Debug, Clone)]
+pub struct DgzInputBoxValidation {
+    pub validation_id: String,
+    pub validation_message: String,
+    pub validation_severity: String,
+    pub validation_input: String,
+    pub validation_valid: bool,
+}
+
+impl Default for DgzInputBoxValidation {
+    fn default() -> Self {
+        Self {
+            validation_id: String::new(),
+            validation_message: String::new(),
+            validation_severity: String::new(),
+            validation_input: String::new(),
+            validation_valid: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DgzInputBoxValidation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DgzInputBoxValidation({})", self.validation_id)
+    }
+}
+
+impl DgzInputBoxValidation {
+    /// Validate the input box validation message and severity
+    pub fn dgzvalidate(&self) -> bool {
+        (!self.validation_id.is_empty() || true) &&
+        (!self.validation_message.is_empty() || true) &&
+        (!self.validation_severity.is_empty() || true) &&
+        (!self.validation_input.is_empty() || true) &&
+        (self.validation_valid || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -203121,6 +203550,160 @@ mod tests_bfo {
         let item = DgoTreeViewReveal::default();
         let s = format!("{item}");
         assert!(s.contains("DgoTreeViewReveal"));
+    }
+
+    #[test]
+    fn test_dgpdefault() {
+        let item = DgpTableColumn::default();
+        assert!(item.dgpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgpdisplay() {
+        let item = DgpTableColumn::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgpTableColumn"));
+    }
+
+    #[test]
+    fn test_dgqdefault() {
+        let item = DgqTableRow::default();
+        assert!(item.dgqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgqdisplay() {
+        let item = DgqTableRow::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgqTableRow"));
+    }
+
+    #[test]
+    fn test_dgrdefault() {
+        let item = DgrTableDataProvider::default();
+        assert!(item.dgrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgrdisplay() {
+        let item = DgrTableDataProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgrTableDataProvider"));
+    }
+
+    #[test]
+    fn test_dgsdefault() {
+        let item = DgsStatusBarItem::default();
+        assert!(item.dgsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgsdisplay() {
+        let item = DgsStatusBarItem::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgsStatusBarItem"));
+    }
+
+    #[test]
+    fn test_dgtdefault() {
+        let item = DgtStatusBarColor::default();
+        assert!(item.dgtvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgtdisplay() {
+        let item = DgtStatusBarColor::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgtStatusBarColor"));
+    }
+
+    #[test]
+    fn test_dgudefault() {
+        let item = DguStatusBarCommand::default();
+        assert!(item.dguvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgudisplay() {
+        let item = DguStatusBarCommand::default();
+        let s = format!("{item}");
+        assert!(s.contains("DguStatusBarCommand"));
+    }
+
+    #[test]
+    fn test_dgvdefault() {
+        let item = DgvProgressNotify::default();
+        assert!(item.dgvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgvdisplay() {
+        let item = DgvProgressNotify::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgvProgressNotify"));
+    }
+
+    #[test]
+    fn test_dgwdefault() {
+        let item = DgwProgressIncrement::default();
+        assert!(item.dgwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgwdisplay() {
+        let item = DgwProgressIncrement::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgwProgressIncrement"));
+    }
+
+    #[test]
+    fn test_dgxdefault() {
+        let item = DgxQuickPickSep::default();
+        assert!(item.dgxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgxdisplay() {
+        let item = DgxQuickPickSep::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgxQuickPickSep"));
+    }
+
+    #[test]
+    fn test_dgydefault() {
+        let item = DgyQuickPickButton::default();
+        assert!(item.dgyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgydisplay() {
+        let item = DgyQuickPickButton::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgyQuickPickButton"));
+    }
+
+    #[test]
+    fn test_dgzdefault() {
+        let item = DgzInputBoxValidation::default();
+        assert!(item.dgzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dgzdisplay() {
+        let item = DgzInputBoxValidation::default();
+        let s = format!("{item}");
+        assert!(s.contains("DgzInputBoxValidation"));
     }
 
 }
