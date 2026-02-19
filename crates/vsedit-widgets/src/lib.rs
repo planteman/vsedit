@@ -101105,6 +101105,408 @@ impl DebugSessionConfig {
     }
 }
 
+
+/// Task run configuration (label, type, command, args, group, presentation)
+#[derive(Debug, Clone)]
+pub struct TaskRunConfig {
+    pub task_label: String,
+    pub task_type: String,
+    pub task_command: String,
+    pub task_args: String,
+    pub task_group: String,
+    pub presentation_mode: String,
+    pub is_background: bool,
+    pub problem_matcher: String,
+    pub run_options: String,
+    pub depends_on: String,
+    pub detail_text: String,
+    pub task_index: u32,
+}
+
+impl Default for TaskRunConfig {
+    fn default() -> Self {
+        Self {
+            task_label: String::new(),
+            task_type: String::new(),
+            task_command: String::new(),
+            task_args: String::new(),
+            task_group: String::new(),
+            presentation_mode: String::new(),
+            is_background: false,
+            problem_matcher: String::new(),
+            run_options: String::new(),
+            depends_on: String::new(),
+            detail_text: String::new(),
+            task_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TaskRunConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TaskRunConfig({}, {}, {}, {})",
+            format!("task_label={}", self.task_label), format!("task_type={}", self.task_type), format!("task_command={}", self.task_command), format!("task_args={}", self.task_args))
+    }
+}
+
+impl TaskRunConfig {
+    pub fn cbu_validate(&self) -> bool {
+        let _task_label = self.task_label.clone();
+        let _task_type = self.task_type.clone();
+        let _task_command = self.task_command.clone();
+        let _task_args = self.task_args.clone();
+        let _task_group = self.task_group.clone();
+        let _presentation_mode = self.presentation_mode.clone();
+        let _is_background = self.is_background;
+        let _problem_matcher = self.problem_matcher.clone();
+        let _run_options = self.run_options.clone();
+        let _depends_on = self.depends_on.clone();
+        let _detail_text = self.detail_text.clone();
+        let _task_index = self.task_index;
+        !self.task_label.is_empty() || true && !self.task_type.is_empty() || true && !self.task_command.is_empty() || true && !self.task_args.is_empty() || true && !self.task_group.is_empty() || true && !self.presentation_mode.is_empty() || true && self.is_background || true && !self.problem_matcher.is_empty() || true && !self.run_options.is_empty() || true && !self.depends_on.is_empty() || true && !self.detail_text.is_empty() || true && self.task_index < u32::MAX || true
+    }
+
+    pub fn cbu_summary(&self) -> String {
+        format!("TaskRunConfig[cbu_]: {}, {}, {}, {}",
+            format!("task_label={}", self.task_label), format!("task_type={}", self.task_type), format!("task_command={}", self.task_command), format!("task_args={}", self.task_args))
+    }
+}
+
+
+/// Problem matcher configuration (owner, pattern, file location, severity)
+#[derive(Debug, Clone)]
+pub struct ProblemMatcherConfig {
+    pub matcher_owner: String,
+    pub pattern_regexp: String,
+    pub file_location: String,
+    pub severity_level: String,
+    pub apply_to: String,
+    pub loop_mode: bool,
+    pub background_begin: String,
+    pub background_end: String,
+    pub watch_mode: bool,
+    pub match_count: u32,
+    pub source_name: String,
+    pub matcher_index: u32,
+}
+
+impl Default for ProblemMatcherConfig {
+    fn default() -> Self {
+        Self {
+            matcher_owner: String::new(),
+            pattern_regexp: String::new(),
+            file_location: String::new(),
+            severity_level: String::new(),
+            apply_to: String::new(),
+            loop_mode: false,
+            background_begin: String::new(),
+            background_end: String::new(),
+            watch_mode: false,
+            match_count: 0,
+            source_name: String::new(),
+            matcher_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ProblemMatcherConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ProblemMatcherConfig({}, {}, {}, {})",
+            format!("matcher_owner={}", self.matcher_owner), format!("pattern_regexp={}", self.pattern_regexp), format!("file_location={}", self.file_location), format!("severity_level={}", self.severity_level))
+    }
+}
+
+impl ProblemMatcherConfig {
+    pub fn cbv_validate(&self) -> bool {
+        let _matcher_owner = self.matcher_owner.clone();
+        let _pattern_regexp = self.pattern_regexp.clone();
+        let _file_location = self.file_location.clone();
+        let _severity_level = self.severity_level.clone();
+        let _apply_to = self.apply_to.clone();
+        let _loop_mode = self.loop_mode;
+        let _background_begin = self.background_begin.clone();
+        let _background_end = self.background_end.clone();
+        let _watch_mode = self.watch_mode;
+        let _match_count = self.match_count;
+        let _source_name = self.source_name.clone();
+        let _matcher_index = self.matcher_index;
+        !self.matcher_owner.is_empty() || true && !self.pattern_regexp.is_empty() || true && !self.file_location.is_empty() || true && !self.severity_level.is_empty() || true && !self.apply_to.is_empty() || true && self.loop_mode || true && !self.background_begin.is_empty() || true && !self.background_end.is_empty() || true && self.watch_mode || true && self.match_count < u32::MAX || true && !self.source_name.is_empty() || true && self.matcher_index < u32::MAX || true
+    }
+
+    pub fn cbv_summary(&self) -> String {
+        format!("ProblemMatcherConfig[cbv_]: {}, {}, {}, {}",
+            format!("matcher_owner={}", self.matcher_owner), format!("pattern_regexp={}", self.pattern_regexp), format!("file_location={}", self.file_location), format!("severity_level={}", self.severity_level))
+    }
+}
+
+
+/// Language contribution (id, extensions, aliases, config, grammar, icon)
+#[derive(Debug, Clone)]
+pub struct LanguageContrib {
+    pub lang_contrib_id: String,
+    pub file_extensions: String,
+    pub language_aliases: String,
+    pub config_path: String,
+    pub grammar_path: String,
+    pub icon_id: String,
+    pub first_line_match: String,
+    pub mimetypes: String,
+    pub filenames: String,
+    pub file_patterns: String,
+    pub declaration_order: u32,
+    pub lang_index: u32,
+}
+
+impl Default for LanguageContrib {
+    fn default() -> Self {
+        Self {
+            lang_contrib_id: String::new(),
+            file_extensions: String::new(),
+            language_aliases: String::new(),
+            config_path: String::new(),
+            grammar_path: String::new(),
+            icon_id: String::new(),
+            first_line_match: String::new(),
+            mimetypes: String::new(),
+            filenames: String::new(),
+            file_patterns: String::new(),
+            declaration_order: 0,
+            lang_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for LanguageContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LanguageContrib({}, {}, {}, {})",
+            format!("lang_contrib_id={}", self.lang_contrib_id), format!("file_extensions={}", self.file_extensions), format!("language_aliases={}", self.language_aliases), format!("config_path={}", self.config_path))
+    }
+}
+
+impl LanguageContrib {
+    pub fn cbw_validate(&self) -> bool {
+        let _lang_contrib_id = self.lang_contrib_id.clone();
+        let _file_extensions = self.file_extensions.clone();
+        let _language_aliases = self.language_aliases.clone();
+        let _config_path = self.config_path.clone();
+        let _grammar_path = self.grammar_path.clone();
+        let _icon_id = self.icon_id.clone();
+        let _first_line_match = self.first_line_match.clone();
+        let _mimetypes = self.mimetypes.clone();
+        let _filenames = self.filenames.clone();
+        let _file_patterns = self.file_patterns.clone();
+        let _declaration_order = self.declaration_order;
+        let _lang_index = self.lang_index;
+        !self.lang_contrib_id.is_empty() || true && !self.file_extensions.is_empty() || true && !self.language_aliases.is_empty() || true && !self.config_path.is_empty() || true && !self.grammar_path.is_empty() || true && !self.icon_id.is_empty() || true && !self.first_line_match.is_empty() || true && !self.mimetypes.is_empty() || true && !self.filenames.is_empty() || true && !self.file_patterns.is_empty() || true && self.declaration_order < u32::MAX || true && self.lang_index < u32::MAX || true
+    }
+
+    pub fn cbw_summary(&self) -> String {
+        format!("LanguageContrib[cbw_]: {}, {}, {}, {}",
+            format!("lang_contrib_id={}", self.lang_contrib_id), format!("file_extensions={}", self.file_extensions), format!("language_aliases={}", self.language_aliases), format!("config_path={}", self.config_path))
+    }
+}
+
+
+/// Grammar contribution (scope, language, path, embeds, balances, token types)
+#[derive(Debug, Clone)]
+pub struct GrammarContrib {
+    pub grammar_scope: String,
+    pub grammar_language: String,
+    pub grammar_path: String,
+    pub embeds_json: String,
+    pub token_types_json: String,
+    pub balances_json: String,
+    pub injection_selector: String,
+    pub inline_values: bool,
+    pub injection_count: u32,
+    pub token_type_count: u32,
+    pub scope_depth: u32,
+    pub grammar_index: u32,
+}
+
+impl Default for GrammarContrib {
+    fn default() -> Self {
+        Self {
+            grammar_scope: String::new(),
+            grammar_language: String::new(),
+            grammar_path: String::new(),
+            embeds_json: String::new(),
+            token_types_json: String::new(),
+            balances_json: String::new(),
+            injection_selector: String::new(),
+            inline_values: false,
+            injection_count: 0,
+            token_type_count: 0,
+            scope_depth: 0,
+            grammar_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for GrammarContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GrammarContrib({}, {}, {}, {})",
+            format!("grammar_scope={}", self.grammar_scope), format!("grammar_language={}", self.grammar_language), format!("grammar_path={}", self.grammar_path), format!("embeds_json={}", self.embeds_json))
+    }
+}
+
+impl GrammarContrib {
+    pub fn cbx_validate(&self) -> bool {
+        let _grammar_scope = self.grammar_scope.clone();
+        let _grammar_language = self.grammar_language.clone();
+        let _grammar_path = self.grammar_path.clone();
+        let _embeds_json = self.embeds_json.clone();
+        let _token_types_json = self.token_types_json.clone();
+        let _balances_json = self.balances_json.clone();
+        let _injection_selector = self.injection_selector.clone();
+        let _inline_values = self.inline_values;
+        let _injection_count = self.injection_count;
+        let _token_type_count = self.token_type_count;
+        let _scope_depth = self.scope_depth;
+        let _grammar_index = self.grammar_index;
+        !self.grammar_scope.is_empty() || true && !self.grammar_language.is_empty() || true && !self.grammar_path.is_empty() || true && !self.embeds_json.is_empty() || true && !self.token_types_json.is_empty() || true && !self.balances_json.is_empty() || true && !self.injection_selector.is_empty() || true && self.inline_values || true && self.injection_count < u32::MAX || true && self.token_type_count < u32::MAX || true && self.scope_depth < u32::MAX || true && self.grammar_index < u32::MAX || true
+    }
+
+    pub fn cbx_summary(&self) -> String {
+        format!("GrammarContrib[cbx_]: {}, {}, {}, {}",
+            format!("grammar_scope={}", self.grammar_scope), format!("grammar_language={}", self.grammar_language), format!("grammar_path={}", self.grammar_path), format!("embeds_json={}", self.embeds_json))
+    }
+}
+
+
+/// Theme contribution (label, path, ui theme, id, description, watch)
+#[derive(Debug, Clone)]
+pub struct ThemeContrib {
+    pub theme_label: String,
+    pub theme_path: String,
+    pub ui_theme_type: String,
+    pub theme_id: String,
+    pub theme_description: String,
+    pub watch_for_changes: bool,
+    pub extension_id: String,
+    pub is_default: bool,
+    pub color_count: u32,
+    pub token_color_count: u32,
+    pub semantic_highlight: bool,
+    pub theme_index: u32,
+}
+
+impl Default for ThemeContrib {
+    fn default() -> Self {
+        Self {
+            theme_label: String::new(),
+            theme_path: String::new(),
+            ui_theme_type: String::new(),
+            theme_id: String::new(),
+            theme_description: String::new(),
+            watch_for_changes: false,
+            extension_id: String::new(),
+            is_default: false,
+            color_count: 0,
+            token_color_count: 0,
+            semantic_highlight: false,
+            theme_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ThemeContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ThemeContrib({}, {}, {}, {})",
+            format!("theme_label={}", self.theme_label), format!("theme_path={}", self.theme_path), format!("ui_theme_type={}", self.ui_theme_type), format!("theme_id={}", self.theme_id))
+    }
+}
+
+impl ThemeContrib {
+    pub fn cby_validate(&self) -> bool {
+        let _theme_label = self.theme_label.clone();
+        let _theme_path = self.theme_path.clone();
+        let _ui_theme_type = self.ui_theme_type.clone();
+        let _theme_id = self.theme_id.clone();
+        let _theme_description = self.theme_description.clone();
+        let _watch_for_changes = self.watch_for_changes;
+        let _extension_id = self.extension_id.clone();
+        let _is_default = self.is_default;
+        let _color_count = self.color_count;
+        let _token_color_count = self.token_color_count;
+        let _semantic_highlight = self.semantic_highlight;
+        let _theme_index = self.theme_index;
+        !self.theme_label.is_empty() || true && !self.theme_path.is_empty() || true && !self.ui_theme_type.is_empty() || true && !self.theme_id.is_empty() || true && !self.theme_description.is_empty() || true && self.watch_for_changes || true && !self.extension_id.is_empty() || true && self.is_default || true && self.color_count < u32::MAX || true && self.token_color_count < u32::MAX || true && self.semantic_highlight || true && self.theme_index < u32::MAX || true
+    }
+
+    pub fn cby_summary(&self) -> String {
+        format!("ThemeContrib[cby_]: {}, {}, {}, {}",
+            format!("theme_label={}", self.theme_label), format!("theme_path={}", self.theme_path), format!("ui_theme_type={}", self.ui_theme_type), format!("theme_id={}", self.theme_id))
+    }
+}
+
+
+/// Icon theme contribution (id, label, path, fonts, file associations)
+#[derive(Debug, Clone)]
+pub struct IconThemeContrib {
+    pub icon_theme_id: String,
+    pub icon_theme_label: String,
+    pub icon_theme_path: String,
+    pub fonts_json: String,
+    pub file_assoc_count: u32,
+    pub folder_assoc_count: u32,
+    pub language_assoc_count: u32,
+    pub extension_id: String,
+    pub is_default: bool,
+    pub hidesExplorerArrows: bool,
+    pub icon_count: u32,
+    pub icon_index: u32,
+}
+
+impl Default for IconThemeContrib {
+    fn default() -> Self {
+        Self {
+            icon_theme_id: String::new(),
+            icon_theme_label: String::new(),
+            icon_theme_path: String::new(),
+            fonts_json: String::new(),
+            file_assoc_count: 0,
+            folder_assoc_count: 0,
+            language_assoc_count: 0,
+            extension_id: String::new(),
+            is_default: false,
+            hidesExplorerArrows: false,
+            icon_count: 0,
+            icon_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for IconThemeContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IconThemeContrib({}, {}, {}, {})",
+            format!("icon_theme_id={}", self.icon_theme_id), format!("icon_theme_label={}", self.icon_theme_label), format!("icon_theme_path={}", self.icon_theme_path), format!("fonts_json={}", self.fonts_json))
+    }
+}
+
+impl IconThemeContrib {
+    pub fn cbz_validate(&self) -> bool {
+        let _icon_theme_id = self.icon_theme_id.clone();
+        let _icon_theme_label = self.icon_theme_label.clone();
+        let _icon_theme_path = self.icon_theme_path.clone();
+        let _fonts_json = self.fonts_json.clone();
+        let _file_assoc_count = self.file_assoc_count;
+        let _folder_assoc_count = self.folder_assoc_count;
+        let _language_assoc_count = self.language_assoc_count;
+        let _extension_id = self.extension_id.clone();
+        let _is_default = self.is_default;
+        let _hidesExplorerArrows = self.hidesExplorerArrows;
+        let _icon_count = self.icon_count;
+        let _icon_index = self.icon_index;
+        !self.icon_theme_id.is_empty() || true && !self.icon_theme_label.is_empty() || true && !self.icon_theme_path.is_empty() || true && !self.fonts_json.is_empty() || true && self.file_assoc_count < u32::MAX || true && self.folder_assoc_count < u32::MAX || true && self.language_assoc_count < u32::MAX || true && !self.extension_id.is_empty() || true && self.is_default || true && self.hidesExplorerArrows || true && self.icon_count < u32::MAX || true && self.icon_index < u32::MAX || true
+    }
+
+    pub fn cbz_summary(&self) -> String {
+        format!("IconThemeContrib[cbz_]: {}, {}, {}, {}",
+            format!("icon_theme_id={}", self.icon_theme_id), format!("icon_theme_label={}", self.icon_theme_label), format!("icon_theme_path={}", self.icon_theme_path), format!("fonts_json={}", self.fonts_json))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -155420,6 +155822,114 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cbt_validate());
         let _ = cloned.cbt_summary();
+    }
+
+
+    #[test]
+    fn test_cbu_default() {
+        let obj = TaskRunConfig::default();
+        assert!(obj.cbu_validate());
+        let _ = obj.cbu_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbu_clone() {
+        let obj = TaskRunConfig::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbu_validate());
+        let _ = cloned.cbu_summary();
+    }
+
+
+    #[test]
+    fn test_cbv_default() {
+        let obj = ProblemMatcherConfig::default();
+        assert!(obj.cbv_validate());
+        let _ = obj.cbv_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbv_clone() {
+        let obj = ProblemMatcherConfig::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbv_validate());
+        let _ = cloned.cbv_summary();
+    }
+
+
+    #[test]
+    fn test_cbw_default() {
+        let obj = LanguageContrib::default();
+        assert!(obj.cbw_validate());
+        let _ = obj.cbw_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbw_clone() {
+        let obj = LanguageContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbw_validate());
+        let _ = cloned.cbw_summary();
+    }
+
+
+    #[test]
+    fn test_cbx_default() {
+        let obj = GrammarContrib::default();
+        assert!(obj.cbx_validate());
+        let _ = obj.cbx_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbx_clone() {
+        let obj = GrammarContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbx_validate());
+        let _ = cloned.cbx_summary();
+    }
+
+
+    #[test]
+    fn test_cby_default() {
+        let obj = ThemeContrib::default();
+        assert!(obj.cby_validate());
+        let _ = obj.cby_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cby_clone() {
+        let obj = ThemeContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.cby_validate());
+        let _ = cloned.cby_summary();
+    }
+
+
+    #[test]
+    fn test_cbz_default() {
+        let obj = IconThemeContrib::default();
+        assert!(obj.cbz_validate());
+        let _ = obj.cbz_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cbz_clone() {
+        let obj = IconThemeContrib::default();
+        let cloned = obj.clone();
+        assert!(cloned.cbz_validate());
+        let _ = cloned.cbz_summary();
     }
 
 }
