@@ -67136,3 +67136,180 @@ mod bdb_tests {
         assert!(c.display().contains("⚪")); // disconnected
     }
 }
+
+
+// --- bdc_: Editor terminal link detection model ---
+
+/// Link kind detected in terminal output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BdcLinkKind { Url, FilePath, FileLineCol, Command }
+
+/// A detected link in terminal output.
+#[derive(Debug, Clone)]
+pub struct BdcTerminalLink {
+    pub text: String,
+    pub kind: BdcLinkKind,
+    pub start_col: usize,
+    pub end_col: usize,
+    pub line: usize,
+    pub file_path: Option<String>,
+    pub file_line: Option<u32>,
+    pub file_col: Option<u32>,
+}
+
+impl BdcTerminalLink {
+    pub fn url(text: &str, start: usize, end: usize, line: usize) -> Self {
+        Self { text: text.to_string(), kind: BdcLinkKind::Url, start_col: start, end_col: end, line, file_path: None, file_line: None, file_col: None }
+    }
+
+    pub fn file(path: &str, ln: u32, col: u32, start: usize, end: usize, line: usize) -> Self {
+        Self { text: format!("{}:{}:{}", path, ln, col), kind: BdcLinkKind::FileLineCol, start_col: start, end_col: end, line, file_path: Some(path.to_string()), file_line: Some(ln), file_col: Some(col) }
+    }
+
+    pub fn tooltip(&self) -> String {
+        match self.kind {
+            BdcLinkKind::Url => format!("Open {}", self.text),
+            BdcLinkKind::FilePath | BdcLinkKind::FileLineCol => {
+                let path = self.file_path.as_deref().unwrap_or(&self.text);
+                match (self.file_line, self.file_col) {
+                    (Some(l), Some(c)) => format!("Open {}:{}:{}", path, l, c),
+                    (Some(l), None) => format!("Open {}:{}", path, l),
+                    _ => format!("Open {}", path),
+                }
+            }
+            BdcLinkKind::Command => format!("Run: {}", self.text),
+        }
+    }
+}
+
+/// Link detector for terminal lines.
+#[derive(Debug)]
+pub struct BdcLinkDetector {
+    url_patterns: Vec<String>,
+    file_patterns: Vec<String>,
+    cwd: String,
+}
+
+impl BdcLinkDetector {
+    pub fn new(cwd: &str) -> Self {
+        Self {
+            url_patterns: vec!["https://".to_string(), "http://".to_string()],
+            file_patterns: vec![".rs".to_string(), ".ts".to_string(), ".js".to_string(), ".py".to_string()],
+            cwd: cwd.to_string(),
+        }
+    }
+
+    pub fn detect_urls(&self, text: &str, line: usize) -> Vec<BdcTerminalLink> {
+        let mut links = Vec::new();
+        for pat in &self.url_patterns {
+            let mut start = 0;
+            while let Some(pos) = text[start..].find(pat.as_str()) {
+                let abs_start = start + pos;
+                let end = text[abs_start..].find(|c: char| c.is_whitespace() || c == ')' || c == ']').map(|e| abs_start + e).unwrap_or(text.len());
+                links.push(BdcTerminalLink::url(&text[abs_start..end], abs_start, end, line));
+                start = end;
+            }
+        }
+        links
+    }
+
+    pub fn detect_file_refs(&self, text: &str, line: usize) -> Vec<BdcTerminalLink> {
+        let mut links = Vec::new();
+        // Pattern: path:line:col
+        let parts: Vec<&str> = text.split_whitespace().collect();
+        for part in parts {
+            let segments: Vec<&str> = part.split(':').collect();
+            if segments.len() >= 3 {
+                if let (Ok(ln), Ok(col)) = (segments[1].parse::<u32>(), segments[2].parse::<u32>()) {
+                    if self.file_patterns.iter().any(|ext| segments[0].ends_with(ext.as_str())) {
+                        let start = text.find(part).unwrap_or(0);
+                        links.push(BdcTerminalLink::file(segments[0], ln, col, start, start + part.len(), line));
+                    }
+                }
+            }
+        }
+        links
+    }
+
+    pub fn detect_all(&self, text: &str, line: usize) -> Vec<BdcTerminalLink> {
+        let mut links = self.detect_urls(text, line);
+        links.extend(self.detect_file_refs(text, line));
+        links
+    }
+
+    pub fn set_cwd(&mut self, cwd: &str) { self.cwd = cwd.to_string(); }
+    pub fn cwd(&self) -> &str { &self.cwd }
+}
+
+#[cfg(test)]
+mod bdc_tests {
+    use super::*;
+
+    #[test]
+    fn test_bdc_url_detect() {
+        let d = BdcLinkDetector::new("/home");
+        let links = d.detect_urls("Visit https://example.com for more", 0);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].kind, BdcLinkKind::Url);
+    }
+
+    #[test]
+    fn test_bdc_file_detect() {
+        let d = BdcLinkDetector::new("/home");
+        let links = d.detect_file_refs("error at src/main.rs:42:5 something", 0);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].file_line, Some(42));
+    }
+
+    #[test]
+    fn test_bdc_detect_all() {
+        let d = BdcLinkDetector::new("/home");
+        let links = d.detect_all("see https://doc.rs and src/lib.rs:10:1", 0);
+        assert_eq!(links.len(), 2);
+    }
+
+    #[test]
+    fn test_bdc_tooltip_url() {
+        let l = BdcTerminalLink::url("https://x.com", 0, 13, 0);
+        assert!(l.tooltip().contains("Open"));
+    }
+
+    #[test]
+    fn test_bdc_tooltip_file() {
+        let l = BdcTerminalLink::file("main.rs", 10, 5, 0, 15, 0);
+        assert!(l.tooltip().contains("10:5"));
+    }
+
+    #[test]
+    fn test_bdc_no_links() {
+        let d = BdcLinkDetector::new("/home");
+        assert!(d.detect_all("no links here", 0).is_empty());
+    }
+
+    #[test]
+    fn test_bdc_multiple_urls() {
+        let d = BdcLinkDetector::new("/home");
+        let links = d.detect_urls("http://a.com and https://b.com", 0);
+        assert_eq!(links.len(), 2);
+    }
+
+    #[test]
+    fn test_bdc_cwd() {
+        let mut d = BdcLinkDetector::new("/home");
+        d.set_cwd("/workspace");
+        assert_eq!(d.cwd(), "/workspace");
+    }
+
+    #[test]
+    fn test_bdc_file_link_text() {
+        let l = BdcTerminalLink::file("src/lib.rs", 5, 3, 0, 17, 0);
+        assert!(l.text.contains("src/lib.rs:5:3"));
+    }
+
+    #[test]
+    fn test_bdc_link_range() {
+        let l = BdcTerminalLink::url("https://x.com", 5, 18, 3);
+        assert_eq!(l.start_col, 5);
+        assert_eq!(l.line, 3);
+    }
+}
