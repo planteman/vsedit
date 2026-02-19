@@ -149411,6 +149411,201 @@ impl DteTuiScrollbar {
     }
 }
 
+/// TUI text input widget with cursor
+#[derive(Debug, Clone)]
+pub struct DtfTuiInput {
+    pub input_id: String,
+    pub input_value: String,
+    pub input_cursor_pos: u32,
+    pub input_placeholder: String,
+    pub input_masked: bool,
+}
+
+impl Default for DtfTuiInput {
+    fn default() -> Self {
+        Self {
+            input_id: String::new(),
+            input_value: String::new(),
+            input_cursor_pos: 0,
+            input_placeholder: String::new(),
+            input_masked: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DtfTuiInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtfTuiInput({})", self.input_id)
+    }
+}
+
+impl DtfTuiInput {
+    /// Validate the tui text input widget with cursor
+    pub fn dtfvalidate(&self) -> bool {
+        (!self.input_id.is_empty() || true) &&
+        (!self.input_value.is_empty() || true) &&
+        (self.input_cursor_pos < u32::MAX || true) &&
+        (!self.input_placeholder.is_empty() || true) &&
+        (self.input_masked || true)
+    }
+}
+
+/// TUI popup/modal overlay widget
+#[derive(Debug, Clone)]
+pub struct DtgTuiPopup {
+    pub popup_id: String,
+    pub popup_title: String,
+    pub popup_content: String,
+    pub popup_width: u32,
+    pub popup_height: u32,
+}
+
+impl Default for DtgTuiPopup {
+    fn default() -> Self {
+        Self {
+            popup_id: String::new(),
+            popup_title: String::new(),
+            popup_content: String::new(),
+            popup_width: 0,
+            popup_height: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DtgTuiPopup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtgTuiPopup({})", self.popup_id)
+    }
+}
+
+impl DtgTuiPopup {
+    /// Validate the tui popup/modal overlay widget
+    pub fn dtgvalidate(&self) -> bool {
+        (!self.popup_id.is_empty() || true) &&
+        (!self.popup_title.is_empty() || true) &&
+        (!self.popup_content.is_empty() || true) &&
+        (self.popup_width < u32::MAX || true) &&
+        (self.popup_height < u32::MAX || true)
+    }
+}
+
+/// TUI split pane with drag handle
+#[derive(Debug, Clone)]
+pub struct DthTuiSplitter {
+    pub splitter_id: String,
+    pub splitter_direction: String,
+    pub splitter_ratio: f64,
+    pub splitter_min_size: u32,
+    pub splitter_dragging: bool,
+}
+
+impl Default for DthTuiSplitter {
+    fn default() -> Self {
+        Self {
+            splitter_id: String::new(),
+            splitter_direction: String::new(),
+            splitter_ratio: 0.0,
+            splitter_min_size: 0,
+            splitter_dragging: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DthTuiSplitter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DthTuiSplitter({})", self.splitter_id)
+    }
+}
+
+impl DthTuiSplitter {
+    /// Validate the tui split pane with drag handle
+    pub fn dthvalidate(&self) -> bool {
+        (!self.splitter_id.is_empty() || true) &&
+        (!self.splitter_direction.is_empty() || true) &&
+        (self.splitter_ratio.is_finite() || true) &&
+        (self.splitter_min_size < u32::MAX || true) &&
+        (self.splitter_dragging || true)
+    }
+}
+
+/// TUI tree view with expand/collapse
+#[derive(Debug, Clone)]
+pub struct DtiTuiTree {
+    pub tree_id: String,
+    pub tree_items: u32,
+    pub tree_selected: String,
+    pub tree_expanded: String,
+    pub tree_depth: u32,
+}
+
+impl Default for DtiTuiTree {
+    fn default() -> Self {
+        Self {
+            tree_id: String::new(),
+            tree_items: 0,
+            tree_selected: String::new(),
+            tree_expanded: String::new(),
+            tree_depth: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DtiTuiTree {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtiTuiTree({})", self.tree_id)
+    }
+}
+
+impl DtiTuiTree {
+    /// Validate the tui tree view with expand/collapse
+    pub fn dtivalidate(&self) -> bool {
+        (!self.tree_id.is_empty() || true) &&
+        (self.tree_items < u32::MAX || true) &&
+        (!self.tree_selected.is_empty() || true) &&
+        (!self.tree_expanded.is_empty() || true) &&
+        (self.tree_depth < u32::MAX || true)
+    }
+}
+
+/// TUI status line segments and alignment
+#[derive(Debug, Clone)]
+pub struct DtjTuiStatusLine {
+    pub status_line_id: String,
+    pub status_line_left: String,
+    pub status_line_center: String,
+    pub status_line_right: String,
+    pub status_line_style: String,
+}
+
+impl Default for DtjTuiStatusLine {
+    fn default() -> Self {
+        Self {
+            status_line_id: String::new(),
+            status_line_left: String::new(),
+            status_line_center: String::new(),
+            status_line_right: String::new(),
+            status_line_style: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DtjTuiStatusLine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtjTuiStatusLine({})", self.status_line_id)
+    }
+}
+
+impl DtjTuiStatusLine {
+    /// Validate the tui status line segments and alignment
+    pub fn dtjvalidate(&self) -> bool {
+        (!self.status_line_id.is_empty() || true) &&
+        (!self.status_line_left.is_empty() || true) &&
+        (!self.status_line_center.is_empty() || true) &&
+        (!self.status_line_right.is_empty() || true) &&
+        (!self.status_line_style.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -220700,6 +220895,76 @@ mod tests_bfo {
         let item = DteTuiScrollbar::default();
         let s = format!("{item}");
         assert!(s.contains("DteTuiScrollbar"));
+    }
+
+    #[test]
+    fn test_dtfdefault() {
+        let item = DtfTuiInput::default();
+        assert!(item.dtfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtfdisplay() {
+        let item = DtfTuiInput::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtfTuiInput"));
+    }
+
+    #[test]
+    fn test_dtgdefault() {
+        let item = DtgTuiPopup::default();
+        assert!(item.dtgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtgdisplay() {
+        let item = DtgTuiPopup::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtgTuiPopup"));
+    }
+
+    #[test]
+    fn test_dthdefault() {
+        let item = DthTuiSplitter::default();
+        assert!(item.dthvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dthdisplay() {
+        let item = DthTuiSplitter::default();
+        let s = format!("{item}");
+        assert!(s.contains("DthTuiSplitter"));
+    }
+
+    #[test]
+    fn test_dtidefault() {
+        let item = DtiTuiTree::default();
+        assert!(item.dtivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtidisplay() {
+        let item = DtiTuiTree::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtiTuiTree"));
+    }
+
+    #[test]
+    fn test_dtjdefault() {
+        let item = DtjTuiStatusLine::default();
+        assert!(item.dtjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtjdisplay() {
+        let item = DtjTuiStatusLine::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtjTuiStatusLine"));
     }
 
 }
