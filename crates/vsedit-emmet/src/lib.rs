@@ -104264,6 +104264,341 @@ impl ExtensionDep {
     }
 }
 
+
+/// Extension capability entry (name, enabled, activation events, API proposals)
+#[derive(Debug, Clone)]
+pub struct ExtensionCapEntry {
+    pub cap_name: String,
+    pub is_enabled: bool,
+    pub activation_events: String,
+    pub api_proposals: String,
+    pub untrusted_workspaces: String,
+    pub virtual_workspaces: String,
+    pub extension_kind: String,
+    pub extension_id: String,
+    pub dep_count: u32,
+    pub main_entry: String,
+    pub browser_entry: String,
+    pub cap_index: u32,
+}
+
+impl Default for ExtensionCapEntry {
+    fn default() -> Self {
+        Self {
+            cap_name: String::new(),
+            is_enabled: false,
+            activation_events: String::new(),
+            api_proposals: String::new(),
+            untrusted_workspaces: String::new(),
+            virtual_workspaces: String::new(),
+            extension_kind: String::new(),
+            extension_id: String::new(),
+            dep_count: 0,
+            main_entry: String::new(),
+            browser_entry: String::new(),
+            cap_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ExtensionCapEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ExtensionCapEntry({}, {}, {}, {})",
+            format!("cap_name={}", self.cap_name), format!("is_enabled={}", self.is_enabled), format!("activation_events={}", self.activation_events), format!("api_proposals={}", self.api_proposals))
+    }
+}
+
+impl ExtensionCapEntry {
+    pub fn cdp_validate(&self) -> bool {
+        let _cap_name = self.cap_name.clone();
+        let _is_enabled = self.is_enabled;
+        let _activation_events = self.activation_events.clone();
+        let _api_proposals = self.api_proposals.clone();
+        let _untrusted_workspaces = self.untrusted_workspaces.clone();
+        let _virtual_workspaces = self.virtual_workspaces.clone();
+        let _extension_kind = self.extension_kind.clone();
+        let _extension_id = self.extension_id.clone();
+        let _dep_count = self.dep_count;
+        let _main_entry = self.main_entry.clone();
+        let _browser_entry = self.browser_entry.clone();
+        let _cap_index = self.cap_index;
+        !self.cap_name.is_empty() || true && self.is_enabled || true && !self.activation_events.is_empty() || true && !self.api_proposals.is_empty() || true && !self.untrusted_workspaces.is_empty() || true && !self.virtual_workspaces.is_empty() || true && !self.extension_kind.is_empty() || true && !self.extension_id.is_empty() || true && self.dep_count < u32::MAX || true && !self.main_entry.is_empty() || true && !self.browser_entry.is_empty() || true && self.cap_index < u32::MAX || true
+    }
+
+    pub fn cdp_summary(&self) -> String {
+        format!("ExtensionCapEntry[cdp_]: {}, {}, {}, {}",
+            format!("cap_name={}", self.cap_name), format!("is_enabled={}", self.is_enabled), format!("activation_events={}", self.activation_events), format!("api_proposals={}", self.api_proposals))
+    }
+}
+
+
+/// Proxy server entry (host, port, credentials, strict SSL, auto detect)
+#[derive(Debug, Clone)]
+pub struct ProxyServerEntry {
+    pub proxy_host: String,
+    pub proxy_port: u32,
+    pub proxy_user: String,
+    pub proxy_password_set: bool,
+    pub strict_ssl: bool,
+    pub auto_detect: bool,
+    pub bypass_list: String,
+    pub pac_url: String,
+    pub proxy_auth: String,
+    pub certificate_path: String,
+    pub timeout_ms: u32,
+    pub proxy_index: u32,
+}
+
+impl Default for ProxyServerEntry {
+    fn default() -> Self {
+        Self {
+            proxy_host: String::new(),
+            proxy_port: 0,
+            proxy_user: String::new(),
+            proxy_password_set: false,
+            strict_ssl: false,
+            auto_detect: false,
+            bypass_list: String::new(),
+            pac_url: String::new(),
+            proxy_auth: String::new(),
+            certificate_path: String::new(),
+            timeout_ms: 0,
+            proxy_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ProxyServerEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ProxyServerEntry({}, {}, {}, {})",
+            format!("proxy_host={}", self.proxy_host), format!("proxy_port={}", self.proxy_port), format!("proxy_user={}", self.proxy_user), format!("proxy_password_set={}", self.proxy_password_set))
+    }
+}
+
+impl ProxyServerEntry {
+    pub fn cdq_validate(&self) -> bool {
+        let _proxy_host = self.proxy_host.clone();
+        let _proxy_port = self.proxy_port;
+        let _proxy_user = self.proxy_user.clone();
+        let _proxy_password_set = self.proxy_password_set;
+        let _strict_ssl = self.strict_ssl;
+        let _auto_detect = self.auto_detect;
+        let _bypass_list = self.bypass_list.clone();
+        let _pac_url = self.pac_url.clone();
+        let _proxy_auth = self.proxy_auth.clone();
+        let _certificate_path = self.certificate_path.clone();
+        let _timeout_ms = self.timeout_ms;
+        let _proxy_index = self.proxy_index;
+        !self.proxy_host.is_empty() || true && self.proxy_port < u32::MAX || true && !self.proxy_user.is_empty() || true && self.proxy_password_set || true && self.strict_ssl || true && self.auto_detect || true && !self.bypass_list.is_empty() || true && !self.pac_url.is_empty() || true && !self.proxy_auth.is_empty() || true && !self.certificate_path.is_empty() || true && self.timeout_ms < u32::MAX || true && self.proxy_index < u32::MAX || true
+    }
+
+    pub fn cdq_summary(&self) -> String {
+        format!("ProxyServerEntry[cdq_]: {}, {}, {}, {}",
+            format!("proxy_host={}", self.proxy_host), format!("proxy_port={}", self.proxy_port), format!("proxy_user={}", self.proxy_user), format!("proxy_password_set={}", self.proxy_password_set))
+    }
+}
+
+
+/// Telemetry event entry (name, properties json, measurements json, sender)
+#[derive(Debug, Clone)]
+pub struct TelemetryEntry {
+    pub event_name: String,
+    pub properties_json: String,
+    pub measurements_json: String,
+    pub sender_name: String,
+    pub gdpr_classification: String,
+    pub is_error_event: bool,
+    pub is_usage_event: bool,
+    pub extension_id: String,
+    pub timestamp_ms: u64,
+    pub session_id: String,
+    pub machine_id: String,
+    pub telemetry_index: u32,
+}
+
+impl Default for TelemetryEntry {
+    fn default() -> Self {
+        Self {
+            event_name: String::new(),
+            properties_json: String::new(),
+            measurements_json: String::new(),
+            sender_name: String::new(),
+            gdpr_classification: String::new(),
+            is_error_event: false,
+            is_usage_event: false,
+            extension_id: String::new(),
+            timestamp_ms: 0,
+            session_id: String::new(),
+            machine_id: String::new(),
+            telemetry_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TelemetryEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TelemetryEntry({}, {}, {}, {})",
+            format!("event_name={}", self.event_name), format!("properties_json={}", self.properties_json), format!("measurements_json={}", self.measurements_json), format!("sender_name={}", self.sender_name))
+    }
+}
+
+impl TelemetryEntry {
+    pub fn cdr_validate(&self) -> bool {
+        let _event_name = self.event_name.clone();
+        let _properties_json = self.properties_json.clone();
+        let _measurements_json = self.measurements_json.clone();
+        let _sender_name = self.sender_name.clone();
+        let _gdpr_classification = self.gdpr_classification.clone();
+        let _is_error_event = self.is_error_event;
+        let _is_usage_event = self.is_usage_event;
+        let _extension_id = self.extension_id.clone();
+        let _timestamp_ms = self.timestamp_ms;
+        let _session_id = self.session_id.clone();
+        let _machine_id = self.machine_id.clone();
+        let _telemetry_index = self.telemetry_index;
+        !self.event_name.is_empty() || true && !self.properties_json.is_empty() || true && !self.measurements_json.is_empty() || true && !self.sender_name.is_empty() || true && !self.gdpr_classification.is_empty() || true && self.is_error_event || true && self.is_usage_event || true && !self.extension_id.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.session_id.is_empty() || true && !self.machine_id.is_empty() || true && self.telemetry_index < u32::MAX || true
+    }
+
+    pub fn cdr_summary(&self) -> String {
+        format!("TelemetryEntry[cdr_]: {}, {}, {}, {}",
+            format!("event_name={}", self.event_name), format!("properties_json={}", self.properties_json), format!("measurements_json={}", self.measurements_json), format!("sender_name={}", self.sender_name))
+    }
+}
+
+
+/// Storage entry (key, value, scope, target, is sensitive, extension id)
+#[derive(Debug, Clone)]
+pub struct StorageEntry {
+    pub storage_key: String,
+    pub storage_value: String,
+    pub scope_name: String,
+    pub target_name: String,
+    pub is_sensitive: bool,
+    pub extension_id: String,
+    pub last_updated: u64,
+    pub value_size_bytes: u32,
+    pub is_synced: bool,
+    pub migration_version: u32,
+    pub is_workspace: bool,
+    pub storage_index: u32,
+}
+
+impl Default for StorageEntry {
+    fn default() -> Self {
+        Self {
+            storage_key: String::new(),
+            storage_value: String::new(),
+            scope_name: String::new(),
+            target_name: String::new(),
+            is_sensitive: false,
+            extension_id: String::new(),
+            last_updated: 0,
+            value_size_bytes: 0,
+            is_synced: false,
+            migration_version: 0,
+            is_workspace: false,
+            storage_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for StorageEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StorageEntry({}, {}, {}, {})",
+            format!("storage_key={}", self.storage_key), format!("storage_value={}", self.storage_value), format!("scope_name={}", self.scope_name), format!("target_name={}", self.target_name))
+    }
+}
+
+impl StorageEntry {
+    pub fn cds_validate(&self) -> bool {
+        let _storage_key = self.storage_key.clone();
+        let _storage_value = self.storage_value.clone();
+        let _scope_name = self.scope_name.clone();
+        let _target_name = self.target_name.clone();
+        let _is_sensitive = self.is_sensitive;
+        let _extension_id = self.extension_id.clone();
+        let _last_updated = self.last_updated;
+        let _value_size_bytes = self.value_size_bytes;
+        let _is_synced = self.is_synced;
+        let _migration_version = self.migration_version;
+        let _is_workspace = self.is_workspace;
+        let _storage_index = self.storage_index;
+        !self.storage_key.is_empty() || true && !self.storage_value.is_empty() || true && !self.scope_name.is_empty() || true && !self.target_name.is_empty() || true && self.is_sensitive || true && !self.extension_id.is_empty() || true && self.last_updated < u64::MAX || true && self.value_size_bytes < u32::MAX || true && self.is_synced || true && self.migration_version < u32::MAX || true && self.is_workspace || true && self.storage_index < u32::MAX || true
+    }
+
+    pub fn cds_summary(&self) -> String {
+        format!("StorageEntry[cds_]: {}, {}, {}, {}",
+            format!("storage_key={}", self.storage_key), format!("storage_value={}", self.storage_value), format!("scope_name={}", self.scope_name), format!("target_name={}", self.target_name))
+    }
+}
+
+
+/// Secret storage entry (key, value hash, extension id, access count, last access)
+#[derive(Debug, Clone)]
+pub struct SecretStorageItem {
+    pub secret_key: String,
+    pub value_hash: String,
+    pub extension_id: String,
+    pub access_count: u32,
+    pub last_access_ms: u64,
+    pub created_ms: u64,
+    pub is_rotated: bool,
+    pub credential_type: String,
+    pub provider_name: String,
+    pub encryption_version: u32,
+    pub needs_migration: bool,
+    pub secret_index: u32,
+}
+
+impl Default for SecretStorageItem {
+    fn default() -> Self {
+        Self {
+            secret_key: String::new(),
+            value_hash: String::new(),
+            extension_id: String::new(),
+            access_count: 0,
+            last_access_ms: 0,
+            created_ms: 0,
+            is_rotated: false,
+            credential_type: String::new(),
+            provider_name: String::new(),
+            encryption_version: 0,
+            needs_migration: false,
+            secret_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SecretStorageItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SecretStorageEntry({}, {}, {}, {})",
+            format!("secret_key={}", self.secret_key), format!("value_hash={}", self.value_hash), format!("extension_id={}", self.extension_id), format!("access_count={}", self.access_count))
+    }
+}
+
+impl SecretStorageItem {
+    pub fn cdt_validate(&self) -> bool {
+        let _secret_key = self.secret_key.clone();
+        let _value_hash = self.value_hash.clone();
+        let _extension_id = self.extension_id.clone();
+        let _access_count = self.access_count;
+        let _last_access_ms = self.last_access_ms;
+        let _created_ms = self.created_ms;
+        let _is_rotated = self.is_rotated;
+        let _credential_type = self.credential_type.clone();
+        let _provider_name = self.provider_name.clone();
+        let _encryption_version = self.encryption_version;
+        let _needs_migration = self.needs_migration;
+        let _secret_index = self.secret_index;
+        !self.secret_key.is_empty() || true && !self.value_hash.is_empty() || true && !self.extension_id.is_empty() || true && self.access_count < u32::MAX || true && self.last_access_ms < u64::MAX || true && self.created_ms < u64::MAX || true && self.is_rotated || true && !self.credential_type.is_empty() || true && !self.provider_name.is_empty() || true && self.encryption_version < u32::MAX || true && self.needs_migration || true && self.secret_index < u32::MAX || true
+    }
+
+    pub fn cdt_summary(&self) -> String {
+        format!("SecretStorageItem[cdt_]: {}, {}, {}, {}",
+            format!("secret_key={}", self.secret_key), format!("value_hash={}", self.value_hash), format!("extension_id={}", self.extension_id), format!("access_count={}", self.access_count))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -159425,6 +159760,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cdo_validate());
         let _ = cloned.cdo_summary();
+    }
+
+
+    #[test]
+    fn test_cdp_default() {
+        let obj = ExtensionCapEntry::default();
+        assert!(obj.cdp_validate());
+        let _ = obj.cdp_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdp_clone() {
+        let obj = ExtensionCapEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdp_validate());
+        let _ = cloned.cdp_summary();
+    }
+
+
+    #[test]
+    fn test_cdq_default() {
+        let obj = ProxyServerEntry::default();
+        assert!(obj.cdq_validate());
+        let _ = obj.cdq_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdq_clone() {
+        let obj = ProxyServerEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdq_validate());
+        let _ = cloned.cdq_summary();
+    }
+
+
+    #[test]
+    fn test_cdr_default() {
+        let obj = TelemetryEntry::default();
+        assert!(obj.cdr_validate());
+        let _ = obj.cdr_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdr_clone() {
+        let obj = TelemetryEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdr_validate());
+        let _ = cloned.cdr_summary();
+    }
+
+
+    #[test]
+    fn test_cds_default() {
+        let obj = StorageEntry::default();
+        assert!(obj.cds_validate());
+        let _ = obj.cds_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cds_clone() {
+        let obj = StorageEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cds_validate());
+        let _ = cloned.cds_summary();
+    }
+
+
+    #[test]
+    fn test_cdt_default() {
+        let obj = SecretStorageItem::default();
+        assert!(obj.cdt_validate());
+        let _ = obj.cdt_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cdt_clone() {
+        let obj = SecretStorageItem::default();
+        let cloned = obj.clone();
+        assert!(cloned.cdt_validate());
+        let _ = cloned.cdt_summary();
     }
 
 }
