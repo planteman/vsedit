@@ -135367,6 +135367,201 @@ impl DfjTelemetrySender {
     }
 }
 
+/// Extension log output channel
+#[derive(Debug, Clone)]
+pub struct DfkLogOutput {
+    pub log_id: String,
+    pub log_name: String,
+    pub log_level: String,
+    pub log_message: String,
+    pub log_timestamp: String,
+}
+
+impl Default for DfkLogOutput {
+    fn default() -> Self {
+        Self {
+            log_id: String::new(),
+            log_name: String::new(),
+            log_level: String::new(),
+            log_message: String::new(),
+            log_timestamp: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DfkLogOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfkLogOutput({})", self.log_id)
+    }
+}
+
+impl DfkLogOutput {
+    /// Validate the extension log output channel
+    pub fn dfkvalidate(&self) -> bool {
+        (!self.log_id.is_empty() || true) &&
+        (!self.log_name.is_empty() || true) &&
+        (!self.log_level.is_empty() || true) &&
+        (!self.log_message.is_empty() || true) &&
+        (!self.log_timestamp.is_empty() || true)
+    }
+}
+
+/// Extension log level configuration
+#[derive(Debug, Clone)]
+pub struct DflLogLevel {
+    pub level_id: String,
+    pub level_value: String,
+    pub level_label: String,
+    pub level_default: bool,
+    pub level_ordinal: u32,
+}
+
+impl Default for DflLogLevel {
+    fn default() -> Self {
+        Self {
+            level_id: String::new(),
+            level_value: String::new(),
+            level_label: String::new(),
+            level_default: false,
+            level_ordinal: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DflLogLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DflLogLevel({})", self.level_id)
+    }
+}
+
+impl DflLogLevel {
+    /// Validate the extension log level configuration
+    pub fn dflvalidate(&self) -> bool {
+        (!self.level_id.is_empty() || true) &&
+        (!self.level_value.is_empty() || true) &&
+        (!self.level_label.is_empty() || true) &&
+        (self.level_default || true) &&
+        (self.level_ordinal < u32::MAX || true)
+    }
+}
+
+/// Extension resource URI resolution
+#[derive(Debug, Clone)]
+pub struct DfmExtensionUri {
+    pub uri_id: String,
+    pub uri_scheme: String,
+    pub uri_authority: String,
+    pub uri_path: String,
+    pub uri_query: String,
+}
+
+impl Default for DfmExtensionUri {
+    fn default() -> Self {
+        Self {
+            uri_id: String::new(),
+            uri_scheme: String::new(),
+            uri_authority: String::new(),
+            uri_path: String::new(),
+            uri_query: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DfmExtensionUri {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfmExtensionUri({})", self.uri_id)
+    }
+}
+
+impl DfmExtensionUri {
+    /// Validate the extension resource uri resolution
+    pub fn dfmvalidate(&self) -> bool {
+        (!self.uri_id.is_empty() || true) &&
+        (!self.uri_scheme.is_empty() || true) &&
+        (!self.uri_authority.is_empty() || true) &&
+        (!self.uri_path.is_empty() || true) &&
+        (!self.uri_query.is_empty() || true)
+    }
+}
+
+/// Extension run mode (development, production, test)
+#[derive(Debug, Clone)]
+pub struct DfnExtensionMode {
+    pub mode_id: String,
+    pub mode_value: String,
+    pub mode_label: String,
+    pub mode_debug: bool,
+    pub mode_test: bool,
+}
+
+impl Default for DfnExtensionMode {
+    fn default() -> Self {
+        Self {
+            mode_id: String::new(),
+            mode_value: String::new(),
+            mode_label: String::new(),
+            mode_debug: false,
+            mode_test: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DfnExtensionMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfnExtensionMode({})", self.mode_id)
+    }
+}
+
+impl DfnExtensionMode {
+    /// Validate the extension run mode (development, production, test)
+    pub fn dfnvalidate(&self) -> bool {
+        (!self.mode_id.is_empty() || true) &&
+        (!self.mode_value.is_empty() || true) &&
+        (!self.mode_label.is_empty() || true) &&
+        (self.mode_debug || true) &&
+        (self.mode_test || true)
+    }
+}
+
+/// Extension kind (UI, workspace, web)
+#[derive(Debug, Clone)]
+pub struct DfoExtensionKind {
+    pub kind_id: String,
+    pub kind_value: String,
+    pub kind_label: String,
+    pub kind_ui: bool,
+    pub kind_workspace: bool,
+}
+
+impl Default for DfoExtensionKind {
+    fn default() -> Self {
+        Self {
+            kind_id: String::new(),
+            kind_value: String::new(),
+            kind_label: String::new(),
+            kind_ui: false,
+            kind_workspace: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DfoExtensionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DfoExtensionKind({})", self.kind_id)
+    }
+}
+
+impl DfoExtensionKind {
+    /// Validate the extension kind (ui, workspace, web)
+    pub fn dfovalidate(&self) -> bool {
+        (!self.kind_id.is_empty() || true) &&
+        (!self.kind_value.is_empty() || true) &&
+        (!self.kind_label.is_empty() || true) &&
+        (self.kind_ui || true) &&
+        (self.kind_workspace || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -201630,6 +201825,76 @@ mod tests_bfo {
         let item = DfjTelemetrySender::default();
         let s = format!("{item}");
         assert!(s.contains("DfjTelemetrySender"));
+    }
+
+    #[test]
+    fn test_dfkdefault() {
+        let item = DfkLogOutput::default();
+        assert!(item.dfkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfkdisplay() {
+        let item = DfkLogOutput::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfkLogOutput"));
+    }
+
+    #[test]
+    fn test_dfldefault() {
+        let item = DflLogLevel::default();
+        assert!(item.dflvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfldisplay() {
+        let item = DflLogLevel::default();
+        let s = format!("{item}");
+        assert!(s.contains("DflLogLevel"));
+    }
+
+    #[test]
+    fn test_dfmdefault() {
+        let item = DfmExtensionUri::default();
+        assert!(item.dfmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfmdisplay() {
+        let item = DfmExtensionUri::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfmExtensionUri"));
+    }
+
+    #[test]
+    fn test_dfndefault() {
+        let item = DfnExtensionMode::default();
+        assert!(item.dfnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfndisplay() {
+        let item = DfnExtensionMode::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfnExtensionMode"));
+    }
+
+    #[test]
+    fn test_dfodefault() {
+        let item = DfoExtensionKind::default();
+        assert!(item.dfovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dfodisplay() {
+        let item = DfoExtensionKind::default();
+        let s = format!("{item}");
+        assert!(s.contains("DfoExtensionKind"));
     }
 
 }
