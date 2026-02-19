@@ -62833,3 +62833,182 @@ mod bce_tests {
         assert!(lines[0].contains("▸"));
     }
 }
+
+
+// --- bcf_: Editor drag-and-drop model ---
+
+/// What kind of item is being dragged.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BcfDragKind { Tab, File, TreeItem, Text, External }
+
+/// A drag source with payload.
+#[derive(Debug, Clone)]
+pub struct BcfDragData {
+    pub kind: BcfDragKind,
+    pub source_id: String,
+    pub label: String,
+    pub payload: Option<String>,
+}
+
+impl BcfDragData {
+    pub fn tab(source_id: &str, label: &str) -> Self {
+        Self { kind: BcfDragKind::Tab, source_id: source_id.to_string(), label: label.to_string(), payload: None }
+    }
+
+    pub fn file(path: &str) -> Self {
+        let label = path.rsplit('/').next().unwrap_or(path);
+        Self { kind: BcfDragKind::File, source_id: path.to_string(), label: label.to_string(), payload: Some(path.to_string()) }
+    }
+
+    pub fn text(text: &str) -> Self {
+        Self { kind: BcfDragKind::Text, source_id: String::new(), label: text.chars().take(30).collect(), payload: Some(text.to_string()) }
+    }
+}
+
+/// Where a drop target is located.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcfDropPosition { Before, After, Center, Left, Right, Top, Bottom }
+
+/// A drop zone that accepts drag data.
+#[derive(Debug, Clone)]
+pub struct BcfDropTarget {
+    pub zone_id: String,
+    pub position: BcfDropPosition,
+    pub accepted_kinds: Vec<BcfDragKind>,
+}
+
+impl BcfDropTarget {
+    pub fn new(zone_id: &str, pos: BcfDropPosition) -> Self {
+        Self { zone_id: zone_id.to_string(), position: pos, accepted_kinds: vec![BcfDragKind::Tab, BcfDragKind::File, BcfDragKind::Text] }
+    }
+
+    pub fn accepts(&self, data: &BcfDragData) -> bool { self.accepted_kinds.contains(&data.kind) }
+}
+
+/// Result of a completed drag-and-drop operation.
+#[derive(Debug)]
+pub struct BcfDropResult {
+    pub data: BcfDragData,
+    pub target: BcfDropTarget,
+    pub handled: bool,
+}
+
+/// Manages an active drag-and-drop session.
+#[derive(Debug)]
+pub struct BcfDragSession {
+    active_drag: Option<BcfDragData>,
+    drop_targets: Vec<BcfDropTarget>,
+    history: Vec<BcfDropResult>,
+}
+
+impl BcfDragSession {
+    pub fn new() -> Self { Self { active_drag: None, drop_targets: Vec::new(), history: Vec::new() } }
+
+    pub fn start_drag(&mut self, data: BcfDragData) { self.active_drag = Some(data); }
+
+    pub fn is_dragging(&self) -> bool { self.active_drag.is_some() }
+
+    pub fn drag_data(&self) -> Option<&BcfDragData> { self.active_drag.as_ref() }
+
+    pub fn register_target(&mut self, target: BcfDropTarget) { self.drop_targets.push(target); }
+
+    pub fn valid_targets(&self) -> Vec<&BcfDropTarget> {
+        if let Some(data) = &self.active_drag {
+            self.drop_targets.iter().filter(|t| t.accepts(data)).collect()
+        } else { Vec::new() }
+    }
+
+    pub fn drop_on(&mut self, zone_id: &str) -> Option<BcfDropResult> {
+        let data = self.active_drag.take()?;
+        let target = self.drop_targets.iter().find(|t| t.zone_id == zone_id && t.accepts(&data))?.clone();
+        let result = BcfDropResult { data, target, handled: true };
+        self.history.push(BcfDropResult { data: result.data.clone(), target: result.target.clone(), handled: true });
+        Some(BcfDropResult { data: self.history.last().unwrap().data.clone(), target: self.history.last().unwrap().target.clone(), handled: true })
+    }
+
+    pub fn cancel(&mut self) { self.active_drag = None; }
+
+    pub fn drop_count(&self) -> usize { self.history.len() }
+}
+
+#[cfg(test)]
+mod bcf_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcf_drag_tab() {
+        let d = BcfDragData::tab("group1:0", "main.rs");
+        assert_eq!(d.kind, BcfDragKind::Tab);
+        assert_eq!(d.label, "main.rs");
+    }
+
+    #[test]
+    fn test_bcf_drag_file() {
+        let d = BcfDragData::file("/home/user/foo.rs");
+        assert_eq!(d.label, "foo.rs");
+        assert_eq!(d.payload.as_deref(), Some("/home/user/foo.rs"));
+    }
+
+    #[test]
+    fn test_bcf_drag_text() {
+        let d = BcfDragData::text("hello world");
+        assert_eq!(d.kind, BcfDragKind::Text);
+    }
+
+    #[test]
+    fn test_bcf_target_accepts() {
+        let t = BcfDropTarget::new("editor1", BcfDropPosition::Center);
+        assert!(t.accepts(&BcfDragData::tab("x", "x")));
+        assert!(!t.accepts(&BcfDragData { kind: BcfDragKind::External, source_id: String::new(), label: String::new(), payload: None }));
+    }
+
+    #[test]
+    fn test_bcf_session_drag() {
+        let mut s = BcfDragSession::new();
+        assert!(!s.is_dragging());
+        s.start_drag(BcfDragData::tab("g1:0", "test.rs"));
+        assert!(s.is_dragging());
+    }
+
+    #[test]
+    fn test_bcf_session_cancel() {
+        let mut s = BcfDragSession::new();
+        s.start_drag(BcfDragData::file("/a.rs"));
+        s.cancel();
+        assert!(!s.is_dragging());
+    }
+
+    #[test]
+    fn test_bcf_session_drop() {
+        let mut s = BcfDragSession::new();
+        s.register_target(BcfDropTarget::new("zone1", BcfDropPosition::Center));
+        s.start_drag(BcfDragData::tab("g1:0", "main.rs"));
+        let r = s.drop_on("zone1");
+        assert!(r.is_some());
+        assert!(!s.is_dragging());
+    }
+
+    #[test]
+    fn test_bcf_valid_targets() {
+        let mut s = BcfDragSession::new();
+        s.register_target(BcfDropTarget::new("z1", BcfDropPosition::Left));
+        s.register_target(BcfDropTarget::new("z2", BcfDropPosition::Right));
+        s.start_drag(BcfDragData::file("/b.rs"));
+        assert_eq!(s.valid_targets().len(), 2);
+    }
+
+    #[test]
+    fn test_bcf_drop_count() {
+        let mut s = BcfDragSession::new();
+        s.register_target(BcfDropTarget::new("z1", BcfDropPosition::Center));
+        s.start_drag(BcfDragData::tab("x", "x"));
+        s.drop_on("z1");
+        assert_eq!(s.drop_count(), 1);
+    }
+
+    #[test]
+    fn test_bcf_drop_position() {
+        let t = BcfDropTarget::new("x", BcfDropPosition::Bottom);
+        assert_eq!(t.position, BcfDropPosition::Bottom);
+    }
+}
