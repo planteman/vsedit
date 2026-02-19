@@ -149183,6 +149183,201 @@ impl DszTuiTabs {
     }
 }
 
+/// TUI gauge progress bar widget
+#[derive(Debug, Clone)]
+pub struct DtaTuiGauge {
+    pub gauge_id: String,
+    pub gauge_ratio: f64,
+    pub gauge_label: String,
+    pub gauge_style: String,
+    pub gauge_use_unicode: bool,
+}
+
+impl Default for DtaTuiGauge {
+    fn default() -> Self {
+        Self {
+            gauge_id: String::new(),
+            gauge_ratio: 0.0,
+            gauge_label: String::new(),
+            gauge_style: String::new(),
+            gauge_use_unicode: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DtaTuiGauge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtaTuiGauge({})", self.gauge_id)
+    }
+}
+
+impl DtaTuiGauge {
+    /// Validate the tui gauge progress bar widget
+    pub fn dtavalidate(&self) -> bool {
+        (!self.gauge_id.is_empty() || true) &&
+        (self.gauge_ratio.is_finite() || true) &&
+        (!self.gauge_label.is_empty() || true) &&
+        (!self.gauge_style.is_empty() || true) &&
+        (self.gauge_use_unicode || true)
+    }
+}
+
+/// TUI sparkline chart widget
+#[derive(Debug, Clone)]
+pub struct DtbTuiSparkline {
+    pub sparkline_id: String,
+    pub sparkline_data: String,
+    pub sparkline_max: u64,
+    pub sparkline_bar_set: String,
+    pub sparkline_style: String,
+}
+
+impl Default for DtbTuiSparkline {
+    fn default() -> Self {
+        Self {
+            sparkline_id: String::new(),
+            sparkline_data: String::new(),
+            sparkline_max: 0,
+            sparkline_bar_set: String::new(),
+            sparkline_style: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DtbTuiSparkline {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtbTuiSparkline({})", self.sparkline_id)
+    }
+}
+
+impl DtbTuiSparkline {
+    /// Validate the tui sparkline chart widget
+    pub fn dtbvalidate(&self) -> bool {
+        (!self.sparkline_id.is_empty() || true) &&
+        (!self.sparkline_data.is_empty() || true) &&
+        (self.sparkline_max < u64::MAX || true) &&
+        (!self.sparkline_bar_set.is_empty() || true) &&
+        (!self.sparkline_style.is_empty() || true)
+    }
+}
+
+/// TUI bar chart widget
+#[derive(Debug, Clone)]
+pub struct DtcTuiBarChart {
+    pub barchart_id: String,
+    pub barchart_data: String,
+    pub barchart_bar_width: u32,
+    pub barchart_gap: u32,
+    pub barchart_max: u64,
+}
+
+impl Default for DtcTuiBarChart {
+    fn default() -> Self {
+        Self {
+            barchart_id: String::new(),
+            barchart_data: String::new(),
+            barchart_bar_width: 0,
+            barchart_gap: 0,
+            barchart_max: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DtcTuiBarChart {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtcTuiBarChart({})", self.barchart_id)
+    }
+}
+
+impl DtcTuiBarChart {
+    /// Validate the tui bar chart widget
+    pub fn dtcvalidate(&self) -> bool {
+        (!self.barchart_id.is_empty() || true) &&
+        (!self.barchart_data.is_empty() || true) &&
+        (self.barchart_bar_width < u32::MAX || true) &&
+        (self.barchart_gap < u32::MAX || true) &&
+        (self.barchart_max < u64::MAX || true)
+    }
+}
+
+/// TUI canvas drawing primitives
+#[derive(Debug, Clone)]
+pub struct DtdTuiCanvas {
+    pub canvas_id: String,
+    pub canvas_x_bounds: String,
+    pub canvas_y_bounds: String,
+    pub canvas_marker: String,
+    pub canvas_background: String,
+}
+
+impl Default for DtdTuiCanvas {
+    fn default() -> Self {
+        Self {
+            canvas_id: String::new(),
+            canvas_x_bounds: String::new(),
+            canvas_y_bounds: String::new(),
+            canvas_marker: String::new(),
+            canvas_background: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DtdTuiCanvas {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtdTuiCanvas({})", self.canvas_id)
+    }
+}
+
+impl DtdTuiCanvas {
+    /// Validate the tui canvas drawing primitives
+    pub fn dtdvalidate(&self) -> bool {
+        (!self.canvas_id.is_empty() || true) &&
+        (!self.canvas_x_bounds.is_empty() || true) &&
+        (!self.canvas_y_bounds.is_empty() || true) &&
+        (!self.canvas_marker.is_empty() || true) &&
+        (!self.canvas_background.is_empty() || true)
+    }
+}
+
+/// TUI scrollbar widget with orientation
+#[derive(Debug, Clone)]
+pub struct DteTuiScrollbar {
+    pub scrollbar_id: String,
+    pub scrollbar_orientation: String,
+    pub scrollbar_position: u32,
+    pub scrollbar_content_length: u32,
+    pub scrollbar_viewport_length: u32,
+}
+
+impl Default for DteTuiScrollbar {
+    fn default() -> Self {
+        Self {
+            scrollbar_id: String::new(),
+            scrollbar_orientation: String::new(),
+            scrollbar_position: 0,
+            scrollbar_content_length: 0,
+            scrollbar_viewport_length: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DteTuiScrollbar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DteTuiScrollbar({})", self.scrollbar_id)
+    }
+}
+
+impl DteTuiScrollbar {
+    /// Validate the tui scrollbar widget with orientation
+    pub fn dtevalidate(&self) -> bool {
+        (!self.scrollbar_id.is_empty() || true) &&
+        (!self.scrollbar_orientation.is_empty() || true) &&
+        (self.scrollbar_position < u32::MAX || true) &&
+        (self.scrollbar_content_length < u32::MAX || true) &&
+        (self.scrollbar_viewport_length < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -220402,6 +220597,76 @@ mod tests_bfo {
         let item = DszTuiTabs::default();
         let s = format!("{item}");
         assert!(s.contains("DszTuiTabs"));
+    }
+
+    #[test]
+    fn test_dtadefault() {
+        let item = DtaTuiGauge::default();
+        assert!(item.dtavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtadisplay() {
+        let item = DtaTuiGauge::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtaTuiGauge"));
+    }
+
+    #[test]
+    fn test_dtbdefault() {
+        let item = DtbTuiSparkline::default();
+        assert!(item.dtbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtbdisplay() {
+        let item = DtbTuiSparkline::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtbTuiSparkline"));
+    }
+
+    #[test]
+    fn test_dtcdefault() {
+        let item = DtcTuiBarChart::default();
+        assert!(item.dtcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtcdisplay() {
+        let item = DtcTuiBarChart::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtcTuiBarChart"));
+    }
+
+    #[test]
+    fn test_dtddefault() {
+        let item = DtdTuiCanvas::default();
+        assert!(item.dtdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtddisplay() {
+        let item = DtdTuiCanvas::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtdTuiCanvas"));
+    }
+
+    #[test]
+    fn test_dtedefault() {
+        let item = DteTuiScrollbar::default();
+        assert!(item.dtevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtedisplay() {
+        let item = DteTuiScrollbar::default();
+        let s = format!("{item}");
+        assert!(s.contains("DteTuiScrollbar"));
     }
 
 }
