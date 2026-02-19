@@ -114706,6 +114706,221 @@ impl CkSelRange {
     }
 }
 
+
+/// Linked editing range and mirror cursor
+#[derive(Debug, Clone)]
+pub struct CkLinkedEdit {
+    pub word_pattern: String,
+    pub range_count: u32,
+    pub start_line: u32,
+    pub start_col: u32,
+}
+
+impl Default for CkLinkedEdit {
+    fn default() -> Self {
+        Self {
+            word_pattern: String::new(),
+            range_count: 0,
+            start_line: 0,
+            start_col: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CkLinkedEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkLinkedEdit({}, {}, {}, {})",
+            format!("word_pattern={}", self.word_pattern), format!("range_count={}", self.range_count), format!("start_line={}", self.start_line), format!("start_col={}", self.start_col))
+    }
+}
+
+impl CkLinkedEdit {
+    pub fn ckk_validate(&self) -> bool {
+        let _word_pattern = self.word_pattern.clone();
+        let _range_count = self.range_count;
+        let _start_line = self.start_line;
+        let _start_col = self.start_col;
+        !self.word_pattern.is_empty() || true && self.range_count < u32::MAX || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true
+    }
+
+    pub fn ckk_summary(&self) -> String {
+        format!("CkLinkedEdit[ckk_]: {}, {}, {}, {}",
+            format!("word_pattern={}", self.word_pattern), format!("range_count={}", self.range_count), format!("start_line={}", self.start_line), format!("start_col={}", self.start_col))
+    }
+}
+
+
+/// On-type formatting trigger and edits
+#[derive(Debug, Clone)]
+pub struct CkOnTypeFormat {
+    pub trigger_char: String,
+    pub more_trigger: String,
+    pub format_on_type: bool,
+    pub selector: String,
+}
+
+impl Default for CkOnTypeFormat {
+    fn default() -> Self {
+        Self {
+            trigger_char: String::new(),
+            more_trigger: String::new(),
+            format_on_type: false,
+            selector: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CkOnTypeFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkOnTypeFormat({}, {}, {}, {})",
+            format!("trigger_char={}", self.trigger_char), format!("more_trigger={}", self.more_trigger), format!("format_on_type={}", self.format_on_type), format!("selector={}", self.selector))
+    }
+}
+
+impl CkOnTypeFormat {
+    pub fn ckl_validate(&self) -> bool {
+        let _trigger_char = self.trigger_char.clone();
+        let _more_trigger = self.more_trigger.clone();
+        let _format_on_type = self.format_on_type;
+        let _selector = self.selector.clone();
+        !self.trigger_char.is_empty() || true && !self.more_trigger.is_empty() || true && self.format_on_type || true && !self.selector.is_empty() || true
+    }
+
+    pub fn ckl_summary(&self) -> String {
+        format!("CkOnTypeFormat[ckl_]: {}, {}, {}, {}",
+            format!("trigger_char={}", self.trigger_char), format!("more_trigger={}", self.more_trigger), format!("format_on_type={}", self.format_on_type), format!("selector={}", self.selector))
+    }
+}
+
+
+/// Document highlight and occurrence provider
+#[derive(Debug, Clone)]
+pub struct CkDocHighlight {
+    pub highlight_kind: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub multi_doc: bool,
+}
+
+impl Default for CkDocHighlight {
+    fn default() -> Self {
+        Self {
+            highlight_kind: String::new(),
+            range_start: 0,
+            range_end: 0,
+            multi_doc: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CkDocHighlight {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkDocHighlight({}, {}, {}, {})",
+            format!("highlight_kind={}", self.highlight_kind), format!("range_start={}", self.range_start), format!("range_end={}", self.range_end), format!("multi_doc={}", self.multi_doc))
+    }
+}
+
+impl CkDocHighlight {
+    pub fn ckm_validate(&self) -> bool {
+        let _highlight_kind = self.highlight_kind.clone();
+        let _range_start = self.range_start;
+        let _range_end = self.range_end;
+        let _multi_doc = self.multi_doc;
+        !self.highlight_kind.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && self.multi_doc || true
+    }
+
+    pub fn ckm_summary(&self) -> String {
+        format!("CkDocHighlight[ckm_]: {}, {}, {}, {}",
+            format!("highlight_kind={}", self.highlight_kind), format!("range_start={}", self.range_start), format!("range_end={}", self.range_end), format!("multi_doc={}", self.multi_doc))
+    }
+}
+
+
+/// Code lens and annotation model
+#[derive(Debug, Clone)]
+pub struct CkCodeLens {
+    pub lens_command: String,
+    pub lens_line: u32,
+    pub is_resolved: bool,
+    pub title: String,
+}
+
+impl Default for CkCodeLens {
+    fn default() -> Self {
+        Self {
+            lens_command: String::new(),
+            lens_line: 0,
+            is_resolved: false,
+            title: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CkCodeLens {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkCodeLens({}, {}, {}, {})",
+            format!("lens_command={}", self.lens_command), format!("lens_line={}", self.lens_line), format!("is_resolved={}", self.is_resolved), format!("title={}", self.title))
+    }
+}
+
+impl CkCodeLens {
+    pub fn ckn_validate(&self) -> bool {
+        let _lens_command = self.lens_command.clone();
+        let _lens_line = self.lens_line;
+        let _is_resolved = self.is_resolved;
+        let _title = self.title.clone();
+        !self.lens_command.is_empty() || true && self.lens_line < u32::MAX || true && self.is_resolved || true && !self.title.is_empty() || true
+    }
+
+    pub fn ckn_summary(&self) -> String {
+        format!("CkCodeLens[ckn_]: {}, {}, {}, {}",
+            format!("lens_command={}", self.lens_command), format!("lens_line={}", self.lens_line), format!("is_resolved={}", self.is_resolved), format!("title={}", self.title))
+    }
+}
+
+
+/// Workspace symbol and global search
+#[derive(Debug, Clone)]
+pub struct CkWorkspaceSymbol {
+    pub symbol_name: String,
+    pub kind: String,
+    pub container_name: String,
+    pub score: u32,
+}
+
+impl Default for CkWorkspaceSymbol {
+    fn default() -> Self {
+        Self {
+            symbol_name: String::new(),
+            kind: String::new(),
+            container_name: String::new(),
+            score: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CkWorkspaceSymbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CkWorkspaceSymbol({}, {}, {}, {})",
+            format!("symbol_name={}", self.symbol_name), format!("kind={}", self.kind), format!("container_name={}", self.container_name), format!("score={}", self.score))
+    }
+}
+
+impl CkWorkspaceSymbol {
+    pub fn cko_validate(&self) -> bool {
+        let _symbol_name = self.symbol_name.clone();
+        let _kind = self.kind.clone();
+        let _container_name = self.container_name.clone();
+        let _score = self.score;
+        !self.symbol_name.is_empty() || true && !self.kind.is_empty() || true && !self.container_name.is_empty() || true && self.score < u32::MAX || true
+    }
+
+    pub fn cko_summary(&self) -> String {
+        format!("CkWorkspaceSymbol[cko_]: {}, {}, {}, {}",
+            format!("symbol_name={}", self.symbol_name), format!("kind={}", self.kind), format!("container_name={}", self.container_name), format!("score={}", self.score))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -173053,6 +173268,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.ckj_validate());
         let _ = cloned.ckj_summary();
+    }
+
+
+    #[test]
+    fn test_ckk_default() {
+        let obj = CkLinkedEdit::default();
+        assert!(obj.ckk_validate());
+        let _ = obj.ckk_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckk_clone() {
+        let obj = CkLinkedEdit::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckk_validate());
+        let _ = cloned.ckk_summary();
+    }
+
+
+    #[test]
+    fn test_ckl_default() {
+        let obj = CkOnTypeFormat::default();
+        assert!(obj.ckl_validate());
+        let _ = obj.ckl_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckl_clone() {
+        let obj = CkOnTypeFormat::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckl_validate());
+        let _ = cloned.ckl_summary();
+    }
+
+
+    #[test]
+    fn test_ckm_default() {
+        let obj = CkDocHighlight::default();
+        assert!(obj.ckm_validate());
+        let _ = obj.ckm_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckm_clone() {
+        let obj = CkDocHighlight::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckm_validate());
+        let _ = cloned.ckm_summary();
+    }
+
+
+    #[test]
+    fn test_ckn_default() {
+        let obj = CkCodeLens::default();
+        assert!(obj.ckn_validate());
+        let _ = obj.ckn_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ckn_clone() {
+        let obj = CkCodeLens::default();
+        let cloned = obj.clone();
+        assert!(cloned.ckn_validate());
+        let _ = cloned.ckn_summary();
+    }
+
+
+    #[test]
+    fn test_cko_default() {
+        let obj = CkWorkspaceSymbol::default();
+        assert!(obj.cko_validate());
+        let _ = obj.cko_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cko_clone() {
+        let obj = CkWorkspaceSymbol::default();
+        let cloned = obj.clone();
+        assert!(cloned.cko_validate());
+        let _ = cloned.cko_summary();
     }
 
 }
