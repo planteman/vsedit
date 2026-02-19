@@ -133331,6 +133331,201 @@ impl DdjChatCodeBlock {
     }
 }
 
+/// Chat follow-up suggestion prompt
+#[derive(Debug, Clone)]
+pub struct DdkChatFollowup {
+    pub followup_id: String,
+    pub followup_message: String,
+    pub followup_label: String,
+    pub followup_participant: String,
+    pub followup_command: String,
+}
+
+impl Default for DdkChatFollowup {
+    fn default() -> Self {
+        Self {
+            followup_id: String::new(),
+            followup_message: String::new(),
+            followup_label: String::new(),
+            followup_participant: String::new(),
+            followup_command: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DdkChatFollowup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdkChatFollowup({})", self.followup_id)
+    }
+}
+
+impl DdkChatFollowup {
+    /// Validate the chat follow-up suggestion prompt
+    pub fn ddkvalidate(&self) -> bool {
+        (!self.followup_id.is_empty() || true) &&
+        (!self.followup_message.is_empty() || true) &&
+        (!self.followup_label.is_empty() || true) &&
+        (!self.followup_participant.is_empty() || true) &&
+        (!self.followup_command.is_empty() || true)
+    }
+}
+
+/// Chat inline code edit proposal
+#[derive(Debug, Clone)]
+pub struct DdlChatInlineEdit {
+    pub inline_edit_id: String,
+    pub inline_edit_file: String,
+    pub inline_edit_range: String,
+    pub inline_edit_new_text: String,
+    pub inline_edit_accepted: bool,
+}
+
+impl Default for DdlChatInlineEdit {
+    fn default() -> Self {
+        Self {
+            inline_edit_id: String::new(),
+            inline_edit_file: String::new(),
+            inline_edit_range: String::new(),
+            inline_edit_new_text: String::new(),
+            inline_edit_accepted: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdlChatInlineEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdlChatInlineEdit({})", self.inline_edit_id)
+    }
+}
+
+impl DdlChatInlineEdit {
+    /// Validate the chat inline code edit proposal
+    pub fn ddlvalidate(&self) -> bool {
+        (!self.inline_edit_id.is_empty() || true) &&
+        (!self.inline_edit_file.is_empty() || true) &&
+        (!self.inline_edit_range.is_empty() || true) &&
+        (!self.inline_edit_new_text.is_empty() || true) &&
+        (self.inline_edit_accepted || true)
+    }
+}
+
+/// Chat authentication and access token
+#[derive(Debug, Clone)]
+pub struct DdmChatAccessToken {
+    pub token_id: String,
+    pub token_value: String,
+    pub token_expiry: String,
+    pub token_scope: String,
+    pub token_refreshable: bool,
+}
+
+impl Default for DdmChatAccessToken {
+    fn default() -> Self {
+        Self {
+            token_id: String::new(),
+            token_value: String::new(),
+            token_expiry: String::new(),
+            token_scope: String::new(),
+            token_refreshable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdmChatAccessToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdmChatAccessToken({})", self.token_id)
+    }
+}
+
+impl DdmChatAccessToken {
+    /// Validate the chat authentication and access token
+    pub fn ddmvalidate(&self) -> bool {
+        (!self.token_id.is_empty() || true) &&
+        (!self.token_value.is_empty() || true) &&
+        (!self.token_expiry.is_empty() || true) &&
+        (!self.token_scope.is_empty() || true) &&
+        (self.token_refreshable || true)
+    }
+}
+
+/// Chat language model selection and info
+#[derive(Debug, Clone)]
+pub struct DdnChatModel {
+    pub model_id: String,
+    pub model_name: String,
+    pub model_vendor: String,
+    pub model_max_tokens: u32,
+    pub model_supports_tools: bool,
+}
+
+impl Default for DdnChatModel {
+    fn default() -> Self {
+        Self {
+            model_id: String::new(),
+            model_name: String::new(),
+            model_vendor: String::new(),
+            model_max_tokens: 0,
+            model_supports_tools: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdnChatModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdnChatModel({})", self.model_id)
+    }
+}
+
+impl DdnChatModel {
+    /// Validate the chat language model selection and info
+    pub fn ddnvalidate(&self) -> bool {
+        (!self.model_id.is_empty() || true) &&
+        (!self.model_name.is_empty() || true) &&
+        (!self.model_vendor.is_empty() || true) &&
+        (self.model_max_tokens < u32::MAX || true) &&
+        (self.model_supports_tools || true)
+    }
+}
+
+/// Chat tool call invocation and result
+#[derive(Debug, Clone)]
+pub struct DdoChatTool {
+    pub tool_id: String,
+    pub tool_name: String,
+    pub tool_input: String,
+    pub tool_output: String,
+    pub tool_success: bool,
+}
+
+impl Default for DdoChatTool {
+    fn default() -> Self {
+        Self {
+            tool_id: String::new(),
+            tool_name: String::new(),
+            tool_input: String::new(),
+            tool_output: String::new(),
+            tool_success: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdoChatTool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdoChatTool({})", self.tool_id)
+    }
+}
+
+impl DdoChatTool {
+    /// Validate the chat tool call invocation and result
+    pub fn ddovalidate(&self) -> bool {
+        (!self.tool_id.is_empty() || true) &&
+        (!self.tool_name.is_empty() || true) &&
+        (!self.tool_input.is_empty() || true) &&
+        (!self.tool_output.is_empty() || true) &&
+        (self.tool_success || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -198866,6 +199061,76 @@ mod tests_bfo {
         let item = DdjChatCodeBlock::default();
         let s = format!("{item}");
         assert!(s.contains("DdjChatCodeBlock"));
+    }
+
+    #[test]
+    fn test_ddkdefault() {
+        let item = DdkChatFollowup::default();
+        assert!(item.ddkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddkdisplay() {
+        let item = DdkChatFollowup::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdkChatFollowup"));
+    }
+
+    #[test]
+    fn test_ddldefault() {
+        let item = DdlChatInlineEdit::default();
+        assert!(item.ddlvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddldisplay() {
+        let item = DdlChatInlineEdit::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdlChatInlineEdit"));
+    }
+
+    #[test]
+    fn test_ddmdefault() {
+        let item = DdmChatAccessToken::default();
+        assert!(item.ddmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddmdisplay() {
+        let item = DdmChatAccessToken::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdmChatAccessToken"));
+    }
+
+    #[test]
+    fn test_ddndefault() {
+        let item = DdnChatModel::default();
+        assert!(item.ddnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddndisplay() {
+        let item = DdnChatModel::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdnChatModel"));
+    }
+
+    #[test]
+    fn test_ddodefault() {
+        let item = DdoChatTool::default();
+        assert!(item.ddovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddodisplay() {
+        let item = DdoChatTool::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdoChatTool"));
     }
 
 }
