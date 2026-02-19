@@ -88394,6 +88394,111 @@ impl CallHierarchyItem {
     }
 }
 
+/// Runtime wiring: bpp_ SemanticTokensData
+#[derive(Debug, Clone)]
+pub struct SemanticTokensData {
+    pub bpp_result_id: String,
+    pub bpp_token_count: usize,
+    pub bpp_delta_line: Vec<u32>,
+    pub bpp_delta_start_char: Vec<u32>,
+    pub bpp_lengths: Vec<u32>,
+    pub bpp_token_types: Vec<u32>,
+    pub bpp_token_modifiers: Vec<u32>,
+    pub bpp_is_full: bool,
+    pub bpp_is_delta: bool,
+    pub bpp_previous_result_id: String,
+}
+
+impl SemanticTokensData {
+    pub fn bpp_summary(&self) -> String {
+        format!("SemanticTokensData({})", self.bpp_result_id)
+    }
+}
+
+/// Runtime wiring: bpq_ InlayHintItem
+#[derive(Debug, Clone)]
+pub struct InlayHintItem {
+    pub bpq_label_text: String,
+    pub bpq_position_line: u32,
+    pub bpq_position_col: u32,
+    pub bpq_hint_kind: u8,
+    pub bpq_padding_left: bool,
+    pub bpq_padding_right: bool,
+    pub bpq_tooltip: String,
+    pub bpq_text_edits_count: u32,
+    pub bpq_command_id: String,
+    pub bpq_data_value: String,
+}
+
+impl InlayHintItem {
+    pub fn bpq_summary(&self) -> String {
+        format!("InlayHintItem({})", self.bpq_label_text)
+    }
+}
+
+/// Runtime wiring: bpr_ InlineValue
+#[derive(Debug, Clone)]
+pub struct InlineValue {
+    pub bpr_value_type: String,
+    pub bpr_range_start_line: u32,
+    pub bpr_range_start_col: u32,
+    pub bpr_range_end_line: u32,
+    pub bpr_range_end_col: u32,
+    pub bpr_text: String,
+    pub bpr_variable_name: String,
+    pub bpr_case_sensitive: bool,
+    pub bpr_expression: String,
+    pub bpr_stopped_line: u32,
+}
+
+impl InlineValue {
+    pub fn bpr_summary(&self) -> String {
+        format!("InlineValue({})", self.bpr_value_type)
+    }
+}
+
+/// Runtime wiring: bps_ LinkedEditingRange
+#[derive(Debug, Clone)]
+pub struct LinkedEditingRange {
+    pub bps_word_pattern: String,
+    pub bps_ranges_count: usize,
+    pub bps_range_start_lines: Vec<u32>,
+    pub bps_range_start_cols: Vec<u32>,
+    pub bps_range_end_lines: Vec<u32>,
+    pub bps_range_end_cols: Vec<u32>,
+    pub bps_uri: String,
+    pub bps_is_active: bool,
+    pub bps_trigger_offset: u32,
+    pub bps_word_length: u32,
+}
+
+impl LinkedEditingRange {
+    pub fn bps_summary(&self) -> String {
+        format!("LinkedEditingRange({})", self.bps_word_pattern)
+    }
+}
+
+/// Runtime wiring: bpt_ SelectionRange
+#[derive(Debug, Clone)]
+pub struct SelectionRange {
+    pub bpt_range_start_line: u32,
+    pub bpt_range_start_col: u32,
+    pub bpt_range_end_line: u32,
+    pub bpt_range_end_col: u32,
+    pub bpt_parent_start_line: Option<u32>,
+    pub bpt_parent_end_line: Option<u32>,
+    pub bpt_depth: u32,
+    pub bpt_kind: String,
+    pub bpt_is_statement: bool,
+    pub bpt_is_block: bool,
+}
+
+impl SelectionRange {
+    pub fn bpt_summary(&self) -> String {
+        format!("SelectionRange({})", self.bpt_range_start_line)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -109762,6 +109867,910 @@ mod tests_bfo {
         };
         let _ = obj.bpo_summary();
         assert_eq!(obj.bpo_data_value, "test");
+    }
+
+    #[test]
+    fn test_bpp_result_id() {
+        let obj = SemanticTokensData {
+            bpp_result_id: String::from("test"),
+            bpp_token_count: 0,
+            bpp_delta_line: Vec::new(),
+            bpp_delta_start_char: Vec::new(),
+            bpp_lengths: Vec::new(),
+            bpp_token_types: Vec::new(),
+            bpp_token_modifiers: Vec::new(),
+            bpp_is_full: false,
+            bpp_is_delta: false,
+            bpp_previous_result_id: String::from("test"),
+        };
+        let _ = obj.bpp_summary();
+        assert_eq!(obj.bpp_result_id, "test");
+    }
+
+    #[test]
+    fn test_bpp_token_count() {
+        let obj = SemanticTokensData {
+            bpp_result_id: String::from("test"),
+            bpp_token_count: 0,
+            bpp_delta_line: Vec::new(),
+            bpp_delta_start_char: Vec::new(),
+            bpp_lengths: Vec::new(),
+            bpp_token_types: Vec::new(),
+            bpp_token_modifiers: Vec::new(),
+            bpp_is_full: false,
+            bpp_is_delta: false,
+            bpp_previous_result_id: String::from("test"),
+        };
+        let _ = obj.bpp_summary();
+        assert_eq!(obj.bpp_token_count, 0);
+    }
+
+    #[test]
+    fn test_bpp_delta_line() {
+        let obj = SemanticTokensData {
+            bpp_result_id: String::from("test"),
+            bpp_token_count: 0,
+            bpp_delta_line: Vec::new(),
+            bpp_delta_start_char: Vec::new(),
+            bpp_lengths: Vec::new(),
+            bpp_token_types: Vec::new(),
+            bpp_token_modifiers: Vec::new(),
+            bpp_is_full: false,
+            bpp_is_delta: false,
+            bpp_previous_result_id: String::from("test"),
+        };
+        let _ = obj.bpp_summary();
+        assert!(obj.bpp_delta_line.is_empty());
+    }
+
+    #[test]
+    fn test_bpp_delta_start_char() {
+        let obj = SemanticTokensData {
+            bpp_result_id: String::from("test"),
+            bpp_token_count: 0,
+            bpp_delta_line: Vec::new(),
+            bpp_delta_start_char: Vec::new(),
+            bpp_lengths: Vec::new(),
+            bpp_token_types: Vec::new(),
+            bpp_token_modifiers: Vec::new(),
+            bpp_is_full: false,
+            bpp_is_delta: false,
+            bpp_previous_result_id: String::from("test"),
+        };
+        let _ = obj.bpp_summary();
+        assert!(obj.bpp_delta_start_char.is_empty());
+    }
+
+    #[test]
+    fn test_bpp_lengths() {
+        let obj = SemanticTokensData {
+            bpp_result_id: String::from("test"),
+            bpp_token_count: 0,
+            bpp_delta_line: Vec::new(),
+            bpp_delta_start_char: Vec::new(),
+            bpp_lengths: Vec::new(),
+            bpp_token_types: Vec::new(),
+            bpp_token_modifiers: Vec::new(),
+            bpp_is_full: false,
+            bpp_is_delta: false,
+            bpp_previous_result_id: String::from("test"),
+        };
+        let _ = obj.bpp_summary();
+        assert!(obj.bpp_lengths.is_empty());
+    }
+
+    #[test]
+    fn test_bpp_token_types() {
+        let obj = SemanticTokensData {
+            bpp_result_id: String::from("test"),
+            bpp_token_count: 0,
+            bpp_delta_line: Vec::new(),
+            bpp_delta_start_char: Vec::new(),
+            bpp_lengths: Vec::new(),
+            bpp_token_types: Vec::new(),
+            bpp_token_modifiers: Vec::new(),
+            bpp_is_full: false,
+            bpp_is_delta: false,
+            bpp_previous_result_id: String::from("test"),
+        };
+        let _ = obj.bpp_summary();
+        assert!(obj.bpp_token_types.is_empty());
+    }
+
+    #[test]
+    fn test_bpp_token_modifiers() {
+        let obj = SemanticTokensData {
+            bpp_result_id: String::from("test"),
+            bpp_token_count: 0,
+            bpp_delta_line: Vec::new(),
+            bpp_delta_start_char: Vec::new(),
+            bpp_lengths: Vec::new(),
+            bpp_token_types: Vec::new(),
+            bpp_token_modifiers: Vec::new(),
+            bpp_is_full: false,
+            bpp_is_delta: false,
+            bpp_previous_result_id: String::from("test"),
+        };
+        let _ = obj.bpp_summary();
+        assert!(obj.bpp_token_modifiers.is_empty());
+    }
+
+    #[test]
+    fn test_bpp_is_full() {
+        let obj = SemanticTokensData {
+            bpp_result_id: String::from("test"),
+            bpp_token_count: 0,
+            bpp_delta_line: Vec::new(),
+            bpp_delta_start_char: Vec::new(),
+            bpp_lengths: Vec::new(),
+            bpp_token_types: Vec::new(),
+            bpp_token_modifiers: Vec::new(),
+            bpp_is_full: false,
+            bpp_is_delta: false,
+            bpp_previous_result_id: String::from("test"),
+        };
+        let _ = obj.bpp_summary();
+        assert!(!obj.bpp_is_full);
+    }
+
+    #[test]
+    fn test_bpp_is_delta() {
+        let obj = SemanticTokensData {
+            bpp_result_id: String::from("test"),
+            bpp_token_count: 0,
+            bpp_delta_line: Vec::new(),
+            bpp_delta_start_char: Vec::new(),
+            bpp_lengths: Vec::new(),
+            bpp_token_types: Vec::new(),
+            bpp_token_modifiers: Vec::new(),
+            bpp_is_full: false,
+            bpp_is_delta: false,
+            bpp_previous_result_id: String::from("test"),
+        };
+        let _ = obj.bpp_summary();
+        assert!(!obj.bpp_is_delta);
+    }
+
+    #[test]
+    fn test_bpp_previous_result_id() {
+        let obj = SemanticTokensData {
+            bpp_result_id: String::from("test"),
+            bpp_token_count: 0,
+            bpp_delta_line: Vec::new(),
+            bpp_delta_start_char: Vec::new(),
+            bpp_lengths: Vec::new(),
+            bpp_token_types: Vec::new(),
+            bpp_token_modifiers: Vec::new(),
+            bpp_is_full: false,
+            bpp_is_delta: false,
+            bpp_previous_result_id: String::from("test"),
+        };
+        let _ = obj.bpp_summary();
+        assert_eq!(obj.bpp_previous_result_id, "test");
+    }
+
+
+    #[test]
+    fn test_bpq_label_text() {
+        let obj = InlayHintItem {
+            bpq_label_text: String::from("test"),
+            bpq_position_line: 0,
+            bpq_position_col: 0,
+            bpq_hint_kind: 0,
+            bpq_padding_left: false,
+            bpq_padding_right: false,
+            bpq_tooltip: String::from("test"),
+            bpq_text_edits_count: 0,
+            bpq_command_id: String::from("test"),
+            bpq_data_value: String::from("test"),
+        };
+        let _ = obj.bpq_summary();
+        assert_eq!(obj.bpq_label_text, "test");
+    }
+
+    #[test]
+    fn test_bpq_position_line() {
+        let obj = InlayHintItem {
+            bpq_label_text: String::from("test"),
+            bpq_position_line: 0,
+            bpq_position_col: 0,
+            bpq_hint_kind: 0,
+            bpq_padding_left: false,
+            bpq_padding_right: false,
+            bpq_tooltip: String::from("test"),
+            bpq_text_edits_count: 0,
+            bpq_command_id: String::from("test"),
+            bpq_data_value: String::from("test"),
+        };
+        let _ = obj.bpq_summary();
+        assert_eq!(obj.bpq_position_line, 0);
+    }
+
+    #[test]
+    fn test_bpq_position_col() {
+        let obj = InlayHintItem {
+            bpq_label_text: String::from("test"),
+            bpq_position_line: 0,
+            bpq_position_col: 0,
+            bpq_hint_kind: 0,
+            bpq_padding_left: false,
+            bpq_padding_right: false,
+            bpq_tooltip: String::from("test"),
+            bpq_text_edits_count: 0,
+            bpq_command_id: String::from("test"),
+            bpq_data_value: String::from("test"),
+        };
+        let _ = obj.bpq_summary();
+        assert_eq!(obj.bpq_position_col, 0);
+    }
+
+    #[test]
+    fn test_bpq_hint_kind() {
+        let obj = InlayHintItem {
+            bpq_label_text: String::from("test"),
+            bpq_position_line: 0,
+            bpq_position_col: 0,
+            bpq_hint_kind: 0,
+            bpq_padding_left: false,
+            bpq_padding_right: false,
+            bpq_tooltip: String::from("test"),
+            bpq_text_edits_count: 0,
+            bpq_command_id: String::from("test"),
+            bpq_data_value: String::from("test"),
+        };
+        let _ = obj.bpq_summary();
+        assert_eq!(obj.bpq_hint_kind, 0);
+    }
+
+    #[test]
+    fn test_bpq_padding_left() {
+        let obj = InlayHintItem {
+            bpq_label_text: String::from("test"),
+            bpq_position_line: 0,
+            bpq_position_col: 0,
+            bpq_hint_kind: 0,
+            bpq_padding_left: false,
+            bpq_padding_right: false,
+            bpq_tooltip: String::from("test"),
+            bpq_text_edits_count: 0,
+            bpq_command_id: String::from("test"),
+            bpq_data_value: String::from("test"),
+        };
+        let _ = obj.bpq_summary();
+        assert!(!obj.bpq_padding_left);
+    }
+
+    #[test]
+    fn test_bpq_padding_right() {
+        let obj = InlayHintItem {
+            bpq_label_text: String::from("test"),
+            bpq_position_line: 0,
+            bpq_position_col: 0,
+            bpq_hint_kind: 0,
+            bpq_padding_left: false,
+            bpq_padding_right: false,
+            bpq_tooltip: String::from("test"),
+            bpq_text_edits_count: 0,
+            bpq_command_id: String::from("test"),
+            bpq_data_value: String::from("test"),
+        };
+        let _ = obj.bpq_summary();
+        assert!(!obj.bpq_padding_right);
+    }
+
+    #[test]
+    fn test_bpq_tooltip() {
+        let obj = InlayHintItem {
+            bpq_label_text: String::from("test"),
+            bpq_position_line: 0,
+            bpq_position_col: 0,
+            bpq_hint_kind: 0,
+            bpq_padding_left: false,
+            bpq_padding_right: false,
+            bpq_tooltip: String::from("test"),
+            bpq_text_edits_count: 0,
+            bpq_command_id: String::from("test"),
+            bpq_data_value: String::from("test"),
+        };
+        let _ = obj.bpq_summary();
+        assert_eq!(obj.bpq_tooltip, "test");
+    }
+
+    #[test]
+    fn test_bpq_text_edits_count() {
+        let obj = InlayHintItem {
+            bpq_label_text: String::from("test"),
+            bpq_position_line: 0,
+            bpq_position_col: 0,
+            bpq_hint_kind: 0,
+            bpq_padding_left: false,
+            bpq_padding_right: false,
+            bpq_tooltip: String::from("test"),
+            bpq_text_edits_count: 0,
+            bpq_command_id: String::from("test"),
+            bpq_data_value: String::from("test"),
+        };
+        let _ = obj.bpq_summary();
+        assert_eq!(obj.bpq_text_edits_count, 0);
+    }
+
+    #[test]
+    fn test_bpq_command_id() {
+        let obj = InlayHintItem {
+            bpq_label_text: String::from("test"),
+            bpq_position_line: 0,
+            bpq_position_col: 0,
+            bpq_hint_kind: 0,
+            bpq_padding_left: false,
+            bpq_padding_right: false,
+            bpq_tooltip: String::from("test"),
+            bpq_text_edits_count: 0,
+            bpq_command_id: String::from("test"),
+            bpq_data_value: String::from("test"),
+        };
+        let _ = obj.bpq_summary();
+        assert_eq!(obj.bpq_command_id, "test");
+    }
+
+    #[test]
+    fn test_bpq_data_value() {
+        let obj = InlayHintItem {
+            bpq_label_text: String::from("test"),
+            bpq_position_line: 0,
+            bpq_position_col: 0,
+            bpq_hint_kind: 0,
+            bpq_padding_left: false,
+            bpq_padding_right: false,
+            bpq_tooltip: String::from("test"),
+            bpq_text_edits_count: 0,
+            bpq_command_id: String::from("test"),
+            bpq_data_value: String::from("test"),
+        };
+        let _ = obj.bpq_summary();
+        assert_eq!(obj.bpq_data_value, "test");
+    }
+
+
+    #[test]
+    fn test_bpr_value_type() {
+        let obj = InlineValue {
+            bpr_value_type: String::from("test"),
+            bpr_range_start_line: 0,
+            bpr_range_start_col: 0,
+            bpr_range_end_line: 0,
+            bpr_range_end_col: 0,
+            bpr_text: String::from("test"),
+            bpr_variable_name: String::from("test"),
+            bpr_case_sensitive: false,
+            bpr_expression: String::from("test"),
+            bpr_stopped_line: 0,
+        };
+        let _ = obj.bpr_summary();
+        assert_eq!(obj.bpr_value_type, "test");
+    }
+
+    #[test]
+    fn test_bpr_range_start_line() {
+        let obj = InlineValue {
+            bpr_value_type: String::from("test"),
+            bpr_range_start_line: 0,
+            bpr_range_start_col: 0,
+            bpr_range_end_line: 0,
+            bpr_range_end_col: 0,
+            bpr_text: String::from("test"),
+            bpr_variable_name: String::from("test"),
+            bpr_case_sensitive: false,
+            bpr_expression: String::from("test"),
+            bpr_stopped_line: 0,
+        };
+        let _ = obj.bpr_summary();
+        assert_eq!(obj.bpr_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_bpr_range_start_col() {
+        let obj = InlineValue {
+            bpr_value_type: String::from("test"),
+            bpr_range_start_line: 0,
+            bpr_range_start_col: 0,
+            bpr_range_end_line: 0,
+            bpr_range_end_col: 0,
+            bpr_text: String::from("test"),
+            bpr_variable_name: String::from("test"),
+            bpr_case_sensitive: false,
+            bpr_expression: String::from("test"),
+            bpr_stopped_line: 0,
+        };
+        let _ = obj.bpr_summary();
+        assert_eq!(obj.bpr_range_start_col, 0);
+    }
+
+    #[test]
+    fn test_bpr_range_end_line() {
+        let obj = InlineValue {
+            bpr_value_type: String::from("test"),
+            bpr_range_start_line: 0,
+            bpr_range_start_col: 0,
+            bpr_range_end_line: 0,
+            bpr_range_end_col: 0,
+            bpr_text: String::from("test"),
+            bpr_variable_name: String::from("test"),
+            bpr_case_sensitive: false,
+            bpr_expression: String::from("test"),
+            bpr_stopped_line: 0,
+        };
+        let _ = obj.bpr_summary();
+        assert_eq!(obj.bpr_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_bpr_range_end_col() {
+        let obj = InlineValue {
+            bpr_value_type: String::from("test"),
+            bpr_range_start_line: 0,
+            bpr_range_start_col: 0,
+            bpr_range_end_line: 0,
+            bpr_range_end_col: 0,
+            bpr_text: String::from("test"),
+            bpr_variable_name: String::from("test"),
+            bpr_case_sensitive: false,
+            bpr_expression: String::from("test"),
+            bpr_stopped_line: 0,
+        };
+        let _ = obj.bpr_summary();
+        assert_eq!(obj.bpr_range_end_col, 0);
+    }
+
+    #[test]
+    fn test_bpr_text() {
+        let obj = InlineValue {
+            bpr_value_type: String::from("test"),
+            bpr_range_start_line: 0,
+            bpr_range_start_col: 0,
+            bpr_range_end_line: 0,
+            bpr_range_end_col: 0,
+            bpr_text: String::from("test"),
+            bpr_variable_name: String::from("test"),
+            bpr_case_sensitive: false,
+            bpr_expression: String::from("test"),
+            bpr_stopped_line: 0,
+        };
+        let _ = obj.bpr_summary();
+        assert_eq!(obj.bpr_text, "test");
+    }
+
+    #[test]
+    fn test_bpr_variable_name() {
+        let obj = InlineValue {
+            bpr_value_type: String::from("test"),
+            bpr_range_start_line: 0,
+            bpr_range_start_col: 0,
+            bpr_range_end_line: 0,
+            bpr_range_end_col: 0,
+            bpr_text: String::from("test"),
+            bpr_variable_name: String::from("test"),
+            bpr_case_sensitive: false,
+            bpr_expression: String::from("test"),
+            bpr_stopped_line: 0,
+        };
+        let _ = obj.bpr_summary();
+        assert_eq!(obj.bpr_variable_name, "test");
+    }
+
+    #[test]
+    fn test_bpr_case_sensitive() {
+        let obj = InlineValue {
+            bpr_value_type: String::from("test"),
+            bpr_range_start_line: 0,
+            bpr_range_start_col: 0,
+            bpr_range_end_line: 0,
+            bpr_range_end_col: 0,
+            bpr_text: String::from("test"),
+            bpr_variable_name: String::from("test"),
+            bpr_case_sensitive: false,
+            bpr_expression: String::from("test"),
+            bpr_stopped_line: 0,
+        };
+        let _ = obj.bpr_summary();
+        assert!(!obj.bpr_case_sensitive);
+    }
+
+    #[test]
+    fn test_bpr_expression() {
+        let obj = InlineValue {
+            bpr_value_type: String::from("test"),
+            bpr_range_start_line: 0,
+            bpr_range_start_col: 0,
+            bpr_range_end_line: 0,
+            bpr_range_end_col: 0,
+            bpr_text: String::from("test"),
+            bpr_variable_name: String::from("test"),
+            bpr_case_sensitive: false,
+            bpr_expression: String::from("test"),
+            bpr_stopped_line: 0,
+        };
+        let _ = obj.bpr_summary();
+        assert_eq!(obj.bpr_expression, "test");
+    }
+
+    #[test]
+    fn test_bpr_stopped_line() {
+        let obj = InlineValue {
+            bpr_value_type: String::from("test"),
+            bpr_range_start_line: 0,
+            bpr_range_start_col: 0,
+            bpr_range_end_line: 0,
+            bpr_range_end_col: 0,
+            bpr_text: String::from("test"),
+            bpr_variable_name: String::from("test"),
+            bpr_case_sensitive: false,
+            bpr_expression: String::from("test"),
+            bpr_stopped_line: 0,
+        };
+        let _ = obj.bpr_summary();
+        assert_eq!(obj.bpr_stopped_line, 0);
+    }
+
+
+    #[test]
+    fn test_bps_word_pattern() {
+        let obj = LinkedEditingRange {
+            bps_word_pattern: String::from("test"),
+            bps_ranges_count: 0,
+            bps_range_start_lines: Vec::new(),
+            bps_range_start_cols: Vec::new(),
+            bps_range_end_lines: Vec::new(),
+            bps_range_end_cols: Vec::new(),
+            bps_uri: String::from("test"),
+            bps_is_active: false,
+            bps_trigger_offset: 0,
+            bps_word_length: 0,
+        };
+        let _ = obj.bps_summary();
+        assert_eq!(obj.bps_word_pattern, "test");
+    }
+
+    #[test]
+    fn test_bps_ranges_count() {
+        let obj = LinkedEditingRange {
+            bps_word_pattern: String::from("test"),
+            bps_ranges_count: 0,
+            bps_range_start_lines: Vec::new(),
+            bps_range_start_cols: Vec::new(),
+            bps_range_end_lines: Vec::new(),
+            bps_range_end_cols: Vec::new(),
+            bps_uri: String::from("test"),
+            bps_is_active: false,
+            bps_trigger_offset: 0,
+            bps_word_length: 0,
+        };
+        let _ = obj.bps_summary();
+        assert_eq!(obj.bps_ranges_count, 0);
+    }
+
+    #[test]
+    fn test_bps_range_start_lines() {
+        let obj = LinkedEditingRange {
+            bps_word_pattern: String::from("test"),
+            bps_ranges_count: 0,
+            bps_range_start_lines: Vec::new(),
+            bps_range_start_cols: Vec::new(),
+            bps_range_end_lines: Vec::new(),
+            bps_range_end_cols: Vec::new(),
+            bps_uri: String::from("test"),
+            bps_is_active: false,
+            bps_trigger_offset: 0,
+            bps_word_length: 0,
+        };
+        let _ = obj.bps_summary();
+        assert!(obj.bps_range_start_lines.is_empty());
+    }
+
+    #[test]
+    fn test_bps_range_start_cols() {
+        let obj = LinkedEditingRange {
+            bps_word_pattern: String::from("test"),
+            bps_ranges_count: 0,
+            bps_range_start_lines: Vec::new(),
+            bps_range_start_cols: Vec::new(),
+            bps_range_end_lines: Vec::new(),
+            bps_range_end_cols: Vec::new(),
+            bps_uri: String::from("test"),
+            bps_is_active: false,
+            bps_trigger_offset: 0,
+            bps_word_length: 0,
+        };
+        let _ = obj.bps_summary();
+        assert!(obj.bps_range_start_cols.is_empty());
+    }
+
+    #[test]
+    fn test_bps_range_end_lines() {
+        let obj = LinkedEditingRange {
+            bps_word_pattern: String::from("test"),
+            bps_ranges_count: 0,
+            bps_range_start_lines: Vec::new(),
+            bps_range_start_cols: Vec::new(),
+            bps_range_end_lines: Vec::new(),
+            bps_range_end_cols: Vec::new(),
+            bps_uri: String::from("test"),
+            bps_is_active: false,
+            bps_trigger_offset: 0,
+            bps_word_length: 0,
+        };
+        let _ = obj.bps_summary();
+        assert!(obj.bps_range_end_lines.is_empty());
+    }
+
+    #[test]
+    fn test_bps_range_end_cols() {
+        let obj = LinkedEditingRange {
+            bps_word_pattern: String::from("test"),
+            bps_ranges_count: 0,
+            bps_range_start_lines: Vec::new(),
+            bps_range_start_cols: Vec::new(),
+            bps_range_end_lines: Vec::new(),
+            bps_range_end_cols: Vec::new(),
+            bps_uri: String::from("test"),
+            bps_is_active: false,
+            bps_trigger_offset: 0,
+            bps_word_length: 0,
+        };
+        let _ = obj.bps_summary();
+        assert!(obj.bps_range_end_cols.is_empty());
+    }
+
+    #[test]
+    fn test_bps_uri() {
+        let obj = LinkedEditingRange {
+            bps_word_pattern: String::from("test"),
+            bps_ranges_count: 0,
+            bps_range_start_lines: Vec::new(),
+            bps_range_start_cols: Vec::new(),
+            bps_range_end_lines: Vec::new(),
+            bps_range_end_cols: Vec::new(),
+            bps_uri: String::from("test"),
+            bps_is_active: false,
+            bps_trigger_offset: 0,
+            bps_word_length: 0,
+        };
+        let _ = obj.bps_summary();
+        assert_eq!(obj.bps_uri, "test");
+    }
+
+    #[test]
+    fn test_bps_is_active() {
+        let obj = LinkedEditingRange {
+            bps_word_pattern: String::from("test"),
+            bps_ranges_count: 0,
+            bps_range_start_lines: Vec::new(),
+            bps_range_start_cols: Vec::new(),
+            bps_range_end_lines: Vec::new(),
+            bps_range_end_cols: Vec::new(),
+            bps_uri: String::from("test"),
+            bps_is_active: false,
+            bps_trigger_offset: 0,
+            bps_word_length: 0,
+        };
+        let _ = obj.bps_summary();
+        assert!(!obj.bps_is_active);
+    }
+
+    #[test]
+    fn test_bps_trigger_offset() {
+        let obj = LinkedEditingRange {
+            bps_word_pattern: String::from("test"),
+            bps_ranges_count: 0,
+            bps_range_start_lines: Vec::new(),
+            bps_range_start_cols: Vec::new(),
+            bps_range_end_lines: Vec::new(),
+            bps_range_end_cols: Vec::new(),
+            bps_uri: String::from("test"),
+            bps_is_active: false,
+            bps_trigger_offset: 0,
+            bps_word_length: 0,
+        };
+        let _ = obj.bps_summary();
+        assert_eq!(obj.bps_trigger_offset, 0);
+    }
+
+    #[test]
+    fn test_bps_word_length() {
+        let obj = LinkedEditingRange {
+            bps_word_pattern: String::from("test"),
+            bps_ranges_count: 0,
+            bps_range_start_lines: Vec::new(),
+            bps_range_start_cols: Vec::new(),
+            bps_range_end_lines: Vec::new(),
+            bps_range_end_cols: Vec::new(),
+            bps_uri: String::from("test"),
+            bps_is_active: false,
+            bps_trigger_offset: 0,
+            bps_word_length: 0,
+        };
+        let _ = obj.bps_summary();
+        assert_eq!(obj.bps_word_length, 0);
+    }
+
+
+    #[test]
+    fn test_bpt_range_start_line() {
+        let obj = SelectionRange {
+            bpt_range_start_line: 0,
+            bpt_range_start_col: 0,
+            bpt_range_end_line: 0,
+            bpt_range_end_col: 0,
+            bpt_parent_start_line: None,
+            bpt_parent_end_line: None,
+            bpt_depth: 0,
+            bpt_kind: String::from("test"),
+            bpt_is_statement: false,
+            bpt_is_block: false,
+        };
+        let _ = obj.bpt_summary();
+        assert_eq!(obj.bpt_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_bpt_range_start_col() {
+        let obj = SelectionRange {
+            bpt_range_start_line: 0,
+            bpt_range_start_col: 0,
+            bpt_range_end_line: 0,
+            bpt_range_end_col: 0,
+            bpt_parent_start_line: None,
+            bpt_parent_end_line: None,
+            bpt_depth: 0,
+            bpt_kind: String::from("test"),
+            bpt_is_statement: false,
+            bpt_is_block: false,
+        };
+        let _ = obj.bpt_summary();
+        assert_eq!(obj.bpt_range_start_col, 0);
+    }
+
+    #[test]
+    fn test_bpt_range_end_line() {
+        let obj = SelectionRange {
+            bpt_range_start_line: 0,
+            bpt_range_start_col: 0,
+            bpt_range_end_line: 0,
+            bpt_range_end_col: 0,
+            bpt_parent_start_line: None,
+            bpt_parent_end_line: None,
+            bpt_depth: 0,
+            bpt_kind: String::from("test"),
+            bpt_is_statement: false,
+            bpt_is_block: false,
+        };
+        let _ = obj.bpt_summary();
+        assert_eq!(obj.bpt_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_bpt_range_end_col() {
+        let obj = SelectionRange {
+            bpt_range_start_line: 0,
+            bpt_range_start_col: 0,
+            bpt_range_end_line: 0,
+            bpt_range_end_col: 0,
+            bpt_parent_start_line: None,
+            bpt_parent_end_line: None,
+            bpt_depth: 0,
+            bpt_kind: String::from("test"),
+            bpt_is_statement: false,
+            bpt_is_block: false,
+        };
+        let _ = obj.bpt_summary();
+        assert_eq!(obj.bpt_range_end_col, 0);
+    }
+
+    #[test]
+    fn test_bpt_parent_start_line() {
+        let obj = SelectionRange {
+            bpt_range_start_line: 0,
+            bpt_range_start_col: 0,
+            bpt_range_end_line: 0,
+            bpt_range_end_col: 0,
+            bpt_parent_start_line: None,
+            bpt_parent_end_line: None,
+            bpt_depth: 0,
+            bpt_kind: String::from("test"),
+            bpt_is_statement: false,
+            bpt_is_block: false,
+        };
+        let _ = obj.bpt_summary();
+        assert!(obj.bpt_parent_start_line.is_none());
+    }
+
+    #[test]
+    fn test_bpt_parent_end_line() {
+        let obj = SelectionRange {
+            bpt_range_start_line: 0,
+            bpt_range_start_col: 0,
+            bpt_range_end_line: 0,
+            bpt_range_end_col: 0,
+            bpt_parent_start_line: None,
+            bpt_parent_end_line: None,
+            bpt_depth: 0,
+            bpt_kind: String::from("test"),
+            bpt_is_statement: false,
+            bpt_is_block: false,
+        };
+        let _ = obj.bpt_summary();
+        assert!(obj.bpt_parent_end_line.is_none());
+    }
+
+    #[test]
+    fn test_bpt_depth() {
+        let obj = SelectionRange {
+            bpt_range_start_line: 0,
+            bpt_range_start_col: 0,
+            bpt_range_end_line: 0,
+            bpt_range_end_col: 0,
+            bpt_parent_start_line: None,
+            bpt_parent_end_line: None,
+            bpt_depth: 0,
+            bpt_kind: String::from("test"),
+            bpt_is_statement: false,
+            bpt_is_block: false,
+        };
+        let _ = obj.bpt_summary();
+        assert_eq!(obj.bpt_depth, 0);
+    }
+
+    #[test]
+    fn test_bpt_kind() {
+        let obj = SelectionRange {
+            bpt_range_start_line: 0,
+            bpt_range_start_col: 0,
+            bpt_range_end_line: 0,
+            bpt_range_end_col: 0,
+            bpt_parent_start_line: None,
+            bpt_parent_end_line: None,
+            bpt_depth: 0,
+            bpt_kind: String::from("test"),
+            bpt_is_statement: false,
+            bpt_is_block: false,
+        };
+        let _ = obj.bpt_summary();
+        assert_eq!(obj.bpt_kind, "test");
+    }
+
+    #[test]
+    fn test_bpt_is_statement() {
+        let obj = SelectionRange {
+            bpt_range_start_line: 0,
+            bpt_range_start_col: 0,
+            bpt_range_end_line: 0,
+            bpt_range_end_col: 0,
+            bpt_parent_start_line: None,
+            bpt_parent_end_line: None,
+            bpt_depth: 0,
+            bpt_kind: String::from("test"),
+            bpt_is_statement: false,
+            bpt_is_block: false,
+        };
+        let _ = obj.bpt_summary();
+        assert!(!obj.bpt_is_statement);
+    }
+
+    #[test]
+    fn test_bpt_is_block() {
+        let obj = SelectionRange {
+            bpt_range_start_line: 0,
+            bpt_range_start_col: 0,
+            bpt_range_end_line: 0,
+            bpt_range_end_col: 0,
+            bpt_parent_start_line: None,
+            bpt_parent_end_line: None,
+            bpt_depth: 0,
+            bpt_kind: String::from("test"),
+            bpt_is_statement: false,
+            bpt_is_block: false,
+        };
+        let _ = obj.bpt_summary();
+        assert!(!obj.bpt_is_block);
     }
 
 }
