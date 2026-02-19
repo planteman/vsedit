@@ -64997,3 +64997,181 @@ mod bcp_tests {
         assert_eq!(ch.render(5).len(), 5);
     }
 }
+
+
+// --- bcq_: Editor problems / diagnostics panel model ---
+
+/// Problem severity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BcqProblemSeverity { Error, Warning, Info, Hint }
+
+/// A single problem/diagnostic entry.
+#[derive(Debug, Clone)]
+pub struct BcqProblem {
+    pub file: String,
+    pub line: u32,
+    pub col: u32,
+    pub severity: BcqProblemSeverity,
+    pub message: String,
+    pub source: Option<String>,
+    pub code: Option<String>,
+}
+
+impl BcqProblem {
+    pub fn new(file: &str, line: u32, col: u32, sev: BcqProblemSeverity, msg: &str) -> Self {
+        Self { file: file.to_string(), line, col, severity: sev, message: msg.to_string(), source: None, code: None }
+    }
+
+    pub fn with_source(mut self, s: &str) -> Self { self.source = Some(s.to_string()); self }
+    pub fn with_code(mut self, c: &str) -> Self { self.code = Some(c.to_string()); self }
+
+    pub fn display(&self) -> String {
+        let sev = match self.severity { BcqProblemSeverity::Error => "E", BcqProblemSeverity::Warning => "W", BcqProblemSeverity::Info => "I", BcqProblemSeverity::Hint => "H" };
+        let src = self.source.as_deref().unwrap_or("");
+        format!("[{}] {}:{}:{} {} ({})", sev, self.file, self.line, self.col, self.message, src)
+    }
+}
+
+/// The problems panel model.
+#[derive(Debug)]
+pub struct BcqProblemsPanel {
+    problems: Vec<BcqProblem>,
+    filter: String,
+    show_errors: bool,
+    show_warnings: bool,
+    show_info: bool,
+    cursor: usize,
+}
+
+impl BcqProblemsPanel {
+    pub fn new() -> Self {
+        Self { problems: Vec::new(), filter: String::new(), show_errors: true, show_warnings: true, show_info: true, cursor: 0 }
+    }
+
+    pub fn set_problems(&mut self, problems: Vec<BcqProblem>) {
+        self.problems = problems;
+        self.problems.sort_by(|a, b| a.severity.cmp(&b.severity).then(a.file.cmp(&b.file)).then(a.line.cmp(&b.line)));
+        self.cursor = 0;
+    }
+
+    pub fn add_problem(&mut self, p: BcqProblem) { self.problems.push(p); }
+    pub fn clear(&mut self) { self.problems.clear(); self.cursor = 0; }
+    pub fn clear_file(&mut self, file: &str) { self.problems.retain(|p| p.file != file); }
+
+    pub fn set_filter(&mut self, f: &str) { self.filter = f.to_string(); self.cursor = 0; }
+    pub fn toggle_errors(&mut self) { self.show_errors = !self.show_errors; }
+    pub fn toggle_warnings(&mut self) { self.show_warnings = !self.show_warnings; }
+
+    pub fn visible_problems(&self) -> Vec<&BcqProblem> {
+        self.problems.iter().filter(|p| {
+            let sev_ok = match p.severity {
+                BcqProblemSeverity::Error => self.show_errors,
+                BcqProblemSeverity::Warning => self.show_warnings,
+                BcqProblemSeverity::Info | BcqProblemSeverity::Hint => self.show_info,
+            };
+            let filter_ok = self.filter.is_empty() || p.message.to_lowercase().contains(&self.filter.to_lowercase()) || p.file.to_lowercase().contains(&self.filter.to_lowercase());
+            sev_ok && filter_ok
+        }).collect()
+    }
+
+    pub fn error_count(&self) -> usize { self.problems.iter().filter(|p| p.severity == BcqProblemSeverity::Error).count() }
+    pub fn warning_count(&self) -> usize { self.problems.iter().filter(|p| p.severity == BcqProblemSeverity::Warning).count() }
+    pub fn total_count(&self) -> usize { self.problems.len() }
+
+    pub fn cursor_problem(&self) -> Option<&BcqProblem> { self.visible_problems().get(self.cursor).copied() }
+
+    pub fn move_cursor(&mut self, delta: i32) {
+        let count = self.visible_problems().len();
+        if count == 0 { return; }
+        self.cursor = ((self.cursor as i32 + delta).rem_euclid(count as i32)) as usize;
+    }
+
+    pub fn summary(&self) -> String {
+        format!("{} errors, {} warnings, {} total", self.error_count(), self.warning_count(), self.total_count())
+    }
+}
+
+#[cfg(test)]
+mod bcq_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcq_problem() {
+        let p = BcqProblem::new("src/main.rs", 10, 5, BcqProblemSeverity::Error, "unused var");
+        assert!(p.display().contains("[E]"));
+    }
+
+    #[test]
+    fn test_bcq_panel() {
+        let mut panel = BcqProblemsPanel::new();
+        panel.add_problem(BcqProblem::new("a.rs", 1, 1, BcqProblemSeverity::Error, "err"));
+        assert_eq!(panel.total_count(), 1);
+    }
+
+    #[test]
+    fn test_bcq_counts() {
+        let mut panel = BcqProblemsPanel::new();
+        panel.add_problem(BcqProblem::new("a.rs", 1, 1, BcqProblemSeverity::Error, "err"));
+        panel.add_problem(BcqProblem::new("a.rs", 2, 1, BcqProblemSeverity::Warning, "warn"));
+        assert_eq!(panel.error_count(), 1);
+        assert_eq!(panel.warning_count(), 1);
+    }
+
+    #[test]
+    fn test_bcq_filter() {
+        let mut panel = BcqProblemsPanel::new();
+        panel.add_problem(BcqProblem::new("a.rs", 1, 1, BcqProblemSeverity::Error, "unused variable"));
+        panel.add_problem(BcqProblem::new("b.rs", 1, 1, BcqProblemSeverity::Warning, "dead code"));
+        panel.set_filter("unused");
+        assert_eq!(panel.visible_problems().len(), 1);
+    }
+
+    #[test]
+    fn test_bcq_toggle() {
+        let mut panel = BcqProblemsPanel::new();
+        panel.add_problem(BcqProblem::new("a.rs", 1, 1, BcqProblemSeverity::Error, "e"));
+        panel.toggle_errors();
+        assert_eq!(panel.visible_problems().len(), 0);
+    }
+
+    #[test]
+    fn test_bcq_clear_file() {
+        let mut panel = BcqProblemsPanel::new();
+        panel.add_problem(BcqProblem::new("a.rs", 1, 1, BcqProblemSeverity::Error, "e"));
+        panel.add_problem(BcqProblem::new("b.rs", 1, 1, BcqProblemSeverity::Error, "e"));
+        panel.clear_file("a.rs");
+        assert_eq!(panel.total_count(), 1);
+    }
+
+    #[test]
+    fn test_bcq_cursor() {
+        let mut panel = BcqProblemsPanel::new();
+        panel.add_problem(BcqProblem::new("a.rs", 1, 1, BcqProblemSeverity::Error, "e1"));
+        panel.add_problem(BcqProblem::new("a.rs", 2, 1, BcqProblemSeverity::Error, "e2"));
+        panel.move_cursor(1);
+        assert_eq!(panel.cursor_problem().unwrap().message, "e2");
+    }
+
+    #[test]
+    fn test_bcq_summary() {
+        let mut panel = BcqProblemsPanel::new();
+        panel.add_problem(BcqProblem::new("a.rs", 1, 1, BcqProblemSeverity::Error, "e"));
+        assert!(panel.summary().contains("1 errors"));
+    }
+
+    #[test]
+    fn test_bcq_source() {
+        let p = BcqProblem::new("a.rs", 1, 1, BcqProblemSeverity::Warning, "w").with_source("rustc");
+        assert!(p.display().contains("rustc"));
+    }
+
+    #[test]
+    fn test_bcq_sorted() {
+        let mut panel = BcqProblemsPanel::new();
+        panel.set_problems(vec![
+            BcqProblem::new("b.rs", 1, 1, BcqProblemSeverity::Warning, "w"),
+            BcqProblem::new("a.rs", 1, 1, BcqProblemSeverity::Error, "e"),
+        ]);
+        assert_eq!(panel.visible_problems()[0].severity, BcqProblemSeverity::Error);
+    }
+}
