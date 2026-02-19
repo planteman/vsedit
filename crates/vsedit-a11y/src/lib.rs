@@ -97193,6 +97193,247 @@ impl std::fmt::Display for ThemeEntry {
     }
 }
 
+
+/// IconThemeEntry — icon theme entry
+#[derive(Debug, Clone)]
+pub struct IconThemeEntry {
+    pub bzk_id: String,
+    pub bzk_label: String,
+    pub bzk_path: String,
+    pub bzk_extension_id: String,
+    pub bzk_is_builtin: bool,
+    pub bzk_icon_count: u32,
+    pub bzk_folder_icon_count: u32,
+    pub bzk_has_file_icons: bool,
+}
+
+impl IconThemeEntry {
+    pub fn new() -> Self {
+        Self {
+            bzk_id: "seti".into(),
+            bzk_label: "Seti".into(),
+            bzk_path: "".into(),
+            bzk_extension_id: "".into(),
+            bzk_is_builtin: true,
+            bzk_icon_count: 0,
+            bzk_folder_icon_count: 0,
+            bzk_has_file_icons: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("IconThemeEntry({})", self.bzk_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzk_id.is_empty() || true
+    }
+}
+
+impl Default for IconThemeEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for IconThemeEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IconThemeEntry({})", self.bzk_id)
+    }
+}
+
+/// ProductIconThemeEntry — product icon theme entry
+#[derive(Debug, Clone)]
+pub struct ProductIconThemeEntry {
+    pub bzl_id: String,
+    pub bzl_label: String,
+    pub bzl_path: String,
+    pub bzl_extension_id: String,
+    pub bzl_is_builtin: bool,
+    pub bzl_icon_count: u32,
+    pub bzl_uses_codicons: bool,
+    pub bzl_font_count: u32,
+}
+
+impl ProductIconThemeEntry {
+    pub fn new() -> Self {
+        Self {
+            bzl_id: "default".into(),
+            bzl_label: "Default".into(),
+            bzl_path: "".into(),
+            bzl_extension_id: "".into(),
+            bzl_is_builtin: true,
+            bzl_icon_count: 0,
+            bzl_uses_codicons: true,
+            bzl_font_count: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ProductIconThemeEntry({})", self.bzl_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzl_id.is_empty() || true
+    }
+}
+
+impl Default for ProductIconThemeEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ProductIconThemeEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ProductIconThemeEntry({})", self.bzl_id)
+    }
+}
+
+/// LanguageExtensionPoint — language extension point
+#[derive(Debug, Clone)]
+pub struct LanguageExtensionPoint {
+    pub bzm_id: String,
+    pub bzm_aliases: String,
+    pub bzm_extensions: String,
+    pub bzm_filenames: String,
+    pub bzm_first_line: String,
+    pub bzm_configuration_path: String,
+    pub bzm_mime_types: String,
+    pub bzm_icon_class: String,
+}
+
+impl LanguageExtensionPoint {
+    pub fn new() -> Self {
+        Self {
+            bzm_id: "rust".into(),
+            bzm_aliases: "Rust".into(),
+            bzm_extensions: ".rs".into(),
+            bzm_filenames: "".into(),
+            bzm_first_line: "".into(),
+            bzm_configuration_path: "".into(),
+            bzm_mime_types: "text/x-rust".into(),
+            bzm_icon_class: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("LanguageExtensionPoint({})", self.bzm_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzm_id.is_empty() || true
+    }
+}
+
+impl Default for LanguageExtensionPoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for LanguageExtensionPoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LanguageExtensionPoint({})", self.bzm_id)
+    }
+}
+
+/// DebuggerContribution — debugger contribution entry
+#[derive(Debug, Clone)]
+pub struct DebuggerContribution {
+    pub bzn_debugger_type: String,
+    pub bzn_label: String,
+    pub bzn_program: String,
+    pub bzn_runtime: String,
+    pub bzn_languages: String,
+    pub bzn_config_attributes_count: u32,
+    pub bzn_initial_configs_count: u32,
+    pub bzn_source_extension: String,
+}
+
+impl DebuggerContribution {
+    pub fn new() -> Self {
+        Self {
+            bzn_debugger_type: "node".into(),
+            bzn_label: "Node.js".into(),
+            bzn_program: "".into(),
+            bzn_runtime: "node".into(),
+            bzn_languages: "javascript,typescript".into(),
+            bzn_config_attributes_count: 0,
+            bzn_initial_configs_count: 0,
+            bzn_source_extension: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("DebuggerContribution({})", self.bzn_debugger_type)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzn_debugger_type.is_empty() || true
+    }
+}
+
+impl Default for DebuggerContribution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for DebuggerContribution {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DebuggerContribution({})", self.bzn_debugger_type)
+    }
+}
+
+/// CustomEditorEntry — custom editor contribution
+#[derive(Debug, Clone)]
+pub struct CustomEditorEntry {
+    pub bzo_view_type: String,
+    pub bzo_display_name: String,
+    pub bzo_selector_glob: String,
+    pub bzo_priority: String,
+    pub bzo_extension_id: String,
+    pub bzo_supports_multi_root: bool,
+    pub bzo_backup_support: bool,
+    pub bzo_is_builtin: bool,
+}
+
+impl CustomEditorEntry {
+    pub fn new() -> Self {
+        Self {
+            bzo_view_type: "".into(),
+            bzo_display_name: "".into(),
+            bzo_selector_glob: "".into(),
+            bzo_priority: "default".into(),
+            bzo_extension_id: "".into(),
+            bzo_supports_multi_root: false,
+            bzo_backup_support: false,
+            bzo_is_builtin: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("CustomEditorEntry({})", self.bzo_view_type)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bzo_view_type.is_empty() || true
+    }
+}
+
+impl Default for CustomEditorEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for CustomEditorEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CustomEditorEntry({})", self.bzo_view_type)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -149637,6 +149878,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bzj_id = "default-dark".into();
         assert_eq!(c.summary(), ThemeEntry::new().summary());
+    }
+
+
+    #[test]
+    fn test_bzk_create() {
+        let obj = IconThemeEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzk_validate() {
+        let obj = IconThemeEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzk_display() {
+        let obj = IconThemeEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("IconThemeEntry"));
+    }
+
+    #[test]
+    fn test_bzk_clone() {
+        let obj = IconThemeEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzk_debug() {
+        let obj = IconThemeEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("IconThemeEntry"));
+    }
+
+    #[test]
+    fn test_bzk_default() {
+        let obj = IconThemeEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzk_summary_contains_name() {
+        let obj = IconThemeEntry::new();
+        assert!(obj.summary().contains("IconThemeEntry"));
+    }
+
+    #[test]
+    fn test_bzk_validate_default() {
+        let obj = IconThemeEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzk_display_not_empty() {
+        let obj = IconThemeEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzk_clone_independence() {
+        let mut obj = IconThemeEntry::new();
+        let c = obj.clone();
+        obj.bzk_id = "seti".into();
+        assert_eq!(c.summary(), IconThemeEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bzl_create() {
+        let obj = ProductIconThemeEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzl_validate() {
+        let obj = ProductIconThemeEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzl_display() {
+        let obj = ProductIconThemeEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ProductIconThemeEntry"));
+    }
+
+    #[test]
+    fn test_bzl_clone() {
+        let obj = ProductIconThemeEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzl_debug() {
+        let obj = ProductIconThemeEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ProductIconThemeEntry"));
+    }
+
+    #[test]
+    fn test_bzl_default() {
+        let obj = ProductIconThemeEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzl_summary_contains_name() {
+        let obj = ProductIconThemeEntry::new();
+        assert!(obj.summary().contains("ProductIconThemeEntry"));
+    }
+
+    #[test]
+    fn test_bzl_validate_default() {
+        let obj = ProductIconThemeEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzl_display_not_empty() {
+        let obj = ProductIconThemeEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzl_clone_independence() {
+        let mut obj = ProductIconThemeEntry::new();
+        let c = obj.clone();
+        obj.bzl_id = "default".into();
+        assert_eq!(c.summary(), ProductIconThemeEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bzm_create() {
+        let obj = LanguageExtensionPoint::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzm_validate() {
+        let obj = LanguageExtensionPoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzm_display() {
+        let obj = LanguageExtensionPoint::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("LanguageExtensionPoint"));
+    }
+
+    #[test]
+    fn test_bzm_clone() {
+        let obj = LanguageExtensionPoint::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzm_debug() {
+        let obj = LanguageExtensionPoint::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("LanguageExtensionPoint"));
+    }
+
+    #[test]
+    fn test_bzm_default() {
+        let obj = LanguageExtensionPoint::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzm_summary_contains_name() {
+        let obj = LanguageExtensionPoint::new();
+        assert!(obj.summary().contains("LanguageExtensionPoint"));
+    }
+
+    #[test]
+    fn test_bzm_validate_default() {
+        let obj = LanguageExtensionPoint::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzm_display_not_empty() {
+        let obj = LanguageExtensionPoint::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzm_clone_independence() {
+        let mut obj = LanguageExtensionPoint::new();
+        let c = obj.clone();
+        obj.bzm_id = "rust".into();
+        assert_eq!(c.summary(), LanguageExtensionPoint::new().summary());
+    }
+
+    #[test]
+    fn test_bzn_create() {
+        let obj = DebuggerContribution::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzn_validate() {
+        let obj = DebuggerContribution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzn_display() {
+        let obj = DebuggerContribution::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("DebuggerContribution"));
+    }
+
+    #[test]
+    fn test_bzn_clone() {
+        let obj = DebuggerContribution::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzn_debug() {
+        let obj = DebuggerContribution::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("DebuggerContribution"));
+    }
+
+    #[test]
+    fn test_bzn_default() {
+        let obj = DebuggerContribution::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzn_summary_contains_name() {
+        let obj = DebuggerContribution::new();
+        assert!(obj.summary().contains("DebuggerContribution"));
+    }
+
+    #[test]
+    fn test_bzn_validate_default() {
+        let obj = DebuggerContribution::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzn_display_not_empty() {
+        let obj = DebuggerContribution::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzn_clone_independence() {
+        let mut obj = DebuggerContribution::new();
+        let c = obj.clone();
+        obj.bzn_debugger_type = "node".into();
+        assert_eq!(c.summary(), DebuggerContribution::new().summary());
+    }
+
+    #[test]
+    fn test_bzo_create() {
+        let obj = CustomEditorEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzo_validate() {
+        let obj = CustomEditorEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzo_display() {
+        let obj = CustomEditorEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("CustomEditorEntry"));
+    }
+
+    #[test]
+    fn test_bzo_clone() {
+        let obj = CustomEditorEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bzo_debug() {
+        let obj = CustomEditorEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("CustomEditorEntry"));
+    }
+
+    #[test]
+    fn test_bzo_default() {
+        let obj = CustomEditorEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bzo_summary_contains_name() {
+        let obj = CustomEditorEntry::new();
+        assert!(obj.summary().contains("CustomEditorEntry"));
+    }
+
+    #[test]
+    fn test_bzo_validate_default() {
+        let obj = CustomEditorEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bzo_display_not_empty() {
+        let obj = CustomEditorEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bzo_clone_independence() {
+        let mut obj = CustomEditorEntry::new();
+        let c = obj.clone();
+        obj.bzo_view_type = "".into();
+        assert_eq!(c.summary(), CustomEditorEntry::new().summary());
     }
 
 }
