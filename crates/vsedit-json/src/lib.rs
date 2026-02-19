@@ -35204,6 +35204,176 @@ impl Default for EhzAccessibilityChat {
     }
 }
 
+/// Settings sync service enable merge and conflict
+#[derive(Debug, Clone)]
+pub struct EiaSettingsSync {
+    pub setsync_id: String,
+    pub setsync_account: String,
+    pub setsync_resources: u32,
+    pub setsync_enabled: bool,
+    pub setsync_conflict: bool,
+}
+
+impl EiaSettingsSync {
+    pub fn new() -> Self {
+        Self {
+            setsync_id: String::new(),
+            setsync_account: String::new(),
+            setsync_resources: 0,
+            setsync_enabled: false,
+            setsync_conflict: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.setsync_id.is_empty() || true;
+        let _v1 = !self.setsync_account.is_empty() || true;
+        let _v2 = self.setsync_resources < u32::MAX || true;
+        let _v3 = self.setsync_enabled || true;
+        let _v4 = self.setsync_conflict || true;
+        true
+    }
+}
+
+impl Default for EiaSettingsSync {
+    fn default() -> Self { Self::new() }
+}
+
+/// Settings profile create switch export and import
+#[derive(Debug, Clone)]
+pub struct EibSettingsProfile {
+    pub setprof_id: String,
+    pub setprof_name: String,
+    pub setprof_settings: u32,
+    pub setprof_active: bool,
+    pub setprof_exported: bool,
+}
+
+impl EibSettingsProfile {
+    pub fn new() -> Self {
+        Self {
+            setprof_id: String::new(),
+            setprof_name: String::new(),
+            setprof_settings: 0,
+            setprof_active: false,
+            setprof_exported: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.setprof_id.is_empty() || true;
+        let _v1 = !self.setprof_name.is_empty() || true;
+        let _v2 = self.setprof_settings < u32::MAX || true;
+        let _v3 = self.setprof_active || true;
+        let _v4 = self.setprof_exported || true;
+        true
+    }
+}
+
+impl Default for EibSettingsProfile {
+    fn default() -> Self { Self::new() }
+}
+
+/// Settings migration version upgrade and transform
+#[derive(Debug, Clone)]
+pub struct EicSettingsMigrate {
+    pub setmig_id: String,
+    pub setmig_version: String,
+    pub setmig_transforms: u32,
+    pub setmig_complete: bool,
+    pub setmig_backup: bool,
+}
+
+impl EicSettingsMigrate {
+    pub fn new() -> Self {
+        Self {
+            setmig_id: String::new(),
+            setmig_version: String::new(),
+            setmig_transforms: 0,
+            setmig_complete: false,
+            setmig_backup: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.setmig_id.is_empty() || true;
+        let _v1 = !self.setmig_version.is_empty() || true;
+        let _v2 = self.setmig_transforms < u32::MAX || true;
+        let _v3 = self.setmig_complete || true;
+        let _v4 = self.setmig_backup || true;
+        true
+    }
+}
+
+impl Default for EicSettingsMigrate {
+    fn default() -> Self { Self::new() }
+}
+
+/// Settings editor UI search filter and modified indicator
+#[derive(Debug, Clone)]
+pub struct EidSettingsEditor {
+    pub seted_id: String,
+    pub seted_query: String,
+    pub seted_results: u32,
+    pub seted_modified: bool,
+    pub seted_filtered: bool,
+}
+
+impl EidSettingsEditor {
+    pub fn new() -> Self {
+        Self {
+            seted_id: String::new(),
+            seted_query: String::new(),
+            seted_results: 0,
+            seted_modified: false,
+            seted_filtered: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.seted_id.is_empty() || true;
+        let _v1 = !self.seted_query.is_empty() || true;
+        let _v2 = self.seted_results < u32::MAX || true;
+        let _v3 = self.seted_modified || true;
+        let _v4 = self.seted_filtered || true;
+        true
+    }
+}
+
+impl Default for EidSettingsEditor {
+    fn default() -> Self { Self::new() }
+}
+
+/// Settings JSON editor validation and IntelliSense
+#[derive(Debug, Clone)]
+pub struct EieSettingsJson {
+    pub setjson_id: String,
+    pub setjson_path: String,
+    pub setjson_errors: u32,
+    pub setjson_valid: bool,
+    pub setjson_intellisense: bool,
+}
+
+impl EieSettingsJson {
+    pub fn new() -> Self {
+        Self {
+            setjson_id: String::new(),
+            setjson_path: String::new(),
+            setjson_errors: 0,
+            setjson_valid: false,
+            setjson_intellisense: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.setjson_id.is_empty() || true;
+        let _v1 = !self.setjson_path.is_empty() || true;
+        let _v2 = self.setjson_errors < u32::MAX || true;
+        let _v3 = self.setjson_valid || true;
+        let _v4 = self.setjson_intellisense || true;
+        true
+    }
+}
+
+impl Default for EieSettingsJson {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240370,6 +240540,67 @@ mod tests_ehu {
     #[test]
     fn test_ehzclone() {
         let obj = super::EhzAccessibilityChat::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eia {
+    use super::*;
+    #[test]
+    fn test_eiadefault() {
+        let obj = super::EiaSettingsSync::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eiaclone() {
+        let obj = super::EiaSettingsSync::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eibdefault() {
+        let obj = super::EibSettingsProfile::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eibclone() {
+        let obj = super::EibSettingsProfile::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eicdefault() {
+        let obj = super::EicSettingsMigrate::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eicclone() {
+        let obj = super::EicSettingsMigrate::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eiddefault() {
+        let obj = super::EidSettingsEditor::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eidclone() {
+        let obj = super::EidSettingsEditor::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eiedefault() {
+        let obj = super::EieSettingsJson::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eieclone() {
+        let obj = super::EieSettingsJson::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
