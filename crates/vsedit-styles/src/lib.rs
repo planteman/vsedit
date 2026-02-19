@@ -63851,3 +63851,165 @@ mod bcj_tests {
         assert!(ib.is_valid()); // warnings don't block
     }
 }
+
+
+// --- bck_: Editor dialog / message box model ---
+
+/// Dialog severity icon.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BckDialogSeverity { Info, Warning, Error, None }
+
+/// A dialog button.
+#[derive(Debug, Clone)]
+pub struct BckDialogButton {
+    pub id: String,
+    pub label: String,
+    pub is_close: bool,
+}
+
+impl BckDialogButton {
+    pub fn new(id: &str, label: &str) -> Self { Self { id: id.to_string(), label: label.to_string(), is_close: false } }
+    pub fn close(id: &str, label: &str) -> Self { Self { id: id.to_string(), label: label.to_string(), is_close: true } }
+}
+
+/// A dialog with message and buttons.
+#[derive(Debug)]
+pub struct BckDialog {
+    severity: BckDialogSeverity,
+    message: String,
+    detail: Option<String>,
+    buttons: Vec<BckDialogButton>,
+    checkbox_label: Option<String>,
+    checkbox_checked: bool,
+    selected_button: usize,
+}
+
+impl BckDialog {
+    pub fn new(sev: BckDialogSeverity, message: &str) -> Self {
+        Self { severity: sev, message: message.to_string(), detail: None, buttons: Vec::new(), checkbox_label: None, checkbox_checked: false, selected_button: 0 }
+    }
+
+    pub fn info(msg: &str) -> Self { Self::new(BckDialogSeverity::Info, msg) }
+    pub fn warning(msg: &str) -> Self { Self::new(BckDialogSeverity::Warning, msg) }
+    pub fn error(msg: &str) -> Self { Self::new(BckDialogSeverity::Error, msg) }
+
+    pub fn with_detail(mut self, d: &str) -> Self { self.detail = Some(d.to_string()); self }
+    pub fn with_button(mut self, b: BckDialogButton) -> Self { self.buttons.push(b); self }
+    pub fn with_checkbox(mut self, label: &str) -> Self { self.checkbox_label = Some(label.to_string()); self }
+
+    pub fn message(&self) -> &str { &self.message }
+    pub fn detail(&self) -> Option<&str> { self.detail.as_deref() }
+    pub fn severity(&self) -> BckDialogSeverity { self.severity }
+    pub fn buttons(&self) -> &[BckDialogButton] { &self.buttons }
+    pub fn has_checkbox(&self) -> bool { self.checkbox_label.is_some() }
+    pub fn is_checkbox_checked(&self) -> bool { self.checkbox_checked }
+
+    pub fn toggle_checkbox(&mut self) { self.checkbox_checked = !self.checkbox_checked; }
+
+    pub fn move_selection(&mut self, delta: i32) {
+        if self.buttons.is_empty() { return; }
+        let n = self.buttons.len() as i32;
+        self.selected_button = ((self.selected_button as i32 + delta).rem_euclid(n)) as usize;
+    }
+
+    pub fn selected_button(&self) -> Option<&BckDialogButton> { self.buttons.get(self.selected_button) }
+
+    pub fn confirm_save_dialog(filename: &str) -> Self {
+        Self::warning(&format!("Do you want to save changes to {}?", filename))
+            .with_detail("Your changes will be lost if you don't save them.")
+            .with_button(BckDialogButton::new("save", "Save"))
+            .with_button(BckDialogButton::new("dont_save", "Don't Save"))
+            .with_button(BckDialogButton::close("cancel", "Cancel"))
+    }
+
+    pub fn render(&self, width: usize) -> Vec<String> {
+        let mut lines = Vec::new();
+        let icon = match self.severity { BckDialogSeverity::Info => "ℹ ", BckDialogSeverity::Warning => "⚠ ", BckDialogSeverity::Error => "✗ ", BckDialogSeverity::None => "" };
+        lines.push(format!("{}{}", icon, self.message));
+        if let Some(d) = &self.detail { lines.push(format!("  {}", d)); }
+        if let Some(cb) = &self.checkbox_label {
+            let mark = if self.checkbox_checked { "☑" } else { "☐" };
+            lines.push(format!("  {} {}", mark, cb));
+        }
+        let btns: String = self.buttons.iter().enumerate().map(|(i, b)| {
+            if i == self.selected_button { format!(" [{}] ", b.label) } else { format!("  {}  ", b.label) }
+        }).collect();
+        if !btns.is_empty() { lines.push(btns[..btns.len().min(width)].to_string()); }
+        lines
+    }
+}
+
+#[cfg(test)]
+mod bck_tests {
+    use super::*;
+
+    #[test]
+    fn test_bck_info() {
+        let d = BckDialog::info("Hello");
+        assert_eq!(d.severity(), BckDialogSeverity::Info);
+        assert_eq!(d.message(), "Hello");
+    }
+
+    #[test]
+    fn test_bck_buttons() {
+        let d = BckDialog::warning("Sure?").with_button(BckDialogButton::new("ok", "OK"));
+        assert_eq!(d.buttons().len(), 1);
+    }
+
+    #[test]
+    fn test_bck_selection() {
+        let mut d = BckDialog::info("X").with_button(BckDialogButton::new("a", "A")).with_button(BckDialogButton::new("b", "B"));
+        assert_eq!(d.selected_button().unwrap().id, "a");
+        d.move_selection(1);
+        assert_eq!(d.selected_button().unwrap().id, "b");
+    }
+
+    #[test]
+    fn test_bck_checkbox() {
+        let mut d = BckDialog::info("X").with_checkbox("Don't show again");
+        assert!(d.has_checkbox());
+        assert!(!d.is_checkbox_checked());
+        d.toggle_checkbox();
+        assert!(d.is_checkbox_checked());
+    }
+
+    #[test]
+    fn test_bck_confirm_save() {
+        let d = BckDialog::confirm_save_dialog("main.rs");
+        assert!(d.message().contains("main.rs"));
+        assert_eq!(d.buttons().len(), 3);
+    }
+
+    #[test]
+    fn test_bck_render() {
+        let d = BckDialog::error("Failed").with_detail("Check logs");
+        let lines = d.render(60);
+        assert!(lines[0].contains("✗"));
+        assert!(lines.len() >= 2);
+    }
+
+    #[test]
+    fn test_bck_wrap_selection() {
+        let mut d = BckDialog::info("X").with_button(BckDialogButton::new("a", "A")).with_button(BckDialogButton::new("b", "B"));
+        d.move_selection(-1); // wraps to last
+        assert_eq!(d.selected_button().unwrap().id, "b");
+    }
+
+    #[test]
+    fn test_bck_detail() {
+        let d = BckDialog::info("X").with_detail("Details here");
+        assert_eq!(d.detail(), Some("Details here"));
+    }
+
+    #[test]
+    fn test_bck_close_button() {
+        let b = BckDialogButton::close("cancel", "Cancel");
+        assert!(b.is_close);
+    }
+
+    #[test]
+    fn test_bck_no_buttons() {
+        let d = BckDialog::info("Simple");
+        assert!(d.selected_button().is_none());
+    }
+}
