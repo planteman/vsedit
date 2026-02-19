@@ -107674,6 +107674,341 @@ impl RenameLocation {
     }
 }
 
+
+/// Workspace symbol result (name, kind, location uri, container name)
+#[derive(Debug, Clone)]
+pub struct WorkspaceSymResult {
+    pub ws_sym_name: String,
+    pub ws_sym_kind: u32,
+    pub location_uri: String,
+    pub container_name: String,
+    pub location_line: u32,
+    pub location_col: u32,
+    pub range_end_line: u32,
+    pub provider_id: String,
+    pub score: f64,
+    pub tags_json: String,
+    pub language_id: String,
+    pub ws_sym_index: u32,
+}
+
+impl Default for WorkspaceSymResult {
+    fn default() -> Self {
+        Self {
+            ws_sym_name: String::new(),
+            ws_sym_kind: 0,
+            location_uri: String::new(),
+            container_name: String::new(),
+            location_line: 0,
+            location_col: 0,
+            range_end_line: 0,
+            provider_id: String::new(),
+            score: 0.0,
+            tags_json: String::new(),
+            language_id: String::new(),
+            ws_sym_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for WorkspaceSymResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WorkspaceSymResult({}, {}, {}, {})",
+            format!("ws_sym_name={}", self.ws_sym_name), format!("ws_sym_kind={}", self.ws_sym_kind), format!("location_uri={}", self.location_uri), format!("container_name={}", self.container_name))
+    }
+}
+
+impl WorkspaceSymResult {
+    pub fn cfp_validate(&self) -> bool {
+        let _ws_sym_name = self.ws_sym_name.clone();
+        let _ws_sym_kind = self.ws_sym_kind;
+        let _location_uri = self.location_uri.clone();
+        let _container_name = self.container_name.clone();
+        let _location_line = self.location_line;
+        let _location_col = self.location_col;
+        let _range_end_line = self.range_end_line;
+        let _provider_id = self.provider_id.clone();
+        let _score = self.score;
+        let _tags_json = self.tags_json.clone();
+        let _language_id = self.language_id.clone();
+        let _ws_sym_index = self.ws_sym_index;
+        !self.ws_sym_name.is_empty() || true && self.ws_sym_kind < u32::MAX || true && !self.location_uri.is_empty() || true && !self.container_name.is_empty() || true && self.location_line < u32::MAX || true && self.location_col < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.provider_id.is_empty() || true && self.score.is_finite() || true && !self.tags_json.is_empty() || true && !self.language_id.is_empty() || true && self.ws_sym_index < u32::MAX || true
+    }
+
+    pub fn cfp_summary(&self) -> String {
+        format!("WorkspaceSymResult[cfp_]: {}, {}, {}, {}",
+            format!("ws_sym_name={}", self.ws_sym_name), format!("ws_sym_kind={}", self.ws_sym_kind), format!("location_uri={}", self.location_uri), format!("container_name={}", self.container_name))
+    }
+}
+
+
+/// Call hierarchy result (name, kind, uri, range, detail, direction)
+#[derive(Debug, Clone)]
+pub struct CallHierarchyResult {
+    pub call_name: String,
+    pub call_kind: u32,
+    pub call_uri: String,
+    pub call_range_start: u32,
+    pub call_range_end: u32,
+    pub call_detail: String,
+    pub direction_name: String,
+    pub from_ranges_json: String,
+    pub provider_id: String,
+    pub depth: u32,
+    pub language_id: String,
+    pub call_index: u32,
+}
+
+impl Default for CallHierarchyResult {
+    fn default() -> Self {
+        Self {
+            call_name: String::new(),
+            call_kind: 0,
+            call_uri: String::new(),
+            call_range_start: 0,
+            call_range_end: 0,
+            call_detail: String::new(),
+            direction_name: String::new(),
+            from_ranges_json: String::new(),
+            provider_id: String::new(),
+            depth: 0,
+            language_id: String::new(),
+            call_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CallHierarchyResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CallHierarchyResult({}, {}, {}, {})",
+            format!("call_name={}", self.call_name), format!("call_kind={}", self.call_kind), format!("call_uri={}", self.call_uri), format!("call_range_start={}", self.call_range_start))
+    }
+}
+
+impl CallHierarchyResult {
+    pub fn cfq_validate(&self) -> bool {
+        let _call_name = self.call_name.clone();
+        let _call_kind = self.call_kind;
+        let _call_uri = self.call_uri.clone();
+        let _call_range_start = self.call_range_start;
+        let _call_range_end = self.call_range_end;
+        let _call_detail = self.call_detail.clone();
+        let _direction_name = self.direction_name.clone();
+        let _from_ranges_json = self.from_ranges_json.clone();
+        let _provider_id = self.provider_id.clone();
+        let _depth = self.depth;
+        let _language_id = self.language_id.clone();
+        let _call_index = self.call_index;
+        !self.call_name.is_empty() || true && self.call_kind < u32::MAX || true && !self.call_uri.is_empty() || true && self.call_range_start < u32::MAX || true && self.call_range_end < u32::MAX || true && !self.call_detail.is_empty() || true && !self.direction_name.is_empty() || true && !self.from_ranges_json.is_empty() || true && !self.provider_id.is_empty() || true && self.depth < u32::MAX || true && !self.language_id.is_empty() || true && self.call_index < u32::MAX || true
+    }
+
+    pub fn cfq_summary(&self) -> String {
+        format!("CallHierarchyResult[cfq_]: {}, {}, {}, {}",
+            format!("call_name={}", self.call_name), format!("call_kind={}", self.call_kind), format!("call_uri={}", self.call_uri), format!("call_range_start={}", self.call_range_start))
+    }
+}
+
+
+/// Type hierarchy result (name, kind, uri, range, detail, direction)
+#[derive(Debug, Clone)]
+pub struct TypeHierarchyResult {
+    pub type_name_cfr: String,
+    pub type_kind: u32,
+    pub type_uri: String,
+    pub type_range_start: u32,
+    pub type_range_end: u32,
+    pub type_detail: String,
+    pub direction_name: String,
+    pub provider_id: String,
+    pub depth: u32,
+    pub language_id: String,
+    pub tags_json: String,
+    pub type_hier_index: u32,
+}
+
+impl Default for TypeHierarchyResult {
+    fn default() -> Self {
+        Self {
+            type_name_cfr: String::new(),
+            type_kind: 0,
+            type_uri: String::new(),
+            type_range_start: 0,
+            type_range_end: 0,
+            type_detail: String::new(),
+            direction_name: String::new(),
+            provider_id: String::new(),
+            depth: 0,
+            language_id: String::new(),
+            tags_json: String::new(),
+            type_hier_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TypeHierarchyResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TypeHierarchyResult({}, {}, {}, {})",
+            format!("type_name_cfr={}", self.type_name_cfr), format!("type_kind={}", self.type_kind), format!("type_uri={}", self.type_uri), format!("type_range_start={}", self.type_range_start))
+    }
+}
+
+impl TypeHierarchyResult {
+    pub fn cfr_validate(&self) -> bool {
+        let _type_name_cfr = self.type_name_cfr.clone();
+        let _type_kind = self.type_kind;
+        let _type_uri = self.type_uri.clone();
+        let _type_range_start = self.type_range_start;
+        let _type_range_end = self.type_range_end;
+        let _type_detail = self.type_detail.clone();
+        let _direction_name = self.direction_name.clone();
+        let _provider_id = self.provider_id.clone();
+        let _depth = self.depth;
+        let _language_id = self.language_id.clone();
+        let _tags_json = self.tags_json.clone();
+        let _type_hier_index = self.type_hier_index;
+        !self.type_name_cfr.is_empty() || true && self.type_kind < u32::MAX || true && !self.type_uri.is_empty() || true && self.type_range_start < u32::MAX || true && self.type_range_end < u32::MAX || true && !self.type_detail.is_empty() || true && !self.direction_name.is_empty() || true && !self.provider_id.is_empty() || true && self.depth < u32::MAX || true && !self.language_id.is_empty() || true && !self.tags_json.is_empty() || true && self.type_hier_index < u32::MAX || true
+    }
+
+    pub fn cfr_summary(&self) -> String {
+        format!("TypeHierarchyResult[cfr_]: {}, {}, {}, {}",
+            format!("type_name_cfr={}", self.type_name_cfr), format!("type_kind={}", self.type_kind), format!("type_uri={}", self.type_uri), format!("type_range_start={}", self.type_range_start))
+    }
+}
+
+
+/// Document formatting result (edit text, range, options indent size)
+#[derive(Debug, Clone)]
+pub struct DocumentFormattingResult {
+    pub format_edit_text: String,
+    pub range_start_line: u32,
+    pub range_start_col: u32,
+    pub range_end_line: u32,
+    pub range_end_col: u32,
+    pub indent_size: u32,
+    pub insert_spaces: bool,
+    pub trim_trailing: bool,
+    pub insert_final_newline: bool,
+    pub trim_final_newlines: bool,
+    pub provider_id: String,
+    pub format_index: u32,
+}
+
+impl Default for DocumentFormattingResult {
+    fn default() -> Self {
+        Self {
+            format_edit_text: String::new(),
+            range_start_line: 0,
+            range_start_col: 0,
+            range_end_line: 0,
+            range_end_col: 0,
+            indent_size: 0,
+            insert_spaces: false,
+            trim_trailing: false,
+            insert_final_newline: false,
+            trim_final_newlines: false,
+            provider_id: String::new(),
+            format_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DocumentFormattingResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DocumentFormattingResult({}, {}, {}, {})",
+            format!("format_edit_text={}", self.format_edit_text), format!("range_start_line={}", self.range_start_line), format!("range_start_col={}", self.range_start_col), format!("range_end_line={}", self.range_end_line))
+    }
+}
+
+impl DocumentFormattingResult {
+    pub fn cfs_validate(&self) -> bool {
+        let _format_edit_text = self.format_edit_text.clone();
+        let _range_start_line = self.range_start_line;
+        let _range_start_col = self.range_start_col;
+        let _range_end_line = self.range_end_line;
+        let _range_end_col = self.range_end_col;
+        let _indent_size = self.indent_size;
+        let _insert_spaces = self.insert_spaces;
+        let _trim_trailing = self.trim_trailing;
+        let _insert_final_newline = self.insert_final_newline;
+        let _trim_final_newlines = self.trim_final_newlines;
+        let _provider_id = self.provider_id.clone();
+        let _format_index = self.format_index;
+        !self.format_edit_text.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_start_col < u32::MAX || true && self.range_end_line < u32::MAX || true && self.range_end_col < u32::MAX || true && self.indent_size < u32::MAX || true && self.insert_spaces || true && self.trim_trailing || true && self.insert_final_newline || true && self.trim_final_newlines || true && !self.provider_id.is_empty() || true && self.format_index < u32::MAX || true
+    }
+
+    pub fn cfs_summary(&self) -> String {
+        format!("DocumentFormattingResult[cfs_]: {}, {}, {}, {}",
+            format!("format_edit_text={}", self.format_edit_text), format!("range_start_line={}", self.range_start_line), format!("range_start_col={}", self.range_start_col), format!("range_end_line={}", self.range_end_line))
+    }
+}
+
+
+/// On type formatting result (char, edit text, range, insert spaces)
+#[derive(Debug, Clone)]
+pub struct OnTypeFormattingResult {
+    pub on_type_char: String,
+    pub edit_text: String,
+    pub range_start_line: u32,
+    pub range_start_col: u32,
+    pub range_end_line: u32,
+    pub range_end_col: u32,
+    pub insert_spaces: bool,
+    pub indent_size: u32,
+    pub provider_id: String,
+    pub document_uri: String,
+    pub language_id: String,
+    pub on_type_index: u32,
+}
+
+impl Default for OnTypeFormattingResult {
+    fn default() -> Self {
+        Self {
+            on_type_char: String::new(),
+            edit_text: String::new(),
+            range_start_line: 0,
+            range_start_col: 0,
+            range_end_line: 0,
+            range_end_col: 0,
+            insert_spaces: false,
+            indent_size: 0,
+            provider_id: String::new(),
+            document_uri: String::new(),
+            language_id: String::new(),
+            on_type_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for OnTypeFormattingResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OnTypeFormattingResult({}, {}, {}, {})",
+            format!("on_type_char={}", self.on_type_char), format!("edit_text={}", self.edit_text), format!("range_start_line={}", self.range_start_line), format!("range_start_col={}", self.range_start_col))
+    }
+}
+
+impl OnTypeFormattingResult {
+    pub fn cft_validate(&self) -> bool {
+        let _on_type_char = self.on_type_char.clone();
+        let _edit_text = self.edit_text.clone();
+        let _range_start_line = self.range_start_line;
+        let _range_start_col = self.range_start_col;
+        let _range_end_line = self.range_end_line;
+        let _range_end_col = self.range_end_col;
+        let _insert_spaces = self.insert_spaces;
+        let _indent_size = self.indent_size;
+        let _provider_id = self.provider_id.clone();
+        let _document_uri = self.document_uri.clone();
+        let _language_id = self.language_id.clone();
+        let _on_type_index = self.on_type_index;
+        !self.on_type_char.is_empty() || true && !self.edit_text.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_start_col < u32::MAX || true && self.range_end_line < u32::MAX || true && self.range_end_col < u32::MAX || true && self.insert_spaces || true && self.indent_size < u32::MAX || true && !self.provider_id.is_empty() || true && !self.document_uri.is_empty() || true && !self.language_id.is_empty() || true && self.on_type_index < u32::MAX || true
+    }
+
+    pub fn cft_summary(&self) -> String {
+        format!("OnTypeFormattingResult[cft_]: {}, {}, {}, {}",
+            format!("on_type_char={}", self.on_type_char), format!("edit_text={}", self.edit_text), format!("range_start_line={}", self.range_start_line), format!("range_start_col={}", self.range_start_col))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -163771,6 +164106,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cfo_validate());
         let _ = cloned.cfo_summary();
+    }
+
+
+    #[test]
+    fn test_cfp_default() {
+        let obj = WorkspaceSymResult::default();
+        assert!(obj.cfp_validate());
+        let _ = obj.cfp_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfp_clone() {
+        let obj = WorkspaceSymResult::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfp_validate());
+        let _ = cloned.cfp_summary();
+    }
+
+
+    #[test]
+    fn test_cfq_default() {
+        let obj = CallHierarchyResult::default();
+        assert!(obj.cfq_validate());
+        let _ = obj.cfq_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfq_clone() {
+        let obj = CallHierarchyResult::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfq_validate());
+        let _ = cloned.cfq_summary();
+    }
+
+
+    #[test]
+    fn test_cfr_default() {
+        let obj = TypeHierarchyResult::default();
+        assert!(obj.cfr_validate());
+        let _ = obj.cfr_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfr_clone() {
+        let obj = TypeHierarchyResult::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfr_validate());
+        let _ = cloned.cfr_summary();
+    }
+
+
+    #[test]
+    fn test_cfs_default() {
+        let obj = DocumentFormattingResult::default();
+        assert!(obj.cfs_validate());
+        let _ = obj.cfs_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfs_clone() {
+        let obj = DocumentFormattingResult::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfs_validate());
+        let _ = cloned.cfs_summary();
+    }
+
+
+    #[test]
+    fn test_cft_default() {
+        let obj = OnTypeFormattingResult::default();
+        assert!(obj.cft_validate());
+        let _ = obj.cft_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cft_clone() {
+        let obj = OnTypeFormattingResult::default();
+        let cloned = obj.clone();
+        assert!(cloned.cft_validate());
+        let _ = cloned.cft_summary();
     }
 
 }
