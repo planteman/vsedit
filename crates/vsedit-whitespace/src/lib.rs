@@ -62222,3 +62222,235 @@ mod bca_tests {
         assert!(g.find_tab("y").is_none());
     }
 }
+
+
+// --- bcb_: Editor panel/sidebar model ---
+
+/// Panel location.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BcbPanelLocation { Left, Right, Bottom }
+
+impl BcbPanelLocation {
+    pub fn label(&self) -> &'static str {
+        match self { Self::Left => "Left", Self::Right => "Right", Self::Bottom => "Bottom" }
+    }
+    pub fn is_side(&self) -> bool { matches!(self, Self::Left | Self::Right) }
+}
+
+/// A panel view entry.
+#[derive(Debug, Clone)]
+pub struct BcbPanelView {
+    pub id: String,
+    pub title: String,
+    pub icon: char,
+    pub location: BcbPanelLocation,
+    pub order: i32,
+    pub visible: bool,
+    pub badge: Option<String>,
+}
+
+impl BcbPanelView {
+    pub fn new(id: &str, title: &str, icon: char, loc: BcbPanelLocation) -> Self {
+        Self { id: id.to_string(), title: title.to_string(), icon, location: loc, order: 0, visible: true, badge: None }
+    }
+
+    pub fn with_order(mut self, o: i32) -> Self { self.order = o; self }
+    pub fn set_badge(&mut self, b: Option<String>) { self.badge = b; }
+
+    pub fn display_text(&self) -> String {
+        match &self.badge {
+            Some(b) => format!("{} {} ({})", self.icon, self.title, b),
+            None => format!("{} {}", self.icon, self.title),
+        }
+    }
+}
+
+/// Sidebar state.
+#[derive(Debug)]
+pub struct BcbSidebar {
+    views: Vec<BcbPanelView>,
+    active_id: Option<String>,
+    visible: bool,
+    width: u32,
+    location: BcbPanelLocation,
+}
+
+impl BcbSidebar {
+    pub fn new(location: BcbPanelLocation) -> Self {
+        Self { views: Vec::new(), active_id: None, visible: true, width: 30, location }
+    }
+
+    pub fn add_view(&mut self, view: BcbPanelView) { self.views.push(view); }
+
+    pub fn activate(&mut self, id: &str) -> bool {
+        if self.views.iter().any(|v| v.id == id) {
+            self.active_id = Some(id.to_string());
+            self.visible = true;
+            return true;
+        }
+        false
+    }
+
+    pub fn toggle(&mut self) {
+        if self.visible { self.visible = false; }
+        else { self.visible = true; }
+    }
+
+    pub fn toggle_view(&mut self, id: &str) {
+        if self.active_id.as_deref() == Some(id) && self.visible {
+            self.visible = false;
+        } else {
+            self.activate(id);
+        }
+    }
+
+    pub fn active_view(&self) -> Option<&BcbPanelView> {
+        self.active_id.as_ref().and_then(|id| self.views.iter().find(|v| v.id == *id))
+    }
+
+    pub fn views(&self) -> Vec<&BcbPanelView> {
+        let mut v: Vec<_> = self.views.iter().filter(|v| v.visible).collect();
+        v.sort_by_key(|v| v.order);
+        v
+    }
+
+    pub fn is_visible(&self) -> bool { self.visible }
+    pub fn width(&self) -> u32 { if self.visible { self.width } else { 0 } }
+    pub fn set_width(&mut self, w: u32) { self.width = w.max(10); }
+    pub fn view_count(&self) -> usize { self.views.len() }
+}
+
+/// Bottom panel state.
+#[derive(Debug)]
+pub struct BcbBottomPanel {
+    views: Vec<BcbPanelView>,
+    active_id: Option<String>,
+    visible: bool,
+    height: u32,
+    maximized: bool,
+}
+
+impl BcbBottomPanel {
+    pub fn new() -> Self {
+        Self { views: Vec::new(), active_id: None, visible: false, height: 15, maximized: false }
+    }
+
+    pub fn add_view(&mut self, view: BcbPanelView) { self.views.push(view); }
+
+    pub fn activate(&mut self, id: &str) -> bool {
+        if self.views.iter().any(|v| v.id == id) {
+            self.active_id = Some(id.to_string());
+            self.visible = true;
+            return true;
+        }
+        false
+    }
+
+    pub fn toggle(&mut self) { self.visible = !self.visible; }
+    pub fn toggle_maximize(&mut self) { self.maximized = !self.maximized; }
+
+    pub fn active_view(&self) -> Option<&BcbPanelView> {
+        self.active_id.as_ref().and_then(|id| self.views.iter().find(|v| v.id == *id))
+    }
+
+    pub fn is_visible(&self) -> bool { self.visible }
+    pub fn height(&self) -> u32 { if self.visible { self.height } else { 0 } }
+    pub fn is_maximized(&self) -> bool { self.maximized }
+    pub fn set_height(&mut self, h: u32) { self.height = h.max(5); }
+}
+
+#[cfg(test)]
+mod bcb_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcb_location() {
+        assert!(BcbPanelLocation::Left.is_side());
+        assert!(!BcbPanelLocation::Bottom.is_side());
+    }
+
+    #[test]
+    fn test_bcb_view_display() {
+        let mut v = BcbPanelView::new("explorer", "Explorer", '📁', BcbPanelLocation::Left);
+        assert_eq!(v.display_text(), "📁 Explorer");
+        v.set_badge(Some("3".to_string()));
+        assert!(v.display_text().contains("(3)"));
+    }
+
+    #[test]
+    fn test_bcb_sidebar_activate() {
+        let mut s = BcbSidebar::new(BcbPanelLocation::Left);
+        s.add_view(BcbPanelView::new("explorer", "Explorer", '📁', BcbPanelLocation::Left));
+        s.add_view(BcbPanelView::new("search", "Search", '🔍', BcbPanelLocation::Left));
+        assert!(s.activate("explorer"));
+        assert_eq!(s.active_view().unwrap().id, "explorer");
+    }
+
+    #[test]
+    fn test_bcb_sidebar_toggle() {
+        let mut s = BcbSidebar::new(BcbPanelLocation::Left);
+        s.add_view(BcbPanelView::new("x", "X", '□', BcbPanelLocation::Left));
+        s.activate("x");
+        assert!(s.is_visible());
+        s.toggle();
+        assert!(!s.is_visible());
+        assert_eq!(s.width(), 0);
+    }
+
+    #[test]
+    fn test_bcb_sidebar_toggle_view() {
+        let mut s = BcbSidebar::new(BcbPanelLocation::Left);
+        s.add_view(BcbPanelView::new("a", "A", '□', BcbPanelLocation::Left));
+        s.add_view(BcbPanelView::new("b", "B", '□', BcbPanelLocation::Left));
+        s.toggle_view("a");
+        assert!(s.is_visible());
+        assert_eq!(s.active_view().unwrap().id, "a");
+        s.toggle_view("a"); // toggle same = hide
+        assert!(!s.is_visible());
+    }
+
+    #[test]
+    fn test_bcb_sidebar_width() {
+        let mut s = BcbSidebar::new(BcbPanelLocation::Left);
+        s.set_width(50);
+        assert_eq!(s.width(), 50);
+        s.set_width(5); // below min
+        assert_eq!(s.width(), 10);
+    }
+
+    #[test]
+    fn test_bcb_bottom_panel() {
+        let mut p = BcbBottomPanel::new();
+        p.add_view(BcbPanelView::new("terminal", "Terminal", '>', BcbPanelLocation::Bottom));
+        p.add_view(BcbPanelView::new("output", "Output", '□', BcbPanelLocation::Bottom));
+        assert!(!p.is_visible());
+        p.activate("terminal");
+        assert!(p.is_visible());
+        assert_eq!(p.active_view().unwrap().id, "terminal");
+    }
+
+    #[test]
+    fn test_bcb_bottom_maximize() {
+        let mut p = BcbBottomPanel::new();
+        assert!(!p.is_maximized());
+        p.toggle_maximize();
+        assert!(p.is_maximized());
+    }
+
+    #[test]
+    fn test_bcb_bottom_height() {
+        let mut p = BcbBottomPanel::new();
+        assert_eq!(p.height(), 0); // not visible
+        p.visible = true;
+        assert_eq!(p.height(), 15);
+    }
+
+    #[test]
+    fn test_bcb_views_sorted() {
+        let mut s = BcbSidebar::new(BcbPanelLocation::Left);
+        s.add_view(BcbPanelView::new("b", "B", '□', BcbPanelLocation::Left).with_order(2));
+        s.add_view(BcbPanelView::new("a", "A", '□', BcbPanelLocation::Left).with_order(1));
+        let views = s.views();
+        assert_eq!(views[0].id, "a");
+    }
+}
