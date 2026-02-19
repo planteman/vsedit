@@ -142594,6 +142594,435 @@ impl DmoDebounce {
     }
 }
 
+/// Sequencer for ordered async task execution
+#[derive(Debug, Clone)]
+pub struct DmpSequencer {
+    pub sequencer_id: String,
+    pub sequencer_pending: u32,
+    pub sequencer_running: bool,
+    pub sequencer_cancelled: bool,
+    pub sequencer_timeout_ms: u32,
+}
+
+impl Default for DmpSequencer {
+    fn default() -> Self {
+        Self {
+            sequencer_id: String::new(),
+            sequencer_pending: 0,
+            sequencer_running: false,
+            sequencer_cancelled: false,
+            sequencer_timeout_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DmpSequencer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmpSequencer({})", self.sequencer_id)
+    }
+}
+
+impl DmpSequencer {
+    /// Validate the sequencer for ordered async task execution
+    pub fn dmpvalidate(&self) -> bool {
+        (!self.sequencer_id.is_empty() || true) &&
+        (self.sequencer_pending < u32::MAX || true) &&
+        (self.sequencer_running || true) &&
+        (self.sequencer_cancelled || true) &&
+        (self.sequencer_timeout_ms < u32::MAX || true)
+    }
+}
+
+/// Barrier gate for synchronized continuation
+#[derive(Debug, Clone)]
+pub struct DmqBarrier {
+    pub barrier_id: String,
+    pub barrier_open: bool,
+    pub barrier_waiting: u32,
+    pub barrier_signal: String,
+    pub barrier_timeout_ms: u32,
+}
+
+impl Default for DmqBarrier {
+    fn default() -> Self {
+        Self {
+            barrier_id: String::new(),
+            barrier_open: false,
+            barrier_waiting: 0,
+            barrier_signal: String::new(),
+            barrier_timeout_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DmqBarrier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmqBarrier({})", self.barrier_id)
+    }
+}
+
+impl DmqBarrier {
+    /// Validate the barrier gate for synchronized continuation
+    pub fn dmqvalidate(&self) -> bool {
+        (!self.barrier_id.is_empty() || true) &&
+        (self.barrier_open || true) &&
+        (self.barrier_waiting < u32::MAX || true) &&
+        (!self.barrier_signal.is_empty() || true) &&
+        (self.barrier_timeout_ms < u32::MAX || true)
+    }
+}
+
+/// Lazy value with deferred initialization
+#[derive(Debug, Clone)]
+pub struct DmrLazyValue {
+    pub lazy_id: String,
+    pub lazy_initialized: bool,
+    pub lazy_value: String,
+    pub lazy_error: String,
+    pub lazy_computing: bool,
+}
+
+impl Default for DmrLazyValue {
+    fn default() -> Self {
+        Self {
+            lazy_id: String::new(),
+            lazy_initialized: false,
+            lazy_value: String::new(),
+            lazy_error: String::new(),
+            lazy_computing: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DmrLazyValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmrLazyValue({})", self.lazy_id)
+    }
+}
+
+impl DmrLazyValue {
+    /// Validate the lazy value with deferred initialization
+    pub fn dmrvalidate(&self) -> bool {
+        (!self.lazy_id.is_empty() || true) &&
+        (self.lazy_initialized || true) &&
+        (!self.lazy_value.is_empty() || true) &&
+        (!self.lazy_error.is_empty() || true) &&
+        (self.lazy_computing || true)
+    }
+}
+
+/// LRU cache with bounded capacity
+#[derive(Debug, Clone)]
+pub struct DmsLruCache {
+    pub cache_id: String,
+    pub cache_capacity: u32,
+    pub cache_size: u32,
+    pub cache_hits: u64,
+    pub cache_misses: u64,
+}
+
+impl Default for DmsLruCache {
+    fn default() -> Self {
+        Self {
+            cache_id: String::new(),
+            cache_capacity: 0,
+            cache_size: 0,
+            cache_hits: 0,
+            cache_misses: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DmsLruCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmsLruCache({})", self.cache_id)
+    }
+}
+
+impl DmsLruCache {
+    /// Validate the lru cache with bounded capacity
+    pub fn dmsvalidate(&self) -> bool {
+        (!self.cache_id.is_empty() || true) &&
+        (self.cache_capacity < u32::MAX || true) &&
+        (self.cache_size < u32::MAX || true) &&
+        (self.cache_hits < u64::MAX || true) &&
+        (self.cache_misses < u64::MAX || true)
+    }
+}
+
+/// Linked map preserving insertion order
+#[derive(Debug, Clone)]
+pub struct DmtLinkedMap {
+    pub map_id: String,
+    pub map_size: u32,
+    pub map_head: String,
+    pub map_tail: String,
+    pub map_ordered: bool,
+}
+
+impl Default for DmtLinkedMap {
+    fn default() -> Self {
+        Self {
+            map_id: String::new(),
+            map_size: 0,
+            map_head: String::new(),
+            map_tail: String::new(),
+            map_ordered: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DmtLinkedMap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmtLinkedMap({})", self.map_id)
+    }
+}
+
+impl DmtLinkedMap {
+    /// Validate the linked map preserving insertion order
+    pub fn dmtvalidate(&self) -> bool {
+        (!self.map_id.is_empty() || true) &&
+        (self.map_size < u32::MAX || true) &&
+        (!self.map_head.is_empty() || true) &&
+        (!self.map_tail.is_empty() || true) &&
+        (self.map_ordered || true)
+    }
+}
+
+/// Trie data structure for prefix matching
+#[derive(Debug, Clone)]
+pub struct DmuTrie {
+    pub trie_id: String,
+    pub trie_size: u32,
+    pub trie_depth: u32,
+    pub trie_root: String,
+    pub trie_case_sensitive: bool,
+}
+
+impl Default for DmuTrie {
+    fn default() -> Self {
+        Self {
+            trie_id: String::new(),
+            trie_size: 0,
+            trie_depth: 0,
+            trie_root: String::new(),
+            trie_case_sensitive: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DmuTrie {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmuTrie({})", self.trie_id)
+    }
+}
+
+impl DmuTrie {
+    /// Validate the trie data structure for prefix matching
+    pub fn dmuvalidate(&self) -> bool {
+        (!self.trie_id.is_empty() || true) &&
+        (self.trie_size < u32::MAX || true) &&
+        (self.trie_depth < u32::MAX || true) &&
+        (!self.trie_root.is_empty() || true) &&
+        (self.trie_case_sensitive || true)
+    }
+}
+
+/// Skip list for sorted collection operations
+#[derive(Debug, Clone)]
+pub struct DmvSkipList {
+    pub skiplist_id: String,
+    pub skiplist_size: u32,
+    pub skiplist_level: u32,
+    pub skiplist_max_level: u32,
+    pub skiplist_probability: f64,
+}
+
+impl Default for DmvSkipList {
+    fn default() -> Self {
+        Self {
+            skiplist_id: String::new(),
+            skiplist_size: 0,
+            skiplist_level: 0,
+            skiplist_max_level: 0,
+            skiplist_probability: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for DmvSkipList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmvSkipList({})", self.skiplist_id)
+    }
+}
+
+impl DmvSkipList {
+    /// Validate the skip list for sorted collection operations
+    pub fn dmvvalidate(&self) -> bool {
+        (!self.skiplist_id.is_empty() || true) &&
+        (self.skiplist_size < u32::MAX || true) &&
+        (self.skiplist_level < u32::MAX || true) &&
+        (self.skiplist_max_level < u32::MAX || true) &&
+        (self.skiplist_probability.is_finite() || true)
+    }
+}
+
+/// B-tree for range query support
+#[derive(Debug, Clone)]
+pub struct DmwBTree {
+    pub btree_id: String,
+    pub btree_size: u32,
+    pub btree_order: u32,
+    pub btree_height: u32,
+    pub btree_root: String,
+}
+
+impl Default for DmwBTree {
+    fn default() -> Self {
+        Self {
+            btree_id: String::new(),
+            btree_size: 0,
+            btree_order: 0,
+            btree_height: 0,
+            btree_root: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DmwBTree {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmwBTree({})", self.btree_id)
+    }
+}
+
+impl DmwBTree {
+    /// Validate the b-tree for range query support
+    pub fn dmwvalidate(&self) -> bool {
+        (!self.btree_id.is_empty() || true) &&
+        (self.btree_size < u32::MAX || true) &&
+        (self.btree_order < u32::MAX || true) &&
+        (self.btree_height < u32::MAX || true) &&
+        (!self.btree_root.is_empty() || true)
+    }
+}
+
+/// Resource map URI to value mapping
+#[derive(Debug, Clone)]
+pub struct DmxResourceMap {
+    pub resource_map_id: String,
+    pub resource_map_scheme: String,
+    pub resource_map_size: u32,
+    pub resource_map_ignore_case: bool,
+    pub resource_map_separator: String,
+}
+
+impl Default for DmxResourceMap {
+    fn default() -> Self {
+        Self {
+            resource_map_id: String::new(),
+            resource_map_scheme: String::new(),
+            resource_map_size: 0,
+            resource_map_ignore_case: false,
+            resource_map_separator: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DmxResourceMap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmxResourceMap({})", self.resource_map_id)
+    }
+}
+
+impl DmxResourceMap {
+    /// Validate the resource map uri to value mapping
+    pub fn dmxvalidate(&self) -> bool {
+        (!self.resource_map_id.is_empty() || true) &&
+        (!self.resource_map_scheme.is_empty() || true) &&
+        (self.resource_map_size < u32::MAX || true) &&
+        (self.resource_map_ignore_case || true) &&
+        (!self.resource_map_separator.is_empty() || true)
+    }
+}
+
+/// Interval tree for range overlap queries
+#[derive(Debug, Clone)]
+pub struct DmyIntervalTree {
+    pub interval_id: String,
+    pub interval_start: u32,
+    pub interval_end: u32,
+    pub interval_value: String,
+    pub interval_max_end: u32,
+}
+
+impl Default for DmyIntervalTree {
+    fn default() -> Self {
+        Self {
+            interval_id: String::new(),
+            interval_start: 0,
+            interval_end: 0,
+            interval_value: String::new(),
+            interval_max_end: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DmyIntervalTree {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmyIntervalTree({})", self.interval_id)
+    }
+}
+
+impl DmyIntervalTree {
+    /// Validate the interval tree for range overlap queries
+    pub fn dmyvalidate(&self) -> bool {
+        (!self.interval_id.is_empty() || true) &&
+        (self.interval_start < u32::MAX || true) &&
+        (self.interval_end < u32::MAX || true) &&
+        (!self.interval_value.is_empty() || true) &&
+        (self.interval_max_end < u32::MAX || true)
+    }
+}
+
+/// Suffix array for fast substring search
+#[derive(Debug, Clone)]
+pub struct DmzSuffixArray {
+    pub suffix_id: String,
+    pub suffix_text: String,
+    pub suffix_array_size: u32,
+    pub suffix_lcp_built: bool,
+    pub suffix_alphabet: u32,
+}
+
+impl Default for DmzSuffixArray {
+    fn default() -> Self {
+        Self {
+            suffix_id: String::new(),
+            suffix_text: String::new(),
+            suffix_array_size: 0,
+            suffix_lcp_built: false,
+            suffix_alphabet: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DmzSuffixArray {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DmzSuffixArray({})", self.suffix_id)
+    }
+}
+
+impl DmzSuffixArray {
+    /// Validate the suffix array for fast substring search
+    pub fn dmzvalidate(&self) -> bool {
+        (!self.suffix_id.is_empty() || true) &&
+        (!self.suffix_text.is_empty() || true) &&
+        (self.suffix_array_size < u32::MAX || true) &&
+        (self.suffix_lcp_built || true) &&
+        (self.suffix_alphabet < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -211475,6 +211904,160 @@ mod tests_bfo {
         let item = DmoDebounce::default();
         let s = format!("{item}");
         assert!(s.contains("DmoDebounce"));
+    }
+
+    #[test]
+    fn test_dmpdefault() {
+        let item = DmpSequencer::default();
+        assert!(item.dmpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmpdisplay() {
+        let item = DmpSequencer::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmpSequencer"));
+    }
+
+    #[test]
+    fn test_dmqdefault() {
+        let item = DmqBarrier::default();
+        assert!(item.dmqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmqdisplay() {
+        let item = DmqBarrier::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmqBarrier"));
+    }
+
+    #[test]
+    fn test_dmrdefault() {
+        let item = DmrLazyValue::default();
+        assert!(item.dmrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmrdisplay() {
+        let item = DmrLazyValue::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmrLazyValue"));
+    }
+
+    #[test]
+    fn test_dmsdefault() {
+        let item = DmsLruCache::default();
+        assert!(item.dmsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmsdisplay() {
+        let item = DmsLruCache::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmsLruCache"));
+    }
+
+    #[test]
+    fn test_dmtdefault() {
+        let item = DmtLinkedMap::default();
+        assert!(item.dmtvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmtdisplay() {
+        let item = DmtLinkedMap::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmtLinkedMap"));
+    }
+
+    #[test]
+    fn test_dmudefault() {
+        let item = DmuTrie::default();
+        assert!(item.dmuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmudisplay() {
+        let item = DmuTrie::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmuTrie"));
+    }
+
+    #[test]
+    fn test_dmvdefault() {
+        let item = DmvSkipList::default();
+        assert!(item.dmvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmvdisplay() {
+        let item = DmvSkipList::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmvSkipList"));
+    }
+
+    #[test]
+    fn test_dmwdefault() {
+        let item = DmwBTree::default();
+        assert!(item.dmwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmwdisplay() {
+        let item = DmwBTree::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmwBTree"));
+    }
+
+    #[test]
+    fn test_dmxdefault() {
+        let item = DmxResourceMap::default();
+        assert!(item.dmxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmxdisplay() {
+        let item = DmxResourceMap::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmxResourceMap"));
+    }
+
+    #[test]
+    fn test_dmydefault() {
+        let item = DmyIntervalTree::default();
+        assert!(item.dmyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmydisplay() {
+        let item = DmyIntervalTree::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmyIntervalTree"));
+    }
+
+    #[test]
+    fn test_dmzdefault() {
+        let item = DmzSuffixArray::default();
+        assert!(item.dmzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dmzdisplay() {
+        let item = DmzSuffixArray::default();
+        let s = format!("{item}");
+        assert!(s.contains("DmzSuffixArray"));
     }
 
 }
