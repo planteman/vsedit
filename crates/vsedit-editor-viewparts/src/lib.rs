@@ -80458,6 +80458,445 @@ impl BfzTypeHierarchy {
 }
 
 
+
+// bga_ Editor Scroll State Model
+
+/// Scroll direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgaScrollDirection {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+/// Smooth scroll animation state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgaScrollAnimation {
+    None,
+    Smooth,
+    Instant,
+}
+
+/// Editor scroll state.
+#[derive(Debug, Clone)]
+pub struct BgaScrollState {
+    pub scroll_top: f64,
+    pub scroll_left: f64,
+    pub viewport_height: f64,
+    pub viewport_width: f64,
+    pub content_height: f64,
+    pub content_width: f64,
+    pub animation: BgaScrollAnimation,
+}
+
+impl BgaScrollState {
+    pub fn new(viewport_h: f64, viewport_w: f64) -> Self {
+        Self {
+            scroll_top: 0.0, scroll_left: 0.0,
+            viewport_height: viewport_h, viewport_width: viewport_w,
+            content_height: 0.0, content_width: 0.0,
+            animation: BgaScrollAnimation::Smooth,
+        }
+    }
+
+    pub fn scroll_by(&mut self, dx: f64, dy: f64) {
+        self.scroll_top = (self.scroll_top + dy).max(0.0).min(self.max_scroll_top());
+        self.scroll_left = (self.scroll_left + dx).max(0.0).min(self.max_scroll_left());
+    }
+
+    pub fn scroll_to(&mut self, top: f64, left: f64) {
+        self.scroll_top = top.max(0.0).min(self.max_scroll_top());
+        self.scroll_left = left.max(0.0).min(self.max_scroll_left());
+    }
+
+    pub fn scroll_to_top(&mut self) {
+        self.scroll_top = 0.0;
+    }
+
+    pub fn scroll_to_bottom(&mut self) {
+        self.scroll_top = self.max_scroll_top();
+    }
+
+    pub fn max_scroll_top(&self) -> f64 {
+        (self.content_height - self.viewport_height).max(0.0)
+    }
+
+    pub fn max_scroll_left(&self) -> f64 {
+        (self.content_width - self.viewport_width).max(0.0)
+    }
+
+    pub fn is_at_top(&self) -> bool {
+        self.scroll_top <= 0.0
+    }
+
+    pub fn is_at_bottom(&self) -> bool {
+        self.scroll_top >= self.max_scroll_top()
+    }
+
+    pub fn visible_range_lines(&self, line_height: f64) -> (usize, usize) {
+        if line_height <= 0.0 { return (0, 0); }
+        let first = (self.scroll_top / line_height) as usize;
+        let visible = (self.viewport_height / line_height).ceil() as usize;
+        (first, first + visible)
+    }
+
+    pub fn set_content_size(&mut self, height: f64, width: f64) {
+        self.content_height = height;
+        self.content_width = width;
+    }
+
+    pub fn scroll_fraction(&self) -> f64 {
+        let max = self.max_scroll_top();
+        if max <= 0.0 { 0.0 } else { self.scroll_top / max }
+    }
+}
+
+
+// bgb_ Editor Cursor Blink Model
+
+/// Cursor blink style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgbBlinkStyle {
+    Blink,
+    Smooth,
+    Phase,
+    Expand,
+    Solid,
+    Hidden,
+}
+
+/// Cursor shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgbCursorShape {
+    Line,
+    Block,
+    Underline,
+    LineThin,
+    BlockOutline,
+    UnderlineThin,
+}
+
+/// Cursor blink and rendering model.
+#[derive(Debug, Clone)]
+pub struct BgbCursorModel {
+    pub shape: BgbCursorShape,
+    pub blink_style: BgbBlinkStyle,
+    pub blink_interval_ms: u32,
+    pub is_visible: bool,
+    pub is_focused: bool,
+    tick_count: u64,
+}
+
+impl BgbCursorModel {
+    pub fn new() -> Self {
+        Self {
+            shape: BgbCursorShape::Line,
+            blink_style: BgbBlinkStyle::Blink,
+            blink_interval_ms: 530,
+            is_visible: true,
+            is_focused: true,
+            tick_count: 0,
+        }
+    }
+
+    pub fn tick(&mut self) {
+        self.tick_count += 1;
+        match self.blink_style {
+            BgbBlinkStyle::Solid => self.is_visible = true,
+            BgbBlinkStyle::Hidden => self.is_visible = false,
+            BgbBlinkStyle::Blink => self.is_visible = self.tick_count % 2 == 0,
+            BgbBlinkStyle::Smooth | BgbBlinkStyle::Phase | BgbBlinkStyle::Expand => {
+                self.is_visible = true; // animation handled by renderer
+            }
+        }
+    }
+
+    pub fn reset_blink(&mut self) {
+        self.tick_count = 0;
+        self.is_visible = true;
+    }
+
+    pub fn set_shape(&mut self, shape: BgbCursorShape) {
+        self.shape = shape;
+    }
+
+    pub fn set_blink_style(&mut self, style: BgbBlinkStyle) {
+        self.blink_style = style;
+        self.reset_blink();
+    }
+
+    pub fn set_focused(&mut self, focused: bool) {
+        self.is_focused = focused;
+        if focused { self.reset_blink(); }
+    }
+
+    pub fn should_render(&self) -> bool {
+        self.is_focused && self.is_visible
+    }
+
+    pub fn opacity(&self) -> f64 {
+        if !self.is_focused { return 0.4; }
+        if self.is_visible { 1.0 } else { 0.0 }
+    }
+}
+
+
+// bgc_ Editor Minimap Model
+
+/// Minimap rendering mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgcMinimapMode {
+    Proportional,
+    Fill,
+    Fit,
+}
+
+/// Minimap side position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgcMinimapSide {
+    Left,
+    Right,
+}
+
+/// Minimap decoration.
+#[derive(Debug, Clone)]
+pub struct BgcMinimapDecoration {
+    pub line: usize,
+    pub color: String,
+    pub kind: BgcMinimapDecorationKind,
+}
+
+/// Kind of minimap decoration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BgcMinimapDecorationKind {
+    Highlight,
+    Gutter,
+    Overview,
+}
+
+/// Editor minimap model.
+#[derive(Debug, Clone)]
+pub struct BgcMinimapModel {
+    pub is_enabled: bool,
+    pub mode: BgcMinimapMode,
+    pub side: BgcMinimapSide,
+    pub max_column: usize,
+    pub scale: f64,
+    pub show_slider: bool,
+    pub decorations: Vec<BgcMinimapDecoration>,
+    pub slider_top: f64,
+    pub slider_height: f64,
+}
+
+impl BgcMinimapModel {
+    pub fn new() -> Self {
+        Self {
+            is_enabled: true, mode: BgcMinimapMode::Proportional,
+            side: BgcMinimapSide::Right, max_column: 120,
+            scale: 1.0, show_slider: true,
+            decorations: Vec::new(), slider_top: 0.0, slider_height: 50.0,
+        }
+    }
+
+    pub fn toggle(&mut self) {
+        self.is_enabled = !self.is_enabled;
+    }
+
+    pub fn set_mode(&mut self, mode: BgcMinimapMode) {
+        self.mode = mode;
+    }
+
+    pub fn set_side(&mut self, side: BgcMinimapSide) {
+        self.side = side;
+    }
+
+    pub fn set_scale(&mut self, scale: f64) {
+        self.scale = scale.max(0.1).min(3.0);
+    }
+
+    pub fn add_decoration(&mut self, line: usize, color: &str, kind: BgcMinimapDecorationKind) {
+        self.decorations.push(BgcMinimapDecoration {
+            line, color: color.to_string(), kind,
+        });
+    }
+
+    pub fn clear_decorations(&mut self) {
+        self.decorations.clear();
+    }
+
+    pub fn update_slider(&mut self, top: f64, height: f64) {
+        self.slider_top = top;
+        self.slider_height = height;
+    }
+
+    pub fn decorations_at_line(&self, line: usize) -> Vec<&BgcMinimapDecoration> {
+        self.decorations.iter().filter(|d| d.line == line).collect()
+    }
+
+    pub fn decoration_count(&self) -> usize {
+        self.decorations.len()
+    }
+}
+
+
+// bgd_ Editor Sticky Scroll Model
+
+/// A sticky scroll line representing a scope boundary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BgdStickyLine {
+    pub line: usize,
+    pub text: String,
+    pub indent_level: usize,
+    pub scope_depth: usize,
+}
+
+/// Sticky scroll model for pinning scope headers.
+#[derive(Debug, Clone)]
+pub struct BgdStickyScrollModel {
+    pub is_enabled: bool,
+    pub max_lines: usize,
+    pub lines: Vec<BgdStickyLine>,
+    pub scroll_offset: usize,
+}
+
+impl BgdStickyScrollModel {
+    pub fn new() -> Self {
+        Self {
+            is_enabled: true,
+            max_lines: 5,
+            lines: Vec::new(),
+            scroll_offset: 0,
+        }
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.is_enabled = enabled;
+        if !enabled { self.lines.clear(); }
+    }
+
+    pub fn set_max_lines(&mut self, max: usize) {
+        self.max_lines = max.max(1).min(10);
+        self.truncate();
+    }
+
+    pub fn update_lines(&mut self, lines: Vec<BgdStickyLine>) {
+        self.lines = lines;
+        self.truncate();
+    }
+
+    fn truncate(&mut self) {
+        if self.lines.len() > self.max_lines {
+            let excess = self.lines.len() - self.max_lines;
+            self.lines.drain(0..excess);
+        }
+    }
+
+    pub fn visible_lines(&self) -> &[BgdStickyLine] {
+        if self.is_enabled { &self.lines } else { &[] }
+    }
+
+    pub fn height(&self) -> usize {
+        if self.is_enabled { self.lines.len() } else { 0 }
+    }
+
+    pub fn clear(&mut self) {
+        self.lines.clear();
+    }
+
+    pub fn contains_line(&self, line: usize) -> bool {
+        self.lines.iter().any(|l| l.line == line)
+    }
+
+    pub fn deepest_scope(&self) -> usize {
+        self.lines.iter().map(|l| l.scope_depth).max().unwrap_or(0)
+    }
+
+    pub fn toggle(&mut self) {
+        self.set_enabled(!self.is_enabled);
+    }
+}
+
+
+// bge_ Editor Column Selection Model
+
+/// A column (box) selection region.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BgeColumnSelection {
+    pub start_line: usize,
+    pub end_line: usize,
+    pub start_column: usize,
+    pub end_column: usize,
+}
+
+/// Column selection model for rectangular/box selections.
+#[derive(Debug, Clone)]
+pub struct BgeColumnSelectionModel {
+    pub is_active: bool,
+    pub selection: Option<BgeColumnSelection>,
+    pub anchor_line: usize,
+    pub anchor_column: usize,
+}
+
+impl BgeColumnSelectionModel {
+    pub fn new() -> Self {
+        Self { is_active: false, selection: None, anchor_line: 0, anchor_column: 0 }
+    }
+
+    pub fn start(&mut self, line: usize, column: usize) {
+        self.is_active = true;
+        self.anchor_line = line;
+        self.anchor_column = column;
+        self.selection = Some(BgeColumnSelection {
+            start_line: line, end_line: line,
+            start_column: column, end_column: column,
+        });
+    }
+
+    pub fn extend_to(&mut self, line: usize, column: usize) {
+        if !self.is_active { return; }
+        let sl = self.anchor_line.min(line);
+        let el = self.anchor_line.max(line);
+        let sc = self.anchor_column.min(column);
+        let ec = self.anchor_column.max(column);
+        self.selection = Some(BgeColumnSelection {
+            start_line: sl, end_line: el, start_column: sc, end_column: ec,
+        });
+    }
+
+    pub fn finish(&mut self) {
+        self.is_active = false;
+    }
+
+    pub fn cancel(&mut self) {
+        self.is_active = false;
+        self.selection = None;
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.selection.as_ref().map(|s| s.end_line - s.start_line + 1).unwrap_or(0)
+    }
+
+    pub fn width(&self) -> usize {
+        self.selection.as_ref().map(|s| s.end_column.saturating_sub(s.start_column)).unwrap_or(0)
+    }
+
+    pub fn contains(&self, line: usize, column: usize) -> bool {
+        self.selection.as_ref().map(|s| {
+            line >= s.start_line && line <= s.end_line && column >= s.start_column && column < s.end_column
+        }).unwrap_or(false)
+    }
+
+    pub fn selected_lines(&self) -> Vec<usize> {
+        self.selection.as_ref().map(|s| (s.start_line..=s.end_line).collect()).unwrap_or_default()
+    }
+
+    pub fn has_selection(&self) -> bool {
+        self.selection.is_some() && self.width() > 0
+    }
+}
+
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -81655,6 +82094,459 @@ mod tests_bfo {
     fn test_bfz_root_name_empty() {
         let h = BfzTypeHierarchy::new();
         assert!(h.root_name().is_none());
+    }
+
+
+
+    // bga_ tests
+
+    #[test]
+    fn test_bga_scroll_creation() {
+        let s = BgaScrollState::new(600.0, 800.0);
+        assert!(s.is_at_top());
+        assert_eq!(s.scroll_top, 0.0);
+    }
+
+    #[test]
+    fn test_bga_scroll_by() {
+        let mut s = BgaScrollState::new(100.0, 200.0);
+        s.set_content_size(500.0, 400.0);
+        s.scroll_by(0.0, 50.0);
+        assert_eq!(s.scroll_top, 50.0);
+        s.scroll_by(0.0, -100.0);
+        assert_eq!(s.scroll_top, 0.0);
+    }
+
+    #[test]
+    fn test_bga_scroll_to_bounds() {
+        let mut s = BgaScrollState::new(100.0, 200.0);
+        s.set_content_size(300.0, 400.0);
+        s.scroll_to(999.0, 999.0);
+        assert_eq!(s.scroll_top, 200.0);
+        assert_eq!(s.scroll_left, 200.0);
+    }
+
+    #[test]
+    fn test_bga_scroll_to_top_bottom() {
+        let mut s = BgaScrollState::new(100.0, 200.0);
+        s.set_content_size(500.0, 200.0);
+        s.scroll_to_bottom();
+        assert!(s.is_at_bottom());
+        assert_eq!(s.scroll_top, 400.0);
+        s.scroll_to_top();
+        assert!(s.is_at_top());
+    }
+
+    #[test]
+    fn test_bga_visible_range() {
+        let mut s = BgaScrollState::new(100.0, 200.0);
+        s.set_content_size(1000.0, 200.0);
+        s.scroll_to(200.0, 0.0);
+        let (first, last) = s.visible_range_lines(20.0);
+        assert_eq!(first, 10);
+        assert_eq!(last, 15);
+    }
+
+    #[test]
+    fn test_bga_scroll_fraction() {
+        let mut s = BgaScrollState::new(100.0, 200.0);
+        s.set_content_size(200.0, 200.0);
+        s.scroll_to(50.0, 0.0);
+        assert!((s.scroll_fraction() - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_bga_no_content() {
+        let s = BgaScrollState::new(100.0, 200.0);
+        assert_eq!(s.max_scroll_top(), 0.0);
+        assert!(s.is_at_bottom());
+        assert!(s.is_at_top());
+    }
+
+    #[test]
+    fn test_bga_scroll_direction_variants() {
+        let dirs = [BgaScrollDirection::Up, BgaScrollDirection::Down, BgaScrollDirection::Left, BgaScrollDirection::Right];
+        assert_eq!(dirs.len(), 4);
+    }
+
+    #[test]
+    fn test_bga_animation_variants() {
+        let anims = [BgaScrollAnimation::None, BgaScrollAnimation::Smooth, BgaScrollAnimation::Instant];
+        assert_eq!(anims.len(), 3);
+    }
+
+    #[test]
+    fn test_bga_horizontal_scroll() {
+        let mut s = BgaScrollState::new(100.0, 200.0);
+        s.set_content_size(100.0, 500.0);
+        s.scroll_by(150.0, 0.0);
+        assert_eq!(s.scroll_left, 150.0);
+        assert_eq!(s.max_scroll_left(), 300.0);
+    }
+
+
+    // bgb_ tests
+
+    #[test]
+    fn test_bgb_cursor_creation() {
+        let c = BgbCursorModel::new();
+        assert_eq!(c.shape, BgbCursorShape::Line);
+        assert_eq!(c.blink_style, BgbBlinkStyle::Blink);
+        assert!(c.should_render());
+    }
+
+    #[test]
+    fn test_bgb_blink_toggle() {
+        let mut c = BgbCursorModel::new();
+        c.tick(); // tick 1 -> odd -> not visible
+        assert!(!c.is_visible);
+        c.tick(); // tick 2 -> even -> visible
+        assert!(c.is_visible);
+    }
+
+    #[test]
+    fn test_bgb_solid_always_visible() {
+        let mut c = BgbCursorModel::new();
+        c.set_blink_style(BgbBlinkStyle::Solid);
+        for _ in 0..10 { c.tick(); }
+        assert!(c.is_visible);
+    }
+
+    #[test]
+    fn test_bgb_hidden_never_visible() {
+        let mut c = BgbCursorModel::new();
+        c.set_blink_style(BgbBlinkStyle::Hidden);
+        c.tick();
+        assert!(!c.is_visible);
+    }
+
+    #[test]
+    fn test_bgb_reset_blink() {
+        let mut c = BgbCursorModel::new();
+        c.tick();
+        assert!(!c.is_visible);
+        c.reset_blink();
+        assert!(c.is_visible);
+    }
+
+    #[test]
+    fn test_bgb_set_shape() {
+        let mut c = BgbCursorModel::new();
+        c.set_shape(BgbCursorShape::Block);
+        assert_eq!(c.shape, BgbCursorShape::Block);
+    }
+
+    #[test]
+    fn test_bgb_unfocused() {
+        let mut c = BgbCursorModel::new();
+        c.set_focused(false);
+        assert!(!c.should_render());
+        assert!((c.opacity() - 0.4).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_bgb_cursor_shape_variants() {
+        let shapes = [
+            BgbCursorShape::Line, BgbCursorShape::Block, BgbCursorShape::Underline,
+            BgbCursorShape::LineThin, BgbCursorShape::BlockOutline, BgbCursorShape::UnderlineThin,
+        ];
+        assert_eq!(shapes.len(), 6);
+    }
+
+    #[test]
+    fn test_bgb_blink_style_variants() {
+        let styles = [
+            BgbBlinkStyle::Blink, BgbBlinkStyle::Smooth, BgbBlinkStyle::Phase,
+            BgbBlinkStyle::Expand, BgbBlinkStyle::Solid, BgbBlinkStyle::Hidden,
+        ];
+        assert_eq!(styles.len(), 6);
+    }
+
+    #[test]
+    fn test_bgb_opacity_visible() {
+        let c = BgbCursorModel::new();
+        assert!((c.opacity() - 1.0).abs() < 0.001);
+    }
+
+
+    // bgc_ tests
+
+    #[test]
+    fn test_bgc_minimap_creation() {
+        let m = BgcMinimapModel::new();
+        assert!(m.is_enabled);
+        assert_eq!(m.mode, BgcMinimapMode::Proportional);
+        assert_eq!(m.side, BgcMinimapSide::Right);
+    }
+
+    #[test]
+    fn test_bgc_toggle() {
+        let mut m = BgcMinimapModel::new();
+        m.toggle();
+        assert!(!m.is_enabled);
+        m.toggle();
+        assert!(m.is_enabled);
+    }
+
+    #[test]
+    fn test_bgc_set_mode() {
+        let mut m = BgcMinimapModel::new();
+        m.set_mode(BgcMinimapMode::Fill);
+        assert_eq!(m.mode, BgcMinimapMode::Fill);
+    }
+
+    #[test]
+    fn test_bgc_set_side() {
+        let mut m = BgcMinimapModel::new();
+        m.set_side(BgcMinimapSide::Left);
+        assert_eq!(m.side, BgcMinimapSide::Left);
+    }
+
+    #[test]
+    fn test_bgc_scale_clamp() {
+        let mut m = BgcMinimapModel::new();
+        m.set_scale(0.01);
+        assert!((m.scale - 0.1).abs() < 0.001);
+        m.set_scale(10.0);
+        assert!((m.scale - 3.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_bgc_decorations() {
+        let mut m = BgcMinimapModel::new();
+        m.add_decoration(10, "#ff0000", BgcMinimapDecorationKind::Highlight);
+        m.add_decoration(10, "#00ff00", BgcMinimapDecorationKind::Gutter);
+        m.add_decoration(20, "#0000ff", BgcMinimapDecorationKind::Overview);
+        assert_eq!(m.decoration_count(), 3);
+        assert_eq!(m.decorations_at_line(10).len(), 2);
+    }
+
+    #[test]
+    fn test_bgc_clear_decorations() {
+        let mut m = BgcMinimapModel::new();
+        m.add_decoration(1, "#fff", BgcMinimapDecorationKind::Highlight);
+        m.clear_decorations();
+        assert_eq!(m.decoration_count(), 0);
+    }
+
+    #[test]
+    fn test_bgc_update_slider() {
+        let mut m = BgcMinimapModel::new();
+        m.update_slider(100.0, 30.0);
+        assert_eq!(m.slider_top, 100.0);
+        assert_eq!(m.slider_height, 30.0);
+    }
+
+    #[test]
+    fn test_bgc_decoration_kind_variants() {
+        let kinds = [BgcMinimapDecorationKind::Highlight, BgcMinimapDecorationKind::Gutter, BgcMinimapDecorationKind::Overview];
+        assert_eq!(kinds.len(), 3);
+    }
+
+    #[test]
+    fn test_bgc_minimap_mode_variants() {
+        let modes = [BgcMinimapMode::Proportional, BgcMinimapMode::Fill, BgcMinimapMode::Fit];
+        assert_eq!(modes.len(), 3);
+    }
+
+
+    // bgd_ tests
+
+    #[test]
+    fn test_bgd_sticky_creation() {
+        let m = BgdStickyScrollModel::new();
+        assert!(m.is_enabled);
+        assert_eq!(m.max_lines, 5);
+        assert_eq!(m.height(), 0);
+    }
+
+    #[test]
+    fn test_bgd_update_lines() {
+        let mut m = BgdStickyScrollModel::new();
+        m.update_lines(vec![
+            BgdStickyLine { line: 1, text: "fn main()".into(), indent_level: 0, scope_depth: 1 },
+            BgdStickyLine { line: 5, text: "  if x > 0".into(), indent_level: 1, scope_depth: 2 },
+        ]);
+        assert_eq!(m.height(), 2);
+        assert_eq!(m.visible_lines().len(), 2);
+    }
+
+    #[test]
+    fn test_bgd_max_lines_truncate() {
+        let mut m = BgdStickyScrollModel::new();
+        m.set_max_lines(2);
+        m.update_lines(vec![
+            BgdStickyLine { line: 1, text: "a".into(), indent_level: 0, scope_depth: 1 },
+            BgdStickyLine { line: 2, text: "b".into(), indent_level: 1, scope_depth: 2 },
+            BgdStickyLine { line: 3, text: "c".into(), indent_level: 2, scope_depth: 3 },
+        ]);
+        assert_eq!(m.height(), 2);
+        assert_eq!(m.lines[0].text, "b");
+    }
+
+    #[test]
+    fn test_bgd_disabled_empty() {
+        let mut m = BgdStickyScrollModel::new();
+        m.update_lines(vec![
+            BgdStickyLine { line: 1, text: "x".into(), indent_level: 0, scope_depth: 1 },
+        ]);
+        m.set_enabled(false);
+        assert_eq!(m.height(), 0);
+        assert!(m.visible_lines().is_empty());
+    }
+
+    #[test]
+    fn test_bgd_toggle() {
+        let mut m = BgdStickyScrollModel::new();
+        m.toggle();
+        assert!(!m.is_enabled);
+        m.toggle();
+        assert!(m.is_enabled);
+    }
+
+    #[test]
+    fn test_bgd_contains_line() {
+        let mut m = BgdStickyScrollModel::new();
+        m.update_lines(vec![
+            BgdStickyLine { line: 10, text: "fn".into(), indent_level: 0, scope_depth: 1 },
+        ]);
+        assert!(m.contains_line(10));
+        assert!(!m.contains_line(11));
+    }
+
+    #[test]
+    fn test_bgd_deepest_scope() {
+        let mut m = BgdStickyScrollModel::new();
+        m.update_lines(vec![
+            BgdStickyLine { line: 1, text: "a".into(), indent_level: 0, scope_depth: 1 },
+            BgdStickyLine { line: 5, text: "b".into(), indent_level: 2, scope_depth: 3 },
+        ]);
+        assert_eq!(m.deepest_scope(), 3);
+    }
+
+    #[test]
+    fn test_bgd_clear() {
+        let mut m = BgdStickyScrollModel::new();
+        m.update_lines(vec![
+            BgdStickyLine { line: 1, text: "x".into(), indent_level: 0, scope_depth: 1 },
+        ]);
+        m.clear();
+        assert_eq!(m.height(), 0);
+    }
+
+    #[test]
+    fn test_bgd_max_lines_clamp() {
+        let mut m = BgdStickyScrollModel::new();
+        m.set_max_lines(0);
+        assert_eq!(m.max_lines, 1);
+        m.set_max_lines(100);
+        assert_eq!(m.max_lines, 10);
+    }
+
+    #[test]
+    fn test_bgd_empty_deepest() {
+        let m = BgdStickyScrollModel::new();
+        assert_eq!(m.deepest_scope(), 0);
+    }
+
+
+    // bge_ tests
+
+    #[test]
+    fn test_bge_column_selection_creation() {
+        let m = BgeColumnSelectionModel::new();
+        assert!(!m.is_active);
+        assert!(m.selection.is_none());
+    }
+
+    #[test]
+    fn test_bge_start_and_extend() {
+        let mut m = BgeColumnSelectionModel::new();
+        m.start(5, 10);
+        assert!(m.is_active);
+        m.extend_to(10, 20);
+        let sel = m.selection.as_ref().unwrap();
+        assert_eq!(sel.start_line, 5);
+        assert_eq!(sel.end_line, 10);
+        assert_eq!(sel.start_column, 10);
+        assert_eq!(sel.end_column, 20);
+    }
+
+    #[test]
+    fn test_bge_extend_backwards() {
+        let mut m = BgeColumnSelectionModel::new();
+        m.start(10, 20);
+        m.extend_to(5, 10);
+        let sel = m.selection.as_ref().unwrap();
+        assert_eq!(sel.start_line, 5);
+        assert_eq!(sel.end_line, 10);
+        assert_eq!(sel.start_column, 10);
+        assert_eq!(sel.end_column, 20);
+    }
+
+    #[test]
+    fn test_bge_line_count_and_width() {
+        let mut m = BgeColumnSelectionModel::new();
+        m.start(3, 5);
+        m.extend_to(7, 15);
+        assert_eq!(m.line_count(), 5);
+        assert_eq!(m.width(), 10);
+    }
+
+    #[test]
+    fn test_bge_contains() {
+        let mut m = BgeColumnSelectionModel::new();
+        m.start(5, 10);
+        m.extend_to(10, 20);
+        assert!(m.contains(7, 15));
+        assert!(!m.contains(7, 25));
+        assert!(!m.contains(3, 15));
+    }
+
+    #[test]
+    fn test_bge_cancel() {
+        let mut m = BgeColumnSelectionModel::new();
+        m.start(1, 1);
+        m.extend_to(5, 5);
+        m.cancel();
+        assert!(!m.is_active);
+        assert!(m.selection.is_none());
+    }
+
+    #[test]
+    fn test_bge_finish() {
+        let mut m = BgeColumnSelectionModel::new();
+        m.start(1, 1);
+        m.extend_to(3, 10);
+        m.finish();
+        assert!(!m.is_active);
+        assert!(m.selection.is_some());
+    }
+
+    #[test]
+    fn test_bge_selected_lines() {
+        let mut m = BgeColumnSelectionModel::new();
+        m.start(5, 0);
+        m.extend_to(8, 10);
+        assert_eq!(m.selected_lines(), vec![5, 6, 7, 8]);
+    }
+
+    #[test]
+    fn test_bge_has_selection() {
+        let mut m = BgeColumnSelectionModel::new();
+        assert!(!m.has_selection());
+        m.start(1, 5);
+        m.extend_to(1, 5);
+        assert!(!m.has_selection()); // zero width
+        m.extend_to(1, 10);
+        assert!(m.has_selection());
+    }
+
+    #[test]
+    fn test_bge_no_extend_when_inactive() {
+        let mut m = BgeColumnSelectionModel::new();
+        m.extend_to(5, 10);
+        assert!(m.selection.is_none());
     }
 
 
