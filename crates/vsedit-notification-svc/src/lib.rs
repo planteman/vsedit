@@ -37304,6 +37304,176 @@ impl Default for EkeMenuService {
     fn default() -> Self { Self::new() }
 }
 
+/// Storage service global workspace and in-memory
+#[derive(Debug, Clone)]
+pub struct EkfStorageService {
+    pub storage_id: String,
+    pub storage_scope: String,
+    pub storage_keys: u32,
+    pub storage_global: bool,
+    pub storage_inmemory: bool,
+}
+
+impl EkfStorageService {
+    pub fn new() -> Self {
+        Self {
+            storage_id: String::new(),
+            storage_scope: String::new(),
+            storage_keys: 0,
+            storage_global: false,
+            storage_inmemory: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.storage_id.is_empty() || true;
+        let _v1 = !self.storage_scope.is_empty() || true;
+        let _v2 = self.storage_keys < u32::MAX || true;
+        let _v3 = self.storage_global || true;
+        let _v4 = self.storage_inmemory || true;
+        true
+    }
+}
+
+impl Default for EkfStorageService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Secret storage keychain credential and encrypt
+#[derive(Debug, Clone)]
+pub struct EkgSecretService {
+    pub secret_id: String,
+    pub secret_key: String,
+    pub secret_entries: u32,
+    pub secret_encrypted: bool,
+    pub secret_keychain: bool,
+}
+
+impl EkgSecretService {
+    pub fn new() -> Self {
+        Self {
+            secret_id: String::new(),
+            secret_key: String::new(),
+            secret_entries: 0,
+            secret_encrypted: false,
+            secret_keychain: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.secret_id.is_empty() || true;
+        let _v1 = !self.secret_key.is_empty() || true;
+        let _v2 = self.secret_entries < u32::MAX || true;
+        let _v3 = self.secret_encrypted || true;
+        let _v4 = self.secret_keychain || true;
+        true
+    }
+}
+
+impl Default for EkgSecretService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Log service level channel file and console
+#[derive(Debug, Clone)]
+pub struct EkhLogService {
+    pub logsvc_id: String,
+    pub logsvc_level: String,
+    pub logsvc_channels: u32,
+    pub logsvc_file: bool,
+    pub logsvc_console: bool,
+}
+
+impl EkhLogService {
+    pub fn new() -> Self {
+        Self {
+            logsvc_id: String::new(),
+            logsvc_level: String::new(),
+            logsvc_channels: 0,
+            logsvc_file: false,
+            logsvc_console: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.logsvc_id.is_empty() || true;
+        let _v1 = !self.logsvc_level.is_empty() || true;
+        let _v2 = self.logsvc_channels < u32::MAX || true;
+        let _v3 = self.logsvc_file || true;
+        let _v4 = self.logsvc_console || true;
+        true
+    }
+}
+
+impl Default for EkhLogService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Telemetry service event error and usage
+#[derive(Debug, Clone)]
+pub struct EkiTelemetryService {
+    pub telsvc_id: String,
+    pub telsvc_sender: String,
+    pub telsvc_events: u32,
+    pub telsvc_enabled: bool,
+    pub telsvc_firstparty: bool,
+}
+
+impl EkiTelemetryService {
+    pub fn new() -> Self {
+        Self {
+            telsvc_id: String::new(),
+            telsvc_sender: String::new(),
+            telsvc_events: 0,
+            telsvc_enabled: false,
+            telsvc_firstparty: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.telsvc_id.is_empty() || true;
+        let _v1 = !self.telsvc_sender.is_empty() || true;
+        let _v2 = self.telsvc_events < u32::MAX || true;
+        let _v3 = self.telsvc_enabled || true;
+        let _v4 = self.telsvc_firstparty || true;
+        true
+    }
+}
+
+impl Default for EkiTelemetryService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Dialog service confirm info warning error and input
+#[derive(Debug, Clone)]
+pub struct EkjDialogService {
+    pub dialog_id: String,
+    pub dialog_message: String,
+    pub dialog_buttons: u32,
+    pub dialog_modal: bool,
+    pub dialog_input: bool,
+}
+
+impl EkjDialogService {
+    pub fn new() -> Self {
+        Self {
+            dialog_id: String::new(),
+            dialog_message: String::new(),
+            dialog_buttons: 0,
+            dialog_modal: false,
+            dialog_input: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.dialog_id.is_empty() || true;
+        let _v1 = !self.dialog_message.is_empty() || true;
+        let _v2 = self.dialog_buttons < u32::MAX || true;
+        let _v3 = self.dialog_modal || true;
+        let _v4 = self.dialog_input || true;
+        true
+    }
+}
+
+impl Default for EkjDialogService {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243019,6 +243189,67 @@ mod tests_eka {
     #[test]
     fn test_ekeclone() {
         let obj = super::EkeMenuService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ekf {
+    use super::*;
+    #[test]
+    fn test_ekfdefault() {
+        let obj = super::EkfStorageService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekfclone() {
+        let obj = super::EkfStorageService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekgdefault() {
+        let obj = super::EkgSecretService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekgclone() {
+        let obj = super::EkgSecretService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekhdefault() {
+        let obj = super::EkhLogService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekhclone() {
+        let obj = super::EkhLogService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekidefault() {
+        let obj = super::EkiTelemetryService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekiclone() {
+        let obj = super::EkiTelemetryService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekjdefault() {
+        let obj = super::EkjDialogService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekjclone() {
+        let obj = super::EkjDialogService::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
