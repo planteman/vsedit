@@ -86705,6 +86705,67 @@ pub struct BmeEolChange { pub file: String, pub from_eol: u8, pub to_eol: u8 }
 #[derive(Debug, Clone)]
 pub struct BmeEolWarning { pub file: String, pub mixed: bool, pub message: String }
 
+
+// File label service — file icon themes, file name display, path shortening, decorations
+#[derive(Debug, Clone)]
+pub struct BmfFileLabel { pub uri: String, pub name: String, pub description: Option<String>, pub icon_id: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmfIconTheme { pub id: String, pub label: String, pub extensionId: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmfPathShortening { pub full_path: String, pub shortened: String, pub separator: char }
+#[derive(Debug, Clone)]
+pub struct BmfFileDecoration { pub uri: String, pub badge: Option<String>, pub color: Option<u32>, pub tooltip: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmfLabelConfig { pub show_path: bool, pub separator: String, pub tab_description: bool }
+
+// Path service — path resolution, relative paths, home dir expansion, URI parsing
+#[derive(Debug, Clone)]
+pub struct BmgResolvedPath { pub original: String, pub resolved: String, pub is_absolute: bool }
+#[derive(Debug, Clone)]
+pub struct BmgRelativePath { pub from_uri: String, pub to_uri: String, pub relative: String }
+#[derive(Debug, Clone)]
+pub struct BmgHomeDirExpansion { pub input: String, pub expanded: String, pub home_dir: String }
+#[derive(Debug, Clone)]
+pub struct BmgUriComponents { pub scheme: String, pub authority: String, pub path: String, pub query: Option<String>, pub fragment: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmgPathConfig { pub separator: char, pub case_sensitive: bool }
+
+// JSON schema validation — schema registry, validation errors, schema associations, completion from schema
+#[derive(Debug, Clone)]
+pub struct BmhJsonSchema { pub uri: String, pub file_match: Vec<String>, pub schema_json: String }
+#[derive(Debug, Clone)]
+pub struct BmhValidationError { pub path: String, pub message: String, pub severity: u8, pub offset: usize, pub length: usize }
+#[derive(Debug, Clone)]
+pub struct BmhSchemaAssociation { pub file_pattern: String, pub schema_uri: String, pub priority: i32 }
+#[derive(Debug, Clone)]
+pub struct BmhSchemaCompletion { pub label: String, pub detail: Option<String>, pub insert_text: String, pub schema_path: String }
+#[derive(Debug, Clone)]
+pub struct BmhSchemaRegistry { pub schemas: Vec<BmhJsonSchema>, pub associations: Vec<BmhSchemaAssociation> }
+
+// Configuration resolver — configuration scopes, override identifiers, language-specific settings
+#[derive(Debug, Clone)]
+pub struct BmiConfigValue { pub key: String, pub value: String, pub scope: u8, pub overridden: bool }
+#[derive(Debug, Clone)]
+pub struct BmiConfigOverride { pub section: String, pub language_id: Option<String>, pub resource_uri: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmiConfigScope { pub scope_type: u8, pub label: String, pub order: u32 }
+#[derive(Debug, Clone)]
+pub struct BmiConfigChange { pub affected_keys: Vec<String>, pub source: u8 }
+#[derive(Debug, Clone)]
+pub struct BmiConfigTarget { pub scope: u8, pub resource: Option<String>, pub language: Option<String> }
+
+// Setting scope hierarchy — scope precedence, effective values, scope display, merge strategies
+#[derive(Debug, Clone)]
+pub struct BmjScopeEntry { pub scope: u8, pub value: Option<String>, pub source_uri: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmjEffectiveValue { pub key: String, pub value: String, pub effective_scope: u8, pub overrides: Vec<BmjScopeEntry> }
+#[derive(Debug, Clone)]
+pub struct BmjMergeStrategy { pub strategy: u8, pub deep_merge: bool }
+#[derive(Debug, Clone)]
+pub struct BmjScopeDisplay { pub scope: u8, pub label: String, pub description: String, pub icon: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmjSettingInspect { pub key: String, pub default_value: Option<String>, pub user_value: Option<String>, pub workspace_value: Option<String>, pub folder_value: Option<String> }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -96345,4 +96406,104 @@ mod tests_bfo {
     fn test_bme_warning_none() { let w = BmeEolWarning { file: "c.txt".into(), mixed: false, message: String::new() }; assert!(!w.mixed); }
     #[test]
     fn test_bme_all_crlf() { let d = BmeEolDetection { dominant: 2, has_mixed: false, crlf_count: 200, lf_count: 0, cr_count: 0 }; assert_eq!(d.crlf_count, 200); }
+    #[test]
+    fn test_bmf_label_basic() { let l = BmfFileLabel { uri: "file:///a.rs".into(), name: "a.rs".into(), description: Some("src".into()), icon_id: Some("rust".into()) }; assert_eq!(l.name, "a.rs"); }
+    #[test]
+    fn test_bmf_label_no_icon() { let l = BmfFileLabel { uri: "file:///b.txt".into(), name: "b.txt".into(), description: None, icon_id: None }; assert!(l.icon_id.is_none()); }
+    #[test]
+    fn test_bmf_icon_theme() { let t = BmfIconTheme { id: "seti".into(), label: "Seti".into(), extensionId: Some("ext.seti".into()) }; assert!(t.extensionId.is_some()); }
+    #[test]
+    fn test_bmf_builtin_theme() { let t = BmfIconTheme { id: "minimal".into(), label: "Minimal".into(), extensionId: None }; assert!(t.extensionId.is_none()); }
+    #[test]
+    fn test_bmf_path_shortened() { let p = BmfPathShortening { full_path: "/home/user/project/src/main.rs".into(), shortened: "src/main.rs".into(), separator: '/' }; assert!(p.shortened.len() < p.full_path.len()); }
+    #[test]
+    fn test_bmf_decoration_badge() { let d = BmfFileDecoration { uri: "file:///a.rs".into(), badge: Some("M".into()), color: Some(0xE2C08D), tooltip: Some("Modified".into()) }; assert!(d.badge.is_some()); }
+    #[test]
+    fn test_bmf_decoration_none() { let d = BmfFileDecoration { uri: "file:///b.rs".into(), badge: None, color: None, tooltip: None }; assert!(d.badge.is_none()); }
+    #[test]
+    fn test_bmf_config_show_path() { let c = BmfLabelConfig { show_path: true, separator: " — ".into(), tab_description: true }; assert!(c.show_path); }
+    #[test]
+    fn test_bmf_config_no_path() { let c = BmfLabelConfig { show_path: false, separator: String::new(), tab_description: false }; assert!(!c.show_path); }
+    #[test]
+    fn test_bmf_windows_separator() { let p = BmfPathShortening { full_path: "C:\\Users\\project\\src".into(), shortened: "src".into(), separator: '\\' }; assert_eq!(p.separator, '\\'); }
+    #[test]
+    fn test_bmg_resolve_absolute() { let p = BmgResolvedPath { original: "/a/b".into(), resolved: "/a/b".into(), is_absolute: true }; assert!(p.is_absolute); }
+    #[test]
+    fn test_bmg_resolve_relative() { let p = BmgResolvedPath { original: "./a".into(), resolved: "/cwd/a".into(), is_absolute: false }; assert!(!p.is_absolute); }
+    #[test]
+    fn test_bmg_relative_path() { let r = BmgRelativePath { from_uri: "file:///a/b".into(), to_uri: "file:///a/c".into(), relative: "../c".into() }; assert_eq!(r.relative, "../c"); }
+    #[test]
+    fn test_bmg_home_expansion() { let h = BmgHomeDirExpansion { input: "~/project".into(), expanded: "/home/user/project".into(), home_dir: "/home/user".into() }; assert!(h.expanded.starts_with(&h.home_dir)); }
+    #[test]
+    fn test_bmg_no_home() { let h = BmgHomeDirExpansion { input: "/absolute/path".into(), expanded: "/absolute/path".into(), home_dir: "/home/user".into() }; assert_eq!(h.input, h.expanded); }
+    #[test]
+    fn test_bmg_uri_file() { let u = BmgUriComponents { scheme: "file".into(), authority: String::new(), path: "/a/b".into(), query: None, fragment: None }; assert_eq!(u.scheme, "file"); }
+    #[test]
+    fn test_bmg_uri_http() { let u = BmgUriComponents { scheme: "https".into(), authority: "example.com".into(), path: "/api".into(), query: Some("key=val".into()), fragment: None }; assert!(u.query.is_some()); }
+    #[test]
+    fn test_bmg_uri_fragment() { let u = BmgUriComponents { scheme: "file".into(), authority: String::new(), path: "/a".into(), query: None, fragment: Some("L10".into()) }; assert!(u.fragment.is_some()); }
+    #[test]
+    fn test_bmg_config_unix() { let c = BmgPathConfig { separator: '/', case_sensitive: true }; assert_eq!(c.separator, '/'); }
+    #[test]
+    fn test_bmg_config_windows() { let c = BmgPathConfig { separator: '\\', case_sensitive: false }; assert!(!c.case_sensitive); }
+    #[test]
+    fn test_bmh_schema_basic() { let s = BmhJsonSchema { uri: "vscode://schemas/settings".into(), file_match: vec!["settings.json".into()], schema_json: "{}".into() }; assert_eq!(s.file_match.len(), 1); }
+    #[test]
+    fn test_bmh_schema_multi_match() { let s = BmhJsonSchema { uri: "schema://launch".into(), file_match: vec!["launch.json".into(), ".vscode/launch.json".into()], schema_json: "{}".into() }; assert_eq!(s.file_match.len(), 2); }
+    #[test]
+    fn test_bmh_validation_error() { let e = BmhValidationError { path: "/editor/fontSize".into(), message: "Expected number".into(), severity: 0, offset: 50, length: 5 }; assert_eq!(e.severity, 0); }
+    #[test]
+    fn test_bmh_validation_warning() { let e = BmhValidationError { path: "/deprecated".into(), message: "Deprecated setting".into(), severity: 1, offset: 10, length: 12 }; assert_eq!(e.severity, 1); }
+    #[test]
+    fn test_bmh_association() { let a = BmhSchemaAssociation { file_pattern: "*.json".into(), schema_uri: "schema://default".into(), priority: 0 }; assert_eq!(a.priority, 0); }
+    #[test]
+    fn test_bmh_high_priority_assoc() { let a = BmhSchemaAssociation { file_pattern: "tsconfig.json".into(), schema_uri: "schema://tsconfig".into(), priority: 100 }; assert_eq!(a.priority, 100); }
+    #[test]
+    fn test_bmh_completion() { let c = BmhSchemaCompletion { label: "fontSize".into(), detail: Some("number".into()), insert_text: "\"fontSize\": 14".into(), schema_path: "/properties/fontSize".into() }; assert!(c.detail.is_some()); }
+    #[test]
+    fn test_bmh_completion_no_detail() { let c = BmhSchemaCompletion { label: "x".into(), detail: None, insert_text: "\"x\": ".into(), schema_path: "/x".into() }; assert!(c.detail.is_none()); }
+    #[test]
+    fn test_bmh_empty_registry() { let r = BmhSchemaRegistry { schemas: vec![], associations: vec![] }; assert!(r.schemas.is_empty()); }
+    #[test]
+    fn test_bmh_registry_with_schemas() { let s = BmhJsonSchema { uri: "x".into(), file_match: vec![], schema_json: "{}".into() }; let r = BmhSchemaRegistry { schemas: vec![s], associations: vec![] }; assert_eq!(r.schemas.len(), 1); }
+    #[test]
+    fn test_bmi_user_value() { let v = BmiConfigValue { key: "editor.fontSize".into(), value: "14".into(), scope: 1, overridden: false }; assert_eq!(v.scope, 1); }
+    #[test]
+    fn test_bmi_overridden_value() { let v = BmiConfigValue { key: "editor.tabSize".into(), value: "2".into(), scope: 2, overridden: true }; assert!(v.overridden); }
+    #[test]
+    fn test_bmi_override_by_language() { let o = BmiConfigOverride { section: "editor".into(), language_id: Some("rust".into()), resource_uri: None }; assert!(o.language_id.is_some()); }
+    #[test]
+    fn test_bmi_override_by_resource() { let o = BmiConfigOverride { section: "files".into(), language_id: None, resource_uri: Some("file:///project".into()) }; assert!(o.resource_uri.is_some()); }
+    #[test]
+    fn test_bmi_default_scope() { let s = BmiConfigScope { scope_type: 0, label: "Default".into(), order: 0 }; assert_eq!(s.scope_type, 0); }
+    #[test]
+    fn test_bmi_workspace_scope() { let s = BmiConfigScope { scope_type: 3, label: "Workspace".into(), order: 3 }; assert_eq!(s.scope_type, 3); }
+    #[test]
+    fn test_bmi_change_event() { let c = BmiConfigChange { affected_keys: vec!["editor.fontSize".into()], source: 1 }; assert_eq!(c.affected_keys.len(), 1); }
+    #[test]
+    fn test_bmi_multi_key_change() { let c = BmiConfigChange { affected_keys: vec!["a".into(), "b".into(), "c".into()], source: 2 }; assert_eq!(c.affected_keys.len(), 3); }
+    #[test]
+    fn test_bmi_target_user() { let t = BmiConfigTarget { scope: 1, resource: None, language: None }; assert_eq!(t.scope, 1); }
+    #[test]
+    fn test_bmi_target_lang_resource() { let t = BmiConfigTarget { scope: 3, resource: Some("file:///x".into()), language: Some("python".into()) }; assert!(t.language.is_some()); }
+    #[test]
+    fn test_bmj_scope_entry_user() { let e = BmjScopeEntry { scope: 1, value: Some("14".into()), source_uri: None }; assert!(e.value.is_some()); }
+    #[test]
+    fn test_bmj_scope_entry_none() { let e = BmjScopeEntry { scope: 2, value: None, source_uri: None }; assert!(e.value.is_none()); }
+    #[test]
+    fn test_bmj_effective_value() { let v = BmjEffectiveValue { key: "editor.fontSize".into(), value: "16".into(), effective_scope: 2, overrides: vec![] }; assert_eq!(v.effective_scope, 2); }
+    #[test]
+    fn test_bmj_effective_with_overrides() { let o = BmjScopeEntry { scope: 1, value: Some("14".into()), source_uri: None }; let v = BmjEffectiveValue { key: "k".into(), value: "16".into(), effective_scope: 2, overrides: vec![o] }; assert_eq!(v.overrides.len(), 1); }
+    #[test]
+    fn test_bmj_merge_replace() { let m = BmjMergeStrategy { strategy: 0, deep_merge: false }; assert_eq!(m.strategy, 0); }
+    #[test]
+    fn test_bmj_merge_deep() { let m = BmjMergeStrategy { strategy: 1, deep_merge: true }; assert!(m.deep_merge); }
+    #[test]
+    fn test_bmj_scope_display() { let d = BmjScopeDisplay { scope: 1, label: "User".into(), description: "User Settings".into(), icon: Some("account".into()) }; assert!(d.icon.is_some()); }
+    #[test]
+    fn test_bmj_inspect_all_none() { let i = BmjSettingInspect { key: "k".into(), default_value: Some("d".into()), user_value: None, workspace_value: None, folder_value: None }; assert!(i.user_value.is_none()); }
+    #[test]
+    fn test_bmj_inspect_user_override() { let i = BmjSettingInspect { key: "k".into(), default_value: Some("d".into()), user_value: Some("u".into()), workspace_value: None, folder_value: None }; assert!(i.user_value.is_some()); }
+    #[test]
+    fn test_bmj_inspect_all_set() { let i = BmjSettingInspect { key: "k".into(), default_value: Some("d".into()), user_value: Some("u".into()), workspace_value: Some("w".into()), folder_value: Some("f".into()) }; assert!(i.folder_value.is_some()); }
 }
