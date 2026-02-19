@@ -65722,3 +65722,186 @@ mod bct_tests {
         assert_eq!(s.children[0].state, BctTestState::Running);
     }
 }
+
+
+// --- bcu_: Editor extension details view ---
+
+/// Extension installation state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcuExtState { NotInstalled, Installed, Disabled, Outdated, Installing }
+
+/// An extension detail.
+#[derive(Debug, Clone)]
+pub struct BcuExtension {
+    pub id: String,
+    pub display_name: String,
+    pub publisher: String,
+    pub version: String,
+    pub description: String,
+    pub state: BcuExtState,
+    pub rating: Option<f32>,
+    pub install_count: u64,
+    pub categories: Vec<String>,
+}
+
+impl BcuExtension {
+    pub fn new(id: &str, name: &str, publisher: &str, version: &str) -> Self {
+        Self { id: id.to_string(), display_name: name.to_string(), publisher: publisher.to_string(), version: version.to_string(), description: String::new(), state: BcuExtState::NotInstalled, rating: None, install_count: 0, categories: Vec::new() }
+    }
+
+    pub fn with_description(mut self, d: &str) -> Self { self.description = d.to_string(); self }
+    pub fn with_rating(mut self, r: f32) -> Self { self.rating = Some(r); self }
+    pub fn with_installs(mut self, n: u64) -> Self { self.install_count = n; self }
+
+    pub fn full_id(&self) -> String { format!("{}.{}", self.publisher, self.id) }
+
+    pub fn stars(&self) -> String {
+        match self.rating {
+            Some(r) => {
+                let full = r.floor() as usize;
+                let half = if r - r.floor() >= 0.5 { 1 } else { 0 };
+                let empty = 5usize.saturating_sub(full + half);
+                format!("{}{}{}", "★".repeat(full), "½".repeat(half), "☆".repeat(empty))
+            }
+            None => "☆☆☆☆☆".to_string(),
+        }
+    }
+
+    pub fn install_display(&self) -> String {
+        if self.install_count >= 1_000_000 { format!("{:.1}M", self.install_count as f64 / 1_000_000.0) }
+        else if self.install_count >= 1_000 { format!("{:.1}K", self.install_count as f64 / 1_000.0) }
+        else { format!("{}", self.install_count) }
+    }
+
+    pub fn state_label(&self) -> &str {
+        match self.state {
+            BcuExtState::NotInstalled => "Install",
+            BcuExtState::Installed => "Installed",
+            BcuExtState::Disabled => "Disabled",
+            BcuExtState::Outdated => "Update",
+            BcuExtState::Installing => "Installing...",
+        }
+    }
+}
+
+/// Extension list view with search.
+#[derive(Debug)]
+pub struct BcuExtensionList {
+    extensions: Vec<BcuExtension>,
+    filter: String,
+    cursor: usize,
+    sort_by_installs: bool,
+}
+
+impl BcuExtensionList {
+    pub fn new() -> Self { Self { extensions: Vec::new(), filter: String::new(), cursor: 0, sort_by_installs: true } }
+
+    pub fn set_extensions(&mut self, exts: Vec<BcuExtension>) { self.extensions = exts; self.cursor = 0; }
+    pub fn set_filter(&mut self, f: &str) { self.filter = f.to_string(); self.cursor = 0; }
+
+    pub fn visible(&self) -> Vec<&BcuExtension> {
+        let mut exts: Vec<_> = if self.filter.is_empty() { self.extensions.iter().collect() }
+        else {
+            let f = self.filter.to_lowercase();
+            self.extensions.iter().filter(|e| e.display_name.to_lowercase().contains(&f) || e.description.to_lowercase().contains(&f)).collect()
+        };
+        if self.sort_by_installs { exts.sort_by(|a, b| b.install_count.cmp(&a.install_count)); }
+        exts
+    }
+
+    pub fn cursor_ext(&self) -> Option<&BcuExtension> { self.visible().get(self.cursor).copied() }
+
+    pub fn move_cursor(&mut self, delta: i32) {
+        let count = self.visible().len();
+        if count == 0 { return; }
+        self.cursor = ((self.cursor as i32 + delta).rem_euclid(count as i32)) as usize;
+    }
+
+    pub fn installed_count(&self) -> usize { self.extensions.iter().filter(|e| e.state == BcuExtState::Installed || e.state == BcuExtState::Disabled).count() }
+    pub fn outdated_count(&self) -> usize { self.extensions.iter().filter(|e| e.state == BcuExtState::Outdated).count() }
+}
+
+#[cfg(test)]
+mod bcu_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcu_ext_new() {
+        let e = BcuExtension::new("python", "Python", "ms-python", "2024.1");
+        assert_eq!(e.full_id(), "ms-python.python");
+    }
+
+    #[test]
+    fn test_bcu_stars() {
+        let e = BcuExtension::new("x", "X", "p", "1").with_rating(3.5);
+        let s = e.stars();
+        assert!(s.contains("★"));
+    }
+
+    #[test]
+    fn test_bcu_installs() {
+        let e = BcuExtension::new("x", "X", "p", "1").with_installs(1_500_000);
+        assert!(e.install_display().contains("M"));
+    }
+
+    #[test]
+    fn test_bcu_state_label() {
+        let mut e = BcuExtension::new("x", "X", "p", "1");
+        assert_eq!(e.state_label(), "Install");
+        e.state = BcuExtState::Installed;
+        assert_eq!(e.state_label(), "Installed");
+    }
+
+    #[test]
+    fn test_bcu_list_filter() {
+        let mut l = BcuExtensionList::new();
+        l.set_extensions(vec![
+            BcuExtension::new("py", "Python", "ms", "1").with_description("Python support"),
+            BcuExtension::new("rs", "Rust", "ra", "1").with_description("Rust support"),
+        ]);
+        l.set_filter("python");
+        assert_eq!(l.visible().len(), 1);
+    }
+
+    #[test]
+    fn test_bcu_list_sort() {
+        let mut l = BcuExtensionList::new();
+        l.set_extensions(vec![
+            BcuExtension::new("a", "A", "p", "1").with_installs(100),
+            BcuExtension::new("b", "B", "p", "1").with_installs(1000),
+        ]);
+        assert_eq!(l.visible()[0].id, "b"); // sorted by installs desc
+    }
+
+    #[test]
+    fn test_bcu_cursor() {
+        let mut l = BcuExtensionList::new();
+        l.set_extensions(vec![BcuExtension::new("a", "A", "p", "1"), BcuExtension::new("b", "B", "p", "1")]);
+        l.move_cursor(1);
+        assert!(l.cursor_ext().is_some());
+    }
+
+    #[test]
+    fn test_bcu_installed_count() {
+        let mut l = BcuExtensionList::new();
+        let mut e = BcuExtension::new("x", "X", "p", "1");
+        e.state = BcuExtState::Installed;
+        l.set_extensions(vec![e]);
+        assert_eq!(l.installed_count(), 1);
+    }
+
+    #[test]
+    fn test_bcu_outdated() {
+        let mut l = BcuExtensionList::new();
+        let mut e = BcuExtension::new("x", "X", "p", "1");
+        e.state = BcuExtState::Outdated;
+        l.set_extensions(vec![e]);
+        assert_eq!(l.outdated_count(), 1);
+    }
+
+    #[test]
+    fn test_bcu_no_rating() {
+        let e = BcuExtension::new("x", "X", "p", "1");
+        assert!(e.stars().contains("☆☆☆☆☆"));
+    }
+}
