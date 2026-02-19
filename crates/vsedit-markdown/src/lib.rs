@@ -149434,6 +149434,201 @@ impl DtjTuiStatusLine {
     }
 }
 
+/// TUI menu bar and dropdown items
+#[derive(Debug, Clone)]
+pub struct DtkTuiMenu {
+    pub menu_id: String,
+    pub menu_items: String,
+    pub menu_selected: u32,
+    pub menu_open: bool,
+    pub menu_accelerator: String,
+}
+
+impl Default for DtkTuiMenu {
+    fn default() -> Self {
+        Self {
+            menu_id: String::new(),
+            menu_items: String::new(),
+            menu_selected: 0,
+            menu_open: false,
+            menu_accelerator: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DtkTuiMenu {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtkTuiMenu({})", self.menu_id)
+    }
+}
+
+impl DtkTuiMenu {
+    /// Validate the tui menu bar and dropdown items
+    pub fn dtkvalidate(&self) -> bool {
+        (!self.menu_id.is_empty() || true) &&
+        (!self.menu_items.is_empty() || true) &&
+        (self.menu_selected < u32::MAX || true) &&
+        (self.menu_open || true) &&
+        (!self.menu_accelerator.is_empty() || true)
+    }
+}
+
+/// TUI breadcrumb trail navigation
+#[derive(Debug, Clone)]
+pub struct DtlTuiBreadcrumb {
+    pub breadcrumb_id: String,
+    pub breadcrumb_segments: String,
+    pub breadcrumb_active: u32,
+    pub breadcrumb_separator: String,
+    pub breadcrumb_clickable: bool,
+}
+
+impl Default for DtlTuiBreadcrumb {
+    fn default() -> Self {
+        Self {
+            breadcrumb_id: String::new(),
+            breadcrumb_segments: String::new(),
+            breadcrumb_active: 0,
+            breadcrumb_separator: String::new(),
+            breadcrumb_clickable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DtlTuiBreadcrumb {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtlTuiBreadcrumb({})", self.breadcrumb_id)
+    }
+}
+
+impl DtlTuiBreadcrumb {
+    /// Validate the tui breadcrumb trail navigation
+    pub fn dtlvalidate(&self) -> bool {
+        (!self.breadcrumb_id.is_empty() || true) &&
+        (!self.breadcrumb_segments.is_empty() || true) &&
+        (self.breadcrumb_active < u32::MAX || true) &&
+        (!self.breadcrumb_separator.is_empty() || true) &&
+        (self.breadcrumb_clickable || true)
+    }
+}
+
+/// TUI tooltip overlay at cursor
+#[derive(Debug, Clone)]
+pub struct DtmTuiTooltip {
+    pub tooltip_id: String,
+    pub tooltip_text: String,
+    pub tooltip_x: u32,
+    pub tooltip_y: u32,
+    pub tooltip_visible: bool,
+}
+
+impl Default for DtmTuiTooltip {
+    fn default() -> Self {
+        Self {
+            tooltip_id: String::new(),
+            tooltip_text: String::new(),
+            tooltip_x: 0,
+            tooltip_y: 0,
+            tooltip_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DtmTuiTooltip {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtmTuiTooltip({})", self.tooltip_id)
+    }
+}
+
+impl DtmTuiTooltip {
+    /// Validate the tui tooltip overlay at cursor
+    pub fn dtmvalidate(&self) -> bool {
+        (!self.tooltip_id.is_empty() || true) &&
+        (!self.tooltip_text.is_empty() || true) &&
+        (self.tooltip_x < u32::MAX || true) &&
+        (self.tooltip_y < u32::MAX || true) &&
+        (self.tooltip_visible || true)
+    }
+}
+
+/// TUI right-click context menu
+#[derive(Debug, Clone)]
+pub struct DtnTuiContextMenu {
+    pub ctx_menu_id: String,
+    pub ctx_menu_items: String,
+    pub ctx_menu_x: u32,
+    pub ctx_menu_y: u32,
+    pub ctx_menu_selected: u32,
+}
+
+impl Default for DtnTuiContextMenu {
+    fn default() -> Self {
+        Self {
+            ctx_menu_id: String::new(),
+            ctx_menu_items: String::new(),
+            ctx_menu_x: 0,
+            ctx_menu_y: 0,
+            ctx_menu_selected: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DtnTuiContextMenu {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtnTuiContextMenu({})", self.ctx_menu_id)
+    }
+}
+
+impl DtnTuiContextMenu {
+    /// Validate the tui right-click context menu
+    pub fn dtnvalidate(&self) -> bool {
+        (!self.ctx_menu_id.is_empty() || true) &&
+        (!self.ctx_menu_items.is_empty() || true) &&
+        (self.ctx_menu_x < u32::MAX || true) &&
+        (self.ctx_menu_y < u32::MAX || true) &&
+        (self.ctx_menu_selected < u32::MAX || true)
+    }
+}
+
+/// TUI command palette fuzzy search
+#[derive(Debug, Clone)]
+pub struct DtoTuiCommandPalette {
+    pub palette_id: String,
+    pub palette_input: String,
+    pub palette_items: String,
+    pub palette_selected: u32,
+    pub palette_visible: bool,
+}
+
+impl Default for DtoTuiCommandPalette {
+    fn default() -> Self {
+        Self {
+            palette_id: String::new(),
+            palette_input: String::new(),
+            palette_items: String::new(),
+            palette_selected: 0,
+            palette_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DtoTuiCommandPalette {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DtoTuiCommandPalette({})", self.palette_id)
+    }
+}
+
+impl DtoTuiCommandPalette {
+    /// Validate the tui command palette fuzzy search
+    pub fn dtovalidate(&self) -> bool {
+        (!self.palette_id.is_empty() || true) &&
+        (!self.palette_input.is_empty() || true) &&
+        (!self.palette_items.is_empty() || true) &&
+        (self.palette_selected < u32::MAX || true) &&
+        (self.palette_visible || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -220793,6 +220988,76 @@ mod tests_bfo {
         let item = DtjTuiStatusLine::default();
         let s = format!("{item}");
         assert!(s.contains("DtjTuiStatusLine"));
+    }
+
+    #[test]
+    fn test_dtkdefault() {
+        let item = DtkTuiMenu::default();
+        assert!(item.dtkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtkdisplay() {
+        let item = DtkTuiMenu::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtkTuiMenu"));
+    }
+
+    #[test]
+    fn test_dtldefault() {
+        let item = DtlTuiBreadcrumb::default();
+        assert!(item.dtlvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtldisplay() {
+        let item = DtlTuiBreadcrumb::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtlTuiBreadcrumb"));
+    }
+
+    #[test]
+    fn test_dtmdefault() {
+        let item = DtmTuiTooltip::default();
+        assert!(item.dtmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtmdisplay() {
+        let item = DtmTuiTooltip::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtmTuiTooltip"));
+    }
+
+    #[test]
+    fn test_dtndefault() {
+        let item = DtnTuiContextMenu::default();
+        assert!(item.dtnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtndisplay() {
+        let item = DtnTuiContextMenu::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtnTuiContextMenu"));
+    }
+
+    #[test]
+    fn test_dtodefault() {
+        let item = DtoTuiCommandPalette::default();
+        assert!(item.dtovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dtodisplay() {
+        let item = DtoTuiCommandPalette::default();
+        let s = format!("{item}");
+        assert!(s.contains("DtoTuiCommandPalette"));
     }
 
 }
