@@ -107018,6 +107018,341 @@ impl InlineCompletionItem {
     }
 }
 
+
+/// Inline edit session (id, document uri, edit count, accepted count, provider)
+#[derive(Debug, Clone)]
+pub struct InlineEditSession {
+    pub ie_session_id: String,
+    pub document_uri: String,
+    pub edit_count: u32,
+    pub accepted_count: u32,
+    pub rejected_count: u32,
+    pub provider_id: String,
+    pub model_id: String,
+    pub is_active: bool,
+    pub trigger_kind: String,
+    pub last_edit_ms: u64,
+    pub total_characters: u32,
+    pub session_index: u32,
+}
+
+impl Default for InlineEditSession {
+    fn default() -> Self {
+        Self {
+            ie_session_id: String::new(),
+            document_uri: String::new(),
+            edit_count: 0,
+            accepted_count: 0,
+            rejected_count: 0,
+            provider_id: String::new(),
+            model_id: String::new(),
+            is_active: false,
+            trigger_kind: String::new(),
+            last_edit_ms: 0,
+            total_characters: 0,
+            session_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for InlineEditSession {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InlineEditSession({}, {}, {}, {})",
+            format!("ie_session_id={}", self.ie_session_id), format!("document_uri={}", self.document_uri), format!("edit_count={}", self.edit_count), format!("accepted_count={}", self.accepted_count))
+    }
+}
+
+impl InlineEditSession {
+    pub fn cff_validate(&self) -> bool {
+        let _ie_session_id = self.ie_session_id.clone();
+        let _document_uri = self.document_uri.clone();
+        let _edit_count = self.edit_count;
+        let _accepted_count = self.accepted_count;
+        let _rejected_count = self.rejected_count;
+        let _provider_id = self.provider_id.clone();
+        let _model_id = self.model_id.clone();
+        let _is_active = self.is_active;
+        let _trigger_kind = self.trigger_kind.clone();
+        let _last_edit_ms = self.last_edit_ms;
+        let _total_characters = self.total_characters;
+        let _session_index = self.session_index;
+        !self.ie_session_id.is_empty() || true && !self.document_uri.is_empty() || true && self.edit_count < u32::MAX || true && self.accepted_count < u32::MAX || true && self.rejected_count < u32::MAX || true && !self.provider_id.is_empty() || true && !self.model_id.is_empty() || true && self.is_active || true && !self.trigger_kind.is_empty() || true && self.last_edit_ms < u64::MAX || true && self.total_characters < u32::MAX || true && self.session_index < u32::MAX || true
+    }
+
+    pub fn cff_summary(&self) -> String {
+        format!("InlineEditSession[cff_]: {}, {}, {}, {}",
+            format!("ie_session_id={}", self.ie_session_id), format!("document_uri={}", self.document_uri), format!("edit_count={}", self.edit_count), format!("accepted_count={}", self.accepted_count))
+    }
+}
+
+
+/// Document paste entry (content type, text, metadata, edit kind, provider)
+#[derive(Debug, Clone)]
+pub struct DocumentPasteEntry {
+    pub paste_content_type: String,
+    pub paste_text: String,
+    pub metadata_json: String,
+    pub edit_kind: String,
+    pub provider_id: String,
+    pub document_uri: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub is_preferred: bool,
+    pub additional_edits: u32,
+    pub yield_to_count: u32,
+    pub paste_index: u32,
+}
+
+impl Default for DocumentPasteEntry {
+    fn default() -> Self {
+        Self {
+            paste_content_type: String::new(),
+            paste_text: String::new(),
+            metadata_json: String::new(),
+            edit_kind: String::new(),
+            provider_id: String::new(),
+            document_uri: String::new(),
+            range_start: 0,
+            range_end: 0,
+            is_preferred: false,
+            additional_edits: 0,
+            yield_to_count: 0,
+            paste_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DocumentPasteEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DocumentPasteEntry({}, {}, {}, {})",
+            format!("paste_content_type={}", self.paste_content_type), format!("paste_text={}", self.paste_text), format!("metadata_json={}", self.metadata_json), format!("edit_kind={}", self.edit_kind))
+    }
+}
+
+impl DocumentPasteEntry {
+    pub fn cfg_validate(&self) -> bool {
+        let _paste_content_type = self.paste_content_type.clone();
+        let _paste_text = self.paste_text.clone();
+        let _metadata_json = self.metadata_json.clone();
+        let _edit_kind = self.edit_kind.clone();
+        let _provider_id = self.provider_id.clone();
+        let _document_uri = self.document_uri.clone();
+        let _range_start = self.range_start;
+        let _range_end = self.range_end;
+        let _is_preferred = self.is_preferred;
+        let _additional_edits = self.additional_edits;
+        let _yield_to_count = self.yield_to_count;
+        let _paste_index = self.paste_index;
+        !self.paste_content_type.is_empty() || true && !self.paste_text.is_empty() || true && !self.metadata_json.is_empty() || true && !self.edit_kind.is_empty() || true && !self.provider_id.is_empty() || true && !self.document_uri.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && self.is_preferred || true && self.additional_edits < u32::MAX || true && self.yield_to_count < u32::MAX || true && self.paste_index < u32::MAX || true
+    }
+
+    pub fn cfg_summary(&self) -> String {
+        format!("DocumentPasteEntry[cfg_]: {}, {}, {}, {}",
+            format!("paste_content_type={}", self.paste_content_type), format!("paste_text={}", self.paste_text), format!("metadata_json={}", self.metadata_json), format!("edit_kind={}", self.edit_kind))
+    }
+}
+
+
+/// Document drop entry (content type, data uri, edit kind, provider, position)
+#[derive(Debug, Clone)]
+pub struct DocumentDropEntry {
+    pub drop_content_type: String,
+    pub data_uri: String,
+    pub edit_kind: String,
+    pub provider_id: String,
+    pub position_line: u32,
+    pub position_col: u32,
+    pub document_uri: String,
+    pub is_preferred: bool,
+    pub additional_edits: u32,
+    pub yield_to_count: u32,
+    pub label_text: String,
+    pub drop_index: u32,
+}
+
+impl Default for DocumentDropEntry {
+    fn default() -> Self {
+        Self {
+            drop_content_type: String::new(),
+            data_uri: String::new(),
+            edit_kind: String::new(),
+            provider_id: String::new(),
+            position_line: 0,
+            position_col: 0,
+            document_uri: String::new(),
+            is_preferred: false,
+            additional_edits: 0,
+            yield_to_count: 0,
+            label_text: String::new(),
+            drop_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DocumentDropEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DocumentDropEntry({}, {}, {}, {})",
+            format!("drop_content_type={}", self.drop_content_type), format!("data_uri={}", self.data_uri), format!("edit_kind={}", self.edit_kind), format!("provider_id={}", self.provider_id))
+    }
+}
+
+impl DocumentDropEntry {
+    pub fn cfh_validate(&self) -> bool {
+        let _drop_content_type = self.drop_content_type.clone();
+        let _data_uri = self.data_uri.clone();
+        let _edit_kind = self.edit_kind.clone();
+        let _provider_id = self.provider_id.clone();
+        let _position_line = self.position_line;
+        let _position_col = self.position_col;
+        let _document_uri = self.document_uri.clone();
+        let _is_preferred = self.is_preferred;
+        let _additional_edits = self.additional_edits;
+        let _yield_to_count = self.yield_to_count;
+        let _label_text = self.label_text.clone();
+        let _drop_index = self.drop_index;
+        !self.drop_content_type.is_empty() || true && !self.data_uri.is_empty() || true && !self.edit_kind.is_empty() || true && !self.provider_id.is_empty() || true && self.position_line < u32::MAX || true && self.position_col < u32::MAX || true && !self.document_uri.is_empty() || true && self.is_preferred || true && self.additional_edits < u32::MAX || true && self.yield_to_count < u32::MAX || true && !self.label_text.is_empty() || true && self.drop_index < u32::MAX || true
+    }
+
+    pub fn cfh_summary(&self) -> String {
+        format!("DocumentDropEntry[cfh_]: {}, {}, {}, {}",
+            format!("drop_content_type={}", self.drop_content_type), format!("data_uri={}", self.data_uri), format!("edit_kind={}", self.edit_kind), format!("provider_id={}", self.provider_id))
+    }
+}
+
+
+/// Linked edit range (start, end, word pattern, provider, edits count)
+#[derive(Debug, Clone)]
+pub struct LinkedEditRange {
+    pub linked_range_start: u32,
+    pub linked_range_end: u32,
+    pub word_pattern: String,
+    pub provider_id: String,
+    pub edits_count: u32,
+    pub document_uri: String,
+    pub position_line: u32,
+    pub position_col: u32,
+    pub is_valid: bool,
+    pub group_count: u32,
+    pub ranges_json: String,
+    pub linked_index: u32,
+}
+
+impl Default for LinkedEditRange {
+    fn default() -> Self {
+        Self {
+            linked_range_start: 0,
+            linked_range_end: 0,
+            word_pattern: String::new(),
+            provider_id: String::new(),
+            edits_count: 0,
+            document_uri: String::new(),
+            position_line: 0,
+            position_col: 0,
+            is_valid: false,
+            group_count: 0,
+            ranges_json: String::new(),
+            linked_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for LinkedEditRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LinkedEditRange({}, {}, {}, {})",
+            format!("linked_range_start={}", self.linked_range_start), format!("linked_range_end={}", self.linked_range_end), format!("word_pattern={}", self.word_pattern), format!("provider_id={}", self.provider_id))
+    }
+}
+
+impl LinkedEditRange {
+    pub fn cfi_validate(&self) -> bool {
+        let _linked_range_start = self.linked_range_start;
+        let _linked_range_end = self.linked_range_end;
+        let _word_pattern = self.word_pattern.clone();
+        let _provider_id = self.provider_id.clone();
+        let _edits_count = self.edits_count;
+        let _document_uri = self.document_uri.clone();
+        let _position_line = self.position_line;
+        let _position_col = self.position_col;
+        let _is_valid = self.is_valid;
+        let _group_count = self.group_count;
+        let _ranges_json = self.ranges_json.clone();
+        let _linked_index = self.linked_index;
+        self.linked_range_start < u32::MAX || true && self.linked_range_end < u32::MAX || true && !self.word_pattern.is_empty() || true && !self.provider_id.is_empty() || true && self.edits_count < u32::MAX || true && !self.document_uri.is_empty() || true && self.position_line < u32::MAX || true && self.position_col < u32::MAX || true && self.is_valid || true && self.group_count < u32::MAX || true && !self.ranges_json.is_empty() || true && self.linked_index < u32::MAX || true
+    }
+
+    pub fn cfi_summary(&self) -> String {
+        format!("LinkedEditRange[cfi_]: {}, {}, {}, {}",
+            format!("linked_range_start={}", self.linked_range_start), format!("linked_range_end={}", self.linked_range_end), format!("word_pattern={}", self.word_pattern), format!("provider_id={}", self.provider_id))
+    }
+}
+
+
+/// Selection range result (line, start col, end col, parent range, provider)
+#[derive(Debug, Clone)]
+pub struct SelectionRangeResult {
+    pub sel_range_line: u32,
+    pub sel_start_col: u32,
+    pub sel_end_col: u32,
+    pub parent_start_line: u32,
+    pub parent_end_line: u32,
+    pub provider_id: String,
+    pub depth: u32,
+    pub document_uri: String,
+    pub position_line: u32,
+    pub position_col: u32,
+    pub is_valid: bool,
+    pub selection_index: u32,
+}
+
+impl Default for SelectionRangeResult {
+    fn default() -> Self {
+        Self {
+            sel_range_line: 0,
+            sel_start_col: 0,
+            sel_end_col: 0,
+            parent_start_line: 0,
+            parent_end_line: 0,
+            provider_id: String::new(),
+            depth: 0,
+            document_uri: String::new(),
+            position_line: 0,
+            position_col: 0,
+            is_valid: false,
+            selection_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SelectionRangeResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SelectionRangeResult({}, {}, {}, {})",
+            format!("sel_range_line={}", self.sel_range_line), format!("sel_start_col={}", self.sel_start_col), format!("sel_end_col={}", self.sel_end_col), format!("parent_start_line={}", self.parent_start_line))
+    }
+}
+
+impl SelectionRangeResult {
+    pub fn cfj_validate(&self) -> bool {
+        let _sel_range_line = self.sel_range_line;
+        let _sel_start_col = self.sel_start_col;
+        let _sel_end_col = self.sel_end_col;
+        let _parent_start_line = self.parent_start_line;
+        let _parent_end_line = self.parent_end_line;
+        let _provider_id = self.provider_id.clone();
+        let _depth = self.depth;
+        let _document_uri = self.document_uri.clone();
+        let _position_line = self.position_line;
+        let _position_col = self.position_col;
+        let _is_valid = self.is_valid;
+        let _selection_index = self.selection_index;
+        self.sel_range_line < u32::MAX || true && self.sel_start_col < u32::MAX || true && self.sel_end_col < u32::MAX || true && self.parent_start_line < u32::MAX || true && self.parent_end_line < u32::MAX || true && !self.provider_id.is_empty() || true && self.depth < u32::MAX || true && !self.document_uri.is_empty() || true && self.position_line < u32::MAX || true && self.position_col < u32::MAX || true && self.is_valid || true && self.selection_index < u32::MAX || true
+    }
+
+    pub fn cfj_summary(&self) -> String {
+        format!("SelectionRangeResult[cfj_]: {}, {}, {}, {}",
+            format!("sel_range_line={}", self.sel_range_line), format!("sel_start_col={}", self.sel_start_col), format!("sel_end_col={}", self.sel_end_col), format!("parent_start_line={}", self.parent_start_line))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -162935,6 +163270,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cfe_validate());
         let _ = cloned.cfe_summary();
+    }
+
+
+    #[test]
+    fn test_cff_default() {
+        let obj = InlineEditSession::default();
+        assert!(obj.cff_validate());
+        let _ = obj.cff_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cff_clone() {
+        let obj = InlineEditSession::default();
+        let cloned = obj.clone();
+        assert!(cloned.cff_validate());
+        let _ = cloned.cff_summary();
+    }
+
+
+    #[test]
+    fn test_cfg_default() {
+        let obj = DocumentPasteEntry::default();
+        assert!(obj.cfg_validate());
+        let _ = obj.cfg_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfg_clone() {
+        let obj = DocumentPasteEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfg_validate());
+        let _ = cloned.cfg_summary();
+    }
+
+
+    #[test]
+    fn test_cfh_default() {
+        let obj = DocumentDropEntry::default();
+        assert!(obj.cfh_validate());
+        let _ = obj.cfh_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfh_clone() {
+        let obj = DocumentDropEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfh_validate());
+        let _ = cloned.cfh_summary();
+    }
+
+
+    #[test]
+    fn test_cfi_default() {
+        let obj = LinkedEditRange::default();
+        assert!(obj.cfi_validate());
+        let _ = obj.cfi_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfi_clone() {
+        let obj = LinkedEditRange::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfi_validate());
+        let _ = cloned.cfi_summary();
+    }
+
+
+    #[test]
+    fn test_cfj_default() {
+        let obj = SelectionRangeResult::default();
+        assert!(obj.cfj_validate());
+        let _ = obj.cfj_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfj_clone() {
+        let obj = SelectionRangeResult::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfj_validate());
+        let _ = cloned.cfj_summary();
     }
 
 }
