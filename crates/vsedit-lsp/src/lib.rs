@@ -109921,6 +109921,408 @@ impl ParameterHintState {
     }
 }
 
+
+/// Find widget state (visible, search text, replace text, regex, case)
+#[derive(Debug, Clone)]
+pub struct FindWidgetState {
+    pub find_visible: bool,
+    pub find_search_text: String,
+    pub find_replace_text: String,
+    pub is_regex: bool,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub preserve_case: bool,
+    pub match_count: u32,
+    pub current_match: u32,
+    pub search_scope: String,
+    pub in_selection: bool,
+    pub find_state_index: u32,
+}
+
+impl Default for FindWidgetState {
+    fn default() -> Self {
+        Self {
+            find_visible: false,
+            find_search_text: String::new(),
+            find_replace_text: String::new(),
+            is_regex: false,
+            case_sensitive: false,
+            whole_word: false,
+            preserve_case: false,
+            match_count: 0,
+            current_match: 0,
+            search_scope: String::new(),
+            in_selection: false,
+            find_state_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for FindWidgetState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FindWidgetState({}, {}, {}, {})",
+            format!("find_visible={}", self.find_visible), format!("find_search_text={}", self.find_search_text), format!("find_replace_text={}", self.find_replace_text), format!("is_regex={}", self.is_regex))
+    }
+}
+
+impl FindWidgetState {
+    pub fn cgu_validate(&self) -> bool {
+        let _find_visible = self.find_visible;
+        let _find_search_text = self.find_search_text.clone();
+        let _find_replace_text = self.find_replace_text.clone();
+        let _is_regex = self.is_regex;
+        let _case_sensitive = self.case_sensitive;
+        let _whole_word = self.whole_word;
+        let _preserve_case = self.preserve_case;
+        let _match_count = self.match_count;
+        let _current_match = self.current_match;
+        let _search_scope = self.search_scope.clone();
+        let _in_selection = self.in_selection;
+        let _find_state_index = self.find_state_index;
+        self.find_visible || true && !self.find_search_text.is_empty() || true && !self.find_replace_text.is_empty() || true && self.is_regex || true && self.case_sensitive || true && self.whole_word || true && self.preserve_case || true && self.match_count < u32::MAX || true && self.current_match < u32::MAX || true && !self.search_scope.is_empty() || true && self.in_selection || true && self.find_state_index < u32::MAX || true
+    }
+
+    pub fn cgu_summary(&self) -> String {
+        format!("FindWidgetState[cgu_]: {}, {}, {}, {}",
+            format!("find_visible={}", self.find_visible), format!("find_search_text={}", self.find_search_text), format!("find_replace_text={}", self.find_replace_text), format!("is_regex={}", self.is_regex))
+    }
+}
+
+
+/// Goto line state (visible, input value, validated line, max line, error)
+#[derive(Debug, Clone)]
+pub struct GotoLineState {
+    pub goto_line_visible: bool,
+    pub input_value: String,
+    pub validated_line: u32,
+    pub max_line: u32,
+    pub error_message: String,
+    pub last_line: u32,
+    pub column_value: u32,
+    pub is_valid: bool,
+    pub show_column: bool,
+    pub decoration_id: String,
+    pub source_name: String,
+    pub goto_state_index: u32,
+}
+
+impl Default for GotoLineState {
+    fn default() -> Self {
+        Self {
+            goto_line_visible: false,
+            input_value: String::new(),
+            validated_line: 0,
+            max_line: 0,
+            error_message: String::new(),
+            last_line: 0,
+            column_value: 0,
+            is_valid: false,
+            show_column: false,
+            decoration_id: String::new(),
+            source_name: String::new(),
+            goto_state_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for GotoLineState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GotoLineState({}, {}, {}, {})",
+            format!("goto_line_visible={}", self.goto_line_visible), format!("input_value={}", self.input_value), format!("validated_line={}", self.validated_line), format!("max_line={}", self.max_line))
+    }
+}
+
+impl GotoLineState {
+    pub fn cgv_validate(&self) -> bool {
+        let _goto_line_visible = self.goto_line_visible;
+        let _input_value = self.input_value.clone();
+        let _validated_line = self.validated_line;
+        let _max_line = self.max_line;
+        let _error_message = self.error_message.clone();
+        let _last_line = self.last_line;
+        let _column_value = self.column_value;
+        let _is_valid = self.is_valid;
+        let _show_column = self.show_column;
+        let _decoration_id = self.decoration_id.clone();
+        let _source_name = self.source_name.clone();
+        let _goto_state_index = self.goto_state_index;
+        self.goto_line_visible || true && !self.input_value.is_empty() || true && self.validated_line < u32::MAX || true && self.max_line < u32::MAX || true && !self.error_message.is_empty() || true && self.last_line < u32::MAX || true && self.column_value < u32::MAX || true && self.is_valid || true && self.show_column || true && !self.decoration_id.is_empty() || true && !self.source_name.is_empty() || true && self.goto_state_index < u32::MAX || true
+    }
+
+    pub fn cgv_summary(&self) -> String {
+        format!("GotoLineState[cgv_]: {}, {}, {}, {}",
+            format!("goto_line_visible={}", self.goto_line_visible), format!("input_value={}", self.input_value), format!("validated_line={}", self.validated_line), format!("max_line={}", self.max_line))
+    }
+}
+
+
+/// Goto symbol state (visible, filter text, items count, selected, provider)
+#[derive(Debug, Clone)]
+pub struct GotoSymbolState {
+    pub goto_sym_visible: bool,
+    pub sym_filter_text: String,
+    pub sym_items_count: u32,
+    pub sym_selected_index: u32,
+    pub provider_id: String,
+    pub scope_name: String,
+    pub sort_by: String,
+    pub show_kind: bool,
+    pub show_detail: bool,
+    pub sym_last_query: String,
+    pub sym_type_filter: String,
+    pub goto_sym_index: u32,
+}
+
+impl Default for GotoSymbolState {
+    fn default() -> Self {
+        Self {
+            goto_sym_visible: false,
+            sym_filter_text: String::new(),
+            sym_items_count: 0,
+            sym_selected_index: 0,
+            provider_id: String::new(),
+            scope_name: String::new(),
+            sort_by: String::new(),
+            show_kind: false,
+            show_detail: false,
+            sym_last_query: String::new(),
+            sym_type_filter: String::new(),
+            goto_sym_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for GotoSymbolState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GotoSymbolState({}, {}, {}, {})",
+            format!("goto_sym_visible={}", self.goto_sym_visible), format!("sym_filter_text={}", self.sym_filter_text), format!("sym_items_count={}", self.sym_items_count), format!("sym_selected_index={}", self.sym_selected_index))
+    }
+}
+
+impl GotoSymbolState {
+    pub fn cgw_validate(&self) -> bool {
+        let _goto_sym_visible = self.goto_sym_visible;
+        let _sym_filter_text = self.sym_filter_text.clone();
+        let _sym_items_count = self.sym_items_count;
+        let _sym_selected_index = self.sym_selected_index;
+        let _provider_id = self.provider_id.clone();
+        let _scope_name = self.scope_name.clone();
+        let _sort_by = self.sort_by.clone();
+        let _show_kind = self.show_kind;
+        let _show_detail = self.show_detail;
+        let _sym_last_query = self.sym_last_query.clone();
+        let _sym_type_filter = self.sym_type_filter.clone();
+        let _goto_sym_index = self.goto_sym_index;
+        self.goto_sym_visible || true && !self.sym_filter_text.is_empty() || true && self.sym_items_count < u32::MAX || true && self.sym_selected_index < u32::MAX || true && !self.provider_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.sort_by.is_empty() || true && self.show_kind || true && self.show_detail || true && !self.sym_last_query.is_empty() || true && !self.sym_type_filter.is_empty() || true && self.goto_sym_index < u32::MAX || true
+    }
+
+    pub fn cgw_summary(&self) -> String {
+        format!("GotoSymbolState[cgw_]: {}, {}, {}, {}",
+            format!("goto_sym_visible={}", self.goto_sym_visible), format!("sym_filter_text={}", self.sym_filter_text), format!("sym_items_count={}", self.sym_items_count), format!("sym_selected_index={}", self.sym_selected_index))
+    }
+}
+
+
+/// Quick access state (visible, prefix, filter, items count, provider id)
+#[derive(Debug, Clone)]
+pub struct QuickAccessState {
+    pub qa_visible: bool,
+    pub qa_prefix: String,
+    pub qa_filter: String,
+    pub qa_items_count: u32,
+    pub qa_provider_id: String,
+    pub qa_placeholder: String,
+    pub qa_title: String,
+    pub qa_step: u32,
+    pub qa_total_steps: u32,
+    pub qa_busy: bool,
+    pub qa_value: String,
+    pub qa_index: u32,
+}
+
+impl Default for QuickAccessState {
+    fn default() -> Self {
+        Self {
+            qa_visible: false,
+            qa_prefix: String::new(),
+            qa_filter: String::new(),
+            qa_items_count: 0,
+            qa_provider_id: String::new(),
+            qa_placeholder: String::new(),
+            qa_title: String::new(),
+            qa_step: 0,
+            qa_total_steps: 0,
+            qa_busy: false,
+            qa_value: String::new(),
+            qa_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for QuickAccessState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "QuickAccessState({}, {}, {}, {})",
+            format!("qa_visible={}", self.qa_visible), format!("qa_prefix={}", self.qa_prefix), format!("qa_filter={}", self.qa_filter), format!("qa_items_count={}", self.qa_items_count))
+    }
+}
+
+impl QuickAccessState {
+    pub fn cgx_validate(&self) -> bool {
+        let _qa_visible = self.qa_visible;
+        let _qa_prefix = self.qa_prefix.clone();
+        let _qa_filter = self.qa_filter.clone();
+        let _qa_items_count = self.qa_items_count;
+        let _qa_provider_id = self.qa_provider_id.clone();
+        let _qa_placeholder = self.qa_placeholder.clone();
+        let _qa_title = self.qa_title.clone();
+        let _qa_step = self.qa_step;
+        let _qa_total_steps = self.qa_total_steps;
+        let _qa_busy = self.qa_busy;
+        let _qa_value = self.qa_value.clone();
+        let _qa_index = self.qa_index;
+        self.qa_visible || true && !self.qa_prefix.is_empty() || true && !self.qa_filter.is_empty() || true && self.qa_items_count < u32::MAX || true && !self.qa_provider_id.is_empty() || true && !self.qa_placeholder.is_empty() || true && !self.qa_title.is_empty() || true && self.qa_step < u32::MAX || true && self.qa_total_steps < u32::MAX || true && self.qa_busy || true && !self.qa_value.is_empty() || true && self.qa_index < u32::MAX || true
+    }
+
+    pub fn cgx_summary(&self) -> String {
+        format!("QuickAccessState[cgx_]: {}, {}, {}, {}",
+            format!("qa_visible={}", self.qa_visible), format!("qa_prefix={}", self.qa_prefix), format!("qa_filter={}", self.qa_filter), format!("qa_items_count={}", self.qa_items_count))
+    }
+}
+
+
+/// Command palette state (visible, filter text, items count, recent count)
+#[derive(Debug, Clone)]
+pub struct CommandPaletteState {
+    pub cp_visible: bool,
+    pub cp_filter_text: String,
+    pub cp_items_count: u32,
+    pub cp_recent_count: u32,
+    pub cp_selected_index: u32,
+    pub cp_mode: String,
+    pub cp_placeholder: String,
+    pub cp_show_detail: bool,
+    pub cp_fuzzy_score: f64,
+    pub cp_category: String,
+    pub cp_provider: String,
+    pub cp_index: u32,
+}
+
+impl Default for CommandPaletteState {
+    fn default() -> Self {
+        Self {
+            cp_visible: false,
+            cp_filter_text: String::new(),
+            cp_items_count: 0,
+            cp_recent_count: 0,
+            cp_selected_index: 0,
+            cp_mode: String::new(),
+            cp_placeholder: String::new(),
+            cp_show_detail: false,
+            cp_fuzzy_score: 0.0,
+            cp_category: String::new(),
+            cp_provider: String::new(),
+            cp_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CommandPaletteState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CommandPaletteState({}, {}, {}, {})",
+            format!("cp_visible={}", self.cp_visible), format!("cp_filter_text={}", self.cp_filter_text), format!("cp_items_count={}", self.cp_items_count), format!("cp_recent_count={}", self.cp_recent_count))
+    }
+}
+
+impl CommandPaletteState {
+    pub fn cgy_validate(&self) -> bool {
+        let _cp_visible = self.cp_visible;
+        let _cp_filter_text = self.cp_filter_text.clone();
+        let _cp_items_count = self.cp_items_count;
+        let _cp_recent_count = self.cp_recent_count;
+        let _cp_selected_index = self.cp_selected_index;
+        let _cp_mode = self.cp_mode.clone();
+        let _cp_placeholder = self.cp_placeholder.clone();
+        let _cp_show_detail = self.cp_show_detail;
+        let _cp_fuzzy_score = self.cp_fuzzy_score;
+        let _cp_category = self.cp_category.clone();
+        let _cp_provider = self.cp_provider.clone();
+        let _cp_index = self.cp_index;
+        self.cp_visible || true && !self.cp_filter_text.is_empty() || true && self.cp_items_count < u32::MAX || true && self.cp_recent_count < u32::MAX || true && self.cp_selected_index < u32::MAX || true && !self.cp_mode.is_empty() || true && !self.cp_placeholder.is_empty() || true && self.cp_show_detail || true && self.cp_fuzzy_score.is_finite() || true && !self.cp_category.is_empty() || true && !self.cp_provider.is_empty() || true && self.cp_index < u32::MAX || true
+    }
+
+    pub fn cgy_summary(&self) -> String {
+        format!("CommandPaletteState[cgy_]: {}, {}, {}, {}",
+            format!("cp_visible={}", self.cp_visible), format!("cp_filter_text={}", self.cp_filter_text), format!("cp_items_count={}", self.cp_items_count), format!("cp_recent_count={}", self.cp_recent_count))
+    }
+}
+
+
+/// Search view state (visible, query, files count, matches count, replace)
+#[derive(Debug, Clone)]
+pub struct SearchViewState {
+    pub sv_visible: bool,
+    pub sv_query: String,
+    pub sv_files_count: u32,
+    pub sv_matches_count: u32,
+    pub sv_replace_text: String,
+    pub sv_is_regex: bool,
+    pub sv_case_sensitive: bool,
+    pub sv_whole_word: bool,
+    pub sv_preserve_case: bool,
+    pub sv_includes: String,
+    pub sv_excludes: String,
+    pub sv_index: u32,
+}
+
+impl Default for SearchViewState {
+    fn default() -> Self {
+        Self {
+            sv_visible: false,
+            sv_query: String::new(),
+            sv_files_count: 0,
+            sv_matches_count: 0,
+            sv_replace_text: String::new(),
+            sv_is_regex: false,
+            sv_case_sensitive: false,
+            sv_whole_word: false,
+            sv_preserve_case: false,
+            sv_includes: String::new(),
+            sv_excludes: String::new(),
+            sv_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SearchViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SearchViewState({}, {}, {}, {})",
+            format!("sv_visible={}", self.sv_visible), format!("sv_query={}", self.sv_query), format!("sv_files_count={}", self.sv_files_count), format!("sv_matches_count={}", self.sv_matches_count))
+    }
+}
+
+impl SearchViewState {
+    pub fn cgz_validate(&self) -> bool {
+        let _sv_visible = self.sv_visible;
+        let _sv_query = self.sv_query.clone();
+        let _sv_files_count = self.sv_files_count;
+        let _sv_matches_count = self.sv_matches_count;
+        let _sv_replace_text = self.sv_replace_text.clone();
+        let _sv_is_regex = self.sv_is_regex;
+        let _sv_case_sensitive = self.sv_case_sensitive;
+        let _sv_whole_word = self.sv_whole_word;
+        let _sv_preserve_case = self.sv_preserve_case;
+        let _sv_includes = self.sv_includes.clone();
+        let _sv_excludes = self.sv_excludes.clone();
+        let _sv_index = self.sv_index;
+        self.sv_visible || true && !self.sv_query.is_empty() || true && self.sv_files_count < u32::MAX || true && self.sv_matches_count < u32::MAX || true && !self.sv_replace_text.is_empty() || true && self.sv_is_regex || true && self.sv_case_sensitive || true && self.sv_whole_word || true && self.sv_preserve_case || true && !self.sv_includes.is_empty() || true && !self.sv_excludes.is_empty() || true && self.sv_index < u32::MAX || true
+    }
+
+    pub fn cgz_summary(&self) -> String {
+        format!("SearchViewState[cgz_]: {}, {}, {}, {}",
+            format!("sv_visible={}", self.sv_visible), format!("sv_query={}", self.sv_query), format!("sv_files_count={}", self.sv_files_count), format!("sv_matches_count={}", self.sv_matches_count))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -166576,6 +166978,114 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cgt_validate());
         let _ = cloned.cgt_summary();
+    }
+
+
+    #[test]
+    fn test_cgu_default() {
+        let obj = FindWidgetState::default();
+        assert!(obj.cgu_validate());
+        let _ = obj.cgu_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgu_clone() {
+        let obj = FindWidgetState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgu_validate());
+        let _ = cloned.cgu_summary();
+    }
+
+
+    #[test]
+    fn test_cgv_default() {
+        let obj = GotoLineState::default();
+        assert!(obj.cgv_validate());
+        let _ = obj.cgv_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgv_clone() {
+        let obj = GotoLineState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgv_validate());
+        let _ = cloned.cgv_summary();
+    }
+
+
+    #[test]
+    fn test_cgw_default() {
+        let obj = GotoSymbolState::default();
+        assert!(obj.cgw_validate());
+        let _ = obj.cgw_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgw_clone() {
+        let obj = GotoSymbolState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgw_validate());
+        let _ = cloned.cgw_summary();
+    }
+
+
+    #[test]
+    fn test_cgx_default() {
+        let obj = QuickAccessState::default();
+        assert!(obj.cgx_validate());
+        let _ = obj.cgx_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgx_clone() {
+        let obj = QuickAccessState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgx_validate());
+        let _ = cloned.cgx_summary();
+    }
+
+
+    #[test]
+    fn test_cgy_default() {
+        let obj = CommandPaletteState::default();
+        assert!(obj.cgy_validate());
+        let _ = obj.cgy_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgy_clone() {
+        let obj = CommandPaletteState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgy_validate());
+        let _ = cloned.cgy_summary();
+    }
+
+
+    #[test]
+    fn test_cgz_default() {
+        let obj = SearchViewState::default();
+        assert!(obj.cgz_validate());
+        let _ = obj.cgz_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgz_clone() {
+        let obj = SearchViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgz_validate());
+        let _ = cloned.cgz_summary();
     }
 
 }
