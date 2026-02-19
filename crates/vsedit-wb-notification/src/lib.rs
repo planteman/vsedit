@@ -47728,3 +47728,439 @@ mod bad_tests {
         assert_eq!(item.timestamp_ms(), 12345);
     }
 }
+
+
+// --- bae_: SCM change set model ---
+
+/// SCM resource state (file status in source control).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BaeScmStatus {
+    Untracked,
+    Added,
+    Modified,
+    Deleted,
+    Renamed,
+    Copied,
+    Ignored,
+    Conflicting,
+    TypeChanged,
+}
+
+impl BaeScmStatus {
+    pub fn letter(&self) -> char {
+        match self {
+            Self::Untracked => '?',
+            Self::Added => 'A',
+            Self::Modified => 'M',
+            Self::Deleted => 'D',
+            Self::Renamed => 'R',
+            Self::Copied => 'C',
+            Self::Ignored => '!',
+            Self::Conflicting => 'U',
+            Self::TypeChanged => 'T',
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Untracked => "Untracked",
+            Self::Added => "Added",
+            Self::Modified => "Modified",
+            Self::Deleted => "Deleted",
+            Self::Renamed => "Renamed",
+            Self::Copied => "Copied",
+            Self::Ignored => "Ignored",
+            Self::Conflicting => "Conflict",
+            Self::TypeChanged => "Type Changed",
+        }
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        !matches!(self, Self::Ignored | Self::Untracked)
+    }
+}
+
+/// A resource in the SCM view.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BaeScmResource {
+    pub path: String,
+    pub original_path: Option<String>,
+    pub status: BaeScmStatus,
+    pub is_staged: bool,
+}
+
+impl BaeScmResource {
+    pub fn new(path: &str, status: BaeScmStatus) -> Self {
+        Self {
+            path: path.to_string(),
+            original_path: None,
+            status,
+            is_staged: false,
+        }
+    }
+
+    pub fn renamed(original: &str, new_path: &str) -> Self {
+        Self {
+            path: new_path.to_string(),
+            original_path: Some(original.to_string()),
+            status: BaeScmStatus::Renamed,
+            is_staged: false,
+        }
+    }
+
+    pub fn stage(&mut self) {
+        self.is_staged = true;
+    }
+
+    pub fn unstage(&mut self) {
+        self.is_staged = false;
+    }
+
+    pub fn filename(&self) -> &str {
+        self.path.rsplit('/').next().unwrap_or(&self.path)
+    }
+
+    pub fn directory(&self) -> &str {
+        match self.path.rsplit_once('/') {
+            Some((dir, _)) => dir,
+            None => "",
+        }
+    }
+}
+
+/// A resource group in the SCM view (e.g., "Changes", "Staged Changes").
+#[derive(Debug, Clone)]
+pub struct BaeScmResourceGroup {
+    pub id: String,
+    pub label: String,
+    pub resources: Vec<BaeScmResource>,
+    pub hide_when_empty: bool,
+}
+
+impl BaeScmResourceGroup {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            resources: Vec::new(),
+            hide_when_empty: true,
+        }
+    }
+
+    pub fn add_resource(&mut self, resource: BaeScmResource) {
+        self.resources.push(resource);
+    }
+
+    pub fn remove_resource(&mut self, path: &str) -> bool {
+        if let Some(idx) = self.resources.iter().position(|r| r.path == path) {
+            self.resources.remove(idx);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn resource_count(&self) -> usize {
+        self.resources.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.resources.is_empty()
+    }
+
+    pub fn is_visible(&self) -> bool {
+        !self.hide_when_empty || !self.resources.is_empty()
+    }
+
+    pub fn resources_by_status(&self, status: BaeScmStatus) -> Vec<&BaeScmResource> {
+        self.resources.iter().filter(|r| r.status == status).collect()
+    }
+
+    pub fn sort_by_path(&mut self) {
+        self.resources.sort_by(|a, b| a.path.cmp(&b.path));
+    }
+
+    pub fn sort_by_status(&mut self) {
+        self.resources.sort_by(|a, b| a.status.letter().cmp(&b.status.letter()));
+    }
+}
+
+/// Represents a commit in the SCM log.
+#[derive(Debug, Clone)]
+pub struct BaeScmCommit {
+    pub hash: String,
+    pub short_hash: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub timestamp: u64,
+    pub message: String,
+    pub parent_hashes: Vec<String>,
+}
+
+impl BaeScmCommit {
+    pub fn new(hash: &str, message: &str, author: &str, email: &str, timestamp: u64) -> Self {
+        Self {
+            hash: hash.to_string(),
+            short_hash: hash.chars().take(7).collect(),
+            author_name: author.to_string(),
+            author_email: email.to_string(),
+            timestamp,
+            message: message.to_string(),
+            parent_hashes: Vec::new(),
+        }
+    }
+
+    pub fn subject(&self) -> &str {
+        self.message.lines().next().unwrap_or("")
+    }
+
+    pub fn is_merge(&self) -> bool {
+        self.parent_hashes.len() > 1
+    }
+}
+
+/// The SCM provider model (e.g., Git).
+#[derive(Debug, Clone)]
+pub struct BaeScmProvider {
+    pub id: String,
+    pub label: String,
+    pub root_uri: String,
+    pub groups: Vec<BaeScmResourceGroup>,
+    pub commit_input: String,
+    pub branch_name: Option<String>,
+    pub ahead_behind: Option<(u32, u32)>,
+}
+
+impl BaeScmProvider {
+    pub fn new(id: &str, label: &str, root: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            root_uri: root.to_string(),
+            groups: Vec::new(),
+            commit_input: String::new(),
+            branch_name: None,
+            ahead_behind: None,
+        }
+    }
+
+    pub fn add_group(&mut self, group: BaeScmResourceGroup) {
+        self.groups.push(group);
+    }
+
+    pub fn group(&self, id: &str) -> Option<&BaeScmResourceGroup> {
+        self.groups.iter().find(|g| g.id == id)
+    }
+
+    pub fn group_mut(&mut self, id: &str) -> Option<&mut BaeScmResourceGroup> {
+        self.groups.iter_mut().find(|g| g.id == id)
+    }
+
+    pub fn total_resource_count(&self) -> usize {
+        self.groups.iter().map(|g| g.resource_count()).sum()
+    }
+
+    pub fn dirty_resource_count(&self) -> usize {
+        self.groups.iter()
+            .flat_map(|g| g.resources.iter())
+            .filter(|r| r.status.is_dirty())
+            .count()
+    }
+
+    pub fn set_branch(&mut self, name: &str) {
+        self.branch_name = Some(name.to_string());
+    }
+
+    pub fn set_ahead_behind(&mut self, ahead: u32, behind: u32) {
+        self.ahead_behind = Some((ahead, behind));
+    }
+
+    pub fn status_summary(&self) -> String {
+        let dirty = self.dirty_resource_count();
+        match &self.branch_name {
+            Some(branch) => {
+                let ab = match self.ahead_behind {
+                    Some((a, b)) if a > 0 && b > 0 => format!(" {}↑ {}↓", a, b),
+                    Some((a, 0)) if a > 0 => format!(" {}↑", a),
+                    Some((0, b)) if b > 0 => format!(" {}↓", b),
+                    _ => String::new(),
+                };
+                if dirty > 0 {
+                    format!("{}{} ({})", branch, ab, dirty)
+                } else {
+                    format!("{}{}", branch, ab)
+                }
+            }
+            None => {
+                if dirty > 0 {
+                    format!("({})", dirty)
+                } else {
+                    String::new()
+                }
+            }
+        }
+    }
+
+    pub fn set_commit_message(&mut self, msg: &str) {
+        self.commit_input = msg.to_string();
+    }
+}
+
+#[cfg(test)]
+mod bae_tests {
+    use super::*;
+
+    #[test]
+    fn test_bae_status_letter() {
+        assert_eq!(BaeScmStatus::Modified.letter(), 'M');
+        assert_eq!(BaeScmStatus::Added.letter(), 'A');
+        assert_eq!(BaeScmStatus::Deleted.letter(), 'D');
+        assert_eq!(BaeScmStatus::Untracked.letter(), '?');
+    }
+
+    #[test]
+    fn test_bae_status_dirty() {
+        assert!(BaeScmStatus::Modified.is_dirty());
+        assert!(BaeScmStatus::Added.is_dirty());
+        assert!(!BaeScmStatus::Ignored.is_dirty());
+        assert!(!BaeScmStatus::Untracked.is_dirty());
+    }
+
+    #[test]
+    fn test_bae_resource_creation() {
+        let r = BaeScmResource::new("src/main.rs", BaeScmStatus::Modified);
+        assert_eq!(r.filename(), "main.rs");
+        assert_eq!(r.directory(), "src");
+        assert!(!r.is_staged);
+    }
+
+    #[test]
+    fn test_bae_resource_renamed() {
+        let r = BaeScmResource::renamed("old.rs", "new.rs");
+        assert_eq!(r.status, BaeScmStatus::Renamed);
+        assert_eq!(r.original_path.as_deref(), Some("old.rs"));
+    }
+
+    #[test]
+    fn test_bae_resource_stage_unstage() {
+        let mut r = BaeScmResource::new("file.rs", BaeScmStatus::Modified);
+        r.stage();
+        assert!(r.is_staged);
+        r.unstage();
+        assert!(!r.is_staged);
+    }
+
+    #[test]
+    fn test_bae_group_operations() {
+        let mut group = BaeScmResourceGroup::new("changes", "Changes");
+        assert!(group.is_empty());
+        assert!(!group.is_visible()); // hide_when_empty = true
+
+        group.add_resource(BaeScmResource::new("a.rs", BaeScmStatus::Modified));
+        group.add_resource(BaeScmResource::new("b.rs", BaeScmStatus::Added));
+        assert_eq!(group.resource_count(), 2);
+        assert!(group.is_visible());
+
+        assert!(group.remove_resource("a.rs"));
+        assert_eq!(group.resource_count(), 1);
+        assert!(!group.remove_resource("nonexistent"));
+    }
+
+    #[test]
+    fn test_bae_group_filter_by_status() {
+        let mut group = BaeScmResourceGroup::new("changes", "Changes");
+        group.add_resource(BaeScmResource::new("a.rs", BaeScmStatus::Modified));
+        group.add_resource(BaeScmResource::new("b.rs", BaeScmStatus::Added));
+        group.add_resource(BaeScmResource::new("c.rs", BaeScmStatus::Modified));
+
+        let modified = group.resources_by_status(BaeScmStatus::Modified);
+        assert_eq!(modified.len(), 2);
+    }
+
+    #[test]
+    fn test_bae_group_sort() {
+        let mut group = BaeScmResourceGroup::new("changes", "Changes");
+        group.add_resource(BaeScmResource::new("c.rs", BaeScmStatus::Modified));
+        group.add_resource(BaeScmResource::new("a.rs", BaeScmStatus::Added));
+        group.add_resource(BaeScmResource::new("b.rs", BaeScmStatus::Deleted));
+        group.sort_by_path();
+        assert_eq!(group.resources[0].path, "a.rs");
+
+        group.sort_by_status();
+        assert_eq!(group.resources[0].status, BaeScmStatus::Added);
+    }
+
+    #[test]
+    fn test_bae_commit() {
+        let mut commit = BaeScmCommit::new(
+            "abc1234567890", "Fix bug\n\nDetails here", "Alice", "alice@example.com", 1700000000,
+        );
+        assert_eq!(commit.short_hash, "abc1234");
+        assert_eq!(commit.subject(), "Fix bug");
+        assert!(!commit.is_merge());
+
+        commit.parent_hashes.push("parent1".to_string());
+        commit.parent_hashes.push("parent2".to_string());
+        assert!(commit.is_merge());
+    }
+
+    #[test]
+    fn test_bae_provider_creation() {
+        let provider = BaeScmProvider::new("git", "Git", "/workspace");
+        assert_eq!(provider.total_resource_count(), 0);
+        assert_eq!(provider.dirty_resource_count(), 0);
+    }
+
+    #[test]
+    fn test_bae_provider_with_groups() {
+        let mut provider = BaeScmProvider::new("git", "Git", "/ws");
+        let mut staged = BaeScmResourceGroup::new("staged", "Staged Changes");
+        staged.add_resource(BaeScmResource::new("a.rs", BaeScmStatus::Added));
+        let mut changes = BaeScmResourceGroup::new("changes", "Changes");
+        changes.add_resource(BaeScmResource::new("b.rs", BaeScmStatus::Modified));
+        changes.add_resource(BaeScmResource::new("c.rs", BaeScmStatus::Modified));
+
+        provider.add_group(staged);
+        provider.add_group(changes);
+
+        assert_eq!(provider.total_resource_count(), 3);
+        assert_eq!(provider.dirty_resource_count(), 3);
+        assert!(provider.group("staged").is_some());
+    }
+
+    #[test]
+    fn test_bae_provider_status_summary() {
+        let mut provider = BaeScmProvider::new("git", "Git", "/ws");
+        provider.set_branch("main");
+        assert_eq!(provider.status_summary(), "main");
+
+        provider.set_ahead_behind(2, 1);
+        assert_eq!(provider.status_summary(), "main 2↑ 1↓");
+
+        let mut changes = BaeScmResourceGroup::new("changes", "Changes");
+        changes.add_resource(BaeScmResource::new("a.rs", BaeScmStatus::Modified));
+        provider.add_group(changes);
+        assert_eq!(provider.status_summary(), "main 2↑ 1↓ (1)");
+    }
+
+    #[test]
+    fn test_bae_provider_commit_message() {
+        let mut provider = BaeScmProvider::new("git", "Git", "/ws");
+        provider.set_commit_message("Initial commit");
+        assert_eq!(provider.commit_input, "Initial commit");
+    }
+
+    #[test]
+    fn test_bae_resource_directory_root() {
+        let r = BaeScmResource::new("file.rs", BaeScmStatus::Added);
+        assert_eq!(r.directory(), "");
+        assert_eq!(r.filename(), "file.rs");
+    }
+
+    #[test]
+    fn test_bae_status_label() {
+        assert_eq!(BaeScmStatus::Modified.label(), "Modified");
+        assert_eq!(BaeScmStatus::Conflicting.label(), "Conflict");
+        assert_eq!(BaeScmStatus::TypeChanged.label(), "Type Changed");
+    }
+}
