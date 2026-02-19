@@ -62408,3 +62408,188 @@ mod bcb_tests {
         assert_eq!(views[0].id, "a");
     }
 }
+
+
+// --- bcc_: Editor activity bar model ---
+
+/// Activity bar position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BccActivityPosition { Side, Top, Hidden }
+
+/// An activity bar entry.
+#[derive(Debug, Clone)]
+pub struct BccActivityEntry {
+    pub id: String,
+    pub label: String,
+    pub icon: char,
+    pub order: i32,
+    pub badge_count: Option<u32>,
+    pub badge_text: Option<String>,
+    pub enabled: bool,
+}
+
+impl BccActivityEntry {
+    pub fn new(id: &str, label: &str, icon: char) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), icon, order: 0, badge_count: None, badge_text: None, enabled: true }
+    }
+
+    pub fn with_order(mut self, o: i32) -> Self { self.order = o; self }
+
+    pub fn set_badge_count(&mut self, count: Option<u32>) { self.badge_count = count; }
+    pub fn set_badge_text(&mut self, text: Option<String>) { self.badge_text = text; }
+
+    pub fn has_badge(&self) -> bool { self.badge_count.is_some() || self.badge_text.is_some() }
+
+    pub fn display_text(&self) -> String {
+        if let Some(c) = self.badge_count { format!("{} {} ({})", self.icon, self.label, c) }
+        else if let Some(t) = &self.badge_text { format!("{} {} [{}]", self.icon, self.label, t) }
+        else { format!("{} {}", self.icon, self.label) }
+    }
+}
+
+/// The activity bar model.
+#[derive(Debug)]
+pub struct BccActivityBar {
+    entries: Vec<BccActivityEntry>,
+    active_id: Option<String>,
+    position: BccActivityPosition,
+}
+
+impl BccActivityBar {
+    pub fn new() -> Self {
+        Self { entries: Vec::new(), active_id: None, position: BccActivityPosition::Side }
+    }
+
+    pub fn add_entry(&mut self, entry: BccActivityEntry) { self.entries.push(entry); }
+
+    pub fn activate(&mut self, id: &str) -> bool {
+        if self.entries.iter().any(|e| e.id == id && e.enabled) {
+            self.active_id = Some(id.to_string());
+            return true;
+        }
+        false
+    }
+
+    pub fn active_entry(&self) -> Option<&BccActivityEntry> {
+        self.active_id.as_ref().and_then(|id| self.entries.iter().find(|e| e.id == *id))
+    }
+
+    pub fn entries(&self) -> Vec<&BccActivityEntry> {
+        let mut e: Vec<_> = self.entries.iter().filter(|e| e.enabled).collect();
+        e.sort_by_key(|e| e.order);
+        e
+    }
+
+    pub fn entry_count(&self) -> usize { self.entries.len() }
+    pub fn position(&self) -> BccActivityPosition { self.position }
+    pub fn set_position(&mut self, p: BccActivityPosition) { self.position = p; }
+    pub fn is_visible(&self) -> bool { self.position != BccActivityPosition::Hidden }
+
+    pub fn set_badge(&mut self, id: &str, count: Option<u32>) {
+        if let Some(e) = self.entries.iter_mut().find(|e| e.id == id) {
+            e.set_badge_count(count);
+        }
+    }
+
+    pub fn toggle_entry(&mut self, id: &str) {
+        if self.active_id.as_deref() == Some(id) {
+            self.active_id = None;
+        } else {
+            self.activate(id);
+        }
+    }
+
+    pub fn next_entry(&mut self) {
+        let entries = self.entries();
+        if entries.is_empty() { return; }
+        let current_idx = self.active_id.as_ref().and_then(|id| entries.iter().position(|e| e.id == *id));
+        let next = match current_idx {
+            Some(i) => (i + 1) % entries.len(),
+            None => 0,
+        };
+        self.active_id = Some(entries[next].id.clone());
+    }
+}
+
+#[cfg(test)]
+mod bcc_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcc_entry_display() {
+        let mut e = BccActivityEntry::new("explorer", "Explorer", '📁');
+        assert_eq!(e.display_text(), "📁 Explorer");
+        e.set_badge_count(Some(5));
+        assert!(e.display_text().contains("(5)"));
+    }
+
+    #[test]
+    fn test_bcc_entry_badge() {
+        let mut e = BccActivityEntry::new("x", "X", '□');
+        assert!(!e.has_badge());
+        e.set_badge_count(Some(3));
+        assert!(e.has_badge());
+    }
+
+    #[test]
+    fn test_bcc_bar_activate() {
+        let mut bar = BccActivityBar::new();
+        bar.add_entry(BccActivityEntry::new("explorer", "Explorer", '📁'));
+        bar.add_entry(BccActivityEntry::new("search", "Search", '🔍'));
+        assert!(bar.activate("explorer"));
+        assert_eq!(bar.active_entry().unwrap().id, "explorer");
+    }
+
+    #[test]
+    fn test_bcc_bar_toggle() {
+        let mut bar = BccActivityBar::new();
+        bar.add_entry(BccActivityEntry::new("a", "A", '□'));
+        bar.toggle_entry("a");
+        assert!(bar.active_entry().is_some());
+        bar.toggle_entry("a"); // deactivate
+        assert!(bar.active_entry().is_none());
+    }
+
+    #[test]
+    fn test_bcc_bar_next() {
+        let mut bar = BccActivityBar::new();
+        bar.add_entry(BccActivityEntry::new("a", "A", '□').with_order(1));
+        bar.add_entry(BccActivityEntry::new("b", "B", '□').with_order(2));
+        bar.activate("a");
+        bar.next_entry();
+        assert_eq!(bar.active_entry().unwrap().id, "b");
+    }
+
+    #[test]
+    fn test_bcc_bar_position() {
+        let mut bar = BccActivityBar::new();
+        assert!(bar.is_visible());
+        bar.set_position(BccActivityPosition::Hidden);
+        assert!(!bar.is_visible());
+    }
+
+    #[test]
+    fn test_bcc_bar_set_badge() {
+        let mut bar = BccActivityBar::new();
+        bar.add_entry(BccActivityEntry::new("scm", "SCM", '⎇'));
+        bar.set_badge("scm", Some(3));
+        assert!(bar.entries()[0].has_badge());
+    }
+
+    #[test]
+    fn test_bcc_disabled() {
+        let mut bar = BccActivityBar::new();
+        let mut e = BccActivityEntry::new("x", "X", '□');
+        e.enabled = false;
+        bar.add_entry(e);
+        assert!(!bar.activate("x"));
+    }
+
+    #[test]
+    fn test_bcc_entries_sorted() {
+        let mut bar = BccActivityBar::new();
+        bar.add_entry(BccActivityEntry::new("b", "B", '□').with_order(2));
+        bar.add_entry(BccActivityEntry::new("a", "A", '□').with_order(1));
+        assert_eq!(bar.entries()[0].id, "a");
+    }
+}
