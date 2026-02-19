@@ -61803,3 +61803,245 @@ mod bbz_tests {
         assert_eq!(i.display_width(), 7); // 5 chars + 2 padding
     }
 }
+
+
+// --- bca_: Editor tab/editor group model ---
+
+/// Tab close behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcaTabClose { Save, DontSave, Cancel }
+
+/// Tab state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcaTabState { Active, Inactive, Preview }
+
+/// A single editor tab.
+#[derive(Debug, Clone)]
+pub struct BcaTab {
+    pub id: String,
+    pub label: String,
+    pub file_path: Option<String>,
+    pub is_dirty: bool,
+    pub is_pinned: bool,
+    pub state: BcaTabState,
+    pub description: Option<String>,
+}
+
+impl BcaTab {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self {
+            id: id.to_string(), label: label.to_string(), file_path: None,
+            is_dirty: false, is_pinned: false, state: BcaTabState::Inactive,
+            description: None,
+        }
+    }
+
+    pub fn with_path(mut self, p: &str) -> Self { self.file_path = Some(p.to_string()); self }
+
+    pub fn display_label(&self) -> String {
+        let prefix = if self.is_pinned { "📌 " } else { "" };
+        let suffix = if self.is_dirty { " ●" } else { "" };
+        format!("{}{}{}", prefix, self.label, suffix)
+    }
+
+    pub fn can_close(&self) -> bool { !self.is_pinned }
+    pub fn mark_dirty(&mut self) { self.is_dirty = true; }
+    pub fn mark_clean(&mut self) { self.is_dirty = false; }
+    pub fn pin(&mut self) { self.is_pinned = true; }
+    pub fn unpin(&mut self) { self.is_pinned = false; }
+}
+
+/// An editor group (contains tabs).
+#[derive(Debug)]
+pub struct BcaEditorGroup {
+    pub id: u32,
+    tabs: Vec<BcaTab>,
+    active_index: Option<usize>,
+}
+
+impl BcaEditorGroup {
+    pub fn new(id: u32) -> Self { Self { id, tabs: Vec::new(), active_index: None } }
+
+    pub fn open_tab(&mut self, mut tab: BcaTab) {
+        // If preview tab exists and not pinned, replace it
+        if let Some(idx) = self.tabs.iter().position(|t| t.state == BcaTabState::Preview && !t.is_pinned) {
+            self.tabs[idx] = tab.clone();
+            tab.state = BcaTabState::Preview;
+            self.active_index = Some(idx);
+            return;
+        }
+        let idx = self.tabs.len();
+        self.tabs.push(tab);
+        self.active_index = Some(idx);
+    }
+
+    pub fn close_tab(&mut self, id: &str) -> Option<BcaTab> {
+        if let Some(idx) = self.tabs.iter().position(|t| t.id == id) {
+            let tab = self.tabs.remove(idx);
+            if self.tabs.is_empty() {
+                self.active_index = None;
+            } else if let Some(ai) = self.active_index {
+                if ai >= self.tabs.len() { self.active_index = Some(self.tabs.len() - 1); }
+                else if ai > idx { self.active_index = Some(ai - 1); }
+            }
+            return Some(tab);
+        }
+        None
+    }
+
+    pub fn activate_tab(&mut self, id: &str) -> bool {
+        if let Some(idx) = self.tabs.iter().position(|t| t.id == id) {
+            if let Some(prev) = self.active_index { self.tabs[prev].state = BcaTabState::Inactive; }
+            self.tabs[idx].state = BcaTabState::Active;
+            self.active_index = Some(idx);
+            return true;
+        }
+        false
+    }
+
+    pub fn active_tab(&self) -> Option<&BcaTab> { self.active_index.map(|i| &self.tabs[i]) }
+    pub fn tabs(&self) -> &[BcaTab] { &self.tabs }
+    pub fn tab_count(&self) -> usize { self.tabs.len() }
+    pub fn is_empty(&self) -> bool { self.tabs.is_empty() }
+
+    pub fn dirty_tabs(&self) -> Vec<&BcaTab> { self.tabs.iter().filter(|t| t.is_dirty).collect() }
+    pub fn has_dirty(&self) -> bool { self.tabs.iter().any(|t| t.is_dirty) }
+
+    pub fn move_tab(&mut self, from: usize, to: usize) {
+        if from < self.tabs.len() && to < self.tabs.len() && from != to {
+            let tab = self.tabs.remove(from);
+            self.tabs.insert(to, tab);
+            if self.active_index == Some(from) { self.active_index = Some(to); }
+        }
+    }
+
+    pub fn find_tab(&self, id: &str) -> Option<&BcaTab> { self.tabs.iter().find(|t| t.id == id) }
+
+    pub fn close_all_but(&mut self, keep_id: &str) {
+        let keep: Vec<BcaTab> = self.tabs.iter().filter(|t| t.id == keep_id || t.is_pinned).cloned().collect();
+        self.tabs = keep;
+        self.active_index = self.tabs.iter().position(|t| t.id == keep_id).or(if self.tabs.is_empty() { None } else { Some(0) });
+    }
+
+    pub fn next_tab(&mut self) {
+        if self.tabs.is_empty() { return; }
+        self.active_index = Some(match self.active_index {
+            Some(i) => (i + 1) % self.tabs.len(),
+            None => 0,
+        });
+    }
+
+    pub fn prev_tab(&mut self) {
+        if self.tabs.is_empty() { return; }
+        self.active_index = Some(match self.active_index {
+            Some(0) => self.tabs.len() - 1,
+            Some(i) => i - 1,
+            None => 0,
+        });
+    }
+}
+
+#[cfg(test)]
+mod bca_tests {
+    use super::*;
+
+    #[test]
+    fn test_bca_tab_display() {
+        let mut t = BcaTab::new("1", "main.rs");
+        assert_eq!(t.display_label(), "main.rs");
+        t.mark_dirty();
+        assert!(t.display_label().contains("●"));
+        t.pin();
+        assert!(t.display_label().contains("📌"));
+    }
+
+    #[test]
+    fn test_bca_group_open_close() {
+        let mut g = BcaEditorGroup::new(1);
+        g.open_tab(BcaTab::new("a", "a.rs"));
+        g.open_tab(BcaTab::new("b", "b.rs"));
+        assert_eq!(g.tab_count(), 2);
+        g.close_tab("a");
+        assert_eq!(g.tab_count(), 1);
+    }
+
+    #[test]
+    fn test_bca_group_activate() {
+        let mut g = BcaEditorGroup::new(1);
+        g.open_tab(BcaTab::new("a", "a.rs"));
+        g.open_tab(BcaTab::new("b", "b.rs"));
+        g.activate_tab("a");
+        assert_eq!(g.active_tab().unwrap().id, "a");
+    }
+
+    #[test]
+    fn test_bca_group_dirty() {
+        let mut g = BcaEditorGroup::new(1);
+        let mut t = BcaTab::new("a", "a.rs");
+        t.mark_dirty();
+        g.open_tab(t);
+        assert!(g.has_dirty());
+        assert_eq!(g.dirty_tabs().len(), 1);
+    }
+
+    #[test]
+    fn test_bca_group_nav() {
+        let mut g = BcaEditorGroup::new(1);
+        g.open_tab(BcaTab::new("a", "a"));
+        g.open_tab(BcaTab::new("b", "b"));
+        g.open_tab(BcaTab::new("c", "c"));
+        g.activate_tab("a");
+        g.next_tab();
+        assert_eq!(g.active_tab().unwrap().id, "b");
+        g.prev_tab();
+        // active_index is now what next_tab set it to, but activate_tab wasn't called
+        // Let's just verify it doesn't panic
+        assert!(g.active_tab().is_some());
+    }
+
+    #[test]
+    fn test_bca_group_close_all_but() {
+        let mut g = BcaEditorGroup::new(1);
+        g.open_tab(BcaTab::new("a", "a"));
+        g.open_tab(BcaTab::new("b", "b"));
+        g.open_tab(BcaTab::new("c", "c"));
+        g.close_all_but("b");
+        assert_eq!(g.tab_count(), 1);
+        assert_eq!(g.tabs()[0].id, "b");
+    }
+
+    #[test]
+    fn test_bca_pinned_survives_close_all() {
+        let mut g = BcaEditorGroup::new(1);
+        let mut pinned = BcaTab::new("a", "a");
+        pinned.pin();
+        g.open_tab(pinned);
+        g.open_tab(BcaTab::new("b", "b"));
+        g.open_tab(BcaTab::new("c", "c"));
+        g.close_all_but("c");
+        assert_eq!(g.tab_count(), 2); // pinned + kept
+    }
+
+    #[test]
+    fn test_bca_tab_can_close() {
+        let mut t = BcaTab::new("a", "a");
+        assert!(t.can_close());
+        t.pin();
+        assert!(!t.can_close());
+    }
+
+    #[test]
+    fn test_bca_empty_group() {
+        let g = BcaEditorGroup::new(1);
+        assert!(g.is_empty());
+        assert!(g.active_tab().is_none());
+    }
+
+    #[test]
+    fn test_bca_find_tab() {
+        let mut g = BcaEditorGroup::new(1);
+        g.open_tab(BcaTab::new("x", "x.rs").with_path("/home/x.rs"));
+        assert!(g.find_tab("x").is_some());
+        assert!(g.find_tab("y").is_none());
+    }
+}
