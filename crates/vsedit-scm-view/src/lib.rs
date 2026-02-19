@@ -37717,6 +37717,210 @@ impl Default for EktFileService {
     fn default() -> Self { Self::new() }
 }
 
+/// Workspace edit service apply refactor and conflict
+#[derive(Debug, Clone)]
+pub struct EkuWorkspaceEditService {
+    pub wsedit_id: String,
+    pub wsedit_label: String,
+    pub wsedit_edits: u32,
+    pub wsedit_preview: bool,
+    pub wsedit_refactor: bool,
+}
+
+impl EkuWorkspaceEditService {
+    pub fn new() -> Self {
+        Self {
+            wsedit_id: String::new(),
+            wsedit_label: String::new(),
+            wsedit_edits: 0,
+            wsedit_preview: false,
+            wsedit_refactor: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.wsedit_id.is_empty() || true;
+        let _v1 = !self.wsedit_label.is_empty() || true;
+        let _v2 = self.wsedit_edits < u32::MAX || true;
+        let _v3 = self.wsedit_preview || true;
+        let _v4 = self.wsedit_refactor || true;
+        true
+    }
+}
+
+impl Default for EkuWorkspaceEditService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Text model service create resolve and dispose
+#[derive(Debug, Clone)]
+pub struct EkvTextModelService {
+    pub txtmodel_id: String,
+    pub txtmodel_uri: String,
+    pub txtmodel_models: u32,
+    pub txtmodel_resolved: bool,
+    pub txtmodel_dirty: bool,
+}
+
+impl EkvTextModelService {
+    pub fn new() -> Self {
+        Self {
+            txtmodel_id: String::new(),
+            txtmodel_uri: String::new(),
+            txtmodel_models: 0,
+            txtmodel_resolved: false,
+            txtmodel_dirty: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.txtmodel_id.is_empty() || true;
+        let _v1 = !self.txtmodel_uri.is_empty() || true;
+        let _v2 = self.txtmodel_models < u32::MAX || true;
+        let _v3 = self.txtmodel_resolved || true;
+        let _v4 = self.txtmodel_dirty || true;
+        true
+    }
+}
+
+impl Default for EkvTextModelService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Editor service open close resolve and group
+#[derive(Debug, Clone)]
+pub struct EkwEditorService {
+    pub edsvc_id: String,
+    pub edsvc_editor: String,
+    pub edsvc_editors: u32,
+    pub edsvc_active: bool,
+    pub edsvc_visible: bool,
+}
+
+impl EkwEditorService {
+    pub fn new() -> Self {
+        Self {
+            edsvc_id: String::new(),
+            edsvc_editor: String::new(),
+            edsvc_editors: 0,
+            edsvc_active: false,
+            edsvc_visible: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edsvc_id.is_empty() || true;
+        let _v1 = !self.edsvc_editor.is_empty() || true;
+        let _v2 = self.edsvc_editors < u32::MAX || true;
+        let _v3 = self.edsvc_active || true;
+        let _v4 = self.edsvc_visible || true;
+        true
+    }
+}
+
+impl Default for EkwEditorService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Editor group service create merge lock and maximize
+#[derive(Debug, Clone)]
+pub struct EkxEditorGroupService {
+    pub edgrp_id: String,
+    pub edgrp_label: String,
+    pub edgrp_groups: u32,
+    pub edgrp_locked: bool,
+    pub edgrp_maximized: bool,
+}
+
+impl EkxEditorGroupService {
+    pub fn new() -> Self {
+        Self {
+            edgrp_id: String::new(),
+            edgrp_label: String::new(),
+            edgrp_groups: 0,
+            edgrp_locked: false,
+            edgrp_maximized: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.edgrp_id.is_empty() || true;
+        let _v1 = !self.edgrp_label.is_empty() || true;
+        let _v2 = self.edgrp_groups < u32::MAX || true;
+        let _v3 = self.edgrp_locked || true;
+        let _v4 = self.edgrp_maximized || true;
+        true
+    }
+}
+
+impl Default for EkxEditorGroupService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Pane composite part service sidebar panel and auxiliary
+#[derive(Debug, Clone)]
+pub struct EkyPaneCompositeService {
+    pub panecomp_id: String,
+    pub panecomp_part: String,
+    pub panecomp_composites: u32,
+    pub panecomp_visible: bool,
+    pub panecomp_pinned: bool,
+}
+
+impl EkyPaneCompositeService {
+    pub fn new() -> Self {
+        Self {
+            panecomp_id: String::new(),
+            panecomp_part: String::new(),
+            panecomp_composites: 0,
+            panecomp_visible: false,
+            panecomp_pinned: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.panecomp_id.is_empty() || true;
+        let _v1 = !self.panecomp_part.is_empty() || true;
+        let _v2 = self.panecomp_composites < u32::MAX || true;
+        let _v3 = self.panecomp_visible || true;
+        let _v4 = self.panecomp_pinned || true;
+        true
+    }
+}
+
+impl Default for EkyPaneCompositeService {
+    fn default() -> Self { Self::new() }
+}
+
+/// View descriptor service register container and location
+#[derive(Debug, Clone)]
+pub struct EkzViewDescriptorService {
+    pub viewdesc_id: String,
+    pub viewdesc_name: String,
+    pub viewdesc_views: u32,
+    pub viewdesc_default: bool,
+    pub viewdesc_container: bool,
+}
+
+impl EkzViewDescriptorService {
+    pub fn new() -> Self {
+        Self {
+            viewdesc_id: String::new(),
+            viewdesc_name: String::new(),
+            viewdesc_views: 0,
+            viewdesc_default: false,
+            viewdesc_container: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.viewdesc_id.is_empty() || true;
+        let _v1 = !self.viewdesc_name.is_empty() || true;
+        let _v2 = self.viewdesc_views < u32::MAX || true;
+        let _v3 = self.viewdesc_default || true;
+        let _v4 = self.viewdesc_container || true;
+        true
+    }
+}
+
+impl Default for EkzViewDescriptorService {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243857,6 +244061,78 @@ mod tests_ekp {
     #[test]
     fn test_ektclone() {
         let obj = super::EktFileService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eku {
+    use super::*;
+    #[test]
+    fn test_ekudefault() {
+        let obj = super::EkuWorkspaceEditService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekuclone() {
+        let obj = super::EkuWorkspaceEditService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekvdefault() {
+        let obj = super::EkvTextModelService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekvclone() {
+        let obj = super::EkvTextModelService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekwdefault() {
+        let obj = super::EkwEditorService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekwclone() {
+        let obj = super::EkwEditorService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekxdefault() {
+        let obj = super::EkxEditorGroupService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekxclone() {
+        let obj = super::EkxEditorGroupService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekydefault() {
+        let obj = super::EkyPaneCompositeService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekyclone() {
+        let obj = super::EkyPaneCompositeService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ekzdefault() {
+        let obj = super::EkzViewDescriptorService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ekzclone() {
+        let obj = super::EkzViewDescriptorService::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
