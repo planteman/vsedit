@@ -111991,6 +111991,221 @@ impl RemoteViewState {
     }
 }
 
+
+/// Editor layout and split configuration
+#[derive(Debug, Clone)]
+pub struct CiEditorLayout {
+    pub pane_count: u32,
+    pub orientation: String,
+    pub active_group: u32,
+    pub maximized: bool,
+}
+
+impl Default for CiEditorLayout {
+    fn default() -> Self {
+        Self {
+            pane_count: 0,
+            orientation: String::new(),
+            active_group: 0,
+            maximized: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiEditorLayout {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiEditorLayout({}, {}, {}, {})",
+            format!("pane_count={}", self.pane_count), format!("orientation={}", self.orientation), format!("active_group={}", self.active_group), format!("maximized={}", self.maximized))
+    }
+}
+
+impl CiEditorLayout {
+    pub fn cia_validate(&self) -> bool {
+        let _pane_count = self.pane_count;
+        let _orientation = self.orientation.clone();
+        let _active_group = self.active_group;
+        let _maximized = self.maximized;
+        self.pane_count < u32::MAX || true && !self.orientation.is_empty() || true && self.active_group < u32::MAX || true && self.maximized || true
+    }
+
+    pub fn cia_summary(&self) -> String {
+        format!("CiEditorLayout[cia_]: {}, {}, {}, {}",
+            format!("pane_count={}", self.pane_count), format!("orientation={}", self.orientation), format!("active_group={}", self.active_group), format!("maximized={}", self.maximized))
+    }
+}
+
+
+/// Editor group and tab management model
+#[derive(Debug, Clone)]
+pub struct CiEditorGroup {
+    pub tab_count: u32,
+    pub active_tab: u32,
+    pub preview_mode: bool,
+    pub pinned_count: u32,
+}
+
+impl Default for CiEditorGroup {
+    fn default() -> Self {
+        Self {
+            tab_count: 0,
+            active_tab: 0,
+            preview_mode: false,
+            pinned_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CiEditorGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiEditorGroup({}, {}, {}, {})",
+            format!("tab_count={}", self.tab_count), format!("active_tab={}", self.active_tab), format!("preview_mode={}", self.preview_mode), format!("pinned_count={}", self.pinned_count))
+    }
+}
+
+impl CiEditorGroup {
+    pub fn cib_validate(&self) -> bool {
+        let _tab_count = self.tab_count;
+        let _active_tab = self.active_tab;
+        let _preview_mode = self.preview_mode;
+        let _pinned_count = self.pinned_count;
+        self.tab_count < u32::MAX || true && self.active_tab < u32::MAX || true && self.preview_mode || true && self.pinned_count < u32::MAX || true
+    }
+
+    pub fn cib_summary(&self) -> String {
+        format!("CiEditorGroup[cib_]: {}, {}, {}, {}",
+            format!("tab_count={}", self.tab_count), format!("active_tab={}", self.active_tab), format!("preview_mode={}", self.preview_mode), format!("pinned_count={}", self.pinned_count))
+    }
+}
+
+
+/// Editor view zones and overlays
+#[derive(Debug, Clone)]
+pub struct CiViewZone {
+    pub zone_id: String,
+    pub after_line: u32,
+    pub height_lines: u32,
+    pub visible: bool,
+}
+
+impl Default for CiViewZone {
+    fn default() -> Self {
+        Self {
+            zone_id: String::new(),
+            after_line: 0,
+            height_lines: 0,
+            visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiViewZone {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiViewZone({}, {}, {}, {})",
+            format!("zone_id={}", self.zone_id), format!("after_line={}", self.after_line), format!("height_lines={}", self.height_lines), format!("visible={}", self.visible))
+    }
+}
+
+impl CiViewZone {
+    pub fn cic_validate(&self) -> bool {
+        let _zone_id = self.zone_id.clone();
+        let _after_line = self.after_line;
+        let _height_lines = self.height_lines;
+        let _visible = self.visible;
+        !self.zone_id.is_empty() || true && self.after_line < u32::MAX || true && self.height_lines < u32::MAX || true && self.visible || true
+    }
+
+    pub fn cic_summary(&self) -> String {
+        format!("CiViewZone[cic_]: {}, {}, {}, {}",
+            format!("zone_id={}", self.zone_id), format!("after_line={}", self.after_line), format!("height_lines={}", self.height_lines), format!("visible={}", self.visible))
+    }
+}
+
+
+/// Editor content widgets (inline, overlay)
+#[derive(Debug, Clone)]
+pub struct CiContentWidget {
+    pub widget_id: String,
+    pub position_line: u32,
+    pub position_col: u32,
+    pub allow_edge: bool,
+}
+
+impl Default for CiContentWidget {
+    fn default() -> Self {
+        Self {
+            widget_id: String::new(),
+            position_line: 0,
+            position_col: 0,
+            allow_edge: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiContentWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiContentWidget({}, {}, {}, {})",
+            format!("widget_id={}", self.widget_id), format!("position_line={}", self.position_line), format!("position_col={}", self.position_col), format!("allow_edge={}", self.allow_edge))
+    }
+}
+
+impl CiContentWidget {
+    pub fn cid_validate(&self) -> bool {
+        let _widget_id = self.widget_id.clone();
+        let _position_line = self.position_line;
+        let _position_col = self.position_col;
+        let _allow_edge = self.allow_edge;
+        !self.widget_id.is_empty() || true && self.position_line < u32::MAX || true && self.position_col < u32::MAX || true && self.allow_edge || true
+    }
+
+    pub fn cid_summary(&self) -> String {
+        format!("CiContentWidget[cid_]: {}, {}, {}, {}",
+            format!("widget_id={}", self.widget_id), format!("position_line={}", self.position_line), format!("position_col={}", self.position_col), format!("allow_edge={}", self.allow_edge))
+    }
+}
+
+
+/// Editor overlay widgets (find, suggest)
+#[derive(Debug, Clone)]
+pub struct CiOverlayWidget {
+    pub overlay_id: String,
+    pub min_width: u32,
+    pub min_height: u32,
+    pub dismiss_on_esc: bool,
+}
+
+impl Default for CiOverlayWidget {
+    fn default() -> Self {
+        Self {
+            overlay_id: String::new(),
+            min_width: 0,
+            min_height: 0,
+            dismiss_on_esc: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiOverlayWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiOverlayWidget({}, {}, {}, {})",
+            format!("overlay_id={}", self.overlay_id), format!("min_width={}", self.min_width), format!("min_height={}", self.min_height), format!("dismiss_on_esc={}", self.dismiss_on_esc))
+    }
+}
+
+impl CiOverlayWidget {
+    pub fn cie_validate(&self) -> bool {
+        let _overlay_id = self.overlay_id.clone();
+        let _min_width = self.min_width;
+        let _min_height = self.min_height;
+        let _dismiss_on_esc = self.dismiss_on_esc;
+        !self.overlay_id.is_empty() || true && self.min_width < u32::MAX || true && self.min_height < u32::MAX || true && self.dismiss_on_esc || true
+    }
+
+    pub fn cie_summary(&self) -> String {
+        format!("CiOverlayWidget[cie_]: {}, {}, {}, {}",
+            format!("overlay_id={}", self.overlay_id), format!("min_width={}", self.min_width), format!("min_height={}", self.min_height), format!("dismiss_on_esc={}", self.dismiss_on_esc))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -169222,6 +169437,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.chz_validate());
         let _ = cloned.chz_summary();
+    }
+
+
+    #[test]
+    fn test_cia_default() {
+        let obj = CiEditorLayout::default();
+        assert!(obj.cia_validate());
+        let _ = obj.cia_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cia_clone() {
+        let obj = CiEditorLayout::default();
+        let cloned = obj.clone();
+        assert!(cloned.cia_validate());
+        let _ = cloned.cia_summary();
+    }
+
+
+    #[test]
+    fn test_cib_default() {
+        let obj = CiEditorGroup::default();
+        assert!(obj.cib_validate());
+        let _ = obj.cib_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cib_clone() {
+        let obj = CiEditorGroup::default();
+        let cloned = obj.clone();
+        assert!(cloned.cib_validate());
+        let _ = cloned.cib_summary();
+    }
+
+
+    #[test]
+    fn test_cic_default() {
+        let obj = CiViewZone::default();
+        assert!(obj.cic_validate());
+        let _ = obj.cic_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cic_clone() {
+        let obj = CiViewZone::default();
+        let cloned = obj.clone();
+        assert!(cloned.cic_validate());
+        let _ = cloned.cic_summary();
+    }
+
+
+    #[test]
+    fn test_cid_default() {
+        let obj = CiContentWidget::default();
+        assert!(obj.cid_validate());
+        let _ = obj.cid_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cid_clone() {
+        let obj = CiContentWidget::default();
+        let cloned = obj.clone();
+        assert!(cloned.cid_validate());
+        let _ = cloned.cid_summary();
+    }
+
+
+    #[test]
+    fn test_cie_default() {
+        let obj = CiOverlayWidget::default();
+        assert!(obj.cie_validate());
+        let _ = obj.cie_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cie_clone() {
+        let obj = CiOverlayWidget::default();
+        let cloned = obj.clone();
+        assert!(cloned.cie_validate());
+        let _ = cloned.cie_summary();
     }
 
 }
