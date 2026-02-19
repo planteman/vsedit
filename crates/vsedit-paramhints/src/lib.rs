@@ -61035,3 +61035,237 @@ mod bbv_tests {
         assert!(e.display_text().contains("ƒ"));
     }
 }
+
+
+// --- bbw_: Workspace diagnostics summary model ---
+
+/// Diagnostic severity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum BbwSeverity { Error, Warning, Info, Hint }
+
+impl BbwSeverity {
+    pub fn label(&self) -> &'static str {
+        match self { Self::Error => "Error", Self::Warning => "Warning", Self::Info => "Info", Self::Hint => "Hint" }
+    }
+
+    pub fn icon(&self) -> char {
+        match self { Self::Error => '✖', Self::Warning => '⚠', Self::Info => 'ℹ', Self::Hint => '💡' }
+    }
+
+    pub fn priority(&self) -> u8 {
+        match self { Self::Error => 3, Self::Warning => 2, Self::Info => 1, Self::Hint => 0 }
+    }
+}
+
+/// A single diagnostic.
+#[derive(Debug, Clone)]
+pub struct BbwDiagnostic {
+    pub file_path: String,
+    pub line: u32,
+    pub col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub severity: BbwSeverity,
+    pub message: String,
+    pub source: Option<String>,
+    pub code: Option<String>,
+}
+
+impl BbwDiagnostic {
+    pub fn new(path: &str, line: u32, col: u32, sev: BbwSeverity, msg: &str) -> Self {
+        Self {
+            file_path: path.to_string(), line, col, end_line: line, end_col: col,
+            severity: sev, message: msg.to_string(), source: None, code: None,
+        }
+    }
+
+    pub fn with_source(mut self, s: &str) -> Self { self.source = Some(s.to_string()); self }
+    pub fn with_code(mut self, c: &str) -> Self { self.code = Some(c.to_string()); self }
+
+    pub fn location_text(&self) -> String {
+        format!("{}:{}:{}", self.file_path, self.line + 1, self.col + 1)
+    }
+
+    pub fn display_text(&self) -> String {
+        format!("{} {} {}", self.severity.icon(), self.location_text(), self.message)
+    }
+}
+
+/// Per-file diagnostic summary.
+#[derive(Debug, Clone)]
+pub struct BbwFileSummary {
+    pub file_path: String,
+    pub errors: u32,
+    pub warnings: u32,
+    pub infos: u32,
+    pub hints: u32,
+}
+
+impl BbwFileSummary {
+    pub fn from_diagnostics(path: &str, diags: &[&BbwDiagnostic]) -> Self {
+        let mut s = Self { file_path: path.to_string(), errors: 0, warnings: 0, infos: 0, hints: 0 };
+        for d in diags {
+            match d.severity {
+                BbwSeverity::Error => s.errors += 1,
+                BbwSeverity::Warning => s.warnings += 1,
+                BbwSeverity::Info => s.infos += 1,
+                BbwSeverity::Hint => s.hints += 1,
+            }
+        }
+        s
+    }
+
+    pub fn total(&self) -> u32 { self.errors + self.warnings + self.infos + self.hints }
+    pub fn worst_severity(&self) -> BbwSeverity {
+        if self.errors > 0 { BbwSeverity::Error }
+        else if self.warnings > 0 { BbwSeverity::Warning }
+        else if self.infos > 0 { BbwSeverity::Info }
+        else { BbwSeverity::Hint }
+    }
+}
+
+/// The workspace diagnostics model.
+#[derive(Debug)]
+pub struct BbwDiagnosticsModel {
+    diagnostics: Vec<BbwDiagnostic>,
+    filter_severity: Option<BbwSeverity>,
+    filter_source: Option<String>,
+}
+
+impl BbwDiagnosticsModel {
+    pub fn new() -> Self {
+        Self { diagnostics: Vec::new(), filter_severity: None, filter_source: None }
+    }
+
+    pub fn set_diagnostics(&mut self, diags: Vec<BbwDiagnostic>) { self.diagnostics = diags; }
+    pub fn add(&mut self, diag: BbwDiagnostic) { self.diagnostics.push(diag); }
+    pub fn total(&self) -> usize { self.diagnostics.len() }
+
+    pub fn errors(&self) -> usize { self.diagnostics.iter().filter(|d| d.severity == BbwSeverity::Error).count() }
+    pub fn warnings(&self) -> usize { self.diagnostics.iter().filter(|d| d.severity == BbwSeverity::Warning).count() }
+
+    pub fn for_file(&self, path: &str) -> Vec<&BbwDiagnostic> {
+        self.diagnostics.iter().filter(|d| d.file_path == path).collect()
+    }
+
+    pub fn file_summaries(&self) -> Vec<BbwFileSummary> {
+        let mut paths: Vec<&str> = self.diagnostics.iter().map(|d| d.file_path.as_str()).collect();
+        paths.sort(); paths.dedup();
+        paths.into_iter().map(|p| {
+            let diags: Vec<&BbwDiagnostic> = self.for_file(p);
+            BbwFileSummary::from_diagnostics(p, &diags)
+        }).collect()
+    }
+
+    pub fn filtered(&self) -> Vec<&BbwDiagnostic> {
+        self.diagnostics.iter().filter(|d| {
+            if let Some(s) = &self.filter_severity { if d.severity != *s { return false; } }
+            if let Some(src) = &self.filter_source { if d.source.as_deref() != Some(src.as_str()) { return false; } }
+            true
+        }).collect()
+    }
+
+    pub fn set_severity_filter(&mut self, s: Option<BbwSeverity>) { self.filter_severity = s; }
+    pub fn set_source_filter(&mut self, s: Option<String>) { self.filter_source = s; }
+
+    pub fn clear_file(&mut self, path: &str) { self.diagnostics.retain(|d| d.file_path != path); }
+    pub fn clear_all(&mut self) { self.diagnostics.clear(); }
+
+    pub fn status_text(&self) -> String {
+        format!("{} errors, {} warnings", self.errors(), self.warnings())
+    }
+}
+
+#[cfg(test)]
+mod bbw_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbw_severity() {
+        assert!(BbwSeverity::Error.priority() > BbwSeverity::Warning.priority());
+        assert_eq!(BbwSeverity::Warning.icon(), '⚠');
+    }
+
+    #[test]
+    fn test_bbw_diagnostic() {
+        let d = BbwDiagnostic::new("src/lib.rs", 10, 5, BbwSeverity::Error, "unused var")
+            .with_source("rustc").with_code("E0001");
+        assert_eq!(d.location_text(), "src/lib.rs:11:6");
+        assert!(d.display_text().contains("unused var"));
+    }
+
+    #[test]
+    fn test_bbw_file_summary() {
+        let d1 = BbwDiagnostic::new("x.rs", 1, 0, BbwSeverity::Error, "e");
+        let d2 = BbwDiagnostic::new("x.rs", 2, 0, BbwSeverity::Warning, "w");
+        let refs: Vec<&BbwDiagnostic> = vec![&d1, &d2];
+        let s = BbwFileSummary::from_diagnostics("x.rs", &refs);
+        assert_eq!(s.total(), 2);
+        assert_eq!(s.worst_severity(), BbwSeverity::Error);
+    }
+
+    #[test]
+    fn test_bbw_model_counts() {
+        let mut m = BbwDiagnosticsModel::new();
+        m.set_diagnostics(vec![
+            BbwDiagnostic::new("a.rs", 1, 0, BbwSeverity::Error, "e1"),
+            BbwDiagnostic::new("a.rs", 2, 0, BbwSeverity::Error, "e2"),
+            BbwDiagnostic::new("b.rs", 1, 0, BbwSeverity::Warning, "w1"),
+        ]);
+        assert_eq!(m.errors(), 2);
+        assert_eq!(m.warnings(), 1);
+        assert_eq!(m.total(), 3);
+    }
+
+    #[test]
+    fn test_bbw_model_for_file() {
+        let mut m = BbwDiagnosticsModel::new();
+        m.set_diagnostics(vec![
+            BbwDiagnostic::new("a.rs", 1, 0, BbwSeverity::Error, "e"),
+            BbwDiagnostic::new("b.rs", 1, 0, BbwSeverity::Warning, "w"),
+        ]);
+        assert_eq!(m.for_file("a.rs").len(), 1);
+    }
+
+    #[test]
+    fn test_bbw_model_summaries() {
+        let mut m = BbwDiagnosticsModel::new();
+        m.set_diagnostics(vec![
+            BbwDiagnostic::new("a.rs", 1, 0, BbwSeverity::Error, "e"),
+            BbwDiagnostic::new("b.rs", 1, 0, BbwSeverity::Warning, "w"),
+        ]);
+        assert_eq!(m.file_summaries().len(), 2);
+    }
+
+    #[test]
+    fn test_bbw_model_filter() {
+        let mut m = BbwDiagnosticsModel::new();
+        m.set_diagnostics(vec![
+            BbwDiagnostic::new("a.rs", 1, 0, BbwSeverity::Error, "e"),
+            BbwDiagnostic::new("a.rs", 2, 0, BbwSeverity::Warning, "w"),
+        ]);
+        m.set_severity_filter(Some(BbwSeverity::Error));
+        assert_eq!(m.filtered().len(), 1);
+    }
+
+    #[test]
+    fn test_bbw_model_clear_file() {
+        let mut m = BbwDiagnosticsModel::new();
+        m.set_diagnostics(vec![
+            BbwDiagnostic::new("a.rs", 1, 0, BbwSeverity::Error, "e"),
+            BbwDiagnostic::new("b.rs", 1, 0, BbwSeverity::Warning, "w"),
+        ]);
+        m.clear_file("a.rs");
+        assert_eq!(m.total(), 1);
+    }
+
+    #[test]
+    fn test_bbw_model_status() {
+        let mut m = BbwDiagnosticsModel::new();
+        m.set_diagnostics(vec![
+            BbwDiagnostic::new("a.rs", 1, 0, BbwSeverity::Error, "e"),
+            BbwDiagnostic::new("a.rs", 2, 0, BbwSeverity::Warning, "w"),
+        ]);
+        assert_eq!(m.status_text(), "1 errors, 1 warnings");
+    }
+}
