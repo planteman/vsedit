@@ -52281,3 +52281,385 @@ mod bao_tests {
         assert_eq!(view.entry_count(), 0);
     }
 }
+
+
+// --- bap_: Editor accessibility/screen reader model ---
+
+/// Accessibility role for a UI element.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BapAccessRole {
+    Editor,
+    TreeView,
+    List,
+    ListItem,
+    Button,
+    Checkbox,
+    Textbox,
+    Tab,
+    TabList,
+    Menu,
+    MenuItem,
+    Dialog,
+    Alert,
+    Status,
+    Toolbar,
+    Tooltip,
+    Label,
+    Group,
+}
+
+impl BapAccessRole {
+    pub fn aria_role(&self) -> &'static str {
+        match self {
+            Self::Editor => "textbox",
+            Self::TreeView => "tree",
+            Self::List => "list",
+            Self::ListItem => "listitem",
+            Self::Button => "button",
+            Self::Checkbox => "checkbox",
+            Self::Textbox => "textbox",
+            Self::Tab => "tab",
+            Self::TabList => "tablist",
+            Self::Menu => "menu",
+            Self::MenuItem => "menuitem",
+            Self::Dialog => "dialog",
+            Self::Alert => "alert",
+            Self::Status => "status",
+            Self::Toolbar => "toolbar",
+            Self::Tooltip => "tooltip",
+            Self::Label => "label",
+            Self::Group => "group",
+        }
+    }
+}
+
+/// An accessible element in the UI.
+#[derive(Debug, Clone)]
+pub struct BapAccessElement {
+    pub id: String,
+    pub role: BapAccessRole,
+    pub label: String,
+    pub value: Option<String>,
+    pub description: Option<String>,
+    pub is_focused: bool,
+    pub is_selected: bool,
+    pub is_expanded: Option<bool>,
+    pub is_disabled: bool,
+    pub level: Option<u32>,
+    pub position_in_set: Option<u32>,
+    pub set_size: Option<u32>,
+}
+
+impl BapAccessElement {
+    pub fn new(id: &str, role: BapAccessRole, label: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            role,
+            label: label.to_string(),
+            value: None,
+            description: None,
+            is_focused: false,
+            is_selected: false,
+            is_expanded: None,
+            is_disabled: false,
+            level: None,
+            position_in_set: None,
+            set_size: None,
+        }
+    }
+
+    pub fn with_value(mut self, value: &str) -> Self {
+        self.value = Some(value.to_string());
+        self
+    }
+
+    pub fn with_description(mut self, desc: &str) -> Self {
+        self.description = Some(desc.to_string());
+        self
+    }
+
+    pub fn with_set_info(mut self, position: u32, size: u32) -> Self {
+        self.position_in_set = Some(position);
+        self.set_size = Some(size);
+        self
+    }
+
+    pub fn with_level(mut self, level: u32) -> Self {
+        self.level = Some(level);
+        self
+    }
+
+    pub fn announce(&self) -> String {
+        let mut parts = Vec::new();
+        parts.push(self.label.clone());
+        if let Some(v) = &self.value {
+            parts.push(v.clone());
+        }
+        parts.push(self.role.aria_role().to_string());
+        if let Some(expanded) = self.is_expanded {
+            parts.push(if expanded { "expanded" } else { "collapsed" }.to_string());
+        }
+        if self.is_selected {
+            parts.push("selected".to_string());
+        }
+        if self.is_disabled {
+            parts.push("disabled".to_string());
+        }
+        if let (Some(pos), Some(size)) = (self.position_in_set, self.set_size) {
+            parts.push(format!("{} of {}", pos, size));
+        }
+        parts.join(", ")
+    }
+}
+
+/// Screen reader announcement priority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BapAnnouncePriority {
+    Polite,
+    Assertive,
+}
+
+/// A screen reader announcement.
+#[derive(Debug, Clone)]
+pub struct BapAnnouncement {
+    pub message: String,
+    pub priority: BapAnnouncePriority,
+    pub timestamp_ms: u64,
+}
+
+impl BapAnnouncement {
+    pub fn polite(message: &str, timestamp_ms: u64) -> Self {
+        Self { message: message.to_string(), priority: BapAnnouncePriority::Polite, timestamp_ms }
+    }
+
+    pub fn assertive(message: &str, timestamp_ms: u64) -> Self {
+        Self { message: message.to_string(), priority: BapAnnouncePriority::Assertive, timestamp_ms }
+    }
+}
+
+/// Accessibility settings.
+#[derive(Debug, Clone)]
+pub struct BapAccessSettings {
+    pub screen_reader_detected: bool,
+    pub high_contrast: bool,
+    pub reduce_motion: bool,
+    pub tab_focus_mode: bool,
+    pub font_size_factor: f64,
+    pub cursor_width: u32,
+    pub line_highlight: bool,
+}
+
+impl BapAccessSettings {
+    pub fn default_settings() -> Self {
+        Self {
+            screen_reader_detected: false,
+            high_contrast: false,
+            reduce_motion: false,
+            tab_focus_mode: false,
+            font_size_factor: 1.0,
+            cursor_width: 2,
+            line_highlight: true,
+        }
+    }
+
+    pub fn screen_reader_mode() -> Self {
+        Self {
+            screen_reader_detected: true,
+            high_contrast: true,
+            reduce_motion: true,
+            tab_focus_mode: true,
+            font_size_factor: 1.2,
+            cursor_width: 3,
+            line_highlight: true,
+        }
+    }
+
+    pub fn needs_accessibility_mode(&self) -> bool {
+        self.screen_reader_detected || self.high_contrast
+    }
+}
+
+/// Manages accessibility state for the workbench.
+#[derive(Debug, Clone)]
+pub struct BapAccessibilityManager {
+    pub settings: BapAccessSettings,
+    pub announcements: Vec<BapAnnouncement>,
+    pub focus_path: Vec<String>,
+    max_announcements: usize,
+}
+
+impl BapAccessibilityManager {
+    pub fn new() -> Self {
+        Self {
+            settings: BapAccessSettings::default_settings(),
+            announcements: Vec::new(),
+            focus_path: Vec::new(),
+            max_announcements: 100,
+        }
+    }
+
+    pub fn announce(&mut self, message: &str, priority: BapAnnouncePriority, timestamp_ms: u64) {
+        let ann = BapAnnouncement {
+            message: message.to_string(),
+            priority,
+            timestamp_ms,
+        };
+        self.announcements.push(ann);
+        if self.announcements.len() > self.max_announcements {
+            self.announcements.remove(0);
+        }
+    }
+
+    pub fn announce_polite(&mut self, message: &str, timestamp_ms: u64) {
+        self.announce(message, BapAnnouncePriority::Polite, timestamp_ms);
+    }
+
+    pub fn announce_assertive(&mut self, message: &str, timestamp_ms: u64) {
+        self.announce(message, BapAnnouncePriority::Assertive, timestamp_ms);
+    }
+
+    pub fn set_focus_path(&mut self, path: Vec<String>) {
+        self.focus_path = path;
+    }
+
+    pub fn focus_description(&self) -> String {
+        self.focus_path.join(" > ")
+    }
+
+    pub fn latest_announcement(&self) -> Option<&BapAnnouncement> {
+        self.announcements.last()
+    }
+
+    pub fn pending_assertive(&self) -> Vec<&BapAnnouncement> {
+        self.announcements.iter()
+            .filter(|a| a.priority == BapAnnouncePriority::Assertive)
+            .collect()
+    }
+
+    pub fn clear_announcements(&mut self) {
+        self.announcements.clear();
+    }
+
+    pub fn is_screen_reader_active(&self) -> bool {
+        self.settings.screen_reader_detected
+    }
+
+    pub fn enable_screen_reader(&mut self) {
+        self.settings = BapAccessSettings::screen_reader_mode();
+    }
+}
+
+#[cfg(test)]
+mod bap_tests {
+    use super::*;
+
+    #[test]
+    fn test_bap_role_aria() {
+        assert_eq!(BapAccessRole::Button.aria_role(), "button");
+        assert_eq!(BapAccessRole::Editor.aria_role(), "textbox");
+        assert_eq!(BapAccessRole::TreeView.aria_role(), "tree");
+    }
+
+    #[test]
+    fn test_bap_element_creation() {
+        let elem = BapAccessElement::new("btn1", BapAccessRole::Button, "Save")
+            .with_description("Save current file");
+        assert_eq!(elem.label, "Save");
+        assert_eq!(elem.description.as_deref(), Some("Save current file"));
+    }
+
+    #[test]
+    fn test_bap_element_announce() {
+        let elem = BapAccessElement::new("item1", BapAccessRole::ListItem, "File A")
+            .with_set_info(2, 5);
+        let ann = elem.announce();
+        assert!(ann.contains("File A"));
+        assert!(ann.contains("listitem"));
+        assert!(ann.contains("2 of 5"));
+    }
+
+    #[test]
+    fn test_bap_element_expanded() {
+        let mut elem = BapAccessElement::new("tree1", BapAccessRole::TreeView, "Folder");
+        elem.is_expanded = Some(true);
+        assert!(elem.announce().contains("expanded"));
+        elem.is_expanded = Some(false);
+        assert!(elem.announce().contains("collapsed"));
+    }
+
+    #[test]
+    fn test_bap_element_disabled() {
+        let mut elem = BapAccessElement::new("btn", BapAccessRole::Button, "Delete");
+        elem.is_disabled = true;
+        assert!(elem.announce().contains("disabled"));
+    }
+
+    #[test]
+    fn test_bap_announcement_creation() {
+        let ann = BapAnnouncement::polite("File saved", 1000);
+        assert_eq!(ann.priority, BapAnnouncePriority::Polite);
+
+        let ann2 = BapAnnouncement::assertive("Error!", 2000);
+        assert_eq!(ann2.priority, BapAnnouncePriority::Assertive);
+    }
+
+    #[test]
+    fn test_bap_settings_default() {
+        let s = BapAccessSettings::default_settings();
+        assert!(!s.screen_reader_detected);
+        assert!(!s.needs_accessibility_mode());
+    }
+
+    #[test]
+    fn test_bap_settings_screen_reader() {
+        let s = BapAccessSettings::screen_reader_mode();
+        assert!(s.screen_reader_detected);
+        assert!(s.high_contrast);
+        assert!(s.needs_accessibility_mode());
+    }
+
+    #[test]
+    fn test_bap_manager_announce() {
+        let mut mgr = BapAccessibilityManager::new();
+        mgr.announce_polite("Hello", 1000);
+        mgr.announce_assertive("Alert!", 2000);
+        assert_eq!(mgr.announcements.len(), 2);
+        assert_eq!(mgr.latest_announcement().unwrap().message, "Alert!");
+        assert_eq!(mgr.pending_assertive().len(), 1);
+    }
+
+    #[test]
+    fn test_bap_manager_focus() {
+        let mut mgr = BapAccessibilityManager::new();
+        mgr.set_focus_path(vec!["Workbench".to_string(), "Editor".to_string(), "Line 42".to_string()]);
+        assert_eq!(mgr.focus_description(), "Workbench > Editor > Line 42");
+    }
+
+    #[test]
+    fn test_bap_manager_screen_reader() {
+        let mut mgr = BapAccessibilityManager::new();
+        assert!(!mgr.is_screen_reader_active());
+        mgr.enable_screen_reader();
+        assert!(mgr.is_screen_reader_active());
+    }
+
+    #[test]
+    fn test_bap_manager_clear() {
+        let mut mgr = BapAccessibilityManager::new();
+        mgr.announce_polite("test", 1000);
+        mgr.clear_announcements();
+        assert_eq!(mgr.announcements.len(), 0);
+    }
+
+    #[test]
+    fn test_bap_priority_ordering() {
+        assert!(BapAnnouncePriority::Polite < BapAnnouncePriority::Assertive);
+    }
+
+    #[test]
+    fn test_bap_element_with_level() {
+        let elem = BapAccessElement::new("h1", BapAccessRole::Label, "Heading")
+            .with_level(2);
+        assert_eq!(elem.level, Some(2));
+    }
+}
