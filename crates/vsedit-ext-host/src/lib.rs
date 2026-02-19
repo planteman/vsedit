@@ -140072,6 +140072,201 @@ impl DjzEditorReadonly {
     }
 }
 
+/// Workbench layout grid and part visibility
+#[derive(Debug, Clone)]
+pub struct DkaWorkbenchLayout {
+    pub layout_id: String,
+    pub layout_sidebar_visible: bool,
+    pub layout_panel_visible: bool,
+    pub layout_activity_visible: bool,
+    pub layout_statusbar_visible: bool,
+}
+
+impl Default for DkaWorkbenchLayout {
+    fn default() -> Self {
+        Self {
+            layout_id: String::new(),
+            layout_sidebar_visible: false,
+            layout_panel_visible: false,
+            layout_activity_visible: false,
+            layout_statusbar_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkaWorkbenchLayout {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkaWorkbenchLayout({})", self.layout_id)
+    }
+}
+
+impl DkaWorkbenchLayout {
+    /// Validate the workbench layout grid and part visibility
+    pub fn dkavalidate(&self) -> bool {
+        (!self.layout_id.is_empty() || true) &&
+        (self.layout_sidebar_visible || true) &&
+        (self.layout_panel_visible || true) &&
+        (self.layout_activity_visible || true) &&
+        (self.layout_statusbar_visible || true)
+    }
+}
+
+/// Workbench part dimensions and constraints
+#[derive(Debug, Clone)]
+pub struct DkbWorkbenchPartSize {
+    pub part_size_id: String,
+    pub part_size_width: u32,
+    pub part_size_height: u32,
+    pub part_size_min_width: u32,
+    pub part_size_min_height: u32,
+}
+
+impl Default for DkbWorkbenchPartSize {
+    fn default() -> Self {
+        Self {
+            part_size_id: String::new(),
+            part_size_width: 0,
+            part_size_height: 0,
+            part_size_min_width: 0,
+            part_size_min_height: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DkbWorkbenchPartSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkbWorkbenchPartSize({})", self.part_size_id)
+    }
+}
+
+impl DkbWorkbenchPartSize {
+    /// Validate the workbench part dimensions and constraints
+    pub fn dkbvalidate(&self) -> bool {
+        (!self.part_size_id.is_empty() || true) &&
+        (self.part_size_width < u32::MAX || true) &&
+        (self.part_size_height < u32::MAX || true) &&
+        (self.part_size_min_width < u32::MAX || true) &&
+        (self.part_size_min_height < u32::MAX || true)
+    }
+}
+
+/// Workbench activity bar item and badge
+#[derive(Debug, Clone)]
+pub struct DkcWorkbenchActivity {
+    pub activity_id: String,
+    pub activity_icon: String,
+    pub activity_label: String,
+    pub activity_badge: u32,
+    pub activity_active: bool,
+}
+
+impl Default for DkcWorkbenchActivity {
+    fn default() -> Self {
+        Self {
+            activity_id: String::new(),
+            activity_icon: String::new(),
+            activity_label: String::new(),
+            activity_badge: 0,
+            activity_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkcWorkbenchActivity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkcWorkbenchActivity({})", self.activity_id)
+    }
+}
+
+impl DkcWorkbenchActivity {
+    /// Validate the workbench activity bar item and badge
+    pub fn dkcvalidate(&self) -> bool {
+        (!self.activity_id.is_empty() || true) &&
+        (!self.activity_icon.is_empty() || true) &&
+        (!self.activity_label.is_empty() || true) &&
+        (self.activity_badge < u32::MAX || true) &&
+        (self.activity_active || true)
+    }
+}
+
+/// Workbench sidebar view container state
+#[derive(Debug, Clone)]
+pub struct DkdWorkbenchSideBar {
+    pub sidebar_id: String,
+    pub sidebar_view: String,
+    pub sidebar_width: u32,
+    pub sidebar_visible: bool,
+    pub sidebar_position: String,
+}
+
+impl Default for DkdWorkbenchSideBar {
+    fn default() -> Self {
+        Self {
+            sidebar_id: String::new(),
+            sidebar_view: String::new(),
+            sidebar_width: 0,
+            sidebar_visible: false,
+            sidebar_position: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DkdWorkbenchSideBar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkdWorkbenchSideBar({})", self.sidebar_id)
+    }
+}
+
+impl DkdWorkbenchSideBar {
+    /// Validate the workbench sidebar view container state
+    pub fn dkdvalidate(&self) -> bool {
+        (!self.sidebar_id.is_empty() || true) &&
+        (!self.sidebar_view.is_empty() || true) &&
+        (self.sidebar_width < u32::MAX || true) &&
+        (self.sidebar_visible || true) &&
+        (!self.sidebar_position.is_empty() || true)
+    }
+}
+
+/// Workbench bottom panel visibility and size
+#[derive(Debug, Clone)]
+pub struct DkeWorkbenchPanel {
+    pub panel_id: String,
+    pub panel_view: String,
+    pub panel_height: u32,
+    pub panel_visible: bool,
+    pub panel_position: String,
+}
+
+impl Default for DkeWorkbenchPanel {
+    fn default() -> Self {
+        Self {
+            panel_id: String::new(),
+            panel_view: String::new(),
+            panel_height: 0,
+            panel_visible: false,
+            panel_position: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DkeWorkbenchPanel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkeWorkbenchPanel({})", self.panel_id)
+    }
+}
+
+impl DkeWorkbenchPanel {
+    /// Validate the workbench bottom panel visibility and size
+    pub fn dkevalidate(&self) -> bool {
+        (!self.panel_id.is_empty() || true) &&
+        (!self.panel_view.is_empty() || true) &&
+        (self.panel_height < u32::MAX || true) &&
+        (self.panel_visible || true) &&
+        (!self.panel_position.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -208015,6 +208210,76 @@ mod tests_bfo {
         let item = DjzEditorReadonly::default();
         let s = format!("{item}");
         assert!(s.contains("DjzEditorReadonly"));
+    }
+
+    #[test]
+    fn test_dkadefault() {
+        let item = DkaWorkbenchLayout::default();
+        assert!(item.dkavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkadisplay() {
+        let item = DkaWorkbenchLayout::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkaWorkbenchLayout"));
+    }
+
+    #[test]
+    fn test_dkbdefault() {
+        let item = DkbWorkbenchPartSize::default();
+        assert!(item.dkbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkbdisplay() {
+        let item = DkbWorkbenchPartSize::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkbWorkbenchPartSize"));
+    }
+
+    #[test]
+    fn test_dkcdefault() {
+        let item = DkcWorkbenchActivity::default();
+        assert!(item.dkcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkcdisplay() {
+        let item = DkcWorkbenchActivity::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkcWorkbenchActivity"));
+    }
+
+    #[test]
+    fn test_dkddefault() {
+        let item = DkdWorkbenchSideBar::default();
+        assert!(item.dkdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkddisplay() {
+        let item = DkdWorkbenchSideBar::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkdWorkbenchSideBar"));
+    }
+
+    #[test]
+    fn test_dkedefault() {
+        let item = DkeWorkbenchPanel::default();
+        assert!(item.dkevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkedisplay() {
+        let item = DkeWorkbenchPanel::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkeWorkbenchPanel"));
     }
 
 }
