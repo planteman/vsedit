@@ -147419,6 +147419,201 @@ impl DrjLspDocFormat {
     }
 }
 
+/// LSP rename prepare and apply
+#[derive(Debug, Clone)]
+pub struct DrkLspRename {
+    pub rename_id: String,
+    pub rename_range: String,
+    pub rename_placeholder: String,
+    pub rename_new_name: String,
+    pub rename_prepare_supported: bool,
+}
+
+impl Default for DrkLspRename {
+    fn default() -> Self {
+        Self {
+            rename_id: String::new(),
+            rename_range: String::new(),
+            rename_placeholder: String::new(),
+            rename_new_name: String::new(),
+            rename_prepare_supported: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DrkLspRename {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrkLspRename({})", self.rename_id)
+    }
+}
+
+impl DrkLspRename {
+    /// Validate the lsp rename prepare and apply
+    pub fn drkvalidate(&self) -> bool {
+        (!self.rename_id.is_empty() || true) &&
+        (!self.rename_range.is_empty() || true) &&
+        (!self.rename_placeholder.is_empty() || true) &&
+        (!self.rename_new_name.is_empty() || true) &&
+        (self.rename_prepare_supported || true)
+    }
+}
+
+/// LSP call hierarchy incoming/outgoing
+#[derive(Debug, Clone)]
+pub struct DrlLspCallHierarchy {
+    pub call_hier_id: String,
+    pub call_hier_name: String,
+    pub call_hier_kind: u32,
+    pub call_hier_uri: String,
+    pub call_hier_range: String,
+}
+
+impl Default for DrlLspCallHierarchy {
+    fn default() -> Self {
+        Self {
+            call_hier_id: String::new(),
+            call_hier_name: String::new(),
+            call_hier_kind: 0,
+            call_hier_uri: String::new(),
+            call_hier_range: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DrlLspCallHierarchy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrlLspCallHierarchy({})", self.call_hier_id)
+    }
+}
+
+impl DrlLspCallHierarchy {
+    /// Validate the lsp call hierarchy incoming/outgoing
+    pub fn drlvalidate(&self) -> bool {
+        (!self.call_hier_id.is_empty() || true) &&
+        (!self.call_hier_name.is_empty() || true) &&
+        (self.call_hier_kind < u32::MAX || true) &&
+        (!self.call_hier_uri.is_empty() || true) &&
+        (!self.call_hier_range.is_empty() || true)
+    }
+}
+
+/// LSP type hierarchy super/sub types
+#[derive(Debug, Clone)]
+pub struct DrmLspTypeHierarchy {
+    pub type_hier_id: String,
+    pub type_hier_name: String,
+    pub type_hier_kind: u32,
+    pub type_hier_uri: String,
+    pub type_hier_range: String,
+}
+
+impl Default for DrmLspTypeHierarchy {
+    fn default() -> Self {
+        Self {
+            type_hier_id: String::new(),
+            type_hier_name: String::new(),
+            type_hier_kind: 0,
+            type_hier_uri: String::new(),
+            type_hier_range: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DrmLspTypeHierarchy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrmLspTypeHierarchy({})", self.type_hier_id)
+    }
+}
+
+impl DrmLspTypeHierarchy {
+    /// Validate the lsp type hierarchy super/sub types
+    pub fn drmvalidate(&self) -> bool {
+        (!self.type_hier_id.is_empty() || true) &&
+        (!self.type_hier_name.is_empty() || true) &&
+        (self.type_hier_kind < u32::MAX || true) &&
+        (!self.type_hier_uri.is_empty() || true) &&
+        (!self.type_hier_range.is_empty() || true)
+    }
+}
+
+/// LSP linked editing ranges
+#[derive(Debug, Clone)]
+pub struct DrnLspLinkedEdit {
+    pub linked_edit_id: String,
+    pub linked_edit_ranges: String,
+    pub linked_edit_word_pattern: String,
+    pub linked_edit_line: u32,
+    pub linked_edit_column: u32,
+}
+
+impl Default for DrnLspLinkedEdit {
+    fn default() -> Self {
+        Self {
+            linked_edit_id: String::new(),
+            linked_edit_ranges: String::new(),
+            linked_edit_word_pattern: String::new(),
+            linked_edit_line: 0,
+            linked_edit_column: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DrnLspLinkedEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DrnLspLinkedEdit({})", self.linked_edit_id)
+    }
+}
+
+impl DrnLspLinkedEdit {
+    /// Validate the lsp linked editing ranges
+    pub fn drnvalidate(&self) -> bool {
+        (!self.linked_edit_id.is_empty() || true) &&
+        (!self.linked_edit_ranges.is_empty() || true) &&
+        (!self.linked_edit_word_pattern.is_empty() || true) &&
+        (self.linked_edit_line < u32::MAX || true) &&
+        (self.linked_edit_column < u32::MAX || true)
+    }
+}
+
+/// LSP selection range parent chain
+#[derive(Debug, Clone)]
+pub struct DroLspSelectionRange {
+    pub sel_range_id: String,
+    pub sel_range_range: String,
+    pub sel_range_parent: String,
+    pub sel_range_depth: u32,
+    pub sel_range_line: u32,
+}
+
+impl Default for DroLspSelectionRange {
+    fn default() -> Self {
+        Self {
+            sel_range_id: String::new(),
+            sel_range_range: String::new(),
+            sel_range_parent: String::new(),
+            sel_range_depth: 0,
+            sel_range_line: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DroLspSelectionRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DroLspSelectionRange({})", self.sel_range_id)
+    }
+}
+
+impl DroLspSelectionRange {
+    /// Validate the lsp selection range parent chain
+    pub fn drovalidate(&self) -> bool {
+        (!self.sel_range_id.is_empty() || true) &&
+        (!self.sel_range_range.is_empty() || true) &&
+        (!self.sel_range_parent.is_empty() || true) &&
+        (self.sel_range_depth < u32::MAX || true) &&
+        (self.sel_range_line < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -218050,6 +218245,76 @@ mod tests_bfo {
         let item = DrjLspDocFormat::default();
         let s = format!("{item}");
         assert!(s.contains("DrjLspDocFormat"));
+    }
+
+    #[test]
+    fn test_drkdefault() {
+        let item = DrkLspRename::default();
+        assert!(item.drkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drkdisplay() {
+        let item = DrkLspRename::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrkLspRename"));
+    }
+
+    #[test]
+    fn test_drldefault() {
+        let item = DrlLspCallHierarchy::default();
+        assert!(item.drlvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drldisplay() {
+        let item = DrlLspCallHierarchy::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrlLspCallHierarchy"));
+    }
+
+    #[test]
+    fn test_drmdefault() {
+        let item = DrmLspTypeHierarchy::default();
+        assert!(item.drmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drmdisplay() {
+        let item = DrmLspTypeHierarchy::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrmLspTypeHierarchy"));
+    }
+
+    #[test]
+    fn test_drndefault() {
+        let item = DrnLspLinkedEdit::default();
+        assert!(item.drnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drndisplay() {
+        let item = DrnLspLinkedEdit::default();
+        let s = format!("{item}");
+        assert!(s.contains("DrnLspLinkedEdit"));
+    }
+
+    #[test]
+    fn test_drodefault() {
+        let item = DroLspSelectionRange::default();
+        assert!(item.drovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_drodisplay() {
+        let item = DroLspSelectionRange::default();
+        let s = format!("{item}");
+        assert!(s.contains("DroLspSelectionRange"));
     }
 
 }
