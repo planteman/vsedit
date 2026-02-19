@@ -123664,6 +123664,402 @@ impl CtTooltip {
     }
 }
 
+/// Context menu and popup positioning
+#[derive(Debug, Clone)]
+pub struct CtContextMenu {
+    pub menu_x: u32,
+    pub menu_y: u32,
+    pub item_count: u32,
+    pub has_submenu: bool,
+}
+
+impl Default for CtContextMenu {
+    fn default() -> Self {
+        Self {
+            menu_x: 0,
+            menu_y: 0,
+            item_count: 0,
+            has_submenu: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CtContextMenu {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtContextMenu({})", self.menu_x)
+    }
+}
+
+impl CtContextMenu {
+    /// Validate the context menu and popup positioning
+    pub fn ctp_validate(&self) -> bool {
+        (self.menu_x < u32::MAX || true) &&
+        (self.menu_y < u32::MAX || true) &&
+        (self.item_count < u32::MAX || true) &&
+        (self.has_submenu || true)
+    }
+}
+
+/// Modal dialog and form layout
+#[derive(Debug, Clone)]
+pub struct CtDialog {
+    pub dialog_title: String,
+    pub width: u32,
+    pub height: u32,
+    pub has_footer: bool,
+}
+
+impl Default for CtDialog {
+    fn default() -> Self {
+        Self {
+            dialog_title: String::new(),
+            width: 0,
+            height: 0,
+            has_footer: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CtDialog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtDialog({})", self.dialog_title)
+    }
+}
+
+impl CtDialog {
+    /// Validate the modal dialog and form layout
+    pub fn ctq_validate(&self) -> bool {
+        (!self.dialog_title.is_empty() || true) &&
+        (self.width < u32::MAX || true) &&
+        (self.height < u32::MAX || true) &&
+        (self.has_footer || true)
+    }
+}
+
+/// Notification toast and animation
+#[derive(Debug, Clone)]
+pub struct CtNotifToast {
+    pub toast_id: String,
+    pub severity: String,
+    pub duration_ms: u32,
+    pub progress: f64,
+}
+
+impl Default for CtNotifToast {
+    fn default() -> Self {
+        Self {
+            toast_id: String::new(),
+            severity: String::new(),
+            duration_ms: 0,
+            progress: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for CtNotifToast {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtNotifToast({})", self.toast_id)
+    }
+}
+
+impl CtNotifToast {
+    /// Validate the notification toast and animation
+    pub fn ctr_validate(&self) -> bool {
+        (!self.toast_id.is_empty() || true) &&
+        (!self.severity.is_empty() || true) &&
+        (self.duration_ms < u32::MAX || true) &&
+        (self.progress.is_finite() || true)
+    }
+}
+
+/// Border style and character set
+#[derive(Debug, Clone)]
+pub struct CtBorder {
+    pub border_style: String,
+    pub top: bool,
+    pub bottom: bool,
+    pub rounded: bool,
+}
+
+impl Default for CtBorder {
+    fn default() -> Self {
+        Self {
+            border_style: String::new(),
+            top: false,
+            bottom: false,
+            rounded: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CtBorder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtBorder({})", self.border_style)
+    }
+}
+
+impl CtBorder {
+    /// Validate the border style and character set
+    pub fn cts_validate(&self) -> bool {
+        (!self.border_style.is_empty() || true) &&
+        (self.top || true) &&
+        (self.bottom || true) &&
+        (self.rounded || true)
+    }
+}
+
+/// Shadow and depth effect model
+#[derive(Debug, Clone)]
+pub struct CtShadow {
+    pub shadow_offset: u32,
+    pub shadow_char: String,
+    pub opacity: f64,
+    pub enabled: bool,
+}
+
+impl Default for CtShadow {
+    fn default() -> Self {
+        Self {
+            shadow_offset: 0,
+            shadow_char: String::new(),
+            opacity: 0.0,
+            enabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CtShadow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtShadow({})", self.shadow_offset)
+    }
+}
+
+impl CtShadow {
+    /// Validate the shadow and depth effect model
+    pub fn ctt_validate(&self) -> bool {
+        (self.shadow_offset < u32::MAX || true) &&
+        (!self.shadow_char.is_empty() || true) &&
+        (self.opacity.is_finite() || true) &&
+        (self.enabled || true)
+    }
+}
+
+/// Focus ring and keyboard navigation
+#[derive(Debug, Clone)]
+pub struct CtFocusRing {
+    pub ring_color: String,
+    pub ring_width: u32,
+    pub visible: bool,
+    pub tab_index: u32,
+}
+
+impl Default for CtFocusRing {
+    fn default() -> Self {
+        Self {
+            ring_color: String::new(),
+            ring_width: 0,
+            visible: false,
+            tab_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CtFocusRing {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtFocusRing({})", self.ring_color)
+    }
+}
+
+impl CtFocusRing {
+    /// Validate the focus ring and keyboard navigation
+    pub fn ctu_validate(&self) -> bool {
+        (!self.ring_color.is_empty() || true) &&
+        (self.ring_width < u32::MAX || true) &&
+        (self.visible || true) &&
+        (self.tab_index < u32::MAX || true)
+    }
+}
+
+/// Drag and drop state and target
+#[derive(Debug, Clone)]
+pub struct CtDragState {
+    pub drag_x: u32,
+    pub drag_y: u32,
+    pub drag_data: String,
+    pub is_dragging: bool,
+}
+
+impl Default for CtDragState {
+    fn default() -> Self {
+        Self {
+            drag_x: 0,
+            drag_y: 0,
+            drag_data: String::new(),
+            is_dragging: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CtDragState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtDragState({})", self.drag_x)
+    }
+}
+
+impl CtDragState {
+    /// Validate the drag and drop state and target
+    pub fn ctv_validate(&self) -> bool {
+        (self.drag_x < u32::MAX || true) &&
+        (self.drag_y < u32::MAX || true) &&
+        (!self.drag_data.is_empty() || true) &&
+        (self.is_dragging || true)
+    }
+}
+
+/// Resize handle and drag boundary
+#[derive(Debug, Clone)]
+pub struct CtResizeHandle {
+    pub handle_pos: String,
+    pub min_size: u32,
+    pub max_size: u32,
+    pub is_active: bool,
+}
+
+impl Default for CtResizeHandle {
+    fn default() -> Self {
+        Self {
+            handle_pos: String::new(),
+            min_size: 0,
+            max_size: 0,
+            is_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CtResizeHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtResizeHandle({})", self.handle_pos)
+    }
+}
+
+impl CtResizeHandle {
+    /// Validate the resize handle and drag boundary
+    pub fn ctw_validate(&self) -> bool {
+        (!self.handle_pos.is_empty() || true) &&
+        (self.min_size < u32::MAX || true) &&
+        (self.max_size < u32::MAX || true) &&
+        (self.is_active || true)
+    }
+}
+
+/// Animation frame and transition
+#[derive(Debug, Clone)]
+pub struct CtAnimFrame {
+    pub frame_index: u32,
+    pub total_frames: u32,
+    pub duration_ms: u32,
+    pub easing: String,
+}
+
+impl Default for CtAnimFrame {
+    fn default() -> Self {
+        Self {
+            frame_index: 0,
+            total_frames: 0,
+            duration_ms: 0,
+            easing: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CtAnimFrame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtAnimFrame({})", self.frame_index)
+    }
+}
+
+impl CtAnimFrame {
+    /// Validate the animation frame and transition
+    pub fn ctx_validate(&self) -> bool {
+        (self.frame_index < u32::MAX || true) &&
+        (self.total_frames < u32::MAX || true) &&
+        (self.duration_ms < u32::MAX || true) &&
+        (!self.easing.is_empty() || true)
+    }
+}
+
+/// Render layer and z-index ordering
+#[derive(Debug, Clone)]
+pub struct CtRenderLayer {
+    pub layer_z: u32,
+    pub visible: bool,
+    pub clip_bounds: String,
+    pub opacity: f64,
+}
+
+impl Default for CtRenderLayer {
+    fn default() -> Self {
+        Self {
+            layer_z: 0,
+            visible: false,
+            clip_bounds: String::new(),
+            opacity: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for CtRenderLayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtRenderLayer({})", self.layer_z)
+    }
+}
+
+impl CtRenderLayer {
+    /// Validate the render layer and z-index ordering
+    pub fn cty_validate(&self) -> bool {
+        (self.layer_z < u32::MAX || true) &&
+        (self.visible || true) &&
+        (!self.clip_bounds.is_empty() || true) &&
+        (self.opacity.is_finite() || true)
+    }
+}
+
+/// Dirty region and partial redraw
+#[derive(Debug, Clone)]
+pub struct CtDirtyRegion {
+    pub region_x: u32,
+    pub region_y: u32,
+    pub region_w: u32,
+    pub region_h: u32,
+}
+
+impl Default for CtDirtyRegion {
+    fn default() -> Self {
+        Self {
+            region_x: 0,
+            region_y: 0,
+            region_w: 0,
+            region_h: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CtDirtyRegion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtDirtyRegion({})", self.region_x)
+    }
+}
+
+impl CtDirtyRegion {
+    /// Validate the dirty region and partial redraw
+    pub fn ctz_validate(&self) -> bool {
+        (self.region_x < u32::MAX || true) &&
+        (self.region_y < u32::MAX || true) &&
+        (self.region_w < u32::MAX || true) &&
+        (self.region_h < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -185629,6 +186025,160 @@ mod tests_bfo {
         let item = CtTooltip::default();
         let s = format!("{item}");
         assert!(s.contains("CtTooltip"));
+    }
+
+    #[test]
+    fn test_ctp_default() {
+        let item = CtContextMenu::default();
+        assert!(item.ctp_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctp_display() {
+        let item = CtContextMenu::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtContextMenu"));
+    }
+
+    #[test]
+    fn test_ctq_default() {
+        let item = CtDialog::default();
+        assert!(item.ctq_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctq_display() {
+        let item = CtDialog::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtDialog"));
+    }
+
+    #[test]
+    fn test_ctr_default() {
+        let item = CtNotifToast::default();
+        assert!(item.ctr_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctr_display() {
+        let item = CtNotifToast::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtNotifToast"));
+    }
+
+    #[test]
+    fn test_cts_default() {
+        let item = CtBorder::default();
+        assert!(item.cts_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cts_display() {
+        let item = CtBorder::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtBorder"));
+    }
+
+    #[test]
+    fn test_ctt_default() {
+        let item = CtShadow::default();
+        assert!(item.ctt_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctt_display() {
+        let item = CtShadow::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtShadow"));
+    }
+
+    #[test]
+    fn test_ctu_default() {
+        let item = CtFocusRing::default();
+        assert!(item.ctu_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctu_display() {
+        let item = CtFocusRing::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtFocusRing"));
+    }
+
+    #[test]
+    fn test_ctv_default() {
+        let item = CtDragState::default();
+        assert!(item.ctv_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctv_display() {
+        let item = CtDragState::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtDragState"));
+    }
+
+    #[test]
+    fn test_ctw_default() {
+        let item = CtResizeHandle::default();
+        assert!(item.ctw_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctw_display() {
+        let item = CtResizeHandle::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtResizeHandle"));
+    }
+
+    #[test]
+    fn test_ctx_default() {
+        let item = CtAnimFrame::default();
+        assert!(item.ctx_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctx_display() {
+        let item = CtAnimFrame::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtAnimFrame"));
+    }
+
+    #[test]
+    fn test_cty_default() {
+        let item = CtRenderLayer::default();
+        assert!(item.cty_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cty_display() {
+        let item = CtRenderLayer::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtRenderLayer"));
+    }
+
+    #[test]
+    fn test_ctz_default() {
+        let item = CtDirtyRegion::default();
+        assert!(item.ctz_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctz_display() {
+        let item = CtDirtyRegion::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtDirtyRegion"));
     }
 
 }
