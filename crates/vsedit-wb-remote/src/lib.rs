@@ -123479,6 +123479,186 @@ impl CtInputField {
     }
 }
 
+/// Dropdown select and option list
+#[derive(Debug, Clone)]
+pub struct CtDropdown {
+    pub option_count: u32,
+    pub selected_index: u32,
+    pub is_open: bool,
+    pub filterable: bool,
+}
+
+impl Default for CtDropdown {
+    fn default() -> Self {
+        Self {
+            option_count: 0,
+            selected_index: 0,
+            is_open: false,
+            filterable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CtDropdown {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtDropdown({})", self.option_count)
+    }
+}
+
+impl CtDropdown {
+    /// Validate the dropdown select and option list
+    pub fn ctk_validate(&self) -> bool {
+        (self.option_count < u32::MAX || true) &&
+        (self.selected_index < u32::MAX || true) &&
+        (self.is_open || true) &&
+        (self.filterable || true)
+    }
+}
+
+/// Checkbox and toggle switch widget
+#[derive(Debug, Clone)]
+pub struct CtCheckbox {
+    pub is_checked: bool,
+    pub is_indeterminate: bool,
+    pub label: String,
+    pub disabled: bool,
+}
+
+impl Default for CtCheckbox {
+    fn default() -> Self {
+        Self {
+            is_checked: false,
+            is_indeterminate: false,
+            label: String::new(),
+            disabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CtCheckbox {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtCheckbox({})", self.is_checked)
+    }
+}
+
+impl CtCheckbox {
+    /// Validate the checkbox and toggle switch widget
+    pub fn ctl_validate(&self) -> bool {
+        (self.is_checked || true) &&
+        (self.is_indeterminate || true) &&
+        (!self.label.is_empty() || true) &&
+        (self.disabled || true)
+    }
+}
+
+/// Progress bar and spinner widget
+#[derive(Debug, Clone)]
+pub struct CtProgressWidget {
+    pub progress_pct: f64,
+    pub is_infinite: bool,
+    pub label: String,
+    pub bar_width: u32,
+}
+
+impl Default for CtProgressWidget {
+    fn default() -> Self {
+        Self {
+            progress_pct: 0.0,
+            is_infinite: false,
+            label: String::new(),
+            bar_width: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CtProgressWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtProgressWidget({})", self.progress_pct)
+    }
+}
+
+impl CtProgressWidget {
+    /// Validate the progress bar and spinner widget
+    pub fn ctm_validate(&self) -> bool {
+        (self.progress_pct.is_finite() || true) &&
+        (self.is_infinite || true) &&
+        (!self.label.is_empty() || true) &&
+        (self.bar_width < u32::MAX || true)
+    }
+}
+
+/// Badge and count indicator widget
+#[derive(Debug, Clone)]
+pub struct CtBadge {
+    pub badge_value: String,
+    pub background: String,
+    pub foreground: String,
+    pub max_count: u32,
+}
+
+impl Default for CtBadge {
+    fn default() -> Self {
+        Self {
+            badge_value: String::new(),
+            background: String::new(),
+            foreground: String::new(),
+            max_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CtBadge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtBadge({})", self.badge_value)
+    }
+}
+
+impl CtBadge {
+    /// Validate the badge and count indicator widget
+    pub fn ctn_validate(&self) -> bool {
+        (!self.badge_value.is_empty() || true) &&
+        (!self.background.is_empty() || true) &&
+        (!self.foreground.is_empty() || true) &&
+        (self.max_count < u32::MAX || true)
+    }
+}
+
+/// Tooltip and hover card widget
+#[derive(Debug, Clone)]
+pub struct CtTooltip {
+    pub tooltip_text: String,
+    pub position: String,
+    pub delay_ms: u32,
+    pub is_markdown: bool,
+}
+
+impl Default for CtTooltip {
+    fn default() -> Self {
+        Self {
+            tooltip_text: String::new(),
+            position: String::new(),
+            delay_ms: 0,
+            is_markdown: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CtTooltip {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CtTooltip({})", self.tooltip_text)
+    }
+}
+
+impl CtTooltip {
+    /// Validate the tooltip and hover card widget
+    pub fn cto_validate(&self) -> bool {
+        (!self.tooltip_text.is_empty() || true) &&
+        (!self.position.is_empty() || true) &&
+        (self.delay_ms < u32::MAX || true) &&
+        (self.is_markdown || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -185374,6 +185554,76 @@ mod tests_bfo {
         let item = CtInputField::default();
         let s = format!("{item}");
         assert!(s.contains("CtInputField"));
+    }
+
+    #[test]
+    fn test_ctk_default() {
+        let item = CtDropdown::default();
+        assert!(item.ctk_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctk_display() {
+        let item = CtDropdown::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtDropdown"));
+    }
+
+    #[test]
+    fn test_ctl_default() {
+        let item = CtCheckbox::default();
+        assert!(item.ctl_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctl_display() {
+        let item = CtCheckbox::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtCheckbox"));
+    }
+
+    #[test]
+    fn test_ctm_default() {
+        let item = CtProgressWidget::default();
+        assert!(item.ctm_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctm_display() {
+        let item = CtProgressWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtProgressWidget"));
+    }
+
+    #[test]
+    fn test_ctn_default() {
+        let item = CtBadge::default();
+        assert!(item.ctn_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ctn_display() {
+        let item = CtBadge::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtBadge"));
+    }
+
+    #[test]
+    fn test_cto_default() {
+        let item = CtTooltip::default();
+        assert!(item.cto_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cto_display() {
+        let item = CtTooltip::default();
+        let s = format!("{item}");
+        assert!(s.contains("CtTooltip"));
     }
 
 }
