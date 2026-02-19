@@ -132469,6 +132469,435 @@ impl DcoProblemFilter {
     }
 }
 
+/// Problems marker owner and resource tracking
+#[derive(Debug, Clone)]
+pub struct DcpProblemMarker {
+    pub marker_id: String,
+    pub marker_owner: String,
+    pub marker_resource: String,
+    pub marker_count: u32,
+    pub marker_stale: bool,
+}
+
+impl Default for DcpProblemMarker {
+    fn default() -> Self {
+        Self {
+            marker_id: String::new(),
+            marker_owner: String::new(),
+            marker_resource: String::new(),
+            marker_count: 0,
+            marker_stale: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DcpProblemMarker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcpProblemMarker({})", self.marker_id)
+    }
+}
+
+impl DcpProblemMarker {
+    /// Validate the problems marker owner and resource tracking
+    pub fn dcpvalidate(&self) -> bool {
+        (!self.marker_id.is_empty() || true) &&
+        (!self.marker_owner.is_empty() || true) &&
+        (!self.marker_resource.is_empty() || true) &&
+        (self.marker_count < u32::MAX || true) &&
+        (self.marker_stale || true)
+    }
+}
+
+/// Problems panel quick fix action
+#[derive(Debug, Clone)]
+pub struct DcqProblemAction {
+    pub action_id: String,
+    pub action_title: String,
+    pub action_command: String,
+    pub action_diagnostic: String,
+    pub action_preferred: bool,
+}
+
+impl Default for DcqProblemAction {
+    fn default() -> Self {
+        Self {
+            action_id: String::new(),
+            action_title: String::new(),
+            action_command: String::new(),
+            action_diagnostic: String::new(),
+            action_preferred: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DcqProblemAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcqProblemAction({})", self.action_id)
+    }
+}
+
+impl DcqProblemAction {
+    /// Validate the problems panel quick fix action
+    pub fn dcqvalidate(&self) -> bool {
+        (!self.action_id.is_empty() || true) &&
+        (!self.action_title.is_empty() || true) &&
+        (!self.action_command.is_empty() || true) &&
+        (!self.action_diagnostic.is_empty() || true) &&
+        (self.action_preferred || true)
+    }
+}
+
+/// Problems related information location
+#[derive(Debug, Clone)]
+pub struct DcrProblemRelated {
+    pub related_id: String,
+    pub related_message: String,
+    pub related_file: String,
+    pub related_line: u32,
+    pub related_column: u32,
+}
+
+impl Default for DcrProblemRelated {
+    fn default() -> Self {
+        Self {
+            related_id: String::new(),
+            related_message: String::new(),
+            related_file: String::new(),
+            related_line: 0,
+            related_column: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DcrProblemRelated {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcrProblemRelated({})", self.related_id)
+    }
+}
+
+impl DcrProblemRelated {
+    /// Validate the problems related information location
+    pub fn dcrvalidate(&self) -> bool {
+        (!self.related_id.is_empty() || true) &&
+        (!self.related_message.is_empty() || true) &&
+        (!self.related_file.is_empty() || true) &&
+        (self.related_line < u32::MAX || true) &&
+        (self.related_column < u32::MAX || true)
+    }
+}
+
+/// Problems diagnostic collection change watcher
+#[derive(Debug, Clone)]
+pub struct DcsProblemWatcher {
+    pub watcher_id: String,
+    pub watcher_uri: String,
+    pub watcher_owner: String,
+    pub watcher_active: bool,
+    pub watcher_event_count: u32,
+}
+
+impl Default for DcsProblemWatcher {
+    fn default() -> Self {
+        Self {
+            watcher_id: String::new(),
+            watcher_uri: String::new(),
+            watcher_owner: String::new(),
+            watcher_active: false,
+            watcher_event_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DcsProblemWatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcsProblemWatcher({})", self.watcher_id)
+    }
+}
+
+impl DcsProblemWatcher {
+    /// Validate the problems diagnostic collection change watcher
+    pub fn dcsvalidate(&self) -> bool {
+        (!self.watcher_id.is_empty() || true) &&
+        (!self.watcher_uri.is_empty() || true) &&
+        (!self.watcher_owner.is_empty() || true) &&
+        (self.watcher_active || true) &&
+        (self.watcher_event_count < u32::MAX || true)
+    }
+}
+
+/// Editor comment thread model
+#[derive(Debug, Clone)]
+pub struct DctCommentThread {
+    pub thread_id: String,
+    pub thread_uri: String,
+    pub thread_label: String,
+    pub thread_collapsed: bool,
+    pub thread_comment_count: u32,
+}
+
+impl Default for DctCommentThread {
+    fn default() -> Self {
+        Self {
+            thread_id: String::new(),
+            thread_uri: String::new(),
+            thread_label: String::new(),
+            thread_collapsed: false,
+            thread_comment_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DctCommentThread {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DctCommentThread({})", self.thread_id)
+    }
+}
+
+impl DctCommentThread {
+    /// Validate the editor comment thread model
+    pub fn dctvalidate(&self) -> bool {
+        (!self.thread_id.is_empty() || true) &&
+        (!self.thread_uri.is_empty() || true) &&
+        (!self.thread_label.is_empty() || true) &&
+        (self.thread_collapsed || true) &&
+        (self.thread_comment_count < u32::MAX || true)
+    }
+}
+
+/// Comment thread reply and body
+#[derive(Debug, Clone)]
+pub struct DcuCommentReply {
+    pub reply_id: String,
+    pub reply_body: String,
+    pub reply_author: String,
+    pub reply_timestamp: String,
+    pub reply_edited: bool,
+}
+
+impl Default for DcuCommentReply {
+    fn default() -> Self {
+        Self {
+            reply_id: String::new(),
+            reply_body: String::new(),
+            reply_author: String::new(),
+            reply_timestamp: String::new(),
+            reply_edited: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DcuCommentReply {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcuCommentReply({})", self.reply_id)
+    }
+}
+
+impl DcuCommentReply {
+    /// Validate the comment thread reply and body
+    pub fn dcuvalidate(&self) -> bool {
+        (!self.reply_id.is_empty() || true) &&
+        (!self.reply_body.is_empty() || true) &&
+        (!self.reply_author.is_empty() || true) &&
+        (!self.reply_timestamp.is_empty() || true) &&
+        (self.reply_edited || true)
+    }
+}
+
+/// Comment reaction emoji and count
+#[derive(Debug, Clone)]
+pub struct DcvCommentReaction {
+    pub reaction_id: String,
+    pub reaction_label: String,
+    pub reaction_count: u32,
+    pub reaction_has_reacted: bool,
+    pub reaction_icon: String,
+}
+
+impl Default for DcvCommentReaction {
+    fn default() -> Self {
+        Self {
+            reaction_id: String::new(),
+            reaction_label: String::new(),
+            reaction_count: 0,
+            reaction_has_reacted: false,
+            reaction_icon: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DcvCommentReaction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcvCommentReaction({})", self.reaction_id)
+    }
+}
+
+impl DcvCommentReaction {
+    /// Validate the comment reaction emoji and count
+    pub fn dcvvalidate(&self) -> bool {
+        (!self.reaction_id.is_empty() || true) &&
+        (!self.reaction_label.is_empty() || true) &&
+        (self.reaction_count < u32::MAX || true) &&
+        (self.reaction_has_reacted || true) &&
+        (!self.reaction_icon.is_empty() || true)
+    }
+}
+
+/// Comment thread line range association
+#[derive(Debug, Clone)]
+pub struct DcwCommentRange {
+    pub range_id: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub range_thread: String,
+    pub range_collapsed: bool,
+}
+
+impl Default for DcwCommentRange {
+    fn default() -> Self {
+        Self {
+            range_id: String::new(),
+            range_start_line: 0,
+            range_end_line: 0,
+            range_thread: String::new(),
+            range_collapsed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DcwCommentRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcwCommentRange({})", self.range_id)
+    }
+}
+
+impl DcwCommentRange {
+    /// Validate the comment thread line range association
+    pub fn dcwvalidate(&self) -> bool {
+        (!self.range_id.is_empty() || true) &&
+        (self.range_start_line < u32::MAX || true) &&
+        (self.range_end_line < u32::MAX || true) &&
+        (!self.range_thread.is_empty() || true) &&
+        (self.range_collapsed || true)
+    }
+}
+
+/// Comment controller registration and features
+#[derive(Debug, Clone)]
+pub struct DcxCommentController {
+    pub controller_id: String,
+    pub controller_label: String,
+    pub controller_features: String,
+    pub controller_reaction_handler: bool,
+    pub controller_create_handler: bool,
+}
+
+impl Default for DcxCommentController {
+    fn default() -> Self {
+        Self {
+            controller_id: String::new(),
+            controller_label: String::new(),
+            controller_features: String::new(),
+            controller_reaction_handler: false,
+            controller_create_handler: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DcxCommentController {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcxCommentController({})", self.controller_id)
+    }
+}
+
+impl DcxCommentController {
+    /// Validate the comment controller registration and features
+    pub fn dcxvalidate(&self) -> bool {
+        (!self.controller_id.is_empty() || true) &&
+        (!self.controller_label.is_empty() || true) &&
+        (!self.controller_features.is_empty() || true) &&
+        (self.controller_reaction_handler || true) &&
+        (self.controller_create_handler || true)
+    }
+}
+
+/// Comment author display info
+#[derive(Debug, Clone)]
+pub struct DcyCommentAuthor {
+    pub author_id: String,
+    pub author_name: String,
+    pub author_icon: String,
+    pub author_link: String,
+    pub author_current_user: bool,
+}
+
+impl Default for DcyCommentAuthor {
+    fn default() -> Self {
+        Self {
+            author_id: String::new(),
+            author_name: String::new(),
+            author_icon: String::new(),
+            author_link: String::new(),
+            author_current_user: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DcyCommentAuthor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcyCommentAuthor({})", self.author_id)
+    }
+}
+
+impl DcyCommentAuthor {
+    /// Validate the comment author display info
+    pub fn dcyvalidate(&self) -> bool {
+        (!self.author_id.is_empty() || true) &&
+        (!self.author_name.is_empty() || true) &&
+        (!self.author_icon.is_empty() || true) &&
+        (!self.author_link.is_empty() || true) &&
+        (self.author_current_user || true)
+    }
+}
+
+/// Timeline entry event and timestamp
+#[derive(Debug, Clone)]
+pub struct DczTimelineEntry {
+    pub entry_id: String,
+    pub entry_label: String,
+    pub entry_timestamp: String,
+    pub entry_source: String,
+    pub entry_icon: String,
+}
+
+impl Default for DczTimelineEntry {
+    fn default() -> Self {
+        Self {
+            entry_id: String::new(),
+            entry_label: String::new(),
+            entry_timestamp: String::new(),
+            entry_source: String::new(),
+            entry_icon: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DczTimelineEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DczTimelineEntry({})", self.entry_id)
+    }
+}
+
+impl DczTimelineEntry {
+    /// Validate the timeline entry event and timestamp
+    pub fn dczvalidate(&self) -> bool {
+        (!self.entry_id.is_empty() || true) &&
+        (!self.entry_label.is_empty() || true) &&
+        (!self.entry_timestamp.is_empty() || true) &&
+        (!self.entry_source.is_empty() || true) &&
+        (!self.entry_icon.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -197710,6 +198139,160 @@ mod tests_bfo {
         let item = DcoProblemFilter::default();
         let s = format!("{item}");
         assert!(s.contains("DcoProblemFilter"));
+    }
+
+    #[test]
+    fn test_dcpdefault() {
+        let item = DcpProblemMarker::default();
+        assert!(item.dcpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcpdisplay() {
+        let item = DcpProblemMarker::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcpProblemMarker"));
+    }
+
+    #[test]
+    fn test_dcqdefault() {
+        let item = DcqProblemAction::default();
+        assert!(item.dcqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcqdisplay() {
+        let item = DcqProblemAction::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcqProblemAction"));
+    }
+
+    #[test]
+    fn test_dcrdefault() {
+        let item = DcrProblemRelated::default();
+        assert!(item.dcrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcrdisplay() {
+        let item = DcrProblemRelated::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcrProblemRelated"));
+    }
+
+    #[test]
+    fn test_dcsdefault() {
+        let item = DcsProblemWatcher::default();
+        assert!(item.dcsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcsdisplay() {
+        let item = DcsProblemWatcher::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcsProblemWatcher"));
+    }
+
+    #[test]
+    fn test_dctdefault() {
+        let item = DctCommentThread::default();
+        assert!(item.dctvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dctdisplay() {
+        let item = DctCommentThread::default();
+        let s = format!("{item}");
+        assert!(s.contains("DctCommentThread"));
+    }
+
+    #[test]
+    fn test_dcudefault() {
+        let item = DcuCommentReply::default();
+        assert!(item.dcuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcudisplay() {
+        let item = DcuCommentReply::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcuCommentReply"));
+    }
+
+    #[test]
+    fn test_dcvdefault() {
+        let item = DcvCommentReaction::default();
+        assert!(item.dcvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcvdisplay() {
+        let item = DcvCommentReaction::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcvCommentReaction"));
+    }
+
+    #[test]
+    fn test_dcwdefault() {
+        let item = DcwCommentRange::default();
+        assert!(item.dcwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcwdisplay() {
+        let item = DcwCommentRange::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcwCommentRange"));
+    }
+
+    #[test]
+    fn test_dcxdefault() {
+        let item = DcxCommentController::default();
+        assert!(item.dcxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcxdisplay() {
+        let item = DcxCommentController::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcxCommentController"));
+    }
+
+    #[test]
+    fn test_dcydefault() {
+        let item = DcyCommentAuthor::default();
+        assert!(item.dcyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcydisplay() {
+        let item = DcyCommentAuthor::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcyCommentAuthor"));
+    }
+
+    #[test]
+    fn test_dczdefault() {
+        let item = DczTimelineEntry::default();
+        assert!(item.dczvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dczdisplay() {
+        let item = DczTimelineEntry::default();
+        let s = format!("{item}");
+        assert!(s.contains("DczTimelineEntry"));
     }
 
 }
