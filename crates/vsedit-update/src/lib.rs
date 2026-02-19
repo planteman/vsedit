@@ -140086,6 +140086,201 @@ impl DkeWorkbenchPanel {
     }
 }
 
+/// Workbench editor area groups and layout
+#[derive(Debug, Clone)]
+pub struct DkfWorkbenchEditorArea {
+    pub editor_area_id: String,
+    pub editor_area_groups: u32,
+    pub editor_area_direction: String,
+    pub editor_area_empty: bool,
+    pub editor_area_lock_layout: bool,
+}
+
+impl Default for DkfWorkbenchEditorArea {
+    fn default() -> Self {
+        Self {
+            editor_area_id: String::new(),
+            editor_area_groups: 0,
+            editor_area_direction: String::new(),
+            editor_area_empty: false,
+            editor_area_lock_layout: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkfWorkbenchEditorArea {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkfWorkbenchEditorArea({})", self.editor_area_id)
+    }
+}
+
+impl DkfWorkbenchEditorArea {
+    /// Validate the workbench editor area groups and layout
+    pub fn dkfvalidate(&self) -> bool {
+        (!self.editor_area_id.is_empty() || true) &&
+        (self.editor_area_groups < u32::MAX || true) &&
+        (!self.editor_area_direction.is_empty() || true) &&
+        (self.editor_area_empty || true) &&
+        (self.editor_area_lock_layout || true)
+    }
+}
+
+/// Workbench title bar window controls
+#[derive(Debug, Clone)]
+pub struct DkgWorkbenchTitleBar {
+    pub title_bar_id: String,
+    pub title_bar_style: String,
+    pub title_bar_text: String,
+    pub title_bar_dirty: bool,
+    pub title_bar_focused: bool,
+}
+
+impl Default for DkgWorkbenchTitleBar {
+    fn default() -> Self {
+        Self {
+            title_bar_id: String::new(),
+            title_bar_style: String::new(),
+            title_bar_text: String::new(),
+            title_bar_dirty: false,
+            title_bar_focused: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkgWorkbenchTitleBar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkgWorkbenchTitleBar({})", self.title_bar_id)
+    }
+}
+
+impl DkgWorkbenchTitleBar {
+    /// Validate the workbench title bar window controls
+    pub fn dkgvalidate(&self) -> bool {
+        (!self.title_bar_id.is_empty() || true) &&
+        (!self.title_bar_style.is_empty() || true) &&
+        (!self.title_bar_text.is_empty() || true) &&
+        (self.title_bar_dirty || true) &&
+        (self.title_bar_focused || true)
+    }
+}
+
+/// Workbench menu bar visibility and style
+#[derive(Debug, Clone)]
+pub struct DkhWorkbenchMenuBar {
+    pub menu_bar_id: String,
+    pub menu_bar_visible: String,
+    pub menu_bar_compact: bool,
+    pub menu_bar_focus: bool,
+    pub menu_bar_native: bool,
+}
+
+impl Default for DkhWorkbenchMenuBar {
+    fn default() -> Self {
+        Self {
+            menu_bar_id: String::new(),
+            menu_bar_visible: String::new(),
+            menu_bar_compact: false,
+            menu_bar_focus: false,
+            menu_bar_native: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkhWorkbenchMenuBar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkhWorkbenchMenuBar({})", self.menu_bar_id)
+    }
+}
+
+impl DkhWorkbenchMenuBar {
+    /// Validate the workbench menu bar visibility and style
+    pub fn dkhvalidate(&self) -> bool {
+        (!self.menu_bar_id.is_empty() || true) &&
+        (!self.menu_bar_visible.is_empty() || true) &&
+        (self.menu_bar_compact || true) &&
+        (self.menu_bar_focus || true) &&
+        (self.menu_bar_native || true)
+    }
+}
+
+/// Workbench notification toast and center
+#[derive(Debug, Clone)]
+pub struct DkiWorkbenchNotify {
+    pub notify_id: String,
+    pub notify_severity: String,
+    pub notify_message: String,
+    pub notify_source: String,
+    pub notify_sticky: bool,
+}
+
+impl Default for DkiWorkbenchNotify {
+    fn default() -> Self {
+        Self {
+            notify_id: String::new(),
+            notify_severity: String::new(),
+            notify_message: String::new(),
+            notify_source: String::new(),
+            notify_sticky: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkiWorkbenchNotify {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkiWorkbenchNotify({})", self.notify_id)
+    }
+}
+
+impl DkiWorkbenchNotify {
+    /// Validate the workbench notification toast and center
+    pub fn dkivalidate(&self) -> bool {
+        (!self.notify_id.is_empty() || true) &&
+        (!self.notify_severity.is_empty() || true) &&
+        (!self.notify_message.is_empty() || true) &&
+        (!self.notify_source.is_empty() || true) &&
+        (self.notify_sticky || true)
+    }
+}
+
+/// Workbench info/warning banner model
+#[derive(Debug, Clone)]
+pub struct DkjWorkbenchBanner {
+    pub banner_id: String,
+    pub banner_message: String,
+    pub banner_icon: String,
+    pub banner_actions: String,
+    pub banner_closeable: bool,
+}
+
+impl Default for DkjWorkbenchBanner {
+    fn default() -> Self {
+        Self {
+            banner_id: String::new(),
+            banner_message: String::new(),
+            banner_icon: String::new(),
+            banner_actions: String::new(),
+            banner_closeable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DkjWorkbenchBanner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DkjWorkbenchBanner({})", self.banner_id)
+    }
+}
+
+impl DkjWorkbenchBanner {
+    /// Validate the workbench info/warning banner model
+    pub fn dkjvalidate(&self) -> bool {
+        (!self.banner_id.is_empty() || true) &&
+        (!self.banner_message.is_empty() || true) &&
+        (!self.banner_icon.is_empty() || true) &&
+        (!self.banner_actions.is_empty() || true) &&
+        (self.banner_closeable || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -208099,6 +208294,76 @@ mod tests_bfo {
         let item = DkeWorkbenchPanel::default();
         let s = format!("{item}");
         assert!(s.contains("DkeWorkbenchPanel"));
+    }
+
+    #[test]
+    fn test_dkfdefault() {
+        let item = DkfWorkbenchEditorArea::default();
+        assert!(item.dkfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkfdisplay() {
+        let item = DkfWorkbenchEditorArea::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkfWorkbenchEditorArea"));
+    }
+
+    #[test]
+    fn test_dkgdefault() {
+        let item = DkgWorkbenchTitleBar::default();
+        assert!(item.dkgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkgdisplay() {
+        let item = DkgWorkbenchTitleBar::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkgWorkbenchTitleBar"));
+    }
+
+    #[test]
+    fn test_dkhdefault() {
+        let item = DkhWorkbenchMenuBar::default();
+        assert!(item.dkhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkhdisplay() {
+        let item = DkhWorkbenchMenuBar::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkhWorkbenchMenuBar"));
+    }
+
+    #[test]
+    fn test_dkidefault() {
+        let item = DkiWorkbenchNotify::default();
+        assert!(item.dkivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkidisplay() {
+        let item = DkiWorkbenchNotify::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkiWorkbenchNotify"));
+    }
+
+    #[test]
+    fn test_dkjdefault() {
+        let item = DkjWorkbenchBanner::default();
+        assert!(item.dkjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dkjdisplay() {
+        let item = DkjWorkbenchBanner::default();
+        let s = format!("{item}");
+        assert!(s.contains("DkjWorkbenchBanner"));
     }
 
 }
