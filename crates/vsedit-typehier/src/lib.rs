@@ -50419,3 +50419,394 @@ mod baj_tests {
         assert_eq!(links[0].link_type, BajTerminalLinkType::FilePath);
     }
 }
+
+
+// --- bak_: Editor parameter hints model ---
+
+/// A single parameter in a signature.
+#[derive(Debug, Clone)]
+pub struct BakParameter {
+    pub label: String,
+    pub documentation: Option<String>,
+    pub type_annotation: Option<String>,
+    pub is_optional: bool,
+    pub is_rest: bool,
+    pub default_value: Option<String>,
+}
+
+impl BakParameter {
+    pub fn new(label: &str) -> Self {
+        Self {
+            label: label.to_string(),
+            documentation: None,
+            type_annotation: None,
+            is_optional: false,
+            is_rest: false,
+            default_value: None,
+        }
+    }
+
+    pub fn with_type(mut self, type_ann: &str) -> Self {
+        self.type_annotation = Some(type_ann.to_string());
+        self
+    }
+
+    pub fn with_doc(mut self, doc: &str) -> Self {
+        self.documentation = Some(doc.to_string());
+        self
+    }
+
+    pub fn optional(mut self) -> Self {
+        self.is_optional = true;
+        self
+    }
+
+    pub fn rest(mut self) -> Self {
+        self.is_rest = true;
+        self
+    }
+
+    pub fn with_default(mut self, val: &str) -> Self {
+        self.default_value = Some(val.to_string());
+        self.is_optional = true;
+        self
+    }
+
+    pub fn display_label(&self) -> String {
+        let mut s = String::new();
+        if self.is_rest {
+            s.push_str("...");
+        }
+        s.push_str(&self.label);
+        if let Some(t) = &self.type_annotation {
+            s.push_str(": ");
+            s.push_str(t);
+        }
+        if let Some(d) = &self.default_value {
+            s.push_str(" = ");
+            s.push_str(d);
+        }
+        if self.is_optional && self.default_value.is_none() {
+            s.push('?');
+        }
+        s
+    }
+}
+
+/// A function/method signature.
+#[derive(Debug, Clone)]
+pub struct BakSignature {
+    pub label: String,
+    pub documentation: Option<String>,
+    pub parameters: Vec<BakParameter>,
+    pub return_type: Option<String>,
+}
+
+impl BakSignature {
+    pub fn new(label: &str) -> Self {
+        Self {
+            label: label.to_string(),
+            documentation: None,
+            parameters: Vec::new(),
+            return_type: None,
+        }
+    }
+
+    pub fn with_doc(mut self, doc: &str) -> Self {
+        self.documentation = Some(doc.to_string());
+        self
+    }
+
+    pub fn with_return_type(mut self, rt: &str) -> Self {
+        self.return_type = Some(rt.to_string());
+        self
+    }
+
+    pub fn add_param(&mut self, param: BakParameter) {
+        self.parameters.push(param);
+    }
+
+    pub fn param_count(&self) -> usize {
+        self.parameters.len()
+    }
+
+    pub fn required_param_count(&self) -> usize {
+        self.parameters.iter().filter(|p| !p.is_optional).count()
+    }
+
+    pub fn param_at(&self, index: usize) -> Option<&BakParameter> {
+        self.parameters.get(index)
+    }
+
+    pub fn full_signature(&self) -> String {
+        let params: Vec<String> = self.parameters.iter().map(|p| p.display_label()).collect();
+        let params_str = params.join(", ");
+        match &self.return_type {
+            Some(rt) => format!("{}({}) -> {}", self.label, params_str, rt),
+            None => format!("{}({})", self.label, params_str),
+        }
+    }
+}
+
+/// State of the parameter hint widget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BakHintState {
+    Hidden,
+    Visible,
+}
+
+/// The parameter hints widget model.
+#[derive(Debug, Clone)]
+pub struct BakParameterHints {
+    pub signatures: Vec<BakSignature>,
+    pub active_signature: usize,
+    pub active_parameter: usize,
+    pub state: BakHintState,
+    pub trigger_char: Option<char>,
+    pub line: u32,
+    pub column: u32,
+}
+
+impl BakParameterHints {
+    pub fn new() -> Self {
+        Self {
+            signatures: Vec::new(),
+            active_signature: 0,
+            active_parameter: 0,
+            state: BakHintState::Hidden,
+            trigger_char: None,
+            line: 0,
+            column: 0,
+        }
+    }
+
+    pub fn show(&mut self, signatures: Vec<BakSignature>, line: u32, column: u32, trigger: Option<char>) {
+        if signatures.is_empty() {
+            self.hide();
+            return;
+        }
+        self.signatures = signatures;
+        self.active_signature = 0;
+        self.active_parameter = 0;
+        self.state = BakHintState::Visible;
+        self.trigger_char = trigger;
+        self.line = line;
+        self.column = column;
+    }
+
+    pub fn hide(&mut self) {
+        self.state = BakHintState::Hidden;
+        self.signatures.clear();
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.state == BakHintState::Visible
+    }
+
+    pub fn active_sig(&self) -> Option<&BakSignature> {
+        self.signatures.get(self.active_signature)
+    }
+
+    pub fn active_param(&self) -> Option<&BakParameter> {
+        self.active_sig().and_then(|s| s.param_at(self.active_parameter))
+    }
+
+    pub fn next_signature(&mut self) {
+        if !self.signatures.is_empty() {
+            self.active_signature = (self.active_signature + 1) % self.signatures.len();
+        }
+    }
+
+    pub fn prev_signature(&mut self) {
+        if !self.signatures.is_empty() {
+            self.active_signature = if self.active_signature == 0 {
+                self.signatures.len() - 1
+            } else {
+                self.active_signature - 1
+            };
+        }
+    }
+
+    pub fn set_active_parameter(&mut self, index: usize) {
+        self.active_parameter = index;
+    }
+
+    pub fn advance_parameter(&mut self) {
+        if let Some(sig) = self.active_sig() {
+            if self.active_parameter + 1 < sig.param_count() {
+                self.active_parameter += 1;
+            }
+        }
+    }
+
+    pub fn retreat_parameter(&mut self) {
+        if self.active_parameter > 0 {
+            self.active_parameter -= 1;
+        }
+    }
+
+    pub fn signature_count(&self) -> usize {
+        self.signatures.len()
+    }
+
+    pub fn signature_label(&self) -> String {
+        if self.signatures.len() <= 1 {
+            String::new()
+        } else {
+            format!("{}/{}", self.active_signature + 1, self.signatures.len())
+        }
+    }
+}
+
+#[cfg(test)]
+mod bak_tests {
+    use super::*;
+
+    #[test]
+    fn test_bak_parameter_creation() {
+        let p = BakParameter::new("name")
+            .with_type("&str")
+            .with_doc("The name parameter");
+        assert_eq!(p.label, "name");
+        assert_eq!(p.type_annotation.as_deref(), Some("&str"));
+        assert!(!p.is_optional);
+    }
+
+    #[test]
+    fn test_bak_parameter_optional() {
+        let p = BakParameter::new("count").with_type("usize").optional();
+        assert!(p.is_optional);
+        assert!(p.display_label().contains('?'));
+    }
+
+    #[test]
+    fn test_bak_parameter_default() {
+        let p = BakParameter::new("size").with_type("u32").with_default("10");
+        assert!(p.is_optional);
+        assert!(p.display_label().contains("= 10"));
+    }
+
+    #[test]
+    fn test_bak_parameter_rest() {
+        let p = BakParameter::new("args").rest();
+        assert!(p.display_label().starts_with("..."));
+    }
+
+    #[test]
+    fn test_bak_signature_creation() {
+        let mut sig = BakSignature::new("foo")
+            .with_doc("Does foo things")
+            .with_return_type("bool");
+        sig.add_param(BakParameter::new("x").with_type("i32"));
+        sig.add_param(BakParameter::new("y").with_type("i32"));
+        assert_eq!(sig.param_count(), 2);
+        assert_eq!(sig.required_param_count(), 2);
+        assert!(sig.full_signature().contains("foo(x: i32, y: i32) -> bool"));
+    }
+
+    #[test]
+    fn test_bak_signature_required_count() {
+        let mut sig = BakSignature::new("bar");
+        sig.add_param(BakParameter::new("a").with_type("i32"));
+        sig.add_param(BakParameter::new("b").with_type("i32").optional());
+        assert_eq!(sig.required_param_count(), 1);
+        assert_eq!(sig.param_count(), 2);
+    }
+
+    #[test]
+    fn test_bak_hints_show_hide() {
+        let mut hints = BakParameterHints::new();
+        assert!(!hints.is_visible());
+
+        let sig = BakSignature::new("test");
+        hints.show(vec![sig], 10, 5, Some('('));
+        assert!(hints.is_visible());
+        assert_eq!(hints.trigger_char, Some('('));
+
+        hints.hide();
+        assert!(!hints.is_visible());
+    }
+
+    #[test]
+    fn test_bak_hints_empty_signatures() {
+        let mut hints = BakParameterHints::new();
+        hints.show(vec![], 1, 1, None);
+        assert!(!hints.is_visible());
+    }
+
+    #[test]
+    fn test_bak_hints_navigation() {
+        let mut hints = BakParameterHints::new();
+        let sig1 = BakSignature::new("foo");
+        let sig2 = BakSignature::new("bar");
+        hints.show(vec![sig1, sig2], 1, 1, None);
+        assert_eq!(hints.active_signature, 0);
+
+        hints.next_signature();
+        assert_eq!(hints.active_signature, 1);
+
+        hints.next_signature();
+        assert_eq!(hints.active_signature, 0); // Wraps
+
+        hints.prev_signature();
+        assert_eq!(hints.active_signature, 1); // Wraps back
+    }
+
+    #[test]
+    fn test_bak_parameter_advance() {
+        let mut hints = BakParameterHints::new();
+        let mut sig = BakSignature::new("foo");
+        sig.add_param(BakParameter::new("a"));
+        sig.add_param(BakParameter::new("b"));
+        sig.add_param(BakParameter::new("c"));
+        hints.show(vec![sig], 1, 1, None);
+
+        assert_eq!(hints.active_parameter, 0);
+        hints.advance_parameter();
+        assert_eq!(hints.active_parameter, 1);
+        hints.advance_parameter();
+        assert_eq!(hints.active_parameter, 2);
+        hints.advance_parameter();
+        assert_eq!(hints.active_parameter, 2); // Can't go past last
+
+        hints.retreat_parameter();
+        assert_eq!(hints.active_parameter, 1);
+    }
+
+    #[test]
+    fn test_bak_active_param() {
+        let mut hints = BakParameterHints::new();
+        let mut sig = BakSignature::new("test");
+        sig.add_param(BakParameter::new("x").with_type("i32"));
+        hints.show(vec![sig], 1, 1, None);
+        let p = hints.active_param();
+        assert_eq!(p.unwrap().label, "x");
+    }
+
+    #[test]
+    fn test_bak_signature_label() {
+        let mut hints = BakParameterHints::new();
+        hints.show(vec![BakSignature::new("a"), BakSignature::new("b")], 1, 1, None);
+        assert_eq!(hints.signature_label(), "1/2");
+        hints.next_signature();
+        assert_eq!(hints.signature_label(), "2/2");
+    }
+
+    #[test]
+    fn test_bak_single_signature_label() {
+        let mut hints = BakParameterHints::new();
+        hints.show(vec![BakSignature::new("only")], 1, 1, None);
+        assert_eq!(hints.signature_label(), "");
+    }
+
+    #[test]
+    fn test_bak_parameter_display() {
+        let p = BakParameter::new("data")
+            .with_type("Vec<u8>")
+            .with_default("vec![]");
+        let display = p.display_label();
+        assert!(display.contains("data"));
+        assert!(display.contains("Vec<u8>"));
+        assert!(display.contains("vec![]"));
+    }
+}
