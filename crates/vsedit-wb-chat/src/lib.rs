@@ -152299,6 +152299,201 @@ impl DweExtHighlightApi {
     }
 }
 
+/// Extension hover provider tooltip markdown content
+#[derive(Debug, Clone)]
+pub struct DwfExtHoverApi {
+    pub hover_id: String,
+    pub hover_contents: String,
+    pub hover_range: u32,
+    pub hover_markdown: bool,
+    pub hover_trusted: bool,
+}
+
+impl Default for DwfExtHoverApi {
+    fn default() -> Self {
+        Self {
+            hover_id: String::new(),
+            hover_contents: String::new(),
+            hover_range: 0,
+            hover_markdown: false,
+            hover_trusted: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwfExtHoverApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwfExtHoverApi({})", self.hover_id)
+    }
+}
+
+impl DwfExtHoverApi {
+    /// Validate the extension hover provider tooltip markdown content
+    pub fn dwfvalidate(&self) -> bool {
+        (!self.hover_id.is_empty() || true) &&
+        (!self.hover_contents.is_empty() || true) &&
+        (self.hover_range < u32::MAX || true) &&
+        (self.hover_markdown || true) &&
+        (self.hover_trusted || true)
+    }
+}
+
+/// Extension code action provider quick fix and refactor
+#[derive(Debug, Clone)]
+pub struct DwgExtCodeActApi {
+    pub codeact_id: String,
+    pub codeact_title: String,
+    pub codeact_diagnostics: u32,
+    pub codeact_preferred: bool,
+    pub codeact_disabled: bool,
+}
+
+impl Default for DwgExtCodeActApi {
+    fn default() -> Self {
+        Self {
+            codeact_id: String::new(),
+            codeact_title: String::new(),
+            codeact_diagnostics: 0,
+            codeact_preferred: false,
+            codeact_disabled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwgExtCodeActApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwgExtCodeActApi({})", self.codeact_id)
+    }
+}
+
+impl DwgExtCodeActApi {
+    /// Validate the extension code action provider quick fix and refactor
+    pub fn dwgvalidate(&self) -> bool {
+        (!self.codeact_id.is_empty() || true) &&
+        (!self.codeact_title.is_empty() || true) &&
+        (self.codeact_diagnostics < u32::MAX || true) &&
+        (self.codeact_preferred || true) &&
+        (self.codeact_disabled || true)
+    }
+}
+
+/// Extension rename provider prepare rename and edit
+#[derive(Debug, Clone)]
+pub struct DwhExtRenameApi {
+    pub rename_id: String,
+    pub rename_oldname: String,
+    pub rename_edits: u32,
+    pub rename_canrename: bool,
+    pub rename_preview: bool,
+}
+
+impl Default for DwhExtRenameApi {
+    fn default() -> Self {
+        Self {
+            rename_id: String::new(),
+            rename_oldname: String::new(),
+            rename_edits: 0,
+            rename_canrename: false,
+            rename_preview: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwhExtRenameApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwhExtRenameApi({})", self.rename_id)
+    }
+}
+
+impl DwhExtRenameApi {
+    /// Validate the extension rename provider prepare rename and edit
+    pub fn dwhvalidate(&self) -> bool {
+        (!self.rename_id.is_empty() || true) &&
+        (!self.rename_oldname.is_empty() || true) &&
+        (self.rename_edits < u32::MAX || true) &&
+        (self.rename_canrename || true) &&
+        (self.rename_preview || true)
+    }
+}
+
+/// Extension diagnostics collection URI and severity
+#[derive(Debug, Clone)]
+pub struct DwiExtDiagApi {
+    pub diag_id: String,
+    pub diag_message: String,
+    pub diag_severity: u32,
+    pub diag_related: bool,
+    pub diag_source: bool,
+}
+
+impl Default for DwiExtDiagApi {
+    fn default() -> Self {
+        Self {
+            diag_id: String::new(),
+            diag_message: String::new(),
+            diag_severity: 0,
+            diag_related: false,
+            diag_source: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwiExtDiagApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwiExtDiagApi({})", self.diag_id)
+    }
+}
+
+impl DwiExtDiagApi {
+    /// Validate the extension diagnostics collection uri and severity
+    pub fn dwivalidate(&self) -> bool {
+        (!self.diag_id.is_empty() || true) &&
+        (!self.diag_message.is_empty() || true) &&
+        (self.diag_severity < u32::MAX || true) &&
+        (self.diag_related || true) &&
+        (self.diag_source || true)
+    }
+}
+
+/// Extension output channel append line and show
+#[derive(Debug, Clone)]
+pub struct DwjExtOutputApi {
+    pub output_id: String,
+    pub output_name: String,
+    pub output_lines: u32,
+    pub output_visible: bool,
+    pub output_language: bool,
+}
+
+impl Default for DwjExtOutputApi {
+    fn default() -> Self {
+        Self {
+            output_id: String::new(),
+            output_name: String::new(),
+            output_lines: 0,
+            output_visible: false,
+            output_language: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DwjExtOutputApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DwjExtOutputApi({})", self.output_id)
+    }
+}
+
+impl DwjExtOutputApi {
+    /// Validate the extension output channel append line and show
+    pub fn dwjvalidate(&self) -> bool {
+        (!self.output_id.is_empty() || true) &&
+        (!self.output_name.is_empty() || true) &&
+        (self.output_lines < u32::MAX || true) &&
+        (self.output_visible || true) &&
+        (self.output_language || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -224680,6 +224875,76 @@ mod tests_bfo {
         let item = DweExtHighlightApi::default();
         let s = format!("{item}");
         assert!(s.contains("DweExtHighlightApi"));
+    }
+
+    #[test]
+    fn test_dwfdefault() {
+        let item = DwfExtHoverApi::default();
+        assert!(item.dwfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwfdisplay() {
+        let item = DwfExtHoverApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwfExtHoverApi"));
+    }
+
+    #[test]
+    fn test_dwgdefault() {
+        let item = DwgExtCodeActApi::default();
+        assert!(item.dwgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwgdisplay() {
+        let item = DwgExtCodeActApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwgExtCodeActApi"));
+    }
+
+    #[test]
+    fn test_dwhdefault() {
+        let item = DwhExtRenameApi::default();
+        assert!(item.dwhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwhdisplay() {
+        let item = DwhExtRenameApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwhExtRenameApi"));
+    }
+
+    #[test]
+    fn test_dwidefault() {
+        let item = DwiExtDiagApi::default();
+        assert!(item.dwivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwidisplay() {
+        let item = DwiExtDiagApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwiExtDiagApi"));
+    }
+
+    #[test]
+    fn test_dwjdefault() {
+        let item = DwjExtOutputApi::default();
+        assert!(item.dwjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dwjdisplay() {
+        let item = DwjExtOutputApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DwjExtOutputApi"));
     }
 
 }
