@@ -88211,6 +88211,111 @@ impl SourceFixAll {
     }
 }
 
+/// Runtime wiring: bpk_ DocumentHighlight
+#[derive(Debug, Clone)]
+pub struct DocumentHighlight {
+    pub bpk_highlight_kind: u8,
+    pub bpk_range_start_line: u32,
+    pub bpk_range_start_col: u32,
+    pub bpk_range_end_line: u32,
+    pub bpk_range_end_col: u32,
+    pub bpk_is_read: bool,
+    pub bpk_is_write: bool,
+    pub bpk_document_uri: String,
+    pub bpk_symbol_name: String,
+    pub bpk_total_highlights: u32,
+}
+
+impl DocumentHighlight {
+    pub fn bpk_summary(&self) -> String {
+        format!("DocumentHighlight({})", self.bpk_highlight_kind)
+    }
+}
+
+/// Runtime wiring: bpl_ DocumentSymbolNode
+#[derive(Debug, Clone)]
+pub struct DocumentSymbolNode {
+    pub bpl_symbol_name: String,
+    pub bpl_symbol_kind: u8,
+    pub bpl_symbol_detail: String,
+    pub bpl_range_start_line: u32,
+    pub bpl_range_end_line: u32,
+    pub bpl_selection_start_line: u32,
+    pub bpl_selection_end_line: u32,
+    pub bpl_children_count: usize,
+    pub bpl_tags: Vec<u8>,
+    pub bpl_container_name: String,
+}
+
+impl DocumentSymbolNode {
+    pub fn bpl_summary(&self) -> String {
+        format!("DocumentSymbolNode({})", self.bpl_symbol_name)
+    }
+}
+
+/// Runtime wiring: bpm_ WorkspaceSymbolResult
+#[derive(Debug, Clone)]
+pub struct WorkspaceSymbolResult {
+    pub bpm_symbol_name: String,
+    pub bpm_symbol_kind: u8,
+    pub bpm_container_name: String,
+    pub bpm_uri: String,
+    pub bpm_range_start_line: u32,
+    pub bpm_range_start_col: u32,
+    pub bpm_score: f64,
+    pub bpm_query: String,
+    pub bpm_total_results: u32,
+    pub bpm_is_partial: bool,
+}
+
+impl WorkspaceSymbolResult {
+    pub fn bpm_summary(&self) -> String {
+        format!("WorkspaceSymbolResult({})", self.bpm_symbol_name)
+    }
+}
+
+/// Runtime wiring: bpn_ TypeHierarchyItem
+#[derive(Debug, Clone)]
+pub struct TypeHierarchyItem {
+    pub bpn_item_name: String,
+    pub bpn_item_kind: u8,
+    pub bpn_detail: String,
+    pub bpn_uri: String,
+    pub bpn_range_start_line: u32,
+    pub bpn_range_end_line: u32,
+    pub bpn_supertypes_count: u32,
+    pub bpn_subtypes_count: u32,
+    pub bpn_tags: Vec<u8>,
+    pub bpn_data_value: String,
+}
+
+impl TypeHierarchyItem {
+    pub fn bpn_summary(&self) -> String {
+        format!("TypeHierarchyItem({})", self.bpn_item_name)
+    }
+}
+
+/// Runtime wiring: bpo_ CallHierarchyItem
+#[derive(Debug, Clone)]
+pub struct CallHierarchyItem {
+    pub bpo_item_name: String,
+    pub bpo_item_kind: u8,
+    pub bpo_detail: String,
+    pub bpo_uri: String,
+    pub bpo_range_start_line: u32,
+    pub bpo_range_end_line: u32,
+    pub bpo_incoming_calls: u32,
+    pub bpo_outgoing_calls: u32,
+    pub bpo_tags: Vec<u8>,
+    pub bpo_data_value: String,
+}
+
+impl CallHierarchyItem {
+    pub fn bpo_summary(&self) -> String {
+        format!("CallHierarchyItem({})", self.bpo_item_name)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -108675,6 +108780,910 @@ mod tests_bfo {
         };
         let _ = obj.bpj_summary();
         assert_eq!(obj.bpj_source_action_kind, "test");
+    }
+
+    #[test]
+    fn test_bpk_highlight_kind() {
+        let obj = DocumentHighlight {
+            bpk_highlight_kind: 0,
+            bpk_range_start_line: 0,
+            bpk_range_start_col: 0,
+            bpk_range_end_line: 0,
+            bpk_range_end_col: 0,
+            bpk_is_read: false,
+            bpk_is_write: false,
+            bpk_document_uri: String::from("test"),
+            bpk_symbol_name: String::from("test"),
+            bpk_total_highlights: 0,
+        };
+        let _ = obj.bpk_summary();
+        assert_eq!(obj.bpk_highlight_kind, 0);
+    }
+
+    #[test]
+    fn test_bpk_range_start_line() {
+        let obj = DocumentHighlight {
+            bpk_highlight_kind: 0,
+            bpk_range_start_line: 0,
+            bpk_range_start_col: 0,
+            bpk_range_end_line: 0,
+            bpk_range_end_col: 0,
+            bpk_is_read: false,
+            bpk_is_write: false,
+            bpk_document_uri: String::from("test"),
+            bpk_symbol_name: String::from("test"),
+            bpk_total_highlights: 0,
+        };
+        let _ = obj.bpk_summary();
+        assert_eq!(obj.bpk_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_bpk_range_start_col() {
+        let obj = DocumentHighlight {
+            bpk_highlight_kind: 0,
+            bpk_range_start_line: 0,
+            bpk_range_start_col: 0,
+            bpk_range_end_line: 0,
+            bpk_range_end_col: 0,
+            bpk_is_read: false,
+            bpk_is_write: false,
+            bpk_document_uri: String::from("test"),
+            bpk_symbol_name: String::from("test"),
+            bpk_total_highlights: 0,
+        };
+        let _ = obj.bpk_summary();
+        assert_eq!(obj.bpk_range_start_col, 0);
+    }
+
+    #[test]
+    fn test_bpk_range_end_line() {
+        let obj = DocumentHighlight {
+            bpk_highlight_kind: 0,
+            bpk_range_start_line: 0,
+            bpk_range_start_col: 0,
+            bpk_range_end_line: 0,
+            bpk_range_end_col: 0,
+            bpk_is_read: false,
+            bpk_is_write: false,
+            bpk_document_uri: String::from("test"),
+            bpk_symbol_name: String::from("test"),
+            bpk_total_highlights: 0,
+        };
+        let _ = obj.bpk_summary();
+        assert_eq!(obj.bpk_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_bpk_range_end_col() {
+        let obj = DocumentHighlight {
+            bpk_highlight_kind: 0,
+            bpk_range_start_line: 0,
+            bpk_range_start_col: 0,
+            bpk_range_end_line: 0,
+            bpk_range_end_col: 0,
+            bpk_is_read: false,
+            bpk_is_write: false,
+            bpk_document_uri: String::from("test"),
+            bpk_symbol_name: String::from("test"),
+            bpk_total_highlights: 0,
+        };
+        let _ = obj.bpk_summary();
+        assert_eq!(obj.bpk_range_end_col, 0);
+    }
+
+    #[test]
+    fn test_bpk_is_read() {
+        let obj = DocumentHighlight {
+            bpk_highlight_kind: 0,
+            bpk_range_start_line: 0,
+            bpk_range_start_col: 0,
+            bpk_range_end_line: 0,
+            bpk_range_end_col: 0,
+            bpk_is_read: false,
+            bpk_is_write: false,
+            bpk_document_uri: String::from("test"),
+            bpk_symbol_name: String::from("test"),
+            bpk_total_highlights: 0,
+        };
+        let _ = obj.bpk_summary();
+        assert!(!obj.bpk_is_read);
+    }
+
+    #[test]
+    fn test_bpk_is_write() {
+        let obj = DocumentHighlight {
+            bpk_highlight_kind: 0,
+            bpk_range_start_line: 0,
+            bpk_range_start_col: 0,
+            bpk_range_end_line: 0,
+            bpk_range_end_col: 0,
+            bpk_is_read: false,
+            bpk_is_write: false,
+            bpk_document_uri: String::from("test"),
+            bpk_symbol_name: String::from("test"),
+            bpk_total_highlights: 0,
+        };
+        let _ = obj.bpk_summary();
+        assert!(!obj.bpk_is_write);
+    }
+
+    #[test]
+    fn test_bpk_document_uri() {
+        let obj = DocumentHighlight {
+            bpk_highlight_kind: 0,
+            bpk_range_start_line: 0,
+            bpk_range_start_col: 0,
+            bpk_range_end_line: 0,
+            bpk_range_end_col: 0,
+            bpk_is_read: false,
+            bpk_is_write: false,
+            bpk_document_uri: String::from("test"),
+            bpk_symbol_name: String::from("test"),
+            bpk_total_highlights: 0,
+        };
+        let _ = obj.bpk_summary();
+        assert_eq!(obj.bpk_document_uri, "test");
+    }
+
+    #[test]
+    fn test_bpk_symbol_name() {
+        let obj = DocumentHighlight {
+            bpk_highlight_kind: 0,
+            bpk_range_start_line: 0,
+            bpk_range_start_col: 0,
+            bpk_range_end_line: 0,
+            bpk_range_end_col: 0,
+            bpk_is_read: false,
+            bpk_is_write: false,
+            bpk_document_uri: String::from("test"),
+            bpk_symbol_name: String::from("test"),
+            bpk_total_highlights: 0,
+        };
+        let _ = obj.bpk_summary();
+        assert_eq!(obj.bpk_symbol_name, "test");
+    }
+
+    #[test]
+    fn test_bpk_total_highlights() {
+        let obj = DocumentHighlight {
+            bpk_highlight_kind: 0,
+            bpk_range_start_line: 0,
+            bpk_range_start_col: 0,
+            bpk_range_end_line: 0,
+            bpk_range_end_col: 0,
+            bpk_is_read: false,
+            bpk_is_write: false,
+            bpk_document_uri: String::from("test"),
+            bpk_symbol_name: String::from("test"),
+            bpk_total_highlights: 0,
+        };
+        let _ = obj.bpk_summary();
+        assert_eq!(obj.bpk_total_highlights, 0);
+    }
+
+
+    #[test]
+    fn test_bpl_symbol_name() {
+        let obj = DocumentSymbolNode {
+            bpl_symbol_name: String::from("test"),
+            bpl_symbol_kind: 0,
+            bpl_symbol_detail: String::from("test"),
+            bpl_range_start_line: 0,
+            bpl_range_end_line: 0,
+            bpl_selection_start_line: 0,
+            bpl_selection_end_line: 0,
+            bpl_children_count: 0,
+            bpl_tags: Vec::new(),
+            bpl_container_name: String::from("test"),
+        };
+        let _ = obj.bpl_summary();
+        assert_eq!(obj.bpl_symbol_name, "test");
+    }
+
+    #[test]
+    fn test_bpl_symbol_kind() {
+        let obj = DocumentSymbolNode {
+            bpl_symbol_name: String::from("test"),
+            bpl_symbol_kind: 0,
+            bpl_symbol_detail: String::from("test"),
+            bpl_range_start_line: 0,
+            bpl_range_end_line: 0,
+            bpl_selection_start_line: 0,
+            bpl_selection_end_line: 0,
+            bpl_children_count: 0,
+            bpl_tags: Vec::new(),
+            bpl_container_name: String::from("test"),
+        };
+        let _ = obj.bpl_summary();
+        assert_eq!(obj.bpl_symbol_kind, 0);
+    }
+
+    #[test]
+    fn test_bpl_symbol_detail() {
+        let obj = DocumentSymbolNode {
+            bpl_symbol_name: String::from("test"),
+            bpl_symbol_kind: 0,
+            bpl_symbol_detail: String::from("test"),
+            bpl_range_start_line: 0,
+            bpl_range_end_line: 0,
+            bpl_selection_start_line: 0,
+            bpl_selection_end_line: 0,
+            bpl_children_count: 0,
+            bpl_tags: Vec::new(),
+            bpl_container_name: String::from("test"),
+        };
+        let _ = obj.bpl_summary();
+        assert_eq!(obj.bpl_symbol_detail, "test");
+    }
+
+    #[test]
+    fn test_bpl_range_start_line() {
+        let obj = DocumentSymbolNode {
+            bpl_symbol_name: String::from("test"),
+            bpl_symbol_kind: 0,
+            bpl_symbol_detail: String::from("test"),
+            bpl_range_start_line: 0,
+            bpl_range_end_line: 0,
+            bpl_selection_start_line: 0,
+            bpl_selection_end_line: 0,
+            bpl_children_count: 0,
+            bpl_tags: Vec::new(),
+            bpl_container_name: String::from("test"),
+        };
+        let _ = obj.bpl_summary();
+        assert_eq!(obj.bpl_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_bpl_range_end_line() {
+        let obj = DocumentSymbolNode {
+            bpl_symbol_name: String::from("test"),
+            bpl_symbol_kind: 0,
+            bpl_symbol_detail: String::from("test"),
+            bpl_range_start_line: 0,
+            bpl_range_end_line: 0,
+            bpl_selection_start_line: 0,
+            bpl_selection_end_line: 0,
+            bpl_children_count: 0,
+            bpl_tags: Vec::new(),
+            bpl_container_name: String::from("test"),
+        };
+        let _ = obj.bpl_summary();
+        assert_eq!(obj.bpl_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_bpl_selection_start_line() {
+        let obj = DocumentSymbolNode {
+            bpl_symbol_name: String::from("test"),
+            bpl_symbol_kind: 0,
+            bpl_symbol_detail: String::from("test"),
+            bpl_range_start_line: 0,
+            bpl_range_end_line: 0,
+            bpl_selection_start_line: 0,
+            bpl_selection_end_line: 0,
+            bpl_children_count: 0,
+            bpl_tags: Vec::new(),
+            bpl_container_name: String::from("test"),
+        };
+        let _ = obj.bpl_summary();
+        assert_eq!(obj.bpl_selection_start_line, 0);
+    }
+
+    #[test]
+    fn test_bpl_selection_end_line() {
+        let obj = DocumentSymbolNode {
+            bpl_symbol_name: String::from("test"),
+            bpl_symbol_kind: 0,
+            bpl_symbol_detail: String::from("test"),
+            bpl_range_start_line: 0,
+            bpl_range_end_line: 0,
+            bpl_selection_start_line: 0,
+            bpl_selection_end_line: 0,
+            bpl_children_count: 0,
+            bpl_tags: Vec::new(),
+            bpl_container_name: String::from("test"),
+        };
+        let _ = obj.bpl_summary();
+        assert_eq!(obj.bpl_selection_end_line, 0);
+    }
+
+    #[test]
+    fn test_bpl_children_count() {
+        let obj = DocumentSymbolNode {
+            bpl_symbol_name: String::from("test"),
+            bpl_symbol_kind: 0,
+            bpl_symbol_detail: String::from("test"),
+            bpl_range_start_line: 0,
+            bpl_range_end_line: 0,
+            bpl_selection_start_line: 0,
+            bpl_selection_end_line: 0,
+            bpl_children_count: 0,
+            bpl_tags: Vec::new(),
+            bpl_container_name: String::from("test"),
+        };
+        let _ = obj.bpl_summary();
+        assert_eq!(obj.bpl_children_count, 0);
+    }
+
+    #[test]
+    fn test_bpl_tags() {
+        let obj = DocumentSymbolNode {
+            bpl_symbol_name: String::from("test"),
+            bpl_symbol_kind: 0,
+            bpl_symbol_detail: String::from("test"),
+            bpl_range_start_line: 0,
+            bpl_range_end_line: 0,
+            bpl_selection_start_line: 0,
+            bpl_selection_end_line: 0,
+            bpl_children_count: 0,
+            bpl_tags: Vec::new(),
+            bpl_container_name: String::from("test"),
+        };
+        let _ = obj.bpl_summary();
+        assert!(obj.bpl_tags.is_empty());
+    }
+
+    #[test]
+    fn test_bpl_container_name() {
+        let obj = DocumentSymbolNode {
+            bpl_symbol_name: String::from("test"),
+            bpl_symbol_kind: 0,
+            bpl_symbol_detail: String::from("test"),
+            bpl_range_start_line: 0,
+            bpl_range_end_line: 0,
+            bpl_selection_start_line: 0,
+            bpl_selection_end_line: 0,
+            bpl_children_count: 0,
+            bpl_tags: Vec::new(),
+            bpl_container_name: String::from("test"),
+        };
+        let _ = obj.bpl_summary();
+        assert_eq!(obj.bpl_container_name, "test");
+    }
+
+
+    #[test]
+    fn test_bpm_symbol_name() {
+        let obj = WorkspaceSymbolResult {
+            bpm_symbol_name: String::from("test"),
+            bpm_symbol_kind: 0,
+            bpm_container_name: String::from("test"),
+            bpm_uri: String::from("test"),
+            bpm_range_start_line: 0,
+            bpm_range_start_col: 0,
+            bpm_score: 0.0,
+            bpm_query: String::from("test"),
+            bpm_total_results: 0,
+            bpm_is_partial: false,
+        };
+        let _ = obj.bpm_summary();
+        assert_eq!(obj.bpm_symbol_name, "test");
+    }
+
+    #[test]
+    fn test_bpm_symbol_kind() {
+        let obj = WorkspaceSymbolResult {
+            bpm_symbol_name: String::from("test"),
+            bpm_symbol_kind: 0,
+            bpm_container_name: String::from("test"),
+            bpm_uri: String::from("test"),
+            bpm_range_start_line: 0,
+            bpm_range_start_col: 0,
+            bpm_score: 0.0,
+            bpm_query: String::from("test"),
+            bpm_total_results: 0,
+            bpm_is_partial: false,
+        };
+        let _ = obj.bpm_summary();
+        assert_eq!(obj.bpm_symbol_kind, 0);
+    }
+
+    #[test]
+    fn test_bpm_container_name() {
+        let obj = WorkspaceSymbolResult {
+            bpm_symbol_name: String::from("test"),
+            bpm_symbol_kind: 0,
+            bpm_container_name: String::from("test"),
+            bpm_uri: String::from("test"),
+            bpm_range_start_line: 0,
+            bpm_range_start_col: 0,
+            bpm_score: 0.0,
+            bpm_query: String::from("test"),
+            bpm_total_results: 0,
+            bpm_is_partial: false,
+        };
+        let _ = obj.bpm_summary();
+        assert_eq!(obj.bpm_container_name, "test");
+    }
+
+    #[test]
+    fn test_bpm_uri() {
+        let obj = WorkspaceSymbolResult {
+            bpm_symbol_name: String::from("test"),
+            bpm_symbol_kind: 0,
+            bpm_container_name: String::from("test"),
+            bpm_uri: String::from("test"),
+            bpm_range_start_line: 0,
+            bpm_range_start_col: 0,
+            bpm_score: 0.0,
+            bpm_query: String::from("test"),
+            bpm_total_results: 0,
+            bpm_is_partial: false,
+        };
+        let _ = obj.bpm_summary();
+        assert_eq!(obj.bpm_uri, "test");
+    }
+
+    #[test]
+    fn test_bpm_range_start_line() {
+        let obj = WorkspaceSymbolResult {
+            bpm_symbol_name: String::from("test"),
+            bpm_symbol_kind: 0,
+            bpm_container_name: String::from("test"),
+            bpm_uri: String::from("test"),
+            bpm_range_start_line: 0,
+            bpm_range_start_col: 0,
+            bpm_score: 0.0,
+            bpm_query: String::from("test"),
+            bpm_total_results: 0,
+            bpm_is_partial: false,
+        };
+        let _ = obj.bpm_summary();
+        assert_eq!(obj.bpm_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_bpm_range_start_col() {
+        let obj = WorkspaceSymbolResult {
+            bpm_symbol_name: String::from("test"),
+            bpm_symbol_kind: 0,
+            bpm_container_name: String::from("test"),
+            bpm_uri: String::from("test"),
+            bpm_range_start_line: 0,
+            bpm_range_start_col: 0,
+            bpm_score: 0.0,
+            bpm_query: String::from("test"),
+            bpm_total_results: 0,
+            bpm_is_partial: false,
+        };
+        let _ = obj.bpm_summary();
+        assert_eq!(obj.bpm_range_start_col, 0);
+    }
+
+    #[test]
+    fn test_bpm_score() {
+        let obj = WorkspaceSymbolResult {
+            bpm_symbol_name: String::from("test"),
+            bpm_symbol_kind: 0,
+            bpm_container_name: String::from("test"),
+            bpm_uri: String::from("test"),
+            bpm_range_start_line: 0,
+            bpm_range_start_col: 0,
+            bpm_score: 0.0,
+            bpm_query: String::from("test"),
+            bpm_total_results: 0,
+            bpm_is_partial: false,
+        };
+        let _ = obj.bpm_summary();
+        assert!((obj.bpm_score - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_bpm_query() {
+        let obj = WorkspaceSymbolResult {
+            bpm_symbol_name: String::from("test"),
+            bpm_symbol_kind: 0,
+            bpm_container_name: String::from("test"),
+            bpm_uri: String::from("test"),
+            bpm_range_start_line: 0,
+            bpm_range_start_col: 0,
+            bpm_score: 0.0,
+            bpm_query: String::from("test"),
+            bpm_total_results: 0,
+            bpm_is_partial: false,
+        };
+        let _ = obj.bpm_summary();
+        assert_eq!(obj.bpm_query, "test");
+    }
+
+    #[test]
+    fn test_bpm_total_results() {
+        let obj = WorkspaceSymbolResult {
+            bpm_symbol_name: String::from("test"),
+            bpm_symbol_kind: 0,
+            bpm_container_name: String::from("test"),
+            bpm_uri: String::from("test"),
+            bpm_range_start_line: 0,
+            bpm_range_start_col: 0,
+            bpm_score: 0.0,
+            bpm_query: String::from("test"),
+            bpm_total_results: 0,
+            bpm_is_partial: false,
+        };
+        let _ = obj.bpm_summary();
+        assert_eq!(obj.bpm_total_results, 0);
+    }
+
+    #[test]
+    fn test_bpm_is_partial() {
+        let obj = WorkspaceSymbolResult {
+            bpm_symbol_name: String::from("test"),
+            bpm_symbol_kind: 0,
+            bpm_container_name: String::from("test"),
+            bpm_uri: String::from("test"),
+            bpm_range_start_line: 0,
+            bpm_range_start_col: 0,
+            bpm_score: 0.0,
+            bpm_query: String::from("test"),
+            bpm_total_results: 0,
+            bpm_is_partial: false,
+        };
+        let _ = obj.bpm_summary();
+        assert!(!obj.bpm_is_partial);
+    }
+
+
+    #[test]
+    fn test_bpn_item_name() {
+        let obj = TypeHierarchyItem {
+            bpn_item_name: String::from("test"),
+            bpn_item_kind: 0,
+            bpn_detail: String::from("test"),
+            bpn_uri: String::from("test"),
+            bpn_range_start_line: 0,
+            bpn_range_end_line: 0,
+            bpn_supertypes_count: 0,
+            bpn_subtypes_count: 0,
+            bpn_tags: Vec::new(),
+            bpn_data_value: String::from("test"),
+        };
+        let _ = obj.bpn_summary();
+        assert_eq!(obj.bpn_item_name, "test");
+    }
+
+    #[test]
+    fn test_bpn_item_kind() {
+        let obj = TypeHierarchyItem {
+            bpn_item_name: String::from("test"),
+            bpn_item_kind: 0,
+            bpn_detail: String::from("test"),
+            bpn_uri: String::from("test"),
+            bpn_range_start_line: 0,
+            bpn_range_end_line: 0,
+            bpn_supertypes_count: 0,
+            bpn_subtypes_count: 0,
+            bpn_tags: Vec::new(),
+            bpn_data_value: String::from("test"),
+        };
+        let _ = obj.bpn_summary();
+        assert_eq!(obj.bpn_item_kind, 0);
+    }
+
+    #[test]
+    fn test_bpn_detail() {
+        let obj = TypeHierarchyItem {
+            bpn_item_name: String::from("test"),
+            bpn_item_kind: 0,
+            bpn_detail: String::from("test"),
+            bpn_uri: String::from("test"),
+            bpn_range_start_line: 0,
+            bpn_range_end_line: 0,
+            bpn_supertypes_count: 0,
+            bpn_subtypes_count: 0,
+            bpn_tags: Vec::new(),
+            bpn_data_value: String::from("test"),
+        };
+        let _ = obj.bpn_summary();
+        assert_eq!(obj.bpn_detail, "test");
+    }
+
+    #[test]
+    fn test_bpn_uri() {
+        let obj = TypeHierarchyItem {
+            bpn_item_name: String::from("test"),
+            bpn_item_kind: 0,
+            bpn_detail: String::from("test"),
+            bpn_uri: String::from("test"),
+            bpn_range_start_line: 0,
+            bpn_range_end_line: 0,
+            bpn_supertypes_count: 0,
+            bpn_subtypes_count: 0,
+            bpn_tags: Vec::new(),
+            bpn_data_value: String::from("test"),
+        };
+        let _ = obj.bpn_summary();
+        assert_eq!(obj.bpn_uri, "test");
+    }
+
+    #[test]
+    fn test_bpn_range_start_line() {
+        let obj = TypeHierarchyItem {
+            bpn_item_name: String::from("test"),
+            bpn_item_kind: 0,
+            bpn_detail: String::from("test"),
+            bpn_uri: String::from("test"),
+            bpn_range_start_line: 0,
+            bpn_range_end_line: 0,
+            bpn_supertypes_count: 0,
+            bpn_subtypes_count: 0,
+            bpn_tags: Vec::new(),
+            bpn_data_value: String::from("test"),
+        };
+        let _ = obj.bpn_summary();
+        assert_eq!(obj.bpn_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_bpn_range_end_line() {
+        let obj = TypeHierarchyItem {
+            bpn_item_name: String::from("test"),
+            bpn_item_kind: 0,
+            bpn_detail: String::from("test"),
+            bpn_uri: String::from("test"),
+            bpn_range_start_line: 0,
+            bpn_range_end_line: 0,
+            bpn_supertypes_count: 0,
+            bpn_subtypes_count: 0,
+            bpn_tags: Vec::new(),
+            bpn_data_value: String::from("test"),
+        };
+        let _ = obj.bpn_summary();
+        assert_eq!(obj.bpn_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_bpn_supertypes_count() {
+        let obj = TypeHierarchyItem {
+            bpn_item_name: String::from("test"),
+            bpn_item_kind: 0,
+            bpn_detail: String::from("test"),
+            bpn_uri: String::from("test"),
+            bpn_range_start_line: 0,
+            bpn_range_end_line: 0,
+            bpn_supertypes_count: 0,
+            bpn_subtypes_count: 0,
+            bpn_tags: Vec::new(),
+            bpn_data_value: String::from("test"),
+        };
+        let _ = obj.bpn_summary();
+        assert_eq!(obj.bpn_supertypes_count, 0);
+    }
+
+    #[test]
+    fn test_bpn_subtypes_count() {
+        let obj = TypeHierarchyItem {
+            bpn_item_name: String::from("test"),
+            bpn_item_kind: 0,
+            bpn_detail: String::from("test"),
+            bpn_uri: String::from("test"),
+            bpn_range_start_line: 0,
+            bpn_range_end_line: 0,
+            bpn_supertypes_count: 0,
+            bpn_subtypes_count: 0,
+            bpn_tags: Vec::new(),
+            bpn_data_value: String::from("test"),
+        };
+        let _ = obj.bpn_summary();
+        assert_eq!(obj.bpn_subtypes_count, 0);
+    }
+
+    #[test]
+    fn test_bpn_tags() {
+        let obj = TypeHierarchyItem {
+            bpn_item_name: String::from("test"),
+            bpn_item_kind: 0,
+            bpn_detail: String::from("test"),
+            bpn_uri: String::from("test"),
+            bpn_range_start_line: 0,
+            bpn_range_end_line: 0,
+            bpn_supertypes_count: 0,
+            bpn_subtypes_count: 0,
+            bpn_tags: Vec::new(),
+            bpn_data_value: String::from("test"),
+        };
+        let _ = obj.bpn_summary();
+        assert!(obj.bpn_tags.is_empty());
+    }
+
+    #[test]
+    fn test_bpn_data_value() {
+        let obj = TypeHierarchyItem {
+            bpn_item_name: String::from("test"),
+            bpn_item_kind: 0,
+            bpn_detail: String::from("test"),
+            bpn_uri: String::from("test"),
+            bpn_range_start_line: 0,
+            bpn_range_end_line: 0,
+            bpn_supertypes_count: 0,
+            bpn_subtypes_count: 0,
+            bpn_tags: Vec::new(),
+            bpn_data_value: String::from("test"),
+        };
+        let _ = obj.bpn_summary();
+        assert_eq!(obj.bpn_data_value, "test");
+    }
+
+
+    #[test]
+    fn test_bpo_item_name() {
+        let obj = CallHierarchyItem {
+            bpo_item_name: String::from("test"),
+            bpo_item_kind: 0,
+            bpo_detail: String::from("test"),
+            bpo_uri: String::from("test"),
+            bpo_range_start_line: 0,
+            bpo_range_end_line: 0,
+            bpo_incoming_calls: 0,
+            bpo_outgoing_calls: 0,
+            bpo_tags: Vec::new(),
+            bpo_data_value: String::from("test"),
+        };
+        let _ = obj.bpo_summary();
+        assert_eq!(obj.bpo_item_name, "test");
+    }
+
+    #[test]
+    fn test_bpo_item_kind() {
+        let obj = CallHierarchyItem {
+            bpo_item_name: String::from("test"),
+            bpo_item_kind: 0,
+            bpo_detail: String::from("test"),
+            bpo_uri: String::from("test"),
+            bpo_range_start_line: 0,
+            bpo_range_end_line: 0,
+            bpo_incoming_calls: 0,
+            bpo_outgoing_calls: 0,
+            bpo_tags: Vec::new(),
+            bpo_data_value: String::from("test"),
+        };
+        let _ = obj.bpo_summary();
+        assert_eq!(obj.bpo_item_kind, 0);
+    }
+
+    #[test]
+    fn test_bpo_detail() {
+        let obj = CallHierarchyItem {
+            bpo_item_name: String::from("test"),
+            bpo_item_kind: 0,
+            bpo_detail: String::from("test"),
+            bpo_uri: String::from("test"),
+            bpo_range_start_line: 0,
+            bpo_range_end_line: 0,
+            bpo_incoming_calls: 0,
+            bpo_outgoing_calls: 0,
+            bpo_tags: Vec::new(),
+            bpo_data_value: String::from("test"),
+        };
+        let _ = obj.bpo_summary();
+        assert_eq!(obj.bpo_detail, "test");
+    }
+
+    #[test]
+    fn test_bpo_uri() {
+        let obj = CallHierarchyItem {
+            bpo_item_name: String::from("test"),
+            bpo_item_kind: 0,
+            bpo_detail: String::from("test"),
+            bpo_uri: String::from("test"),
+            bpo_range_start_line: 0,
+            bpo_range_end_line: 0,
+            bpo_incoming_calls: 0,
+            bpo_outgoing_calls: 0,
+            bpo_tags: Vec::new(),
+            bpo_data_value: String::from("test"),
+        };
+        let _ = obj.bpo_summary();
+        assert_eq!(obj.bpo_uri, "test");
+    }
+
+    #[test]
+    fn test_bpo_range_start_line() {
+        let obj = CallHierarchyItem {
+            bpo_item_name: String::from("test"),
+            bpo_item_kind: 0,
+            bpo_detail: String::from("test"),
+            bpo_uri: String::from("test"),
+            bpo_range_start_line: 0,
+            bpo_range_end_line: 0,
+            bpo_incoming_calls: 0,
+            bpo_outgoing_calls: 0,
+            bpo_tags: Vec::new(),
+            bpo_data_value: String::from("test"),
+        };
+        let _ = obj.bpo_summary();
+        assert_eq!(obj.bpo_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_bpo_range_end_line() {
+        let obj = CallHierarchyItem {
+            bpo_item_name: String::from("test"),
+            bpo_item_kind: 0,
+            bpo_detail: String::from("test"),
+            bpo_uri: String::from("test"),
+            bpo_range_start_line: 0,
+            bpo_range_end_line: 0,
+            bpo_incoming_calls: 0,
+            bpo_outgoing_calls: 0,
+            bpo_tags: Vec::new(),
+            bpo_data_value: String::from("test"),
+        };
+        let _ = obj.bpo_summary();
+        assert_eq!(obj.bpo_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_bpo_incoming_calls() {
+        let obj = CallHierarchyItem {
+            bpo_item_name: String::from("test"),
+            bpo_item_kind: 0,
+            bpo_detail: String::from("test"),
+            bpo_uri: String::from("test"),
+            bpo_range_start_line: 0,
+            bpo_range_end_line: 0,
+            bpo_incoming_calls: 0,
+            bpo_outgoing_calls: 0,
+            bpo_tags: Vec::new(),
+            bpo_data_value: String::from("test"),
+        };
+        let _ = obj.bpo_summary();
+        assert_eq!(obj.bpo_incoming_calls, 0);
+    }
+
+    #[test]
+    fn test_bpo_outgoing_calls() {
+        let obj = CallHierarchyItem {
+            bpo_item_name: String::from("test"),
+            bpo_item_kind: 0,
+            bpo_detail: String::from("test"),
+            bpo_uri: String::from("test"),
+            bpo_range_start_line: 0,
+            bpo_range_end_line: 0,
+            bpo_incoming_calls: 0,
+            bpo_outgoing_calls: 0,
+            bpo_tags: Vec::new(),
+            bpo_data_value: String::from("test"),
+        };
+        let _ = obj.bpo_summary();
+        assert_eq!(obj.bpo_outgoing_calls, 0);
+    }
+
+    #[test]
+    fn test_bpo_tags() {
+        let obj = CallHierarchyItem {
+            bpo_item_name: String::from("test"),
+            bpo_item_kind: 0,
+            bpo_detail: String::from("test"),
+            bpo_uri: String::from("test"),
+            bpo_range_start_line: 0,
+            bpo_range_end_line: 0,
+            bpo_incoming_calls: 0,
+            bpo_outgoing_calls: 0,
+            bpo_tags: Vec::new(),
+            bpo_data_value: String::from("test"),
+        };
+        let _ = obj.bpo_summary();
+        assert!(obj.bpo_tags.is_empty());
+    }
+
+    #[test]
+    fn test_bpo_data_value() {
+        let obj = CallHierarchyItem {
+            bpo_item_name: String::from("test"),
+            bpo_item_kind: 0,
+            bpo_detail: String::from("test"),
+            bpo_uri: String::from("test"),
+            bpo_range_start_line: 0,
+            bpo_range_end_line: 0,
+            bpo_incoming_calls: 0,
+            bpo_outgoing_calls: 0,
+            bpo_tags: Vec::new(),
+            bpo_data_value: String::from("test"),
+        };
+        let _ = obj.bpo_summary();
+        assert_eq!(obj.bpo_data_value, "test");
     }
 
 }
