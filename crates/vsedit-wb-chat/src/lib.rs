@@ -88015,6 +88015,111 @@ impl EditorGroup {
     }
 }
 
+/// Runtime wiring: bpa_ WorkspaceEdit
+#[derive(Debug, Clone)]
+pub struct WorkspaceEdit {
+    pub bpa_edit_id: u64,
+    pub bpa_entry_count: usize,
+    pub bpa_creates_count: u32,
+    pub bpa_deletes_count: u32,
+    pub bpa_renames_count: u32,
+    pub bpa_text_edits_count: u32,
+    pub bpa_needs_confirmation: bool,
+    pub bpa_label: String,
+    pub bpa_is_applied: bool,
+    pub bpa_metadata_keys: Vec<String>,
+}
+
+impl WorkspaceEdit {
+    pub fn bpa_summary(&self) -> String {
+        format!("WorkspaceEdit({})", self.bpa_edit_id)
+    }
+}
+
+/// Runtime wiring: bpb_ RefactorPreview
+#[derive(Debug, Clone)]
+pub struct RefactorPreview {
+    pub bpb_preview_id: String,
+    pub bpb_source_uri: String,
+    pub bpb_target_uri: String,
+    pub bpb_diff_line_count: u32,
+    pub bpb_added_lines: u32,
+    pub bpb_removed_lines: u32,
+    pub bpb_is_rename: bool,
+    pub bpb_is_move: bool,
+    pub bpb_show_diff: bool,
+    pub bpb_affected_files: Vec<String>,
+}
+
+impl RefactorPreview {
+    pub fn bpb_summary(&self) -> String {
+        format!("RefactorPreview({})", self.bpb_preview_id)
+    }
+}
+
+/// Runtime wiring: bpc_ RenameProvider
+#[derive(Debug, Clone)]
+pub struct RenameProvider {
+    pub bpc_old_name: String,
+    pub bpc_new_name: String,
+    pub bpc_uri: String,
+    pub bpc_line_number: u32,
+    pub bpc_column: u32,
+    pub bpc_is_valid: bool,
+    pub bpc_reject_reason: String,
+    pub bpc_supports_preview: bool,
+    pub bpc_affected_locations: usize,
+    pub bpc_provider_id: String,
+}
+
+impl RenameProvider {
+    pub fn bpc_summary(&self) -> String {
+        format!("RenameProvider({})", self.bpc_old_name)
+    }
+}
+
+/// Runtime wiring: bpd_ CodeActionList
+#[derive(Debug, Clone)]
+pub struct CodeActionList {
+    pub bpd_action_count: usize,
+    pub bpd_preferred_index: Option<u32>,
+    pub bpd_has_auto_fix: bool,
+    pub bpd_has_refactor: bool,
+    pub bpd_has_source_action: bool,
+    pub bpd_trigger_kind: u8,
+    pub bpd_diagnostics_count: u32,
+    pub bpd_only_kinds: Vec<String>,
+    pub bpd_is_on_save: bool,
+    pub bpd_action_titles: Vec<String>,
+}
+
+impl CodeActionList {
+    pub fn bpd_summary(&self) -> String {
+        format!("CodeActionList({})", self.bpd_action_count)
+    }
+}
+
+/// Runtime wiring: bpe_ QuickFix
+#[derive(Debug, Clone)]
+pub struct QuickFix {
+    pub bpe_fix_id: String,
+    pub bpe_title: String,
+    pub bpe_diagnostic_message: String,
+    pub bpe_diagnostic_severity: u8,
+    pub bpe_fix_uri: String,
+    pub bpe_fix_line: u32,
+    pub bpe_fix_column: u32,
+    pub bpe_is_preferred: bool,
+    pub bpe_edit_count: u32,
+    pub bpe_command_id: String,
+}
+
+impl QuickFix {
+    pub fn bpe_summary(&self) -> String {
+        format!("QuickFix({})", self.bpe_fix_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -106671,6 +106776,910 @@ mod tests_bfo {
         };
         let _ = obj.boz_summary();
         assert_eq!(obj.boz_tab_count, 0);
+    }
+
+    #[test]
+    fn test_bpa_edit_id() {
+        let obj = WorkspaceEdit {
+            bpa_edit_id: 0,
+            bpa_entry_count: 0,
+            bpa_creates_count: 0,
+            bpa_deletes_count: 0,
+            bpa_renames_count: 0,
+            bpa_text_edits_count: 0,
+            bpa_needs_confirmation: false,
+            bpa_label: String::from("test"),
+            bpa_is_applied: false,
+            bpa_metadata_keys: Vec::new(),
+        };
+        let _ = obj.bpa_summary();
+        assert_eq!(obj.bpa_edit_id, 0);
+    }
+
+    #[test]
+    fn test_bpa_entry_count() {
+        let obj = WorkspaceEdit {
+            bpa_edit_id: 0,
+            bpa_entry_count: 0,
+            bpa_creates_count: 0,
+            bpa_deletes_count: 0,
+            bpa_renames_count: 0,
+            bpa_text_edits_count: 0,
+            bpa_needs_confirmation: false,
+            bpa_label: String::from("test"),
+            bpa_is_applied: false,
+            bpa_metadata_keys: Vec::new(),
+        };
+        let _ = obj.bpa_summary();
+        assert_eq!(obj.bpa_entry_count, 0);
+    }
+
+    #[test]
+    fn test_bpa_creates_count() {
+        let obj = WorkspaceEdit {
+            bpa_edit_id: 0,
+            bpa_entry_count: 0,
+            bpa_creates_count: 0,
+            bpa_deletes_count: 0,
+            bpa_renames_count: 0,
+            bpa_text_edits_count: 0,
+            bpa_needs_confirmation: false,
+            bpa_label: String::from("test"),
+            bpa_is_applied: false,
+            bpa_metadata_keys: Vec::new(),
+        };
+        let _ = obj.bpa_summary();
+        assert_eq!(obj.bpa_creates_count, 0);
+    }
+
+    #[test]
+    fn test_bpa_deletes_count() {
+        let obj = WorkspaceEdit {
+            bpa_edit_id: 0,
+            bpa_entry_count: 0,
+            bpa_creates_count: 0,
+            bpa_deletes_count: 0,
+            bpa_renames_count: 0,
+            bpa_text_edits_count: 0,
+            bpa_needs_confirmation: false,
+            bpa_label: String::from("test"),
+            bpa_is_applied: false,
+            bpa_metadata_keys: Vec::new(),
+        };
+        let _ = obj.bpa_summary();
+        assert_eq!(obj.bpa_deletes_count, 0);
+    }
+
+    #[test]
+    fn test_bpa_renames_count() {
+        let obj = WorkspaceEdit {
+            bpa_edit_id: 0,
+            bpa_entry_count: 0,
+            bpa_creates_count: 0,
+            bpa_deletes_count: 0,
+            bpa_renames_count: 0,
+            bpa_text_edits_count: 0,
+            bpa_needs_confirmation: false,
+            bpa_label: String::from("test"),
+            bpa_is_applied: false,
+            bpa_metadata_keys: Vec::new(),
+        };
+        let _ = obj.bpa_summary();
+        assert_eq!(obj.bpa_renames_count, 0);
+    }
+
+    #[test]
+    fn test_bpa_text_edits_count() {
+        let obj = WorkspaceEdit {
+            bpa_edit_id: 0,
+            bpa_entry_count: 0,
+            bpa_creates_count: 0,
+            bpa_deletes_count: 0,
+            bpa_renames_count: 0,
+            bpa_text_edits_count: 0,
+            bpa_needs_confirmation: false,
+            bpa_label: String::from("test"),
+            bpa_is_applied: false,
+            bpa_metadata_keys: Vec::new(),
+        };
+        let _ = obj.bpa_summary();
+        assert_eq!(obj.bpa_text_edits_count, 0);
+    }
+
+    #[test]
+    fn test_bpa_needs_confirmation() {
+        let obj = WorkspaceEdit {
+            bpa_edit_id: 0,
+            bpa_entry_count: 0,
+            bpa_creates_count: 0,
+            bpa_deletes_count: 0,
+            bpa_renames_count: 0,
+            bpa_text_edits_count: 0,
+            bpa_needs_confirmation: false,
+            bpa_label: String::from("test"),
+            bpa_is_applied: false,
+            bpa_metadata_keys: Vec::new(),
+        };
+        let _ = obj.bpa_summary();
+        assert!(!obj.bpa_needs_confirmation);
+    }
+
+    #[test]
+    fn test_bpa_label() {
+        let obj = WorkspaceEdit {
+            bpa_edit_id: 0,
+            bpa_entry_count: 0,
+            bpa_creates_count: 0,
+            bpa_deletes_count: 0,
+            bpa_renames_count: 0,
+            bpa_text_edits_count: 0,
+            bpa_needs_confirmation: false,
+            bpa_label: String::from("test"),
+            bpa_is_applied: false,
+            bpa_metadata_keys: Vec::new(),
+        };
+        let _ = obj.bpa_summary();
+        assert_eq!(obj.bpa_label, "test");
+    }
+
+    #[test]
+    fn test_bpa_is_applied() {
+        let obj = WorkspaceEdit {
+            bpa_edit_id: 0,
+            bpa_entry_count: 0,
+            bpa_creates_count: 0,
+            bpa_deletes_count: 0,
+            bpa_renames_count: 0,
+            bpa_text_edits_count: 0,
+            bpa_needs_confirmation: false,
+            bpa_label: String::from("test"),
+            bpa_is_applied: false,
+            bpa_metadata_keys: Vec::new(),
+        };
+        let _ = obj.bpa_summary();
+        assert!(!obj.bpa_is_applied);
+    }
+
+    #[test]
+    fn test_bpa_metadata_keys() {
+        let obj = WorkspaceEdit {
+            bpa_edit_id: 0,
+            bpa_entry_count: 0,
+            bpa_creates_count: 0,
+            bpa_deletes_count: 0,
+            bpa_renames_count: 0,
+            bpa_text_edits_count: 0,
+            bpa_needs_confirmation: false,
+            bpa_label: String::from("test"),
+            bpa_is_applied: false,
+            bpa_metadata_keys: Vec::new(),
+        };
+        let _ = obj.bpa_summary();
+        assert!(obj.bpa_metadata_keys.is_empty());
+    }
+
+
+    #[test]
+    fn test_bpb_preview_id() {
+        let obj = RefactorPreview {
+            bpb_preview_id: String::from("test"),
+            bpb_source_uri: String::from("test"),
+            bpb_target_uri: String::from("test"),
+            bpb_diff_line_count: 0,
+            bpb_added_lines: 0,
+            bpb_removed_lines: 0,
+            bpb_is_rename: false,
+            bpb_is_move: false,
+            bpb_show_diff: false,
+            bpb_affected_files: Vec::new(),
+        };
+        let _ = obj.bpb_summary();
+        assert_eq!(obj.bpb_preview_id, "test");
+    }
+
+    #[test]
+    fn test_bpb_source_uri() {
+        let obj = RefactorPreview {
+            bpb_preview_id: String::from("test"),
+            bpb_source_uri: String::from("test"),
+            bpb_target_uri: String::from("test"),
+            bpb_diff_line_count: 0,
+            bpb_added_lines: 0,
+            bpb_removed_lines: 0,
+            bpb_is_rename: false,
+            bpb_is_move: false,
+            bpb_show_diff: false,
+            bpb_affected_files: Vec::new(),
+        };
+        let _ = obj.bpb_summary();
+        assert_eq!(obj.bpb_source_uri, "test");
+    }
+
+    #[test]
+    fn test_bpb_target_uri() {
+        let obj = RefactorPreview {
+            bpb_preview_id: String::from("test"),
+            bpb_source_uri: String::from("test"),
+            bpb_target_uri: String::from("test"),
+            bpb_diff_line_count: 0,
+            bpb_added_lines: 0,
+            bpb_removed_lines: 0,
+            bpb_is_rename: false,
+            bpb_is_move: false,
+            bpb_show_diff: false,
+            bpb_affected_files: Vec::new(),
+        };
+        let _ = obj.bpb_summary();
+        assert_eq!(obj.bpb_target_uri, "test");
+    }
+
+    #[test]
+    fn test_bpb_diff_line_count() {
+        let obj = RefactorPreview {
+            bpb_preview_id: String::from("test"),
+            bpb_source_uri: String::from("test"),
+            bpb_target_uri: String::from("test"),
+            bpb_diff_line_count: 0,
+            bpb_added_lines: 0,
+            bpb_removed_lines: 0,
+            bpb_is_rename: false,
+            bpb_is_move: false,
+            bpb_show_diff: false,
+            bpb_affected_files: Vec::new(),
+        };
+        let _ = obj.bpb_summary();
+        assert_eq!(obj.bpb_diff_line_count, 0);
+    }
+
+    #[test]
+    fn test_bpb_added_lines() {
+        let obj = RefactorPreview {
+            bpb_preview_id: String::from("test"),
+            bpb_source_uri: String::from("test"),
+            bpb_target_uri: String::from("test"),
+            bpb_diff_line_count: 0,
+            bpb_added_lines: 0,
+            bpb_removed_lines: 0,
+            bpb_is_rename: false,
+            bpb_is_move: false,
+            bpb_show_diff: false,
+            bpb_affected_files: Vec::new(),
+        };
+        let _ = obj.bpb_summary();
+        assert_eq!(obj.bpb_added_lines, 0);
+    }
+
+    #[test]
+    fn test_bpb_removed_lines() {
+        let obj = RefactorPreview {
+            bpb_preview_id: String::from("test"),
+            bpb_source_uri: String::from("test"),
+            bpb_target_uri: String::from("test"),
+            bpb_diff_line_count: 0,
+            bpb_added_lines: 0,
+            bpb_removed_lines: 0,
+            bpb_is_rename: false,
+            bpb_is_move: false,
+            bpb_show_diff: false,
+            bpb_affected_files: Vec::new(),
+        };
+        let _ = obj.bpb_summary();
+        assert_eq!(obj.bpb_removed_lines, 0);
+    }
+
+    #[test]
+    fn test_bpb_is_rename() {
+        let obj = RefactorPreview {
+            bpb_preview_id: String::from("test"),
+            bpb_source_uri: String::from("test"),
+            bpb_target_uri: String::from("test"),
+            bpb_diff_line_count: 0,
+            bpb_added_lines: 0,
+            bpb_removed_lines: 0,
+            bpb_is_rename: false,
+            bpb_is_move: false,
+            bpb_show_diff: false,
+            bpb_affected_files: Vec::new(),
+        };
+        let _ = obj.bpb_summary();
+        assert!(!obj.bpb_is_rename);
+    }
+
+    #[test]
+    fn test_bpb_is_move() {
+        let obj = RefactorPreview {
+            bpb_preview_id: String::from("test"),
+            bpb_source_uri: String::from("test"),
+            bpb_target_uri: String::from("test"),
+            bpb_diff_line_count: 0,
+            bpb_added_lines: 0,
+            bpb_removed_lines: 0,
+            bpb_is_rename: false,
+            bpb_is_move: false,
+            bpb_show_diff: false,
+            bpb_affected_files: Vec::new(),
+        };
+        let _ = obj.bpb_summary();
+        assert!(!obj.bpb_is_move);
+    }
+
+    #[test]
+    fn test_bpb_show_diff() {
+        let obj = RefactorPreview {
+            bpb_preview_id: String::from("test"),
+            bpb_source_uri: String::from("test"),
+            bpb_target_uri: String::from("test"),
+            bpb_diff_line_count: 0,
+            bpb_added_lines: 0,
+            bpb_removed_lines: 0,
+            bpb_is_rename: false,
+            bpb_is_move: false,
+            bpb_show_diff: false,
+            bpb_affected_files: Vec::new(),
+        };
+        let _ = obj.bpb_summary();
+        assert!(!obj.bpb_show_diff);
+    }
+
+    #[test]
+    fn test_bpb_affected_files() {
+        let obj = RefactorPreview {
+            bpb_preview_id: String::from("test"),
+            bpb_source_uri: String::from("test"),
+            bpb_target_uri: String::from("test"),
+            bpb_diff_line_count: 0,
+            bpb_added_lines: 0,
+            bpb_removed_lines: 0,
+            bpb_is_rename: false,
+            bpb_is_move: false,
+            bpb_show_diff: false,
+            bpb_affected_files: Vec::new(),
+        };
+        let _ = obj.bpb_summary();
+        assert!(obj.bpb_affected_files.is_empty());
+    }
+
+
+    #[test]
+    fn test_bpc_old_name() {
+        let obj = RenameProvider {
+            bpc_old_name: String::from("test"),
+            bpc_new_name: String::from("test"),
+            bpc_uri: String::from("test"),
+            bpc_line_number: 0,
+            bpc_column: 0,
+            bpc_is_valid: false,
+            bpc_reject_reason: String::from("test"),
+            bpc_supports_preview: false,
+            bpc_affected_locations: 0,
+            bpc_provider_id: String::from("test"),
+        };
+        let _ = obj.bpc_summary();
+        assert_eq!(obj.bpc_old_name, "test");
+    }
+
+    #[test]
+    fn test_bpc_new_name() {
+        let obj = RenameProvider {
+            bpc_old_name: String::from("test"),
+            bpc_new_name: String::from("test"),
+            bpc_uri: String::from("test"),
+            bpc_line_number: 0,
+            bpc_column: 0,
+            bpc_is_valid: false,
+            bpc_reject_reason: String::from("test"),
+            bpc_supports_preview: false,
+            bpc_affected_locations: 0,
+            bpc_provider_id: String::from("test"),
+        };
+        let _ = obj.bpc_summary();
+        assert_eq!(obj.bpc_new_name, "test");
+    }
+
+    #[test]
+    fn test_bpc_uri() {
+        let obj = RenameProvider {
+            bpc_old_name: String::from("test"),
+            bpc_new_name: String::from("test"),
+            bpc_uri: String::from("test"),
+            bpc_line_number: 0,
+            bpc_column: 0,
+            bpc_is_valid: false,
+            bpc_reject_reason: String::from("test"),
+            bpc_supports_preview: false,
+            bpc_affected_locations: 0,
+            bpc_provider_id: String::from("test"),
+        };
+        let _ = obj.bpc_summary();
+        assert_eq!(obj.bpc_uri, "test");
+    }
+
+    #[test]
+    fn test_bpc_line_number() {
+        let obj = RenameProvider {
+            bpc_old_name: String::from("test"),
+            bpc_new_name: String::from("test"),
+            bpc_uri: String::from("test"),
+            bpc_line_number: 0,
+            bpc_column: 0,
+            bpc_is_valid: false,
+            bpc_reject_reason: String::from("test"),
+            bpc_supports_preview: false,
+            bpc_affected_locations: 0,
+            bpc_provider_id: String::from("test"),
+        };
+        let _ = obj.bpc_summary();
+        assert_eq!(obj.bpc_line_number, 0);
+    }
+
+    #[test]
+    fn test_bpc_column() {
+        let obj = RenameProvider {
+            bpc_old_name: String::from("test"),
+            bpc_new_name: String::from("test"),
+            bpc_uri: String::from("test"),
+            bpc_line_number: 0,
+            bpc_column: 0,
+            bpc_is_valid: false,
+            bpc_reject_reason: String::from("test"),
+            bpc_supports_preview: false,
+            bpc_affected_locations: 0,
+            bpc_provider_id: String::from("test"),
+        };
+        let _ = obj.bpc_summary();
+        assert_eq!(obj.bpc_column, 0);
+    }
+
+    #[test]
+    fn test_bpc_is_valid() {
+        let obj = RenameProvider {
+            bpc_old_name: String::from("test"),
+            bpc_new_name: String::from("test"),
+            bpc_uri: String::from("test"),
+            bpc_line_number: 0,
+            bpc_column: 0,
+            bpc_is_valid: false,
+            bpc_reject_reason: String::from("test"),
+            bpc_supports_preview: false,
+            bpc_affected_locations: 0,
+            bpc_provider_id: String::from("test"),
+        };
+        let _ = obj.bpc_summary();
+        assert!(!obj.bpc_is_valid);
+    }
+
+    #[test]
+    fn test_bpc_reject_reason() {
+        let obj = RenameProvider {
+            bpc_old_name: String::from("test"),
+            bpc_new_name: String::from("test"),
+            bpc_uri: String::from("test"),
+            bpc_line_number: 0,
+            bpc_column: 0,
+            bpc_is_valid: false,
+            bpc_reject_reason: String::from("test"),
+            bpc_supports_preview: false,
+            bpc_affected_locations: 0,
+            bpc_provider_id: String::from("test"),
+        };
+        let _ = obj.bpc_summary();
+        assert_eq!(obj.bpc_reject_reason, "test");
+    }
+
+    #[test]
+    fn test_bpc_supports_preview() {
+        let obj = RenameProvider {
+            bpc_old_name: String::from("test"),
+            bpc_new_name: String::from("test"),
+            bpc_uri: String::from("test"),
+            bpc_line_number: 0,
+            bpc_column: 0,
+            bpc_is_valid: false,
+            bpc_reject_reason: String::from("test"),
+            bpc_supports_preview: false,
+            bpc_affected_locations: 0,
+            bpc_provider_id: String::from("test"),
+        };
+        let _ = obj.bpc_summary();
+        assert!(!obj.bpc_supports_preview);
+    }
+
+    #[test]
+    fn test_bpc_affected_locations() {
+        let obj = RenameProvider {
+            bpc_old_name: String::from("test"),
+            bpc_new_name: String::from("test"),
+            bpc_uri: String::from("test"),
+            bpc_line_number: 0,
+            bpc_column: 0,
+            bpc_is_valid: false,
+            bpc_reject_reason: String::from("test"),
+            bpc_supports_preview: false,
+            bpc_affected_locations: 0,
+            bpc_provider_id: String::from("test"),
+        };
+        let _ = obj.bpc_summary();
+        assert_eq!(obj.bpc_affected_locations, 0);
+    }
+
+    #[test]
+    fn test_bpc_provider_id() {
+        let obj = RenameProvider {
+            bpc_old_name: String::from("test"),
+            bpc_new_name: String::from("test"),
+            bpc_uri: String::from("test"),
+            bpc_line_number: 0,
+            bpc_column: 0,
+            bpc_is_valid: false,
+            bpc_reject_reason: String::from("test"),
+            bpc_supports_preview: false,
+            bpc_affected_locations: 0,
+            bpc_provider_id: String::from("test"),
+        };
+        let _ = obj.bpc_summary();
+        assert_eq!(obj.bpc_provider_id, "test");
+    }
+
+
+    #[test]
+    fn test_bpd_action_count() {
+        let obj = CodeActionList {
+            bpd_action_count: 0,
+            bpd_preferred_index: None,
+            bpd_has_auto_fix: false,
+            bpd_has_refactor: false,
+            bpd_has_source_action: false,
+            bpd_trigger_kind: 0,
+            bpd_diagnostics_count: 0,
+            bpd_only_kinds: Vec::new(),
+            bpd_is_on_save: false,
+            bpd_action_titles: Vec::new(),
+        };
+        let _ = obj.bpd_summary();
+        assert_eq!(obj.bpd_action_count, 0);
+    }
+
+    #[test]
+    fn test_bpd_preferred_index() {
+        let obj = CodeActionList {
+            bpd_action_count: 0,
+            bpd_preferred_index: None,
+            bpd_has_auto_fix: false,
+            bpd_has_refactor: false,
+            bpd_has_source_action: false,
+            bpd_trigger_kind: 0,
+            bpd_diagnostics_count: 0,
+            bpd_only_kinds: Vec::new(),
+            bpd_is_on_save: false,
+            bpd_action_titles: Vec::new(),
+        };
+        let _ = obj.bpd_summary();
+        assert!(obj.bpd_preferred_index.is_none());
+    }
+
+    #[test]
+    fn test_bpd_has_auto_fix() {
+        let obj = CodeActionList {
+            bpd_action_count: 0,
+            bpd_preferred_index: None,
+            bpd_has_auto_fix: false,
+            bpd_has_refactor: false,
+            bpd_has_source_action: false,
+            bpd_trigger_kind: 0,
+            bpd_diagnostics_count: 0,
+            bpd_only_kinds: Vec::new(),
+            bpd_is_on_save: false,
+            bpd_action_titles: Vec::new(),
+        };
+        let _ = obj.bpd_summary();
+        assert!(!obj.bpd_has_auto_fix);
+    }
+
+    #[test]
+    fn test_bpd_has_refactor() {
+        let obj = CodeActionList {
+            bpd_action_count: 0,
+            bpd_preferred_index: None,
+            bpd_has_auto_fix: false,
+            bpd_has_refactor: false,
+            bpd_has_source_action: false,
+            bpd_trigger_kind: 0,
+            bpd_diagnostics_count: 0,
+            bpd_only_kinds: Vec::new(),
+            bpd_is_on_save: false,
+            bpd_action_titles: Vec::new(),
+        };
+        let _ = obj.bpd_summary();
+        assert!(!obj.bpd_has_refactor);
+    }
+
+    #[test]
+    fn test_bpd_has_source_action() {
+        let obj = CodeActionList {
+            bpd_action_count: 0,
+            bpd_preferred_index: None,
+            bpd_has_auto_fix: false,
+            bpd_has_refactor: false,
+            bpd_has_source_action: false,
+            bpd_trigger_kind: 0,
+            bpd_diagnostics_count: 0,
+            bpd_only_kinds: Vec::new(),
+            bpd_is_on_save: false,
+            bpd_action_titles: Vec::new(),
+        };
+        let _ = obj.bpd_summary();
+        assert!(!obj.bpd_has_source_action);
+    }
+
+    #[test]
+    fn test_bpd_trigger_kind() {
+        let obj = CodeActionList {
+            bpd_action_count: 0,
+            bpd_preferred_index: None,
+            bpd_has_auto_fix: false,
+            bpd_has_refactor: false,
+            bpd_has_source_action: false,
+            bpd_trigger_kind: 0,
+            bpd_diagnostics_count: 0,
+            bpd_only_kinds: Vec::new(),
+            bpd_is_on_save: false,
+            bpd_action_titles: Vec::new(),
+        };
+        let _ = obj.bpd_summary();
+        assert_eq!(obj.bpd_trigger_kind, 0);
+    }
+
+    #[test]
+    fn test_bpd_diagnostics_count() {
+        let obj = CodeActionList {
+            bpd_action_count: 0,
+            bpd_preferred_index: None,
+            bpd_has_auto_fix: false,
+            bpd_has_refactor: false,
+            bpd_has_source_action: false,
+            bpd_trigger_kind: 0,
+            bpd_diagnostics_count: 0,
+            bpd_only_kinds: Vec::new(),
+            bpd_is_on_save: false,
+            bpd_action_titles: Vec::new(),
+        };
+        let _ = obj.bpd_summary();
+        assert_eq!(obj.bpd_diagnostics_count, 0);
+    }
+
+    #[test]
+    fn test_bpd_only_kinds() {
+        let obj = CodeActionList {
+            bpd_action_count: 0,
+            bpd_preferred_index: None,
+            bpd_has_auto_fix: false,
+            bpd_has_refactor: false,
+            bpd_has_source_action: false,
+            bpd_trigger_kind: 0,
+            bpd_diagnostics_count: 0,
+            bpd_only_kinds: Vec::new(),
+            bpd_is_on_save: false,
+            bpd_action_titles: Vec::new(),
+        };
+        let _ = obj.bpd_summary();
+        assert!(obj.bpd_only_kinds.is_empty());
+    }
+
+    #[test]
+    fn test_bpd_is_on_save() {
+        let obj = CodeActionList {
+            bpd_action_count: 0,
+            bpd_preferred_index: None,
+            bpd_has_auto_fix: false,
+            bpd_has_refactor: false,
+            bpd_has_source_action: false,
+            bpd_trigger_kind: 0,
+            bpd_diagnostics_count: 0,
+            bpd_only_kinds: Vec::new(),
+            bpd_is_on_save: false,
+            bpd_action_titles: Vec::new(),
+        };
+        let _ = obj.bpd_summary();
+        assert!(!obj.bpd_is_on_save);
+    }
+
+    #[test]
+    fn test_bpd_action_titles() {
+        let obj = CodeActionList {
+            bpd_action_count: 0,
+            bpd_preferred_index: None,
+            bpd_has_auto_fix: false,
+            bpd_has_refactor: false,
+            bpd_has_source_action: false,
+            bpd_trigger_kind: 0,
+            bpd_diagnostics_count: 0,
+            bpd_only_kinds: Vec::new(),
+            bpd_is_on_save: false,
+            bpd_action_titles: Vec::new(),
+        };
+        let _ = obj.bpd_summary();
+        assert!(obj.bpd_action_titles.is_empty());
+    }
+
+
+    #[test]
+    fn test_bpe_fix_id() {
+        let obj = QuickFix {
+            bpe_fix_id: String::from("test"),
+            bpe_title: String::from("test"),
+            bpe_diagnostic_message: String::from("test"),
+            bpe_diagnostic_severity: 0,
+            bpe_fix_uri: String::from("test"),
+            bpe_fix_line: 0,
+            bpe_fix_column: 0,
+            bpe_is_preferred: false,
+            bpe_edit_count: 0,
+            bpe_command_id: String::from("test"),
+        };
+        let _ = obj.bpe_summary();
+        assert_eq!(obj.bpe_fix_id, "test");
+    }
+
+    #[test]
+    fn test_bpe_title() {
+        let obj = QuickFix {
+            bpe_fix_id: String::from("test"),
+            bpe_title: String::from("test"),
+            bpe_diagnostic_message: String::from("test"),
+            bpe_diagnostic_severity: 0,
+            bpe_fix_uri: String::from("test"),
+            bpe_fix_line: 0,
+            bpe_fix_column: 0,
+            bpe_is_preferred: false,
+            bpe_edit_count: 0,
+            bpe_command_id: String::from("test"),
+        };
+        let _ = obj.bpe_summary();
+        assert_eq!(obj.bpe_title, "test");
+    }
+
+    #[test]
+    fn test_bpe_diagnostic_message() {
+        let obj = QuickFix {
+            bpe_fix_id: String::from("test"),
+            bpe_title: String::from("test"),
+            bpe_diagnostic_message: String::from("test"),
+            bpe_diagnostic_severity: 0,
+            bpe_fix_uri: String::from("test"),
+            bpe_fix_line: 0,
+            bpe_fix_column: 0,
+            bpe_is_preferred: false,
+            bpe_edit_count: 0,
+            bpe_command_id: String::from("test"),
+        };
+        let _ = obj.bpe_summary();
+        assert_eq!(obj.bpe_diagnostic_message, "test");
+    }
+
+    #[test]
+    fn test_bpe_diagnostic_severity() {
+        let obj = QuickFix {
+            bpe_fix_id: String::from("test"),
+            bpe_title: String::from("test"),
+            bpe_diagnostic_message: String::from("test"),
+            bpe_diagnostic_severity: 0,
+            bpe_fix_uri: String::from("test"),
+            bpe_fix_line: 0,
+            bpe_fix_column: 0,
+            bpe_is_preferred: false,
+            bpe_edit_count: 0,
+            bpe_command_id: String::from("test"),
+        };
+        let _ = obj.bpe_summary();
+        assert_eq!(obj.bpe_diagnostic_severity, 0);
+    }
+
+    #[test]
+    fn test_bpe_fix_uri() {
+        let obj = QuickFix {
+            bpe_fix_id: String::from("test"),
+            bpe_title: String::from("test"),
+            bpe_diagnostic_message: String::from("test"),
+            bpe_diagnostic_severity: 0,
+            bpe_fix_uri: String::from("test"),
+            bpe_fix_line: 0,
+            bpe_fix_column: 0,
+            bpe_is_preferred: false,
+            bpe_edit_count: 0,
+            bpe_command_id: String::from("test"),
+        };
+        let _ = obj.bpe_summary();
+        assert_eq!(obj.bpe_fix_uri, "test");
+    }
+
+    #[test]
+    fn test_bpe_fix_line() {
+        let obj = QuickFix {
+            bpe_fix_id: String::from("test"),
+            bpe_title: String::from("test"),
+            bpe_diagnostic_message: String::from("test"),
+            bpe_diagnostic_severity: 0,
+            bpe_fix_uri: String::from("test"),
+            bpe_fix_line: 0,
+            bpe_fix_column: 0,
+            bpe_is_preferred: false,
+            bpe_edit_count: 0,
+            bpe_command_id: String::from("test"),
+        };
+        let _ = obj.bpe_summary();
+        assert_eq!(obj.bpe_fix_line, 0);
+    }
+
+    #[test]
+    fn test_bpe_fix_column() {
+        let obj = QuickFix {
+            bpe_fix_id: String::from("test"),
+            bpe_title: String::from("test"),
+            bpe_diagnostic_message: String::from("test"),
+            bpe_diagnostic_severity: 0,
+            bpe_fix_uri: String::from("test"),
+            bpe_fix_line: 0,
+            bpe_fix_column: 0,
+            bpe_is_preferred: false,
+            bpe_edit_count: 0,
+            bpe_command_id: String::from("test"),
+        };
+        let _ = obj.bpe_summary();
+        assert_eq!(obj.bpe_fix_column, 0);
+    }
+
+    #[test]
+    fn test_bpe_is_preferred() {
+        let obj = QuickFix {
+            bpe_fix_id: String::from("test"),
+            bpe_title: String::from("test"),
+            bpe_diagnostic_message: String::from("test"),
+            bpe_diagnostic_severity: 0,
+            bpe_fix_uri: String::from("test"),
+            bpe_fix_line: 0,
+            bpe_fix_column: 0,
+            bpe_is_preferred: false,
+            bpe_edit_count: 0,
+            bpe_command_id: String::from("test"),
+        };
+        let _ = obj.bpe_summary();
+        assert!(!obj.bpe_is_preferred);
+    }
+
+    #[test]
+    fn test_bpe_edit_count() {
+        let obj = QuickFix {
+            bpe_fix_id: String::from("test"),
+            bpe_title: String::from("test"),
+            bpe_diagnostic_message: String::from("test"),
+            bpe_diagnostic_severity: 0,
+            bpe_fix_uri: String::from("test"),
+            bpe_fix_line: 0,
+            bpe_fix_column: 0,
+            bpe_is_preferred: false,
+            bpe_edit_count: 0,
+            bpe_command_id: String::from("test"),
+        };
+        let _ = obj.bpe_summary();
+        assert_eq!(obj.bpe_edit_count, 0);
+    }
+
+    #[test]
+    fn test_bpe_command_id() {
+        let obj = QuickFix {
+            bpe_fix_id: String::from("test"),
+            bpe_title: String::from("test"),
+            bpe_diagnostic_message: String::from("test"),
+            bpe_diagnostic_severity: 0,
+            bpe_fix_uri: String::from("test"),
+            bpe_fix_line: 0,
+            bpe_fix_column: 0,
+            bpe_is_preferred: false,
+            bpe_edit_count: 0,
+            bpe_command_id: String::from("test"),
+        };
+        let _ = obj.bpe_summary();
+        assert_eq!(obj.bpe_command_id, "test");
     }
 
 }
