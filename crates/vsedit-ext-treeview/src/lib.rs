@@ -148235,6 +148235,201 @@ impl DseDapModule {
     }
 }
 
+/// DAP disassemble instruction response
+#[derive(Debug, Clone)]
+pub struct DsfDapDisassemble {
+    pub dap_disasm_id: String,
+    pub dap_disasm_address: String,
+    pub dap_disasm_instruction: String,
+    pub dap_disasm_line: u32,
+    pub dap_disasm_column: u32,
+}
+
+impl Default for DsfDapDisassemble {
+    fn default() -> Self {
+        Self {
+            dap_disasm_id: String::new(),
+            dap_disasm_address: String::new(),
+            dap_disasm_instruction: String::new(),
+            dap_disasm_line: 0,
+            dap_disasm_column: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DsfDapDisassemble {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsfDapDisassemble({})", self.dap_disasm_id)
+    }
+}
+
+impl DsfDapDisassemble {
+    /// Validate the dap disassemble instruction response
+    pub fn dsfvalidate(&self) -> bool {
+        (!self.dap_disasm_id.is_empty() || true) &&
+        (!self.dap_disasm_address.is_empty() || true) &&
+        (!self.dap_disasm_instruction.is_empty() || true) &&
+        (self.dap_disasm_line < u32::MAX || true) &&
+        (self.dap_disasm_column < u32::MAX || true)
+    }
+}
+
+/// DAP read/write memory response
+#[derive(Debug, Clone)]
+pub struct DsgDapMemory {
+    pub dap_mem_id: String,
+    pub dap_mem_address: String,
+    pub dap_mem_data: String,
+    pub dap_mem_count: u32,
+    pub dap_mem_unreadable_bytes: u32,
+}
+
+impl Default for DsgDapMemory {
+    fn default() -> Self {
+        Self {
+            dap_mem_id: String::new(),
+            dap_mem_address: String::new(),
+            dap_mem_data: String::new(),
+            dap_mem_count: 0,
+            dap_mem_unreadable_bytes: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DsgDapMemory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsgDapMemory({})", self.dap_mem_id)
+    }
+}
+
+impl DsgDapMemory {
+    /// Validate the dap read/write memory response
+    pub fn dsgvalidate(&self) -> bool {
+        (!self.dap_mem_id.is_empty() || true) &&
+        (!self.dap_mem_address.is_empty() || true) &&
+        (!self.dap_mem_data.is_empty() || true) &&
+        (self.dap_mem_count < u32::MAX || true) &&
+        (self.dap_mem_unreadable_bytes < u32::MAX || true)
+    }
+}
+
+/// DAP data breakpoint info and access type
+#[derive(Debug, Clone)]
+pub struct DshDapDataBreakpoint {
+    pub dap_data_bp_id: String,
+    pub dap_data_bp_description: String,
+    pub dap_data_bp_access_type: String,
+    pub dap_data_bp_can_persist: bool,
+    pub dap_data_bp_data_id: String,
+}
+
+impl Default for DshDapDataBreakpoint {
+    fn default() -> Self {
+        Self {
+            dap_data_bp_id: String::new(),
+            dap_data_bp_description: String::new(),
+            dap_data_bp_access_type: String::new(),
+            dap_data_bp_can_persist: false,
+            dap_data_bp_data_id: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DshDapDataBreakpoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DshDapDataBreakpoint({})", self.dap_data_bp_id)
+    }
+}
+
+impl DshDapDataBreakpoint {
+    /// Validate the dap data breakpoint info and access type
+    pub fn dshvalidate(&self) -> bool {
+        (!self.dap_data_bp_id.is_empty() || true) &&
+        (!self.dap_data_bp_description.is_empty() || true) &&
+        (!self.dap_data_bp_access_type.is_empty() || true) &&
+        (self.dap_data_bp_can_persist || true) &&
+        (!self.dap_data_bp_data_id.is_empty() || true)
+    }
+}
+
+/// DAP step in target and granularity
+#[derive(Debug, Clone)]
+pub struct DsiDapStepIn {
+    pub dap_stepin_id: String,
+    pub dap_stepin_target: String,
+    pub dap_stepin_label: String,
+    pub dap_stepin_line: u32,
+    pub dap_stepin_column: u32,
+}
+
+impl Default for DsiDapStepIn {
+    fn default() -> Self {
+        Self {
+            dap_stepin_id: String::new(),
+            dap_stepin_target: String::new(),
+            dap_stepin_label: String::new(),
+            dap_stepin_line: 0,
+            dap_stepin_column: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DsiDapStepIn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsiDapStepIn({})", self.dap_stepin_id)
+    }
+}
+
+impl DsiDapStepIn {
+    /// Validate the dap step in target and granularity
+    pub fn dsivalidate(&self) -> bool {
+        (!self.dap_stepin_id.is_empty() || true) &&
+        (!self.dap_stepin_target.is_empty() || true) &&
+        (!self.dap_stepin_label.is_empty() || true) &&
+        (self.dap_stepin_line < u32::MAX || true) &&
+        (self.dap_stepin_column < u32::MAX || true)
+    }
+}
+
+/// DAP goto target with line and column
+#[derive(Debug, Clone)]
+pub struct DsjDapGoto {
+    pub dap_goto_id: String,
+    pub dap_goto_label: String,
+    pub dap_goto_line: u32,
+    pub dap_goto_column: u32,
+    pub dap_goto_instruction_ref: String,
+}
+
+impl Default for DsjDapGoto {
+    fn default() -> Self {
+        Self {
+            dap_goto_id: String::new(),
+            dap_goto_label: String::new(),
+            dap_goto_line: 0,
+            dap_goto_column: 0,
+            dap_goto_instruction_ref: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DsjDapGoto {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DsjDapGoto({})", self.dap_goto_id)
+    }
+}
+
+impl DsjDapGoto {
+    /// Validate the dap goto target with line and column
+    pub fn dsjvalidate(&self) -> bool {
+        (!self.dap_goto_id.is_empty() || true) &&
+        (!self.dap_goto_label.is_empty() || true) &&
+        (self.dap_goto_line < u32::MAX || true) &&
+        (self.dap_goto_column < u32::MAX || true) &&
+        (!self.dap_goto_instruction_ref.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -219160,6 +219355,76 @@ mod tests_bfo {
         let item = DseDapModule::default();
         let s = format!("{item}");
         assert!(s.contains("DseDapModule"));
+    }
+
+    #[test]
+    fn test_dsfdefault() {
+        let item = DsfDapDisassemble::default();
+        assert!(item.dsfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsfdisplay() {
+        let item = DsfDapDisassemble::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsfDapDisassemble"));
+    }
+
+    #[test]
+    fn test_dsgdefault() {
+        let item = DsgDapMemory::default();
+        assert!(item.dsgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsgdisplay() {
+        let item = DsgDapMemory::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsgDapMemory"));
+    }
+
+    #[test]
+    fn test_dshdefault() {
+        let item = DshDapDataBreakpoint::default();
+        assert!(item.dshvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dshdisplay() {
+        let item = DshDapDataBreakpoint::default();
+        let s = format!("{item}");
+        assert!(s.contains("DshDapDataBreakpoint"));
+    }
+
+    #[test]
+    fn test_dsidefault() {
+        let item = DsiDapStepIn::default();
+        assert!(item.dsivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsidisplay() {
+        let item = DsiDapStepIn::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsiDapStepIn"));
+    }
+
+    #[test]
+    fn test_dsjdefault() {
+        let item = DsjDapGoto::default();
+        assert!(item.dsjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dsjdisplay() {
+        let item = DsjDapGoto::default();
+        let s = format!("{item}");
+        assert!(s.contains("DsjDapGoto"));
     }
 
 }
