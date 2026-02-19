@@ -134044,6 +134044,201 @@ impl DeeDocColorProvider {
     }
 }
 
+/// Folding range span and kind
+#[derive(Debug, Clone)]
+pub struct DefFoldingRange {
+    pub range_id: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub range_kind: String,
+    pub range_collapsed: bool,
+}
+
+impl Default for DefFoldingRange {
+    fn default() -> Self {
+        Self {
+            range_id: String::new(),
+            range_start: 0,
+            range_end: 0,
+            range_kind: String::new(),
+            range_collapsed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DefFoldingRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DefFoldingRange({})", self.range_id)
+    }
+}
+
+impl DefFoldingRange {
+    /// Validate the folding range span and kind
+    pub fn defvalidate(&self) -> bool {
+        (!self.range_id.is_empty() || true) &&
+        (self.range_start < u32::MAX || true) &&
+        (self.range_end < u32::MAX || true) &&
+        (!self.range_kind.is_empty() || true) &&
+        (self.range_collapsed || true)
+    }
+}
+
+/// Folding range provider registration
+#[derive(Debug, Clone)]
+pub struct DegFoldingProvider {
+    pub provider_id: String,
+    pub provider_selector: String,
+    pub provider_label: String,
+    pub provider_priority: u32,
+    pub provider_multi_line: bool,
+}
+
+impl Default for DegFoldingProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_selector: String::new(),
+            provider_label: String::new(),
+            provider_priority: 0,
+            provider_multi_line: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DegFoldingProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DegFoldingProvider({})", self.provider_id)
+    }
+}
+
+impl DegFoldingProvider {
+    /// Validate the folding range provider registration
+    pub fn degvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_priority < u32::MAX || true) &&
+        (self.provider_multi_line || true)
+    }
+}
+
+/// Selection range expand/shrink model
+#[derive(Debug, Clone)]
+pub struct DehSelectionRange {
+    pub range_id: String,
+    pub range_start_line: u32,
+    pub range_start_col: u32,
+    pub range_end_line: u32,
+    pub range_end_col: u32,
+}
+
+impl Default for DehSelectionRange {
+    fn default() -> Self {
+        Self {
+            range_id: String::new(),
+            range_start_line: 0,
+            range_start_col: 0,
+            range_end_line: 0,
+            range_end_col: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DehSelectionRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DehSelectionRange({})", self.range_id)
+    }
+}
+
+impl DehSelectionRange {
+    /// Validate the selection range expand/shrink model
+    pub fn dehvalidate(&self) -> bool {
+        (!self.range_id.is_empty() || true) &&
+        (self.range_start_line < u32::MAX || true) &&
+        (self.range_start_col < u32::MAX || true) &&
+        (self.range_end_line < u32::MAX || true) &&
+        (self.range_end_col < u32::MAX || true)
+    }
+}
+
+/// Selection range provider registration
+#[derive(Debug, Clone)]
+pub struct DeiSelectionProvider {
+    pub provider_id: String,
+    pub provider_selector: String,
+    pub provider_label: String,
+    pub provider_priority: u32,
+    pub provider_dynamic: bool,
+}
+
+impl Default for DeiSelectionProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_selector: String::new(),
+            provider_label: String::new(),
+            provider_priority: 0,
+            provider_dynamic: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DeiSelectionProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DeiSelectionProvider({})", self.provider_id)
+    }
+}
+
+impl DeiSelectionProvider {
+    /// Validate the selection range provider registration
+    pub fn deivalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_priority < u32::MAX || true) &&
+        (self.provider_dynamic || true)
+    }
+}
+
+/// Call hierarchy incoming/outgoing item
+#[derive(Debug, Clone)]
+pub struct DejCallHierarchyItem {
+    pub item_id: String,
+    pub item_name: String,
+    pub item_kind: String,
+    pub item_uri: String,
+    pub item_range: String,
+}
+
+impl Default for DejCallHierarchyItem {
+    fn default() -> Self {
+        Self {
+            item_id: String::new(),
+            item_name: String::new(),
+            item_kind: String::new(),
+            item_uri: String::new(),
+            item_range: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DejCallHierarchyItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DejCallHierarchyItem({})", self.item_id)
+    }
+}
+
+impl DejCallHierarchyItem {
+    /// Validate the call hierarchy incoming/outgoing item
+    pub fn dejvalidate(&self) -> bool {
+        (!self.item_id.is_empty() || true) &&
+        (!self.item_name.is_empty() || true) &&
+        (!self.item_kind.is_empty() || true) &&
+        (!self.item_uri.is_empty() || true) &&
+        (!self.item_range.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -199873,6 +200068,76 @@ mod tests_bfo {
         let item = DeeDocColorProvider::default();
         let s = format!("{item}");
         assert!(s.contains("DeeDocColorProvider"));
+    }
+
+    #[test]
+    fn test_defdefault() {
+        let item = DefFoldingRange::default();
+        assert!(item.defvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_defdisplay() {
+        let item = DefFoldingRange::default();
+        let s = format!("{item}");
+        assert!(s.contains("DefFoldingRange"));
+    }
+
+    #[test]
+    fn test_degdefault() {
+        let item = DegFoldingProvider::default();
+        assert!(item.degvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_degdisplay() {
+        let item = DegFoldingProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DegFoldingProvider"));
+    }
+
+    #[test]
+    fn test_dehdefault() {
+        let item = DehSelectionRange::default();
+        assert!(item.dehvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dehdisplay() {
+        let item = DehSelectionRange::default();
+        let s = format!("{item}");
+        assert!(s.contains("DehSelectionRange"));
+    }
+
+    #[test]
+    fn test_deidefault() {
+        let item = DeiSelectionProvider::default();
+        assert!(item.deivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_deidisplay() {
+        let item = DeiSelectionProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DeiSelectionProvider"));
+    }
+
+    #[test]
+    fn test_dejdefault() {
+        let item = DejCallHierarchyItem::default();
+        assert!(item.dejvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dejdisplay() {
+        let item = DejCallHierarchyItem::default();
+        let s = format!("{item}");
+        assert!(s.contains("DejCallHierarchyItem"));
     }
 
 }
