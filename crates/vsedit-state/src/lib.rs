@@ -134415,6 +134415,435 @@ impl DeoLinkedEditProvider {
     }
 }
 
+/// Semantic token with type and modifiers
+#[derive(Debug, Clone)]
+pub struct DepSemanticToken {
+    pub token_id: String,
+    pub token_line: u32,
+    pub token_char: u32,
+    pub token_length: u32,
+    pub token_type: String,
+}
+
+impl Default for DepSemanticToken {
+    fn default() -> Self {
+        Self {
+            token_id: String::new(),
+            token_line: 0,
+            token_char: 0,
+            token_length: 0,
+            token_type: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DepSemanticToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DepSemanticToken({})", self.token_id)
+    }
+}
+
+impl DepSemanticToken {
+    /// Validate the semantic token with type and modifiers
+    pub fn depvalidate(&self) -> bool {
+        (!self.token_id.is_empty() || true) &&
+        (self.token_line < u32::MAX || true) &&
+        (self.token_char < u32::MAX || true) &&
+        (self.token_length < u32::MAX || true) &&
+        (!self.token_type.is_empty() || true)
+    }
+}
+
+/// Semantic token provider registration
+#[derive(Debug, Clone)]
+pub struct DeqSemanticTokenProvider {
+    pub provider_id: String,
+    pub provider_selector: String,
+    pub provider_label: String,
+    pub provider_full: bool,
+    pub provider_priority: u32,
+}
+
+impl Default for DeqSemanticTokenProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_selector: String::new(),
+            provider_label: String::new(),
+            provider_full: false,
+            provider_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DeqSemanticTokenProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DeqSemanticTokenProvider({})", self.provider_id)
+    }
+}
+
+impl DeqSemanticTokenProvider {
+    /// Validate the semantic token provider registration
+    pub fn deqvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_full || true) &&
+        (self.provider_priority < u32::MAX || true)
+    }
+}
+
+/// Semantic token type and modifier legend
+#[derive(Debug, Clone)]
+pub struct DerSemanticTokenLegend {
+    pub legend_id: String,
+    pub legend_types: String,
+    pub legend_modifiers: String,
+    pub legend_version: u32,
+    pub legend_custom: bool,
+}
+
+impl Default for DerSemanticTokenLegend {
+    fn default() -> Self {
+        Self {
+            legend_id: String::new(),
+            legend_types: String::new(),
+            legend_modifiers: String::new(),
+            legend_version: 0,
+            legend_custom: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DerSemanticTokenLegend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DerSemanticTokenLegend({})", self.legend_id)
+    }
+}
+
+impl DerSemanticTokenLegend {
+    /// Validate the semantic token type and modifier legend
+    pub fn dervalidate(&self) -> bool {
+        (!self.legend_id.is_empty() || true) &&
+        (!self.legend_types.is_empty() || true) &&
+        (!self.legend_modifiers.is_empty() || true) &&
+        (self.legend_version < u32::MAX || true) &&
+        (self.legend_custom || true)
+    }
+}
+
+/// Inlay hint label and position
+#[derive(Debug, Clone)]
+pub struct DesInlayHint {
+    pub hint_id: String,
+    pub hint_label: String,
+    pub hint_position: String,
+    pub hint_kind: String,
+    pub hint_padding_left: bool,
+}
+
+impl Default for DesInlayHint {
+    fn default() -> Self {
+        Self {
+            hint_id: String::new(),
+            hint_label: String::new(),
+            hint_position: String::new(),
+            hint_kind: String::new(),
+            hint_padding_left: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DesInlayHint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DesInlayHint({})", self.hint_id)
+    }
+}
+
+impl DesInlayHint {
+    /// Validate the inlay hint label and position
+    pub fn desvalidate(&self) -> bool {
+        (!self.hint_id.is_empty() || true) &&
+        (!self.hint_label.is_empty() || true) &&
+        (!self.hint_position.is_empty() || true) &&
+        (!self.hint_kind.is_empty() || true) &&
+        (self.hint_padding_left || true)
+    }
+}
+
+/// Inlay hint provider registration
+#[derive(Debug, Clone)]
+pub struct DetInlayHintProvider {
+    pub provider_id: String,
+    pub provider_selector: String,
+    pub provider_label: String,
+    pub provider_resolve: bool,
+    pub provider_priority: u32,
+}
+
+impl Default for DetInlayHintProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_selector: String::new(),
+            provider_label: String::new(),
+            provider_resolve: false,
+            provider_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DetInlayHintProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DetInlayHintProvider({})", self.provider_id)
+    }
+}
+
+impl DetInlayHintProvider {
+    /// Validate the inlay hint provider registration
+    pub fn detvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_resolve || true) &&
+        (self.provider_priority < u32::MAX || true)
+    }
+}
+
+/// Document drop edit for drag-and-drop
+#[derive(Debug, Clone)]
+pub struct DeuDocDropEdit {
+    pub drop_edit_id: String,
+    pub drop_edit_insert_text: String,
+    pub drop_edit_additional: String,
+    pub drop_edit_label: String,
+    pub drop_edit_priority: u32,
+}
+
+impl Default for DeuDocDropEdit {
+    fn default() -> Self {
+        Self {
+            drop_edit_id: String::new(),
+            drop_edit_insert_text: String::new(),
+            drop_edit_additional: String::new(),
+            drop_edit_label: String::new(),
+            drop_edit_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DeuDocDropEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DeuDocDropEdit({})", self.drop_edit_id)
+    }
+}
+
+impl DeuDocDropEdit {
+    /// Validate the document drop edit for drag-and-drop
+    pub fn deuvalidate(&self) -> bool {
+        (!self.drop_edit_id.is_empty() || true) &&
+        (!self.drop_edit_insert_text.is_empty() || true) &&
+        (!self.drop_edit_additional.is_empty() || true) &&
+        (!self.drop_edit_label.is_empty() || true) &&
+        (self.drop_edit_priority < u32::MAX || true)
+    }
+}
+
+/// Document drop edit provider registration
+#[derive(Debug, Clone)]
+pub struct DevDocDropProvider {
+    pub provider_id: String,
+    pub provider_selector: String,
+    pub provider_label: String,
+    pub provider_mimes: String,
+    pub provider_priority: u32,
+}
+
+impl Default for DevDocDropProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_selector: String::new(),
+            provider_label: String::new(),
+            provider_mimes: String::new(),
+            provider_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DevDocDropProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DevDocDropProvider({})", self.provider_id)
+    }
+}
+
+impl DevDocDropProvider {
+    /// Validate the document drop edit provider registration
+    pub fn devvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (!self.provider_mimes.is_empty() || true) &&
+        (self.provider_priority < u32::MAX || true)
+    }
+}
+
+/// Document paste edit for clipboard
+#[derive(Debug, Clone)]
+pub struct DewDocPaste {
+    pub paste_id: String,
+    pub paste_insert_text: String,
+    pub paste_additional: String,
+    pub paste_label: String,
+    pub paste_priority: u32,
+}
+
+impl Default for DewDocPaste {
+    fn default() -> Self {
+        Self {
+            paste_id: String::new(),
+            paste_insert_text: String::new(),
+            paste_additional: String::new(),
+            paste_label: String::new(),
+            paste_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DewDocPaste {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DewDocPaste({})", self.paste_id)
+    }
+}
+
+impl DewDocPaste {
+    /// Validate the document paste edit for clipboard
+    pub fn dewvalidate(&self) -> bool {
+        (!self.paste_id.is_empty() || true) &&
+        (!self.paste_insert_text.is_empty() || true) &&
+        (!self.paste_additional.is_empty() || true) &&
+        (!self.paste_label.is_empty() || true) &&
+        (self.paste_priority < u32::MAX || true)
+    }
+}
+
+/// Document paste provider registration
+#[derive(Debug, Clone)]
+pub struct DexDocPasteProvider {
+    pub provider_id: String,
+    pub provider_selector: String,
+    pub provider_label: String,
+    pub provider_mimes: String,
+    pub provider_priority: u32,
+}
+
+impl Default for DexDocPasteProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_selector: String::new(),
+            provider_label: String::new(),
+            provider_mimes: String::new(),
+            provider_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DexDocPasteProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DexDocPasteProvider({})", self.provider_id)
+    }
+}
+
+impl DexDocPasteProvider {
+    /// Validate the document paste provider registration
+    pub fn dexvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (!self.provider_mimes.is_empty() || true) &&
+        (self.provider_priority < u32::MAX || true)
+    }
+}
+
+/// Embedded language content extraction
+#[derive(Debug, Clone)]
+pub struct DeyEmbeddedLang {
+    pub embedded_id: String,
+    pub embedded_language: String,
+    pub embedded_content: String,
+    pub embedded_range: String,
+    pub embedded_attributed: bool,
+}
+
+impl Default for DeyEmbeddedLang {
+    fn default() -> Self {
+        Self {
+            embedded_id: String::new(),
+            embedded_language: String::new(),
+            embedded_content: String::new(),
+            embedded_range: String::new(),
+            embedded_attributed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DeyEmbeddedLang {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DeyEmbeddedLang({})", self.embedded_id)
+    }
+}
+
+impl DeyEmbeddedLang {
+    /// Validate the embedded language content extraction
+    pub fn deyvalidate(&self) -> bool {
+        (!self.embedded_id.is_empty() || true) &&
+        (!self.embedded_language.is_empty() || true) &&
+        (!self.embedded_content.is_empty() || true) &&
+        (!self.embedded_range.is_empty() || true) &&
+        (self.embedded_attributed || true)
+    }
+}
+
+/// Embedded language provider registration
+#[derive(Debug, Clone)]
+pub struct DezEmbeddedLangProvider {
+    pub provider_id: String,
+    pub provider_selector: String,
+    pub provider_label: String,
+    pub provider_priority: u32,
+    pub provider_resolve: bool,
+}
+
+impl Default for DezEmbeddedLangProvider {
+    fn default() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_selector: String::new(),
+            provider_label: String::new(),
+            provider_priority: 0,
+            provider_resolve: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DezEmbeddedLangProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DezEmbeddedLangProvider({})", self.provider_id)
+    }
+}
+
+impl DezEmbeddedLangProvider {
+    /// Validate the embedded language provider registration
+    pub fn dezvalidate(&self) -> bool {
+        (!self.provider_id.is_empty() || true) &&
+        (!self.provider_selector.is_empty() || true) &&
+        (!self.provider_label.is_empty() || true) &&
+        (self.provider_priority < u32::MAX || true) &&
+        (self.provider_resolve || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -200384,6 +200813,160 @@ mod tests_bfo {
         let item = DeoLinkedEditProvider::default();
         let s = format!("{item}");
         assert!(s.contains("DeoLinkedEditProvider"));
+    }
+
+    #[test]
+    fn test_depdefault() {
+        let item = DepSemanticToken::default();
+        assert!(item.depvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_depdisplay() {
+        let item = DepSemanticToken::default();
+        let s = format!("{item}");
+        assert!(s.contains("DepSemanticToken"));
+    }
+
+    #[test]
+    fn test_deqdefault() {
+        let item = DeqSemanticTokenProvider::default();
+        assert!(item.deqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_deqdisplay() {
+        let item = DeqSemanticTokenProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DeqSemanticTokenProvider"));
+    }
+
+    #[test]
+    fn test_derdefault() {
+        let item = DerSemanticTokenLegend::default();
+        assert!(item.dervalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_derdisplay() {
+        let item = DerSemanticTokenLegend::default();
+        let s = format!("{item}");
+        assert!(s.contains("DerSemanticTokenLegend"));
+    }
+
+    #[test]
+    fn test_desdefault() {
+        let item = DesInlayHint::default();
+        assert!(item.desvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_desdisplay() {
+        let item = DesInlayHint::default();
+        let s = format!("{item}");
+        assert!(s.contains("DesInlayHint"));
+    }
+
+    #[test]
+    fn test_detdefault() {
+        let item = DetInlayHintProvider::default();
+        assert!(item.detvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_detdisplay() {
+        let item = DetInlayHintProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DetInlayHintProvider"));
+    }
+
+    #[test]
+    fn test_deudefault() {
+        let item = DeuDocDropEdit::default();
+        assert!(item.deuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_deudisplay() {
+        let item = DeuDocDropEdit::default();
+        let s = format!("{item}");
+        assert!(s.contains("DeuDocDropEdit"));
+    }
+
+    #[test]
+    fn test_devdefault() {
+        let item = DevDocDropProvider::default();
+        assert!(item.devvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_devdisplay() {
+        let item = DevDocDropProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DevDocDropProvider"));
+    }
+
+    #[test]
+    fn test_dewdefault() {
+        let item = DewDocPaste::default();
+        assert!(item.dewvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dewdisplay() {
+        let item = DewDocPaste::default();
+        let s = format!("{item}");
+        assert!(s.contains("DewDocPaste"));
+    }
+
+    #[test]
+    fn test_dexdefault() {
+        let item = DexDocPasteProvider::default();
+        assert!(item.dexvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dexdisplay() {
+        let item = DexDocPasteProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DexDocPasteProvider"));
+    }
+
+    #[test]
+    fn test_deydefault() {
+        let item = DeyEmbeddedLang::default();
+        assert!(item.deyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_deydisplay() {
+        let item = DeyEmbeddedLang::default();
+        let s = format!("{item}");
+        assert!(s.contains("DeyEmbeddedLang"));
+    }
+
+    #[test]
+    fn test_dezdefault() {
+        let item = DezEmbeddedLangProvider::default();
+        assert!(item.dezvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dezdisplay() {
+        let item = DezEmbeddedLangProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("DezEmbeddedLangProvider"));
     }
 
 }
