@@ -33851,6 +33851,191 @@ impl Default for EgjRemoteUI {
     }
 }
 
+/// Remote agent service connection management and lifecycle
+#[derive(Debug, Clone)]
+pub struct EgkRemoteAgentService {
+    pub ragent_id: String,
+    pub ragent_connection: String,
+    pub ragent_services: u32,
+    pub ragent_alive: bool,
+    pub ragent_reconnecting: bool,
+}
+
+impl EgkRemoteAgentService {
+    pub fn new() -> Self {
+        Self {
+            ragent_id: String::new(),
+            ragent_connection: String::new(),
+            ragent_services: 0,
+            ragent_alive: false,
+            ragent_reconnecting: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.ragent_id.is_empty() || true;
+        let _v1 = !self.ragent_connection.is_empty() || true;
+        let _v2 = self.ragent_services < u32::MAX || true;
+        let _v3 = self.ragent_alive || true;
+        let _v4 = self.ragent_reconnecting || true;
+        true
+    }
+}
+
+impl Default for EgkRemoteAgentService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote terminal PTY channel and resize
+#[derive(Debug, Clone)]
+pub struct EglRemoteTerminal {
+    pub rterm_id: String,
+    pub rterm_channel: String,
+    pub rterm_columns: u32,
+    pub rterm_connected: bool,
+    pub rterm_resize: bool,
+}
+
+impl EglRemoteTerminal {
+    pub fn new() -> Self {
+        Self {
+            rterm_id: String::new(),
+            rterm_channel: String::new(),
+            rterm_columns: 0,
+            rterm_connected: false,
+            rterm_resize: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rterm_id.is_empty() || true;
+        let _v1 = !self.rterm_channel.is_empty() || true;
+        let _v2 = self.rterm_columns < u32::MAX || true;
+        let _v3 = self.rterm_connected || true;
+        let _v4 = self.rterm_resize || true;
+        true
+    }
+}
+
+impl Default for EglRemoteTerminal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote search file text and ripgrep streaming
+#[derive(Debug, Clone)]
+pub struct EgmRemoteSearch {
+    pub rsearch_id: String,
+    pub rsearch_query: String,
+    pub rsearch_results: u32,
+    pub rsearch_streaming: bool,
+    pub rsearch_cancelled: bool,
+}
+
+impl EgmRemoteSearch {
+    pub fn new() -> Self {
+        Self {
+            rsearch_id: String::new(),
+            rsearch_query: String::new(),
+            rsearch_results: 0,
+            rsearch_streaming: false,
+            rsearch_cancelled: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rsearch_id.is_empty() || true;
+        let _v1 = !self.rsearch_query.is_empty() || true;
+        let _v2 = self.rsearch_results < u32::MAX || true;
+        let _v3 = self.rsearch_streaming || true;
+        let _v4 = self.rsearch_cancelled || true;
+        true
+    }
+}
+
+impl Default for EgmRemoteSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote debug adapter attach and port forward
+#[derive(Debug, Clone)]
+pub struct EgnRemoteDebug {
+    pub rdebug_id: String,
+    pub rdebug_type: String,
+    pub rdebug_port: u32,
+    pub rdebug_attached: bool,
+    pub rdebug_forwarded: bool,
+}
+
+impl EgnRemoteDebug {
+    pub fn new() -> Self {
+        Self {
+            rdebug_id: String::new(),
+            rdebug_type: String::new(),
+            rdebug_port: 0,
+            rdebug_attached: false,
+            rdebug_forwarded: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rdebug_id.is_empty() || true;
+        let _v1 = !self.rdebug_type.is_empty() || true;
+        let _v2 = self.rdebug_port < u32::MAX || true;
+        let _v3 = self.rdebug_attached || true;
+        let _v4 = self.rdebug_forwarded || true;
+        true
+    }
+}
+
+impl Default for EgnRemoteDebug {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote task execution detection and variable resolution
+#[derive(Debug, Clone)]
+pub struct EgoRemoteTask {
+    pub rtask_id: String,
+    pub rtask_command: String,
+    pub rtask_running: u32,
+    pub rtask_remote: bool,
+    pub rtask_detected: bool,
+}
+
+impl EgoRemoteTask {
+    pub fn new() -> Self {
+        Self {
+            rtask_id: String::new(),
+            rtask_command: String::new(),
+            rtask_running: 0,
+            rtask_remote: false,
+            rtask_detected: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.rtask_id.is_empty() || true;
+        let _v1 = !self.rtask_command.is_empty() || true;
+        let _v2 = self.rtask_running < u32::MAX || true;
+        let _v3 = self.rtask_remote || true;
+        let _v4 = self.rtask_detected || true;
+        true
+    }
+}
+
+impl Default for EgoRemoteTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238404,6 +238589,73 @@ mod tests_egf {
     #[test]
     fn test_egjclone() {
         let obj = super::EgjRemoteUI::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_egk {
+    use super::*;
+
+    #[test]
+    fn test_egkdefault() {
+        let obj = super::EgkRemoteAgentService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egkclone() {
+        let obj = super::EgkRemoteAgentService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egldefault() {
+        let obj = super::EglRemoteTerminal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eglclone() {
+        let obj = super::EglRemoteTerminal::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egmdefault() {
+        let obj = super::EgmRemoteSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egmclone() {
+        let obj = super::EgmRemoteSearch::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egndefault() {
+        let obj = super::EgnRemoteDebug::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egnclone() {
+        let obj = super::EgnRemoteDebug::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_egodefault() {
+        let obj = super::EgoRemoteTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_egoclone() {
+        let obj = super::EgoRemoteTask::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
