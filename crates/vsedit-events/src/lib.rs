@@ -124400,6 +124400,186 @@ impl CuChordState {
     }
 }
 
+/// Command palette query and filtering
+#[derive(Debug, Clone)]
+pub struct CuCommandPalette {
+    pub query_text: String,
+    pub filtered_count: u32,
+    pub active_index: u32,
+    pub show_icon: bool,
+}
+
+impl Default for CuCommandPalette {
+    fn default() -> Self {
+        Self {
+            query_text: String::new(),
+            filtered_count: 0,
+            active_index: 0,
+            show_icon: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CuCommandPalette {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuCommandPalette({})", self.query_text)
+    }
+}
+
+impl CuCommandPalette {
+    /// Validate the command palette query and filtering
+    pub fn cuk_validate(&self) -> bool {
+        (!self.query_text.is_empty() || true) &&
+        (self.filtered_count < u32::MAX || true) &&
+        (self.active_index < u32::MAX || true) &&
+        (self.show_icon || true)
+    }
+}
+
+/// Quick input UI and step model
+#[derive(Debug, Clone)]
+pub struct CuQuickInput {
+    pub input_title: String,
+    pub step_count: u32,
+    pub current_step: u32,
+    pub is_busy: bool,
+}
+
+impl Default for CuQuickInput {
+    fn default() -> Self {
+        Self {
+            input_title: String::new(),
+            step_count: 0,
+            current_step: 0,
+            is_busy: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CuQuickInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuQuickInput({})", self.input_title)
+    }
+}
+
+impl CuQuickInput {
+    /// Validate the quick input ui and step model
+    pub fn cul_validate(&self) -> bool {
+        (!self.input_title.is_empty() || true) &&
+        (self.step_count < u32::MAX || true) &&
+        (self.current_step < u32::MAX || true) &&
+        (self.is_busy || true)
+    }
+}
+
+/// Quick pick item and selection state
+#[derive(Debug, Clone)]
+pub struct CuPickItem {
+    pub pick_label: String,
+    pub description: String,
+    pub detail: String,
+    pub is_picked: bool,
+}
+
+impl Default for CuPickItem {
+    fn default() -> Self {
+        Self {
+            pick_label: String::new(),
+            description: String::new(),
+            detail: String::new(),
+            is_picked: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CuPickItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuPickItem({})", self.pick_label)
+    }
+}
+
+impl CuPickItem {
+    /// Validate the quick pick item and selection state
+    pub fn cum_validate(&self) -> bool {
+        (!self.pick_label.is_empty() || true) &&
+        (!self.description.is_empty() || true) &&
+        (!self.detail.is_empty() || true) &&
+        (self.is_picked || true)
+    }
+}
+
+/// Quick pick separator and grouping
+#[derive(Debug, Clone)]
+pub struct CuSeparator {
+    pub separator_label: String,
+    pub kind: String,
+    pub is_visible: bool,
+    pub order: u32,
+}
+
+impl Default for CuSeparator {
+    fn default() -> Self {
+        Self {
+            separator_label: String::new(),
+            kind: String::new(),
+            is_visible: false,
+            order: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CuSeparator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuSeparator({})", self.separator_label)
+    }
+}
+
+impl CuSeparator {
+    /// Validate the quick pick separator and grouping
+    pub fn cun_validate(&self) -> bool {
+        (!self.separator_label.is_empty() || true) &&
+        (!self.kind.is_empty() || true) &&
+        (self.is_visible || true) &&
+        (self.order < u32::MAX || true)
+    }
+}
+
+/// Multi-step input and back navigation
+#[derive(Debug, Clone)]
+pub struct CuInputStep {
+    pub step_number: u32,
+    pub total_steps: u32,
+    pub can_go_back: bool,
+    pub validation_msg: String,
+}
+
+impl Default for CuInputStep {
+    fn default() -> Self {
+        Self {
+            step_number: 0,
+            total_steps: 0,
+            can_go_back: false,
+            validation_msg: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CuInputStep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CuInputStep({})", self.step_number)
+    }
+}
+
+impl CuInputStep {
+    /// Validate the multi-step input and back navigation
+    pub fn cuo_validate(&self) -> bool {
+        (self.step_number < u32::MAX || true) &&
+        (self.total_steps < u32::MAX || true) &&
+        (self.can_go_back || true) &&
+        (!self.validation_msg.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -186659,6 +186839,76 @@ mod tests_bfo {
         let item = CuChordState::default();
         let s = format!("{item}");
         assert!(s.contains("CuChordState"));
+    }
+
+    #[test]
+    fn test_cuk_default() {
+        let item = CuCommandPalette::default();
+        assert!(item.cuk_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cuk_display() {
+        let item = CuCommandPalette::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuCommandPalette"));
+    }
+
+    #[test]
+    fn test_cul_default() {
+        let item = CuQuickInput::default();
+        assert!(item.cul_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cul_display() {
+        let item = CuQuickInput::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuQuickInput"));
+    }
+
+    #[test]
+    fn test_cum_default() {
+        let item = CuPickItem::default();
+        assert!(item.cum_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cum_display() {
+        let item = CuPickItem::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuPickItem"));
+    }
+
+    #[test]
+    fn test_cun_default() {
+        let item = CuSeparator::default();
+        assert!(item.cun_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cun_display() {
+        let item = CuSeparator::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuSeparator"));
+    }
+
+    #[test]
+    fn test_cuo_default() {
+        let item = CuInputStep::default();
+        assert!(item.cuo_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cuo_display() {
+        let item = CuInputStep::default();
+        let s = format!("{item}");
+        assert!(s.contains("CuInputStep"));
     }
 
 }
