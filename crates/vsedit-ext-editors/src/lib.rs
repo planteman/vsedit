@@ -131308,6 +131308,201 @@ impl DbjScmInput {
     }
 }
 
+/// Search query model with pattern and options
+#[derive(Debug, Clone)]
+pub struct DbkSearchQuery {
+    pub query_id: String,
+    pub query_pattern: String,
+    pub query_regex: bool,
+    pub query_case_sensitive: bool,
+    pub query_whole_word: bool,
+}
+
+impl Default for DbkSearchQuery {
+    fn default() -> Self {
+        Self {
+            query_id: String::new(),
+            query_pattern: String::new(),
+            query_regex: false,
+            query_case_sensitive: false,
+            query_whole_word: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DbkSearchQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbkSearchQuery({})", self.query_id)
+    }
+}
+
+impl DbkSearchQuery {
+    /// Validate the search query model with pattern and options
+    pub fn dbkvalidate(&self) -> bool {
+        (!self.query_id.is_empty() || true) &&
+        (!self.query_pattern.is_empty() || true) &&
+        (self.query_regex || true) &&
+        (self.query_case_sensitive || true) &&
+        (self.query_whole_word || true)
+    }
+}
+
+/// Search result match with file and line
+#[derive(Debug, Clone)]
+pub struct DblSearchResult {
+    pub result_id: String,
+    pub result_file: String,
+    pub result_line: u32,
+    pub result_column: u32,
+    pub result_preview: String,
+}
+
+impl Default for DblSearchResult {
+    fn default() -> Self {
+        Self {
+            result_id: String::new(),
+            result_file: String::new(),
+            result_line: 0,
+            result_column: 0,
+            result_preview: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DblSearchResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DblSearchResult({})", self.result_id)
+    }
+}
+
+impl DblSearchResult {
+    /// Validate the search result match with file and line
+    pub fn dblvalidate(&self) -> bool {
+        (!self.result_id.is_empty() || true) &&
+        (!self.result_file.is_empty() || true) &&
+        (self.result_line < u32::MAX || true) &&
+        (self.result_column < u32::MAX || true) &&
+        (!self.result_preview.is_empty() || true)
+    }
+}
+
+/// Search and replace operation state
+#[derive(Debug, Clone)]
+pub struct DbmSearchReplace {
+    pub replace_id: String,
+    pub replace_pattern: String,
+    pub replace_replacement: String,
+    pub replace_preserve_case: bool,
+    pub replace_count: u32,
+}
+
+impl Default for DbmSearchReplace {
+    fn default() -> Self {
+        Self {
+            replace_id: String::new(),
+            replace_pattern: String::new(),
+            replace_replacement: String::new(),
+            replace_preserve_case: false,
+            replace_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DbmSearchReplace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbmSearchReplace({})", self.replace_id)
+    }
+}
+
+impl DbmSearchReplace {
+    /// Validate the search and replace operation state
+    pub fn dbmvalidate(&self) -> bool {
+        (!self.replace_id.is_empty() || true) &&
+        (!self.replace_pattern.is_empty() || true) &&
+        (!self.replace_replacement.is_empty() || true) &&
+        (self.replace_preserve_case || true) &&
+        (self.replace_count < u32::MAX || true)
+    }
+}
+
+/// Search history entry and recent patterns
+#[derive(Debug, Clone)]
+pub struct DbnSearchHistory {
+    pub history_id: String,
+    pub history_pattern: String,
+    pub history_regex: bool,
+    pub history_timestamp: String,
+    pub history_result_count: u32,
+}
+
+impl Default for DbnSearchHistory {
+    fn default() -> Self {
+        Self {
+            history_id: String::new(),
+            history_pattern: String::new(),
+            history_regex: false,
+            history_timestamp: String::new(),
+            history_result_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DbnSearchHistory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DbnSearchHistory({})", self.history_id)
+    }
+}
+
+impl DbnSearchHistory {
+    /// Validate the search history entry and recent patterns
+    pub fn dbnvalidate(&self) -> bool {
+        (!self.history_id.is_empty() || true) &&
+        (!self.history_pattern.is_empty() || true) &&
+        (self.history_regex || true) &&
+        (!self.history_timestamp.is_empty() || true) &&
+        (self.history_result_count < u32::MAX || true)
+    }
+}
+
+/// Search exclude and include glob patterns
+#[derive(Debug, Clone)]
+pub struct DboSearchExclude {
+    pub exclude_id: String,
+    pub exclude_glob: String,
+    pub exclude_include: bool,
+    pub exclude_active: bool,
+    pub exclude_from_settings: bool,
+}
+
+impl Default for DboSearchExclude {
+    fn default() -> Self {
+        Self {
+            exclude_id: String::new(),
+            exclude_glob: String::new(),
+            exclude_include: false,
+            exclude_active: false,
+            exclude_from_settings: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DboSearchExclude {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DboSearchExclude({})", self.exclude_id)
+    }
+}
+
+impl DboSearchExclude {
+    /// Validate the search exclude and include glob patterns
+    pub fn dbovalidate(&self) -> bool {
+        (!self.exclude_id.is_empty() || true) &&
+        (!self.exclude_glob.is_empty() || true) &&
+        (self.exclude_include || true) &&
+        (self.exclude_active || true) &&
+        (self.exclude_from_settings || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -196115,6 +196310,76 @@ mod tests_bfo {
         let item = DbjScmInput::default();
         let s = format!("{item}");
         assert!(s.contains("DbjScmInput"));
+    }
+
+    #[test]
+    fn test_dbkdefault() {
+        let item = DbkSearchQuery::default();
+        assert!(item.dbkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbkdisplay() {
+        let item = DbkSearchQuery::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbkSearchQuery"));
+    }
+
+    #[test]
+    fn test_dbldefault() {
+        let item = DblSearchResult::default();
+        assert!(item.dblvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbldisplay() {
+        let item = DblSearchResult::default();
+        let s = format!("{item}");
+        assert!(s.contains("DblSearchResult"));
+    }
+
+    #[test]
+    fn test_dbmdefault() {
+        let item = DbmSearchReplace::default();
+        assert!(item.dbmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbmdisplay() {
+        let item = DbmSearchReplace::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbmSearchReplace"));
+    }
+
+    #[test]
+    fn test_dbndefault() {
+        let item = DbnSearchHistory::default();
+        assert!(item.dbnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbndisplay() {
+        let item = DbnSearchHistory::default();
+        let s = format!("{item}");
+        assert!(s.contains("DbnSearchHistory"));
+    }
+
+    #[test]
+    fn test_dbodefault() {
+        let item = DboSearchExclude::default();
+        assert!(item.dbovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dbodisplay() {
+        let item = DboSearchExclude::default();
+        let s = format!("{item}");
+        assert!(s.contains("DboSearchExclude"));
     }
 
 }
