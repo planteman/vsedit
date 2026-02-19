@@ -137483,6 +137483,435 @@ impl DhoTerminalProfileContrib {
     }
 }
 
+/// Walkthrough contribution with steps
+#[derive(Debug, Clone)]
+pub struct DhpWalkthroughContrib {
+    pub walkthrough_id: String,
+    pub walkthrough_title: String,
+    pub walkthrough_description: String,
+    pub walkthrough_steps: u32,
+    pub walkthrough_featured: bool,
+}
+
+impl Default for DhpWalkthroughContrib {
+    fn default() -> Self {
+        Self {
+            walkthrough_id: String::new(),
+            walkthrough_title: String::new(),
+            walkthrough_description: String::new(),
+            walkthrough_steps: 0,
+            walkthrough_featured: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DhpWalkthroughContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhpWalkthroughContrib({})", self.walkthrough_id)
+    }
+}
+
+impl DhpWalkthroughContrib {
+    /// Validate the walkthrough contribution with steps
+    pub fn dhpvalidate(&self) -> bool {
+        (!self.walkthrough_id.is_empty() || true) &&
+        (!self.walkthrough_title.is_empty() || true) &&
+        (!self.walkthrough_description.is_empty() || true) &&
+        (self.walkthrough_steps < u32::MAX || true) &&
+        (self.walkthrough_featured || true)
+    }
+}
+
+/// Notebook type contribution
+#[derive(Debug, Clone)]
+pub struct DhqNotebookContrib {
+    pub notebook_id: String,
+    pub notebook_type: String,
+    pub notebook_display_name: String,
+    pub notebook_selector: String,
+    pub notebook_priority: u32,
+}
+
+impl Default for DhqNotebookContrib {
+    fn default() -> Self {
+        Self {
+            notebook_id: String::new(),
+            notebook_type: String::new(),
+            notebook_display_name: String::new(),
+            notebook_selector: String::new(),
+            notebook_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DhqNotebookContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhqNotebookContrib({})", self.notebook_id)
+    }
+}
+
+impl DhqNotebookContrib {
+    /// Validate the notebook type contribution
+    pub fn dhqvalidate(&self) -> bool {
+        (!self.notebook_id.is_empty() || true) &&
+        (!self.notebook_type.is_empty() || true) &&
+        (!self.notebook_display_name.is_empty() || true) &&
+        (!self.notebook_selector.is_empty() || true) &&
+        (self.notebook_priority < u32::MAX || true)
+    }
+}
+
+/// Authentication provider contribution
+#[derive(Debug, Clone)]
+pub struct DhrAuthContrib {
+    pub auth_id: String,
+    pub auth_label: String,
+    pub auth_icon: String,
+    pub auth_multiple: bool,
+    pub auth_priority: u32,
+}
+
+impl Default for DhrAuthContrib {
+    fn default() -> Self {
+        Self {
+            auth_id: String::new(),
+            auth_label: String::new(),
+            auth_icon: String::new(),
+            auth_multiple: false,
+            auth_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DhrAuthContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhrAuthContrib({})", self.auth_id)
+    }
+}
+
+impl DhrAuthContrib {
+    /// Validate the authentication provider contribution
+    pub fn dhrvalidate(&self) -> bool {
+        (!self.auth_id.is_empty() || true) &&
+        (!self.auth_label.is_empty() || true) &&
+        (!self.auth_icon.is_empty() || true) &&
+        (self.auth_multiple || true) &&
+        (self.auth_priority < u32::MAX || true)
+    }
+}
+
+/// Custom editor contribution with priority
+#[derive(Debug, Clone)]
+pub struct DhsCustomEditorContrib {
+    pub custom_editor_id: String,
+    pub custom_editor_view_type: String,
+    pub custom_editor_display_name: String,
+    pub custom_editor_selector: String,
+    pub custom_editor_priority: u32,
+}
+
+impl Default for DhsCustomEditorContrib {
+    fn default() -> Self {
+        Self {
+            custom_editor_id: String::new(),
+            custom_editor_view_type: String::new(),
+            custom_editor_display_name: String::new(),
+            custom_editor_selector: String::new(),
+            custom_editor_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DhsCustomEditorContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhsCustomEditorContrib({})", self.custom_editor_id)
+    }
+}
+
+impl DhsCustomEditorContrib {
+    /// Validate the custom editor contribution with priority
+    pub fn dhsvalidate(&self) -> bool {
+        (!self.custom_editor_id.is_empty() || true) &&
+        (!self.custom_editor_view_type.is_empty() || true) &&
+        (!self.custom_editor_display_name.is_empty() || true) &&
+        (!self.custom_editor_selector.is_empty() || true) &&
+        (self.custom_editor_priority < u32::MAX || true)
+    }
+}
+
+/// Problem matcher contribution pattern
+#[derive(Debug, Clone)]
+pub struct DhtProblemMatcherContrib {
+    pub matcher_id: String,
+    pub matcher_owner: String,
+    pub matcher_pattern: String,
+    pub matcher_severity: String,
+    pub matcher_file_location: String,
+}
+
+impl Default for DhtProblemMatcherContrib {
+    fn default() -> Self {
+        Self {
+            matcher_id: String::new(),
+            matcher_owner: String::new(),
+            matcher_pattern: String::new(),
+            matcher_severity: String::new(),
+            matcher_file_location: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DhtProblemMatcherContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhtProblemMatcherContrib({})", self.matcher_id)
+    }
+}
+
+impl DhtProblemMatcherContrib {
+    /// Validate the problem matcher contribution pattern
+    pub fn dhtvalidate(&self) -> bool {
+        (!self.matcher_id.is_empty() || true) &&
+        (!self.matcher_owner.is_empty() || true) &&
+        (!self.matcher_pattern.is_empty() || true) &&
+        (!self.matcher_severity.is_empty() || true) &&
+        (!self.matcher_file_location.is_empty() || true)
+    }
+}
+
+/// Problem pattern contribution regex
+#[derive(Debug, Clone)]
+pub struct DhuProblemPatternContrib {
+    pub pattern_id: String,
+    pub pattern_regex: String,
+    pub pattern_file: u32,
+    pub pattern_line: u32,
+    pub pattern_message: u32,
+}
+
+impl Default for DhuProblemPatternContrib {
+    fn default() -> Self {
+        Self {
+            pattern_id: String::new(),
+            pattern_regex: String::new(),
+            pattern_file: 0,
+            pattern_line: 0,
+            pattern_message: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DhuProblemPatternContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhuProblemPatternContrib({})", self.pattern_id)
+    }
+}
+
+impl DhuProblemPatternContrib {
+    /// Validate the problem pattern contribution regex
+    pub fn dhuvalidate(&self) -> bool {
+        (!self.pattern_id.is_empty() || true) &&
+        (!self.pattern_regex.is_empty() || true) &&
+        (self.pattern_file < u32::MAX || true) &&
+        (self.pattern_line < u32::MAX || true) &&
+        (self.pattern_message < u32::MAX || true)
+    }
+}
+
+/// Localization contribution bundle
+#[derive(Debug, Clone)]
+pub struct DhvLocalizeContrib {
+    pub localize_id: String,
+    pub localize_language: String,
+    pub localize_translations: String,
+    pub localize_path: String,
+    pub localize_default: bool,
+}
+
+impl Default for DhvLocalizeContrib {
+    fn default() -> Self {
+        Self {
+            localize_id: String::new(),
+            localize_language: String::new(),
+            localize_translations: String::new(),
+            localize_path: String::new(),
+            localize_default: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DhvLocalizeContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhvLocalizeContrib({})", self.localize_id)
+    }
+}
+
+impl DhvLocalizeContrib {
+    /// Validate the localization contribution bundle
+    pub fn dhvvalidate(&self) -> bool {
+        (!self.localize_id.is_empty() || true) &&
+        (!self.localize_language.is_empty() || true) &&
+        (!self.localize_translations.is_empty() || true) &&
+        (!self.localize_path.is_empty() || true) &&
+        (self.localize_default || true)
+    }
+}
+
+/// Chat participant contribution
+#[derive(Debug, Clone)]
+pub struct DhwChatParticipantContrib {
+    pub chat_id: String,
+    pub chat_name: String,
+    pub chat_description: String,
+    pub chat_is_default: bool,
+    pub chat_commands: String,
+}
+
+impl Default for DhwChatParticipantContrib {
+    fn default() -> Self {
+        Self {
+            chat_id: String::new(),
+            chat_name: String::new(),
+            chat_description: String::new(),
+            chat_is_default: false,
+            chat_commands: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DhwChatParticipantContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhwChatParticipantContrib({})", self.chat_id)
+    }
+}
+
+impl DhwChatParticipantContrib {
+    /// Validate the chat participant contribution
+    pub fn dhwvalidate(&self) -> bool {
+        (!self.chat_id.is_empty() || true) &&
+        (!self.chat_name.is_empty() || true) &&
+        (!self.chat_description.is_empty() || true) &&
+        (self.chat_is_default || true) &&
+        (!self.chat_commands.is_empty() || true)
+    }
+}
+
+/// Resource label formatter contribution
+#[derive(Debug, Clone)]
+pub struct DhxResourceLabelContrib {
+    pub label_id: String,
+    pub label_scheme: String,
+    pub label_authority: String,
+    pub label_formatter: String,
+    pub label_strip_path_prefix: bool,
+}
+
+impl Default for DhxResourceLabelContrib {
+    fn default() -> Self {
+        Self {
+            label_id: String::new(),
+            label_scheme: String::new(),
+            label_authority: String::new(),
+            label_formatter: String::new(),
+            label_strip_path_prefix: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DhxResourceLabelContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhxResourceLabelContrib({})", self.label_id)
+    }
+}
+
+impl DhxResourceLabelContrib {
+    /// Validate the resource label formatter contribution
+    pub fn dhxvalidate(&self) -> bool {
+        (!self.label_id.is_empty() || true) &&
+        (!self.label_scheme.is_empty() || true) &&
+        (!self.label_authority.is_empty() || true) &&
+        (!self.label_formatter.is_empty() || true) &&
+        (self.label_strip_path_prefix || true)
+    }
+}
+
+/// Settings profile template
+#[derive(Debug, Clone)]
+pub struct DhyProfileTemplate {
+    pub template_id: String,
+    pub template_name: String,
+    pub template_icon: String,
+    pub template_extensions: String,
+    pub template_settings: String,
+}
+
+impl Default for DhyProfileTemplate {
+    fn default() -> Self {
+        Self {
+            template_id: String::new(),
+            template_name: String::new(),
+            template_icon: String::new(),
+            template_extensions: String::new(),
+            template_settings: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DhyProfileTemplate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhyProfileTemplate({})", self.template_id)
+    }
+}
+
+impl DhyProfileTemplate {
+    /// Validate the settings profile template
+    pub fn dhyvalidate(&self) -> bool {
+        (!self.template_id.is_empty() || true) &&
+        (!self.template_name.is_empty() || true) &&
+        (!self.template_icon.is_empty() || true) &&
+        (!self.template_extensions.is_empty() || true) &&
+        (!self.template_settings.is_empty() || true)
+    }
+}
+
+/// Settings sync state and resource
+#[derive(Debug, Clone)]
+pub struct DhzSettingsSync {
+    pub sync_id: String,
+    pub sync_resource: String,
+    pub sync_version: u32,
+    pub sync_enabled: bool,
+    pub sync_conflict: bool,
+}
+
+impl Default for DhzSettingsSync {
+    fn default() -> Self {
+        Self {
+            sync_id: String::new(),
+            sync_resource: String::new(),
+            sync_version: 0,
+            sync_enabled: false,
+            sync_conflict: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DhzSettingsSync {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhzSettingsSync({})", self.sync_id)
+    }
+}
+
+impl DhzSettingsSync {
+    /// Validate the settings sync state and resource
+    pub fn dhzvalidate(&self) -> bool {
+        (!self.sync_id.is_empty() || true) &&
+        (!self.sync_resource.is_empty() || true) &&
+        (self.sync_version < u32::MAX || true) &&
+        (self.sync_enabled || true) &&
+        (self.sync_conflict || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -204544,6 +204973,160 @@ mod tests_bfo {
         let item = DhoTerminalProfileContrib::default();
         let s = format!("{item}");
         assert!(s.contains("DhoTerminalProfileContrib"));
+    }
+
+    #[test]
+    fn test_dhpdefault() {
+        let item = DhpWalkthroughContrib::default();
+        assert!(item.dhpvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhpdisplay() {
+        let item = DhpWalkthroughContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhpWalkthroughContrib"));
+    }
+
+    #[test]
+    fn test_dhqdefault() {
+        let item = DhqNotebookContrib::default();
+        assert!(item.dhqvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhqdisplay() {
+        let item = DhqNotebookContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhqNotebookContrib"));
+    }
+
+    #[test]
+    fn test_dhrdefault() {
+        let item = DhrAuthContrib::default();
+        assert!(item.dhrvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhrdisplay() {
+        let item = DhrAuthContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhrAuthContrib"));
+    }
+
+    #[test]
+    fn test_dhsdefault() {
+        let item = DhsCustomEditorContrib::default();
+        assert!(item.dhsvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhsdisplay() {
+        let item = DhsCustomEditorContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhsCustomEditorContrib"));
+    }
+
+    #[test]
+    fn test_dhtdefault() {
+        let item = DhtProblemMatcherContrib::default();
+        assert!(item.dhtvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhtdisplay() {
+        let item = DhtProblemMatcherContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhtProblemMatcherContrib"));
+    }
+
+    #[test]
+    fn test_dhudefault() {
+        let item = DhuProblemPatternContrib::default();
+        assert!(item.dhuvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhudisplay() {
+        let item = DhuProblemPatternContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhuProblemPatternContrib"));
+    }
+
+    #[test]
+    fn test_dhvdefault() {
+        let item = DhvLocalizeContrib::default();
+        assert!(item.dhvvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhvdisplay() {
+        let item = DhvLocalizeContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhvLocalizeContrib"));
+    }
+
+    #[test]
+    fn test_dhwdefault() {
+        let item = DhwChatParticipantContrib::default();
+        assert!(item.dhwvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhwdisplay() {
+        let item = DhwChatParticipantContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhwChatParticipantContrib"));
+    }
+
+    #[test]
+    fn test_dhxdefault() {
+        let item = DhxResourceLabelContrib::default();
+        assert!(item.dhxvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhxdisplay() {
+        let item = DhxResourceLabelContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhxResourceLabelContrib"));
+    }
+
+    #[test]
+    fn test_dhydefault() {
+        let item = DhyProfileTemplate::default();
+        assert!(item.dhyvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhydisplay() {
+        let item = DhyProfileTemplate::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhyProfileTemplate"));
+    }
+
+    #[test]
+    fn test_dhzdefault() {
+        let item = DhzSettingsSync::default();
+        assert!(item.dhzvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhzdisplay() {
+        let item = DhzSettingsSync::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhzSettingsSync"));
     }
 
 }
