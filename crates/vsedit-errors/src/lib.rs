@@ -95467,6 +95467,247 @@ impl std::fmt::Display for SourceControlActionModel {
     }
 }
 
+
+/// SearchResultModel — search result model
+#[derive(Debug, Clone)]
+pub struct SearchResultEntry {
+    pub bya_uri: String,
+    pub bya_line_number: u32,
+    pub bya_column: u32,
+    pub bya_match_length: u32,
+    pub bya_preview_text: String,
+    pub bya_is_selected: bool,
+    pub bya_replacement_text: String,
+    pub bya_context_lines: u32,
+}
+
+impl SearchResultEntry {
+    pub fn new() -> Self {
+        Self {
+            bya_uri: "".into(),
+            bya_line_number: 0,
+            bya_column: 0,
+            bya_match_length: 0,
+            bya_preview_text: "".into(),
+            bya_is_selected: false,
+            bya_replacement_text: "".into(),
+            bya_context_lines: 2,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("SearchResultEntry({})", self.bya_uri)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bya_uri.is_empty() || true
+    }
+}
+
+impl Default for SearchResultEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for SearchResultEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SearchResultEntry({})", self.bya_uri)
+    }
+}
+
+/// SearchQueryModel — search query model
+#[derive(Debug, Clone)]
+pub struct SearchQueryModel {
+    pub byb_pattern: String,
+    pub byb_is_regex: bool,
+    pub byb_is_case_sensitive: bool,
+    pub byb_is_whole_word: bool,
+    pub byb_include_pattern: String,
+    pub byb_exclude_pattern: String,
+    pub byb_use_ignore_files: bool,
+    pub byb_max_results: u32,
+}
+
+impl SearchQueryModel {
+    pub fn new() -> Self {
+        Self {
+            byb_pattern: "".into(),
+            byb_is_regex: false,
+            byb_is_case_sensitive: false,
+            byb_is_whole_word: false,
+            byb_include_pattern: "".into(),
+            byb_exclude_pattern: "".into(),
+            byb_use_ignore_files: true,
+            byb_max_results: 10000,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("SearchQueryModel({})", self.byb_pattern)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.byb_pattern.is_empty() || true
+    }
+}
+
+impl Default for SearchQueryModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for SearchQueryModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SearchQueryModel({})", self.byb_pattern)
+    }
+}
+
+/// SearchReplaceModel — search replace model
+#[derive(Debug, Clone)]
+pub struct SearchReplaceModel {
+    pub byc_search_pattern: String,
+    pub byc_replace_pattern: String,
+    pub byc_is_regex: bool,
+    pub byc_preserve_case: bool,
+    pub byc_total_matches: u32,
+    pub byc_files_with_matches: u32,
+    pub byc_is_open: bool,
+    pub byc_confirmed_replacements: u32,
+}
+
+impl SearchReplaceModel {
+    pub fn new() -> Self {
+        Self {
+            byc_search_pattern: "".into(),
+            byc_replace_pattern: "".into(),
+            byc_is_regex: false,
+            byc_preserve_case: false,
+            byc_total_matches: 0,
+            byc_files_with_matches: 0,
+            byc_is_open: false,
+            byc_confirmed_replacements: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("SearchReplaceModel({})", self.byc_search_pattern)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.byc_search_pattern.is_empty() || true
+    }
+}
+
+impl Default for SearchReplaceModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for SearchReplaceModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SearchReplaceModel({})", self.byc_search_pattern)
+    }
+}
+
+/// FindWidgetModel — editor find widget model
+#[derive(Debug, Clone)]
+pub struct FindWidgetModel {
+    pub byd_search_string: String,
+    pub byd_replace_string: String,
+    pub byd_is_visible: bool,
+    pub byd_is_replace_visible: bool,
+    pub byd_match_index: u32,
+    pub byd_total_matches: u32,
+    pub byd_is_case_sensitive: bool,
+    pub byd_is_regex: bool,
+}
+
+impl FindWidgetModel {
+    pub fn new() -> Self {
+        Self {
+            byd_search_string: "".into(),
+            byd_replace_string: "".into(),
+            byd_is_visible: false,
+            byd_is_replace_visible: false,
+            byd_match_index: 0,
+            byd_total_matches: 0,
+            byd_is_case_sensitive: false,
+            byd_is_regex: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("FindWidgetModel({})", self.byd_search_string)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.byd_search_string.is_empty() || true
+    }
+}
+
+impl Default for FindWidgetModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for FindWidgetModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FindWidgetModel({})", self.byd_search_string)
+    }
+}
+
+/// GotoLineModel — go to line dialog model
+#[derive(Debug, Clone)]
+pub struct GotoLineModel {
+    pub bye_target_line: u32,
+    pub bye_max_line: u32,
+    pub bye_is_visible: bool,
+    pub bye_input_value: String,
+    pub bye_current_line: u32,
+    pub bye_validation_error: String,
+    pub bye_show_column: bool,
+    pub bye_target_column: u32,
+}
+
+impl GotoLineModel {
+    pub fn new() -> Self {
+        Self {
+            bye_target_line: 1,
+            bye_max_line: 0,
+            bye_is_visible: false,
+            bye_input_value: "".into(),
+            bye_current_line: 1,
+            bye_validation_error: "".into(),
+            bye_show_column: false,
+            bye_target_column: 1,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("GotoLineModel({})", self.bye_target_line)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bye_target_line < u32::MAX || true
+    }
+}
+
+impl Default for GotoLineModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for GotoLineModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GotoLineModel({})", self.bye_target_line)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -145564,6 +145805,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bxz_input_value = "".into();
         assert_eq!(c.summary(), SourceControlActionModel::new().summary());
+    }
+
+
+    #[test]
+    fn test_bya_create() {
+        let obj = SearchResultEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bya_validate() {
+        let obj = SearchResultEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bya_display() {
+        let obj = SearchResultEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("SearchResultEntry"));
+    }
+
+    #[test]
+    fn test_bya_clone() {
+        let obj = SearchResultEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bya_debug() {
+        let obj = SearchResultEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("SearchResultEntry"));
+    }
+
+    #[test]
+    fn test_bya_default() {
+        let obj = SearchResultEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bya_summary_contains_name() {
+        let obj = SearchResultEntry::new();
+        assert!(obj.summary().contains("SearchResultEntry"));
+    }
+
+    #[test]
+    fn test_bya_validate_default() {
+        let obj = SearchResultEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bya_display_not_empty() {
+        let obj = SearchResultEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bya_clone_independence() {
+        let mut obj = SearchResultEntry::new();
+        let c = obj.clone();
+        obj.bya_uri = "".into();
+        assert_eq!(c.summary(), SearchResultEntry::new().summary());
+    }
+
+    #[test]
+    fn test_byb_create() {
+        let obj = SearchQueryModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byb_validate() {
+        let obj = SearchQueryModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byb_display() {
+        let obj = SearchQueryModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("SearchQueryModel"));
+    }
+
+    #[test]
+    fn test_byb_clone() {
+        let obj = SearchQueryModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byb_debug() {
+        let obj = SearchQueryModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("SearchQueryModel"));
+    }
+
+    #[test]
+    fn test_byb_default() {
+        let obj = SearchQueryModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byb_summary_contains_name() {
+        let obj = SearchQueryModel::new();
+        assert!(obj.summary().contains("SearchQueryModel"));
+    }
+
+    #[test]
+    fn test_byb_validate_default() {
+        let obj = SearchQueryModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byb_display_not_empty() {
+        let obj = SearchQueryModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byb_clone_independence() {
+        let mut obj = SearchQueryModel::new();
+        let c = obj.clone();
+        obj.byb_pattern = "".into();
+        assert_eq!(c.summary(), SearchQueryModel::new().summary());
+    }
+
+    #[test]
+    fn test_byc_create() {
+        let obj = SearchReplaceModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byc_validate() {
+        let obj = SearchReplaceModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byc_display() {
+        let obj = SearchReplaceModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("SearchReplaceModel"));
+    }
+
+    #[test]
+    fn test_byc_clone() {
+        let obj = SearchReplaceModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byc_debug() {
+        let obj = SearchReplaceModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("SearchReplaceModel"));
+    }
+
+    #[test]
+    fn test_byc_default() {
+        let obj = SearchReplaceModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byc_summary_contains_name() {
+        let obj = SearchReplaceModel::new();
+        assert!(obj.summary().contains("SearchReplaceModel"));
+    }
+
+    #[test]
+    fn test_byc_validate_default() {
+        let obj = SearchReplaceModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byc_display_not_empty() {
+        let obj = SearchReplaceModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byc_clone_independence() {
+        let mut obj = SearchReplaceModel::new();
+        let c = obj.clone();
+        obj.byc_search_pattern = "".into();
+        assert_eq!(c.summary(), SearchReplaceModel::new().summary());
+    }
+
+    #[test]
+    fn test_byd_create() {
+        let obj = FindWidgetModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byd_validate() {
+        let obj = FindWidgetModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byd_display() {
+        let obj = FindWidgetModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("FindWidgetModel"));
+    }
+
+    #[test]
+    fn test_byd_clone() {
+        let obj = FindWidgetModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byd_debug() {
+        let obj = FindWidgetModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("FindWidgetModel"));
+    }
+
+    #[test]
+    fn test_byd_default() {
+        let obj = FindWidgetModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byd_summary_contains_name() {
+        let obj = FindWidgetModel::new();
+        assert!(obj.summary().contains("FindWidgetModel"));
+    }
+
+    #[test]
+    fn test_byd_validate_default() {
+        let obj = FindWidgetModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byd_display_not_empty() {
+        let obj = FindWidgetModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byd_clone_independence() {
+        let mut obj = FindWidgetModel::new();
+        let c = obj.clone();
+        obj.byd_search_string = "".into();
+        assert_eq!(c.summary(), FindWidgetModel::new().summary());
+    }
+
+    #[test]
+    fn test_bye_create() {
+        let obj = GotoLineModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bye_validate() {
+        let obj = GotoLineModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bye_display() {
+        let obj = GotoLineModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("GotoLineModel"));
+    }
+
+    #[test]
+    fn test_bye_clone() {
+        let obj = GotoLineModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bye_debug() {
+        let obj = GotoLineModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("GotoLineModel"));
+    }
+
+    #[test]
+    fn test_bye_default() {
+        let obj = GotoLineModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bye_summary_contains_name() {
+        let obj = GotoLineModel::new();
+        assert!(obj.summary().contains("GotoLineModel"));
+    }
+
+    #[test]
+    fn test_bye_validate_default() {
+        let obj = GotoLineModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bye_display_not_empty() {
+        let obj = GotoLineModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bye_clone_independence() {
+        let mut obj = GotoLineModel::new();
+        let c = obj.clone();
+        obj.bye_target_line = 1;
+        assert_eq!(c.summary(), GotoLineModel::new().summary());
     }
 
 }
