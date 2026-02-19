@@ -58279,3 +58279,193 @@ mod bbi_tests {
         assert_eq!(BbiCursorStyle::BlockOutline.label(), "Block Outline");
     }
 }
+
+
+// --- bbj_: Editor minimap model ---
+
+/// Minimap rendering scale.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbjMinimapScale {
+    Scale1,
+    Scale2,
+    Scale3,
+}
+
+impl BbjMinimapScale {
+    pub fn factor(&self) -> u32 { match self { Self::Scale1 => 1, Self::Scale2 => 2, Self::Scale3 => 3 } }
+    pub fn label(&self) -> &'static str { match self { Self::Scale1 => "1x", Self::Scale2 => "2x", Self::Scale3 => "3x" } }
+}
+
+/// Minimap side placement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BbjMinimapSide { Left, Right }
+
+impl BbjMinimapSide {
+    pub fn label(&self) -> &'static str { match self { Self::Left => "Left", Self::Right => "Right" } }
+}
+
+/// Minimap display mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BbjMinimapShowMode { Always, MouseOver }
+
+/// A minimap decoration.
+#[derive(Debug, Clone)]
+pub struct BbjMinimapDeco {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub color: u32, // packed RGB
+    pub lane: BbjMinimapLane,
+}
+
+/// Minimap decoration lane.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BbjMinimapLane { Left, Center, Right, Full }
+
+impl BbjMinimapDeco {
+    pub fn new(start: u32, end: u32, color: u32, lane: BbjMinimapLane) -> Self {
+        Self { start_line: start, end_line: end, color, lane }
+    }
+
+    pub fn line_count(&self) -> u32 { self.end_line - self.start_line + 1 }
+}
+
+/// The minimap model.
+#[derive(Debug)]
+pub struct BbjMinimapModel {
+    enabled: bool,
+    side: BbjMinimapSide,
+    scale: BbjMinimapScale,
+    show_mode: BbjMinimapShowMode,
+    max_col: u32,
+    slider_visible: bool,
+    viewport_start: u32,
+    viewport_lines: u32,
+    total_lines: u32,
+    decorations: Vec<BbjMinimapDeco>,
+    render_characters: bool,
+}
+
+impl BbjMinimapModel {
+    pub fn new() -> Self {
+        Self {
+            enabled: true, side: BbjMinimapSide::Right, scale: BbjMinimapScale::Scale1,
+            show_mode: BbjMinimapShowMode::Always, max_col: 120, slider_visible: true,
+            viewport_start: 0, viewport_lines: 50, total_lines: 0,
+            decorations: Vec::new(), render_characters: true,
+        }
+    }
+
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn set_enabled(&mut self, v: bool) { self.enabled = v; }
+
+    pub fn side(&self) -> BbjMinimapSide { self.side }
+    pub fn set_side(&mut self, s: BbjMinimapSide) { self.side = s; }
+
+    pub fn scale(&self) -> BbjMinimapScale { self.scale }
+    pub fn set_scale(&mut self, s: BbjMinimapScale) { self.scale = s; }
+
+    pub fn set_total_lines(&mut self, n: u32) { self.total_lines = n; }
+    pub fn set_viewport(&mut self, start: u32, lines: u32) {
+        self.viewport_start = start;
+        self.viewport_lines = lines;
+    }
+
+    pub fn slider_position(&self) -> (f64, f64) {
+        if self.total_lines == 0 { return (0.0, 1.0); }
+        let top = self.viewport_start as f64 / self.total_lines as f64;
+        let height = self.viewport_lines as f64 / self.total_lines as f64;
+        (top, height.min(1.0))
+    }
+
+    pub fn click_to_line(&self, fraction: f64) -> u32 {
+        ((fraction * self.total_lines as f64) as u32).min(self.total_lines.saturating_sub(1))
+    }
+
+    pub fn add_decoration(&mut self, deco: BbjMinimapDeco) { self.decorations.push(deco); }
+    pub fn clear_decorations(&mut self) { self.decorations.clear(); }
+    pub fn decoration_count(&self) -> usize { self.decorations.len() }
+
+    pub fn decorations_in_range(&self, start: u32, end: u32) -> Vec<&BbjMinimapDeco> {
+        self.decorations.iter().filter(|d| d.end_line >= start && d.start_line <= end).collect()
+    }
+
+    pub fn width(&self) -> u32 {
+        if !self.enabled { return 0; }
+        (self.max_col / self.scale.factor()).min(100)
+    }
+
+    pub fn set_render_characters(&mut self, v: bool) { self.render_characters = v; }
+    pub fn render_characters(&self) -> bool { self.render_characters }
+}
+
+#[cfg(test)]
+mod bbj_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbj_scale() {
+        assert_eq!(BbjMinimapScale::Scale2.factor(), 2);
+        assert_eq!(BbjMinimapScale::Scale1.label(), "1x");
+    }
+
+    #[test]
+    fn test_bbj_side() {
+        assert_eq!(BbjMinimapSide::Right.label(), "Right");
+    }
+
+    #[test]
+    fn test_bbj_deco() {
+        let d = BbjMinimapDeco::new(5, 10, 0xFF0000, BbjMinimapLane::Full);
+        assert_eq!(d.line_count(), 6);
+    }
+
+    #[test]
+    fn test_bbj_model_slider() {
+        let mut m = BbjMinimapModel::new();
+        m.set_total_lines(1000);
+        m.set_viewport(100, 50);
+        let (top, height) = m.slider_position();
+        assert!((top - 0.1).abs() < 0.01);
+        assert!((height - 0.05).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_bbj_model_click() {
+        let mut m = BbjMinimapModel::new();
+        m.set_total_lines(1000);
+        assert_eq!(m.click_to_line(0.5), 500);
+        assert_eq!(m.click_to_line(1.0), 999);
+    }
+
+    #[test]
+    fn test_bbj_model_decorations() {
+        let mut m = BbjMinimapModel::new();
+        m.add_decoration(BbjMinimapDeco::new(5, 10, 0xFF, BbjMinimapLane::Left));
+        m.add_decoration(BbjMinimapDeco::new(20, 25, 0xFF, BbjMinimapLane::Right));
+        assert_eq!(m.decorations_in_range(8, 22).len(), 2);
+        assert_eq!(m.decorations_in_range(15, 18).len(), 0);
+    }
+
+    #[test]
+    fn test_bbj_model_width() {
+        let mut m = BbjMinimapModel::new();
+        assert!(m.width() > 0);
+        m.set_enabled(false);
+        assert_eq!(m.width(), 0);
+    }
+
+    #[test]
+    fn test_bbj_model_disabled() {
+        let mut m = BbjMinimapModel::new();
+        m.set_enabled(false);
+        assert!(!m.is_enabled());
+    }
+
+    #[test]
+    fn test_bbj_empty_slider() {
+        let m = BbjMinimapModel::new();
+        let (top, height) = m.slider_position();
+        assert_eq!(top, 0.0);
+        assert_eq!(height, 1.0);
+    }
+}
