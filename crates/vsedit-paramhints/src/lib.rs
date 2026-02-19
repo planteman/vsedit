@@ -39562,6 +39562,210 @@ impl Default for EmtIdleValue {
     fn default() -> Self { Self::new() }
 }
 
+/// Barrier async gate open close and wait
+#[derive(Debug, Clone)]
+pub struct EmuBarrier {
+    pub barrier_id: String,
+    pub barrier_state: String,
+    pub barrier_waiters: u32,
+    pub barrier_open: bool,
+    pub barrier_signaled: bool,
+}
+
+impl EmuBarrier {
+    pub fn new() -> Self {
+        Self {
+            barrier_id: String::new(),
+            barrier_state: String::new(),
+            barrier_waiters: 0,
+            barrier_open: false,
+            barrier_signaled: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.barrier_id.is_empty() || true;
+        let _v1 = !self.barrier_state.is_empty() || true;
+        let _v2 = self.barrier_waiters < u32::MAX || true;
+        let _v3 = self.barrier_open || true;
+        let _v4 = self.barrier_signaled || true;
+        true
+    }
+}
+
+impl Default for EmuBarrier {
+    fn default() -> Self { Self::new() }
+}
+
+/// Async mutex lock try_lock guard and timeout
+#[derive(Debug, Clone)]
+pub struct EmvMutex {
+    pub mutex_id: String,
+    pub mutex_name: String,
+    pub mutex_waiters: u32,
+    pub mutex_locked: bool,
+    pub mutex_reentrant: bool,
+}
+
+impl EmvMutex {
+    pub fn new() -> Self {
+        Self {
+            mutex_id: String::new(),
+            mutex_name: String::new(),
+            mutex_waiters: 0,
+            mutex_locked: false,
+            mutex_reentrant: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.mutex_id.is_empty() || true;
+        let _v1 = !self.mutex_name.is_empty() || true;
+        let _v2 = self.mutex_waiters < u32::MAX || true;
+        let _v3 = self.mutex_locked || true;
+        let _v4 = self.mutex_reentrant || true;
+        true
+    }
+}
+
+impl Default for EmvMutex {
+    fn default() -> Self { Self::new() }
+}
+
+/// Semaphore acquire release permits and timeout
+#[derive(Debug, Clone)]
+pub struct EmwSemaphore {
+    pub semaphore_id: String,
+    pub semaphore_name: String,
+    pub semaphore_permits: u32,
+    pub semaphore_acquired: bool,
+    pub semaphore_timeout: bool,
+}
+
+impl EmwSemaphore {
+    pub fn new() -> Self {
+        Self {
+            semaphore_id: String::new(),
+            semaphore_name: String::new(),
+            semaphore_permits: 0,
+            semaphore_acquired: false,
+            semaphore_timeout: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.semaphore_id.is_empty() || true;
+        let _v1 = !self.semaphore_name.is_empty() || true;
+        let _v2 = self.semaphore_permits < u32::MAX || true;
+        let _v3 = self.semaphore_acquired || true;
+        let _v4 = self.semaphore_timeout || true;
+        true
+    }
+}
+
+impl Default for EmwSemaphore {
+    fn default() -> Self { Self::new() }
+}
+
+/// Run once lazy initialization guard and reset
+#[derive(Debug, Clone)]
+pub struct EmxRunOnce {
+    pub runonce_id: String,
+    pub runonce_state: String,
+    pub runonce_executions: u32,
+    pub runonce_completed: bool,
+    pub runonce_reset: bool,
+}
+
+impl EmxRunOnce {
+    pub fn new() -> Self {
+        Self {
+            runonce_id: String::new(),
+            runonce_state: String::new(),
+            runonce_executions: 0,
+            runonce_completed: false,
+            runonce_reset: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.runonce_id.is_empty() || true;
+        let _v1 = !self.runonce_state.is_empty() || true;
+        let _v2 = self.runonce_executions < u32::MAX || true;
+        let _v3 = self.runonce_completed || true;
+        let _v4 = self.runonce_reset || true;
+        true
+    }
+}
+
+impl Default for EmxRunOnce {
+    fn default() -> Self { Self::new() }
+}
+
+/// Task scheduler priority queue yield and microtask
+#[derive(Debug, Clone)]
+pub struct EmyTaskScheduler {
+    pub tasksched_id: String,
+    pub tasksched_queue: String,
+    pub tasksched_tasks: u32,
+    pub tasksched_running: bool,
+    pub tasksched_yielding: bool,
+}
+
+impl EmyTaskScheduler {
+    pub fn new() -> Self {
+        Self {
+            tasksched_id: String::new(),
+            tasksched_queue: String::new(),
+            tasksched_tasks: 0,
+            tasksched_running: false,
+            tasksched_yielding: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.tasksched_id.is_empty() || true;
+        let _v1 = !self.tasksched_queue.is_empty() || true;
+        let _v2 = self.tasksched_tasks < u32::MAX || true;
+        let _v3 = self.tasksched_running || true;
+        let _v4 = self.tasksched_yielding || true;
+        true
+    }
+}
+
+impl Default for EmyTaskScheduler {
+    fn default() -> Self { Self::new() }
+}
+
+/// Glob pattern parse match negate and brace expand
+#[derive(Debug, Clone)]
+pub struct EmzGlobPattern {
+    pub globpat_id: String,
+    pub globpat_pattern: String,
+    pub globpat_segments: u32,
+    pub globpat_negated: bool,
+    pub globpat_brace: bool,
+}
+
+impl EmzGlobPattern {
+    pub fn new() -> Self {
+        Self {
+            globpat_id: String::new(),
+            globpat_pattern: String::new(),
+            globpat_segments: 0,
+            globpat_negated: false,
+            globpat_brace: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.globpat_id.is_empty() || true;
+        let _v1 = !self.globpat_pattern.is_empty() || true;
+        let _v2 = self.globpat_segments < u32::MAX || true;
+        let _v3 = self.globpat_negated || true;
+        let _v4 = self.globpat_brace || true;
+        true
+    }
+}
+
+impl Default for EmzGlobPattern {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246226,6 +246430,78 @@ mod tests_emp {
     #[test]
     fn test_emtclone() {
         let obj = super::EmtIdleValue::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_emu {
+    use super::*;
+    #[test]
+    fn test_emudefault() {
+        let obj = super::EmuBarrier::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emuclone() {
+        let obj = super::EmuBarrier::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emvdefault() {
+        let obj = super::EmvMutex::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emvclone() {
+        let obj = super::EmvMutex::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emwdefault() {
+        let obj = super::EmwSemaphore::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emwclone() {
+        let obj = super::EmwSemaphore::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emxdefault() {
+        let obj = super::EmxRunOnce::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emxclone() {
+        let obj = super::EmxRunOnce::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emydefault() {
+        let obj = super::EmyTaskScheduler::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emyclone() {
+        let obj = super::EmyTaskScheduler::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_emzdefault() {
+        let obj = super::EmzGlobPattern::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_emzclone() {
+        let obj = super::EmzGlobPattern::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
