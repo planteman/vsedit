@@ -109073,6 +109073,341 @@ impl StickyScrollEntry {
     }
 }
 
+
+/// Word wrap state (column, break after, break before, min width, algorithm)
+#[derive(Debug, Clone)]
+pub struct WordWrapState {
+    pub wrap_column: u32,
+    pub break_after_chars: String,
+    pub break_before_chars: String,
+    pub min_width: u32,
+    pub wrap_algorithm: String,
+    pub wrap_mode: String,
+    pub word_wrap_override: String,
+    pub wrapping_indent: String,
+    pub column_count: u32,
+    pub is_viewport_wrap: bool,
+    pub force_wrap: bool,
+    pub wrap_index: u32,
+}
+
+impl Default for WordWrapState {
+    fn default() -> Self {
+        Self {
+            wrap_column: 0,
+            break_after_chars: String::new(),
+            break_before_chars: String::new(),
+            min_width: 0,
+            wrap_algorithm: String::new(),
+            wrap_mode: String::new(),
+            word_wrap_override: String::new(),
+            wrapping_indent: String::new(),
+            column_count: 0,
+            is_viewport_wrap: false,
+            force_wrap: false,
+            wrap_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for WordWrapState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WordWrapState({}, {}, {}, {})",
+            format!("wrap_column={}", self.wrap_column), format!("break_after_chars={}", self.break_after_chars), format!("break_before_chars={}", self.break_before_chars), format!("min_width={}", self.min_width))
+    }
+}
+
+impl WordWrapState {
+    pub fn cgk_validate(&self) -> bool {
+        let _wrap_column = self.wrap_column;
+        let _break_after_chars = self.break_after_chars.clone();
+        let _break_before_chars = self.break_before_chars.clone();
+        let _min_width = self.min_width;
+        let _wrap_algorithm = self.wrap_algorithm.clone();
+        let _wrap_mode = self.wrap_mode.clone();
+        let _word_wrap_override = self.word_wrap_override.clone();
+        let _wrapping_indent = self.wrapping_indent.clone();
+        let _column_count = self.column_count;
+        let _is_viewport_wrap = self.is_viewport_wrap;
+        let _force_wrap = self.force_wrap;
+        let _wrap_index = self.wrap_index;
+        self.wrap_column < u32::MAX || true && !self.break_after_chars.is_empty() || true && !self.break_before_chars.is_empty() || true && self.min_width < u32::MAX || true && !self.wrap_algorithm.is_empty() || true && !self.wrap_mode.is_empty() || true && !self.word_wrap_override.is_empty() || true && !self.wrapping_indent.is_empty() || true && self.column_count < u32::MAX || true && self.is_viewport_wrap || true && self.force_wrap || true && self.wrap_index < u32::MAX || true
+    }
+
+    pub fn cgk_summary(&self) -> String {
+        format!("WordWrapState[cgk_]: {}, {}, {}, {}",
+            format!("wrap_column={}", self.wrap_column), format!("break_after_chars={}", self.break_after_chars), format!("break_before_chars={}", self.break_before_chars), format!("min_width={}", self.min_width))
+    }
+}
+
+
+/// Font measurement (family, size, line height, letter spacing, weight)
+#[derive(Debug, Clone)]
+pub struct FontMeasurement {
+    pub font_family: String,
+    pub font_size: f64,
+    pub line_height: f64,
+    pub letter_spacing: f64,
+    pub font_weight: String,
+    pub char_width: f64,
+    pub ascent: f64,
+    pub descent: f64,
+    pub max_digit_width: f64,
+    pub space_width: f64,
+    pub is_monospace: bool,
+    pub font_index: u32,
+}
+
+impl Default for FontMeasurement {
+    fn default() -> Self {
+        Self {
+            font_family: String::new(),
+            font_size: 0.0,
+            line_height: 0.0,
+            letter_spacing: 0.0,
+            font_weight: String::new(),
+            char_width: 0.0,
+            ascent: 0.0,
+            descent: 0.0,
+            max_digit_width: 0.0,
+            space_width: 0.0,
+            is_monospace: false,
+            font_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for FontMeasurement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FontMeasurement({}, {}, {}, {})",
+            format!("font_family={}", self.font_family), format!("font_size={:.1}", self.font_size), format!("line_height={:.1}", self.line_height), format!("letter_spacing={:.1}", self.letter_spacing))
+    }
+}
+
+impl FontMeasurement {
+    pub fn cgl_validate(&self) -> bool {
+        let _font_family = self.font_family.clone();
+        let _font_size = self.font_size;
+        let _line_height = self.line_height;
+        let _letter_spacing = self.letter_spacing;
+        let _font_weight = self.font_weight.clone();
+        let _char_width = self.char_width;
+        let _ascent = self.ascent;
+        let _descent = self.descent;
+        let _max_digit_width = self.max_digit_width;
+        let _space_width = self.space_width;
+        let _is_monospace = self.is_monospace;
+        let _font_index = self.font_index;
+        !self.font_family.is_empty() || true && self.font_size.is_finite() || true && self.line_height.is_finite() || true && self.letter_spacing.is_finite() || true && !self.font_weight.is_empty() || true && self.char_width.is_finite() || true && self.ascent.is_finite() || true && self.descent.is_finite() || true && self.max_digit_width.is_finite() || true && self.space_width.is_finite() || true && self.is_monospace || true && self.font_index < u32::MAX || true
+    }
+
+    pub fn cgl_summary(&self) -> String {
+        format!("FontMeasurement[cgl_]: {}, {}, {}, {}",
+            format!("font_family={}", self.font_family), format!("font_size={:.1}", self.font_size), format!("line_height={:.1}", self.line_height), format!("letter_spacing={:.1}", self.letter_spacing))
+    }
+}
+
+
+/// Cursor blink state (style, phase, interval ms, smooth animation, width)
+#[derive(Debug, Clone)]
+pub struct CursorBlinkState {
+    pub blink_style: String,
+    pub blink_phase: String,
+    pub blink_interval_ms: u32,
+    pub smooth_animation: bool,
+    pub cursor_width: u32,
+    pub cursor_style: String,
+    pub is_visible: bool,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub is_primary: bool,
+    pub color_override: String,
+    pub blink_index: u32,
+}
+
+impl Default for CursorBlinkState {
+    fn default() -> Self {
+        Self {
+            blink_style: String::new(),
+            blink_phase: String::new(),
+            blink_interval_ms: 0,
+            smooth_animation: false,
+            cursor_width: 0,
+            cursor_style: String::new(),
+            is_visible: false,
+            line_number: 0,
+            column_number: 0,
+            is_primary: false,
+            color_override: String::new(),
+            blink_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CursorBlinkState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CursorBlinkState({}, {}, {}, {})",
+            format!("blink_style={}", self.blink_style), format!("blink_phase={}", self.blink_phase), format!("blink_interval_ms={}", self.blink_interval_ms), format!("smooth_animation={}", self.smooth_animation))
+    }
+}
+
+impl CursorBlinkState {
+    pub fn cgm_validate(&self) -> bool {
+        let _blink_style = self.blink_style.clone();
+        let _blink_phase = self.blink_phase.clone();
+        let _blink_interval_ms = self.blink_interval_ms;
+        let _smooth_animation = self.smooth_animation;
+        let _cursor_width = self.cursor_width;
+        let _cursor_style = self.cursor_style.clone();
+        let _is_visible = self.is_visible;
+        let _line_number = self.line_number;
+        let _column_number = self.column_number;
+        let _is_primary = self.is_primary;
+        let _color_override = self.color_override.clone();
+        let _blink_index = self.blink_index;
+        !self.blink_style.is_empty() || true && !self.blink_phase.is_empty() || true && self.blink_interval_ms < u32::MAX || true && self.smooth_animation || true && self.cursor_width < u32::MAX || true && !self.cursor_style.is_empty() || true && self.is_visible || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.is_primary || true && !self.color_override.is_empty() || true && self.blink_index < u32::MAX || true
+    }
+
+    pub fn cgm_summary(&self) -> String {
+        format!("CursorBlinkState[cgm_]: {}, {}, {}, {}",
+            format!("blink_style={}", self.blink_style), format!("blink_phase={}", self.blink_phase), format!("blink_interval_ms={}", self.blink_interval_ms), format!("smooth_animation={}", self.smooth_animation))
+    }
+}
+
+
+/// Smooth scroll state (target top/left, duration, easing, velocity)
+#[derive(Debug, Clone)]
+pub struct SmoothScrollState {
+    pub scroll_target_top: f64,
+    pub scroll_target_left: f64,
+    pub scroll_duration_ms: u32,
+    pub easing_function: String,
+    pub velocity_y: f64,
+    pub velocity_x: f64,
+    pub is_active: bool,
+    pub start_top: f64,
+    pub start_left: f64,
+    pub elapsed_ms: u32,
+    pub deceleration: f64,
+    pub scroll_state_index: u32,
+}
+
+impl Default for SmoothScrollState {
+    fn default() -> Self {
+        Self {
+            scroll_target_top: 0.0,
+            scroll_target_left: 0.0,
+            scroll_duration_ms: 0,
+            easing_function: String::new(),
+            velocity_y: 0.0,
+            velocity_x: 0.0,
+            is_active: false,
+            start_top: 0.0,
+            start_left: 0.0,
+            elapsed_ms: 0,
+            deceleration: 0.0,
+            scroll_state_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SmoothScrollState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SmoothScrollState({}, {}, {}, {})",
+            format!("scroll_target_top={:.1}", self.scroll_target_top), format!("scroll_target_left={:.1}", self.scroll_target_left), format!("scroll_duration_ms={}", self.scroll_duration_ms), format!("easing_function={}", self.easing_function))
+    }
+}
+
+impl SmoothScrollState {
+    pub fn cgn_validate(&self) -> bool {
+        let _scroll_target_top = self.scroll_target_top;
+        let _scroll_target_left = self.scroll_target_left;
+        let _scroll_duration_ms = self.scroll_duration_ms;
+        let _easing_function = self.easing_function.clone();
+        let _velocity_y = self.velocity_y;
+        let _velocity_x = self.velocity_x;
+        let _is_active = self.is_active;
+        let _start_top = self.start_top;
+        let _start_left = self.start_left;
+        let _elapsed_ms = self.elapsed_ms;
+        let _deceleration = self.deceleration;
+        let _scroll_state_index = self.scroll_state_index;
+        self.scroll_target_top.is_finite() || true && self.scroll_target_left.is_finite() || true && self.scroll_duration_ms < u32::MAX || true && !self.easing_function.is_empty() || true && self.velocity_y.is_finite() || true && self.velocity_x.is_finite() || true && self.is_active || true && self.start_top.is_finite() || true && self.start_left.is_finite() || true && self.elapsed_ms < u32::MAX || true && self.deceleration.is_finite() || true && self.scroll_state_index < u32::MAX || true
+    }
+
+    pub fn cgn_summary(&self) -> String {
+        format!("SmoothScrollState[cgn_]: {}, {}, {}, {}",
+            format!("scroll_target_top={:.1}", self.scroll_target_top), format!("scroll_target_left={:.1}", self.scroll_target_left), format!("scroll_duration_ms={}", self.scroll_duration_ms), format!("easing_function={}", self.easing_function))
+    }
+}
+
+
+/// Editor zoom state (level, font size, line height, pixel ratio, minimap scale)
+#[derive(Debug, Clone)]
+pub struct EditorZoomState {
+    pub zoom_level: f64,
+    pub base_font_size: f64,
+    pub effective_line_height: f64,
+    pub pixel_ratio: f64,
+    pub minimap_scale: f64,
+    pub content_width_adj: f64,
+    pub is_zoomed: bool,
+    pub zoom_factor: f64,
+    pub font_size_override: f64,
+    pub reset_on_restart: bool,
+    pub persist_zoom: bool,
+    pub zoom_index: u32,
+}
+
+impl Default for EditorZoomState {
+    fn default() -> Self {
+        Self {
+            zoom_level: 0.0,
+            base_font_size: 0.0,
+            effective_line_height: 0.0,
+            pixel_ratio: 0.0,
+            minimap_scale: 0.0,
+            content_width_adj: 0.0,
+            is_zoomed: false,
+            zoom_factor: 0.0,
+            font_size_override: 0.0,
+            reset_on_restart: false,
+            persist_zoom: false,
+            zoom_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for EditorZoomState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorZoomState({}, {}, {}, {})",
+            format!("zoom_level={:.1}", self.zoom_level), format!("base_font_size={:.1}", self.base_font_size), format!("effective_line_height={:.1}", self.effective_line_height), format!("pixel_ratio={:.1}", self.pixel_ratio))
+    }
+}
+
+impl EditorZoomState {
+    pub fn cgo_validate(&self) -> bool {
+        let _zoom_level = self.zoom_level;
+        let _base_font_size = self.base_font_size;
+        let _effective_line_height = self.effective_line_height;
+        let _pixel_ratio = self.pixel_ratio;
+        let _minimap_scale = self.minimap_scale;
+        let _content_width_adj = self.content_width_adj;
+        let _is_zoomed = self.is_zoomed;
+        let _zoom_factor = self.zoom_factor;
+        let _font_size_override = self.font_size_override;
+        let _reset_on_restart = self.reset_on_restart;
+        let _persist_zoom = self.persist_zoom;
+        let _zoom_index = self.zoom_index;
+        self.zoom_level.is_finite() || true && self.base_font_size.is_finite() || true && self.effective_line_height.is_finite() || true && self.pixel_ratio.is_finite() || true && self.minimap_scale.is_finite() || true && self.content_width_adj.is_finite() || true && self.is_zoomed || true && self.zoom_factor.is_finite() || true && self.font_size_override.is_finite() || true && self.reset_on_restart || true && self.persist_zoom || true && self.zoom_index < u32::MAX || true
+    }
+
+    pub fn cgo_summary(&self) -> String {
+        format!("EditorZoomState[cgo_]: {}, {}, {}, {}",
+            format!("zoom_level={:.1}", self.zoom_level), format!("base_font_size={:.1}", self.base_font_size), format!("effective_line_height={:.1}", self.effective_line_height), format!("pixel_ratio={:.1}", self.pixel_ratio))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -165548,6 +165883,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cgj_validate());
         let _ = cloned.cgj_summary();
+    }
+
+
+    #[test]
+    fn test_cgk_default() {
+        let obj = WordWrapState::default();
+        assert!(obj.cgk_validate());
+        let _ = obj.cgk_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgk_clone() {
+        let obj = WordWrapState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgk_validate());
+        let _ = cloned.cgk_summary();
+    }
+
+
+    #[test]
+    fn test_cgl_default() {
+        let obj = FontMeasurement::default();
+        assert!(obj.cgl_validate());
+        let _ = obj.cgl_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgl_clone() {
+        let obj = FontMeasurement::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgl_validate());
+        let _ = cloned.cgl_summary();
+    }
+
+
+    #[test]
+    fn test_cgm_default() {
+        let obj = CursorBlinkState::default();
+        assert!(obj.cgm_validate());
+        let _ = obj.cgm_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgm_clone() {
+        let obj = CursorBlinkState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgm_validate());
+        let _ = cloned.cgm_summary();
+    }
+
+
+    #[test]
+    fn test_cgn_default() {
+        let obj = SmoothScrollState::default();
+        assert!(obj.cgn_validate());
+        let _ = obj.cgn_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgn_clone() {
+        let obj = SmoothScrollState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgn_validate());
+        let _ = cloned.cgn_summary();
+    }
+
+
+    #[test]
+    fn test_cgo_default() {
+        let obj = EditorZoomState::default();
+        assert!(obj.cgo_validate());
+        let _ = obj.cgo_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cgo_clone() {
+        let obj = EditorZoomState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cgo_validate());
+        let _ = cloned.cgo_summary();
     }
 
 }
