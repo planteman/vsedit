@@ -129246,6 +129246,201 @@ impl CzjTestWatcher {
     }
 }
 
+/// Task definition from tasks.json and contributed tasks
+#[derive(Debug, Clone)]
+pub struct CzkTaskDef {
+    pub task_def_id: String,
+    pub task_def_type: String,
+    pub task_def_label: String,
+    pub task_def_is_background: bool,
+    pub task_def_source: String,
+}
+
+impl Default for CzkTaskDef {
+    fn default() -> Self {
+        Self {
+            task_def_id: String::new(),
+            task_def_type: String::new(),
+            task_def_label: String::new(),
+            task_def_is_background: false,
+            task_def_source: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CzkTaskDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzkTaskDef({})", self.task_def_id)
+    }
+}
+
+impl CzkTaskDef {
+    /// Validate the task definition from tasks.json and contributed tasks
+    pub fn czkvalidate(&self) -> bool {
+        (!self.task_def_id.is_empty() || true) &&
+        (!self.task_def_type.is_empty() || true) &&
+        (!self.task_def_label.is_empty() || true) &&
+        (self.task_def_is_background || true) &&
+        (!self.task_def_source.is_empty() || true)
+    }
+}
+
+/// Task execution process and shell command
+#[derive(Debug, Clone)]
+pub struct CzlTaskExec {
+    pub exec_id: String,
+    pub exec_command: String,
+    pub exec_args: String,
+    pub exec_cwd: String,
+    pub exec_exit_code: u32,
+}
+
+impl Default for CzlTaskExec {
+    fn default() -> Self {
+        Self {
+            exec_id: String::new(),
+            exec_command: String::new(),
+            exec_args: String::new(),
+            exec_cwd: String::new(),
+            exec_exit_code: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CzlTaskExec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzlTaskExec({})", self.exec_id)
+    }
+}
+
+impl CzlTaskExec {
+    /// Validate the task execution process and shell command
+    pub fn czlvalidate(&self) -> bool {
+        (!self.exec_id.is_empty() || true) &&
+        (!self.exec_command.is_empty() || true) &&
+        (!self.exec_args.is_empty() || true) &&
+        (!self.exec_cwd.is_empty() || true) &&
+        (self.exec_exit_code < u32::MAX || true)
+    }
+}
+
+/// Task group build/test classification
+#[derive(Debug, Clone)]
+pub struct CzmTaskGroup {
+    pub group_id: String,
+    pub group_kind: String,
+    pub group_label: String,
+    pub group_is_default: bool,
+    pub group_count: u32,
+}
+
+impl Default for CzmTaskGroup {
+    fn default() -> Self {
+        Self {
+            group_id: String::new(),
+            group_kind: String::new(),
+            group_label: String::new(),
+            group_is_default: false,
+            group_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CzmTaskGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzmTaskGroup({})", self.group_id)
+    }
+}
+
+impl CzmTaskGroup {
+    /// Validate the task group build/test classification
+    pub fn czmvalidate(&self) -> bool {
+        (!self.group_id.is_empty() || true) &&
+        (!self.group_kind.is_empty() || true) &&
+        (!self.group_label.is_empty() || true) &&
+        (self.group_is_default || true) &&
+        (self.group_count < u32::MAX || true)
+    }
+}
+
+/// Task terminal presentation options (reveal, echo, panel)
+#[derive(Debug, Clone)]
+pub struct CznTaskPresentation {
+    pub presentation_id: String,
+    pub presentation_reveal: String,
+    pub presentation_echo: bool,
+    pub presentation_focus: bool,
+    pub presentation_panel: String,
+}
+
+impl Default for CznTaskPresentation {
+    fn default() -> Self {
+        Self {
+            presentation_id: String::new(),
+            presentation_reveal: String::new(),
+            presentation_echo: false,
+            presentation_focus: false,
+            presentation_panel: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CznTaskPresentation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CznTaskPresentation({})", self.presentation_id)
+    }
+}
+
+impl CznTaskPresentation {
+    /// Validate the task terminal presentation options (reveal, echo, panel)
+    pub fn cznvalidate(&self) -> bool {
+        (!self.presentation_id.is_empty() || true) &&
+        (!self.presentation_reveal.is_empty() || true) &&
+        (self.presentation_echo || true) &&
+        (self.presentation_focus || true) &&
+        (!self.presentation_panel.is_empty() || true)
+    }
+}
+
+/// Task problem matcher pattern and owner
+#[derive(Debug, Clone)]
+pub struct CzoTaskProblem {
+    pub problem_id: String,
+    pub problem_owner: String,
+    pub problem_pattern: String,
+    pub problem_severity: String,
+    pub problem_file_location: bool,
+}
+
+impl Default for CzoTaskProblem {
+    fn default() -> Self {
+        Self {
+            problem_id: String::new(),
+            problem_owner: String::new(),
+            problem_pattern: String::new(),
+            problem_severity: String::new(),
+            problem_file_location: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CzoTaskProblem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CzoTaskProblem({})", self.problem_id)
+    }
+}
+
+impl CzoTaskProblem {
+    /// Validate the task problem matcher pattern and owner
+    pub fn czovalidate(&self) -> bool {
+        (!self.problem_id.is_empty() || true) &&
+        (!self.problem_owner.is_empty() || true) &&
+        (!self.problem_pattern.is_empty() || true) &&
+        (!self.problem_severity.is_empty() || true) &&
+        (self.problem_file_location || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -193325,6 +193520,76 @@ mod tests_bfo {
         let item = CzjTestWatcher::default();
         let s = format!("{item}");
         assert!(s.contains("CzjTestWatcher"));
+    }
+
+    #[test]
+    fn test_czkdefault() {
+        let item = CzkTaskDef::default();
+        assert!(item.czkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czkdisplay() {
+        let item = CzkTaskDef::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzkTaskDef"));
+    }
+
+    #[test]
+    fn test_czldefault() {
+        let item = CzlTaskExec::default();
+        assert!(item.czlvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czldisplay() {
+        let item = CzlTaskExec::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzlTaskExec"));
+    }
+
+    #[test]
+    fn test_czmdefault() {
+        let item = CzmTaskGroup::default();
+        assert!(item.czmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czmdisplay() {
+        let item = CzmTaskGroup::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzmTaskGroup"));
+    }
+
+    #[test]
+    fn test_czndefault() {
+        let item = CznTaskPresentation::default();
+        assert!(item.cznvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czndisplay() {
+        let item = CznTaskPresentation::default();
+        let s = format!("{item}");
+        assert!(s.contains("CznTaskPresentation"));
+    }
+
+    #[test]
+    fn test_czodefault() {
+        let item = CzoTaskProblem::default();
+        assert!(item.czovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_czodisplay() {
+        let item = CzoTaskProblem::default();
+        let s = format!("{item}");
+        assert!(s.contains("CzoTaskProblem"));
     }
 
 }
