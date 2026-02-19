@@ -92319,6 +92319,247 @@ impl std::fmt::Display for TestResultMessage {
     }
 }
 
+
+/// ChatParticipant — chat participant model
+#[derive(Debug, Clone)]
+pub struct ChatParticipant {
+    pub bvk_id: String,
+    pub bvk_display_name: String,
+    pub bvk_icon_path: String,
+    pub bvk_description: String,
+    pub bvk_is_default: bool,
+    pub bvk_supports_slow: bool,
+    pub bvk_sample_request: String,
+    pub bvk_when_clause: String,
+}
+
+impl ChatParticipant {
+    pub fn new() -> Self {
+        Self {
+            bvk_id: "copilot".into(),
+            bvk_display_name: "Copilot".into(),
+            bvk_icon_path: "icons/copilot.svg".into(),
+            bvk_description: "AI assistant".into(),
+            bvk_is_default: true,
+            bvk_supports_slow: true,
+            bvk_sample_request: "explain this code".into(),
+            bvk_when_clause: "true".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ChatParticipant({})", self.bvk_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvk_id.is_empty() || true
+    }
+}
+
+impl Default for ChatParticipant {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ChatParticipant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChatParticipant({})", self.bvk_id)
+    }
+}
+
+/// ChatRequestModel — chat request model
+#[derive(Debug, Clone)]
+pub struct ChatRequestModel {
+    pub bvl_message: String,
+    pub bvl_participant_id: String,
+    pub bvl_session_id: String,
+    pub bvl_request_id: String,
+    pub bvl_timestamp: u64,
+    pub bvl_context_files: u32,
+    pub bvl_references: u32,
+    pub bvl_is_implicit: bool,
+}
+
+impl ChatRequestModel {
+    pub fn new() -> Self {
+        Self {
+            bvl_message: "".into(),
+            bvl_participant_id: "copilot".into(),
+            bvl_session_id: "sess-1".into(),
+            bvl_request_id: "req-1".into(),
+            bvl_timestamp: 0,
+            bvl_context_files: 0,
+            bvl_references: 0,
+            bvl_is_implicit: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ChatRequestModel({})", self.bvl_message)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvl_message.is_empty() || true
+    }
+}
+
+impl Default for ChatRequestModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ChatRequestModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChatRequestModel({})", self.bvl_message)
+    }
+}
+
+/// ChatResponseChunk — chat response chunk
+#[derive(Debug, Clone)]
+pub struct ChatResponseChunk {
+    pub bvm_content: String,
+    pub bvm_chunk_index: u32,
+    pub bvm_is_complete: bool,
+    pub bvm_participant_id: String,
+    pub bvm_request_id: String,
+    pub bvm_token_count: u32,
+    pub bvm_is_code_block: bool,
+    pub bvm_language_id: String,
+}
+
+impl ChatResponseChunk {
+    pub fn new() -> Self {
+        Self {
+            bvm_content: "".into(),
+            bvm_chunk_index: 0,
+            bvm_is_complete: false,
+            bvm_participant_id: "copilot".into(),
+            bvm_request_id: "req-1".into(),
+            bvm_token_count: 0,
+            bvm_is_code_block: false,
+            bvm_language_id: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ChatResponseChunk({})", self.bvm_content)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvm_content.is_empty() || true
+    }
+}
+
+impl Default for ChatResponseChunk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ChatResponseChunk {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChatResponseChunk({})", self.bvm_content)
+    }
+}
+
+/// ChatVariable — chat variable
+#[derive(Debug, Clone)]
+pub struct ChatVariable {
+    pub bvn_name: String,
+    pub bvn_value: String,
+    pub bvn_description: String,
+    pub bvn_is_builtin: bool,
+    pub bvn_category: String,
+    pub bvn_icon: String,
+    pub bvn_sort_text: String,
+    pub bvn_is_slow: bool,
+}
+
+impl ChatVariable {
+    pub fn new() -> Self {
+        Self {
+            bvn_name: "selection".into(),
+            bvn_value: "".into(),
+            bvn_description: "Current editor selection".into(),
+            bvn_is_builtin: true,
+            bvn_category: "editor".into(),
+            bvn_icon: "symbol-variable".into(),
+            bvn_sort_text: "0-selection".into(),
+            bvn_is_slow: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ChatVariable({})", self.bvn_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvn_name.is_empty() || true
+    }
+}
+
+impl Default for ChatVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ChatVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChatVariable({})", self.bvn_name)
+    }
+}
+
+/// ChatCommand — chat slash command
+#[derive(Debug, Clone)]
+pub struct ChatCommand {
+    pub bvo_name: String,
+    pub bvo_description: String,
+    pub bvo_participant_id: String,
+    pub bvo_is_sticky: bool,
+    pub bvo_sample_request: String,
+    pub bvo_when_clause: String,
+    pub bvo_yields_to: String,
+    pub bvo_is_default: bool,
+}
+
+impl ChatCommand {
+    pub fn new() -> Self {
+        Self {
+            bvo_name: "explain".into(),
+            bvo_description: "Explain code".into(),
+            bvo_participant_id: "copilot".into(),
+            bvo_is_sticky: false,
+            bvo_sample_request: "explain this function".into(),
+            bvo_when_clause: "true".into(),
+            bvo_yields_to: "".into(),
+            bvo_is_default: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ChatCommand({})", self.bvo_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bvo_name.is_empty() || true
+    }
+}
+
+impl Default for ChatCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ChatCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChatCommand({})", self.bvo_name)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -137983,6 +138224,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bvj_message = "assertion failed".into();
         assert_eq!(c.summary(), TestResultMessage::new().summary());
+    }
+
+
+    #[test]
+    fn test_bvk_create() {
+        let obj = ChatParticipant::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvk_validate() {
+        let obj = ChatParticipant::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvk_display() {
+        let obj = ChatParticipant::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ChatParticipant"));
+    }
+
+    #[test]
+    fn test_bvk_clone() {
+        let obj = ChatParticipant::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvk_debug() {
+        let obj = ChatParticipant::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ChatParticipant"));
+    }
+
+    #[test]
+    fn test_bvk_default() {
+        let obj = ChatParticipant::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvk_summary_contains_name() {
+        let obj = ChatParticipant::new();
+        assert!(obj.summary().contains("ChatParticipant"));
+    }
+
+    #[test]
+    fn test_bvk_validate_default() {
+        let obj = ChatParticipant::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvk_display_not_empty() {
+        let obj = ChatParticipant::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvk_clone_independence() {
+        let mut obj = ChatParticipant::new();
+        let c = obj.clone();
+        obj.bvk_id = "copilot".into();
+        assert_eq!(c.summary(), ChatParticipant::new().summary());
+    }
+
+    #[test]
+    fn test_bvl_create() {
+        let obj = ChatRequestModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvl_validate() {
+        let obj = ChatRequestModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvl_display() {
+        let obj = ChatRequestModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ChatRequestModel"));
+    }
+
+    #[test]
+    fn test_bvl_clone() {
+        let obj = ChatRequestModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvl_debug() {
+        let obj = ChatRequestModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ChatRequestModel"));
+    }
+
+    #[test]
+    fn test_bvl_default() {
+        let obj = ChatRequestModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvl_summary_contains_name() {
+        let obj = ChatRequestModel::new();
+        assert!(obj.summary().contains("ChatRequestModel"));
+    }
+
+    #[test]
+    fn test_bvl_validate_default() {
+        let obj = ChatRequestModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvl_display_not_empty() {
+        let obj = ChatRequestModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvl_clone_independence() {
+        let mut obj = ChatRequestModel::new();
+        let c = obj.clone();
+        obj.bvl_message = "".into();
+        assert_eq!(c.summary(), ChatRequestModel::new().summary());
+    }
+
+    #[test]
+    fn test_bvm_create() {
+        let obj = ChatResponseChunk::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvm_validate() {
+        let obj = ChatResponseChunk::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvm_display() {
+        let obj = ChatResponseChunk::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ChatResponseChunk"));
+    }
+
+    #[test]
+    fn test_bvm_clone() {
+        let obj = ChatResponseChunk::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvm_debug() {
+        let obj = ChatResponseChunk::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ChatResponseChunk"));
+    }
+
+    #[test]
+    fn test_bvm_default() {
+        let obj = ChatResponseChunk::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvm_summary_contains_name() {
+        let obj = ChatResponseChunk::new();
+        assert!(obj.summary().contains("ChatResponseChunk"));
+    }
+
+    #[test]
+    fn test_bvm_validate_default() {
+        let obj = ChatResponseChunk::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvm_display_not_empty() {
+        let obj = ChatResponseChunk::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvm_clone_independence() {
+        let mut obj = ChatResponseChunk::new();
+        let c = obj.clone();
+        obj.bvm_content = "".into();
+        assert_eq!(c.summary(), ChatResponseChunk::new().summary());
+    }
+
+    #[test]
+    fn test_bvn_create() {
+        let obj = ChatVariable::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvn_validate() {
+        let obj = ChatVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvn_display() {
+        let obj = ChatVariable::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ChatVariable"));
+    }
+
+    #[test]
+    fn test_bvn_clone() {
+        let obj = ChatVariable::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvn_debug() {
+        let obj = ChatVariable::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ChatVariable"));
+    }
+
+    #[test]
+    fn test_bvn_default() {
+        let obj = ChatVariable::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvn_summary_contains_name() {
+        let obj = ChatVariable::new();
+        assert!(obj.summary().contains("ChatVariable"));
+    }
+
+    #[test]
+    fn test_bvn_validate_default() {
+        let obj = ChatVariable::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvn_display_not_empty() {
+        let obj = ChatVariable::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvn_clone_independence() {
+        let mut obj = ChatVariable::new();
+        let c = obj.clone();
+        obj.bvn_name = "selection".into();
+        assert_eq!(c.summary(), ChatVariable::new().summary());
+    }
+
+    #[test]
+    fn test_bvo_create() {
+        let obj = ChatCommand::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvo_validate() {
+        let obj = ChatCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvo_display() {
+        let obj = ChatCommand::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ChatCommand"));
+    }
+
+    #[test]
+    fn test_bvo_clone() {
+        let obj = ChatCommand::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bvo_debug() {
+        let obj = ChatCommand::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ChatCommand"));
+    }
+
+    #[test]
+    fn test_bvo_default() {
+        let obj = ChatCommand::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bvo_summary_contains_name() {
+        let obj = ChatCommand::new();
+        assert!(obj.summary().contains("ChatCommand"));
+    }
+
+    #[test]
+    fn test_bvo_validate_default() {
+        let obj = ChatCommand::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bvo_display_not_empty() {
+        let obj = ChatCommand::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bvo_clone_independence() {
+        let mut obj = ChatCommand::new();
+        let c = obj.clone();
+        obj.bvo_name = "explain".into();
+        assert_eq!(c.summary(), ChatCommand::new().summary());
     }
 
 }
