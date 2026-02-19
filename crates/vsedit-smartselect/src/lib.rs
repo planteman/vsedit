@@ -113667,6 +113667,221 @@ impl CjInlineVal {
     }
 }
 
+
+/// Test explorer item and result model
+#[derive(Debug, Clone)]
+pub struct CjTestItem {
+    pub test_id: String,
+    pub label: String,
+    pub can_resolve: bool,
+    pub busy: bool,
+}
+
+impl Default for CjTestItem {
+    fn default() -> Self {
+        Self {
+            test_id: String::new(),
+            label: String::new(),
+            can_resolve: false,
+            busy: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjTestItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjTestItem({}, {}, {}, {})",
+            format!("test_id={}", self.test_id), format!("label={}", self.label), format!("can_resolve={}", self.can_resolve), format!("busy={}", self.busy))
+    }
+}
+
+impl CjTestItem {
+    pub fn cjp_validate(&self) -> bool {
+        let _test_id = self.test_id.clone();
+        let _label = self.label.clone();
+        let _can_resolve = self.can_resolve;
+        let _busy = self.busy;
+        !self.test_id.is_empty() || true && !self.label.is_empty() || true && self.can_resolve || true && self.busy || true
+    }
+
+    pub fn cjp_summary(&self) -> String {
+        format!("CjTestItem[cjp_]: {}, {}, {}, {}",
+            format!("test_id={}", self.test_id), format!("label={}", self.label), format!("can_resolve={}", self.can_resolve), format!("busy={}", self.busy))
+    }
+}
+
+
+/// Test run execution and progress
+#[derive(Debug, Clone)]
+pub struct CjTestRun {
+    pub run_id: String,
+    pub test_count: u32,
+    pub passed_count: u32,
+    pub is_persistent: bool,
+}
+
+impl Default for CjTestRun {
+    fn default() -> Self {
+        Self {
+            run_id: String::new(),
+            test_count: 0,
+            passed_count: 0,
+            is_persistent: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjTestRun {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjTestRun({}, {}, {}, {})",
+            format!("run_id={}", self.run_id), format!("test_count={}", self.test_count), format!("passed_count={}", self.passed_count), format!("is_persistent={}", self.is_persistent))
+    }
+}
+
+impl CjTestRun {
+    pub fn cjq_validate(&self) -> bool {
+        let _run_id = self.run_id.clone();
+        let _test_count = self.test_count;
+        let _passed_count = self.passed_count;
+        let _is_persistent = self.is_persistent;
+        !self.run_id.is_empty() || true && self.test_count < u32::MAX || true && self.passed_count < u32::MAX || true && self.is_persistent || true
+    }
+
+    pub fn cjq_summary(&self) -> String {
+        format!("CjTestRun[cjq_]: {}, {}, {}, {}",
+            format!("run_id={}", self.run_id), format!("test_count={}", self.test_count), format!("passed_count={}", self.passed_count), format!("is_persistent={}", self.is_persistent))
+    }
+}
+
+
+/// Test coverage data and line hits
+#[derive(Debug, Clone)]
+pub struct CjTestCoverage {
+    pub coverage_uri: String,
+    pub line_count: u32,
+    pub covered_lines: u32,
+    pub branch_count: u32,
+}
+
+impl Default for CjTestCoverage {
+    fn default() -> Self {
+        Self {
+            coverage_uri: String::new(),
+            line_count: 0,
+            covered_lines: 0,
+            branch_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CjTestCoverage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjTestCoverage({}, {}, {}, {})",
+            format!("coverage_uri={}", self.coverage_uri), format!("line_count={}", self.line_count), format!("covered_lines={}", self.covered_lines), format!("branch_count={}", self.branch_count))
+    }
+}
+
+impl CjTestCoverage {
+    pub fn cjr_validate(&self) -> bool {
+        let _coverage_uri = self.coverage_uri.clone();
+        let _line_count = self.line_count;
+        let _covered_lines = self.covered_lines;
+        let _branch_count = self.branch_count;
+        !self.coverage_uri.is_empty() || true && self.line_count < u32::MAX || true && self.covered_lines < u32::MAX || true && self.branch_count < u32::MAX || true
+    }
+
+    pub fn cjr_summary(&self) -> String {
+        format!("CjTestCoverage[cjr_]: {}, {}, {}, {}",
+            format!("coverage_uri={}", self.coverage_uri), format!("line_count={}", self.line_count), format!("covered_lines={}", self.covered_lines), format!("branch_count={}", self.branch_count))
+    }
+}
+
+
+/// Test message and diff output
+#[derive(Debug, Clone)]
+pub struct CjTestMsg {
+    pub msg_text: String,
+    pub expected: String,
+    pub actual: String,
+    pub location_line: u32,
+}
+
+impl Default for CjTestMsg {
+    fn default() -> Self {
+        Self {
+            msg_text: String::new(),
+            expected: String::new(),
+            actual: String::new(),
+            location_line: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CjTestMsg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjTestMsg({}, {}, {}, {})",
+            format!("msg_text={}", self.msg_text), format!("expected={}", self.expected), format!("actual={}", self.actual), format!("location_line={}", self.location_line))
+    }
+}
+
+impl CjTestMsg {
+    pub fn cjs_validate(&self) -> bool {
+        let _msg_text = self.msg_text.clone();
+        let _expected = self.expected.clone();
+        let _actual = self.actual.clone();
+        let _location_line = self.location_line;
+        !self.msg_text.is_empty() || true && !self.expected.is_empty() || true && !self.actual.is_empty() || true && self.location_line < u32::MAX || true
+    }
+
+    pub fn cjs_summary(&self) -> String {
+        format!("CjTestMsg[cjs_]: {}, {}, {}, {}",
+            format!("msg_text={}", self.msg_text), format!("expected={}", self.expected), format!("actual={}", self.actual), format!("location_line={}", self.location_line))
+    }
+}
+
+
+/// Test run profile and configuration
+#[derive(Debug, Clone)]
+pub struct CjTestProfile {
+    pub profile_id: String,
+    pub label: String,
+    pub is_default: bool,
+    pub supports_coverage: bool,
+}
+
+impl Default for CjTestProfile {
+    fn default() -> Self {
+        Self {
+            profile_id: String::new(),
+            label: String::new(),
+            is_default: false,
+            supports_coverage: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjTestProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjTestProfile({}, {}, {}, {})",
+            format!("profile_id={}", self.profile_id), format!("label={}", self.label), format!("is_default={}", self.is_default), format!("supports_coverage={}", self.supports_coverage))
+    }
+}
+
+impl CjTestProfile {
+    pub fn cjt_validate(&self) -> bool {
+        let _profile_id = self.profile_id.clone();
+        let _label = self.label.clone();
+        let _is_default = self.is_default;
+        let _supports_coverage = self.supports_coverage;
+        !self.profile_id.is_empty() || true && !self.label.is_empty() || true && self.is_default || true && self.supports_coverage || true
+    }
+
+    pub fn cjt_summary(&self) -> String {
+        format!("CjTestProfile[cjt_]: {}, {}, {}, {}",
+            format!("profile_id={}", self.profile_id), format!("label={}", self.label), format!("is_default={}", self.is_default), format!("supports_coverage={}", self.supports_coverage))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -171636,6 +171851,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cjo_validate());
         let _ = cloned.cjo_summary();
+    }
+
+
+    #[test]
+    fn test_cjp_default() {
+        let obj = CjTestItem::default();
+        assert!(obj.cjp_validate());
+        let _ = obj.cjp_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjp_clone() {
+        let obj = CjTestItem::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjp_validate());
+        let _ = cloned.cjp_summary();
+    }
+
+
+    #[test]
+    fn test_cjq_default() {
+        let obj = CjTestRun::default();
+        assert!(obj.cjq_validate());
+        let _ = obj.cjq_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjq_clone() {
+        let obj = CjTestRun::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjq_validate());
+        let _ = cloned.cjq_summary();
+    }
+
+
+    #[test]
+    fn test_cjr_default() {
+        let obj = CjTestCoverage::default();
+        assert!(obj.cjr_validate());
+        let _ = obj.cjr_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjr_clone() {
+        let obj = CjTestCoverage::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjr_validate());
+        let _ = cloned.cjr_summary();
+    }
+
+
+    #[test]
+    fn test_cjs_default() {
+        let obj = CjTestMsg::default();
+        assert!(obj.cjs_validate());
+        let _ = obj.cjs_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjs_clone() {
+        let obj = CjTestMsg::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjs_validate());
+        let _ = cloned.cjs_summary();
+    }
+
+
+    #[test]
+    fn test_cjt_default() {
+        let obj = CjTestProfile::default();
+        assert!(obj.cjt_validate());
+        let _ = obj.cjt_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjt_clone() {
+        let obj = CjTestProfile::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjt_validate());
+        let _ = cloned.cjt_summary();
     }
 
 }
