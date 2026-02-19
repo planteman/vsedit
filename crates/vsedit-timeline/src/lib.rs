@@ -65564,3 +65564,177 @@ mod bcs_tests {
         assert_eq!(r.icon(), 'U');
     }
 }
+
+
+// --- bct_: Editor test explorer view ---
+
+/// Test run state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BctTestState { Unset, Queued, Running, Passed, Failed, Skipped, Errored }
+
+/// A test item in the explorer.
+#[derive(Debug, Clone)]
+pub struct BctTestItem {
+    pub id: String,
+    pub label: String,
+    pub state: BctTestState,
+    pub children: Vec<BctTestItem>,
+    pub uri: Option<String>,
+    pub line: Option<u32>,
+    pub duration_ms: Option<u64>,
+    pub message: Option<String>,
+}
+
+impl BctTestItem {
+    pub fn new(id: &str, label: &str) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), state: BctTestState::Unset, children: Vec::new(), uri: None, line: None, duration_ms: None, message: None }
+    }
+
+    pub fn suite(id: &str, label: &str, children: Vec<BctTestItem>) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), state: BctTestState::Unset, children, uri: None, line: None, duration_ms: None, message: None }
+    }
+
+    pub fn icon(&self) -> &str {
+        match self.state {
+            BctTestState::Passed => "✓",
+            BctTestState::Failed | BctTestState::Errored => "✗",
+            BctTestState::Running => "⟳",
+            BctTestState::Queued => "◌",
+            BctTestState::Skipped => "⊘",
+            BctTestState::Unset => "○",
+        }
+    }
+
+    pub fn is_leaf(&self) -> bool { self.children.is_empty() }
+
+    pub fn total_count(&self) -> usize { 1 + self.children.iter().map(|c| c.total_count()).sum::<usize>() }
+
+    pub fn count_by_state(&self, state: BctTestState) -> usize {
+        let own = if self.state == state && self.is_leaf() { 1 } else { 0 };
+        own + self.children.iter().map(|c| c.count_by_state(state)).sum::<usize>()
+    }
+
+    pub fn set_state_recursive(&mut self, state: BctTestState) {
+        if self.is_leaf() { self.state = state; }
+        for child in &mut self.children { child.set_state_recursive(state); }
+    }
+
+    pub fn compute_state(&mut self) {
+        for child in &mut self.children { child.compute_state(); }
+        if !self.children.is_empty() {
+            if self.children.iter().all(|c| c.state == BctTestState::Passed) { self.state = BctTestState::Passed; }
+            else if self.children.iter().any(|c| c.state == BctTestState::Failed || c.state == BctTestState::Errored) { self.state = BctTestState::Failed; }
+            else if self.children.iter().any(|c| c.state == BctTestState::Running) { self.state = BctTestState::Running; }
+            else { self.state = BctTestState::Unset; }
+        }
+    }
+}
+
+/// The test explorer.
+#[derive(Debug)]
+pub struct BctTestExplorer {
+    roots: Vec<BctTestItem>,
+    cursor: usize,
+    filter: String,
+    show_only_failed: bool,
+}
+
+impl BctTestExplorer {
+    pub fn new() -> Self { Self { roots: Vec::new(), cursor: 0, filter: String::new(), show_only_failed: false } }
+
+    pub fn set_roots(&mut self, roots: Vec<BctTestItem>) { self.roots = roots; self.cursor = 0; }
+
+    pub fn total_tests(&self) -> usize { self.roots.iter().map(|r| r.total_count()).sum() }
+    pub fn passed_count(&self) -> usize { self.roots.iter().map(|r| r.count_by_state(BctTestState::Passed)).sum() }
+    pub fn failed_count(&self) -> usize { self.roots.iter().map(|r| r.count_by_state(BctTestState::Failed)).sum() }
+
+    pub fn set_filter(&mut self, f: &str) { self.filter = f.to_string(); }
+    pub fn toggle_failed_only(&mut self) { self.show_only_failed = !self.show_only_failed; }
+
+    pub fn summary(&self) -> String {
+        format!("{} passed, {} failed, {} total", self.passed_count(), self.failed_count(), self.total_tests())
+    }
+
+    pub fn run_all(&mut self) {
+        for root in &mut self.roots { root.set_state_recursive(BctTestState::Queued); }
+    }
+}
+
+#[cfg(test)]
+mod bct_tests {
+    use super::*;
+
+    #[test]
+    fn test_bct_item() {
+        let t = BctTestItem::new("t1", "test_add");
+        assert!(t.is_leaf());
+        assert_eq!(t.icon(), "○");
+    }
+
+    #[test]
+    fn test_bct_suite() {
+        let s = BctTestItem::suite("s1", "math", vec![BctTestItem::new("t1", "add"), BctTestItem::new("t2", "sub")]);
+        assert_eq!(s.total_count(), 3);
+    }
+
+    #[test]
+    fn test_bct_state_icon() {
+        let mut t = BctTestItem::new("t1", "test");
+        t.state = BctTestState::Passed;
+        assert_eq!(t.icon(), "✓");
+    }
+
+    #[test]
+    fn test_bct_count_by_state() {
+        let mut s = BctTestItem::suite("s", "S", vec![BctTestItem::new("a", "A"), BctTestItem::new("b", "B")]);
+        s.children[0].state = BctTestState::Passed;
+        s.children[1].state = BctTestState::Failed;
+        assert_eq!(s.count_by_state(BctTestState::Passed), 1);
+    }
+
+    #[test]
+    fn test_bct_compute_state() {
+        let mut s = BctTestItem::suite("s", "S", vec![BctTestItem::new("a", "A"), BctTestItem::new("b", "B")]);
+        s.children[0].state = BctTestState::Passed;
+        s.children[1].state = BctTestState::Passed;
+        s.compute_state();
+        assert_eq!(s.state, BctTestState::Passed);
+    }
+
+    #[test]
+    fn test_bct_compute_failed() {
+        let mut s = BctTestItem::suite("s", "S", vec![BctTestItem::new("a", "A"), BctTestItem::new("b", "B")]);
+        s.children[0].state = BctTestState::Passed;
+        s.children[1].state = BctTestState::Failed;
+        s.compute_state();
+        assert_eq!(s.state, BctTestState::Failed);
+    }
+
+    #[test]
+    fn test_bct_explorer() {
+        let mut ex = BctTestExplorer::new();
+        ex.set_roots(vec![BctTestItem::new("t1", "test1")]);
+        assert_eq!(ex.total_tests(), 1);
+    }
+
+    #[test]
+    fn test_bct_run_all() {
+        let mut ex = BctTestExplorer::new();
+        ex.set_roots(vec![BctTestItem::new("t1", "test1")]);
+        ex.run_all();
+        assert_eq!(ex.roots[0].state, BctTestState::Queued);
+    }
+
+    #[test]
+    fn test_bct_summary() {
+        let ex = BctTestExplorer::new();
+        assert!(ex.summary().contains("0 total"));
+    }
+
+    #[test]
+    fn test_bct_recursive_state() {
+        let mut s = BctTestItem::suite("s", "S", vec![BctTestItem::new("a", "A")]);
+        s.set_state_recursive(BctTestState::Running);
+        assert_eq!(s.children[0].state, BctTestState::Running);
+    }
+}
