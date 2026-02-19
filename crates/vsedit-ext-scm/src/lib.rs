@@ -59502,3 +59502,195 @@ mod bbo_tests {
         assert_eq!(r.encode().len(), 0);
     }
 }
+
+
+// --- bbp_: Editor inlay hints model ---
+
+/// Inlay hint kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbpInlayKind { Type, Parameter, Other }
+
+impl BbpInlayKind {
+    pub fn label(&self) -> &'static str {
+        match self { Self::Type => "Type", Self::Parameter => "Parameter", Self::Other => "Other" }
+    }
+}
+
+/// Part of an inlay hint label.
+#[derive(Debug, Clone)]
+pub struct BbpLabelPart {
+    pub text: String,
+    pub tooltip: Option<String>,
+    pub command_id: Option<String>,
+}
+
+impl BbpLabelPart {
+    pub fn text(s: &str) -> Self { Self { text: s.to_string(), tooltip: None, command_id: None } }
+
+    pub fn with_tooltip(mut self, t: &str) -> Self { self.tooltip = Some(t.to_string()); self }
+    pub fn with_command(mut self, c: &str) -> Self { self.command_id = Some(c.to_string()); self }
+    pub fn is_clickable(&self) -> bool { self.command_id.is_some() }
+}
+
+/// An inlay hint.
+#[derive(Debug, Clone)]
+pub struct BbpInlayHint {
+    pub line: u32,
+    pub col: u32,
+    pub kind: BbpInlayKind,
+    pub label: Vec<BbpLabelPart>,
+    pub padding_left: bool,
+    pub padding_right: bool,
+}
+
+impl BbpInlayHint {
+    pub fn new(line: u32, col: u32, kind: BbpInlayKind, text: &str) -> Self {
+        Self {
+            line, col, kind, label: vec![BbpLabelPart::text(text)],
+            padding_left: false, padding_right: false,
+        }
+    }
+
+    pub fn type_hint(line: u32, col: u32, text: &str) -> Self {
+        let mut h = Self::new(line, col, BbpInlayKind::Type, text);
+        h.padding_left = true;
+        h
+    }
+
+    pub fn param_hint(line: u32, col: u32, text: &str) -> Self {
+        let mut h = Self::new(line, col, BbpInlayKind::Parameter, text);
+        h.padding_right = true;
+        h
+    }
+
+    pub fn display_text(&self) -> String {
+        self.label.iter().map(|p| p.text.as_str()).collect::<Vec<_>>().join("")
+    }
+
+    pub fn total_width(&self) -> usize {
+        let text_len = self.display_text().len();
+        text_len + if self.padding_left { 1 } else { 0 } + if self.padding_right { 1 } else { 0 }
+    }
+}
+
+/// The inlay hints model.
+#[derive(Debug)]
+pub struct BbpInlayModel {
+    hints: Vec<BbpInlayHint>,
+    enabled: bool,
+    show_types: bool,
+    show_parameters: bool,
+    font_size: Option<u32>,
+}
+
+impl BbpInlayModel {
+    pub fn new() -> Self {
+        Self { hints: Vec::new(), enabled: true, show_types: true, show_parameters: true, font_size: None }
+    }
+
+    pub fn set_hints(&mut self, hints: Vec<BbpInlayHint>) { self.hints = hints; }
+    pub fn hints(&self) -> &[BbpInlayHint] { &self.hints }
+    pub fn hint_count(&self) -> usize { self.hints.len() }
+
+    pub fn hints_on_line(&self, line: u32) -> Vec<&BbpInlayHint> {
+        self.hints.iter().filter(|h| h.line == line && self.should_show(h)).collect()
+    }
+
+    fn should_show(&self, hint: &BbpInlayHint) -> bool {
+        if !self.enabled { return false; }
+        match hint.kind {
+            BbpInlayKind::Type => self.show_types,
+            BbpInlayKind::Parameter => self.show_parameters,
+            BbpInlayKind::Other => true,
+        }
+    }
+
+    pub fn visible_count(&self) -> usize {
+        self.hints.iter().filter(|h| self.should_show(h)).count()
+    }
+
+    pub fn set_enabled(&mut self, v: bool) { self.enabled = v; }
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn set_show_types(&mut self, v: bool) { self.show_types = v; }
+    pub fn set_show_parameters(&mut self, v: bool) { self.show_parameters = v; }
+    pub fn set_font_size(&mut self, s: Option<u32>) { self.font_size = s; }
+
+    pub fn clear(&mut self) { self.hints.clear(); }
+}
+
+#[cfg(test)]
+mod bbp_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbp_kind() {
+        assert_eq!(BbpInlayKind::Type.label(), "Type");
+    }
+
+    #[test]
+    fn test_bbp_label_part() {
+        let p = BbpLabelPart::text("hello").with_tooltip("world").with_command("cmd.go");
+        assert!(p.is_clickable());
+        assert_eq!(p.tooltip.as_deref(), Some("world"));
+    }
+
+    #[test]
+    fn test_bbp_type_hint() {
+        let h = BbpInlayHint::type_hint(5, 10, ": i32");
+        assert_eq!(h.display_text(), ": i32");
+        assert!(h.padding_left);
+        assert_eq!(h.kind, BbpInlayKind::Type);
+    }
+
+    #[test]
+    fn test_bbp_param_hint() {
+        let h = BbpInlayHint::param_hint(5, 10, "name:");
+        assert!(h.padding_right);
+        assert_eq!(h.kind, BbpInlayKind::Parameter);
+    }
+
+    #[test]
+    fn test_bbp_total_width() {
+        let h = BbpInlayHint::type_hint(0, 0, ": i32");
+        assert_eq!(h.total_width(), 6); // 5 + left padding
+    }
+
+    #[test]
+    fn test_bbp_model_basic() {
+        let mut m = BbpInlayModel::new();
+        m.set_hints(vec![
+            BbpInlayHint::type_hint(1, 5, ": i32"),
+            BbpInlayHint::param_hint(3, 10, "x:"),
+        ]);
+        assert_eq!(m.hint_count(), 2);
+        assert_eq!(m.hints_on_line(1).len(), 1);
+    }
+
+    #[test]
+    fn test_bbp_model_filter_types() {
+        let mut m = BbpInlayModel::new();
+        m.set_hints(vec![
+            BbpInlayHint::type_hint(1, 5, ": i32"),
+            BbpInlayHint::param_hint(1, 10, "x:"),
+        ]);
+        m.set_show_types(false);
+        assert_eq!(m.hints_on_line(1).len(), 1); // only param
+        assert_eq!(m.visible_count(), 1);
+    }
+
+    #[test]
+    fn test_bbp_model_disabled() {
+        let mut m = BbpInlayModel::new();
+        m.set_hints(vec![BbpInlayHint::type_hint(1, 5, ": i32")]);
+        m.set_enabled(false);
+        assert_eq!(m.visible_count(), 0);
+    }
+
+    #[test]
+    fn test_bbp_model_clear() {
+        let mut m = BbpInlayModel::new();
+        m.set_hints(vec![BbpInlayHint::type_hint(1, 5, ": i32")]);
+        m.clear();
+        assert_eq!(m.hint_count(), 0);
+    }
+}
