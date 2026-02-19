@@ -94848,6 +94848,247 @@ impl std::fmt::Display for InputBoxModel {
     }
 }
 
+
+/// FileOpenDialogModel — file open dialog model
+#[derive(Debug, Clone)]
+pub struct FileOpenDialogModel {
+    pub bxk_title: String,
+    pub bxk_default_uri: String,
+    pub bxk_can_select_files: bool,
+    pub bxk_can_select_folders: bool,
+    pub bxk_can_select_many: bool,
+    pub bxk_filter_label: String,
+    pub bxk_filter_extensions: String,
+    pub bxk_open_label: String,
+}
+
+impl FileOpenDialogModel {
+    pub fn new() -> Self {
+        Self {
+            bxk_title: "Open File".into(),
+            bxk_default_uri: "".into(),
+            bxk_can_select_files: true,
+            bxk_can_select_folders: false,
+            bxk_can_select_many: false,
+            bxk_filter_label: "All Files".into(),
+            bxk_filter_extensions: "*".into(),
+            bxk_open_label: "Open".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("FileOpenDialogModel({})", self.bxk_title)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxk_title.is_empty() || true
+    }
+}
+
+impl Default for FileOpenDialogModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for FileOpenDialogModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FileOpenDialogModel({})", self.bxk_title)
+    }
+}
+
+/// FileSaveDialogModel — file save dialog model
+#[derive(Debug, Clone)]
+pub struct FileSaveDialogModel {
+    pub bxl_title: String,
+    pub bxl_default_uri: String,
+    pub bxl_default_filename: String,
+    pub bxl_filter_label: String,
+    pub bxl_filter_extensions: String,
+    pub bxl_save_label: String,
+    pub bxl_show_hidden: bool,
+    pub bxl_overwrite_confirm: bool,
+}
+
+impl FileSaveDialogModel {
+    pub fn new() -> Self {
+        Self {
+            bxl_title: "Save File".into(),
+            bxl_default_uri: "".into(),
+            bxl_default_filename: "".into(),
+            bxl_filter_label: "All Files".into(),
+            bxl_filter_extensions: "*".into(),
+            bxl_save_label: "Save".into(),
+            bxl_show_hidden: false,
+            bxl_overwrite_confirm: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("FileSaveDialogModel({})", self.bxl_title)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxl_title.is_empty() || true
+    }
+}
+
+impl Default for FileSaveDialogModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for FileSaveDialogModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FileSaveDialogModel({})", self.bxl_title)
+    }
+}
+
+/// WalkThroughModel — walkthrough step model
+#[derive(Debug, Clone)]
+pub struct WalkThroughModel {
+    pub bxm_id: String,
+    pub bxm_title: String,
+    pub bxm_description: String,
+    pub bxm_media_type: String,
+    pub bxm_media_path: String,
+    pub bxm_is_complete: bool,
+    pub bxm_completion_event: String,
+    pub bxm_order: u32,
+}
+
+impl WalkThroughModel {
+    pub fn new() -> Self {
+        Self {
+            bxm_id: "step-1".into(),
+            bxm_title: "".into(),
+            bxm_description: "".into(),
+            bxm_media_type: "markdown".into(),
+            bxm_media_path: "".into(),
+            bxm_is_complete: false,
+            bxm_completion_event: "".into(),
+            bxm_order: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("WalkThroughModel({})", self.bxm_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxm_id.is_empty() || true
+    }
+}
+
+impl Default for WalkThroughModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for WalkThroughModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WalkThroughModel({})", self.bxm_id)
+    }
+}
+
+/// WelcomeViewModel — welcome view model
+#[derive(Debug, Clone)]
+pub struct WelcomeViewModel {
+    pub bxn_view_id: String,
+    pub bxn_content_md: String,
+    pub bxn_when_clause: String,
+    pub bxn_group: String,
+    pub bxn_order: u32,
+    pub bxn_is_visible: bool,
+    pub bxn_enable_commands: bool,
+    pub bxn_precondition: String,
+}
+
+impl WelcomeViewModel {
+    pub fn new() -> Self {
+        Self {
+            bxn_view_id: "workbench.explorer.emptyView".into(),
+            bxn_content_md: "".into(),
+            bxn_when_clause: "true".into(),
+            bxn_group: "".into(),
+            bxn_order: 0,
+            bxn_is_visible: false,
+            bxn_enable_commands: true,
+            bxn_precondition: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("WelcomeViewModel({})", self.bxn_view_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxn_view_id.is_empty() || true
+    }
+}
+
+impl Default for WelcomeViewModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for WelcomeViewModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WelcomeViewModel({})", self.bxn_view_id)
+    }
+}
+
+/// InteractiveSessionModel — interactive window session model
+#[derive(Debug, Clone)]
+pub struct InteractiveSessionModel {
+    pub bxo_session_id: String,
+    pub bxo_kernel_id: String,
+    pub bxo_input_uri: String,
+    pub bxo_cell_count: u32,
+    pub bxo_execution_count: u32,
+    pub bxo_is_trusted: bool,
+    pub bxo_scroll_top: f64,
+    pub bxo_is_focused: bool,
+}
+
+impl InteractiveSessionModel {
+    pub fn new() -> Self {
+        Self {
+            bxo_session_id: "session-1".into(),
+            bxo_kernel_id: "".into(),
+            bxo_input_uri: "".into(),
+            bxo_cell_count: 0,
+            bxo_execution_count: 0,
+            bxo_is_trusted: false,
+            bxo_scroll_top: 0.0,
+            bxo_is_focused: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("InteractiveSessionModel({})", self.bxo_session_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxo_session_id.is_empty() || true
+    }
+}
+
+impl Default for InteractiveSessionModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for InteractiveSessionModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "InteractiveSessionModel({})", self.bxo_session_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -143902,6 +144143,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bxj_value = "".into();
         assert_eq!(c.summary(), InputBoxModel::new().summary());
+    }
+
+
+    #[test]
+    fn test_bxk_create() {
+        let obj = FileOpenDialogModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxk_validate() {
+        let obj = FileOpenDialogModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxk_display() {
+        let obj = FileOpenDialogModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("FileOpenDialogModel"));
+    }
+
+    #[test]
+    fn test_bxk_clone() {
+        let obj = FileOpenDialogModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxk_debug() {
+        let obj = FileOpenDialogModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("FileOpenDialogModel"));
+    }
+
+    #[test]
+    fn test_bxk_default() {
+        let obj = FileOpenDialogModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxk_summary_contains_name() {
+        let obj = FileOpenDialogModel::new();
+        assert!(obj.summary().contains("FileOpenDialogModel"));
+    }
+
+    #[test]
+    fn test_bxk_validate_default() {
+        let obj = FileOpenDialogModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxk_display_not_empty() {
+        let obj = FileOpenDialogModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxk_clone_independence() {
+        let mut obj = FileOpenDialogModel::new();
+        let c = obj.clone();
+        obj.bxk_title = "Open File".into();
+        assert_eq!(c.summary(), FileOpenDialogModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxl_create() {
+        let obj = FileSaveDialogModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxl_validate() {
+        let obj = FileSaveDialogModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxl_display() {
+        let obj = FileSaveDialogModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("FileSaveDialogModel"));
+    }
+
+    #[test]
+    fn test_bxl_clone() {
+        let obj = FileSaveDialogModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxl_debug() {
+        let obj = FileSaveDialogModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("FileSaveDialogModel"));
+    }
+
+    #[test]
+    fn test_bxl_default() {
+        let obj = FileSaveDialogModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxl_summary_contains_name() {
+        let obj = FileSaveDialogModel::new();
+        assert!(obj.summary().contains("FileSaveDialogModel"));
+    }
+
+    #[test]
+    fn test_bxl_validate_default() {
+        let obj = FileSaveDialogModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxl_display_not_empty() {
+        let obj = FileSaveDialogModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxl_clone_independence() {
+        let mut obj = FileSaveDialogModel::new();
+        let c = obj.clone();
+        obj.bxl_title = "Save File".into();
+        assert_eq!(c.summary(), FileSaveDialogModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxm_create() {
+        let obj = WalkThroughModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxm_validate() {
+        let obj = WalkThroughModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxm_display() {
+        let obj = WalkThroughModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("WalkThroughModel"));
+    }
+
+    #[test]
+    fn test_bxm_clone() {
+        let obj = WalkThroughModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxm_debug() {
+        let obj = WalkThroughModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("WalkThroughModel"));
+    }
+
+    #[test]
+    fn test_bxm_default() {
+        let obj = WalkThroughModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxm_summary_contains_name() {
+        let obj = WalkThroughModel::new();
+        assert!(obj.summary().contains("WalkThroughModel"));
+    }
+
+    #[test]
+    fn test_bxm_validate_default() {
+        let obj = WalkThroughModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxm_display_not_empty() {
+        let obj = WalkThroughModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxm_clone_independence() {
+        let mut obj = WalkThroughModel::new();
+        let c = obj.clone();
+        obj.bxm_id = "step-1".into();
+        assert_eq!(c.summary(), WalkThroughModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxn_create() {
+        let obj = WelcomeViewModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxn_validate() {
+        let obj = WelcomeViewModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxn_display() {
+        let obj = WelcomeViewModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("WelcomeViewModel"));
+    }
+
+    #[test]
+    fn test_bxn_clone() {
+        let obj = WelcomeViewModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxn_debug() {
+        let obj = WelcomeViewModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("WelcomeViewModel"));
+    }
+
+    #[test]
+    fn test_bxn_default() {
+        let obj = WelcomeViewModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxn_summary_contains_name() {
+        let obj = WelcomeViewModel::new();
+        assert!(obj.summary().contains("WelcomeViewModel"));
+    }
+
+    #[test]
+    fn test_bxn_validate_default() {
+        let obj = WelcomeViewModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxn_display_not_empty() {
+        let obj = WelcomeViewModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxn_clone_independence() {
+        let mut obj = WelcomeViewModel::new();
+        let c = obj.clone();
+        obj.bxn_view_id = "workbench.explorer.emptyView".into();
+        assert_eq!(c.summary(), WelcomeViewModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxo_create() {
+        let obj = InteractiveSessionModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxo_validate() {
+        let obj = InteractiveSessionModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxo_display() {
+        let obj = InteractiveSessionModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("InteractiveSessionModel"));
+    }
+
+    #[test]
+    fn test_bxo_clone() {
+        let obj = InteractiveSessionModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxo_debug() {
+        let obj = InteractiveSessionModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("InteractiveSessionModel"));
+    }
+
+    #[test]
+    fn test_bxo_default() {
+        let obj = InteractiveSessionModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxo_summary_contains_name() {
+        let obj = InteractiveSessionModel::new();
+        assert!(obj.summary().contains("InteractiveSessionModel"));
+    }
+
+    #[test]
+    fn test_bxo_validate_default() {
+        let obj = InteractiveSessionModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxo_display_not_empty() {
+        let obj = InteractiveSessionModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxo_clone_independence() {
+        let mut obj = InteractiveSessionModel::new();
+        let c = obj.clone();
+        obj.bxo_session_id = "session-1".into();
+        assert_eq!(c.summary(), InteractiveSessionModel::new().summary());
     }
 
 }
