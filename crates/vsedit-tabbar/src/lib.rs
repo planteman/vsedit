@@ -83580,6 +83580,367 @@ impl BhtWebviewPanel {
     pub fn clear_messages(&mut self) { self.messages.clear(); }
 }
 
+
+/// Custom document content kind (bhu_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BhuContentKind {
+    Text(String),
+    Binary(Vec<u8>),
+}
+
+/// Custom editor edit (bhu_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhuCustomEdit {
+    pub id: usize,
+    pub label: String,
+}
+
+/// Custom editor model (bhu_)
+#[derive(Debug, Clone)]
+pub struct BhuCustomEditor {
+    pub view_type: String,
+    pub document_uri: String,
+    pub content: BhuContentKind,
+    pub edits: Vec<BhuCustomEdit>,
+    pub saved_edit_id: Option<usize>,
+    pub is_dirty: bool,
+}
+
+impl BhuCustomEditor {
+    pub fn new(view_type: String, uri: String, content: BhuContentKind) -> Self {
+        Self { view_type, document_uri: uri, content, edits: Vec::new(), saved_edit_id: None, is_dirty: false }
+    }
+    pub fn apply_edit(&mut self, edit: BhuCustomEdit) {
+        self.edits.push(edit);
+        self.is_dirty = true;
+    }
+    pub fn undo(&mut self) -> Option<BhuCustomEdit> {
+        let edit = self.edits.pop();
+        self.is_dirty = self.saved_edit_id != self.edits.last().map(|e| e.id);
+        edit
+    }
+    pub fn save(&mut self) {
+        self.saved_edit_id = self.edits.last().map(|e| e.id);
+        self.is_dirty = false;
+    }
+    pub fn revert(&mut self) {
+        while self.edits.last().map(|e| e.id) != self.saved_edit_id {
+            self.edits.pop();
+        }
+        self.is_dirty = false;
+    }
+    pub fn edit_count(&self) -> usize { self.edits.len() }
+}
+
+
+/// Notebook cell kind (bhv_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BhvCellKind {
+    Code,
+    Markdown,
+}
+
+/// Cell output (bhv_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhvCellOutput {
+    pub mime_type: String,
+    pub data: String,
+}
+
+/// Notebook cell (bhv_)
+#[derive(Debug, Clone)]
+pub struct BhvNotebookCell {
+    pub kind: BhvCellKind,
+    pub source: String,
+    pub outputs: Vec<BhvCellOutput>,
+    pub execution_order: Option<usize>,
+    pub is_running: bool,
+}
+
+/// Notebook model (bhv_)
+#[derive(Debug, Clone)]
+pub struct BhvNotebook {
+    pub uri: String,
+    pub cells: Vec<BhvNotebookCell>,
+    pub kernel: Option<String>,
+    pub active_cell: usize,
+}
+
+impl BhvNotebook {
+    pub fn new(uri: String) -> Self {
+        Self { uri, cells: Vec::new(), kernel: None, active_cell: 0 }
+    }
+    pub fn add_cell(&mut self, cell: BhvNotebookCell) { self.cells.push(cell); }
+    pub fn insert_cell(&mut self, idx: usize, cell: BhvNotebookCell) {
+        if idx <= self.cells.len() { self.cells.insert(idx, cell); }
+    }
+    pub fn remove_cell(&mut self, idx: usize) -> Option<BhvNotebookCell> {
+        if idx < self.cells.len() { Some(self.cells.remove(idx)) } else { None }
+    }
+    pub fn move_cell(&mut self, from: usize, to: usize) {
+        if from < self.cells.len() && to < self.cells.len() {
+            let cell = self.cells.remove(from);
+            self.cells.insert(to, cell);
+        }
+    }
+    pub fn set_kernel(&mut self, k: String) { self.kernel = Some(k); }
+    pub fn execute_cell(&mut self, idx: usize) {
+        if let Some(cell) = self.cells.get_mut(idx) { cell.is_running = true; }
+    }
+    pub fn finish_cell(&mut self, idx: usize, output: BhvCellOutput, order: usize) {
+        if let Some(cell) = self.cells.get_mut(idx) {
+            cell.is_running = false;
+            cell.outputs.push(output);
+            cell.execution_order = Some(order);
+        }
+    }
+    pub fn cell_count(&self) -> usize { self.cells.len() }
+    pub fn code_cells(&self) -> usize { self.cells.iter().filter(|c| c.kind == BhvCellKind::Code).count() }
+}
+
+
+/// Task group (bhw_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BhwTaskGroup {
+    Build,
+    Test,
+    None,
+}
+
+/// Task state (bhw_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BhwTaskState {
+    Idle,
+    Running,
+    Succeeded,
+    Failed,
+}
+
+/// Task definition (bhw_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhwTaskDef {
+    pub label: String,
+    pub task_type: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub group: BhwTaskGroup,
+    pub problem_matcher: Option<String>,
+}
+
+/// Task runner model (bhw_)
+#[derive(Debug, Clone)]
+pub struct BhwTaskRunner {
+    pub tasks: Vec<BhwTaskDef>,
+    pub running: Vec<(String, BhwTaskState)>,
+    pub history: Vec<String>,
+}
+
+impl BhwTaskRunner {
+    pub fn new() -> Self { Self { tasks: Vec::new(), running: Vec::new(), history: Vec::new() } }
+    pub fn add_task(&mut self, t: BhwTaskDef) { self.tasks.push(t); }
+    pub fn run_task(&mut self, label: &str) -> bool {
+        if self.tasks.iter().any(|t| t.label == label) {
+            self.running.push((label.to_string(), BhwTaskState::Running));
+            true
+        } else { false }
+    }
+    pub fn finish_task(&mut self, label: &str, success: bool) {
+        if let Some(r) = self.running.iter_mut().find(|(l, _)| l == label) {
+            r.1 = if success { BhwTaskState::Succeeded } else { BhwTaskState::Failed };
+        }
+        self.history.push(label.to_string());
+    }
+    pub fn terminate_task(&mut self, label: &str) {
+        self.running.retain(|(l, _)| l != label);
+    }
+    pub fn is_running(&self, label: &str) -> bool {
+        self.running.iter().any(|(l, s)| l == label && *s == BhwTaskState::Running)
+    }
+    pub fn build_tasks(&self) -> Vec<&BhwTaskDef> {
+        self.tasks.iter().filter(|t| t.group == BhwTaskGroup::Build).collect()
+    }
+    pub fn test_tasks(&self) -> Vec<&BhwTaskDef> {
+        self.tasks.iter().filter(|t| t.group == BhwTaskGroup::Test).collect()
+    }
+    pub fn task_count(&self) -> usize { self.tasks.len() }
+}
+
+
+/// Test result state (bhx_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BhxTestResult {
+    Passed,
+    Failed(String),
+    Skipped,
+    NotRun,
+}
+
+/// Test item (bhx_)
+#[derive(Debug, Clone)]
+pub struct BhxTestItem {
+    pub id: String,
+    pub label: String,
+    pub children: Vec<BhxTestItem>,
+    pub result: BhxTestResult,
+    pub duration_ms: Option<u64>,
+}
+
+/// Testing sidebar model (bhx_)
+#[derive(Debug, Clone)]
+pub struct BhxTestingSidebar {
+    pub items: Vec<BhxTestItem>,
+    pub filter: Option<String>,
+    pub show_only_failed: bool,
+}
+
+impl BhxTestingSidebar {
+    pub fn new() -> Self { Self { items: Vec::new(), filter: None, show_only_failed: false } }
+    pub fn add_item(&mut self, item: BhxTestItem) { self.items.push(item); }
+    fn count_results_recursive(item: &BhxTestItem, result: &BhxTestResult) -> usize {
+        let self_match = if std::mem::discriminant(&item.result) == std::mem::discriminant(result) { 1 } else { 0 };
+        self_match + item.children.iter().map(|c| Self::count_results_recursive(c, result)).sum::<usize>()
+    }
+    pub fn passed_count(&self) -> usize {
+        self.items.iter().map(|i| Self::count_results_recursive(i, &BhxTestResult::Passed)).sum()
+    }
+    pub fn failed_count(&self) -> usize {
+        self.items.iter().map(|i| Self::count_results_recursive(i, &BhxTestResult::Failed(String::new()))).sum()
+    }
+    pub fn set_filter(&mut self, f: String) { self.filter = Some(f); }
+    pub fn toggle_failed_only(&mut self) { self.show_only_failed = !self.show_only_failed; }
+    pub fn total_items(&self) -> usize { self.items.len() }
+    pub fn set_result(&mut self, id: &str, result: BhxTestResult, duration: Option<u64>) {
+        fn set_in(items: &mut [BhxTestItem], id: &str, result: &BhxTestResult, dur: Option<u64>) {
+            for item in items.iter_mut() {
+                if item.id == id { item.result = result.clone(); item.duration_ms = dur; return; }
+                set_in(&mut item.children, id, result, dur);
+            }
+        }
+        set_in(&mut self.items, id, &result, duration);
+    }
+}
+
+
+/// Comment author (bhy_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhyCommentAuthor {
+    pub name: String,
+    pub icon_path: Option<String>,
+}
+
+/// Comment reaction (bhy_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhyReaction {
+    pub label: String,
+    pub count: usize,
+    pub has_reacted: bool,
+}
+
+/// Comment (bhy_)
+#[derive(Debug, Clone)]
+pub struct BhyComment {
+    pub id: usize,
+    pub body: String,
+    pub author: BhyCommentAuthor,
+    pub reactions: Vec<BhyReaction>,
+    pub timestamp: u64,
+}
+
+/// Comment thread (bhy_)
+#[derive(Debug, Clone)]
+pub struct BhyCommentThread {
+    pub id: String,
+    pub file_path: String,
+    pub line_start: usize,
+    pub line_end: usize,
+    pub comments: Vec<BhyComment>,
+    pub is_resolved: bool,
+}
+
+impl BhyCommentThread {
+    pub fn new(id: String, path: String, start: usize, end: usize) -> Self {
+        Self { id, file_path: path, line_start: start, line_end: end, comments: Vec::new(), is_resolved: false }
+    }
+    pub fn add_comment(&mut self, c: BhyComment) { self.comments.push(c); }
+    pub fn resolve(&mut self) { self.is_resolved = true; }
+    pub fn unresolve(&mut self) { self.is_resolved = false; }
+    pub fn delete_comment(&mut self, id: usize) { self.comments.retain(|c| c.id != id); }
+    pub fn comment_count(&self) -> usize { self.comments.len() }
+    pub fn latest_comment(&self) -> Option<&BhyComment> { self.comments.last() }
+}
+
+/// Comments controller (bhy_)
+#[derive(Debug, Clone)]
+pub struct BhyCommentsController {
+    pub threads: Vec<BhyCommentThread>,
+}
+
+impl BhyCommentsController {
+    pub fn new() -> Self { Self { threads: Vec::new() } }
+    pub fn add_thread(&mut self, t: BhyCommentThread) { self.threads.push(t); }
+    pub fn threads_for_file(&self, path: &str) -> Vec<&BhyCommentThread> {
+        self.threads.iter().filter(|t| t.file_path == path).collect()
+    }
+    pub fn unresolved_count(&self) -> usize {
+        self.threads.iter().filter(|t| !t.is_resolved).count()
+    }
+    pub fn thread_count(&self) -> usize { self.threads.len() }
+}
+
+
+/// Chat message role (bhz_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BhzChatRole {
+    User,
+    Assistant,
+    System,
+}
+
+/// Chat message (bhz_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhzChatMessage {
+    pub role: BhzChatRole,
+    pub content: String,
+    pub timestamp: u64,
+}
+
+/// Inline suggestion (bhz_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BhzInlineSuggestion {
+    pub text: String,
+    pub line: usize,
+    pub column: usize,
+    pub is_visible: bool,
+}
+
+/// Chat session model (bhz_)
+#[derive(Debug, Clone)]
+pub struct BhzChatSession {
+    pub id: String,
+    pub messages: Vec<BhzChatMessage>,
+    pub is_streaming: bool,
+    pub inline_suggestion: Option<BhzInlineSuggestion>,
+}
+
+impl BhzChatSession {
+    pub fn new(id: String) -> Self {
+        Self { id, messages: Vec::new(), is_streaming: false, inline_suggestion: None }
+    }
+    pub fn add_message(&mut self, msg: BhzChatMessage) { self.messages.push(msg); }
+    pub fn start_streaming(&mut self) { self.is_streaming = true; }
+    pub fn finish_streaming(&mut self) { self.is_streaming = false; }
+    pub fn show_suggestion(&mut self, s: BhzInlineSuggestion) { self.inline_suggestion = Some(s); }
+    pub fn accept_suggestion(&mut self) -> Option<BhzInlineSuggestion> {
+        self.inline_suggestion.take()
+    }
+    pub fn dismiss_suggestion(&mut self) { self.inline_suggestion = None; }
+    pub fn message_count(&self) -> usize { self.messages.len() }
+    pub fn last_assistant_message(&self) -> Option<&BhzChatMessage> {
+        self.messages.iter().rev().find(|m| m.role == BhzChatRole::Assistant)
+    }
+    pub fn clear(&mut self) { self.messages.clear(); self.inline_suggestion = None; self.is_streaming = false; }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -88783,6 +89144,423 @@ mod tests_bfo {
             p.post_message(BhtWebviewMessage { command: format!("cmd{i}"), payload: "{}".into() });
         }
         assert_eq!(p.message_count(), 5);
+    }
+
+
+    #[test]
+    fn test_bhu_custom_editor_new() {
+        let e = BhuCustomEditor::new("hex".into(), "file.bin".into(), BhuContentKind::Binary(vec![0, 1, 2]));
+        assert_eq!(e.view_type, "hex");
+        assert!(!e.is_dirty);
+    }
+    #[test]
+    fn test_bhu_apply_edit() {
+        let mut e = BhuCustomEditor::new("hex".into(), "f".into(), BhuContentKind::Text("hi".into()));
+        e.apply_edit(BhuCustomEdit { id: 1, label: "insert".into() });
+        assert!(e.is_dirty);
+        assert_eq!(e.edit_count(), 1);
+    }
+    #[test]
+    fn test_bhu_undo() {
+        let mut e = BhuCustomEditor::new("hex".into(), "f".into(), BhuContentKind::Text("".into()));
+        e.apply_edit(BhuCustomEdit { id: 1, label: "a".into() });
+        let undone = e.undo();
+        assert_eq!(undone.unwrap().id, 1);
+        assert_eq!(e.edit_count(), 0);
+    }
+    #[test]
+    fn test_bhu_save() {
+        let mut e = BhuCustomEditor::new("hex".into(), "f".into(), BhuContentKind::Text("".into()));
+        e.apply_edit(BhuCustomEdit { id: 1, label: "a".into() });
+        e.save();
+        assert!(!e.is_dirty);
+        assert_eq!(e.saved_edit_id, Some(1));
+    }
+    #[test]
+    fn test_bhu_revert() {
+        let mut e = BhuCustomEditor::new("hex".into(), "f".into(), BhuContentKind::Text("".into()));
+        e.apply_edit(BhuCustomEdit { id: 1, label: "a".into() });
+        e.save();
+        e.apply_edit(BhuCustomEdit { id: 2, label: "b".into() });
+        e.revert();
+        assert_eq!(e.edit_count(), 1);
+        assert!(!e.is_dirty);
+    }
+    #[test]
+    fn test_bhu_text_content() {
+        let c = BhuContentKind::Text("hello world".into());
+        if let BhuContentKind::Text(t) = &c { assert_eq!(t, "hello world"); }
+    }
+    #[test]
+    fn test_bhu_binary_content() {
+        let c = BhuContentKind::Binary(vec![0xFF, 0xD8, 0xFF]);
+        if let BhuContentKind::Binary(b) = &c { assert_eq!(b.len(), 3); }
+    }
+    #[test]
+    fn test_bhu_undo_after_save() {
+        let mut e = BhuCustomEditor::new("hex".into(), "f".into(), BhuContentKind::Text("".into()));
+        e.apply_edit(BhuCustomEdit { id: 1, label: "a".into() });
+        e.save();
+        e.undo();
+        assert!(e.is_dirty);
+    }
+    #[test]
+    fn test_bhu_edit_label() {
+        let edit = BhuCustomEdit { id: 42, label: "Replace bytes".into() };
+        assert_eq!(edit.label, "Replace bytes");
+    }
+    #[test]
+    fn test_bhu_empty_undo() {
+        let mut e = BhuCustomEditor::new("hex".into(), "f".into(), BhuContentKind::Text("".into()));
+        assert!(e.undo().is_none());
+    }
+
+
+    #[test]
+    fn test_bhv_notebook_new() {
+        let n = BhvNotebook::new("nb.ipynb".into());
+        assert_eq!(n.cell_count(), 0);
+        assert!(n.kernel.is_none());
+    }
+    #[test]
+    fn test_bhv_add_cell() {
+        let mut n = BhvNotebook::new("nb.ipynb".into());
+        n.add_cell(BhvNotebookCell { kind: BhvCellKind::Code, source: "print(1)".into(), outputs: vec![], execution_order: None, is_running: false });
+        assert_eq!(n.cell_count(), 1);
+    }
+    #[test]
+    fn test_bhv_insert_remove_cell() {
+        let mut n = BhvNotebook::new("nb.ipynb".into());
+        n.add_cell(BhvNotebookCell { kind: BhvCellKind::Code, source: "a".into(), outputs: vec![], execution_order: None, is_running: false });
+        n.insert_cell(0, BhvNotebookCell { kind: BhvCellKind::Markdown, source: "# Title".into(), outputs: vec![], execution_order: None, is_running: false });
+        assert_eq!(n.cells[0].kind, BhvCellKind::Markdown);
+        n.remove_cell(0);
+        assert_eq!(n.cell_count(), 1);
+    }
+    #[test]
+    fn test_bhv_move_cell() {
+        let mut n = BhvNotebook::new("nb.ipynb".into());
+        n.add_cell(BhvNotebookCell { kind: BhvCellKind::Code, source: "a".into(), outputs: vec![], execution_order: None, is_running: false });
+        n.add_cell(BhvNotebookCell { kind: BhvCellKind::Code, source: "b".into(), outputs: vec![], execution_order: None, is_running: false });
+        n.move_cell(1, 0);
+        assert_eq!(n.cells[0].source, "b");
+    }
+    #[test]
+    fn test_bhv_set_kernel() {
+        let mut n = BhvNotebook::new("nb.ipynb".into());
+        n.set_kernel("python3".into());
+        assert_eq!(n.kernel.as_deref(), Some("python3"));
+    }
+    #[test]
+    fn test_bhv_execute_finish_cell() {
+        let mut n = BhvNotebook::new("nb.ipynb".into());
+        n.add_cell(BhvNotebookCell { kind: BhvCellKind::Code, source: "1+1".into(), outputs: vec![], execution_order: None, is_running: false });
+        n.execute_cell(0);
+        assert!(n.cells[0].is_running);
+        n.finish_cell(0, BhvCellOutput { mime_type: "text/plain".into(), data: "2".into() }, 1);
+        assert!(!n.cells[0].is_running);
+        assert_eq!(n.cells[0].execution_order, Some(1));
+    }
+    #[test]
+    fn test_bhv_code_cells_count() {
+        let mut n = BhvNotebook::new("nb.ipynb".into());
+        n.add_cell(BhvNotebookCell { kind: BhvCellKind::Code, source: "a".into(), outputs: vec![], execution_order: None, is_running: false });
+        n.add_cell(BhvNotebookCell { kind: BhvCellKind::Markdown, source: "b".into(), outputs: vec![], execution_order: None, is_running: false });
+        assert_eq!(n.code_cells(), 1);
+    }
+    #[test]
+    fn test_bhv_cell_output() {
+        let o = BhvCellOutput { mime_type: "image/png".into(), data: "base64...".into() };
+        assert_eq!(o.mime_type, "image/png");
+    }
+    #[test]
+    fn test_bhv_remove_nonexistent() {
+        let mut n = BhvNotebook::new("nb.ipynb".into());
+        assert!(n.remove_cell(5).is_none());
+    }
+    #[test]
+    fn test_bhv_multiple_outputs() {
+        let mut n = BhvNotebook::new("nb.ipynb".into());
+        n.add_cell(BhvNotebookCell { kind: BhvCellKind::Code, source: "x".into(), outputs: vec![], execution_order: None, is_running: false });
+        n.finish_cell(0, BhvCellOutput { mime_type: "text/plain".into(), data: "1".into() }, 1);
+        n.finish_cell(0, BhvCellOutput { mime_type: "text/html".into(), data: "<b>1</b>".into() }, 2);
+        assert_eq!(n.cells[0].outputs.len(), 2);
+    }
+
+
+    #[test]
+    fn test_bhw_task_runner_new() {
+        let r = BhwTaskRunner::new();
+        assert_eq!(r.task_count(), 0);
+    }
+    #[test]
+    fn test_bhw_add_task() {
+        let mut r = BhwTaskRunner::new();
+        r.add_task(BhwTaskDef { label: "build".into(), task_type: "shell".into(), command: "cargo".into(), args: vec!["build".into()], group: BhwTaskGroup::Build, problem_matcher: Some("$rustc".into()) });
+        assert_eq!(r.task_count(), 1);
+    }
+    #[test]
+    fn test_bhw_run_task() {
+        let mut r = BhwTaskRunner::new();
+        r.add_task(BhwTaskDef { label: "test".into(), task_type: "shell".into(), command: "cargo".into(), args: vec!["test".into()], group: BhwTaskGroup::Test, problem_matcher: None });
+        assert!(r.run_task("test"));
+        assert!(r.is_running("test"));
+    }
+    #[test]
+    fn test_bhw_finish_task() {
+        let mut r = BhwTaskRunner::new();
+        r.add_task(BhwTaskDef { label: "t".into(), task_type: "shell".into(), command: "echo".into(), args: vec![], group: BhwTaskGroup::None, problem_matcher: None });
+        r.run_task("t");
+        r.finish_task("t", true);
+        assert!(!r.is_running("t"));
+        assert_eq!(r.history.len(), 1);
+    }
+    #[test]
+    fn test_bhw_terminate_task() {
+        let mut r = BhwTaskRunner::new();
+        r.add_task(BhwTaskDef { label: "t".into(), task_type: "shell".into(), command: "sleep".into(), args: vec!["100".into()], group: BhwTaskGroup::None, problem_matcher: None });
+        r.run_task("t");
+        r.terminate_task("t");
+        assert!(!r.is_running("t"));
+    }
+    #[test]
+    fn test_bhw_run_nonexistent() {
+        let mut r = BhwTaskRunner::new();
+        assert!(!r.run_task("nope"));
+    }
+    #[test]
+    fn test_bhw_build_tasks() {
+        let mut r = BhwTaskRunner::new();
+        r.add_task(BhwTaskDef { label: "build".into(), task_type: "shell".into(), command: "make".into(), args: vec![], group: BhwTaskGroup::Build, problem_matcher: None });
+        r.add_task(BhwTaskDef { label: "lint".into(), task_type: "shell".into(), command: "lint".into(), args: vec![], group: BhwTaskGroup::None, problem_matcher: None });
+        assert_eq!(r.build_tasks().len(), 1);
+    }
+    #[test]
+    fn test_bhw_test_tasks() {
+        let mut r = BhwTaskRunner::new();
+        r.add_task(BhwTaskDef { label: "test".into(), task_type: "shell".into(), command: "pytest".into(), args: vec![], group: BhwTaskGroup::Test, problem_matcher: None });
+        assert_eq!(r.test_tasks().len(), 1);
+    }
+    #[test]
+    fn test_bhw_task_fields() {
+        let t = BhwTaskDef { label: "build".into(), task_type: "npm".into(), command: "npm".into(), args: vec!["run".into(), "build".into()], group: BhwTaskGroup::Build, problem_matcher: Some("$tsc".into()) };
+        assert_eq!(t.args.len(), 2);
+    }
+    #[test]
+    fn test_bhw_task_history() {
+        let mut r = BhwTaskRunner::new();
+        r.add_task(BhwTaskDef { label: "a".into(), task_type: "shell".into(), command: "a".into(), args: vec![], group: BhwTaskGroup::None, problem_matcher: None });
+        r.run_task("a");
+        r.finish_task("a", true);
+        r.run_task("a");
+        r.finish_task("a", false);
+        assert_eq!(r.history.len(), 2);
+    }
+
+
+    #[test]
+    fn test_bhx_testing_new() {
+        let s = BhxTestingSidebar::new();
+        assert_eq!(s.total_items(), 0);
+        assert!(!s.show_only_failed);
+    }
+    #[test]
+    fn test_bhx_add_item() {
+        let mut s = BhxTestingSidebar::new();
+        s.add_item(BhxTestItem { id: "t1".into(), label: "Test 1".into(), children: vec![], result: BhxTestResult::NotRun, duration_ms: None });
+        assert_eq!(s.total_items(), 1);
+    }
+    #[test]
+    fn test_bhx_passed_count() {
+        let mut s = BhxTestingSidebar::new();
+        s.add_item(BhxTestItem { id: "t1".into(), label: "T1".into(), children: vec![], result: BhxTestResult::Passed, duration_ms: Some(10) });
+        s.add_item(BhxTestItem { id: "t2".into(), label: "T2".into(), children: vec![], result: BhxTestResult::Failed("assert".into()), duration_ms: Some(5) });
+        assert_eq!(s.passed_count(), 1);
+    }
+    #[test]
+    fn test_bhx_failed_count() {
+        let mut s = BhxTestingSidebar::new();
+        s.add_item(BhxTestItem { id: "t1".into(), label: "T1".into(), children: vec![], result: BhxTestResult::Failed("err".into()), duration_ms: None });
+        assert_eq!(s.failed_count(), 1);
+    }
+    #[test]
+    fn test_bhx_nested_items() {
+        let mut s = BhxTestingSidebar::new();
+        let child = BhxTestItem { id: "c1".into(), label: "Child".into(), children: vec![], result: BhxTestResult::Passed, duration_ms: Some(2) };
+        s.add_item(BhxTestItem { id: "p1".into(), label: "Parent".into(), children: vec![child], result: BhxTestResult::Passed, duration_ms: None });
+        assert_eq!(s.passed_count(), 2);
+    }
+    #[test]
+    fn test_bhx_set_result() {
+        let mut s = BhxTestingSidebar::new();
+        s.add_item(BhxTestItem { id: "t1".into(), label: "T".into(), children: vec![], result: BhxTestResult::NotRun, duration_ms: None });
+        s.set_result("t1", BhxTestResult::Passed, Some(42));
+        assert_eq!(s.items[0].result, BhxTestResult::Passed);
+        assert_eq!(s.items[0].duration_ms, Some(42));
+    }
+    #[test]
+    fn test_bhx_toggle_failed_only() {
+        let mut s = BhxTestingSidebar::new();
+        s.toggle_failed_only();
+        assert!(s.show_only_failed);
+        s.toggle_failed_only();
+        assert!(!s.show_only_failed);
+    }
+    #[test]
+    fn test_bhx_set_filter() {
+        let mut s = BhxTestingSidebar::new();
+        s.set_filter("integration".into());
+        assert_eq!(s.filter.as_deref(), Some("integration"));
+    }
+    #[test]
+    fn test_bhx_skipped() {
+        let r = BhxTestResult::Skipped;
+        assert_eq!(r, BhxTestResult::Skipped);
+    }
+    #[test]
+    fn test_bhx_duration() {
+        let item = BhxTestItem { id: "t".into(), label: "T".into(), children: vec![], result: BhxTestResult::Passed, duration_ms: Some(1500) };
+        assert_eq!(item.duration_ms, Some(1500));
+    }
+
+
+    #[test]
+    fn test_bhy_comments_controller_new() {
+        let c = BhyCommentsController::new();
+        assert_eq!(c.thread_count(), 0);
+    }
+    #[test]
+    fn test_bhy_add_thread() {
+        let mut c = BhyCommentsController::new();
+        c.add_thread(BhyCommentThread::new("t1".into(), "file.rs".into(), 10, 15));
+        assert_eq!(c.thread_count(), 1);
+    }
+    #[test]
+    fn test_bhy_add_comment() {
+        let mut t = BhyCommentThread::new("t1".into(), "f.rs".into(), 1, 5);
+        t.add_comment(BhyComment { id: 1, body: "Fix this".into(), author: BhyCommentAuthor { name: "Alice".into(), icon_path: None }, reactions: vec![], timestamp: 1000 });
+        assert_eq!(t.comment_count(), 1);
+    }
+    #[test]
+    fn test_bhy_resolve_thread() {
+        let mut t = BhyCommentThread::new("t1".into(), "f.rs".into(), 1, 1);
+        assert!(!t.is_resolved);
+        t.resolve();
+        assert!(t.is_resolved);
+        t.unresolve();
+        assert!(!t.is_resolved);
+    }
+    #[test]
+    fn test_bhy_delete_comment() {
+        let mut t = BhyCommentThread::new("t1".into(), "f.rs".into(), 1, 1);
+        t.add_comment(BhyComment { id: 1, body: "a".into(), author: BhyCommentAuthor { name: "A".into(), icon_path: None }, reactions: vec![], timestamp: 100 });
+        t.add_comment(BhyComment { id: 2, body: "b".into(), author: BhyCommentAuthor { name: "B".into(), icon_path: None }, reactions: vec![], timestamp: 200 });
+        t.delete_comment(1);
+        assert_eq!(t.comment_count(), 1);
+    }
+    #[test]
+    fn test_bhy_threads_for_file() {
+        let mut c = BhyCommentsController::new();
+        c.add_thread(BhyCommentThread::new("t1".into(), "a.rs".into(), 1, 1));
+        c.add_thread(BhyCommentThread::new("t2".into(), "b.rs".into(), 1, 1));
+        assert_eq!(c.threads_for_file("a.rs").len(), 1);
+    }
+    #[test]
+    fn test_bhy_unresolved_count() {
+        let mut c = BhyCommentsController::new();
+        let mut t1 = BhyCommentThread::new("t1".into(), "f.rs".into(), 1, 1);
+        t1.resolve();
+        c.add_thread(t1);
+        c.add_thread(BhyCommentThread::new("t2".into(), "f.rs".into(), 5, 5));
+        assert_eq!(c.unresolved_count(), 1);
+    }
+    #[test]
+    fn test_bhy_latest_comment() {
+        let mut t = BhyCommentThread::new("t1".into(), "f.rs".into(), 1, 1);
+        t.add_comment(BhyComment { id: 1, body: "first".into(), author: BhyCommentAuthor { name: "A".into(), icon_path: None }, reactions: vec![], timestamp: 100 });
+        t.add_comment(BhyComment { id: 2, body: "second".into(), author: BhyCommentAuthor { name: "B".into(), icon_path: None }, reactions: vec![], timestamp: 200 });
+        assert_eq!(t.latest_comment().unwrap().body, "second");
+    }
+    #[test]
+    fn test_bhy_reaction() {
+        let r = BhyReaction { label: "👍".into(), count: 5, has_reacted: true };
+        assert_eq!(r.count, 5);
+        assert!(r.has_reacted);
+    }
+    #[test]
+    fn test_bhy_author_icon() {
+        let a = BhyCommentAuthor { name: "Alice".into(), icon_path: Some("/icons/alice.png".into()) };
+        assert!(a.icon_path.is_some());
+    }
+
+
+    #[test]
+    fn test_bhz_chat_session_new() {
+        let s = BhzChatSession::new("s1".into());
+        assert_eq!(s.message_count(), 0);
+        assert!(!s.is_streaming);
+    }
+    #[test]
+    fn test_bhz_add_message() {
+        let mut s = BhzChatSession::new("s1".into());
+        s.add_message(BhzChatMessage { role: BhzChatRole::User, content: "Hello".into(), timestamp: 1000 });
+        assert_eq!(s.message_count(), 1);
+    }
+    #[test]
+    fn test_bhz_streaming() {
+        let mut s = BhzChatSession::new("s1".into());
+        s.start_streaming();
+        assert!(s.is_streaming);
+        s.finish_streaming();
+        assert!(!s.is_streaming);
+    }
+    #[test]
+    fn test_bhz_inline_suggestion() {
+        let mut s = BhzChatSession::new("s1".into());
+        s.show_suggestion(BhzInlineSuggestion { text: "fn main() {}".into(), line: 1, column: 0, is_visible: true });
+        assert!(s.inline_suggestion.is_some());
+    }
+    #[test]
+    fn test_bhz_accept_suggestion() {
+        let mut s = BhzChatSession::new("s1".into());
+        s.show_suggestion(BhzInlineSuggestion { text: "code".into(), line: 5, column: 4, is_visible: true });
+        let accepted = s.accept_suggestion();
+        assert_eq!(accepted.unwrap().text, "code");
+        assert!(s.inline_suggestion.is_none());
+    }
+    #[test]
+    fn test_bhz_dismiss_suggestion() {
+        let mut s = BhzChatSession::new("s1".into());
+        s.show_suggestion(BhzInlineSuggestion { text: "x".into(), line: 1, column: 0, is_visible: true });
+        s.dismiss_suggestion();
+        assert!(s.inline_suggestion.is_none());
+    }
+    #[test]
+    fn test_bhz_last_assistant_message() {
+        let mut s = BhzChatSession::new("s1".into());
+        s.add_message(BhzChatMessage { role: BhzChatRole::User, content: "q".into(), timestamp: 100 });
+        s.add_message(BhzChatMessage { role: BhzChatRole::Assistant, content: "a".into(), timestamp: 200 });
+        assert_eq!(s.last_assistant_message().unwrap().content, "a");
+    }
+    #[test]
+    fn test_bhz_clear() {
+        let mut s = BhzChatSession::new("s1".into());
+        s.add_message(BhzChatMessage { role: BhzChatRole::User, content: "hi".into(), timestamp: 100 });
+        s.show_suggestion(BhzInlineSuggestion { text: "x".into(), line: 1, column: 0, is_visible: true });
+        s.clear();
+        assert_eq!(s.message_count(), 0);
+        assert!(s.inline_suggestion.is_none());
+    }
+    #[test]
+    fn test_bhz_system_message() {
+        let m = BhzChatMessage { role: BhzChatRole::System, content: "You are a helpful assistant".into(), timestamp: 0 };
+        assert_eq!(m.role, BhzChatRole::System);
+    }
+    #[test]
+    fn test_bhz_no_assistant_message() {
+        let mut s = BhzChatSession::new("s1".into());
+        s.add_message(BhzChatMessage { role: BhzChatRole::User, content: "q".into(), timestamp: 100 });
+        assert!(s.last_assistant_message().is_none());
     }
 
 }
