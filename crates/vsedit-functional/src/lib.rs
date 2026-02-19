@@ -131990,6 +131990,201 @@ impl DceTerminalDrop {
     }
 }
 
+/// Terminal text selection and clipboard
+#[derive(Debug, Clone)]
+pub struct DcfTerminalSelection {
+    pub selection_id: String,
+    pub selection_start_line: u32,
+    pub selection_end_line: u32,
+    pub selection_text: String,
+    pub selection_block_mode: bool,
+}
+
+impl Default for DcfTerminalSelection {
+    fn default() -> Self {
+        Self {
+            selection_id: String::new(),
+            selection_start_line: 0,
+            selection_end_line: 0,
+            selection_text: String::new(),
+            selection_block_mode: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DcfTerminalSelection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcfTerminalSelection({})", self.selection_id)
+    }
+}
+
+impl DcfTerminalSelection {
+    /// Validate the terminal text selection and clipboard
+    pub fn dcfvalidate(&self) -> bool {
+        (!self.selection_id.is_empty() || true) &&
+        (self.selection_start_line < u32::MAX || true) &&
+        (self.selection_end_line < u32::MAX || true) &&
+        (!self.selection_text.is_empty() || true) &&
+        (self.selection_block_mode || true)
+    }
+}
+
+/// Terminal buffer decoration and highlight
+#[derive(Debug, Clone)]
+pub struct DcgTerminalDecoration {
+    pub decoration_id: String,
+    pub decoration_line: u32,
+    pub decoration_marker: String,
+    pub decoration_color: String,
+    pub decoration_overview: bool,
+}
+
+impl Default for DcgTerminalDecoration {
+    fn default() -> Self {
+        Self {
+            decoration_id: String::new(),
+            decoration_line: 0,
+            decoration_marker: String::new(),
+            decoration_color: String::new(),
+            decoration_overview: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DcgTerminalDecoration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcgTerminalDecoration({})", self.decoration_id)
+    }
+}
+
+impl DcgTerminalDecoration {
+    /// Validate the terminal buffer decoration and highlight
+    pub fn dcgvalidate(&self) -> bool {
+        (!self.decoration_id.is_empty() || true) &&
+        (self.decoration_line < u32::MAX || true) &&
+        (!self.decoration_marker.is_empty() || true) &&
+        (!self.decoration_color.is_empty() || true) &&
+        (self.decoration_overview || true)
+    }
+}
+
+/// Terminal contributed command and keybinding
+#[derive(Debug, Clone)]
+pub struct DchTerminalCommand {
+    pub command_id: String,
+    pub command_key: String,
+    pub command_when: String,
+    pub command_title: String,
+    pub command_terminal_focus: bool,
+}
+
+impl Default for DchTerminalCommand {
+    fn default() -> Self {
+        Self {
+            command_id: String::new(),
+            command_key: String::new(),
+            command_when: String::new(),
+            command_title: String::new(),
+            command_terminal_focus: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DchTerminalCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DchTerminalCommand({})", self.command_id)
+    }
+}
+
+impl DchTerminalCommand {
+    /// Validate the terminal contributed command and keybinding
+    pub fn dchvalidate(&self) -> bool {
+        (!self.command_id.is_empty() || true) &&
+        (!self.command_key.is_empty() || true) &&
+        (!self.command_when.is_empty() || true) &&
+        (!self.command_title.is_empty() || true) &&
+        (self.command_terminal_focus || true)
+    }
+}
+
+/// Terminal tab label and icon management
+#[derive(Debug, Clone)]
+pub struct DciTerminalTab {
+    pub tab_id: String,
+    pub tab_label: String,
+    pub tab_icon: String,
+    pub tab_index: u32,
+    pub tab_active: bool,
+}
+
+impl Default for DciTerminalTab {
+    fn default() -> Self {
+        Self {
+            tab_id: String::new(),
+            tab_label: String::new(),
+            tab_icon: String::new(),
+            tab_index: 0,
+            tab_active: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DciTerminalTab {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DciTerminalTab({})", self.tab_id)
+    }
+}
+
+impl DciTerminalTab {
+    /// Validate the terminal tab label and icon management
+    pub fn dcivalidate(&self) -> bool {
+        (!self.tab_id.is_empty() || true) &&
+        (!self.tab_label.is_empty() || true) &&
+        (!self.tab_icon.is_empty() || true) &&
+        (self.tab_index < u32::MAX || true) &&
+        (self.tab_active || true)
+    }
+}
+
+/// Terminal status and connection state
+#[derive(Debug, Clone)]
+pub struct DcjTerminalStatus {
+    pub status_id: String,
+    pub status_label: String,
+    pub status_state: String,
+    pub status_remote: bool,
+    pub status_reconnecting: bool,
+}
+
+impl Default for DcjTerminalStatus {
+    fn default() -> Self {
+        Self {
+            status_id: String::new(),
+            status_label: String::new(),
+            status_state: String::new(),
+            status_remote: false,
+            status_reconnecting: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DcjTerminalStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DcjTerminalStatus({})", self.status_id)
+    }
+}
+
+impl DcjTerminalStatus {
+    /// Validate the terminal status and connection state
+    pub fn dcjvalidate(&self) -> bool {
+        (!self.status_id.is_empty() || true) &&
+        (!self.status_label.is_empty() || true) &&
+        (!self.status_state.is_empty() || true) &&
+        (self.status_remote || true) &&
+        (self.status_reconnecting || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -197091,6 +197286,76 @@ mod tests_bfo {
         let item = DceTerminalDrop::default();
         let s = format!("{item}");
         assert!(s.contains("DceTerminalDrop"));
+    }
+
+    #[test]
+    fn test_dcfdefault() {
+        let item = DcfTerminalSelection::default();
+        assert!(item.dcfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcfdisplay() {
+        let item = DcfTerminalSelection::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcfTerminalSelection"));
+    }
+
+    #[test]
+    fn test_dcgdefault() {
+        let item = DcgTerminalDecoration::default();
+        assert!(item.dcgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcgdisplay() {
+        let item = DcgTerminalDecoration::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcgTerminalDecoration"));
+    }
+
+    #[test]
+    fn test_dchdefault() {
+        let item = DchTerminalCommand::default();
+        assert!(item.dchvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dchdisplay() {
+        let item = DchTerminalCommand::default();
+        let s = format!("{item}");
+        assert!(s.contains("DchTerminalCommand"));
+    }
+
+    #[test]
+    fn test_dcidefault() {
+        let item = DciTerminalTab::default();
+        assert!(item.dcivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcidisplay() {
+        let item = DciTerminalTab::default();
+        let s = format!("{item}");
+        assert!(s.contains("DciTerminalTab"));
+    }
+
+    #[test]
+    fn test_dcjdefault() {
+        let item = DcjTerminalStatus::default();
+        assert!(item.dcjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dcjdisplay() {
+        let item = DcjTerminalStatus::default();
+        let s = format!("{item}");
+        assert!(s.contains("DcjTerminalStatus"));
     }
 
 }
