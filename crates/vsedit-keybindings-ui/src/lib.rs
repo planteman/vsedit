@@ -55963,3 +55963,297 @@ mod baz_tests {
         assert_eq!(BazHighlightKind::Read.decoration_class(), "highlight-read");
     }
 }
+
+
+// --- bba_: Editor selection highlight model ---
+
+/// Type of word highlight.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BbaWordHighlightKind {
+    Same,
+    Similar,
+    Exact,
+}
+
+impl BbaWordHighlightKind {
+    pub fn label(&self) -> &'static str {
+        match self { Self::Same => "Same", Self::Similar => "Similar", Self::Exact => "Exact" }
+    }
+
+    pub fn style_class(&self) -> &'static str {
+        match self {
+            Self::Same => "word-highlight-same",
+            Self::Similar => "word-highlight-similar",
+            Self::Exact => "word-highlight-exact",
+        }
+    }
+}
+
+/// A highlighted occurrence of a word.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BbaWordOccurrence {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub kind: BbaWordHighlightKind,
+}
+
+impl BbaWordOccurrence {
+    pub fn new(line: u32, start: u32, end: u32, kind: BbaWordHighlightKind) -> Self {
+        Self { line, start_col: start, end_col: end, kind }
+    }
+
+    pub fn length(&self) -> u32 { self.end_col - self.start_col }
+
+    pub fn contains_col(&self, col: u32) -> bool {
+        col >= self.start_col && col < self.end_col
+    }
+}
+
+/// Selection range in document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BbaSelectionRange {
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+}
+
+impl BbaSelectionRange {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.start_line == self.end_line && self.start_col == self.end_col
+    }
+
+    pub fn is_single_line(&self) -> bool { self.start_line == self.end_line }
+
+    pub fn line_count(&self) -> u32 { self.end_line - self.start_line + 1 }
+
+    pub fn contains_line(&self, line: u32) -> bool {
+        line >= self.start_line && line <= self.end_line
+    }
+}
+
+/// The selection highlight model.
+#[derive(Debug)]
+pub struct BbaSelectionHighlight {
+    word: Option<String>,
+    occurrences: Vec<BbaWordOccurrence>,
+    selections: Vec<BbaSelectionRange>,
+    enabled: bool,
+    case_sensitive: bool,
+    whole_word: bool,
+    min_word_length: usize,
+    current_index: Option<usize>,
+}
+
+impl BbaSelectionHighlight {
+    pub fn new() -> Self {
+        Self {
+            word: None, occurrences: Vec::new(), selections: Vec::new(),
+            enabled: true, case_sensitive: false, whole_word: true,
+            min_word_length: 2, current_index: None,
+        }
+    }
+
+    pub fn set_word(&mut self, word: Option<String>) {
+        self.word = word;
+        self.current_index = None;
+    }
+
+    pub fn word(&self) -> Option<&str> { self.word.as_deref() }
+
+    pub fn set_occurrences(&mut self, occs: Vec<BbaWordOccurrence>) {
+        self.occurrences = occs;
+        if !self.occurrences.is_empty() { self.current_index = Some(0); }
+    }
+
+    pub fn occurrences(&self) -> &[BbaWordOccurrence] { &self.occurrences }
+    pub fn occurrence_count(&self) -> usize { self.occurrences.len() }
+
+    pub fn add_selection(&mut self, sel: BbaSelectionRange) { self.selections.push(sel); }
+    pub fn clear_selections(&mut self) { self.selections.clear(); }
+    pub fn selections(&self) -> &[BbaSelectionRange] { &self.selections }
+    pub fn selection_count(&self) -> usize { self.selections.len() }
+
+    pub fn set_enabled(&mut self, v: bool) { self.enabled = v; }
+    pub fn is_enabled(&self) -> bool { self.enabled }
+
+    pub fn set_case_sensitive(&mut self, v: bool) { self.case_sensitive = v; }
+    pub fn set_whole_word(&mut self, v: bool) { self.whole_word = v; }
+
+    pub fn should_highlight(&self, word: &str) -> bool {
+        self.enabled && word.len() >= self.min_word_length
+    }
+
+    pub fn matches_word(&self, candidate: &str) -> bool {
+        match &self.word {
+            None => false,
+            Some(w) => {
+                if self.case_sensitive { candidate == w.as_str() }
+                else { candidate.eq_ignore_ascii_case(w) }
+            }
+        }
+    }
+
+    pub fn occurrences_on_line(&self, line: u32) -> Vec<&BbaWordOccurrence> {
+        self.occurrences.iter().filter(|o| o.line == line).collect()
+    }
+
+    pub fn next_occurrence(&mut self) -> Option<&BbaWordOccurrence> {
+        if self.occurrences.is_empty() { return None; }
+        let idx = match self.current_index {
+            Some(i) => (i + 1) % self.occurrences.len(),
+            None => 0,
+        };
+        self.current_index = Some(idx);
+        Some(&self.occurrences[idx])
+    }
+
+    pub fn prev_occurrence(&mut self) -> Option<&BbaWordOccurrence> {
+        if self.occurrences.is_empty() { return None; }
+        let idx = match self.current_index {
+            Some(0) => self.occurrences.len() - 1,
+            Some(i) => i - 1,
+            None => 0,
+        };
+        self.current_index = Some(idx);
+        Some(&self.occurrences[idx])
+    }
+
+    pub fn clear(&mut self) {
+        self.word = None;
+        self.occurrences.clear();
+        self.selections.clear();
+        self.current_index = None;
+    }
+
+    pub fn status_text(&self) -> String {
+        match (&self.word, self.occurrences.len()) {
+            (Some(w), n) if n > 0 => {
+                let idx = self.current_index.map_or(0, |i| i + 1);
+                format!("'{}' {} of {}", w, idx, n)
+            }
+            _ => String::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod bba_tests {
+    use super::*;
+
+    #[test]
+    fn test_bba_word_kind() {
+        assert_eq!(BbaWordHighlightKind::Same.label(), "Same");
+        assert_eq!(BbaWordHighlightKind::Exact.style_class(), "word-highlight-exact");
+    }
+
+    #[test]
+    fn test_bba_occurrence() {
+        let o = BbaWordOccurrence::new(5, 10, 15, BbaWordHighlightKind::Same);
+        assert_eq!(o.length(), 5);
+        assert!(o.contains_col(12));
+        assert!(!o.contains_col(15));
+    }
+
+    #[test]
+    fn test_bba_selection_range() {
+        let s = BbaSelectionRange::new(1, 5, 3, 10);
+        assert!(!s.is_empty());
+        assert!(!s.is_single_line());
+        assert_eq!(s.line_count(), 3);
+        assert!(s.contains_line(2));
+    }
+
+    #[test]
+    fn test_bba_empty_selection() {
+        let s = BbaSelectionRange::new(1, 5, 1, 5);
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn test_bba_model_word() {
+        let mut m = BbaSelectionHighlight::new();
+        m.set_word(Some("hello".to_string()));
+        assert_eq!(m.word(), Some("hello"));
+        assert!(m.matches_word("HELLO")); // case insensitive by default
+    }
+
+    #[test]
+    fn test_bba_model_case_sensitive() {
+        let mut m = BbaSelectionHighlight::new();
+        m.set_case_sensitive(true);
+        m.set_word(Some("Hello".to_string()));
+        assert!(!m.matches_word("hello"));
+        assert!(m.matches_word("Hello"));
+    }
+
+    #[test]
+    fn test_bba_model_occurrences() {
+        let mut m = BbaSelectionHighlight::new();
+        m.set_occurrences(vec![
+            BbaWordOccurrence::new(1, 0, 5, BbaWordHighlightKind::Same),
+            BbaWordOccurrence::new(3, 0, 5, BbaWordHighlightKind::Same),
+            BbaWordOccurrence::new(5, 0, 5, BbaWordHighlightKind::Same),
+        ]);
+        assert_eq!(m.occurrence_count(), 3);
+        assert_eq!(m.occurrences_on_line(3).len(), 1);
+    }
+
+    #[test]
+    fn test_bba_model_navigation() {
+        let mut m = BbaSelectionHighlight::new();
+        m.set_word(Some("x".to_string()));
+        m.set_occurrences(vec![
+            BbaWordOccurrence::new(1, 0, 1, BbaWordHighlightKind::Same),
+            BbaWordOccurrence::new(5, 0, 1, BbaWordHighlightKind::Same),
+        ]);
+        let o = m.next_occurrence().unwrap();
+        assert_eq!(o.line, 5);
+        let o = m.next_occurrence().unwrap();
+        assert_eq!(o.line, 1); // wrap
+    }
+
+    #[test]
+    fn test_bba_model_prev() {
+        let mut m = BbaSelectionHighlight::new();
+        m.set_occurrences(vec![
+            BbaWordOccurrence::new(1, 0, 1, BbaWordHighlightKind::Same),
+            BbaWordOccurrence::new(5, 0, 1, BbaWordHighlightKind::Same),
+        ]);
+        let o = m.prev_occurrence().unwrap();
+        assert_eq!(o.line, 5); // wrap from 0 to last
+    }
+
+    #[test]
+    fn test_bba_model_should_highlight() {
+        let m = BbaSelectionHighlight::new();
+        assert!(m.should_highlight("hello"));
+        assert!(!m.should_highlight("a")); // too short
+    }
+
+    #[test]
+    fn test_bba_model_clear() {
+        let mut m = BbaSelectionHighlight::new();
+        m.set_word(Some("test".to_string()));
+        m.add_selection(BbaSelectionRange::new(1, 0, 1, 4));
+        m.clear();
+        assert!(m.word().is_none());
+        assert_eq!(m.selection_count(), 0);
+    }
+
+    #[test]
+    fn test_bba_model_status() {
+        let mut m = BbaSelectionHighlight::new();
+        m.set_word(Some("foo".to_string()));
+        m.set_occurrences(vec![
+            BbaWordOccurrence::new(1, 0, 3, BbaWordHighlightKind::Same),
+            BbaWordOccurrence::new(5, 0, 3, BbaWordHighlightKind::Same),
+        ]);
+        assert_eq!(m.status_text(), "'foo' 1 of 2");
+    }
+}
