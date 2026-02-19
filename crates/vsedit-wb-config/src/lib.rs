@@ -87547,6 +87547,111 @@ impl SoftWrapModel {
     }
 }
 
+/// Runtime wiring: bof_ TextModel
+#[derive(Debug, Clone)]
+pub struct TextModel {
+    pub bof_model_id: String,
+    pub bof_language_id: String,
+    pub bof_line_count: u32,
+    pub bof_char_count: u64,
+    pub bof_version_id: u64,
+    pub bof_is_for_simple_widget: bool,
+    pub bof_is_large_file: bool,
+    pub bof_eol_sequence: String,
+    pub bof_encoding: String,
+    pub bof_is_readonly: bool,
+}
+
+impl TextModel {
+    pub fn bof_summary(&self) -> String {
+        format!("TextModel({})", self.bof_model_id)
+    }
+}
+
+/// Runtime wiring: bog_ LineTokens
+#[derive(Debug, Clone)]
+pub struct LineTokens {
+    pub bog_line_number: u32,
+    pub bog_token_count: usize,
+    pub bog_token_types: Vec<String>,
+    pub bog_token_offsets: Vec<u32>,
+    pub bog_language_id: String,
+    pub bog_is_complete: bool,
+    pub bog_has_semantic: bool,
+    pub bog_binary_tokens_length: usize,
+    pub bog_is_default: bool,
+    pub bog_state_id: u64,
+}
+
+impl LineTokens {
+    pub fn bog_summary(&self) -> String {
+        format!("LineTokens({})", self.bog_line_number)
+    }
+}
+
+/// Runtime wiring: boh_ EditOperation
+#[derive(Debug, Clone)]
+pub struct EditOperation {
+    pub boh_operation_id: u64,
+    pub boh_range_start_line: u32,
+    pub boh_range_start_col: u32,
+    pub boh_range_end_line: u32,
+    pub boh_range_end_col: u32,
+    pub boh_text: String,
+    pub boh_force_move_markers: bool,
+    pub boh_is_auto_whitespace: bool,
+    pub boh_cursor_state_before: Vec<u32>,
+    pub boh_cursor_state_after: Vec<u32>,
+}
+
+impl EditOperation {
+    pub fn boh_summary(&self) -> String {
+        format!("EditOperation({})", self.boh_operation_id)
+    }
+}
+
+/// Runtime wiring: boi_ ContentChange
+#[derive(Debug, Clone)]
+pub struct ContentChange {
+    pub boi_change_offset: u32,
+    pub boi_change_length: u32,
+    pub boi_change_text: String,
+    pub boi_range_start_line: u32,
+    pub boi_range_start_col: u32,
+    pub boi_range_end_line: u32,
+    pub boi_range_end_col: u32,
+    pub boi_is_undo_redo: bool,
+    pub boi_is_flush: bool,
+    pub boi_version_id: u64,
+}
+
+impl ContentChange {
+    pub fn boi_summary(&self) -> String {
+        format!("ContentChange({})", self.boi_change_offset)
+    }
+}
+
+/// Runtime wiring: boj_ ModelDecoration
+#[derive(Debug, Clone)]
+pub struct ModelDecoration {
+    pub boj_decoration_id: String,
+    pub boj_owner_id: u32,
+    pub boj_range_start_line: u32,
+    pub boj_range_start_col: u32,
+    pub boj_range_end_line: u32,
+    pub boj_range_end_col: u32,
+    pub boj_class_name: String,
+    pub boj_is_whole_line: bool,
+    pub boj_stickiness: u8,
+    pub boj_hover_message: String,
+}
+
+impl ModelDecoration {
+    pub fn boj_summary(&self) -> String {
+        format!("ModelDecoration({})", self.boj_decoration_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -102406,6 +102511,910 @@ mod tests_bfo {
         };
         let _ = obj.boe_summary();
         assert!(!obj.boe_use_tabstops);
+    }
+
+    #[test]
+    fn test_bof_model_id() {
+        let obj = TextModel {
+            bof_model_id: String::from("test"),
+            bof_language_id: String::from("test"),
+            bof_line_count: 0,
+            bof_char_count: 0,
+            bof_version_id: 0,
+            bof_is_for_simple_widget: false,
+            bof_is_large_file: false,
+            bof_eol_sequence: String::from("test"),
+            bof_encoding: String::from("test"),
+            bof_is_readonly: false,
+        };
+        let _ = obj.bof_summary();
+        assert_eq!(obj.bof_model_id, "test");
+    }
+
+    #[test]
+    fn test_bof_language_id() {
+        let obj = TextModel {
+            bof_model_id: String::from("test"),
+            bof_language_id: String::from("test"),
+            bof_line_count: 0,
+            bof_char_count: 0,
+            bof_version_id: 0,
+            bof_is_for_simple_widget: false,
+            bof_is_large_file: false,
+            bof_eol_sequence: String::from("test"),
+            bof_encoding: String::from("test"),
+            bof_is_readonly: false,
+        };
+        let _ = obj.bof_summary();
+        assert_eq!(obj.bof_language_id, "test");
+    }
+
+    #[test]
+    fn test_bof_line_count() {
+        let obj = TextModel {
+            bof_model_id: String::from("test"),
+            bof_language_id: String::from("test"),
+            bof_line_count: 0,
+            bof_char_count: 0,
+            bof_version_id: 0,
+            bof_is_for_simple_widget: false,
+            bof_is_large_file: false,
+            bof_eol_sequence: String::from("test"),
+            bof_encoding: String::from("test"),
+            bof_is_readonly: false,
+        };
+        let _ = obj.bof_summary();
+        assert_eq!(obj.bof_line_count, 0);
+    }
+
+    #[test]
+    fn test_bof_char_count() {
+        let obj = TextModel {
+            bof_model_id: String::from("test"),
+            bof_language_id: String::from("test"),
+            bof_line_count: 0,
+            bof_char_count: 0,
+            bof_version_id: 0,
+            bof_is_for_simple_widget: false,
+            bof_is_large_file: false,
+            bof_eol_sequence: String::from("test"),
+            bof_encoding: String::from("test"),
+            bof_is_readonly: false,
+        };
+        let _ = obj.bof_summary();
+        assert_eq!(obj.bof_char_count, 0);
+    }
+
+    #[test]
+    fn test_bof_version_id() {
+        let obj = TextModel {
+            bof_model_id: String::from("test"),
+            bof_language_id: String::from("test"),
+            bof_line_count: 0,
+            bof_char_count: 0,
+            bof_version_id: 0,
+            bof_is_for_simple_widget: false,
+            bof_is_large_file: false,
+            bof_eol_sequence: String::from("test"),
+            bof_encoding: String::from("test"),
+            bof_is_readonly: false,
+        };
+        let _ = obj.bof_summary();
+        assert_eq!(obj.bof_version_id, 0);
+    }
+
+    #[test]
+    fn test_bof_is_for_simple_widget() {
+        let obj = TextModel {
+            bof_model_id: String::from("test"),
+            bof_language_id: String::from("test"),
+            bof_line_count: 0,
+            bof_char_count: 0,
+            bof_version_id: 0,
+            bof_is_for_simple_widget: false,
+            bof_is_large_file: false,
+            bof_eol_sequence: String::from("test"),
+            bof_encoding: String::from("test"),
+            bof_is_readonly: false,
+        };
+        let _ = obj.bof_summary();
+        assert!(!obj.bof_is_for_simple_widget);
+    }
+
+    #[test]
+    fn test_bof_is_large_file() {
+        let obj = TextModel {
+            bof_model_id: String::from("test"),
+            bof_language_id: String::from("test"),
+            bof_line_count: 0,
+            bof_char_count: 0,
+            bof_version_id: 0,
+            bof_is_for_simple_widget: false,
+            bof_is_large_file: false,
+            bof_eol_sequence: String::from("test"),
+            bof_encoding: String::from("test"),
+            bof_is_readonly: false,
+        };
+        let _ = obj.bof_summary();
+        assert!(!obj.bof_is_large_file);
+    }
+
+    #[test]
+    fn test_bof_eol_sequence() {
+        let obj = TextModel {
+            bof_model_id: String::from("test"),
+            bof_language_id: String::from("test"),
+            bof_line_count: 0,
+            bof_char_count: 0,
+            bof_version_id: 0,
+            bof_is_for_simple_widget: false,
+            bof_is_large_file: false,
+            bof_eol_sequence: String::from("test"),
+            bof_encoding: String::from("test"),
+            bof_is_readonly: false,
+        };
+        let _ = obj.bof_summary();
+        assert_eq!(obj.bof_eol_sequence, "test");
+    }
+
+    #[test]
+    fn test_bof_encoding() {
+        let obj = TextModel {
+            bof_model_id: String::from("test"),
+            bof_language_id: String::from("test"),
+            bof_line_count: 0,
+            bof_char_count: 0,
+            bof_version_id: 0,
+            bof_is_for_simple_widget: false,
+            bof_is_large_file: false,
+            bof_eol_sequence: String::from("test"),
+            bof_encoding: String::from("test"),
+            bof_is_readonly: false,
+        };
+        let _ = obj.bof_summary();
+        assert_eq!(obj.bof_encoding, "test");
+    }
+
+    #[test]
+    fn test_bof_is_readonly() {
+        let obj = TextModel {
+            bof_model_id: String::from("test"),
+            bof_language_id: String::from("test"),
+            bof_line_count: 0,
+            bof_char_count: 0,
+            bof_version_id: 0,
+            bof_is_for_simple_widget: false,
+            bof_is_large_file: false,
+            bof_eol_sequence: String::from("test"),
+            bof_encoding: String::from("test"),
+            bof_is_readonly: false,
+        };
+        let _ = obj.bof_summary();
+        assert!(!obj.bof_is_readonly);
+    }
+
+
+    #[test]
+    fn test_bog_line_number() {
+        let obj = LineTokens {
+            bog_line_number: 0,
+            bog_token_count: 0,
+            bog_token_types: Vec::new(),
+            bog_token_offsets: Vec::new(),
+            bog_language_id: String::from("test"),
+            bog_is_complete: false,
+            bog_has_semantic: false,
+            bog_binary_tokens_length: 0,
+            bog_is_default: false,
+            bog_state_id: 0,
+        };
+        let _ = obj.bog_summary();
+        assert_eq!(obj.bog_line_number, 0);
+    }
+
+    #[test]
+    fn test_bog_token_count() {
+        let obj = LineTokens {
+            bog_line_number: 0,
+            bog_token_count: 0,
+            bog_token_types: Vec::new(),
+            bog_token_offsets: Vec::new(),
+            bog_language_id: String::from("test"),
+            bog_is_complete: false,
+            bog_has_semantic: false,
+            bog_binary_tokens_length: 0,
+            bog_is_default: false,
+            bog_state_id: 0,
+        };
+        let _ = obj.bog_summary();
+        assert_eq!(obj.bog_token_count, 0);
+    }
+
+    #[test]
+    fn test_bog_token_types() {
+        let obj = LineTokens {
+            bog_line_number: 0,
+            bog_token_count: 0,
+            bog_token_types: Vec::new(),
+            bog_token_offsets: Vec::new(),
+            bog_language_id: String::from("test"),
+            bog_is_complete: false,
+            bog_has_semantic: false,
+            bog_binary_tokens_length: 0,
+            bog_is_default: false,
+            bog_state_id: 0,
+        };
+        let _ = obj.bog_summary();
+        assert!(obj.bog_token_types.is_empty());
+    }
+
+    #[test]
+    fn test_bog_token_offsets() {
+        let obj = LineTokens {
+            bog_line_number: 0,
+            bog_token_count: 0,
+            bog_token_types: Vec::new(),
+            bog_token_offsets: Vec::new(),
+            bog_language_id: String::from("test"),
+            bog_is_complete: false,
+            bog_has_semantic: false,
+            bog_binary_tokens_length: 0,
+            bog_is_default: false,
+            bog_state_id: 0,
+        };
+        let _ = obj.bog_summary();
+        assert!(obj.bog_token_offsets.is_empty());
+    }
+
+    #[test]
+    fn test_bog_language_id() {
+        let obj = LineTokens {
+            bog_line_number: 0,
+            bog_token_count: 0,
+            bog_token_types: Vec::new(),
+            bog_token_offsets: Vec::new(),
+            bog_language_id: String::from("test"),
+            bog_is_complete: false,
+            bog_has_semantic: false,
+            bog_binary_tokens_length: 0,
+            bog_is_default: false,
+            bog_state_id: 0,
+        };
+        let _ = obj.bog_summary();
+        assert_eq!(obj.bog_language_id, "test");
+    }
+
+    #[test]
+    fn test_bog_is_complete() {
+        let obj = LineTokens {
+            bog_line_number: 0,
+            bog_token_count: 0,
+            bog_token_types: Vec::new(),
+            bog_token_offsets: Vec::new(),
+            bog_language_id: String::from("test"),
+            bog_is_complete: false,
+            bog_has_semantic: false,
+            bog_binary_tokens_length: 0,
+            bog_is_default: false,
+            bog_state_id: 0,
+        };
+        let _ = obj.bog_summary();
+        assert!(!obj.bog_is_complete);
+    }
+
+    #[test]
+    fn test_bog_has_semantic() {
+        let obj = LineTokens {
+            bog_line_number: 0,
+            bog_token_count: 0,
+            bog_token_types: Vec::new(),
+            bog_token_offsets: Vec::new(),
+            bog_language_id: String::from("test"),
+            bog_is_complete: false,
+            bog_has_semantic: false,
+            bog_binary_tokens_length: 0,
+            bog_is_default: false,
+            bog_state_id: 0,
+        };
+        let _ = obj.bog_summary();
+        assert!(!obj.bog_has_semantic);
+    }
+
+    #[test]
+    fn test_bog_binary_tokens_length() {
+        let obj = LineTokens {
+            bog_line_number: 0,
+            bog_token_count: 0,
+            bog_token_types: Vec::new(),
+            bog_token_offsets: Vec::new(),
+            bog_language_id: String::from("test"),
+            bog_is_complete: false,
+            bog_has_semantic: false,
+            bog_binary_tokens_length: 0,
+            bog_is_default: false,
+            bog_state_id: 0,
+        };
+        let _ = obj.bog_summary();
+        assert_eq!(obj.bog_binary_tokens_length, 0);
+    }
+
+    #[test]
+    fn test_bog_is_default() {
+        let obj = LineTokens {
+            bog_line_number: 0,
+            bog_token_count: 0,
+            bog_token_types: Vec::new(),
+            bog_token_offsets: Vec::new(),
+            bog_language_id: String::from("test"),
+            bog_is_complete: false,
+            bog_has_semantic: false,
+            bog_binary_tokens_length: 0,
+            bog_is_default: false,
+            bog_state_id: 0,
+        };
+        let _ = obj.bog_summary();
+        assert!(!obj.bog_is_default);
+    }
+
+    #[test]
+    fn test_bog_state_id() {
+        let obj = LineTokens {
+            bog_line_number: 0,
+            bog_token_count: 0,
+            bog_token_types: Vec::new(),
+            bog_token_offsets: Vec::new(),
+            bog_language_id: String::from("test"),
+            bog_is_complete: false,
+            bog_has_semantic: false,
+            bog_binary_tokens_length: 0,
+            bog_is_default: false,
+            bog_state_id: 0,
+        };
+        let _ = obj.bog_summary();
+        assert_eq!(obj.bog_state_id, 0);
+    }
+
+
+    #[test]
+    fn test_boh_operation_id() {
+        let obj = EditOperation {
+            boh_operation_id: 0,
+            boh_range_start_line: 0,
+            boh_range_start_col: 0,
+            boh_range_end_line: 0,
+            boh_range_end_col: 0,
+            boh_text: String::from("test"),
+            boh_force_move_markers: false,
+            boh_is_auto_whitespace: false,
+            boh_cursor_state_before: Vec::new(),
+            boh_cursor_state_after: Vec::new(),
+        };
+        let _ = obj.boh_summary();
+        assert_eq!(obj.boh_operation_id, 0);
+    }
+
+    #[test]
+    fn test_boh_range_start_line() {
+        let obj = EditOperation {
+            boh_operation_id: 0,
+            boh_range_start_line: 0,
+            boh_range_start_col: 0,
+            boh_range_end_line: 0,
+            boh_range_end_col: 0,
+            boh_text: String::from("test"),
+            boh_force_move_markers: false,
+            boh_is_auto_whitespace: false,
+            boh_cursor_state_before: Vec::new(),
+            boh_cursor_state_after: Vec::new(),
+        };
+        let _ = obj.boh_summary();
+        assert_eq!(obj.boh_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_boh_range_start_col() {
+        let obj = EditOperation {
+            boh_operation_id: 0,
+            boh_range_start_line: 0,
+            boh_range_start_col: 0,
+            boh_range_end_line: 0,
+            boh_range_end_col: 0,
+            boh_text: String::from("test"),
+            boh_force_move_markers: false,
+            boh_is_auto_whitespace: false,
+            boh_cursor_state_before: Vec::new(),
+            boh_cursor_state_after: Vec::new(),
+        };
+        let _ = obj.boh_summary();
+        assert_eq!(obj.boh_range_start_col, 0);
+    }
+
+    #[test]
+    fn test_boh_range_end_line() {
+        let obj = EditOperation {
+            boh_operation_id: 0,
+            boh_range_start_line: 0,
+            boh_range_start_col: 0,
+            boh_range_end_line: 0,
+            boh_range_end_col: 0,
+            boh_text: String::from("test"),
+            boh_force_move_markers: false,
+            boh_is_auto_whitespace: false,
+            boh_cursor_state_before: Vec::new(),
+            boh_cursor_state_after: Vec::new(),
+        };
+        let _ = obj.boh_summary();
+        assert_eq!(obj.boh_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_boh_range_end_col() {
+        let obj = EditOperation {
+            boh_operation_id: 0,
+            boh_range_start_line: 0,
+            boh_range_start_col: 0,
+            boh_range_end_line: 0,
+            boh_range_end_col: 0,
+            boh_text: String::from("test"),
+            boh_force_move_markers: false,
+            boh_is_auto_whitespace: false,
+            boh_cursor_state_before: Vec::new(),
+            boh_cursor_state_after: Vec::new(),
+        };
+        let _ = obj.boh_summary();
+        assert_eq!(obj.boh_range_end_col, 0);
+    }
+
+    #[test]
+    fn test_boh_text() {
+        let obj = EditOperation {
+            boh_operation_id: 0,
+            boh_range_start_line: 0,
+            boh_range_start_col: 0,
+            boh_range_end_line: 0,
+            boh_range_end_col: 0,
+            boh_text: String::from("test"),
+            boh_force_move_markers: false,
+            boh_is_auto_whitespace: false,
+            boh_cursor_state_before: Vec::new(),
+            boh_cursor_state_after: Vec::new(),
+        };
+        let _ = obj.boh_summary();
+        assert_eq!(obj.boh_text, "test");
+    }
+
+    #[test]
+    fn test_boh_force_move_markers() {
+        let obj = EditOperation {
+            boh_operation_id: 0,
+            boh_range_start_line: 0,
+            boh_range_start_col: 0,
+            boh_range_end_line: 0,
+            boh_range_end_col: 0,
+            boh_text: String::from("test"),
+            boh_force_move_markers: false,
+            boh_is_auto_whitespace: false,
+            boh_cursor_state_before: Vec::new(),
+            boh_cursor_state_after: Vec::new(),
+        };
+        let _ = obj.boh_summary();
+        assert!(!obj.boh_force_move_markers);
+    }
+
+    #[test]
+    fn test_boh_is_auto_whitespace() {
+        let obj = EditOperation {
+            boh_operation_id: 0,
+            boh_range_start_line: 0,
+            boh_range_start_col: 0,
+            boh_range_end_line: 0,
+            boh_range_end_col: 0,
+            boh_text: String::from("test"),
+            boh_force_move_markers: false,
+            boh_is_auto_whitespace: false,
+            boh_cursor_state_before: Vec::new(),
+            boh_cursor_state_after: Vec::new(),
+        };
+        let _ = obj.boh_summary();
+        assert!(!obj.boh_is_auto_whitespace);
+    }
+
+    #[test]
+    fn test_boh_cursor_state_before() {
+        let obj = EditOperation {
+            boh_operation_id: 0,
+            boh_range_start_line: 0,
+            boh_range_start_col: 0,
+            boh_range_end_line: 0,
+            boh_range_end_col: 0,
+            boh_text: String::from("test"),
+            boh_force_move_markers: false,
+            boh_is_auto_whitespace: false,
+            boh_cursor_state_before: Vec::new(),
+            boh_cursor_state_after: Vec::new(),
+        };
+        let _ = obj.boh_summary();
+        assert!(obj.boh_cursor_state_before.is_empty());
+    }
+
+    #[test]
+    fn test_boh_cursor_state_after() {
+        let obj = EditOperation {
+            boh_operation_id: 0,
+            boh_range_start_line: 0,
+            boh_range_start_col: 0,
+            boh_range_end_line: 0,
+            boh_range_end_col: 0,
+            boh_text: String::from("test"),
+            boh_force_move_markers: false,
+            boh_is_auto_whitespace: false,
+            boh_cursor_state_before: Vec::new(),
+            boh_cursor_state_after: Vec::new(),
+        };
+        let _ = obj.boh_summary();
+        assert!(obj.boh_cursor_state_after.is_empty());
+    }
+
+
+    #[test]
+    fn test_boi_change_offset() {
+        let obj = ContentChange {
+            boi_change_offset: 0,
+            boi_change_length: 0,
+            boi_change_text: String::from("test"),
+            boi_range_start_line: 0,
+            boi_range_start_col: 0,
+            boi_range_end_line: 0,
+            boi_range_end_col: 0,
+            boi_is_undo_redo: false,
+            boi_is_flush: false,
+            boi_version_id: 0,
+        };
+        let _ = obj.boi_summary();
+        assert_eq!(obj.boi_change_offset, 0);
+    }
+
+    #[test]
+    fn test_boi_change_length() {
+        let obj = ContentChange {
+            boi_change_offset: 0,
+            boi_change_length: 0,
+            boi_change_text: String::from("test"),
+            boi_range_start_line: 0,
+            boi_range_start_col: 0,
+            boi_range_end_line: 0,
+            boi_range_end_col: 0,
+            boi_is_undo_redo: false,
+            boi_is_flush: false,
+            boi_version_id: 0,
+        };
+        let _ = obj.boi_summary();
+        assert_eq!(obj.boi_change_length, 0);
+    }
+
+    #[test]
+    fn test_boi_change_text() {
+        let obj = ContentChange {
+            boi_change_offset: 0,
+            boi_change_length: 0,
+            boi_change_text: String::from("test"),
+            boi_range_start_line: 0,
+            boi_range_start_col: 0,
+            boi_range_end_line: 0,
+            boi_range_end_col: 0,
+            boi_is_undo_redo: false,
+            boi_is_flush: false,
+            boi_version_id: 0,
+        };
+        let _ = obj.boi_summary();
+        assert_eq!(obj.boi_change_text, "test");
+    }
+
+    #[test]
+    fn test_boi_range_start_line() {
+        let obj = ContentChange {
+            boi_change_offset: 0,
+            boi_change_length: 0,
+            boi_change_text: String::from("test"),
+            boi_range_start_line: 0,
+            boi_range_start_col: 0,
+            boi_range_end_line: 0,
+            boi_range_end_col: 0,
+            boi_is_undo_redo: false,
+            boi_is_flush: false,
+            boi_version_id: 0,
+        };
+        let _ = obj.boi_summary();
+        assert_eq!(obj.boi_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_boi_range_start_col() {
+        let obj = ContentChange {
+            boi_change_offset: 0,
+            boi_change_length: 0,
+            boi_change_text: String::from("test"),
+            boi_range_start_line: 0,
+            boi_range_start_col: 0,
+            boi_range_end_line: 0,
+            boi_range_end_col: 0,
+            boi_is_undo_redo: false,
+            boi_is_flush: false,
+            boi_version_id: 0,
+        };
+        let _ = obj.boi_summary();
+        assert_eq!(obj.boi_range_start_col, 0);
+    }
+
+    #[test]
+    fn test_boi_range_end_line() {
+        let obj = ContentChange {
+            boi_change_offset: 0,
+            boi_change_length: 0,
+            boi_change_text: String::from("test"),
+            boi_range_start_line: 0,
+            boi_range_start_col: 0,
+            boi_range_end_line: 0,
+            boi_range_end_col: 0,
+            boi_is_undo_redo: false,
+            boi_is_flush: false,
+            boi_version_id: 0,
+        };
+        let _ = obj.boi_summary();
+        assert_eq!(obj.boi_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_boi_range_end_col() {
+        let obj = ContentChange {
+            boi_change_offset: 0,
+            boi_change_length: 0,
+            boi_change_text: String::from("test"),
+            boi_range_start_line: 0,
+            boi_range_start_col: 0,
+            boi_range_end_line: 0,
+            boi_range_end_col: 0,
+            boi_is_undo_redo: false,
+            boi_is_flush: false,
+            boi_version_id: 0,
+        };
+        let _ = obj.boi_summary();
+        assert_eq!(obj.boi_range_end_col, 0);
+    }
+
+    #[test]
+    fn test_boi_is_undo_redo() {
+        let obj = ContentChange {
+            boi_change_offset: 0,
+            boi_change_length: 0,
+            boi_change_text: String::from("test"),
+            boi_range_start_line: 0,
+            boi_range_start_col: 0,
+            boi_range_end_line: 0,
+            boi_range_end_col: 0,
+            boi_is_undo_redo: false,
+            boi_is_flush: false,
+            boi_version_id: 0,
+        };
+        let _ = obj.boi_summary();
+        assert!(!obj.boi_is_undo_redo);
+    }
+
+    #[test]
+    fn test_boi_is_flush() {
+        let obj = ContentChange {
+            boi_change_offset: 0,
+            boi_change_length: 0,
+            boi_change_text: String::from("test"),
+            boi_range_start_line: 0,
+            boi_range_start_col: 0,
+            boi_range_end_line: 0,
+            boi_range_end_col: 0,
+            boi_is_undo_redo: false,
+            boi_is_flush: false,
+            boi_version_id: 0,
+        };
+        let _ = obj.boi_summary();
+        assert!(!obj.boi_is_flush);
+    }
+
+    #[test]
+    fn test_boi_version_id() {
+        let obj = ContentChange {
+            boi_change_offset: 0,
+            boi_change_length: 0,
+            boi_change_text: String::from("test"),
+            boi_range_start_line: 0,
+            boi_range_start_col: 0,
+            boi_range_end_line: 0,
+            boi_range_end_col: 0,
+            boi_is_undo_redo: false,
+            boi_is_flush: false,
+            boi_version_id: 0,
+        };
+        let _ = obj.boi_summary();
+        assert_eq!(obj.boi_version_id, 0);
+    }
+
+
+    #[test]
+    fn test_boj_decoration_id() {
+        let obj = ModelDecoration {
+            boj_decoration_id: String::from("test"),
+            boj_owner_id: 0,
+            boj_range_start_line: 0,
+            boj_range_start_col: 0,
+            boj_range_end_line: 0,
+            boj_range_end_col: 0,
+            boj_class_name: String::from("test"),
+            boj_is_whole_line: false,
+            boj_stickiness: 0,
+            boj_hover_message: String::from("test"),
+        };
+        let _ = obj.boj_summary();
+        assert_eq!(obj.boj_decoration_id, "test");
+    }
+
+    #[test]
+    fn test_boj_owner_id() {
+        let obj = ModelDecoration {
+            boj_decoration_id: String::from("test"),
+            boj_owner_id: 0,
+            boj_range_start_line: 0,
+            boj_range_start_col: 0,
+            boj_range_end_line: 0,
+            boj_range_end_col: 0,
+            boj_class_name: String::from("test"),
+            boj_is_whole_line: false,
+            boj_stickiness: 0,
+            boj_hover_message: String::from("test"),
+        };
+        let _ = obj.boj_summary();
+        assert_eq!(obj.boj_owner_id, 0);
+    }
+
+    #[test]
+    fn test_boj_range_start_line() {
+        let obj = ModelDecoration {
+            boj_decoration_id: String::from("test"),
+            boj_owner_id: 0,
+            boj_range_start_line: 0,
+            boj_range_start_col: 0,
+            boj_range_end_line: 0,
+            boj_range_end_col: 0,
+            boj_class_name: String::from("test"),
+            boj_is_whole_line: false,
+            boj_stickiness: 0,
+            boj_hover_message: String::from("test"),
+        };
+        let _ = obj.boj_summary();
+        assert_eq!(obj.boj_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_boj_range_start_col() {
+        let obj = ModelDecoration {
+            boj_decoration_id: String::from("test"),
+            boj_owner_id: 0,
+            boj_range_start_line: 0,
+            boj_range_start_col: 0,
+            boj_range_end_line: 0,
+            boj_range_end_col: 0,
+            boj_class_name: String::from("test"),
+            boj_is_whole_line: false,
+            boj_stickiness: 0,
+            boj_hover_message: String::from("test"),
+        };
+        let _ = obj.boj_summary();
+        assert_eq!(obj.boj_range_start_col, 0);
+    }
+
+    #[test]
+    fn test_boj_range_end_line() {
+        let obj = ModelDecoration {
+            boj_decoration_id: String::from("test"),
+            boj_owner_id: 0,
+            boj_range_start_line: 0,
+            boj_range_start_col: 0,
+            boj_range_end_line: 0,
+            boj_range_end_col: 0,
+            boj_class_name: String::from("test"),
+            boj_is_whole_line: false,
+            boj_stickiness: 0,
+            boj_hover_message: String::from("test"),
+        };
+        let _ = obj.boj_summary();
+        assert_eq!(obj.boj_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_boj_range_end_col() {
+        let obj = ModelDecoration {
+            boj_decoration_id: String::from("test"),
+            boj_owner_id: 0,
+            boj_range_start_line: 0,
+            boj_range_start_col: 0,
+            boj_range_end_line: 0,
+            boj_range_end_col: 0,
+            boj_class_name: String::from("test"),
+            boj_is_whole_line: false,
+            boj_stickiness: 0,
+            boj_hover_message: String::from("test"),
+        };
+        let _ = obj.boj_summary();
+        assert_eq!(obj.boj_range_end_col, 0);
+    }
+
+    #[test]
+    fn test_boj_class_name() {
+        let obj = ModelDecoration {
+            boj_decoration_id: String::from("test"),
+            boj_owner_id: 0,
+            boj_range_start_line: 0,
+            boj_range_start_col: 0,
+            boj_range_end_line: 0,
+            boj_range_end_col: 0,
+            boj_class_name: String::from("test"),
+            boj_is_whole_line: false,
+            boj_stickiness: 0,
+            boj_hover_message: String::from("test"),
+        };
+        let _ = obj.boj_summary();
+        assert_eq!(obj.boj_class_name, "test");
+    }
+
+    #[test]
+    fn test_boj_is_whole_line() {
+        let obj = ModelDecoration {
+            boj_decoration_id: String::from("test"),
+            boj_owner_id: 0,
+            boj_range_start_line: 0,
+            boj_range_start_col: 0,
+            boj_range_end_line: 0,
+            boj_range_end_col: 0,
+            boj_class_name: String::from("test"),
+            boj_is_whole_line: false,
+            boj_stickiness: 0,
+            boj_hover_message: String::from("test"),
+        };
+        let _ = obj.boj_summary();
+        assert!(!obj.boj_is_whole_line);
+    }
+
+    #[test]
+    fn test_boj_stickiness() {
+        let obj = ModelDecoration {
+            boj_decoration_id: String::from("test"),
+            boj_owner_id: 0,
+            boj_range_start_line: 0,
+            boj_range_start_col: 0,
+            boj_range_end_line: 0,
+            boj_range_end_col: 0,
+            boj_class_name: String::from("test"),
+            boj_is_whole_line: false,
+            boj_stickiness: 0,
+            boj_hover_message: String::from("test"),
+        };
+        let _ = obj.boj_summary();
+        assert_eq!(obj.boj_stickiness, 0);
+    }
+
+    #[test]
+    fn test_boj_hover_message() {
+        let obj = ModelDecoration {
+            boj_decoration_id: String::from("test"),
+            boj_owner_id: 0,
+            boj_range_start_line: 0,
+            boj_range_start_col: 0,
+            boj_range_end_line: 0,
+            boj_range_end_col: 0,
+            boj_class_name: String::from("test"),
+            boj_is_whole_line: false,
+            boj_stickiness: 0,
+            boj_hover_message: String::from("test"),
+        };
+        let _ = obj.boj_summary();
+        assert_eq!(obj.boj_hover_message, "test");
     }
 
 }
