@@ -67468,3 +67468,186 @@ mod bdd_tests {
         assert_eq!(p.participants().len(), 2);
     }
 }
+
+
+// --- bde_: Editor multi-cursor editing model ---
+
+/// A cursor position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BdeCursorPos { pub line: u32, pub col: u32 }
+
+impl BdeCursorPos {
+    pub fn new(line: u32, col: u32) -> Self { Self { line, col } }
+}
+
+impl PartialOrd for BdeCursorPos {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> { Some(self.cmp(other)) }
+}
+
+impl Ord for BdeCursorPos {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering { self.line.cmp(&other.line).then(self.col.cmp(&other.col)) }
+}
+
+/// A selection range with anchor and active positions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BdeSelection {
+    pub anchor: BdeCursorPos,
+    pub active: BdeCursorPos,
+}
+
+impl BdeSelection {
+    pub fn cursor(line: u32, col: u32) -> Self {
+        let p = BdeCursorPos::new(line, col);
+        Self { anchor: p, active: p }
+    }
+
+    pub fn range(anchor: BdeCursorPos, active: BdeCursorPos) -> Self { Self { anchor, active } }
+
+    pub fn is_empty(&self) -> bool { self.anchor == self.active }
+    pub fn is_reversed(&self) -> bool { self.active < self.anchor }
+
+    pub fn start(&self) -> BdeCursorPos { if self.is_reversed() { self.active } else { self.anchor } }
+    pub fn end(&self) -> BdeCursorPos { if self.is_reversed() { self.anchor } else { self.active } }
+
+    pub fn contains(&self, pos: BdeCursorPos) -> bool { pos >= self.start() && pos <= self.end() }
+}
+
+/// Multi-cursor state.
+#[derive(Debug)]
+pub struct BdeMultiCursor {
+    selections: Vec<BdeSelection>,
+}
+
+impl BdeMultiCursor {
+    pub fn new() -> Self { Self { selections: vec![BdeSelection::cursor(0, 0)] } }
+
+    pub fn from_cursor(line: u32, col: u32) -> Self { Self { selections: vec![BdeSelection::cursor(line, col)] } }
+
+    pub fn primary(&self) -> &BdeSelection { &self.selections[self.selections.len() - 1] }
+
+    pub fn selections(&self) -> &[BdeSelection] { &self.selections }
+    pub fn count(&self) -> usize { self.selections.len() }
+
+    pub fn add_cursor(&mut self, line: u32, col: u32) {
+        let sel = BdeSelection::cursor(line, col);
+        if !self.selections.contains(&sel) { self.selections.push(sel); }
+    }
+
+    pub fn add_selection(&mut self, sel: BdeSelection) {
+        if !self.selections.contains(&sel) { self.selections.push(sel); }
+    }
+
+    pub fn add_cursor_above(&mut self) {
+        let min_line = self.selections.iter().map(|s| s.active.line).min().unwrap_or(0);
+        let col = self.selections.iter().find(|s| s.active.line == min_line).map(|s| s.active.col).unwrap_or(0);
+        if min_line > 0 { self.add_cursor(min_line - 1, col); }
+    }
+
+    pub fn add_cursor_below(&mut self) {
+        let max_line = self.selections.iter().map(|s| s.active.line).max().unwrap_or(0);
+        let col = self.selections.iter().find(|s| s.active.line == max_line).map(|s| s.active.col).unwrap_or(0);
+        self.add_cursor(max_line + 1, col);
+    }
+
+    pub fn collapse_to_primary(&mut self) {
+        if let Some(last) = self.selections.last().cloned() {
+            self.selections = vec![last];
+        }
+    }
+
+    pub fn sort_selections(&mut self) {
+        self.selections.sort_by_key(|s| s.start());
+        self.selections.dedup();
+    }
+
+    pub fn move_all(&mut self, d_line: i32, d_col: i32) {
+        for sel in &mut self.selections {
+            sel.anchor.line = (sel.anchor.line as i32 + d_line).max(0) as u32;
+            sel.anchor.col = (sel.anchor.col as i32 + d_col).max(0) as u32;
+            sel.active.line = (sel.active.line as i32 + d_line).max(0) as u32;
+            sel.active.col = (sel.active.col as i32 + d_col).max(0) as u32;
+        }
+    }
+
+    pub fn has_multiple(&self) -> bool { self.selections.len() > 1 }
+}
+
+#[cfg(test)]
+mod bde_tests {
+    use super::*;
+
+    #[test]
+    fn test_bde_cursor_pos() {
+        let a = BdeCursorPos::new(1, 5);
+        let b = BdeCursorPos::new(1, 10);
+        assert!(a < b);
+    }
+
+    #[test]
+    fn test_bde_selection_empty() {
+        let s = BdeSelection::cursor(0, 0);
+        assert!(s.is_empty());
+    }
+
+    #[test]
+    fn test_bde_selection_range() {
+        let s = BdeSelection::range(BdeCursorPos::new(1, 0), BdeCursorPos::new(1, 5));
+        assert!(!s.is_empty());
+        assert!(s.contains(BdeCursorPos::new(1, 3)));
+    }
+
+    #[test]
+    fn test_bde_selection_reversed() {
+        let s = BdeSelection::range(BdeCursorPos::new(5, 0), BdeCursorPos::new(1, 0));
+        assert!(s.is_reversed());
+        assert_eq!(s.start().line, 1);
+    }
+
+    #[test]
+    fn test_bde_multi_new() {
+        let mc = BdeMultiCursor::new();
+        assert_eq!(mc.count(), 1);
+        assert!(!mc.has_multiple());
+    }
+
+    #[test]
+    fn test_bde_add_cursor() {
+        let mut mc = BdeMultiCursor::from_cursor(0, 0);
+        mc.add_cursor(1, 0);
+        mc.add_cursor(2, 0);
+        assert_eq!(mc.count(), 3);
+        assert!(mc.has_multiple());
+    }
+
+    #[test]
+    fn test_bde_add_above_below() {
+        let mut mc = BdeMultiCursor::from_cursor(5, 10);
+        mc.add_cursor_above(); // adds 4,10
+        mc.add_cursor_below(); // adds 6,10 (max is still 5)
+        assert_eq!(mc.count(), 3);
+    }
+
+    #[test]
+    fn test_bde_collapse() {
+        let mut mc = BdeMultiCursor::from_cursor(0, 0);
+        mc.add_cursor(1, 0);
+        mc.collapse_to_primary();
+        assert_eq!(mc.count(), 1);
+    }
+
+    #[test]
+    fn test_bde_move_all() {
+        let mut mc = BdeMultiCursor::from_cursor(5, 5);
+        mc.add_cursor(10, 5);
+        mc.move_all(0, 1);
+        assert_eq!(mc.selections()[0].active.col, 6);
+        assert_eq!(mc.selections()[1].active.col, 6);
+    }
+
+    #[test]
+    fn test_bde_no_duplicate() {
+        let mut mc = BdeMultiCursor::from_cursor(0, 0);
+        mc.add_cursor(0, 0);
+        assert_eq!(mc.count(), 1);
+    }
+}
