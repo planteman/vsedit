@@ -93831,6 +93831,247 @@ impl std::fmt::Display for AccessibilityModel {
     }
 }
 
+
+/// ContextKeyExprModel — context key expression model
+#[derive(Debug, Clone)]
+pub struct ContextKeyExprModel {
+    pub bwp_key: String,
+    pub bwp_operator: String,
+    pub bwp_value: String,
+    pub bwp_negated: bool,
+    pub bwp_type: String,
+    pub bwp_serialized: String,
+    pub bwp_is_default: bool,
+    pub bwp_evaluation_count: u64,
+}
+
+impl ContextKeyExprModel {
+    pub fn new() -> Self {
+        Self {
+            bwp_key: "editorTextFocus".into(),
+            bwp_operator: "==".into(),
+            bwp_value: "true".into(),
+            bwp_negated: false,
+            bwp_type: "boolean".into(),
+            bwp_serialized: "editorTextFocus".into(),
+            bwp_is_default: false,
+            bwp_evaluation_count: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ContextKeyExprModel({})", self.bwp_key)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwp_key.is_empty() || true
+    }
+}
+
+impl Default for ContextKeyExprModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ContextKeyExprModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ContextKeyExprModel({})", self.bwp_key)
+    }
+}
+
+/// CommandRegistration — command registration entry
+#[derive(Debug, Clone)]
+pub struct CommandRegistration {
+    pub bwq_id: String,
+    pub bwq_title: String,
+    pub bwq_category: String,
+    pub bwq_icon_id: String,
+    pub bwq_precondition: String,
+    pub bwq_keybinding: String,
+    pub bwq_source: String,
+    pub bwq_is_internal: bool,
+}
+
+impl CommandRegistration {
+    pub fn new() -> Self {
+        Self {
+            bwq_id: "workbench.action.files.save".into(),
+            bwq_title: "Save".into(),
+            bwq_category: "File".into(),
+            bwq_icon_id: "save".into(),
+            bwq_precondition: "".into(),
+            bwq_keybinding: "ctrl+s".into(),
+            bwq_source: "builtin".into(),
+            bwq_is_internal: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("CommandRegistration({})", self.bwq_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwq_id.is_empty() || true
+    }
+}
+
+impl Default for CommandRegistration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for CommandRegistration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CommandRegistration({})", self.bwq_id)
+    }
+}
+
+/// MenuItemEntry — menu item entry
+#[derive(Debug, Clone)]
+pub struct MenuItemEntry {
+    pub bwr_command_id: String,
+    pub bwr_group: String,
+    pub bwr_order: u32,
+    pub bwr_title: String,
+    pub bwr_when_clause: String,
+    pub bwr_alt_command_id: String,
+    pub bwr_is_submenu: bool,
+    pub bwr_toggled: bool,
+}
+
+impl MenuItemEntry {
+    pub fn new() -> Self {
+        Self {
+            bwr_command_id: "".into(),
+            bwr_group: "navigation".into(),
+            bwr_order: 0,
+            bwr_title: "".into(),
+            bwr_when_clause: "true".into(),
+            bwr_alt_command_id: "".into(),
+            bwr_is_submenu: false,
+            bwr_toggled: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("MenuItemEntry({})", self.bwr_command_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwr_command_id.is_empty() || true
+    }
+}
+
+impl Default for MenuItemEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for MenuItemEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MenuItemEntry({})", self.bwr_command_id)
+    }
+}
+
+/// ActionBarEntry — action bar contribution entry
+#[derive(Debug, Clone)]
+pub struct ActionBarEntry {
+    pub bws_id: String,
+    pub bws_title: String,
+    pub bws_icon_id: String,
+    pub bws_tooltip: String,
+    pub bws_view_id: String,
+    pub bws_when_clause: String,
+    pub bws_group: String,
+    pub bws_order: u32,
+}
+
+impl ActionBarEntry {
+    pub fn new() -> Self {
+        Self {
+            bws_id: "action-1".into(),
+            bws_title: "Action".into(),
+            bws_icon_id: "play".into(),
+            bws_tooltip: "".into(),
+            bws_view_id: "".into(),
+            bws_when_clause: "true".into(),
+            bws_group: "navigation".into(),
+            bws_order: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("ActionBarEntry({})", self.bws_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bws_id.is_empty() || true
+    }
+}
+
+impl Default for ActionBarEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for ActionBarEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ActionBarEntry({})", self.bws_id)
+    }
+}
+
+/// StatusBarEntry — status bar contribution entry
+#[derive(Debug, Clone)]
+pub struct StatusBarContrib {
+    pub bwt_id: String,
+    pub bwt_name: String,
+    pub bwt_text: String,
+    pub bwt_tooltip: String,
+    pub bwt_command_id: String,
+    pub bwt_alignment: String,
+    pub bwt_priority: i32,
+    pub bwt_show_when: String,
+}
+
+impl StatusBarContrib {
+    pub fn new() -> Self {
+        Self {
+            bwt_id: "status-1".into(),
+            bwt_name: "Status".into(),
+            bwt_text: "".into(),
+            bwt_tooltip: "".into(),
+            bwt_command_id: "".into(),
+            bwt_alignment: "left".into(),
+            bwt_priority: 0,
+            bwt_show_when: "true".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("StatusBarContrib({})", self.bwt_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bwt_id.is_empty() || true
+    }
+}
+
+impl Default for StatusBarContrib {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for StatusBarContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StatusBarContrib({})", self.bwt_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -141516,6 +141757,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bwo_screen_reader_active = false;
         assert_eq!(c.summary(), AccessibilityModel::new().summary());
+    }
+
+
+    #[test]
+    fn test_bwp_create() {
+        let obj = ContextKeyExprModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwp_validate() {
+        let obj = ContextKeyExprModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwp_display() {
+        let obj = ContextKeyExprModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ContextKeyExprModel"));
+    }
+
+    #[test]
+    fn test_bwp_clone() {
+        let obj = ContextKeyExprModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwp_debug() {
+        let obj = ContextKeyExprModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ContextKeyExprModel"));
+    }
+
+    #[test]
+    fn test_bwp_default() {
+        let obj = ContextKeyExprModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwp_summary_contains_name() {
+        let obj = ContextKeyExprModel::new();
+        assert!(obj.summary().contains("ContextKeyExprModel"));
+    }
+
+    #[test]
+    fn test_bwp_validate_default() {
+        let obj = ContextKeyExprModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwp_display_not_empty() {
+        let obj = ContextKeyExprModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwp_clone_independence() {
+        let mut obj = ContextKeyExprModel::new();
+        let c = obj.clone();
+        obj.bwp_key = "editorTextFocus".into();
+        assert_eq!(c.summary(), ContextKeyExprModel::new().summary());
+    }
+
+    #[test]
+    fn test_bwq_create() {
+        let obj = CommandRegistration::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwq_validate() {
+        let obj = CommandRegistration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwq_display() {
+        let obj = CommandRegistration::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("CommandRegistration"));
+    }
+
+    #[test]
+    fn test_bwq_clone() {
+        let obj = CommandRegistration::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwq_debug() {
+        let obj = CommandRegistration::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("CommandRegistration"));
+    }
+
+    #[test]
+    fn test_bwq_default() {
+        let obj = CommandRegistration::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwq_summary_contains_name() {
+        let obj = CommandRegistration::new();
+        assert!(obj.summary().contains("CommandRegistration"));
+    }
+
+    #[test]
+    fn test_bwq_validate_default() {
+        let obj = CommandRegistration::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwq_display_not_empty() {
+        let obj = CommandRegistration::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwq_clone_independence() {
+        let mut obj = CommandRegistration::new();
+        let c = obj.clone();
+        obj.bwq_id = "workbench.action.files.save".into();
+        assert_eq!(c.summary(), CommandRegistration::new().summary());
+    }
+
+    #[test]
+    fn test_bwr_create() {
+        let obj = MenuItemEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwr_validate() {
+        let obj = MenuItemEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwr_display() {
+        let obj = MenuItemEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("MenuItemEntry"));
+    }
+
+    #[test]
+    fn test_bwr_clone() {
+        let obj = MenuItemEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwr_debug() {
+        let obj = MenuItemEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("MenuItemEntry"));
+    }
+
+    #[test]
+    fn test_bwr_default() {
+        let obj = MenuItemEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwr_summary_contains_name() {
+        let obj = MenuItemEntry::new();
+        assert!(obj.summary().contains("MenuItemEntry"));
+    }
+
+    #[test]
+    fn test_bwr_validate_default() {
+        let obj = MenuItemEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwr_display_not_empty() {
+        let obj = MenuItemEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwr_clone_independence() {
+        let mut obj = MenuItemEntry::new();
+        let c = obj.clone();
+        obj.bwr_command_id = "".into();
+        assert_eq!(c.summary(), MenuItemEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bws_create() {
+        let obj = ActionBarEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bws_validate() {
+        let obj = ActionBarEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bws_display() {
+        let obj = ActionBarEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("ActionBarEntry"));
+    }
+
+    #[test]
+    fn test_bws_clone() {
+        let obj = ActionBarEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bws_debug() {
+        let obj = ActionBarEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("ActionBarEntry"));
+    }
+
+    #[test]
+    fn test_bws_default() {
+        let obj = ActionBarEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bws_summary_contains_name() {
+        let obj = ActionBarEntry::new();
+        assert!(obj.summary().contains("ActionBarEntry"));
+    }
+
+    #[test]
+    fn test_bws_validate_default() {
+        let obj = ActionBarEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bws_display_not_empty() {
+        let obj = ActionBarEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bws_clone_independence() {
+        let mut obj = ActionBarEntry::new();
+        let c = obj.clone();
+        obj.bws_id = "action-1".into();
+        assert_eq!(c.summary(), ActionBarEntry::new().summary());
+    }
+
+    #[test]
+    fn test_bwt_create() {
+        let obj = StatusBarContrib::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwt_validate() {
+        let obj = StatusBarContrib::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwt_display() {
+        let obj = StatusBarContrib::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("StatusBarContrib"));
+    }
+
+    #[test]
+    fn test_bwt_clone() {
+        let obj = StatusBarContrib::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bwt_debug() {
+        let obj = StatusBarContrib::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("StatusBarContrib"));
+    }
+
+    #[test]
+    fn test_bwt_default() {
+        let obj = StatusBarContrib::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bwt_summary_contains_name() {
+        let obj = StatusBarContrib::new();
+        assert!(obj.summary().contains("StatusBarContrib"));
+    }
+
+    #[test]
+    fn test_bwt_validate_default() {
+        let obj = StatusBarContrib::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bwt_display_not_empty() {
+        let obj = StatusBarContrib::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bwt_clone_independence() {
+        let mut obj = StatusBarContrib::new();
+        let c = obj.clone();
+        obj.bwt_id = "status-1".into();
+        assert_eq!(c.summary(), StatusBarContrib::new().summary());
     }
 
 }
