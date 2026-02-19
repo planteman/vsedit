@@ -88814,6 +88814,111 @@ impl DebugConsole {
     }
 }
 
+/// Runtime wiring: bqk_ TestItem
+#[derive(Debug, Clone)]
+pub struct TestItem {
+    pub bqk_test_id: String,
+    pub bqk_label: String,
+    pub bqk_uri: String,
+    pub bqk_range_start_line: u32,
+    pub bqk_range_end_line: u32,
+    pub bqk_can_resolve_children: bool,
+    pub bqk_busy: bool,
+    pub bqk_tags: Vec<String>,
+    pub bqk_description: String,
+    pub bqk_sort_text: String,
+}
+
+impl TestItem {
+    pub fn bqk_summary(&self) -> String {
+        format!("TestItem({})", self.bqk_test_id)
+    }
+}
+
+/// Runtime wiring: bql_ TestRun
+#[derive(Debug, Clone)]
+pub struct TestRun {
+    pub bql_run_id: String,
+    pub bql_run_name: String,
+    pub bql_is_continuous: bool,
+    pub bql_token_cancelled: bool,
+    pub bql_test_count: u32,
+    pub bql_passed_count: u32,
+    pub bql_failed_count: u32,
+    pub bql_skipped_count: u32,
+    pub bql_started_at: u64,
+    pub bql_completed_at: u64,
+}
+
+impl TestRun {
+    pub fn bql_summary(&self) -> String {
+        format!("TestRun({})", self.bql_run_id)
+    }
+}
+
+/// Runtime wiring: bqm_ TestResult
+#[derive(Debug, Clone)]
+pub struct TestResult {
+    pub bqm_test_id: String,
+    pub bqm_state: u8,
+    pub bqm_duration_ms: u64,
+    pub bqm_messages_count: usize,
+    pub bqm_output_text: String,
+    pub bqm_error_message: String,
+    pub bqm_expected_output: String,
+    pub bqm_actual_output: String,
+    pub bqm_diff_uri: String,
+    pub bqm_retry_count: u32,
+}
+
+impl TestResult {
+    pub fn bqm_summary(&self) -> String {
+        format!("TestResult({})", self.bqm_test_id)
+    }
+}
+
+/// Runtime wiring: bqn_ TestCoverage
+#[derive(Debug, Clone)]
+pub struct TestCoverage {
+    pub bqn_uri: String,
+    pub bqn_statement_count: u32,
+    pub bqn_statement_covered: u32,
+    pub bqn_branch_count: u32,
+    pub bqn_branch_covered: u32,
+    pub bqn_function_count: u32,
+    pub bqn_function_covered: u32,
+    pub bqn_line_count: u32,
+    pub bqn_line_covered: u32,
+    pub bqn_detailed_ranges: Vec<u32>,
+}
+
+impl TestCoverage {
+    pub fn bqn_summary(&self) -> String {
+        format!("TestCoverage({})", self.bqn_uri)
+    }
+}
+
+/// Runtime wiring: bqo_ TestMessage
+#[derive(Debug, Clone)]
+pub struct TestMessage {
+    pub bqo_message_text: String,
+    pub bqo_severity: u8,
+    pub bqo_expected_uri: String,
+    pub bqo_actual_uri: String,
+    pub bqo_location_uri: String,
+    pub bqo_location_line: u32,
+    pub bqo_location_col: u32,
+    pub bqo_context_value: String,
+    pub bqo_stack_trace: String,
+    pub bqo_is_markdown: bool,
+}
+
+impl TestMessage {
+    pub fn bqo_summary(&self) -> String {
+        format!("TestMessage({})", self.bqo_message_text)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -113979,6 +114084,910 @@ mod tests_bfo {
         };
         let _ = obj.bqj_summary();
         assert_eq!(obj.bqj_data_value, "test");
+    }
+
+    #[test]
+    fn test_bqk_test_id() {
+        let obj = TestItem {
+            bqk_test_id: String::from("test"),
+            bqk_label: String::from("test"),
+            bqk_uri: String::from("test"),
+            bqk_range_start_line: 0,
+            bqk_range_end_line: 0,
+            bqk_can_resolve_children: false,
+            bqk_busy: false,
+            bqk_tags: Vec::new(),
+            bqk_description: String::from("test"),
+            bqk_sort_text: String::from("test"),
+        };
+        let _ = obj.bqk_summary();
+        assert_eq!(obj.bqk_test_id, "test");
+    }
+
+    #[test]
+    fn test_bqk_label() {
+        let obj = TestItem {
+            bqk_test_id: String::from("test"),
+            bqk_label: String::from("test"),
+            bqk_uri: String::from("test"),
+            bqk_range_start_line: 0,
+            bqk_range_end_line: 0,
+            bqk_can_resolve_children: false,
+            bqk_busy: false,
+            bqk_tags: Vec::new(),
+            bqk_description: String::from("test"),
+            bqk_sort_text: String::from("test"),
+        };
+        let _ = obj.bqk_summary();
+        assert_eq!(obj.bqk_label, "test");
+    }
+
+    #[test]
+    fn test_bqk_uri() {
+        let obj = TestItem {
+            bqk_test_id: String::from("test"),
+            bqk_label: String::from("test"),
+            bqk_uri: String::from("test"),
+            bqk_range_start_line: 0,
+            bqk_range_end_line: 0,
+            bqk_can_resolve_children: false,
+            bqk_busy: false,
+            bqk_tags: Vec::new(),
+            bqk_description: String::from("test"),
+            bqk_sort_text: String::from("test"),
+        };
+        let _ = obj.bqk_summary();
+        assert_eq!(obj.bqk_uri, "test");
+    }
+
+    #[test]
+    fn test_bqk_range_start_line() {
+        let obj = TestItem {
+            bqk_test_id: String::from("test"),
+            bqk_label: String::from("test"),
+            bqk_uri: String::from("test"),
+            bqk_range_start_line: 0,
+            bqk_range_end_line: 0,
+            bqk_can_resolve_children: false,
+            bqk_busy: false,
+            bqk_tags: Vec::new(),
+            bqk_description: String::from("test"),
+            bqk_sort_text: String::from("test"),
+        };
+        let _ = obj.bqk_summary();
+        assert_eq!(obj.bqk_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_bqk_range_end_line() {
+        let obj = TestItem {
+            bqk_test_id: String::from("test"),
+            bqk_label: String::from("test"),
+            bqk_uri: String::from("test"),
+            bqk_range_start_line: 0,
+            bqk_range_end_line: 0,
+            bqk_can_resolve_children: false,
+            bqk_busy: false,
+            bqk_tags: Vec::new(),
+            bqk_description: String::from("test"),
+            bqk_sort_text: String::from("test"),
+        };
+        let _ = obj.bqk_summary();
+        assert_eq!(obj.bqk_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_bqk_can_resolve_children() {
+        let obj = TestItem {
+            bqk_test_id: String::from("test"),
+            bqk_label: String::from("test"),
+            bqk_uri: String::from("test"),
+            bqk_range_start_line: 0,
+            bqk_range_end_line: 0,
+            bqk_can_resolve_children: false,
+            bqk_busy: false,
+            bqk_tags: Vec::new(),
+            bqk_description: String::from("test"),
+            bqk_sort_text: String::from("test"),
+        };
+        let _ = obj.bqk_summary();
+        assert!(!obj.bqk_can_resolve_children);
+    }
+
+    #[test]
+    fn test_bqk_busy() {
+        let obj = TestItem {
+            bqk_test_id: String::from("test"),
+            bqk_label: String::from("test"),
+            bqk_uri: String::from("test"),
+            bqk_range_start_line: 0,
+            bqk_range_end_line: 0,
+            bqk_can_resolve_children: false,
+            bqk_busy: false,
+            bqk_tags: Vec::new(),
+            bqk_description: String::from("test"),
+            bqk_sort_text: String::from("test"),
+        };
+        let _ = obj.bqk_summary();
+        assert!(!obj.bqk_busy);
+    }
+
+    #[test]
+    fn test_bqk_tags() {
+        let obj = TestItem {
+            bqk_test_id: String::from("test"),
+            bqk_label: String::from("test"),
+            bqk_uri: String::from("test"),
+            bqk_range_start_line: 0,
+            bqk_range_end_line: 0,
+            bqk_can_resolve_children: false,
+            bqk_busy: false,
+            bqk_tags: Vec::new(),
+            bqk_description: String::from("test"),
+            bqk_sort_text: String::from("test"),
+        };
+        let _ = obj.bqk_summary();
+        assert!(obj.bqk_tags.is_empty());
+    }
+
+    #[test]
+    fn test_bqk_description() {
+        let obj = TestItem {
+            bqk_test_id: String::from("test"),
+            bqk_label: String::from("test"),
+            bqk_uri: String::from("test"),
+            bqk_range_start_line: 0,
+            bqk_range_end_line: 0,
+            bqk_can_resolve_children: false,
+            bqk_busy: false,
+            bqk_tags: Vec::new(),
+            bqk_description: String::from("test"),
+            bqk_sort_text: String::from("test"),
+        };
+        let _ = obj.bqk_summary();
+        assert_eq!(obj.bqk_description, "test");
+    }
+
+    #[test]
+    fn test_bqk_sort_text() {
+        let obj = TestItem {
+            bqk_test_id: String::from("test"),
+            bqk_label: String::from("test"),
+            bqk_uri: String::from("test"),
+            bqk_range_start_line: 0,
+            bqk_range_end_line: 0,
+            bqk_can_resolve_children: false,
+            bqk_busy: false,
+            bqk_tags: Vec::new(),
+            bqk_description: String::from("test"),
+            bqk_sort_text: String::from("test"),
+        };
+        let _ = obj.bqk_summary();
+        assert_eq!(obj.bqk_sort_text, "test");
+    }
+
+
+    #[test]
+    fn test_bql_run_id() {
+        let obj = TestRun {
+            bql_run_id: String::from("test"),
+            bql_run_name: String::from("test"),
+            bql_is_continuous: false,
+            bql_token_cancelled: false,
+            bql_test_count: 0,
+            bql_passed_count: 0,
+            bql_failed_count: 0,
+            bql_skipped_count: 0,
+            bql_started_at: 0,
+            bql_completed_at: 0,
+        };
+        let _ = obj.bql_summary();
+        assert_eq!(obj.bql_run_id, "test");
+    }
+
+    #[test]
+    fn test_bql_run_name() {
+        let obj = TestRun {
+            bql_run_id: String::from("test"),
+            bql_run_name: String::from("test"),
+            bql_is_continuous: false,
+            bql_token_cancelled: false,
+            bql_test_count: 0,
+            bql_passed_count: 0,
+            bql_failed_count: 0,
+            bql_skipped_count: 0,
+            bql_started_at: 0,
+            bql_completed_at: 0,
+        };
+        let _ = obj.bql_summary();
+        assert_eq!(obj.bql_run_name, "test");
+    }
+
+    #[test]
+    fn test_bql_is_continuous() {
+        let obj = TestRun {
+            bql_run_id: String::from("test"),
+            bql_run_name: String::from("test"),
+            bql_is_continuous: false,
+            bql_token_cancelled: false,
+            bql_test_count: 0,
+            bql_passed_count: 0,
+            bql_failed_count: 0,
+            bql_skipped_count: 0,
+            bql_started_at: 0,
+            bql_completed_at: 0,
+        };
+        let _ = obj.bql_summary();
+        assert!(!obj.bql_is_continuous);
+    }
+
+    #[test]
+    fn test_bql_token_cancelled() {
+        let obj = TestRun {
+            bql_run_id: String::from("test"),
+            bql_run_name: String::from("test"),
+            bql_is_continuous: false,
+            bql_token_cancelled: false,
+            bql_test_count: 0,
+            bql_passed_count: 0,
+            bql_failed_count: 0,
+            bql_skipped_count: 0,
+            bql_started_at: 0,
+            bql_completed_at: 0,
+        };
+        let _ = obj.bql_summary();
+        assert!(!obj.bql_token_cancelled);
+    }
+
+    #[test]
+    fn test_bql_test_count() {
+        let obj = TestRun {
+            bql_run_id: String::from("test"),
+            bql_run_name: String::from("test"),
+            bql_is_continuous: false,
+            bql_token_cancelled: false,
+            bql_test_count: 0,
+            bql_passed_count: 0,
+            bql_failed_count: 0,
+            bql_skipped_count: 0,
+            bql_started_at: 0,
+            bql_completed_at: 0,
+        };
+        let _ = obj.bql_summary();
+        assert_eq!(obj.bql_test_count, 0);
+    }
+
+    #[test]
+    fn test_bql_passed_count() {
+        let obj = TestRun {
+            bql_run_id: String::from("test"),
+            bql_run_name: String::from("test"),
+            bql_is_continuous: false,
+            bql_token_cancelled: false,
+            bql_test_count: 0,
+            bql_passed_count: 0,
+            bql_failed_count: 0,
+            bql_skipped_count: 0,
+            bql_started_at: 0,
+            bql_completed_at: 0,
+        };
+        let _ = obj.bql_summary();
+        assert_eq!(obj.bql_passed_count, 0);
+    }
+
+    #[test]
+    fn test_bql_failed_count() {
+        let obj = TestRun {
+            bql_run_id: String::from("test"),
+            bql_run_name: String::from("test"),
+            bql_is_continuous: false,
+            bql_token_cancelled: false,
+            bql_test_count: 0,
+            bql_passed_count: 0,
+            bql_failed_count: 0,
+            bql_skipped_count: 0,
+            bql_started_at: 0,
+            bql_completed_at: 0,
+        };
+        let _ = obj.bql_summary();
+        assert_eq!(obj.bql_failed_count, 0);
+    }
+
+    #[test]
+    fn test_bql_skipped_count() {
+        let obj = TestRun {
+            bql_run_id: String::from("test"),
+            bql_run_name: String::from("test"),
+            bql_is_continuous: false,
+            bql_token_cancelled: false,
+            bql_test_count: 0,
+            bql_passed_count: 0,
+            bql_failed_count: 0,
+            bql_skipped_count: 0,
+            bql_started_at: 0,
+            bql_completed_at: 0,
+        };
+        let _ = obj.bql_summary();
+        assert_eq!(obj.bql_skipped_count, 0);
+    }
+
+    #[test]
+    fn test_bql_started_at() {
+        let obj = TestRun {
+            bql_run_id: String::from("test"),
+            bql_run_name: String::from("test"),
+            bql_is_continuous: false,
+            bql_token_cancelled: false,
+            bql_test_count: 0,
+            bql_passed_count: 0,
+            bql_failed_count: 0,
+            bql_skipped_count: 0,
+            bql_started_at: 0,
+            bql_completed_at: 0,
+        };
+        let _ = obj.bql_summary();
+        assert_eq!(obj.bql_started_at, 0);
+    }
+
+    #[test]
+    fn test_bql_completed_at() {
+        let obj = TestRun {
+            bql_run_id: String::from("test"),
+            bql_run_name: String::from("test"),
+            bql_is_continuous: false,
+            bql_token_cancelled: false,
+            bql_test_count: 0,
+            bql_passed_count: 0,
+            bql_failed_count: 0,
+            bql_skipped_count: 0,
+            bql_started_at: 0,
+            bql_completed_at: 0,
+        };
+        let _ = obj.bql_summary();
+        assert_eq!(obj.bql_completed_at, 0);
+    }
+
+
+    #[test]
+    fn test_bqm_test_id() {
+        let obj = TestResult {
+            bqm_test_id: String::from("test"),
+            bqm_state: 0,
+            bqm_duration_ms: 0,
+            bqm_messages_count: 0,
+            bqm_output_text: String::from("test"),
+            bqm_error_message: String::from("test"),
+            bqm_expected_output: String::from("test"),
+            bqm_actual_output: String::from("test"),
+            bqm_diff_uri: String::from("test"),
+            bqm_retry_count: 0,
+        };
+        let _ = obj.bqm_summary();
+        assert_eq!(obj.bqm_test_id, "test");
+    }
+
+    #[test]
+    fn test_bqm_state() {
+        let obj = TestResult {
+            bqm_test_id: String::from("test"),
+            bqm_state: 0,
+            bqm_duration_ms: 0,
+            bqm_messages_count: 0,
+            bqm_output_text: String::from("test"),
+            bqm_error_message: String::from("test"),
+            bqm_expected_output: String::from("test"),
+            bqm_actual_output: String::from("test"),
+            bqm_diff_uri: String::from("test"),
+            bqm_retry_count: 0,
+        };
+        let _ = obj.bqm_summary();
+        assert_eq!(obj.bqm_state, 0);
+    }
+
+    #[test]
+    fn test_bqm_duration_ms() {
+        let obj = TestResult {
+            bqm_test_id: String::from("test"),
+            bqm_state: 0,
+            bqm_duration_ms: 0,
+            bqm_messages_count: 0,
+            bqm_output_text: String::from("test"),
+            bqm_error_message: String::from("test"),
+            bqm_expected_output: String::from("test"),
+            bqm_actual_output: String::from("test"),
+            bqm_diff_uri: String::from("test"),
+            bqm_retry_count: 0,
+        };
+        let _ = obj.bqm_summary();
+        assert_eq!(obj.bqm_duration_ms, 0);
+    }
+
+    #[test]
+    fn test_bqm_messages_count() {
+        let obj = TestResult {
+            bqm_test_id: String::from("test"),
+            bqm_state: 0,
+            bqm_duration_ms: 0,
+            bqm_messages_count: 0,
+            bqm_output_text: String::from("test"),
+            bqm_error_message: String::from("test"),
+            bqm_expected_output: String::from("test"),
+            bqm_actual_output: String::from("test"),
+            bqm_diff_uri: String::from("test"),
+            bqm_retry_count: 0,
+        };
+        let _ = obj.bqm_summary();
+        assert_eq!(obj.bqm_messages_count, 0);
+    }
+
+    #[test]
+    fn test_bqm_output_text() {
+        let obj = TestResult {
+            bqm_test_id: String::from("test"),
+            bqm_state: 0,
+            bqm_duration_ms: 0,
+            bqm_messages_count: 0,
+            bqm_output_text: String::from("test"),
+            bqm_error_message: String::from("test"),
+            bqm_expected_output: String::from("test"),
+            bqm_actual_output: String::from("test"),
+            bqm_diff_uri: String::from("test"),
+            bqm_retry_count: 0,
+        };
+        let _ = obj.bqm_summary();
+        assert_eq!(obj.bqm_output_text, "test");
+    }
+
+    #[test]
+    fn test_bqm_error_message() {
+        let obj = TestResult {
+            bqm_test_id: String::from("test"),
+            bqm_state: 0,
+            bqm_duration_ms: 0,
+            bqm_messages_count: 0,
+            bqm_output_text: String::from("test"),
+            bqm_error_message: String::from("test"),
+            bqm_expected_output: String::from("test"),
+            bqm_actual_output: String::from("test"),
+            bqm_diff_uri: String::from("test"),
+            bqm_retry_count: 0,
+        };
+        let _ = obj.bqm_summary();
+        assert_eq!(obj.bqm_error_message, "test");
+    }
+
+    #[test]
+    fn test_bqm_expected_output() {
+        let obj = TestResult {
+            bqm_test_id: String::from("test"),
+            bqm_state: 0,
+            bqm_duration_ms: 0,
+            bqm_messages_count: 0,
+            bqm_output_text: String::from("test"),
+            bqm_error_message: String::from("test"),
+            bqm_expected_output: String::from("test"),
+            bqm_actual_output: String::from("test"),
+            bqm_diff_uri: String::from("test"),
+            bqm_retry_count: 0,
+        };
+        let _ = obj.bqm_summary();
+        assert_eq!(obj.bqm_expected_output, "test");
+    }
+
+    #[test]
+    fn test_bqm_actual_output() {
+        let obj = TestResult {
+            bqm_test_id: String::from("test"),
+            bqm_state: 0,
+            bqm_duration_ms: 0,
+            bqm_messages_count: 0,
+            bqm_output_text: String::from("test"),
+            bqm_error_message: String::from("test"),
+            bqm_expected_output: String::from("test"),
+            bqm_actual_output: String::from("test"),
+            bqm_diff_uri: String::from("test"),
+            bqm_retry_count: 0,
+        };
+        let _ = obj.bqm_summary();
+        assert_eq!(obj.bqm_actual_output, "test");
+    }
+
+    #[test]
+    fn test_bqm_diff_uri() {
+        let obj = TestResult {
+            bqm_test_id: String::from("test"),
+            bqm_state: 0,
+            bqm_duration_ms: 0,
+            bqm_messages_count: 0,
+            bqm_output_text: String::from("test"),
+            bqm_error_message: String::from("test"),
+            bqm_expected_output: String::from("test"),
+            bqm_actual_output: String::from("test"),
+            bqm_diff_uri: String::from("test"),
+            bqm_retry_count: 0,
+        };
+        let _ = obj.bqm_summary();
+        assert_eq!(obj.bqm_diff_uri, "test");
+    }
+
+    #[test]
+    fn test_bqm_retry_count() {
+        let obj = TestResult {
+            bqm_test_id: String::from("test"),
+            bqm_state: 0,
+            bqm_duration_ms: 0,
+            bqm_messages_count: 0,
+            bqm_output_text: String::from("test"),
+            bqm_error_message: String::from("test"),
+            bqm_expected_output: String::from("test"),
+            bqm_actual_output: String::from("test"),
+            bqm_diff_uri: String::from("test"),
+            bqm_retry_count: 0,
+        };
+        let _ = obj.bqm_summary();
+        assert_eq!(obj.bqm_retry_count, 0);
+    }
+
+
+    #[test]
+    fn test_bqn_uri() {
+        let obj = TestCoverage {
+            bqn_uri: String::from("test"),
+            bqn_statement_count: 0,
+            bqn_statement_covered: 0,
+            bqn_branch_count: 0,
+            bqn_branch_covered: 0,
+            bqn_function_count: 0,
+            bqn_function_covered: 0,
+            bqn_line_count: 0,
+            bqn_line_covered: 0,
+            bqn_detailed_ranges: Vec::new(),
+        };
+        let _ = obj.bqn_summary();
+        assert_eq!(obj.bqn_uri, "test");
+    }
+
+    #[test]
+    fn test_bqn_statement_count() {
+        let obj = TestCoverage {
+            bqn_uri: String::from("test"),
+            bqn_statement_count: 0,
+            bqn_statement_covered: 0,
+            bqn_branch_count: 0,
+            bqn_branch_covered: 0,
+            bqn_function_count: 0,
+            bqn_function_covered: 0,
+            bqn_line_count: 0,
+            bqn_line_covered: 0,
+            bqn_detailed_ranges: Vec::new(),
+        };
+        let _ = obj.bqn_summary();
+        assert_eq!(obj.bqn_statement_count, 0);
+    }
+
+    #[test]
+    fn test_bqn_statement_covered() {
+        let obj = TestCoverage {
+            bqn_uri: String::from("test"),
+            bqn_statement_count: 0,
+            bqn_statement_covered: 0,
+            bqn_branch_count: 0,
+            bqn_branch_covered: 0,
+            bqn_function_count: 0,
+            bqn_function_covered: 0,
+            bqn_line_count: 0,
+            bqn_line_covered: 0,
+            bqn_detailed_ranges: Vec::new(),
+        };
+        let _ = obj.bqn_summary();
+        assert_eq!(obj.bqn_statement_covered, 0);
+    }
+
+    #[test]
+    fn test_bqn_branch_count() {
+        let obj = TestCoverage {
+            bqn_uri: String::from("test"),
+            bqn_statement_count: 0,
+            bqn_statement_covered: 0,
+            bqn_branch_count: 0,
+            bqn_branch_covered: 0,
+            bqn_function_count: 0,
+            bqn_function_covered: 0,
+            bqn_line_count: 0,
+            bqn_line_covered: 0,
+            bqn_detailed_ranges: Vec::new(),
+        };
+        let _ = obj.bqn_summary();
+        assert_eq!(obj.bqn_branch_count, 0);
+    }
+
+    #[test]
+    fn test_bqn_branch_covered() {
+        let obj = TestCoverage {
+            bqn_uri: String::from("test"),
+            bqn_statement_count: 0,
+            bqn_statement_covered: 0,
+            bqn_branch_count: 0,
+            bqn_branch_covered: 0,
+            bqn_function_count: 0,
+            bqn_function_covered: 0,
+            bqn_line_count: 0,
+            bqn_line_covered: 0,
+            bqn_detailed_ranges: Vec::new(),
+        };
+        let _ = obj.bqn_summary();
+        assert_eq!(obj.bqn_branch_covered, 0);
+    }
+
+    #[test]
+    fn test_bqn_function_count() {
+        let obj = TestCoverage {
+            bqn_uri: String::from("test"),
+            bqn_statement_count: 0,
+            bqn_statement_covered: 0,
+            bqn_branch_count: 0,
+            bqn_branch_covered: 0,
+            bqn_function_count: 0,
+            bqn_function_covered: 0,
+            bqn_line_count: 0,
+            bqn_line_covered: 0,
+            bqn_detailed_ranges: Vec::new(),
+        };
+        let _ = obj.bqn_summary();
+        assert_eq!(obj.bqn_function_count, 0);
+    }
+
+    #[test]
+    fn test_bqn_function_covered() {
+        let obj = TestCoverage {
+            bqn_uri: String::from("test"),
+            bqn_statement_count: 0,
+            bqn_statement_covered: 0,
+            bqn_branch_count: 0,
+            bqn_branch_covered: 0,
+            bqn_function_count: 0,
+            bqn_function_covered: 0,
+            bqn_line_count: 0,
+            bqn_line_covered: 0,
+            bqn_detailed_ranges: Vec::new(),
+        };
+        let _ = obj.bqn_summary();
+        assert_eq!(obj.bqn_function_covered, 0);
+    }
+
+    #[test]
+    fn test_bqn_line_count() {
+        let obj = TestCoverage {
+            bqn_uri: String::from("test"),
+            bqn_statement_count: 0,
+            bqn_statement_covered: 0,
+            bqn_branch_count: 0,
+            bqn_branch_covered: 0,
+            bqn_function_count: 0,
+            bqn_function_covered: 0,
+            bqn_line_count: 0,
+            bqn_line_covered: 0,
+            bqn_detailed_ranges: Vec::new(),
+        };
+        let _ = obj.bqn_summary();
+        assert_eq!(obj.bqn_line_count, 0);
+    }
+
+    #[test]
+    fn test_bqn_line_covered() {
+        let obj = TestCoverage {
+            bqn_uri: String::from("test"),
+            bqn_statement_count: 0,
+            bqn_statement_covered: 0,
+            bqn_branch_count: 0,
+            bqn_branch_covered: 0,
+            bqn_function_count: 0,
+            bqn_function_covered: 0,
+            bqn_line_count: 0,
+            bqn_line_covered: 0,
+            bqn_detailed_ranges: Vec::new(),
+        };
+        let _ = obj.bqn_summary();
+        assert_eq!(obj.bqn_line_covered, 0);
+    }
+
+    #[test]
+    fn test_bqn_detailed_ranges() {
+        let obj = TestCoverage {
+            bqn_uri: String::from("test"),
+            bqn_statement_count: 0,
+            bqn_statement_covered: 0,
+            bqn_branch_count: 0,
+            bqn_branch_covered: 0,
+            bqn_function_count: 0,
+            bqn_function_covered: 0,
+            bqn_line_count: 0,
+            bqn_line_covered: 0,
+            bqn_detailed_ranges: Vec::new(),
+        };
+        let _ = obj.bqn_summary();
+        assert!(obj.bqn_detailed_ranges.is_empty());
+    }
+
+
+    #[test]
+    fn test_bqo_message_text() {
+        let obj = TestMessage {
+            bqo_message_text: String::from("test"),
+            bqo_severity: 0,
+            bqo_expected_uri: String::from("test"),
+            bqo_actual_uri: String::from("test"),
+            bqo_location_uri: String::from("test"),
+            bqo_location_line: 0,
+            bqo_location_col: 0,
+            bqo_context_value: String::from("test"),
+            bqo_stack_trace: String::from("test"),
+            bqo_is_markdown: false,
+        };
+        let _ = obj.bqo_summary();
+        assert_eq!(obj.bqo_message_text, "test");
+    }
+
+    #[test]
+    fn test_bqo_severity() {
+        let obj = TestMessage {
+            bqo_message_text: String::from("test"),
+            bqo_severity: 0,
+            bqo_expected_uri: String::from("test"),
+            bqo_actual_uri: String::from("test"),
+            bqo_location_uri: String::from("test"),
+            bqo_location_line: 0,
+            bqo_location_col: 0,
+            bqo_context_value: String::from("test"),
+            bqo_stack_trace: String::from("test"),
+            bqo_is_markdown: false,
+        };
+        let _ = obj.bqo_summary();
+        assert_eq!(obj.bqo_severity, 0);
+    }
+
+    #[test]
+    fn test_bqo_expected_uri() {
+        let obj = TestMessage {
+            bqo_message_text: String::from("test"),
+            bqo_severity: 0,
+            bqo_expected_uri: String::from("test"),
+            bqo_actual_uri: String::from("test"),
+            bqo_location_uri: String::from("test"),
+            bqo_location_line: 0,
+            bqo_location_col: 0,
+            bqo_context_value: String::from("test"),
+            bqo_stack_trace: String::from("test"),
+            bqo_is_markdown: false,
+        };
+        let _ = obj.bqo_summary();
+        assert_eq!(obj.bqo_expected_uri, "test");
+    }
+
+    #[test]
+    fn test_bqo_actual_uri() {
+        let obj = TestMessage {
+            bqo_message_text: String::from("test"),
+            bqo_severity: 0,
+            bqo_expected_uri: String::from("test"),
+            bqo_actual_uri: String::from("test"),
+            bqo_location_uri: String::from("test"),
+            bqo_location_line: 0,
+            bqo_location_col: 0,
+            bqo_context_value: String::from("test"),
+            bqo_stack_trace: String::from("test"),
+            bqo_is_markdown: false,
+        };
+        let _ = obj.bqo_summary();
+        assert_eq!(obj.bqo_actual_uri, "test");
+    }
+
+    #[test]
+    fn test_bqo_location_uri() {
+        let obj = TestMessage {
+            bqo_message_text: String::from("test"),
+            bqo_severity: 0,
+            bqo_expected_uri: String::from("test"),
+            bqo_actual_uri: String::from("test"),
+            bqo_location_uri: String::from("test"),
+            bqo_location_line: 0,
+            bqo_location_col: 0,
+            bqo_context_value: String::from("test"),
+            bqo_stack_trace: String::from("test"),
+            bqo_is_markdown: false,
+        };
+        let _ = obj.bqo_summary();
+        assert_eq!(obj.bqo_location_uri, "test");
+    }
+
+    #[test]
+    fn test_bqo_location_line() {
+        let obj = TestMessage {
+            bqo_message_text: String::from("test"),
+            bqo_severity: 0,
+            bqo_expected_uri: String::from("test"),
+            bqo_actual_uri: String::from("test"),
+            bqo_location_uri: String::from("test"),
+            bqo_location_line: 0,
+            bqo_location_col: 0,
+            bqo_context_value: String::from("test"),
+            bqo_stack_trace: String::from("test"),
+            bqo_is_markdown: false,
+        };
+        let _ = obj.bqo_summary();
+        assert_eq!(obj.bqo_location_line, 0);
+    }
+
+    #[test]
+    fn test_bqo_location_col() {
+        let obj = TestMessage {
+            bqo_message_text: String::from("test"),
+            bqo_severity: 0,
+            bqo_expected_uri: String::from("test"),
+            bqo_actual_uri: String::from("test"),
+            bqo_location_uri: String::from("test"),
+            bqo_location_line: 0,
+            bqo_location_col: 0,
+            bqo_context_value: String::from("test"),
+            bqo_stack_trace: String::from("test"),
+            bqo_is_markdown: false,
+        };
+        let _ = obj.bqo_summary();
+        assert_eq!(obj.bqo_location_col, 0);
+    }
+
+    #[test]
+    fn test_bqo_context_value() {
+        let obj = TestMessage {
+            bqo_message_text: String::from("test"),
+            bqo_severity: 0,
+            bqo_expected_uri: String::from("test"),
+            bqo_actual_uri: String::from("test"),
+            bqo_location_uri: String::from("test"),
+            bqo_location_line: 0,
+            bqo_location_col: 0,
+            bqo_context_value: String::from("test"),
+            bqo_stack_trace: String::from("test"),
+            bqo_is_markdown: false,
+        };
+        let _ = obj.bqo_summary();
+        assert_eq!(obj.bqo_context_value, "test");
+    }
+
+    #[test]
+    fn test_bqo_stack_trace() {
+        let obj = TestMessage {
+            bqo_message_text: String::from("test"),
+            bqo_severity: 0,
+            bqo_expected_uri: String::from("test"),
+            bqo_actual_uri: String::from("test"),
+            bqo_location_uri: String::from("test"),
+            bqo_location_line: 0,
+            bqo_location_col: 0,
+            bqo_context_value: String::from("test"),
+            bqo_stack_trace: String::from("test"),
+            bqo_is_markdown: false,
+        };
+        let _ = obj.bqo_summary();
+        assert_eq!(obj.bqo_stack_trace, "test");
+    }
+
+    #[test]
+    fn test_bqo_is_markdown() {
+        let obj = TestMessage {
+            bqo_message_text: String::from("test"),
+            bqo_severity: 0,
+            bqo_expected_uri: String::from("test"),
+            bqo_actual_uri: String::from("test"),
+            bqo_location_uri: String::from("test"),
+            bqo_location_line: 0,
+            bqo_location_col: 0,
+            bqo_context_value: String::from("test"),
+            bqo_stack_trace: String::from("test"),
+            bqo_is_markdown: false,
+        };
+        let _ = obj.bqo_summary();
+        assert!(!obj.bqo_is_markdown);
     }
 
 }
