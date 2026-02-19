@@ -55783,3 +55783,308 @@ mod bay_tests {
         assert_eq!(search.result_count(), 2);
     }
 }
+
+
+// --- baz_: Editor document highlight model ---
+
+/// Kind of document highlight.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BazHighlightKind {
+    Text,
+    Read,
+    Write,
+}
+
+impl BazHighlightKind {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Text => "Text",
+            Self::Read => "Read",
+            Self::Write => "Write",
+        }
+    }
+
+    pub fn is_write(&self) -> bool { matches!(self, Self::Write) }
+
+    pub fn decoration_class(&self) -> &'static str {
+        match self {
+            Self::Text => "highlight-text",
+            Self::Read => "highlight-read",
+            Self::Write => "highlight-write",
+        }
+    }
+}
+
+/// A single document highlight.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BazDocHighlight {
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub kind: BazHighlightKind,
+}
+
+impl BazDocHighlight {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32, kind: BazHighlightKind) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec, kind }
+    }
+
+    pub fn read(sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        Self::new(sl, sc, el, ec, BazHighlightKind::Read)
+    }
+
+    pub fn write(sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        Self::new(sl, sc, el, ec, BazHighlightKind::Write)
+    }
+
+    pub fn text(sl: u32, sc: u32, el: u32, ec: u32) -> Self {
+        Self::new(sl, sc, el, ec, BazHighlightKind::Text)
+    }
+
+    pub fn is_single_line(&self) -> bool { self.start_line == self.end_line }
+
+    pub fn contains_line(&self, line: u32) -> bool {
+        line >= self.start_line && line <= self.end_line
+    }
+
+    pub fn length(&self) -> u32 {
+        if self.is_single_line() { self.end_col - self.start_col } else { 0 }
+    }
+}
+
+/// Result of a highlight provider.
+#[derive(Debug, Clone)]
+pub struct BazHighlightResult {
+    pub highlights: Vec<BazDocHighlight>,
+    pub word: String,
+    pub provider_id: String,
+}
+
+impl BazHighlightResult {
+    pub fn new(word: &str, highlights: Vec<BazDocHighlight>, provider: &str) -> Self {
+        Self { highlights, word: word.to_string(), provider_id: provider.to_string() }
+    }
+
+    pub fn count(&self) -> usize { self.highlights.len() }
+    pub fn read_count(&self) -> usize { self.highlights.iter().filter(|h| h.kind == BazHighlightKind::Read).count() }
+    pub fn write_count(&self) -> usize { self.highlights.iter().filter(|h| h.kind == BazHighlightKind::Write).count() }
+
+    pub fn on_line(&self, line: u32) -> Vec<&BazDocHighlight> {
+        self.highlights.iter().filter(|h| h.contains_line(line)).collect()
+    }
+
+    pub fn is_empty(&self) -> bool { self.highlights.is_empty() }
+}
+
+/// The document highlight model.
+#[derive(Debug)]
+pub struct BazHighlightModel {
+    current: Option<BazHighlightResult>,
+    enabled: bool,
+    selected_index: Option<usize>,
+    occurrences_highlight: bool,
+}
+
+impl BazHighlightModel {
+    pub fn new() -> Self {
+        Self { current: None, enabled: true, selected_index: None, occurrences_highlight: true }
+    }
+
+    pub fn is_enabled(&self) -> bool { self.enabled }
+    pub fn set_enabled(&mut self, v: bool) { self.enabled = v; }
+
+    pub fn set_result(&mut self, result: BazHighlightResult) {
+        self.selected_index = if result.is_empty() { None } else { Some(0) };
+        self.current = Some(result);
+    }
+
+    pub fn clear(&mut self) {
+        self.current = None;
+        self.selected_index = None;
+    }
+
+    pub fn current(&self) -> Option<&BazHighlightResult> { self.current.as_ref() }
+    pub fn has_highlights(&self) -> bool { self.current.as_ref().is_some_and(|r| !r.is_empty()) }
+
+    pub fn highlight_count(&self) -> usize {
+        self.current.as_ref().map_or(0, |r| r.count())
+    }
+
+    pub fn selected(&self) -> Option<&BazDocHighlight> {
+        let r = self.current.as_ref()?;
+        let i = self.selected_index?;
+        r.highlights.get(i)
+    }
+
+    pub fn next(&mut self) {
+        if let Some(r) = &self.current {
+            if r.highlights.is_empty() { return; }
+            self.selected_index = Some(match self.selected_index {
+                Some(i) => (i + 1) % r.highlights.len(),
+                None => 0,
+            });
+        }
+    }
+
+    pub fn prev(&mut self) {
+        if let Some(r) = &self.current {
+            if r.highlights.is_empty() { return; }
+            self.selected_index = Some(match self.selected_index {
+                Some(0) => r.highlights.len() - 1,
+                Some(i) => i - 1,
+                None => 0,
+            });
+        }
+    }
+
+    pub fn decorations_for_line(&self, line: u32) -> Vec<&BazDocHighlight> {
+        match &self.current {
+            Some(r) => r.on_line(line),
+            None => Vec::new(),
+        }
+    }
+
+    pub fn set_occurrences_highlight(&mut self, v: bool) { self.occurrences_highlight = v; }
+    pub fn occurrences_highlight(&self) -> bool { self.occurrences_highlight }
+
+    pub fn status_text(&self) -> String {
+        match &self.current {
+            Some(r) if !r.is_empty() => {
+                let idx = self.selected_index.map_or(0, |i| i + 1);
+                format!("{} of {} occurrences", idx, r.count())
+            }
+            _ => String::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod baz_tests {
+    use super::*;
+
+    #[test]
+    fn test_baz_highlight_kind() {
+        assert!(BazHighlightKind::Write.is_write());
+        assert!(!BazHighlightKind::Read.is_write());
+        assert_eq!(BazHighlightKind::Read.label(), "Read");
+    }
+
+    #[test]
+    fn test_baz_highlight_create() {
+        let h = BazDocHighlight::read(1, 5, 1, 10);
+        assert!(h.is_single_line());
+        assert_eq!(h.length(), 5);
+        assert_eq!(h.kind, BazHighlightKind::Read);
+    }
+
+    #[test]
+    fn test_baz_highlight_contains_line() {
+        let h = BazDocHighlight::text(5, 0, 7, 10);
+        assert!(h.contains_line(5));
+        assert!(h.contains_line(6));
+        assert!(!h.contains_line(8));
+    }
+
+    #[test]
+    fn test_baz_result_counts() {
+        let r = BazHighlightResult::new("foo", vec![
+            BazDocHighlight::read(1, 0, 1, 3),
+            BazDocHighlight::write(5, 0, 5, 3),
+            BazDocHighlight::read(10, 0, 10, 3),
+        ], "semantic");
+        assert_eq!(r.count(), 3);
+        assert_eq!(r.read_count(), 2);
+        assert_eq!(r.write_count(), 1);
+    }
+
+    #[test]
+    fn test_baz_result_on_line() {
+        let r = BazHighlightResult::new("x", vec![
+            BazDocHighlight::read(1, 0, 1, 3),
+            BazDocHighlight::write(1, 10, 1, 13),
+            BazDocHighlight::read(5, 0, 5, 3),
+        ], "p");
+        assert_eq!(r.on_line(1).len(), 2);
+        assert_eq!(r.on_line(5).len(), 1);
+    }
+
+    #[test]
+    fn test_baz_model_lifecycle() {
+        let mut m = BazHighlightModel::new();
+        assert!(!m.has_highlights());
+
+        let r = BazHighlightResult::new("foo", vec![
+            BazDocHighlight::read(1, 0, 1, 3),
+            BazDocHighlight::write(5, 0, 5, 3),
+        ], "p");
+        m.set_result(r);
+        assert!(m.has_highlights());
+        assert_eq!(m.highlight_count(), 2);
+    }
+
+    #[test]
+    fn test_baz_model_navigation() {
+        let mut m = BazHighlightModel::new();
+        m.set_result(BazHighlightResult::new("x", vec![
+            BazDocHighlight::read(1, 0, 1, 3),
+            BazDocHighlight::read(5, 0, 5, 3),
+            BazDocHighlight::read(10, 0, 10, 3),
+        ], "p"));
+
+        assert_eq!(m.selected().unwrap().start_line, 1);
+        m.next();
+        assert_eq!(m.selected().unwrap().start_line, 5);
+        m.next();
+        assert_eq!(m.selected().unwrap().start_line, 10);
+        m.next(); // wrap
+        assert_eq!(m.selected().unwrap().start_line, 1);
+    }
+
+    #[test]
+    fn test_baz_model_prev_wrap() {
+        let mut m = BazHighlightModel::new();
+        m.set_result(BazHighlightResult::new("x", vec![
+            BazDocHighlight::read(1, 0, 1, 3),
+            BazDocHighlight::read(5, 0, 5, 3),
+        ], "p"));
+        m.prev(); // wrap from 0 to last
+        assert_eq!(m.selected().unwrap().start_line, 5);
+    }
+
+    #[test]
+    fn test_baz_model_clear() {
+        let mut m = BazHighlightModel::new();
+        m.set_result(BazHighlightResult::new("x", vec![BazDocHighlight::read(1, 0, 1, 3)], "p"));
+        m.clear();
+        assert!(!m.has_highlights());
+        assert!(m.selected().is_none());
+    }
+
+    #[test]
+    fn test_baz_model_status() {
+        let mut m = BazHighlightModel::new();
+        assert!(m.status_text().is_empty());
+        m.set_result(BazHighlightResult::new("x", vec![
+            BazDocHighlight::read(1, 0, 1, 3),
+            BazDocHighlight::read(5, 0, 5, 3),
+        ], "p"));
+        assert_eq!(m.status_text(), "1 of 2 occurrences");
+    }
+
+    #[test]
+    fn test_baz_model_decorations() {
+        let mut m = BazHighlightModel::new();
+        m.set_result(BazHighlightResult::new("x", vec![
+            BazDocHighlight::read(3, 0, 3, 5),
+        ], "p"));
+        assert_eq!(m.decorations_for_line(3).len(), 1);
+        assert_eq!(m.decorations_for_line(4).len(), 0);
+    }
+
+    #[test]
+    fn test_baz_decoration_class() {
+        assert_eq!(BazHighlightKind::Write.decoration_class(), "highlight-write");
+        assert_eq!(BazHighlightKind::Read.decoration_class(), "highlight-read");
+    }
+}
