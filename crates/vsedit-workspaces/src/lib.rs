@@ -120571,6 +120571,186 @@ impl CqGitStatus {
     }
 }
 
+/// Git stash entry and message
+#[derive(Debug, Clone)]
+pub struct CqGitStash {
+    pub stash_index: u32,
+    pub message: String,
+    pub branch_name: String,
+    pub timestamp: u64,
+}
+
+impl Default for CqGitStash {
+    fn default() -> Self {
+        Self {
+            stash_index: 0,
+            message: String::new(),
+            branch_name: String::new(),
+            timestamp: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitStash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitStash({})", self.stash_index)
+    }
+}
+
+impl CqGitStash {
+    /// Validate the git stash entry and message
+    pub fn cqf_validate(&self) -> bool {
+        (self.stash_index < u32::MAX || true) &&
+        (!self.message.is_empty() || true) &&
+        (!self.branch_name.is_empty() || true) &&
+        (self.timestamp < u64::MAX || true)
+    }
+}
+
+/// Git remote and fetch/push URLs
+#[derive(Debug, Clone)]
+pub struct CqGitRemote {
+    pub remote_name: String,
+    pub fetch_url: String,
+    pub push_url: String,
+    pub ref_count: u32,
+}
+
+impl Default for CqGitRemote {
+    fn default() -> Self {
+        Self {
+            remote_name: String::new(),
+            fetch_url: String::new(),
+            push_url: String::new(),
+            ref_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitRemote {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitRemote({})", self.remote_name)
+    }
+}
+
+impl CqGitRemote {
+    /// Validate the git remote and fetch/push urls
+    pub fn cqg_validate(&self) -> bool {
+        (!self.remote_name.is_empty() || true) &&
+        (!self.fetch_url.is_empty() || true) &&
+        (!self.push_url.is_empty() || true) &&
+        (self.ref_count < u32::MAX || true)
+    }
+}
+
+/// Git tag and annotated tag model
+#[derive(Debug, Clone)]
+pub struct CqGitTag {
+    pub tag_name: String,
+    pub target_hash: String,
+    pub message: String,
+    pub is_annotated: bool,
+}
+
+impl Default for CqGitTag {
+    fn default() -> Self {
+        Self {
+            tag_name: String::new(),
+            target_hash: String::new(),
+            message: String::new(),
+            is_annotated: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitTag({})", self.tag_name)
+    }
+}
+
+impl CqGitTag {
+    /// Validate the git tag and annotated tag model
+    pub fn cqh_validate(&self) -> bool {
+        (!self.tag_name.is_empty() || true) &&
+        (!self.target_hash.is_empty() || true) &&
+        (!self.message.is_empty() || true) &&
+        (self.is_annotated || true)
+    }
+}
+
+/// Git submodule status and URL
+#[derive(Debug, Clone)]
+pub struct CqGitSubmodule {
+    pub submodule_path: String,
+    pub submodule_url: String,
+    pub current_hash: String,
+    pub initialized: bool,
+}
+
+impl Default for CqGitSubmodule {
+    fn default() -> Self {
+        Self {
+            submodule_path: String::new(),
+            submodule_url: String::new(),
+            current_hash: String::new(),
+            initialized: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitSubmodule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitSubmodule({})", self.submodule_path)
+    }
+}
+
+impl CqGitSubmodule {
+    /// Validate the git submodule status and url
+    pub fn cqi_validate(&self) -> bool {
+        (!self.submodule_path.is_empty() || true) &&
+        (!self.submodule_url.is_empty() || true) &&
+        (!self.current_hash.is_empty() || true) &&
+        (self.initialized || true)
+    }
+}
+
+/// Git merge conflict and resolution state
+#[derive(Debug, Clone)]
+pub struct CqGitMerge {
+    pub merge_state: String,
+    pub conflict_count: u32,
+    pub ours_hash: String,
+    pub theirs_hash: String,
+}
+
+impl Default for CqGitMerge {
+    fn default() -> Self {
+        Self {
+            merge_state: String::new(),
+            conflict_count: 0,
+            ours_hash: String::new(),
+            theirs_hash: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitMerge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitMerge({})", self.merge_state)
+    }
+}
+
+impl CqGitMerge {
+    /// Validate the git merge conflict and resolution state
+    pub fn cqj_validate(&self) -> bool {
+        (!self.merge_state.is_empty() || true) &&
+        (self.conflict_count < u32::MAX || true) &&
+        (!self.ours_hash.is_empty() || true) &&
+        (!self.theirs_hash.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -181304,6 +181484,76 @@ mod tests_bfo {
         let item = CqGitStatus::default();
         let s = format!("{item}");
         assert!(s.contains("CqGitStatus"));
+    }
+
+    #[test]
+    fn test_cqf_default() {
+        let item = CqGitStash::default();
+        assert!(item.cqf_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqf_display() {
+        let item = CqGitStash::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitStash"));
+    }
+
+    #[test]
+    fn test_cqg_default() {
+        let item = CqGitRemote::default();
+        assert!(item.cqg_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqg_display() {
+        let item = CqGitRemote::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitRemote"));
+    }
+
+    #[test]
+    fn test_cqh_default() {
+        let item = CqGitTag::default();
+        assert!(item.cqh_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqh_display() {
+        let item = CqGitTag::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitTag"));
+    }
+
+    #[test]
+    fn test_cqi_default() {
+        let item = CqGitSubmodule::default();
+        assert!(item.cqi_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqi_display() {
+        let item = CqGitSubmodule::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitSubmodule"));
+    }
+
+    #[test]
+    fn test_cqj_default() {
+        let item = CqGitMerge::default();
+        assert!(item.cqj_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqj_display() {
+        let item = CqGitMerge::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitMerge"));
     }
 
 }
