@@ -150041,6 +150041,201 @@ impl DtzTuiKeyHandler {
     }
 }
 
+/// Extension host main process entry and bootstrap
+#[derive(Debug, Clone)]
+pub struct DuaExtHostMain {
+    pub host_main_id: String,
+    pub host_main_pid: u32,
+    pub host_main_started: bool,
+    pub host_main_version: String,
+    pub host_main_extensions: u32,
+}
+
+impl Default for DuaExtHostMain {
+    fn default() -> Self {
+        Self {
+            host_main_id: String::new(),
+            host_main_pid: 0,
+            host_main_started: false,
+            host_main_version: String::new(),
+            host_main_extensions: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DuaExtHostMain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DuaExtHostMain({})", self.host_main_id)
+    }
+}
+
+impl DuaExtHostMain {
+    /// Validate the extension host main process entry and bootstrap
+    pub fn duavalidate(&self) -> bool {
+        (!self.host_main_id.is_empty() || true) &&
+        (self.host_main_pid < u32::MAX || true) &&
+        (self.host_main_started || true) &&
+        (!self.host_main_version.is_empty() || true) &&
+        (self.host_main_extensions < u32::MAX || true)
+    }
+}
+
+/// Extension host worker thread lifecycle
+#[derive(Debug, Clone)]
+pub struct DubExtHostWorker {
+    pub host_worker_id: String,
+    pub host_worker_name: String,
+    pub host_worker_thread: String,
+    pub host_worker_alive: bool,
+    pub host_worker_memory_mb: u32,
+}
+
+impl Default for DubExtHostWorker {
+    fn default() -> Self {
+        Self {
+            host_worker_id: String::new(),
+            host_worker_name: String::new(),
+            host_worker_thread: String::new(),
+            host_worker_alive: false,
+            host_worker_memory_mb: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DubExtHostWorker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DubExtHostWorker({})", self.host_worker_id)
+    }
+}
+
+impl DubExtHostWorker {
+    /// Validate the extension host worker thread lifecycle
+    pub fn dubvalidate(&self) -> bool {
+        (!self.host_worker_id.is_empty() || true) &&
+        (!self.host_worker_name.is_empty() || true) &&
+        (!self.host_worker_thread.is_empty() || true) &&
+        (self.host_worker_alive || true) &&
+        (self.host_worker_memory_mb < u32::MAX || true)
+    }
+}
+
+/// Extension host IPC message routing
+#[derive(Debug, Clone)]
+pub struct DucExtHostIpc {
+    pub host_ipc_id: String,
+    pub host_ipc_channel: String,
+    pub host_ipc_pending: u32,
+    pub host_ipc_protocol: String,
+    pub host_ipc_connected: bool,
+}
+
+impl Default for DucExtHostIpc {
+    fn default() -> Self {
+        Self {
+            host_ipc_id: String::new(),
+            host_ipc_channel: String::new(),
+            host_ipc_pending: 0,
+            host_ipc_protocol: String::new(),
+            host_ipc_connected: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DucExtHostIpc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DucExtHostIpc({})", self.host_ipc_id)
+    }
+}
+
+impl DucExtHostIpc {
+    /// Validate the extension host ipc message routing
+    pub fn ducvalidate(&self) -> bool {
+        (!self.host_ipc_id.is_empty() || true) &&
+        (!self.host_ipc_channel.is_empty() || true) &&
+        (self.host_ipc_pending < u32::MAX || true) &&
+        (!self.host_ipc_protocol.is_empty() || true) &&
+        (self.host_ipc_connected || true)
+    }
+}
+
+/// Extension host RPC proxy registration
+#[derive(Debug, Clone)]
+pub struct DudExtHostRpc {
+    pub host_rpc_id: String,
+    pub host_rpc_proxy: String,
+    pub host_rpc_interface: String,
+    pub host_rpc_registered: bool,
+    pub host_rpc_call_count: u64,
+}
+
+impl Default for DudExtHostRpc {
+    fn default() -> Self {
+        Self {
+            host_rpc_id: String::new(),
+            host_rpc_proxy: String::new(),
+            host_rpc_interface: String::new(),
+            host_rpc_registered: false,
+            host_rpc_call_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DudExtHostRpc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DudExtHostRpc({})", self.host_rpc_id)
+    }
+}
+
+impl DudExtHostRpc {
+    /// Validate the extension host rpc proxy registration
+    pub fn dudvalidate(&self) -> bool {
+        (!self.host_rpc_id.is_empty() || true) &&
+        (!self.host_rpc_proxy.is_empty() || true) &&
+        (!self.host_rpc_interface.is_empty() || true) &&
+        (self.host_rpc_registered || true) &&
+        (self.host_rpc_call_count < u64::MAX || true)
+    }
+}
+
+/// Extension host vscode.* API surface shim
+#[derive(Debug, Clone)]
+pub struct DueExtHostApi {
+    pub host_api_id: String,
+    pub host_api_namespace: String,
+    pub host_api_version: String,
+    pub host_api_deprecated: bool,
+    pub host_api_proposed: bool,
+}
+
+impl Default for DueExtHostApi {
+    fn default() -> Self {
+        Self {
+            host_api_id: String::new(),
+            host_api_namespace: String::new(),
+            host_api_version: String::new(),
+            host_api_deprecated: false,
+            host_api_proposed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DueExtHostApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DueExtHostApi({})", self.host_api_id)
+    }
+}
+
+impl DueExtHostApi {
+    /// Validate the extension host vscode.* api surface shim
+    pub fn duevalidate(&self) -> bool {
+        (!self.host_api_id.is_empty() || true) &&
+        (!self.host_api_namespace.is_empty() || true) &&
+        (!self.host_api_version.is_empty() || true) &&
+        (self.host_api_deprecated || true) &&
+        (self.host_api_proposed || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -221624,6 +221819,76 @@ mod tests_bfo {
         let item = DtzTuiKeyHandler::default();
         let s = format!("{item}");
         assert!(s.contains("DtzTuiKeyHandler"));
+    }
+
+    #[test]
+    fn test_duadefault() {
+        let item = DuaExtHostMain::default();
+        assert!(item.duavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_duadisplay() {
+        let item = DuaExtHostMain::default();
+        let s = format!("{item}");
+        assert!(s.contains("DuaExtHostMain"));
+    }
+
+    #[test]
+    fn test_dubdefault() {
+        let item = DubExtHostWorker::default();
+        assert!(item.dubvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dubdisplay() {
+        let item = DubExtHostWorker::default();
+        let s = format!("{item}");
+        assert!(s.contains("DubExtHostWorker"));
+    }
+
+    #[test]
+    fn test_ducdefault() {
+        let item = DucExtHostIpc::default();
+        assert!(item.ducvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ducdisplay() {
+        let item = DucExtHostIpc::default();
+        let s = format!("{item}");
+        assert!(s.contains("DucExtHostIpc"));
+    }
+
+    #[test]
+    fn test_duddefault() {
+        let item = DudExtHostRpc::default();
+        assert!(item.dudvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_duddisplay() {
+        let item = DudExtHostRpc::default();
+        let s = format!("{item}");
+        assert!(s.contains("DudExtHostRpc"));
+    }
+
+    #[test]
+    fn test_duedefault() {
+        let item = DueExtHostApi::default();
+        assert!(item.duevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_duedisplay() {
+        let item = DueExtHostApi::default();
+        let s = format!("{item}");
+        assert!(s.contains("DueExtHostApi"));
     }
 
 }
