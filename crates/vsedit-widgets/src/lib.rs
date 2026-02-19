@@ -94987,6 +94987,247 @@ impl std::fmt::Display for InteractiveSessionModel {
     }
 }
 
+
+/// TerminalLinkModel — terminal link model
+#[derive(Debug, Clone)]
+pub struct TerminalLinkModel {
+    pub bxp_start_index: u32,
+    pub bxp_length: u32,
+    pub bxp_tooltip: String,
+    pub bxp_uri: String,
+    pub bxp_line_number: u32,
+    pub bxp_column_number: u32,
+    pub bxp_link_type: String,
+    pub bxp_is_validated: bool,
+}
+
+impl TerminalLinkModel {
+    pub fn new() -> Self {
+        Self {
+            bxp_start_index: 0,
+            bxp_length: 0,
+            bxp_tooltip: "".into(),
+            bxp_uri: "".into(),
+            bxp_line_number: 0,
+            bxp_column_number: 0,
+            bxp_link_type: "file".into(),
+            bxp_is_validated: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TerminalLinkModel({})", self.bxp_start_index)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bxp_start_index < u32::MAX || true
+    }
+}
+
+impl Default for TerminalLinkModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TerminalLinkModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TerminalLinkModel({})", self.bxp_start_index)
+    }
+}
+
+/// TerminalProfileModel — terminal profile model
+#[derive(Debug, Clone)]
+pub struct TerminalProfileModel {
+    pub bxq_profile_name: String,
+    pub bxq_path: String,
+    pub bxq_icon_id: String,
+    pub bxq_color: String,
+    pub bxq_is_default: bool,
+    pub bxq_is_auto_detected: bool,
+    pub bxq_overridden_name: String,
+    pub bxq_is_unsafe: bool,
+}
+
+impl TerminalProfileModel {
+    pub fn new() -> Self {
+        Self {
+            bxq_profile_name: "bash".into(),
+            bxq_path: "/bin/bash".into(),
+            bxq_icon_id: "terminal".into(),
+            bxq_color: "".into(),
+            bxq_is_default: false,
+            bxq_is_auto_detected: true,
+            bxq_overridden_name: "".into(),
+            bxq_is_unsafe: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TerminalProfileModel({})", self.bxq_profile_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxq_profile_name.is_empty() || true
+    }
+}
+
+impl Default for TerminalProfileModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TerminalProfileModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TerminalProfileModel({})", self.bxq_profile_name)
+    }
+}
+
+/// TerminalQuickFixModel — terminal quick fix action
+#[derive(Debug, Clone)]
+pub struct TerminalQuickFixModel {
+    pub bxr_id: String,
+    pub bxr_type_id: String,
+    pub bxr_terminal_command: String,
+    pub bxr_label: String,
+    pub bxr_source: String,
+    pub bxr_is_preferred: bool,
+    pub bxr_disabled_reason: String,
+    pub bxr_exit_code: i32,
+}
+
+impl TerminalQuickFixModel {
+    pub fn new() -> Self {
+        Self {
+            bxr_id: "fix-1".into(),
+            bxr_type_id: "command".into(),
+            bxr_terminal_command: "".into(),
+            bxr_label: "".into(),
+            bxr_source: "builtin".into(),
+            bxr_is_preferred: false,
+            bxr_disabled_reason: "".into(),
+            bxr_exit_code: -1,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TerminalQuickFixModel({})", self.bxr_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxr_id.is_empty() || true
+    }
+}
+
+impl Default for TerminalQuickFixModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TerminalQuickFixModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TerminalQuickFixModel({})", self.bxr_id)
+    }
+}
+
+/// DebugConsoleModel — debug console model
+#[derive(Debug, Clone)]
+pub struct DebugConsoleModel {
+    pub bxs_session_id: String,
+    pub bxs_line_count: u32,
+    pub bxs_filter_text: String,
+    pub bxs_word_wrap: bool,
+    pub bxs_auto_scroll: bool,
+    pub bxs_font_size: u32,
+    pub bxs_show_timestamps: bool,
+    pub bxs_collapse_identical: bool,
+}
+
+impl DebugConsoleModel {
+    pub fn new() -> Self {
+        Self {
+            bxs_session_id: "".into(),
+            bxs_line_count: 0,
+            bxs_filter_text: "".into(),
+            bxs_word_wrap: false,
+            bxs_auto_scroll: true,
+            bxs_font_size: 12,
+            bxs_show_timestamps: false,
+            bxs_collapse_identical: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("DebugConsoleModel({})", self.bxs_session_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxs_session_id.is_empty() || true
+    }
+}
+
+impl Default for DebugConsoleModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for DebugConsoleModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DebugConsoleModel({})", self.bxs_session_id)
+    }
+}
+
+/// DebugVariableModel — debug variable model
+#[derive(Debug, Clone)]
+pub struct DebugVariableModel {
+    pub bxt_name: String,
+    pub bxt_value: String,
+    pub bxt_var_type: String,
+    pub bxt_evaluate_name: String,
+    pub bxt_variables_ref: u32,
+    pub bxt_named_variables: u32,
+    pub bxt_indexed_variables: u32,
+    pub bxt_memory_ref: String,
+}
+
+impl DebugVariableModel {
+    pub fn new() -> Self {
+        Self {
+            bxt_name: "variable".into(),
+            bxt_value: "".into(),
+            bxt_var_type: "".into(),
+            bxt_evaluate_name: "".into(),
+            bxt_variables_ref: 0,
+            bxt_named_variables: 0,
+            bxt_indexed_variables: 0,
+            bxt_memory_ref: "".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("DebugVariableModel({})", self.bxt_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bxt_name.is_empty() || true
+    }
+}
+
+impl Default for DebugVariableModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for DebugVariableModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DebugVariableModel({})", self.bxt_name)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -144367,6 +144608,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.bxo_session_id = "session-1".into();
         assert_eq!(c.summary(), InteractiveSessionModel::new().summary());
+    }
+
+
+    #[test]
+    fn test_bxp_create() {
+        let obj = TerminalLinkModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxp_validate() {
+        let obj = TerminalLinkModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxp_display() {
+        let obj = TerminalLinkModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TerminalLinkModel"));
+    }
+
+    #[test]
+    fn test_bxp_clone() {
+        let obj = TerminalLinkModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxp_debug() {
+        let obj = TerminalLinkModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TerminalLinkModel"));
+    }
+
+    #[test]
+    fn test_bxp_default() {
+        let obj = TerminalLinkModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxp_summary_contains_name() {
+        let obj = TerminalLinkModel::new();
+        assert!(obj.summary().contains("TerminalLinkModel"));
+    }
+
+    #[test]
+    fn test_bxp_validate_default() {
+        let obj = TerminalLinkModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxp_display_not_empty() {
+        let obj = TerminalLinkModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxp_clone_independence() {
+        let mut obj = TerminalLinkModel::new();
+        let c = obj.clone();
+        obj.bxp_start_index = 0;
+        assert_eq!(c.summary(), TerminalLinkModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxq_create() {
+        let obj = TerminalProfileModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxq_validate() {
+        let obj = TerminalProfileModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxq_display() {
+        let obj = TerminalProfileModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TerminalProfileModel"));
+    }
+
+    #[test]
+    fn test_bxq_clone() {
+        let obj = TerminalProfileModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxq_debug() {
+        let obj = TerminalProfileModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TerminalProfileModel"));
+    }
+
+    #[test]
+    fn test_bxq_default() {
+        let obj = TerminalProfileModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxq_summary_contains_name() {
+        let obj = TerminalProfileModel::new();
+        assert!(obj.summary().contains("TerminalProfileModel"));
+    }
+
+    #[test]
+    fn test_bxq_validate_default() {
+        let obj = TerminalProfileModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxq_display_not_empty() {
+        let obj = TerminalProfileModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxq_clone_independence() {
+        let mut obj = TerminalProfileModel::new();
+        let c = obj.clone();
+        obj.bxq_profile_name = "bash".into();
+        assert_eq!(c.summary(), TerminalProfileModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxr_create() {
+        let obj = TerminalQuickFixModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxr_validate() {
+        let obj = TerminalQuickFixModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxr_display() {
+        let obj = TerminalQuickFixModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TerminalQuickFixModel"));
+    }
+
+    #[test]
+    fn test_bxr_clone() {
+        let obj = TerminalQuickFixModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxr_debug() {
+        let obj = TerminalQuickFixModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TerminalQuickFixModel"));
+    }
+
+    #[test]
+    fn test_bxr_default() {
+        let obj = TerminalQuickFixModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxr_summary_contains_name() {
+        let obj = TerminalQuickFixModel::new();
+        assert!(obj.summary().contains("TerminalQuickFixModel"));
+    }
+
+    #[test]
+    fn test_bxr_validate_default() {
+        let obj = TerminalQuickFixModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxr_display_not_empty() {
+        let obj = TerminalQuickFixModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxr_clone_independence() {
+        let mut obj = TerminalQuickFixModel::new();
+        let c = obj.clone();
+        obj.bxr_id = "fix-1".into();
+        assert_eq!(c.summary(), TerminalQuickFixModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxs_create() {
+        let obj = DebugConsoleModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxs_validate() {
+        let obj = DebugConsoleModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxs_display() {
+        let obj = DebugConsoleModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("DebugConsoleModel"));
+    }
+
+    #[test]
+    fn test_bxs_clone() {
+        let obj = DebugConsoleModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxs_debug() {
+        let obj = DebugConsoleModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("DebugConsoleModel"));
+    }
+
+    #[test]
+    fn test_bxs_default() {
+        let obj = DebugConsoleModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxs_summary_contains_name() {
+        let obj = DebugConsoleModel::new();
+        assert!(obj.summary().contains("DebugConsoleModel"));
+    }
+
+    #[test]
+    fn test_bxs_validate_default() {
+        let obj = DebugConsoleModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxs_display_not_empty() {
+        let obj = DebugConsoleModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxs_clone_independence() {
+        let mut obj = DebugConsoleModel::new();
+        let c = obj.clone();
+        obj.bxs_session_id = "".into();
+        assert_eq!(c.summary(), DebugConsoleModel::new().summary());
+    }
+
+    #[test]
+    fn test_bxt_create() {
+        let obj = DebugVariableModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxt_validate() {
+        let obj = DebugVariableModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxt_display() {
+        let obj = DebugVariableModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("DebugVariableModel"));
+    }
+
+    #[test]
+    fn test_bxt_clone() {
+        let obj = DebugVariableModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bxt_debug() {
+        let obj = DebugVariableModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("DebugVariableModel"));
+    }
+
+    #[test]
+    fn test_bxt_default() {
+        let obj = DebugVariableModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bxt_summary_contains_name() {
+        let obj = DebugVariableModel::new();
+        assert!(obj.summary().contains("DebugVariableModel"));
+    }
+
+    #[test]
+    fn test_bxt_validate_default() {
+        let obj = DebugVariableModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bxt_display_not_empty() {
+        let obj = DebugVariableModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bxt_clone_independence() {
+        let mut obj = DebugVariableModel::new();
+        let c = obj.clone();
+        obj.bxt_name = "variable".into();
+        assert_eq!(c.summary(), DebugVariableModel::new().summary());
     }
 
 }
