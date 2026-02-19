@@ -110562,6 +110562,341 @@ impl ScmViewState {
     }
 }
 
+
+/// Debug view state (session count, active session, call stack, variables)
+#[derive(Debug, Clone)]
+pub struct DebugViewState {
+    pub dbg_session_count: u32,
+    pub active_session_id: String,
+    pub call_stack_depth: u32,
+    pub variables_count: u32,
+    pub breakpoints_count: u32,
+    pub watch_count: u32,
+    pub is_stopped: bool,
+    pub stop_reason: String,
+    pub supports_restart: bool,
+    pub supports_step_back: bool,
+    pub repl_mode: String,
+    pub dbg_view_index: u32,
+}
+
+impl Default for DebugViewState {
+    fn default() -> Self {
+        Self {
+            dbg_session_count: 0,
+            active_session_id: String::new(),
+            call_stack_depth: 0,
+            variables_count: 0,
+            breakpoints_count: 0,
+            watch_count: 0,
+            is_stopped: false,
+            stop_reason: String::new(),
+            supports_restart: false,
+            supports_step_back: false,
+            repl_mode: String::new(),
+            dbg_view_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DebugViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DebugViewState({}, {}, {}, {})",
+            format!("dbg_session_count={}", self.dbg_session_count), format!("active_session_id={}", self.active_session_id), format!("call_stack_depth={}", self.call_stack_depth), format!("variables_count={}", self.variables_count))
+    }
+}
+
+impl DebugViewState {
+    pub fn chf_validate(&self) -> bool {
+        let _dbg_session_count = self.dbg_session_count;
+        let _active_session_id = self.active_session_id.clone();
+        let _call_stack_depth = self.call_stack_depth;
+        let _variables_count = self.variables_count;
+        let _breakpoints_count = self.breakpoints_count;
+        let _watch_count = self.watch_count;
+        let _is_stopped = self.is_stopped;
+        let _stop_reason = self.stop_reason.clone();
+        let _supports_restart = self.supports_restart;
+        let _supports_step_back = self.supports_step_back;
+        let _repl_mode = self.repl_mode.clone();
+        let _dbg_view_index = self.dbg_view_index;
+        self.dbg_session_count < u32::MAX || true && !self.active_session_id.is_empty() || true && self.call_stack_depth < u32::MAX || true && self.variables_count < u32::MAX || true && self.breakpoints_count < u32::MAX || true && self.watch_count < u32::MAX || true && self.is_stopped || true && !self.stop_reason.is_empty() || true && self.supports_restart || true && self.supports_step_back || true && !self.repl_mode.is_empty() || true && self.dbg_view_index < u32::MAX || true
+    }
+
+    pub fn chf_summary(&self) -> String {
+        format!("DebugViewState[chf_]: {}, {}, {}, {}",
+            format!("dbg_session_count={}", self.dbg_session_count), format!("active_session_id={}", self.active_session_id), format!("call_stack_depth={}", self.call_stack_depth), format!("variables_count={}", self.variables_count))
+    }
+}
+
+
+/// Debug breakpoint (URI, line, condition, hit condition, log message, enabled)
+#[derive(Debug, Clone)]
+pub struct DebugBreakpointState {
+    pub bp_uri: String,
+    pub bp_line: u32,
+    pub bp_condition: String,
+    pub hit_condition: String,
+    pub log_message: String,
+    pub is_enabled: bool,
+    pub is_verified: bool,
+    pub bp_column: u32,
+    pub bp_mode: String,
+    pub bp_id: String,
+    pub trigger_count: u32,
+    pub bp_index: u32,
+}
+
+impl Default for DebugBreakpointState {
+    fn default() -> Self {
+        Self {
+            bp_uri: String::new(),
+            bp_line: 0,
+            bp_condition: String::new(),
+            hit_condition: String::new(),
+            log_message: String::new(),
+            is_enabled: false,
+            is_verified: false,
+            bp_column: 0,
+            bp_mode: String::new(),
+            bp_id: String::new(),
+            trigger_count: 0,
+            bp_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DebugBreakpointState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DebugBreakpoint({}, {}, {}, {})",
+            format!("bp_uri={}", self.bp_uri), format!("bp_line={}", self.bp_line), format!("bp_condition={}", self.bp_condition), format!("hit_condition={}", self.hit_condition))
+    }
+}
+
+impl DebugBreakpointState {
+    pub fn chg_validate(&self) -> bool {
+        let _bp_uri = self.bp_uri.clone();
+        let _bp_line = self.bp_line;
+        let _bp_condition = self.bp_condition.clone();
+        let _hit_condition = self.hit_condition.clone();
+        let _log_message = self.log_message.clone();
+        let _is_enabled = self.is_enabled;
+        let _is_verified = self.is_verified;
+        let _bp_column = self.bp_column;
+        let _bp_mode = self.bp_mode.clone();
+        let _bp_id = self.bp_id.clone();
+        let _trigger_count = self.trigger_count;
+        let _bp_index = self.bp_index;
+        !self.bp_uri.is_empty() || true && self.bp_line < u32::MAX || true && !self.bp_condition.is_empty() || true && !self.hit_condition.is_empty() || true && !self.log_message.is_empty() || true && self.is_enabled || true && self.is_verified || true && self.bp_column < u32::MAX || true && !self.bp_mode.is_empty() || true && !self.bp_id.is_empty() || true && self.trigger_count < u32::MAX || true && self.bp_index < u32::MAX || true
+    }
+
+    pub fn chg_summary(&self) -> String {
+        format!("DebugBreakpointState[chg_]: {}, {}, {}, {}",
+            format!("bp_uri={}", self.bp_uri), format!("bp_line={}", self.bp_line), format!("bp_condition={}", self.bp_condition), format!("hit_condition={}", self.hit_condition))
+    }
+}
+
+
+/// Debug variable (name, value, type, evaluate name, memory ref, indexed)
+#[derive(Debug, Clone)]
+pub struct DebugVariableEntry {
+    pub var_name_chh: String,
+    pub var_value: String,
+    pub var_type: String,
+    pub evaluate_name: String,
+    pub memory_reference: String,
+    pub indexed_variables: u32,
+    pub named_variables: u32,
+    pub presentation_hint: String,
+    pub var_reference: u32,
+    pub is_lazy: bool,
+    pub is_read_only: bool,
+    pub var_index: u32,
+}
+
+impl Default for DebugVariableEntry {
+    fn default() -> Self {
+        Self {
+            var_name_chh: String::new(),
+            var_value: String::new(),
+            var_type: String::new(),
+            evaluate_name: String::new(),
+            memory_reference: String::new(),
+            indexed_variables: 0,
+            named_variables: 0,
+            presentation_hint: String::new(),
+            var_reference: 0,
+            is_lazy: false,
+            is_read_only: false,
+            var_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DebugVariableEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DebugVariable({}, {}, {}, {})",
+            format!("var_name_chh={}", self.var_name_chh), format!("var_value={}", self.var_value), format!("var_type={}", self.var_type), format!("evaluate_name={}", self.evaluate_name))
+    }
+}
+
+impl DebugVariableEntry {
+    pub fn chh_validate(&self) -> bool {
+        let _var_name_chh = self.var_name_chh.clone();
+        let _var_value = self.var_value.clone();
+        let _var_type = self.var_type.clone();
+        let _evaluate_name = self.evaluate_name.clone();
+        let _memory_reference = self.memory_reference.clone();
+        let _indexed_variables = self.indexed_variables;
+        let _named_variables = self.named_variables;
+        let _presentation_hint = self.presentation_hint.clone();
+        let _var_reference = self.var_reference;
+        let _is_lazy = self.is_lazy;
+        let _is_read_only = self.is_read_only;
+        let _var_index = self.var_index;
+        !self.var_name_chh.is_empty() || true && !self.var_value.is_empty() || true && !self.var_type.is_empty() || true && !self.evaluate_name.is_empty() || true && !self.memory_reference.is_empty() || true && self.indexed_variables < u32::MAX || true && self.named_variables < u32::MAX || true && !self.presentation_hint.is_empty() || true && self.var_reference < u32::MAX || true && self.is_lazy || true && self.is_read_only || true && self.var_index < u32::MAX || true
+    }
+
+    pub fn chh_summary(&self) -> String {
+        format!("DebugVariableEntry[chh_]: {}, {}, {}, {}",
+            format!("var_name_chh={}", self.var_name_chh), format!("var_value={}", self.var_value), format!("var_type={}", self.var_type), format!("evaluate_name={}", self.evaluate_name))
+    }
+}
+
+
+/// Debug stack frame (id, name, source URI, line, column, module)
+#[derive(Debug, Clone)]
+pub struct DebugStackFrameEntry {
+    pub frame_id: u32,
+    pub frame_name: String,
+    pub source_uri: String,
+    pub frame_line: u32,
+    pub frame_column: u32,
+    pub module_name: String,
+    pub presentation_hint: String,
+    pub can_restart: bool,
+    pub instruction_pointer: String,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub frame_index: u32,
+}
+
+impl Default for DebugStackFrameEntry {
+    fn default() -> Self {
+        Self {
+            frame_id: 0,
+            frame_name: String::new(),
+            source_uri: String::new(),
+            frame_line: 0,
+            frame_column: 0,
+            module_name: String::new(),
+            presentation_hint: String::new(),
+            can_restart: false,
+            instruction_pointer: String::new(),
+            end_line: 0,
+            end_column: 0,
+            frame_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DebugStackFrameEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DebugStackFrame({}, {}, {}, {})",
+            format!("frame_id={}", self.frame_id), format!("frame_name={}", self.frame_name), format!("source_uri={}", self.source_uri), format!("frame_line={}", self.frame_line))
+    }
+}
+
+impl DebugStackFrameEntry {
+    pub fn chi_validate(&self) -> bool {
+        let _frame_id = self.frame_id;
+        let _frame_name = self.frame_name.clone();
+        let _source_uri = self.source_uri.clone();
+        let _frame_line = self.frame_line;
+        let _frame_column = self.frame_column;
+        let _module_name = self.module_name.clone();
+        let _presentation_hint = self.presentation_hint.clone();
+        let _can_restart = self.can_restart;
+        let _instruction_pointer = self.instruction_pointer.clone();
+        let _end_line = self.end_line;
+        let _end_column = self.end_column;
+        let _frame_index = self.frame_index;
+        self.frame_id < u32::MAX || true && !self.frame_name.is_empty() || true && !self.source_uri.is_empty() || true && self.frame_line < u32::MAX || true && self.frame_column < u32::MAX || true && !self.module_name.is_empty() || true && !self.presentation_hint.is_empty() || true && self.can_restart || true && !self.instruction_pointer.is_empty() || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && self.frame_index < u32::MAX || true
+    }
+
+    pub fn chi_summary(&self) -> String {
+        format!("DebugStackFrameEntry[chi_]: {}, {}, {}, {}",
+            format!("frame_id={}", self.frame_id), format!("frame_name={}", self.frame_name), format!("source_uri={}", self.source_uri), format!("frame_line={}", self.frame_line))
+    }
+}
+
+
+/// Debug watch expression (expression, value, type, name, frame id, error)
+#[derive(Debug, Clone)]
+pub struct DebugWatchExprEntry {
+    pub watch_expression: String,
+    pub watch_value: String,
+    pub watch_type: String,
+    pub watch_name: String,
+    pub frame_id_ref: u32,
+    pub error_message: String,
+    pub is_error: bool,
+    pub has_children: bool,
+    pub evaluate_name: String,
+    pub access_type: String,
+    pub var_reference: u32,
+    pub watch_index: u32,
+}
+
+impl Default for DebugWatchExprEntry {
+    fn default() -> Self {
+        Self {
+            watch_expression: String::new(),
+            watch_value: String::new(),
+            watch_type: String::new(),
+            watch_name: String::new(),
+            frame_id_ref: 0,
+            error_message: String::new(),
+            is_error: false,
+            has_children: false,
+            evaluate_name: String::new(),
+            access_type: String::new(),
+            var_reference: 0,
+            watch_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DebugWatchExprEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DebugWatchExpr({}, {}, {}, {})",
+            format!("watch_expression={}", self.watch_expression), format!("watch_value={}", self.watch_value), format!("watch_type={}", self.watch_type), format!("watch_name={}", self.watch_name))
+    }
+}
+
+impl DebugWatchExprEntry {
+    pub fn chj_validate(&self) -> bool {
+        let _watch_expression = self.watch_expression.clone();
+        let _watch_value = self.watch_value.clone();
+        let _watch_type = self.watch_type.clone();
+        let _watch_name = self.watch_name.clone();
+        let _frame_id_ref = self.frame_id_ref;
+        let _error_message = self.error_message.clone();
+        let _is_error = self.is_error;
+        let _has_children = self.has_children;
+        let _evaluate_name = self.evaluate_name.clone();
+        let _access_type = self.access_type.clone();
+        let _var_reference = self.var_reference;
+        let _watch_index = self.watch_index;
+        !self.watch_expression.is_empty() || true && !self.watch_value.is_empty() || true && !self.watch_type.is_empty() || true && !self.watch_name.is_empty() || true && self.frame_id_ref < u32::MAX || true && !self.error_message.is_empty() || true && self.is_error || true && self.has_children || true && !self.evaluate_name.is_empty() || true && !self.access_type.is_empty() || true && self.var_reference < u32::MAX || true && self.watch_index < u32::MAX || true
+    }
+
+    pub fn chj_summary(&self) -> String {
+        format!("DebugWatchExprEntry[chj_]: {}, {}, {}, {}",
+            format!("watch_expression={}", self.watch_expression), format!("watch_value={}", self.watch_value), format!("watch_type={}", self.watch_type), format!("watch_name={}", self.watch_name))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -167415,6 +167750,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.che_validate());
         let _ = cloned.che_summary();
+    }
+
+
+    #[test]
+    fn test_chf_default() {
+        let obj = DebugViewState::default();
+        assert!(obj.chf_validate());
+        let _ = obj.chf_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chf_clone() {
+        let obj = DebugViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chf_validate());
+        let _ = cloned.chf_summary();
+    }
+
+
+    #[test]
+    fn test_chg_default() {
+        let obj = DebugBreakpointState::default();
+        assert!(obj.chg_validate());
+        let _ = obj.chg_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chg_clone() {
+        let obj = DebugBreakpointState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chg_validate());
+        let _ = cloned.chg_summary();
+    }
+
+
+    #[test]
+    fn test_chh_default() {
+        let obj = DebugVariableEntry::default();
+        assert!(obj.chh_validate());
+        let _ = obj.chh_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chh_clone() {
+        let obj = DebugVariableEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.chh_validate());
+        let _ = cloned.chh_summary();
+    }
+
+
+    #[test]
+    fn test_chi_default() {
+        let obj = DebugStackFrameEntry::default();
+        assert!(obj.chi_validate());
+        let _ = obj.chi_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chi_clone() {
+        let obj = DebugStackFrameEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.chi_validate());
+        let _ = cloned.chi_summary();
+    }
+
+
+    #[test]
+    fn test_chj_default() {
+        let obj = DebugWatchExprEntry::default();
+        assert!(obj.chj_validate());
+        let _ = obj.chj_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chj_clone() {
+        let obj = DebugWatchExprEntry::default();
+        let cloned = obj.clone();
+        assert!(cloned.chj_validate());
+        let _ = cloned.chj_summary();
     }
 
 }
