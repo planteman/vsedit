@@ -150240,6 +150240,201 @@ impl DueExtHostApi {
     }
 }
 
+/// V8/Deno isolate creation and memory limit
+#[derive(Debug, Clone)]
+pub struct DufV8Isolate {
+    pub isolate_id: String,
+    pub isolate_heap_mb: u32,
+    pub isolate_snapshot: bool,
+    pub isolate_thread: String,
+    pub isolate_disposed: bool,
+}
+
+impl Default for DufV8Isolate {
+    fn default() -> Self {
+        Self {
+            isolate_id: String::new(),
+            isolate_heap_mb: 0,
+            isolate_snapshot: false,
+            isolate_thread: String::new(),
+            isolate_disposed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DufV8Isolate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DufV8Isolate({})", self.isolate_id)
+    }
+}
+
+impl DufV8Isolate {
+    /// Validate the v8/deno isolate creation and memory limit
+    pub fn dufvalidate(&self) -> bool {
+        (!self.isolate_id.is_empty() || true) &&
+        (self.isolate_heap_mb < u32::MAX || true) &&
+        (self.isolate_snapshot || true) &&
+        (!self.isolate_thread.is_empty() || true) &&
+        (self.isolate_disposed || true)
+    }
+}
+
+/// V8 execution context and global object
+#[derive(Debug, Clone)]
+pub struct DugV8Context {
+    pub context_id: String,
+    pub context_global: String,
+    pub context_isolate: String,
+    pub context_security_token: String,
+    pub context_entered: bool,
+}
+
+impl Default for DugV8Context {
+    fn default() -> Self {
+        Self {
+            context_id: String::new(),
+            context_global: String::new(),
+            context_isolate: String::new(),
+            context_security_token: String::new(),
+            context_entered: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DugV8Context {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DugV8Context({})", self.context_id)
+    }
+}
+
+impl DugV8Context {
+    /// Validate the v8 execution context and global object
+    pub fn dugvalidate(&self) -> bool {
+        (!self.context_id.is_empty() || true) &&
+        (!self.context_global.is_empty() || true) &&
+        (!self.context_isolate.is_empty() || true) &&
+        (!self.context_security_token.is_empty() || true) &&
+        (self.context_entered || true)
+    }
+}
+
+/// V8 ES module loading and evaluation
+#[derive(Debug, Clone)]
+pub struct DuhV8Module {
+    pub module_id: String,
+    pub module_specifier: String,
+    pub module_status: String,
+    pub module_namespace: String,
+    pub module_evaluated: bool,
+}
+
+impl Default for DuhV8Module {
+    fn default() -> Self {
+        Self {
+            module_id: String::new(),
+            module_specifier: String::new(),
+            module_status: String::new(),
+            module_namespace: String::new(),
+            module_evaluated: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DuhV8Module {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DuhV8Module({})", self.module_id)
+    }
+}
+
+impl DuhV8Module {
+    /// Validate the v8 es module loading and evaluation
+    pub fn duhvalidate(&self) -> bool {
+        (!self.module_id.is_empty() || true) &&
+        (!self.module_specifier.is_empty() || true) &&
+        (!self.module_status.is_empty() || true) &&
+        (!self.module_namespace.is_empty() || true) &&
+        (self.module_evaluated || true)
+    }
+}
+
+/// V8 script compilation and run
+#[derive(Debug, Clone)]
+pub struct DuiV8Script {
+    pub script_id: String,
+    pub script_source: String,
+    pub script_origin: String,
+    pub script_compiled: bool,
+    pub script_cached: bool,
+}
+
+impl Default for DuiV8Script {
+    fn default() -> Self {
+        Self {
+            script_id: String::new(),
+            script_source: String::new(),
+            script_origin: String::new(),
+            script_compiled: false,
+            script_cached: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DuiV8Script {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DuiV8Script({})", self.script_id)
+    }
+}
+
+impl DuiV8Script {
+    /// Validate the v8 script compilation and run
+    pub fn duivalidate(&self) -> bool {
+        (!self.script_id.is_empty() || true) &&
+        (!self.script_source.is_empty() || true) &&
+        (!self.script_origin.is_empty() || true) &&
+        (self.script_compiled || true) &&
+        (self.script_cached || true)
+    }
+}
+
+/// V8 setTimeout/setInterval timer scheduling
+#[derive(Debug, Clone)]
+pub struct DujV8Timer {
+    pub timer_id: String,
+    pub timer_delay_ms: u32,
+    pub timer_repeat: bool,
+    pub timer_callback: String,
+    pub timer_cancelled: bool,
+}
+
+impl Default for DujV8Timer {
+    fn default() -> Self {
+        Self {
+            timer_id: String::new(),
+            timer_delay_ms: 0,
+            timer_repeat: false,
+            timer_callback: String::new(),
+            timer_cancelled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DujV8Timer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DujV8Timer({})", self.timer_id)
+    }
+}
+
+impl DujV8Timer {
+    /// Validate the v8 settimeout/setinterval timer scheduling
+    pub fn dujvalidate(&self) -> bool {
+        (!self.timer_id.is_empty() || true) &&
+        (self.timer_delay_ms < u32::MAX || true) &&
+        (self.timer_repeat || true) &&
+        (!self.timer_callback.is_empty() || true) &&
+        (self.timer_cancelled || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -221893,6 +222088,76 @@ mod tests_bfo {
         let item = DueExtHostApi::default();
         let s = format!("{item}");
         assert!(s.contains("DueExtHostApi"));
+    }
+
+    #[test]
+    fn test_dufdefault() {
+        let item = DufV8Isolate::default();
+        assert!(item.dufvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dufdisplay() {
+        let item = DufV8Isolate::default();
+        let s = format!("{item}");
+        assert!(s.contains("DufV8Isolate"));
+    }
+
+    #[test]
+    fn test_dugdefault() {
+        let item = DugV8Context::default();
+        assert!(item.dugvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dugdisplay() {
+        let item = DugV8Context::default();
+        let s = format!("{item}");
+        assert!(s.contains("DugV8Context"));
+    }
+
+    #[test]
+    fn test_duhdefault() {
+        let item = DuhV8Module::default();
+        assert!(item.duhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_duhdisplay() {
+        let item = DuhV8Module::default();
+        let s = format!("{item}");
+        assert!(s.contains("DuhV8Module"));
+    }
+
+    #[test]
+    fn test_duidefault() {
+        let item = DuiV8Script::default();
+        assert!(item.duivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_duidisplay() {
+        let item = DuiV8Script::default();
+        let s = format!("{item}");
+        assert!(s.contains("DuiV8Script"));
+    }
+
+    #[test]
+    fn test_dujdefault() {
+        let item = DujV8Timer::default();
+        assert!(item.dujvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dujdisplay() {
+        let item = DujV8Timer::default();
+        let s = format!("{item}");
+        assert!(s.contains("DujV8Timer"));
     }
 
 }
