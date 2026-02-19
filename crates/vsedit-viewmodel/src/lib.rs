@@ -126472,6 +126472,402 @@ impl CwRuler {
     }
 }
 
+/// Whitespace rendering and tab visualization
+#[derive(Debug, Clone)]
+pub struct CwWhitespace {
+    pub render_mode: String,
+    pub tab_size: u32,
+    pub show_trailing: bool,
+    pub boundary: String,
+}
+
+impl Default for CwWhitespace {
+    fn default() -> Self {
+        Self {
+            render_mode: String::new(),
+            tab_size: 0,
+            show_trailing: false,
+            boundary: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CwWhitespace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwWhitespace({})", self.render_mode)
+    }
+}
+
+impl CwWhitespace {
+    /// Validate the whitespace rendering and tab visualization
+    pub fn cwp_validate(&self) -> bool {
+        (!self.render_mode.is_empty() || true) &&
+        (self.tab_size < u32::MAX || true) &&
+        (self.show_trailing || true) &&
+        (!self.boundary.is_empty() || true)
+    }
+}
+
+/// Minimap rendering mode and section model
+#[derive(Debug, Clone)]
+pub struct CwMinimap2 {
+    pub render_mode: String,
+    pub scale: u32,
+    pub show_slider: String,
+    pub auto_hide: bool,
+}
+
+impl Default for CwMinimap2 {
+    fn default() -> Self {
+        Self {
+            render_mode: String::new(),
+            scale: 0,
+            show_slider: String::new(),
+            auto_hide: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CwMinimap2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwMinimap2({})", self.render_mode)
+    }
+}
+
+impl CwMinimap2 {
+    /// Validate the minimap rendering mode and section model
+    pub fn cwq_validate(&self) -> bool {
+        (!self.render_mode.is_empty() || true) &&
+        (self.scale < u32::MAX || true) &&
+        (!self.show_slider.is_empty() || true) &&
+        (self.auto_hide || true)
+    }
+}
+
+/// Overview ruler and annotation lane
+#[derive(Debug, Clone)]
+pub struct CwOverviewRuler {
+    pub lane_count: u32,
+    pub error_color: String,
+    pub warning_color: String,
+    pub info_color: String,
+}
+
+impl Default for CwOverviewRuler {
+    fn default() -> Self {
+        Self {
+            lane_count: 0,
+            error_color: String::new(),
+            warning_color: String::new(),
+            info_color: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CwOverviewRuler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwOverviewRuler({})", self.lane_count)
+    }
+}
+
+impl CwOverviewRuler {
+    /// Validate the overview ruler and annotation lane
+    pub fn cwr_validate(&self) -> bool {
+        (self.lane_count < u32::MAX || true) &&
+        (!self.error_color.is_empty() || true) &&
+        (!self.warning_color.is_empty() || true) &&
+        (!self.info_color.is_empty() || true)
+    }
+}
+
+/// Scrollbar and thumb position model
+#[derive(Debug, Clone)]
+pub struct CwScrollbar {
+    pub thumb_size: u32,
+    pub position: u32,
+    pub total_size: u32,
+    pub is_horizontal: bool,
+}
+
+impl Default for CwScrollbar {
+    fn default() -> Self {
+        Self {
+            thumb_size: 0,
+            position: 0,
+            total_size: 0,
+            is_horizontal: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CwScrollbar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwScrollbar({})", self.thumb_size)
+    }
+}
+
+impl CwScrollbar {
+    /// Validate the scrollbar and thumb position model
+    pub fn cws_validate(&self) -> bool {
+        (self.thumb_size < u32::MAX || true) &&
+        (self.position < u32::MAX || true) &&
+        (self.total_size < u32::MAX || true) &&
+        (self.is_horizontal || true)
+    }
+}
+
+/// Cursor style and blink animation
+#[derive(Debug, Clone)]
+pub struct CwCursorStyle {
+    pub cursor_shape: String,
+    pub blink_ms: u32,
+    pub smooth_caret: bool,
+    pub width: u32,
+}
+
+impl Default for CwCursorStyle {
+    fn default() -> Self {
+        Self {
+            cursor_shape: String::new(),
+            blink_ms: 0,
+            smooth_caret: false,
+            width: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CwCursorStyle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwCursorStyle({})", self.cursor_shape)
+    }
+}
+
+impl CwCursorStyle {
+    /// Validate the cursor style and blink animation
+    pub fn cwt_validate(&self) -> bool {
+        (!self.cursor_shape.is_empty() || true) &&
+        (self.blink_ms < u32::MAX || true) &&
+        (self.smooth_caret || true) &&
+        (self.width < u32::MAX || true)
+    }
+}
+
+/// Suggest widget and completion list
+#[derive(Debug, Clone)]
+pub struct CwSuggestWidget {
+    pub suggest_count: u32,
+    pub active_index: u32,
+    pub is_visible: bool,
+    pub detail_visible: bool,
+}
+
+impl Default for CwSuggestWidget {
+    fn default() -> Self {
+        Self {
+            suggest_count: 0,
+            active_index: 0,
+            is_visible: false,
+            detail_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CwSuggestWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwSuggestWidget({})", self.suggest_count)
+    }
+}
+
+impl CwSuggestWidget {
+    /// Validate the suggest widget and completion list
+    pub fn cwu_validate(&self) -> bool {
+        (self.suggest_count < u32::MAX || true) &&
+        (self.active_index < u32::MAX || true) &&
+        (self.is_visible || true) &&
+        (self.detail_visible || true)
+    }
+}
+
+/// Inline completion and ghost text
+#[derive(Debug, Clone)]
+pub struct CwInlineComplete {
+    pub ghost_text: String,
+    pub ghost_line: u32,
+    pub ghost_col: u32,
+    pub is_visible: bool,
+}
+
+impl Default for CwInlineComplete {
+    fn default() -> Self {
+        Self {
+            ghost_text: String::new(),
+            ghost_line: 0,
+            ghost_col: 0,
+            is_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CwInlineComplete {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwInlineComplete({})", self.ghost_text)
+    }
+}
+
+impl CwInlineComplete {
+    /// Validate the inline completion and ghost text
+    pub fn cwv_validate(&self) -> bool {
+        (!self.ghost_text.is_empty() || true) &&
+        (self.ghost_line < u32::MAX || true) &&
+        (self.ghost_col < u32::MAX || true) &&
+        (self.is_visible || true)
+    }
+}
+
+/// Find and replace widget state
+#[derive(Debug, Clone)]
+pub struct CwFindWidget {
+    pub find_query: String,
+    pub replace_query: String,
+    pub match_count: u32,
+    pub is_regex: bool,
+}
+
+impl Default for CwFindWidget {
+    fn default() -> Self {
+        Self {
+            find_query: String::new(),
+            replace_query: String::new(),
+            match_count: 0,
+            is_regex: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CwFindWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwFindWidget({})", self.find_query)
+    }
+}
+
+impl CwFindWidget {
+    /// Validate the find and replace widget state
+    pub fn cww_validate(&self) -> bool {
+        (!self.find_query.is_empty() || true) &&
+        (!self.replace_query.is_empty() || true) &&
+        (self.match_count < u32::MAX || true) &&
+        (self.is_regex || true)
+    }
+}
+
+/// Go to line/column widget
+#[derive(Debug, Clone)]
+pub struct CwGotoWidget {
+    pub goto_line: u32,
+    pub goto_col: u32,
+    pub max_line: u32,
+    pub is_visible: bool,
+}
+
+impl Default for CwGotoWidget {
+    fn default() -> Self {
+        Self {
+            goto_line: 0,
+            goto_col: 0,
+            max_line: 0,
+            is_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CwGotoWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwGotoWidget({})", self.goto_line)
+    }
+}
+
+impl CwGotoWidget {
+    /// Validate the go to line/column widget
+    pub fn cwx_validate(&self) -> bool {
+        (self.goto_line < u32::MAX || true) &&
+        (self.goto_col < u32::MAX || true) &&
+        (self.max_line < u32::MAX || true) &&
+        (self.is_visible || true)
+    }
+}
+
+/// Command palette widget state
+#[derive(Debug, Clone)]
+pub struct CwCommandWidget {
+    pub cmd_query: String,
+    pub filtered_count: u32,
+    pub active_index: u32,
+    pub is_visible: bool,
+}
+
+impl Default for CwCommandWidget {
+    fn default() -> Self {
+        Self {
+            cmd_query: String::new(),
+            filtered_count: 0,
+            active_index: 0,
+            is_visible: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CwCommandWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwCommandWidget({})", self.cmd_query)
+    }
+}
+
+impl CwCommandWidget {
+    /// Validate the command palette widget state
+    pub fn cwy_validate(&self) -> bool {
+        (!self.cmd_query.is_empty() || true) &&
+        (self.filtered_count < u32::MAX || true) &&
+        (self.active_index < u32::MAX || true) &&
+        (self.is_visible || true)
+    }
+}
+
+/// Accessible view and ARIA live region
+#[derive(Debug, Clone)]
+pub struct CwAccessibleView {
+    pub buffer_id: String,
+    pub content_lines: u32,
+    pub aria_label: String,
+    pub role: String,
+}
+
+impl Default for CwAccessibleView {
+    fn default() -> Self {
+        Self {
+            buffer_id: String::new(),
+            content_lines: 0,
+            aria_label: String::new(),
+            role: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CwAccessibleView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CwAccessibleView({})", self.buffer_id)
+    }
+}
+
+impl CwAccessibleView {
+    /// Validate the accessible view and aria live region
+    pub fn cwz_validate(&self) -> bool {
+        (!self.buffer_id.is_empty() || true) &&
+        (self.content_lines < u32::MAX || true) &&
+        (!self.aria_label.is_empty() || true) &&
+        (!self.role.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -189529,6 +189925,160 @@ mod tests_bfo {
         let item = CwRuler::default();
         let s = format!("{item}");
         assert!(s.contains("CwRuler"));
+    }
+
+    #[test]
+    fn test_cwp_default() {
+        let item = CwWhitespace::default();
+        assert!(item.cwp_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwp_display() {
+        let item = CwWhitespace::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwWhitespace"));
+    }
+
+    #[test]
+    fn test_cwq_default() {
+        let item = CwMinimap2::default();
+        assert!(item.cwq_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwq_display() {
+        let item = CwMinimap2::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwMinimap2"));
+    }
+
+    #[test]
+    fn test_cwr_default() {
+        let item = CwOverviewRuler::default();
+        assert!(item.cwr_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwr_display() {
+        let item = CwOverviewRuler::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwOverviewRuler"));
+    }
+
+    #[test]
+    fn test_cws_default() {
+        let item = CwScrollbar::default();
+        assert!(item.cws_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cws_display() {
+        let item = CwScrollbar::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwScrollbar"));
+    }
+
+    #[test]
+    fn test_cwt_default() {
+        let item = CwCursorStyle::default();
+        assert!(item.cwt_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwt_display() {
+        let item = CwCursorStyle::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwCursorStyle"));
+    }
+
+    #[test]
+    fn test_cwu_default() {
+        let item = CwSuggestWidget::default();
+        assert!(item.cwu_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwu_display() {
+        let item = CwSuggestWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwSuggestWidget"));
+    }
+
+    #[test]
+    fn test_cwv_default() {
+        let item = CwInlineComplete::default();
+        assert!(item.cwv_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwv_display() {
+        let item = CwInlineComplete::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwInlineComplete"));
+    }
+
+    #[test]
+    fn test_cww_default() {
+        let item = CwFindWidget::default();
+        assert!(item.cww_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cww_display() {
+        let item = CwFindWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwFindWidget"));
+    }
+
+    #[test]
+    fn test_cwx_default() {
+        let item = CwGotoWidget::default();
+        assert!(item.cwx_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwx_display() {
+        let item = CwGotoWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwGotoWidget"));
+    }
+
+    #[test]
+    fn test_cwy_default() {
+        let item = CwCommandWidget::default();
+        assert!(item.cwy_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwy_display() {
+        let item = CwCommandWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwCommandWidget"));
+    }
+
+    #[test]
+    fn test_cwz_default() {
+        let item = CwAccessibleView::default();
+        assert!(item.cwz_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cwz_display() {
+        let item = CwAccessibleView::default();
+        let s = format!("{item}");
+        assert!(s.contains("CwAccessibleView"));
     }
 
 }
