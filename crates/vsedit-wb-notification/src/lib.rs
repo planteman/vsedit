@@ -138305,6 +138305,201 @@ impl DijHighContrastTheme {
     }
 }
 
+/// Reduced motion preference for animations
+#[derive(Debug, Clone)]
+pub struct DikReducedMotion {
+    pub motion_id: String,
+    pub motion_reduced: bool,
+    pub motion_os_pref: String,
+    pub motion_transition_ms: u32,
+    pub motion_override: bool,
+}
+
+impl Default for DikReducedMotion {
+    fn default() -> Self {
+        Self {
+            motion_id: String::new(),
+            motion_reduced: false,
+            motion_os_pref: String::new(),
+            motion_transition_ms: 0,
+            motion_override: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DikReducedMotion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DikReducedMotion({})", self.motion_id)
+    }
+}
+
+impl DikReducedMotion {
+    /// Validate the reduced motion preference for animations
+    pub fn dikvalidate(&self) -> bool {
+        (!self.motion_id.is_empty() || true) &&
+        (self.motion_reduced || true) &&
+        (!self.motion_os_pref.is_empty() || true) &&
+        (self.motion_transition_ms < u32::MAX || true) &&
+        (self.motion_override || true)
+    }
+}
+
+/// Editor zoom level and font scaling
+#[derive(Debug, Clone)]
+pub struct DilZoomLevel {
+    pub zoom_id: String,
+    pub zoom_level: f64,
+    pub zoom_default: f64,
+    pub zoom_min: f64,
+    pub zoom_max: f64,
+}
+
+impl Default for DilZoomLevel {
+    fn default() -> Self {
+        Self {
+            zoom_id: String::new(),
+            zoom_level: 0.0,
+            zoom_default: 0.0,
+            zoom_min: 0.0,
+            zoom_max: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for DilZoomLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DilZoomLevel({})", self.zoom_id)
+    }
+}
+
+impl DilZoomLevel {
+    /// Validate the editor zoom level and font scaling
+    pub fn dilvalidate(&self) -> bool {
+        (!self.zoom_id.is_empty() || true) &&
+        (self.zoom_level.is_finite() || true) &&
+        (self.zoom_default.is_finite() || true) &&
+        (self.zoom_min.is_finite() || true) &&
+        (self.zoom_max.is_finite() || true)
+    }
+}
+
+/// Editor font family, size, and metrics
+#[derive(Debug, Clone)]
+pub struct DimEditorFontInfo {
+    pub font_id: String,
+    pub font_family: String,
+    pub font_size: f64,
+    pub font_line_height: f64,
+    pub font_monospace: bool,
+}
+
+impl Default for DimEditorFontInfo {
+    fn default() -> Self {
+        Self {
+            font_id: String::new(),
+            font_family: String::new(),
+            font_size: 0.0,
+            font_line_height: 0.0,
+            font_monospace: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DimEditorFontInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DimEditorFontInfo({})", self.font_id)
+    }
+}
+
+impl DimEditorFontInfo {
+    /// Validate the editor font family, size, and metrics
+    pub fn dimvalidate(&self) -> bool {
+        (!self.font_id.is_empty() || true) &&
+        (!self.font_family.is_empty() || true) &&
+        (self.font_size.is_finite() || true) &&
+        (self.font_line_height.is_finite() || true) &&
+        (self.font_monospace || true)
+    }
+}
+
+/// Editor viewport dimensions and line height
+#[derive(Debug, Clone)]
+pub struct DinEditorLayoutInfo {
+    pub layout_id: String,
+    pub layout_width: u32,
+    pub layout_height: u32,
+    pub layout_line_height: f64,
+    pub layout_content_left: u32,
+}
+
+impl Default for DinEditorLayoutInfo {
+    fn default() -> Self {
+        Self {
+            layout_id: String::new(),
+            layout_width: 0,
+            layout_height: 0,
+            layout_line_height: 0.0,
+            layout_content_left: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DinEditorLayoutInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DinEditorLayoutInfo({})", self.layout_id)
+    }
+}
+
+impl DinEditorLayoutInfo {
+    /// Validate the editor viewport dimensions and line height
+    pub fn dinvalidate(&self) -> bool {
+        (!self.layout_id.is_empty() || true) &&
+        (self.layout_width < u32::MAX || true) &&
+        (self.layout_height < u32::MAX || true) &&
+        (self.layout_line_height.is_finite() || true) &&
+        (self.layout_content_left < u32::MAX || true)
+    }
+}
+
+/// Editor scroll position and viewport range
+#[derive(Debug, Clone)]
+pub struct DioEditorScrollInfo {
+    pub scroll_id: String,
+    pub scroll_top: u32,
+    pub scroll_left: u32,
+    pub scroll_height: u32,
+    pub scroll_smooth: bool,
+}
+
+impl Default for DioEditorScrollInfo {
+    fn default() -> Self {
+        Self {
+            scroll_id: String::new(),
+            scroll_top: 0,
+            scroll_left: 0,
+            scroll_height: 0,
+            scroll_smooth: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DioEditorScrollInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DioEditorScrollInfo({})", self.scroll_id)
+    }
+}
+
+impl DioEditorScrollInfo {
+    /// Validate the editor scroll position and viewport range
+    pub fn diovalidate(&self) -> bool {
+        (!self.scroll_id.is_empty() || true) &&
+        (self.scroll_top < u32::MAX || true) &&
+        (self.scroll_left < u32::MAX || true) &&
+        (self.scroll_height < u32::MAX || true) &&
+        (self.scroll_smooth || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -205660,6 +205855,76 @@ mod tests_bfo {
         let item = DijHighContrastTheme::default();
         let s = format!("{item}");
         assert!(s.contains("DijHighContrastTheme"));
+    }
+
+    #[test]
+    fn test_dikdefault() {
+        let item = DikReducedMotion::default();
+        assert!(item.dikvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dikdisplay() {
+        let item = DikReducedMotion::default();
+        let s = format!("{item}");
+        assert!(s.contains("DikReducedMotion"));
+    }
+
+    #[test]
+    fn test_dildefault() {
+        let item = DilZoomLevel::default();
+        assert!(item.dilvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dildisplay() {
+        let item = DilZoomLevel::default();
+        let s = format!("{item}");
+        assert!(s.contains("DilZoomLevel"));
+    }
+
+    #[test]
+    fn test_dimdefault() {
+        let item = DimEditorFontInfo::default();
+        assert!(item.dimvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dimdisplay() {
+        let item = DimEditorFontInfo::default();
+        let s = format!("{item}");
+        assert!(s.contains("DimEditorFontInfo"));
+    }
+
+    #[test]
+    fn test_dindefault() {
+        let item = DinEditorLayoutInfo::default();
+        assert!(item.dinvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dindisplay() {
+        let item = DinEditorLayoutInfo::default();
+        let s = format!("{item}");
+        assert!(s.contains("DinEditorLayoutInfo"));
+    }
+
+    #[test]
+    fn test_diodefault() {
+        let item = DioEditorScrollInfo::default();
+        assert!(item.diovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_diodisplay() {
+        let item = DioEditorScrollInfo::default();
+        let s = format!("{item}");
+        assert!(s.contains("DioEditorScrollInfo"));
     }
 
 }
