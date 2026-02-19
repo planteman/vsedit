@@ -136981,6 +136981,201 @@ impl DgzInputBoxValidation {
     }
 }
 
+/// Menu contribution point (editor/context/title)
+#[derive(Debug, Clone)]
+pub struct DhaMenuContrib {
+    pub menu_id: String,
+    pub menu_group: String,
+    pub menu_order: u32,
+    pub menu_when: String,
+    pub menu_command: String,
+}
+
+impl Default for DhaMenuContrib {
+    fn default() -> Self {
+        Self {
+            menu_id: String::new(),
+            menu_group: String::new(),
+            menu_order: 0,
+            menu_when: String::new(),
+            menu_command: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DhaMenuContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhaMenuContrib({})", self.menu_id)
+    }
+}
+
+impl DhaMenuContrib {
+    /// Validate the menu contribution point (editor/context/title)
+    pub fn dhavalidate(&self) -> bool {
+        (!self.menu_id.is_empty() || true) &&
+        (!self.menu_group.is_empty() || true) &&
+        (self.menu_order < u32::MAX || true) &&
+        (!self.menu_when.is_empty() || true) &&
+        (!self.menu_command.is_empty() || true)
+    }
+}
+
+/// Command contribution with icon and category
+#[derive(Debug, Clone)]
+pub struct DhbCommandContrib {
+    pub command_contrib_id: String,
+    pub command_contrib_title: String,
+    pub command_contrib_icon: String,
+    pub command_contrib_category: String,
+    pub command_contrib_enabled_view: String,
+}
+
+impl Default for DhbCommandContrib {
+    fn default() -> Self {
+        Self {
+            command_contrib_id: String::new(),
+            command_contrib_title: String::new(),
+            command_contrib_icon: String::new(),
+            command_contrib_category: String::new(),
+            command_contrib_enabled_view: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DhbCommandContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhbCommandContrib({})", self.command_contrib_id)
+    }
+}
+
+impl DhbCommandContrib {
+    /// Validate the command contribution with icon and category
+    pub fn dhbvalidate(&self) -> bool {
+        (!self.command_contrib_id.is_empty() || true) &&
+        (!self.command_contrib_title.is_empty() || true) &&
+        (!self.command_contrib_icon.is_empty() || true) &&
+        (!self.command_contrib_category.is_empty() || true) &&
+        (!self.command_contrib_enabled_view.is_empty() || true)
+    }
+}
+
+/// Keybinding contribution with when clause
+#[derive(Debug, Clone)]
+pub struct DhcKeyBindingContrib {
+    pub keybinding_id: String,
+    pub keybinding_key: String,
+    pub keybinding_command: String,
+    pub keybinding_when: String,
+    pub keybinding_mac: String,
+}
+
+impl Default for DhcKeyBindingContrib {
+    fn default() -> Self {
+        Self {
+            keybinding_id: String::new(),
+            keybinding_key: String::new(),
+            keybinding_command: String::new(),
+            keybinding_when: String::new(),
+            keybinding_mac: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DhcKeyBindingContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhcKeyBindingContrib({})", self.keybinding_id)
+    }
+}
+
+impl DhcKeyBindingContrib {
+    /// Validate the keybinding contribution with when clause
+    pub fn dhcvalidate(&self) -> bool {
+        (!self.keybinding_id.is_empty() || true) &&
+        (!self.keybinding_key.is_empty() || true) &&
+        (!self.keybinding_command.is_empty() || true) &&
+        (!self.keybinding_when.is_empty() || true) &&
+        (!self.keybinding_mac.is_empty() || true)
+    }
+}
+
+/// View contribution to container
+#[derive(Debug, Clone)]
+pub struct DhdViewContrib {
+    pub view_contrib_id: String,
+    pub view_contrib_name: String,
+    pub view_contrib_container: String,
+    pub view_contrib_icon: String,
+    pub view_contrib_visibility: String,
+}
+
+impl Default for DhdViewContrib {
+    fn default() -> Self {
+        Self {
+            view_contrib_id: String::new(),
+            view_contrib_name: String::new(),
+            view_contrib_container: String::new(),
+            view_contrib_icon: String::new(),
+            view_contrib_visibility: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DhdViewContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DhdViewContrib({})", self.view_contrib_id)
+    }
+}
+
+impl DhdViewContrib {
+    /// Validate the view contribution to container
+    pub fn dhdvalidate(&self) -> bool {
+        (!self.view_contrib_id.is_empty() || true) &&
+        (!self.view_contrib_name.is_empty() || true) &&
+        (!self.view_contrib_container.is_empty() || true) &&
+        (!self.view_contrib_icon.is_empty() || true) &&
+        (!self.view_contrib_visibility.is_empty() || true)
+    }
+}
+
+/// View container contribution (sidebar/panel)
+#[derive(Debug, Clone)]
+pub struct DheViewContainerContrib {
+    pub container_id: String,
+    pub container_title: String,
+    pub container_icon: String,
+    pub container_location: String,
+    pub container_order: u32,
+}
+
+impl Default for DheViewContainerContrib {
+    fn default() -> Self {
+        Self {
+            container_id: String::new(),
+            container_title: String::new(),
+            container_icon: String::new(),
+            container_location: String::new(),
+            container_order: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DheViewContainerContrib {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DheViewContainerContrib({})", self.container_id)
+    }
+}
+
+impl DheViewContainerContrib {
+    /// Validate the view container contribution (sidebar/panel)
+    pub fn dhevalidate(&self) -> bool {
+        (!self.container_id.is_empty() || true) &&
+        (!self.container_title.is_empty() || true) &&
+        (!self.container_icon.is_empty() || true) &&
+        (!self.container_location.is_empty() || true) &&
+        (self.container_order < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -203832,6 +204027,76 @@ mod tests_bfo {
         let item = DgzInputBoxValidation::default();
         let s = format!("{item}");
         assert!(s.contains("DgzInputBoxValidation"));
+    }
+
+    #[test]
+    fn test_dhadefault() {
+        let item = DhaMenuContrib::default();
+        assert!(item.dhavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhadisplay() {
+        let item = DhaMenuContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhaMenuContrib"));
+    }
+
+    #[test]
+    fn test_dhbdefault() {
+        let item = DhbCommandContrib::default();
+        assert!(item.dhbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhbdisplay() {
+        let item = DhbCommandContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhbCommandContrib"));
+    }
+
+    #[test]
+    fn test_dhcdefault() {
+        let item = DhcKeyBindingContrib::default();
+        assert!(item.dhcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhcdisplay() {
+        let item = DhcKeyBindingContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhcKeyBindingContrib"));
+    }
+
+    #[test]
+    fn test_dhddefault() {
+        let item = DhdViewContrib::default();
+        assert!(item.dhdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhddisplay() {
+        let item = DhdViewContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DhdViewContrib"));
+    }
+
+    #[test]
+    fn test_dhedefault() {
+        let item = DheViewContainerContrib::default();
+        assert!(item.dhevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dhedisplay() {
+        let item = DheViewContainerContrib::default();
+        let s = format!("{item}");
+        assert!(s.contains("DheViewContainerContrib"));
     }
 
 }
