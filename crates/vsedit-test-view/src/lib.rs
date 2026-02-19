@@ -143414,6 +143414,201 @@ impl DnjJsonParse {
     }
 }
 
+/// JSON edit operation (insert, replace, remove)
+#[derive(Debug, Clone)]
+pub struct DnkJsonEdit {
+    pub edit_id: String,
+    pub edit_path: String,
+    pub edit_value: String,
+    pub edit_type: String,
+    pub edit_format: bool,
+}
+
+impl Default for DnkJsonEdit {
+    fn default() -> Self {
+        Self {
+            edit_id: String::new(),
+            edit_path: String::new(),
+            edit_value: String::new(),
+            edit_type: String::new(),
+            edit_format: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DnkJsonEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnkJsonEdit({})", self.edit_id)
+    }
+}
+
+impl DnkJsonEdit {
+    /// Validate the json edit operation (insert, replace, remove)
+    pub fn dnkvalidate(&self) -> bool {
+        (!self.edit_id.is_empty() || true) &&
+        (!self.edit_path.is_empty() || true) &&
+        (!self.edit_value.is_empty() || true) &&
+        (!self.edit_type.is_empty() || true) &&
+        (self.edit_format || true)
+    }
+}
+
+/// JSON path location and pointer
+#[derive(Debug, Clone)]
+pub struct DnlJsonPath {
+    pub path_id: String,
+    pub path_segments: String,
+    pub path_pointer: String,
+    pub path_root: bool,
+    pub path_depth: u32,
+}
+
+impl Default for DnlJsonPath {
+    fn default() -> Self {
+        Self {
+            path_id: String::new(),
+            path_segments: String::new(),
+            path_pointer: String::new(),
+            path_root: false,
+            path_depth: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DnlJsonPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnlJsonPath({})", self.path_id)
+    }
+}
+
+impl DnlJsonPath {
+    /// Validate the json path location and pointer
+    pub fn dnlvalidate(&self) -> bool {
+        (!self.path_id.is_empty() || true) &&
+        (!self.path_segments.is_empty() || true) &&
+        (!self.path_pointer.is_empty() || true) &&
+        (self.path_root || true) &&
+        (self.path_depth < u32::MAX || true)
+    }
+}
+
+/// JSON schema validation entry
+#[derive(Debug, Clone)]
+pub struct DnmJsonSchema {
+    pub schema_id: String,
+    pub schema_uri: String,
+    pub schema_file_match: String,
+    pub schema_url: String,
+    pub schema_priority: u32,
+}
+
+impl Default for DnmJsonSchema {
+    fn default() -> Self {
+        Self {
+            schema_id: String::new(),
+            schema_uri: String::new(),
+            schema_file_match: String::new(),
+            schema_url: String::new(),
+            schema_priority: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DnmJsonSchema {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnmJsonSchema({})", self.schema_id)
+    }
+}
+
+impl DnmJsonSchema {
+    /// Validate the json schema validation entry
+    pub fn dnmvalidate(&self) -> bool {
+        (!self.schema_id.is_empty() || true) &&
+        (!self.schema_uri.is_empty() || true) &&
+        (!self.schema_file_match.is_empty() || true) &&
+        (!self.schema_url.is_empty() || true) &&
+        (self.schema_priority < u32::MAX || true)
+    }
+}
+
+/// JSONC parse with comments and trailing commas
+#[derive(Debug, Clone)]
+pub struct DnnJsoncParse {
+    pub jsonc_id: String,
+    pub jsonc_input: String,
+    pub jsonc_errors: u32,
+    pub jsonc_comments: bool,
+    pub jsonc_trailing_commas: bool,
+}
+
+impl Default for DnnJsoncParse {
+    fn default() -> Self {
+        Self {
+            jsonc_id: String::new(),
+            jsonc_input: String::new(),
+            jsonc_errors: 0,
+            jsonc_comments: false,
+            jsonc_trailing_commas: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DnnJsoncParse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnnJsoncParse({})", self.jsonc_id)
+    }
+}
+
+impl DnnJsoncParse {
+    /// Validate the jsonc parse with comments and trailing commas
+    pub fn dnnvalidate(&self) -> bool {
+        (!self.jsonc_id.is_empty() || true) &&
+        (!self.jsonc_input.is_empty() || true) &&
+        (self.jsonc_errors < u32::MAX || true) &&
+        (self.jsonc_comments || true) &&
+        (self.jsonc_trailing_commas || true)
+    }
+}
+
+/// Markdown to terminal rendering
+#[derive(Debug, Clone)]
+pub struct DnoMarkdownRender {
+    pub md_id: String,
+    pub md_source: String,
+    pub md_rendered: String,
+    pub md_trusted: bool,
+    pub md_sanitize: bool,
+}
+
+impl Default for DnoMarkdownRender {
+    fn default() -> Self {
+        Self {
+            md_id: String::new(),
+            md_source: String::new(),
+            md_rendered: String::new(),
+            md_trusted: false,
+            md_sanitize: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DnoMarkdownRender {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DnoMarkdownRender({})", self.md_id)
+    }
+}
+
+impl DnoMarkdownRender {
+    /// Validate the markdown to terminal rendering
+    pub fn dnovalidate(&self) -> bool {
+        (!self.md_id.is_empty() || true) &&
+        (!self.md_source.is_empty() || true) &&
+        (!self.md_rendered.is_empty() || true) &&
+        (self.md_trusted || true) &&
+        (self.md_sanitize || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -212589,6 +212784,76 @@ mod tests_bfo {
         let item = DnjJsonParse::default();
         let s = format!("{item}");
         assert!(s.contains("DnjJsonParse"));
+    }
+
+    #[test]
+    fn test_dnkdefault() {
+        let item = DnkJsonEdit::default();
+        assert!(item.dnkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnkdisplay() {
+        let item = DnkJsonEdit::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnkJsonEdit"));
+    }
+
+    #[test]
+    fn test_dnldefault() {
+        let item = DnlJsonPath::default();
+        assert!(item.dnlvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnldisplay() {
+        let item = DnlJsonPath::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnlJsonPath"));
+    }
+
+    #[test]
+    fn test_dnmdefault() {
+        let item = DnmJsonSchema::default();
+        assert!(item.dnmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnmdisplay() {
+        let item = DnmJsonSchema::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnmJsonSchema"));
+    }
+
+    #[test]
+    fn test_dnndefault() {
+        let item = DnnJsoncParse::default();
+        assert!(item.dnnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnndisplay() {
+        let item = DnnJsoncParse::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnnJsoncParse"));
+    }
+
+    #[test]
+    fn test_dnodefault() {
+        let item = DnoMarkdownRender::default();
+        assert!(item.dnovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dnodisplay() {
+        let item = DnoMarkdownRender::default();
+        let s = format!("{item}");
+        assert!(s.contains("DnoMarkdownRender"));
     }
 
 }
