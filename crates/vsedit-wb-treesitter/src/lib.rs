@@ -61275,3 +61275,203 @@ mod bbw_tests {
         assert_eq!(m.status_text(), "1 errors, 1 warnings");
     }
 }
+
+
+// --- bbx_: Workspace edit/refactoring preview model ---
+
+/// Kind of workspace file operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BbxFileOp { Create, Rename, Delete }
+
+impl BbxFileOp {
+    pub fn label(&self) -> &'static str {
+        match self { Self::Create => "Create", Self::Rename => "Rename", Self::Delete => "Delete" }
+    }
+}
+
+/// A text edit within a file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BbxTextEdit {
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub new_text: String,
+}
+
+impl BbxTextEdit {
+    pub fn new(sl: u32, sc: u32, el: u32, ec: u32, text: &str) -> Self {
+        Self { start_line: sl, start_col: sc, end_line: el, end_col: ec, new_text: text.to_string() }
+    }
+
+    pub fn is_insert(&self) -> bool { self.start_line == self.end_line && self.start_col == self.end_col }
+    pub fn is_delete(&self) -> bool { self.new_text.is_empty() }
+    pub fn is_replace(&self) -> bool { !self.is_insert() && !self.is_delete() }
+}
+
+/// Edits for a single file.
+#[derive(Debug, Clone)]
+pub struct BbxFileEdits {
+    pub file_path: String,
+    pub edits: Vec<BbxTextEdit>,
+    pub checked: bool,
+}
+
+impl BbxFileEdits {
+    pub fn new(path: &str, edits: Vec<BbxTextEdit>) -> Self {
+        Self { file_path: path.to_string(), edits, checked: true }
+    }
+
+    pub fn edit_count(&self) -> usize { self.edits.len() }
+    pub fn toggle(&mut self) { self.checked = !self.checked; }
+}
+
+/// A file operation (create/rename/delete).
+#[derive(Debug, Clone)]
+pub struct BbxFileOperation {
+    pub op: BbxFileOp,
+    pub path: String,
+    pub new_path: Option<String>,
+    pub checked: bool,
+}
+
+impl BbxFileOperation {
+    pub fn create(path: &str) -> Self {
+        Self { op: BbxFileOp::Create, path: path.to_string(), new_path: None, checked: true }
+    }
+
+    pub fn rename(old: &str, new: &str) -> Self {
+        Self { op: BbxFileOp::Rename, path: old.to_string(), new_path: Some(new.to_string()), checked: true }
+    }
+
+    pub fn delete(path: &str) -> Self {
+        Self { op: BbxFileOp::Delete, path: path.to_string(), new_path: None, checked: true }
+    }
+
+    pub fn display_text(&self) -> String {
+        match self.op {
+            BbxFileOp::Create => format!("Create {}", self.path),
+            BbxFileOp::Rename => format!("Rename {} → {}", self.path, self.new_path.as_deref().unwrap_or("?")),
+            BbxFileOp::Delete => format!("Delete {}", self.path),
+        }
+    }
+}
+
+/// The workspace edit preview model.
+#[derive(Debug)]
+pub struct BbxEditPreview {
+    pub label: String,
+    file_edits: Vec<BbxFileEdits>,
+    file_ops: Vec<BbxFileOperation>,
+    confirmed: bool,
+}
+
+impl BbxEditPreview {
+    pub fn new(label: &str) -> Self {
+        Self { label: label.to_string(), file_edits: Vec::new(), file_ops: Vec::new(), confirmed: false }
+    }
+
+    pub fn add_file_edits(&mut self, fe: BbxFileEdits) { self.file_edits.push(fe); }
+    pub fn add_file_op(&mut self, op: BbxFileOperation) { self.file_ops.push(op); }
+
+    pub fn file_count(&self) -> usize { self.file_edits.len() }
+    pub fn total_edits(&self) -> usize { self.file_edits.iter().map(|f| f.edit_count()).sum() }
+    pub fn file_op_count(&self) -> usize { self.file_ops.len() }
+
+    pub fn checked_edits(&self) -> usize {
+        self.file_edits.iter().filter(|f| f.checked).map(|f| f.edit_count()).sum()
+    }
+
+    pub fn toggle_file(&mut self, idx: usize) {
+        if idx < self.file_edits.len() { self.file_edits[idx].toggle(); }
+    }
+
+    pub fn confirm(&mut self) { self.confirmed = true; }
+    pub fn is_confirmed(&self) -> bool { self.confirmed }
+
+    pub fn file_edits(&self) -> &[BbxFileEdits] { &self.file_edits }
+    pub fn file_ops(&self) -> &[BbxFileOperation] { &self.file_ops }
+
+    pub fn status_text(&self) -> String {
+        format!("{}: {} files, {} edits", self.label, self.file_count(), self.total_edits())
+    }
+}
+
+#[cfg(test)]
+mod bbx_tests {
+    use super::*;
+
+    #[test]
+    fn test_bbx_text_edit() {
+        let ins = BbxTextEdit::new(1, 5, 1, 5, "hello");
+        assert!(ins.is_insert());
+        let del = BbxTextEdit::new(1, 0, 1, 5, "");
+        assert!(del.is_delete());
+        let rep = BbxTextEdit::new(1, 0, 1, 5, "world");
+        assert!(rep.is_replace());
+    }
+
+    #[test]
+    fn test_bbx_file_edits() {
+        let mut fe = BbxFileEdits::new("x.rs", vec![
+            BbxTextEdit::new(1, 0, 1, 5, "new"),
+        ]);
+        assert!(fe.checked);
+        fe.toggle();
+        assert!(!fe.checked);
+    }
+
+    #[test]
+    fn test_bbx_file_op_create() {
+        let op = BbxFileOperation::create("new_file.rs");
+        assert_eq!(op.display_text(), "Create new_file.rs");
+    }
+
+    #[test]
+    fn test_bbx_file_op_rename() {
+        let op = BbxFileOperation::rename("old.rs", "new.rs");
+        assert!(op.display_text().contains("→"));
+    }
+
+    #[test]
+    fn test_bbx_preview_basic() {
+        let mut p = BbxEditPreview::new("Rename Symbol");
+        p.add_file_edits(BbxFileEdits::new("a.rs", vec![BbxTextEdit::new(1, 0, 1, 3, "foo")]));
+        p.add_file_edits(BbxFileEdits::new("b.rs", vec![
+            BbxTextEdit::new(5, 0, 5, 3, "foo"),
+            BbxTextEdit::new(10, 0, 10, 3, "foo"),
+        ]));
+        assert_eq!(p.file_count(), 2);
+        assert_eq!(p.total_edits(), 3);
+    }
+
+    #[test]
+    fn test_bbx_preview_toggle() {
+        let mut p = BbxEditPreview::new("test");
+        p.add_file_edits(BbxFileEdits::new("a.rs", vec![BbxTextEdit::new(1, 0, 1, 3, "x")]));
+        assert_eq!(p.checked_edits(), 1);
+        p.toggle_file(0);
+        assert_eq!(p.checked_edits(), 0);
+    }
+
+    #[test]
+    fn test_bbx_preview_confirm() {
+        let mut p = BbxEditPreview::new("test");
+        assert!(!p.is_confirmed());
+        p.confirm();
+        assert!(p.is_confirmed());
+    }
+
+    #[test]
+    fn test_bbx_preview_status() {
+        let mut p = BbxEditPreview::new("Refactor");
+        p.add_file_edits(BbxFileEdits::new("a.rs", vec![BbxTextEdit::new(1, 0, 1, 3, "x")]));
+        assert_eq!(p.status_text(), "Refactor: 1 files, 1 edits");
+    }
+
+    #[test]
+    fn test_bbx_file_op_delete() {
+        let op = BbxFileOperation::delete("old.rs");
+        assert_eq!(op.display_text(), "Delete old.rs");
+    }
+}
