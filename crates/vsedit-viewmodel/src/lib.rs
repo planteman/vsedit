@@ -66098,3 +66098,177 @@ mod bcw_tests {
         assert!(v.cursor_entry().is_none());
     }
 }
+
+
+// --- bcx_: Editor comments / review view ---
+
+/// Comment mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcxCommentMode { Preview, Editing }
+
+/// A single comment.
+#[derive(Debug, Clone)]
+pub struct BcxComment {
+    pub id: u64,
+    pub author: String,
+    pub body: String,
+    pub timestamp: u64,
+    pub mode: BcxCommentMode,
+    pub reactions: Vec<(String, u32)>,
+}
+
+impl BcxComment {
+    pub fn new(id: u64, author: &str, body: &str) -> Self {
+        Self { id, author: author.to_string(), body: body.to_string(), timestamp: 0, mode: BcxCommentMode::Preview, reactions: Vec::new() }
+    }
+
+    pub fn add_reaction(&mut self, emoji: &str) {
+        if let Some(r) = self.reactions.iter_mut().find(|(e, _)| e == emoji) { r.1 += 1; }
+        else { self.reactions.push((emoji.to_string(), 1)); }
+    }
+
+    pub fn render(&self) -> Vec<String> {
+        let mut lines = vec![format!("@{} ({})", self.author, self.id)];
+        for line in self.body.lines() { lines.push(format!("  {}", line)); }
+        if !self.reactions.is_empty() {
+            let r: String = self.reactions.iter().map(|(e, c)| format!("{} {}", e, c)).collect::<Vec<_>>().join(" ");
+            lines.push(format!("  {}", r));
+        }
+        lines
+    }
+}
+
+/// A comment thread on a specific range.
+#[derive(Debug)]
+pub struct BcxCommentThread {
+    pub uri: String,
+    pub line: u32,
+    pub comments: Vec<BcxComment>,
+    pub resolved: bool,
+    pub collapsed: bool,
+    pub label: Option<String>,
+}
+
+impl BcxCommentThread {
+    pub fn new(uri: &str, line: u32) -> Self {
+        Self { uri: uri.to_string(), line, comments: Vec::new(), resolved: false, collapsed: false, label: None }
+    }
+
+    pub fn add_comment(&mut self, c: BcxComment) { self.comments.push(c); }
+    pub fn resolve(&mut self) { self.resolved = true; }
+    pub fn unresolve(&mut self) { self.resolved = false; }
+    pub fn toggle_collapse(&mut self) { self.collapsed = !self.collapsed; }
+    pub fn comment_count(&self) -> usize { self.comments.len() }
+
+    pub fn last_author(&self) -> Option<&str> { self.comments.last().map(|c| c.author.as_str()) }
+}
+
+/// Manages all comment threads.
+#[derive(Debug)]
+pub struct BcxCommentController {
+    threads: Vec<BcxCommentThread>,
+    next_comment_id: u64,
+}
+
+impl BcxCommentController {
+    pub fn new() -> Self { Self { threads: Vec::new(), next_comment_id: 1 } }
+
+    pub fn create_thread(&mut self, uri: &str, line: u32) -> &mut BcxCommentThread {
+        self.threads.push(BcxCommentThread::new(uri, line));
+        self.threads.last_mut().unwrap()
+    }
+
+    pub fn add_comment_to(&mut self, uri: &str, line: u32, author: &str, body: &str) -> u64 {
+        let id = self.next_comment_id;
+        self.next_comment_id += 1;
+        if let Some(t) = self.threads.iter_mut().find(|t| t.uri == uri && t.line == line) {
+            t.add_comment(BcxComment::new(id, author, body));
+        }
+        id
+    }
+
+    pub fn threads_for_file(&self, uri: &str) -> Vec<&BcxCommentThread> {
+        self.threads.iter().filter(|t| t.uri == uri).collect()
+    }
+
+    pub fn unresolved_count(&self) -> usize { self.threads.iter().filter(|t| !t.resolved).count() }
+    pub fn total_threads(&self) -> usize { self.threads.len() }
+}
+
+#[cfg(test)]
+mod bcx_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcx_comment() {
+        let c = BcxComment::new(1, "alice", "looks good");
+        assert_eq!(c.author, "alice");
+    }
+
+    #[test]
+    fn test_bcx_reaction() {
+        let mut c = BcxComment::new(1, "bob", "LGTM");
+        c.add_reaction("👍");
+        c.add_reaction("👍");
+        assert_eq!(c.reactions[0].1, 2);
+    }
+
+    #[test]
+    fn test_bcx_render() {
+        let c = BcxComment::new(1, "alice", "line 1\nline 2");
+        let lines = c.render();
+        assert!(lines.len() >= 3);
+    }
+
+    #[test]
+    fn test_bcx_thread() {
+        let mut t = BcxCommentThread::new("src/main.rs", 42);
+        t.add_comment(BcxComment::new(1, "alice", "fix this"));
+        assert_eq!(t.comment_count(), 1);
+        assert_eq!(t.last_author(), Some("alice"));
+    }
+
+    #[test]
+    fn test_bcx_resolve() {
+        let mut t = BcxCommentThread::new("a.rs", 1);
+        assert!(!t.resolved);
+        t.resolve();
+        assert!(t.resolved);
+    }
+
+    #[test]
+    fn test_bcx_collapse() {
+        let mut t = BcxCommentThread::new("a.rs", 1);
+        t.toggle_collapse();
+        assert!(t.collapsed);
+    }
+
+    #[test]
+    fn test_bcx_controller() {
+        let mut ctrl = BcxCommentController::new();
+        ctrl.create_thread("a.rs", 10);
+        ctrl.add_comment_to("a.rs", 10, "alice", "nice");
+        assert_eq!(ctrl.total_threads(), 1);
+    }
+
+    #[test]
+    fn test_bcx_threads_for_file() {
+        let mut ctrl = BcxCommentController::new();
+        ctrl.create_thread("a.rs", 10);
+        ctrl.create_thread("b.rs", 20);
+        assert_eq!(ctrl.threads_for_file("a.rs").len(), 1);
+    }
+
+    #[test]
+    fn test_bcx_unresolved() {
+        let mut ctrl = BcxCommentController::new();
+        ctrl.create_thread("a.rs", 10);
+        assert_eq!(ctrl.unresolved_count(), 1);
+    }
+
+    #[test]
+    fn test_bcx_empty_controller() {
+        let ctrl = BcxCommentController::new();
+        assert_eq!(ctrl.total_threads(), 0);
+    }
+}
