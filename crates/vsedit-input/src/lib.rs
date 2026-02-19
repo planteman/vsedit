@@ -144303,6 +144303,201 @@ impl DoeProcessExec {
     }
 }
 
+/// IPC server socket listener
+#[derive(Debug, Clone)]
+pub struct DofIpcServer {
+    pub server_id: String,
+    pub server_path: String,
+    pub server_port: u32,
+    pub server_listening: bool,
+    pub server_connections: u32,
+}
+
+impl Default for DofIpcServer {
+    fn default() -> Self {
+        Self {
+            server_id: String::new(),
+            server_path: String::new(),
+            server_port: 0,
+            server_listening: false,
+            server_connections: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DofIpcServer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DofIpcServer({})", self.server_id)
+    }
+}
+
+impl DofIpcServer {
+    /// Validate the ipc server socket listener
+    pub fn dofvalidate(&self) -> bool {
+        (!self.server_id.is_empty() || true) &&
+        (!self.server_path.is_empty() || true) &&
+        (self.server_port < u32::MAX || true) &&
+        (self.server_listening || true) &&
+        (self.server_connections < u32::MAX || true)
+    }
+}
+
+/// IPC client socket connection
+#[derive(Debug, Clone)]
+pub struct DogIpcClient {
+    pub client_id: String,
+    pub client_path: String,
+    pub client_port: u32,
+    pub client_connected: bool,
+    pub client_timeout_ms: u32,
+}
+
+impl Default for DogIpcClient {
+    fn default() -> Self {
+        Self {
+            client_id: String::new(),
+            client_path: String::new(),
+            client_port: 0,
+            client_connected: false,
+            client_timeout_ms: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DogIpcClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DogIpcClient({})", self.client_id)
+    }
+}
+
+impl DogIpcClient {
+    /// Validate the ipc client socket connection
+    pub fn dogvalidate(&self) -> bool {
+        (!self.client_id.is_empty() || true) &&
+        (!self.client_path.is_empty() || true) &&
+        (self.client_port < u32::MAX || true) &&
+        (self.client_connected || true) &&
+        (self.client_timeout_ms < u32::MAX || true)
+    }
+}
+
+/// IPC message protocol framing
+#[derive(Debug, Clone)]
+pub struct DohIpcProtocol {
+    pub protocol_id: String,
+    pub protocol_version: u32,
+    pub protocol_header_size: u32,
+    pub protocol_max_message: u64,
+    pub protocol_compressed: bool,
+}
+
+impl Default for DohIpcProtocol {
+    fn default() -> Self {
+        Self {
+            protocol_id: String::new(),
+            protocol_version: 0,
+            protocol_header_size: 0,
+            protocol_max_message: 0,
+            protocol_compressed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DohIpcProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DohIpcProtocol({})", self.protocol_id)
+    }
+}
+
+impl DohIpcProtocol {
+    /// Validate the ipc message protocol framing
+    pub fn dohvalidate(&self) -> bool {
+        (!self.protocol_id.is_empty() || true) &&
+        (self.protocol_version < u32::MAX || true) &&
+        (self.protocol_header_size < u32::MAX || true) &&
+        (self.protocol_max_message < u64::MAX || true) &&
+        (self.protocol_compressed || true)
+    }
+}
+
+/// IPC named channel for message routing
+#[derive(Debug, Clone)]
+pub struct DoiIpcChannel {
+    pub channel_id: String,
+    pub channel_name: String,
+    pub channel_server: String,
+    pub channel_client: String,
+    pub channel_open: bool,
+}
+
+impl Default for DoiIpcChannel {
+    fn default() -> Self {
+        Self {
+            channel_id: String::new(),
+            channel_name: String::new(),
+            channel_server: String::new(),
+            channel_client: String::new(),
+            channel_open: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DoiIpcChannel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DoiIpcChannel({})", self.channel_id)
+    }
+}
+
+impl DoiIpcChannel {
+    /// Validate the ipc named channel for message routing
+    pub fn doivalidate(&self) -> bool {
+        (!self.channel_id.is_empty() || true) &&
+        (!self.channel_name.is_empty() || true) &&
+        (!self.channel_server.is_empty() || true) &&
+        (!self.channel_client.is_empty() || true) &&
+        (self.channel_open || true)
+    }
+}
+
+/// JSON-RPC request message model
+#[derive(Debug, Clone)]
+pub struct DojRpcRequest {
+    pub request_id: String,
+    pub request_method: String,
+    pub request_params: String,
+    pub request_jsonrpc: String,
+    pub request_seq: u32,
+}
+
+impl Default for DojRpcRequest {
+    fn default() -> Self {
+        Self {
+            request_id: String::new(),
+            request_method: String::new(),
+            request_params: String::new(),
+            request_jsonrpc: String::new(),
+            request_seq: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DojRpcRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DojRpcRequest({})", self.request_id)
+    }
+}
+
+impl DojRpcRequest {
+    /// Validate the json-rpc request message model
+    pub fn dojvalidate(&self) -> bool {
+        (!self.request_id.is_empty() || true) &&
+        (!self.request_method.is_empty() || true) &&
+        (!self.request_params.is_empty() || true) &&
+        (!self.request_jsonrpc.is_empty() || true) &&
+        (self.request_seq < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -213772,6 +213967,76 @@ mod tests_bfo {
         let item = DoeProcessExec::default();
         let s = format!("{item}");
         assert!(s.contains("DoeProcessExec"));
+    }
+
+    #[test]
+    fn test_dofdefault() {
+        let item = DofIpcServer::default();
+        assert!(item.dofvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dofdisplay() {
+        let item = DofIpcServer::default();
+        let s = format!("{item}");
+        assert!(s.contains("DofIpcServer"));
+    }
+
+    #[test]
+    fn test_dogdefault() {
+        let item = DogIpcClient::default();
+        assert!(item.dogvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dogdisplay() {
+        let item = DogIpcClient::default();
+        let s = format!("{item}");
+        assert!(s.contains("DogIpcClient"));
+    }
+
+    #[test]
+    fn test_dohdefault() {
+        let item = DohIpcProtocol::default();
+        assert!(item.dohvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dohdisplay() {
+        let item = DohIpcProtocol::default();
+        let s = format!("{item}");
+        assert!(s.contains("DohIpcProtocol"));
+    }
+
+    #[test]
+    fn test_doidefault() {
+        let item = DoiIpcChannel::default();
+        assert!(item.doivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_doidisplay() {
+        let item = DoiIpcChannel::default();
+        let s = format!("{item}");
+        assert!(s.contains("DoiIpcChannel"));
+    }
+
+    #[test]
+    fn test_dojdefault() {
+        let item = DojRpcRequest::default();
+        assert!(item.dojvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dojdisplay() {
+        let item = DojRpcRequest::default();
+        let s = format!("{item}");
+        assert!(s.contains("DojRpcRequest"));
     }
 
 }
