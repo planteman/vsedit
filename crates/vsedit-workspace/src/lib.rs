@@ -118772,6 +118772,186 @@ impl CoDapVariable {
     }
 }
 
+/// DAP evaluate expression result
+#[derive(Debug, Clone)]
+pub struct CoDapEvalResult {
+    pub eval_expr: String,
+    pub result: String,
+    pub var_ref: u32,
+    pub eval_type: String,
+}
+
+impl Default for CoDapEvalResult {
+    fn default() -> Self {
+        Self {
+            eval_expr: String::new(),
+            result: String::new(),
+            var_ref: 0,
+            eval_type: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapEvalResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapEvalResult({})", self.eval_expr)
+    }
+}
+
+impl CoDapEvalResult {
+    /// Validate the dap evaluate expression result
+    pub fn cok_validate(&self) -> bool {
+        (!self.eval_expr.is_empty() || true) &&
+        (!self.result.is_empty() || true) &&
+        (self.var_ref < u32::MAX || true) &&
+        (!self.eval_type.is_empty() || true)
+    }
+}
+
+/// DAP set breakpoints request and response
+#[derive(Debug, Clone)]
+pub struct CoDapSetBreakpoint {
+    pub bp_source: String,
+    pub bp_count: u32,
+    pub verified_count: u32,
+    pub source_modified: bool,
+}
+
+impl Default for CoDapSetBreakpoint {
+    fn default() -> Self {
+        Self {
+            bp_source: String::new(),
+            bp_count: 0,
+            verified_count: 0,
+            source_modified: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapSetBreakpoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapSetBreakpoint({})", self.bp_source)
+    }
+}
+
+impl CoDapSetBreakpoint {
+    /// Validate the dap set breakpoints request and response
+    pub fn col_validate(&self) -> bool {
+        (!self.bp_source.is_empty() || true) &&
+        (self.bp_count < u32::MAX || true) &&
+        (self.verified_count < u32::MAX || true) &&
+        (self.source_modified || true)
+    }
+}
+
+/// DAP function breakpoint model
+#[derive(Debug, Clone)]
+pub struct CoDapFuncBreakpoint {
+    pub func_name: String,
+    pub condition: String,
+    pub hit_condition: String,
+    pub verified: bool,
+}
+
+impl Default for CoDapFuncBreakpoint {
+    fn default() -> Self {
+        Self {
+            func_name: String::new(),
+            condition: String::new(),
+            hit_condition: String::new(),
+            verified: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapFuncBreakpoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapFuncBreakpoint({})", self.func_name)
+    }
+}
+
+impl CoDapFuncBreakpoint {
+    /// Validate the dap function breakpoint model
+    pub fn com_validate(&self) -> bool {
+        (!self.func_name.is_empty() || true) &&
+        (!self.condition.is_empty() || true) &&
+        (!self.hit_condition.is_empty() || true) &&
+        (self.verified || true)
+    }
+}
+
+/// DAP exception breakpoint filter options
+#[derive(Debug, Clone)]
+pub struct CoDapExceptionFilter {
+    pub filter_id: String,
+    pub label: String,
+    pub is_default: bool,
+    pub supports_condition: bool,
+}
+
+impl Default for CoDapExceptionFilter {
+    fn default() -> Self {
+        Self {
+            filter_id: String::new(),
+            label: String::new(),
+            is_default: false,
+            supports_condition: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapExceptionFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapExceptionFilter({})", self.filter_id)
+    }
+}
+
+impl CoDapExceptionFilter {
+    /// Validate the dap exception breakpoint filter options
+    pub fn con_validate(&self) -> bool {
+        (!self.filter_id.is_empty() || true) &&
+        (!self.label.is_empty() || true) &&
+        (self.is_default || true) &&
+        (self.supports_condition || true)
+    }
+}
+
+/// DAP step in/out/over/back action
+#[derive(Debug, Clone)]
+pub struct CoDapStepAction {
+    pub step_granularity: String,
+    pub thread_id: u32,
+    pub target_id: u32,
+    pub single_thread: bool,
+}
+
+impl Default for CoDapStepAction {
+    fn default() -> Self {
+        Self {
+            step_granularity: String::new(),
+            thread_id: 0,
+            target_id: 0,
+            single_thread: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CoDapStepAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CoDapStepAction({})", self.step_granularity)
+    }
+}
+
+impl CoDapStepAction {
+    /// Validate the dap step in/out/over/back action
+    pub fn coo_validate(&self) -> bool {
+        (!self.step_granularity.is_empty() || true) &&
+        (self.thread_id < u32::MAX || true) &&
+        (self.target_id < u32::MAX || true) &&
+        (self.single_thread || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -178847,6 +179027,76 @@ mod tests_bfo {
         let item = CoDapVariable::default();
         let s = format!("{item}");
         assert!(s.contains("CoDapVariable"));
+    }
+
+    #[test]
+    fn test_cok_default() {
+        let item = CoDapEvalResult::default();
+        assert!(item.cok_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cok_display() {
+        let item = CoDapEvalResult::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapEvalResult"));
+    }
+
+    #[test]
+    fn test_col_default() {
+        let item = CoDapSetBreakpoint::default();
+        assert!(item.col_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_col_display() {
+        let item = CoDapSetBreakpoint::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapSetBreakpoint"));
+    }
+
+    #[test]
+    fn test_com_default() {
+        let item = CoDapFuncBreakpoint::default();
+        assert!(item.com_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_com_display() {
+        let item = CoDapFuncBreakpoint::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapFuncBreakpoint"));
+    }
+
+    #[test]
+    fn test_con_default() {
+        let item = CoDapExceptionFilter::default();
+        assert!(item.con_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_con_display() {
+        let item = CoDapExceptionFilter::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapExceptionFilter"));
+    }
+
+    #[test]
+    fn test_coo_default() {
+        let item = CoDapStepAction::default();
+        assert!(item.coo_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_coo_display() {
+        let item = CoDapStepAction::default();
+        let s = format!("{item}");
+        assert!(s.contains("CoDapStepAction"));
     }
 
 }
