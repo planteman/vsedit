@@ -86798,6 +86798,67 @@ pub struct BmoIconThemeData { pub name: String, pub file_associations: Vec<BmoFi
 #[derive(Debug, Clone)]
 pub struct BmoIconThemeContribution { pub id: String, pub label: String, pub path: String, pub extension_id: String }
 
+
+// Task runner model - task definitions, task execution, problem matchers, task groups
+#[derive(Debug, Clone)]
+pub struct BmpTaskDefinition { pub task_type: String, pub label: String, pub command: String, pub args: Vec<String>, pub group: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmpTaskExecution { pub task_id: String, pub process_id: Option<u32>, pub running: bool, pub exit_code: Option<i32> }
+#[derive(Debug, Clone)]
+pub struct BmpProblemMatcher { pub name: String, pub owner: String, pub pattern: String, pub severity: u8 }
+#[derive(Debug, Clone)]
+pub struct BmpTaskGroup { pub id: String, pub is_default: bool }
+#[derive(Debug, Clone)]
+pub struct BmpTaskProvider { pub task_type: String, pub provider_id: String, pub tasks: Vec<BmpTaskDefinition> }
+
+// Debug adapter protocol - debug session, breakpoints, stack frames, variables, evaluate
+#[derive(Debug, Clone)]
+pub struct BmqBreakpoint { pub id: u64, pub line: usize, pub column: Option<usize>, pub verified: bool, pub source_path: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmqStackFrame { pub id: u64, pub name: String, pub source_path: Option<String>, pub line: usize, pub column: usize }
+#[derive(Debug, Clone)]
+pub struct BmqVariable { pub name: String, pub value: String, pub variable_ref: u64, pub named_variables: usize, pub indexed_variables: usize }
+#[derive(Debug, Clone)]
+pub struct BmqDebugSession { pub id: String, pub name: String, pub adapter_type: String, pub running: bool }
+#[derive(Debug, Clone)]
+pub struct BmqEvaluateResult { pub result: String, pub variable_ref: u64, pub success: bool }
+
+// Extension management - extension install, enable/disable, dependency resolution, extension storage
+#[derive(Debug, Clone)]
+pub struct BmrExtensionInstall { pub id: String, pub version: String, pub source: u8, pub install_path: String }
+#[derive(Debug, Clone)]
+pub struct BmrExtensionDep { pub extension_id: String, pub version_range: String, pub optional: bool }
+#[derive(Debug, Clone)]
+pub struct BmrExtensionStorage { pub extension_id: String, pub global_state: Option<String>, pub workspace_state: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmrExtensionEnable { pub extension_id: String, pub enabled: bool, pub scope: u8 }
+#[derive(Debug, Clone)]
+pub struct BmrExtensionManifest { pub id: String, pub name: String, pub version: String, pub engine: String, pub activation_events: Vec<String> }
+
+// Marketplace service - extension search, ratings, downloads, gallery queries, update check
+#[derive(Debug, Clone)]
+pub struct BmsGalleryExtension { pub id: String, pub display_name: String, pub publisher: String, pub version: String, pub install_count: u64 }
+#[derive(Debug, Clone)]
+pub struct BmsSearchQuery { pub text: String, pub category: Option<String>, pub sort_by: u8, pub page: usize, pub page_size: usize }
+#[derive(Debug, Clone)]
+pub struct BmsSearchResult { pub extensions: Vec<BmsGalleryExtension>, pub total_count: usize }
+#[derive(Debug, Clone)]
+pub struct BmsUpdateInfo { pub extension_id: String, pub current_version: String, pub latest_version: String, pub has_update: bool }
+#[derive(Debug, Clone)]
+pub struct BmsRating { pub average: f64, pub count: u32 }
+
+// Telemetry service - telemetry events, opt-in/out, event properties, crash reporting
+#[derive(Debug, Clone)]
+pub struct BmtTelemetryEvent { pub name: String, pub properties: Vec<String>, pub measurements: Vec<f64> }
+#[derive(Debug, Clone)]
+pub struct BmtTelemetryConfig { pub enabled: bool, pub level: u8, pub crash_reporter: bool }
+#[derive(Debug, Clone)]
+pub struct BmtErrorReport { pub message: String, pub stack: Option<String>, pub extension_id: Option<String> }
+#[derive(Debug, Clone)]
+pub struct BmtUsageData { pub session_id: String, pub session_duration_ms: u64, pub commands_executed: u32 }
+#[derive(Debug, Clone)]
+pub struct BmtTelemetryState { pub opted_in: bool, pub level: u8, pub last_report: Option<u64> }
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -96638,4 +96699,104 @@ mod tests_bfo {
     fn test_bmo_contribution() { let c = BmoIconThemeContribution { id: "seti".into(), label: "Seti".into(), path: "./icons".into(), extension_id: "ext.seti".into() }; assert_eq!(c.id, "seti"); }
     #[test]
     fn test_bmo_no_default_icon() { let t = BmoIconThemeData { name: "None".into(), file_associations: vec![], folder_associations: vec![], default_icon: None }; assert!(t.default_icon.is_none()); }
+    #[test]
+    fn test_bmp_task_def() { let t = BmpTaskDefinition { task_type: "shell".into(), label: "build".into(), command: "cargo".into(), args: vec!["build".into()], group: Some("build".into()) }; assert_eq!(t.task_type, "shell"); }
+    #[test]
+    fn test_bmp_task_no_group() { let t = BmpTaskDefinition { task_type: "process".into(), label: "run".into(), command: "./app".into(), args: vec![], group: None }; assert!(t.group.is_none()); }
+    #[test]
+    fn test_bmp_execution_running() { let e = BmpTaskExecution { task_id: "t1".into(), process_id: Some(1234), running: true, exit_code: None }; assert!(e.running); }
+    #[test]
+    fn test_bmp_execution_done() { let e = BmpTaskExecution { task_id: "t2".into(), process_id: None, running: false, exit_code: Some(0) }; assert!(!e.running); }
+    #[test]
+    fn test_bmp_problem_matcher() { let m = BmpProblemMatcher { name: "rustc".into(), owner: "rust".into(), pattern: "^error".into(), severity: 0 }; assert_eq!(m.severity, 0); }
+    #[test]
+    fn test_bmp_task_group_default() { let g = BmpTaskGroup { id: "build".into(), is_default: true }; assert!(g.is_default); }
+    #[test]
+    fn test_bmp_task_group_not_default() { let g = BmpTaskGroup { id: "test".into(), is_default: false }; assert!(!g.is_default); }
+    #[test]
+    fn test_bmp_provider_basic() { let t = BmpTaskDefinition { task_type: "npm".into(), label: "install".into(), command: "npm".into(), args: vec!["install".into()], group: None }; let p = BmpTaskProvider { task_type: "npm".into(), provider_id: "npm".into(), tasks: vec![t] }; assert_eq!(p.tasks.len(), 1); }
+    #[test]
+    fn test_bmp_empty_provider() { let p = BmpTaskProvider { task_type: "shell".into(), provider_id: "shell".into(), tasks: vec![] }; assert!(p.tasks.is_empty()); }
+    #[test]
+    fn test_bmp_execution_failed() { let e = BmpTaskExecution { task_id: "t3".into(), process_id: None, running: false, exit_code: Some(1) }; assert_eq!(e.exit_code, Some(1)); }
+    #[test]
+    fn test_bmq_breakpoint_verified() { let b = BmqBreakpoint { id: 1, line: 10, column: None, verified: true, source_path: Some("main.rs".into()) }; assert!(b.verified); }
+    #[test]
+    fn test_bmq_breakpoint_unverified() { let b = BmqBreakpoint { id: 2, line: 5, column: Some(3), verified: false, source_path: None }; assert!(!b.verified); }
+    #[test]
+    fn test_bmq_stack_frame() { let f = BmqStackFrame { id: 1, name: "main".into(), source_path: Some("main.rs".into()), line: 10, column: 0 }; assert_eq!(f.name, "main"); }
+    #[test]
+    fn test_bmq_frame_no_source() { let f = BmqStackFrame { id: 2, name: "<unknown>".into(), source_path: None, line: 0, column: 0 }; assert!(f.source_path.is_none()); }
+    #[test]
+    fn test_bmq_variable_simple() { let v = BmqVariable { name: "x".into(), value: "42".into(), variable_ref: 0, named_variables: 0, indexed_variables: 0 }; assert_eq!(v.value, "42"); }
+    #[test]
+    fn test_bmq_variable_complex() { let v = BmqVariable { name: "vec".into(), value: "Vec<i32>".into(), variable_ref: 100, named_variables: 0, indexed_variables: 3 }; assert_eq!(v.indexed_variables, 3); }
+    #[test]
+    fn test_bmq_session_running() { let s = BmqDebugSession { id: "d1".into(), name: "Debug".into(), adapter_type: "lldb".into(), running: true }; assert!(s.running); }
+    #[test]
+    fn test_bmq_session_stopped() { let s = BmqDebugSession { id: "d2".into(), name: "Test".into(), adapter_type: "codelldb".into(), running: false }; assert!(!s.running); }
+    #[test]
+    fn test_bmq_eval_success() { let r = BmqEvaluateResult { result: "42".into(), variable_ref: 0, success: true }; assert!(r.success); }
+    #[test]
+    fn test_bmq_eval_failure() { let r = BmqEvaluateResult { result: "error".into(), variable_ref: 0, success: false }; assert!(!r.success); }
+    #[test]
+    fn test_bmr_install_marketplace() { let i = BmrExtensionInstall { id: "ext.rust".into(), version: "1.0.0".into(), source: 0, install_path: "/ext/rust".into() }; assert_eq!(i.source, 0); }
+    #[test]
+    fn test_bmr_install_vsix() { let i = BmrExtensionInstall { id: "ext.local".into(), version: "0.1.0".into(), source: 1, install_path: "/ext/local".into() }; assert_eq!(i.source, 1); }
+    #[test]
+    fn test_bmr_dep_required() { let d = BmrExtensionDep { extension_id: "ext.core".into(), version_range: "^1.0.0".into(), optional: false }; assert!(!d.optional); }
+    #[test]
+    fn test_bmr_dep_optional() { let d = BmrExtensionDep { extension_id: "ext.ui".into(), version_range: "*".into(), optional: true }; assert!(d.optional); }
+    #[test]
+    fn test_bmr_storage_global() { let s = BmrExtensionStorage { extension_id: "ext.x".into(), global_state: Some("{}".into()), workspace_state: None }; assert!(s.global_state.is_some()); }
+    #[test]
+    fn test_bmr_storage_workspace() { let s = BmrExtensionStorage { extension_id: "ext.y".into(), global_state: None, workspace_state: Some("{}".into()) }; assert!(s.workspace_state.is_some()); }
+    #[test]
+    fn test_bmr_enable_global() { let e = BmrExtensionEnable { extension_id: "ext.z".into(), enabled: true, scope: 0 }; assert!(e.enabled); }
+    #[test]
+    fn test_bmr_disable_workspace() { let e = BmrExtensionEnable { extension_id: "ext.a".into(), enabled: false, scope: 1 }; assert!(!e.enabled); }
+    #[test]
+    fn test_bmr_manifest() { let m = BmrExtensionManifest { id: "ext.test".into(), name: "Test".into(), version: "1.0.0".into(), engine: "^1.50.0".into(), activation_events: vec!["onLanguage:rust".into()] }; assert_eq!(m.activation_events.len(), 1); }
+    #[test]
+    fn test_bmr_manifest_star() { let m = BmrExtensionManifest { id: "ext.all".into(), name: "All".into(), version: "0.0.1".into(), engine: "*".into(), activation_events: vec!["*".into()] }; assert_eq!(m.engine, "*"); }
+    #[test]
+    fn test_bms_gallery_ext() { let e = BmsGalleryExtension { id: "ext.rust".into(), display_name: "Rust".into(), publisher: "rust-lang".into(), version: "1.0.0".into(), install_count: 1000000 }; assert_eq!(e.install_count, 1000000); }
+    #[test]
+    fn test_bms_search_query() { let q = BmsSearchQuery { text: "rust".into(), category: Some("Language".into()), sort_by: 0, page: 1, page_size: 20 }; assert_eq!(q.page_size, 20); }
+    #[test]
+    fn test_bms_search_no_category() { let q = BmsSearchQuery { text: "theme".into(), category: None, sort_by: 1, page: 1, page_size: 10 }; assert!(q.category.is_none()); }
+    #[test]
+    fn test_bms_search_result() { let e = BmsGalleryExtension { id: "x".into(), display_name: "X".into(), publisher: "p".into(), version: "1".into(), install_count: 0 }; let r = BmsSearchResult { extensions: vec![e], total_count: 1 }; assert_eq!(r.total_count, 1); }
+    #[test]
+    fn test_bms_empty_result() { let r = BmsSearchResult { extensions: vec![], total_count: 0 }; assert!(r.extensions.is_empty()); }
+    #[test]
+    fn test_bms_update_available() { let u = BmsUpdateInfo { extension_id: "ext.x".into(), current_version: "1.0.0".into(), latest_version: "2.0.0".into(), has_update: true }; assert!(u.has_update); }
+    #[test]
+    fn test_bms_no_update() { let u = BmsUpdateInfo { extension_id: "ext.y".into(), current_version: "1.0.0".into(), latest_version: "1.0.0".into(), has_update: false }; assert!(!u.has_update); }
+    #[test]
+    fn test_bms_high_rating() { let r = BmsRating { average: 4.8, count: 5000 }; assert!(r.average > 4.5); }
+    #[test]
+    fn test_bms_no_rating() { let r = BmsRating { average: 0.0, count: 0 }; assert_eq!(r.count, 0); }
+    #[test]
+    fn test_bms_low_install() { let e = BmsGalleryExtension { id: "ext.new".into(), display_name: "New".into(), publisher: "p".into(), version: "0.1.0".into(), install_count: 5 }; assert!(e.install_count < 100); }
+    #[test]
+    fn test_bmt_event_basic() { let e = BmtTelemetryEvent { name: "editor.open".into(), properties: vec!["rust".into()], measurements: vec![50.0] }; assert_eq!(e.name, "editor.open"); }
+    #[test]
+    fn test_bmt_event_empty() { let e = BmtTelemetryEvent { name: "startup".into(), properties: vec![], measurements: vec![] }; assert!(e.properties.is_empty()); }
+    #[test]
+    fn test_bmt_config_enabled() { let c = BmtTelemetryConfig { enabled: true, level: 3, crash_reporter: true }; assert!(c.enabled); }
+    #[test]
+    fn test_bmt_config_disabled() { let c = BmtTelemetryConfig { enabled: false, level: 0, crash_reporter: false }; assert!(!c.enabled); }
+    #[test]
+    fn test_bmt_error_report() { let e = BmtErrorReport { message: "panic".into(), stack: Some("at main.rs:10".into()), extension_id: None }; assert!(e.stack.is_some()); }
+    #[test]
+    fn test_bmt_ext_error() { let e = BmtErrorReport { message: "ext crash".into(), stack: None, extension_id: Some("ext.bad".into()) }; assert!(e.extension_id.is_some()); }
+    #[test]
+    fn test_bmt_usage_data() { let u = BmtUsageData { session_id: "s1".into(), session_duration_ms: 3600000, commands_executed: 150 }; assert_eq!(u.commands_executed, 150); }
+    #[test]
+    fn test_bmt_short_session() { let u = BmtUsageData { session_id: "s2".into(), session_duration_ms: 5000, commands_executed: 2 }; assert!(u.session_duration_ms < 10000); }
+    #[test]
+    fn test_bmt_opted_in() { let s = BmtTelemetryState { opted_in: true, level: 3, last_report: Some(1000) }; assert!(s.opted_in); }
+    #[test]
+    fn test_bmt_opted_out() { let s = BmtTelemetryState { opted_in: false, level: 0, last_report: None }; assert!(!s.opted_in); }
 }
