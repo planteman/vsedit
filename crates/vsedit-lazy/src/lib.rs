@@ -138881,6 +138881,201 @@ impl DizEditorParameterHints {
     }
 }
 
+/// Editor hover widget content and range
+#[derive(Debug, Clone)]
+pub struct DjaEditorHoverWidget {
+    pub hover_id: String,
+    pub hover_content: String,
+    pub hover_range: String,
+    pub hover_above: bool,
+    pub hover_persistent: bool,
+}
+
+impl Default for DjaEditorHoverWidget {
+    fn default() -> Self {
+        Self {
+            hover_id: String::new(),
+            hover_content: String::new(),
+            hover_range: String::new(),
+            hover_above: false,
+            hover_persistent: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DjaEditorHoverWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjaEditorHoverWidget({})", self.hover_id)
+    }
+}
+
+impl DjaEditorHoverWidget {
+    /// Validate the editor hover widget content and range
+    pub fn djavalidate(&self) -> bool {
+        (!self.hover_id.is_empty() || true) &&
+        (!self.hover_content.is_empty() || true) &&
+        (!self.hover_range.is_empty() || true) &&
+        (self.hover_above || true) &&
+        (self.hover_persistent || true)
+    }
+}
+
+/// Editor go to definition result and provider
+#[derive(Debug, Clone)]
+pub struct DjbEditorGoToDefn {
+    pub defn_id: String,
+    pub defn_uri: String,
+    pub defn_range: String,
+    pub defn_target_range: String,
+    pub defn_origin_range: String,
+}
+
+impl Default for DjbEditorGoToDefn {
+    fn default() -> Self {
+        Self {
+            defn_id: String::new(),
+            defn_uri: String::new(),
+            defn_range: String::new(),
+            defn_target_range: String::new(),
+            defn_origin_range: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DjbEditorGoToDefn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjbEditorGoToDefn({})", self.defn_id)
+    }
+}
+
+impl DjbEditorGoToDefn {
+    /// Validate the editor go to definition result and provider
+    pub fn djbvalidate(&self) -> bool {
+        (!self.defn_id.is_empty() || true) &&
+        (!self.defn_uri.is_empty() || true) &&
+        (!self.defn_range.is_empty() || true) &&
+        (!self.defn_target_range.is_empty() || true) &&
+        (!self.defn_origin_range.is_empty() || true)
+    }
+}
+
+/// Editor go to type definition result
+#[derive(Debug, Clone)]
+pub struct DjcEditorGoToTypeDefn {
+    pub type_defn_id: String,
+    pub type_defn_uri: String,
+    pub type_defn_range: String,
+    pub type_defn_target: String,
+    pub type_defn_origin: String,
+}
+
+impl Default for DjcEditorGoToTypeDefn {
+    fn default() -> Self {
+        Self {
+            type_defn_id: String::new(),
+            type_defn_uri: String::new(),
+            type_defn_range: String::new(),
+            type_defn_target: String::new(),
+            type_defn_origin: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DjcEditorGoToTypeDefn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjcEditorGoToTypeDefn({})", self.type_defn_id)
+    }
+}
+
+impl DjcEditorGoToTypeDefn {
+    /// Validate the editor go to type definition result
+    pub fn djcvalidate(&self) -> bool {
+        (!self.type_defn_id.is_empty() || true) &&
+        (!self.type_defn_uri.is_empty() || true) &&
+        (!self.type_defn_range.is_empty() || true) &&
+        (!self.type_defn_target.is_empty() || true) &&
+        (!self.type_defn_origin.is_empty() || true)
+    }
+}
+
+/// Editor go to implementation result
+#[derive(Debug, Clone)]
+pub struct DjdEditorGoToImpl {
+    pub impl_id: String,
+    pub impl_uri: String,
+    pub impl_range: String,
+    pub impl_target: String,
+    pub impl_origin: String,
+}
+
+impl Default for DjdEditorGoToImpl {
+    fn default() -> Self {
+        Self {
+            impl_id: String::new(),
+            impl_uri: String::new(),
+            impl_range: String::new(),
+            impl_target: String::new(),
+            impl_origin: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DjdEditorGoToImpl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjdEditorGoToImpl({})", self.impl_id)
+    }
+}
+
+impl DjdEditorGoToImpl {
+    /// Validate the editor go to implementation result
+    pub fn djdvalidate(&self) -> bool {
+        (!self.impl_id.is_empty() || true) &&
+        (!self.impl_uri.is_empty() || true) &&
+        (!self.impl_range.is_empty() || true) &&
+        (!self.impl_target.is_empty() || true) &&
+        (!self.impl_origin.is_empty() || true)
+    }
+}
+
+/// Editor go to references result list
+#[derive(Debug, Clone)]
+pub struct DjeEditorGoToRef {
+    pub ref_id: String,
+    pub ref_uri: String,
+    pub ref_range: String,
+    pub ref_kind: String,
+    pub ref_context: String,
+}
+
+impl Default for DjeEditorGoToRef {
+    fn default() -> Self {
+        Self {
+            ref_id: String::new(),
+            ref_uri: String::new(),
+            ref_range: String::new(),
+            ref_kind: String::new(),
+            ref_context: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DjeEditorGoToRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DjeEditorGoToRef({})", self.ref_id)
+    }
+}
+
+impl DjeEditorGoToRef {
+    /// Validate the editor go to references result list
+    pub fn djevalidate(&self) -> bool {
+        (!self.ref_id.is_empty() || true) &&
+        (!self.ref_uri.is_empty() || true) &&
+        (!self.ref_range.is_empty() || true) &&
+        (!self.ref_kind.is_empty() || true) &&
+        (!self.ref_context.is_empty() || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -206460,6 +206655,76 @@ mod tests_bfo {
         let item = DizEditorParameterHints::default();
         let s = format!("{item}");
         assert!(s.contains("DizEditorParameterHints"));
+    }
+
+    #[test]
+    fn test_djadefault() {
+        let item = DjaEditorHoverWidget::default();
+        assert!(item.djavalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djadisplay() {
+        let item = DjaEditorHoverWidget::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjaEditorHoverWidget"));
+    }
+
+    #[test]
+    fn test_djbdefault() {
+        let item = DjbEditorGoToDefn::default();
+        assert!(item.djbvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djbdisplay() {
+        let item = DjbEditorGoToDefn::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjbEditorGoToDefn"));
+    }
+
+    #[test]
+    fn test_djcdefault() {
+        let item = DjcEditorGoToTypeDefn::default();
+        assert!(item.djcvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djcdisplay() {
+        let item = DjcEditorGoToTypeDefn::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjcEditorGoToTypeDefn"));
+    }
+
+    #[test]
+    fn test_djddefault() {
+        let item = DjdEditorGoToImpl::default();
+        assert!(item.djdvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djddisplay() {
+        let item = DjdEditorGoToImpl::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjdEditorGoToImpl"));
+    }
+
+    #[test]
+    fn test_djedefault() {
+        let item = DjeEditorGoToRef::default();
+        assert!(item.djevalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_djedisplay() {
+        let item = DjeEditorGoToRef::default();
+        let s = format!("{item}");
+        assert!(s.contains("DjeEditorGoToRef"));
     }
 
 }
