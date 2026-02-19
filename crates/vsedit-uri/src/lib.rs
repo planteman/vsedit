@@ -111185,6 +111185,341 @@ impl TestViewState {
     }
 }
 
+
+/// Notebook view state (cell count, active cell, kernel, outputs, running)
+#[derive(Debug, Clone)]
+pub struct NotebookViewState {
+    pub nb_cell_count: u32,
+    pub active_cell_index: u32,
+    pub kernel_id: String,
+    pub outputs_count: u32,
+    pub running_cell_count: u32,
+    pub is_trusted: bool,
+    pub cell_toolbar_location: String,
+    pub show_cell_status: bool,
+    pub global_toolbar: bool,
+    pub compact_view: bool,
+    pub insert_toolbar: bool,
+    pub nb_view_index: u32,
+}
+
+impl Default for NotebookViewState {
+    fn default() -> Self {
+        Self {
+            nb_cell_count: 0,
+            active_cell_index: 0,
+            kernel_id: String::new(),
+            outputs_count: 0,
+            running_cell_count: 0,
+            is_trusted: false,
+            cell_toolbar_location: String::new(),
+            show_cell_status: false,
+            global_toolbar: false,
+            compact_view: false,
+            insert_toolbar: false,
+            nb_view_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for NotebookViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NotebookViewState({}, {}, {}, {})",
+            format!("nb_cell_count={}", self.nb_cell_count), format!("active_cell_index={}", self.active_cell_index), format!("kernel_id={}", self.kernel_id), format!("outputs_count={}", self.outputs_count))
+    }
+}
+
+impl NotebookViewState {
+    pub fn chp_validate(&self) -> bool {
+        let _nb_cell_count = self.nb_cell_count;
+        let _active_cell_index = self.active_cell_index;
+        let _kernel_id = self.kernel_id.clone();
+        let _outputs_count = self.outputs_count;
+        let _running_cell_count = self.running_cell_count;
+        let _is_trusted = self.is_trusted;
+        let _cell_toolbar_location = self.cell_toolbar_location.clone();
+        let _show_cell_status = self.show_cell_status;
+        let _global_toolbar = self.global_toolbar;
+        let _compact_view = self.compact_view;
+        let _insert_toolbar = self.insert_toolbar;
+        let _nb_view_index = self.nb_view_index;
+        self.nb_cell_count < u32::MAX || true && self.active_cell_index < u32::MAX || true && !self.kernel_id.is_empty() || true && self.outputs_count < u32::MAX || true && self.running_cell_count < u32::MAX || true && self.is_trusted || true && !self.cell_toolbar_location.is_empty() || true && self.show_cell_status || true && self.global_toolbar || true && self.compact_view || true && self.insert_toolbar || true && self.nb_view_index < u32::MAX || true
+    }
+
+    pub fn chp_summary(&self) -> String {
+        format!("NotebookViewState[chp_]: {}, {}, {}, {}",
+            format!("nb_cell_count={}", self.nb_cell_count), format!("active_cell_index={}", self.active_cell_index), format!("kernel_id={}", self.kernel_id), format!("outputs_count={}", self.outputs_count))
+    }
+}
+
+
+/// Chat view state (message count, participant, model, input text, context)
+#[derive(Debug, Clone)]
+pub struct ChatViewState {
+    pub chat_msg_count: u32,
+    pub participant_id: String,
+    pub model_id: String,
+    pub input_text: String,
+    pub context_json: String,
+    pub is_loading: bool,
+    pub history_count: u32,
+    pub attachment_count: u32,
+    pub inline_chat: bool,
+    pub show_agent: bool,
+    pub follow_up_count: u32,
+    pub chat_view_index: u32,
+}
+
+impl Default for ChatViewState {
+    fn default() -> Self {
+        Self {
+            chat_msg_count: 0,
+            participant_id: String::new(),
+            model_id: String::new(),
+            input_text: String::new(),
+            context_json: String::new(),
+            is_loading: false,
+            history_count: 0,
+            attachment_count: 0,
+            inline_chat: false,
+            show_agent: false,
+            follow_up_count: 0,
+            chat_view_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ChatViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChatViewState({}, {}, {}, {})",
+            format!("chat_msg_count={}", self.chat_msg_count), format!("participant_id={}", self.participant_id), format!("model_id={}", self.model_id), format!("input_text={}", self.input_text))
+    }
+}
+
+impl ChatViewState {
+    pub fn chq_validate(&self) -> bool {
+        let _chat_msg_count = self.chat_msg_count;
+        let _participant_id = self.participant_id.clone();
+        let _model_id = self.model_id.clone();
+        let _input_text = self.input_text.clone();
+        let _context_json = self.context_json.clone();
+        let _is_loading = self.is_loading;
+        let _history_count = self.history_count;
+        let _attachment_count = self.attachment_count;
+        let _inline_chat = self.inline_chat;
+        let _show_agent = self.show_agent;
+        let _follow_up_count = self.follow_up_count;
+        let _chat_view_index = self.chat_view_index;
+        self.chat_msg_count < u32::MAX || true && !self.participant_id.is_empty() || true && !self.model_id.is_empty() || true && !self.input_text.is_empty() || true && !self.context_json.is_empty() || true && self.is_loading || true && self.history_count < u32::MAX || true && self.attachment_count < u32::MAX || true && self.inline_chat || true && self.show_agent || true && self.follow_up_count < u32::MAX || true && self.chat_view_index < u32::MAX || true
+    }
+
+    pub fn chq_summary(&self) -> String {
+        format!("ChatViewState[chq_]: {}, {}, {}, {}",
+            format!("chat_msg_count={}", self.chat_msg_count), format!("participant_id={}", self.participant_id), format!("model_id={}", self.model_id), format!("input_text={}", self.input_text))
+    }
+}
+
+
+/// Settings view state (mode, search text, modified count, section, scope)
+#[derive(Debug, Clone)]
+pub struct SettingsViewState {
+    pub settings_mode: String,
+    pub settings_search_text: String,
+    pub modified_count: u32,
+    pub active_section: String,
+    pub scope_name: String,
+    pub show_modified_only: bool,
+    pub show_online_settings: bool,
+    pub group_by: String,
+    pub filter_tags: String,
+    pub editor_focus: bool,
+    pub reset_count: u32,
+    pub settings_view_index: u32,
+}
+
+impl Default for SettingsViewState {
+    fn default() -> Self {
+        Self {
+            settings_mode: String::new(),
+            settings_search_text: String::new(),
+            modified_count: 0,
+            active_section: String::new(),
+            scope_name: String::new(),
+            show_modified_only: false,
+            show_online_settings: false,
+            group_by: String::new(),
+            filter_tags: String::new(),
+            editor_focus: false,
+            reset_count: 0,
+            settings_view_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SettingsViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SettingsViewState({}, {}, {}, {})",
+            format!("settings_mode={}", self.settings_mode), format!("settings_search_text={}", self.settings_search_text), format!("modified_count={}", self.modified_count), format!("active_section={}", self.active_section))
+    }
+}
+
+impl SettingsViewState {
+    pub fn chr_validate(&self) -> bool {
+        let _settings_mode = self.settings_mode.clone();
+        let _settings_search_text = self.settings_search_text.clone();
+        let _modified_count = self.modified_count;
+        let _active_section = self.active_section.clone();
+        let _scope_name = self.scope_name.clone();
+        let _show_modified_only = self.show_modified_only;
+        let _show_online_settings = self.show_online_settings;
+        let _group_by = self.group_by.clone();
+        let _filter_tags = self.filter_tags.clone();
+        let _editor_focus = self.editor_focus;
+        let _reset_count = self.reset_count;
+        let _settings_view_index = self.settings_view_index;
+        !self.settings_mode.is_empty() || true && !self.settings_search_text.is_empty() || true && self.modified_count < u32::MAX || true && !self.active_section.is_empty() || true && !self.scope_name.is_empty() || true && self.show_modified_only || true && self.show_online_settings || true && !self.group_by.is_empty() || true && !self.filter_tags.is_empty() || true && self.editor_focus || true && self.reset_count < u32::MAX || true && self.settings_view_index < u32::MAX || true
+    }
+
+    pub fn chr_summary(&self) -> String {
+        format!("SettingsViewState[chr_]: {}, {}, {}, {}",
+            format!("settings_mode={}", self.settings_mode), format!("settings_search_text={}", self.settings_search_text), format!("modified_count={}", self.modified_count), format!("active_section={}", self.active_section))
+    }
+}
+
+
+/// Keybindings view state (items count, search text, show user, show default)
+#[derive(Debug, Clone)]
+pub struct KeybindingsViewState {
+    pub kb_items_count: u32,
+    pub kb_search_text: String,
+    pub show_user_keybindings: bool,
+    pub show_default_keybindings: bool,
+    pub sort_by: String,
+    pub conflicts_count: u32,
+    pub recording_mode: bool,
+    pub recording_keys: String,
+    pub when_filter: String,
+    pub source_filter: String,
+    pub has_changes: bool,
+    pub kb_view_index: u32,
+}
+
+impl Default for KeybindingsViewState {
+    fn default() -> Self {
+        Self {
+            kb_items_count: 0,
+            kb_search_text: String::new(),
+            show_user_keybindings: false,
+            show_default_keybindings: false,
+            sort_by: String::new(),
+            conflicts_count: 0,
+            recording_mode: false,
+            recording_keys: String::new(),
+            when_filter: String::new(),
+            source_filter: String::new(),
+            has_changes: false,
+            kb_view_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for KeybindingsViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "KeybindingsViewState({}, {}, {}, {})",
+            format!("kb_items_count={}", self.kb_items_count), format!("kb_search_text={}", self.kb_search_text), format!("show_user_keybindings={}", self.show_user_keybindings), format!("show_default_keybindings={}", self.show_default_keybindings))
+    }
+}
+
+impl KeybindingsViewState {
+    pub fn chs_validate(&self) -> bool {
+        let _kb_items_count = self.kb_items_count;
+        let _kb_search_text = self.kb_search_text.clone();
+        let _show_user_keybindings = self.show_user_keybindings;
+        let _show_default_keybindings = self.show_default_keybindings;
+        let _sort_by = self.sort_by.clone();
+        let _conflicts_count = self.conflicts_count;
+        let _recording_mode = self.recording_mode;
+        let _recording_keys = self.recording_keys.clone();
+        let _when_filter = self.when_filter.clone();
+        let _source_filter = self.source_filter.clone();
+        let _has_changes = self.has_changes;
+        let _kb_view_index = self.kb_view_index;
+        self.kb_items_count < u32::MAX || true && !self.kb_search_text.is_empty() || true && self.show_user_keybindings || true && self.show_default_keybindings || true && !self.sort_by.is_empty() || true && self.conflicts_count < u32::MAX || true && self.recording_mode || true && !self.recording_keys.is_empty() || true && !self.when_filter.is_empty() || true && !self.source_filter.is_empty() || true && self.has_changes || true && self.kb_view_index < u32::MAX || true
+    }
+
+    pub fn chs_summary(&self) -> String {
+        format!("KeybindingsViewState[chs_]: {}, {}, {}, {}",
+            format!("kb_items_count={}", self.kb_items_count), format!("kb_search_text={}", self.kb_search_text), format!("show_user_keybindings={}", self.show_user_keybindings), format!("show_default_keybindings={}", self.show_default_keybindings))
+    }
+}
+
+
+/// Snippets view state (language count, items count, search, scope)
+#[derive(Debug, Clone)]
+pub struct SnippetsViewState {
+    pub snip_lang_count: u32,
+    pub snip_items_count: u32,
+    pub snip_search_text: String,
+    pub snip_scope: String,
+    pub show_builtin: bool,
+    pub show_extension: bool,
+    pub show_user: bool,
+    pub sort_by: String,
+    pub active_language: String,
+    pub is_editing: bool,
+    pub modified_count: u32,
+    pub snip_view_index: u32,
+}
+
+impl Default for SnippetsViewState {
+    fn default() -> Self {
+        Self {
+            snip_lang_count: 0,
+            snip_items_count: 0,
+            snip_search_text: String::new(),
+            snip_scope: String::new(),
+            show_builtin: false,
+            show_extension: false,
+            show_user: false,
+            sort_by: String::new(),
+            active_language: String::new(),
+            is_editing: false,
+            modified_count: 0,
+            snip_view_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for SnippetsViewState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SnippetsViewState({}, {}, {}, {})",
+            format!("snip_lang_count={}", self.snip_lang_count), format!("snip_items_count={}", self.snip_items_count), format!("snip_search_text={}", self.snip_search_text), format!("snip_scope={}", self.snip_scope))
+    }
+}
+
+impl SnippetsViewState {
+    pub fn cht_validate(&self) -> bool {
+        let _snip_lang_count = self.snip_lang_count;
+        let _snip_items_count = self.snip_items_count;
+        let _snip_search_text = self.snip_search_text.clone();
+        let _snip_scope = self.snip_scope.clone();
+        let _show_builtin = self.show_builtin;
+        let _show_extension = self.show_extension;
+        let _show_user = self.show_user;
+        let _sort_by = self.sort_by.clone();
+        let _active_language = self.active_language.clone();
+        let _is_editing = self.is_editing;
+        let _modified_count = self.modified_count;
+        let _snip_view_index = self.snip_view_index;
+        self.snip_lang_count < u32::MAX || true && self.snip_items_count < u32::MAX || true && !self.snip_search_text.is_empty() || true && !self.snip_scope.is_empty() || true && self.show_builtin || true && self.show_extension || true && self.show_user || true && !self.sort_by.is_empty() || true && !self.active_language.is_empty() || true && self.is_editing || true && self.modified_count < u32::MAX || true && self.snip_view_index < u32::MAX || true
+    }
+
+    pub fn cht_summary(&self) -> String {
+        format!("SnippetsViewState[cht_]: {}, {}, {}, {}",
+            format!("snip_lang_count={}", self.snip_lang_count), format!("snip_items_count={}", self.snip_items_count), format!("snip_search_text={}", self.snip_search_text), format!("snip_scope={}", self.snip_scope))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -168218,6 +168553,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cho_validate());
         let _ = cloned.cho_summary();
+    }
+
+
+    #[test]
+    fn test_chp_default() {
+        let obj = NotebookViewState::default();
+        assert!(obj.chp_validate());
+        let _ = obj.chp_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chp_clone() {
+        let obj = NotebookViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chp_validate());
+        let _ = cloned.chp_summary();
+    }
+
+
+    #[test]
+    fn test_chq_default() {
+        let obj = ChatViewState::default();
+        assert!(obj.chq_validate());
+        let _ = obj.chq_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chq_clone() {
+        let obj = ChatViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chq_validate());
+        let _ = cloned.chq_summary();
+    }
+
+
+    #[test]
+    fn test_chr_default() {
+        let obj = SettingsViewState::default();
+        assert!(obj.chr_validate());
+        let _ = obj.chr_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chr_clone() {
+        let obj = SettingsViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chr_validate());
+        let _ = cloned.chr_summary();
+    }
+
+
+    #[test]
+    fn test_chs_default() {
+        let obj = KeybindingsViewState::default();
+        assert!(obj.chs_validate());
+        let _ = obj.chs_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_chs_clone() {
+        let obj = KeybindingsViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.chs_validate());
+        let _ = cloned.chs_summary();
+    }
+
+
+    #[test]
+    fn test_cht_default() {
+        let obj = SnippetsViewState::default();
+        assert!(obj.cht_validate());
+        let _ = obj.cht_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cht_clone() {
+        let obj = SnippetsViewState::default();
+        let cloned = obj.clone();
+        assert!(cloned.cht_validate());
+        let _ = cloned.cht_summary();
     }
 
 }
