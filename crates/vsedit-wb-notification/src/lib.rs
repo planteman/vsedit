@@ -85144,6 +85144,265 @@ impl BizBackupService {
     pub fn all_uris(&self) -> Vec<&str> { self.entries.iter().map(|e| e.uri.as_str()).collect() }
 }
 
+
+/// File decoration (bja_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjaFileDecoration {
+    pub badge: Option<String>,
+    pub tooltip: Option<String>,
+    pub color: Option<String>,
+    pub propagate: bool,
+}
+
+/// Decoration provider (bja_)
+#[derive(Debug, Clone)]
+pub struct BjaDecorationProvider {
+    pub id: String,
+    pub label: String,
+    pub decorations: std::collections::HashMap<String, BjaFileDecoration>,
+}
+
+impl BjaDecorationProvider {
+    pub fn new(id: String, label: String) -> Self {
+        Self { id, label, decorations: std::collections::HashMap::new() }
+    }
+    pub fn set_decoration(&mut self, uri: String, dec: BjaFileDecoration) {
+        self.decorations.insert(uri, dec);
+    }
+    pub fn get_decoration(&self, uri: &str) -> Option<&BjaFileDecoration> {
+        self.decorations.get(uri)
+    }
+    pub fn remove_decoration(&mut self, uri: &str) { self.decorations.remove(uri); }
+    pub fn clear(&mut self) { self.decorations.clear(); }
+    pub fn decoration_count(&self) -> usize { self.decorations.len() }
+}
+
+/// Decoration service (bja_)
+#[derive(Debug, Clone)]
+pub struct BjaDecorationService {
+    pub providers: Vec<BjaDecorationProvider>,
+}
+
+impl BjaDecorationService {
+    pub fn new() -> Self { Self { providers: Vec::new() } }
+    pub fn register_provider(&mut self, p: BjaDecorationProvider) { self.providers.push(p); }
+    pub fn get_merged(&self, uri: &str) -> Option<BjaFileDecoration> {
+        let decs: Vec<_> = self.providers.iter().filter_map(|p| p.get_decoration(uri)).collect();
+        if decs.is_empty() { return None; }
+        Some(BjaFileDecoration {
+            badge: decs.iter().filter_map(|d| d.badge.as_ref()).next().cloned(),
+            tooltip: decs.iter().filter_map(|d| d.tooltip.as_ref()).next().cloned(),
+            color: decs.iter().filter_map(|d| d.color.as_ref()).next().cloned(),
+            propagate: decs.iter().any(|d| d.propagate),
+        })
+    }
+    pub fn provider_count(&self) -> usize { self.providers.len() }
+}
+
+
+/// Text decoration type (bjb_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BjbDecorationPosition {
+    InlineText,
+    WholeLine,
+    GutterIcon,
+    OverviewRuler,
+}
+
+/// Text decoration range (bjb_)
+#[derive(Debug, Clone, PartialEq)]
+pub struct BjbDecorationRange {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub hover_message: Option<String>,
+}
+
+/// Text decoration type definition (bjb_)
+#[derive(Debug, Clone)]
+pub struct BjbDecorationType {
+    pub key: String,
+    pub position: BjbDecorationPosition,
+    pub color: Option<String>,
+    pub background_color: Option<String>,
+    pub border: Option<String>,
+    pub font_style: Option<String>,
+    pub is_whole_line: bool,
+}
+
+/// Editor decorations (bjb_)
+#[derive(Debug, Clone)]
+pub struct BjbEditorDecorations {
+    pub decoration_types: Vec<BjbDecorationType>,
+    pub applied: std::collections::HashMap<String, Vec<BjbDecorationRange>>,
+}
+
+impl BjbEditorDecorations {
+    pub fn new() -> Self { Self { decoration_types: Vec::new(), applied: std::collections::HashMap::new() } }
+    pub fn create_type(&mut self, dt: BjbDecorationType) { self.decoration_types.push(dt); }
+    pub fn set_decorations(&mut self, type_key: String, ranges: Vec<BjbDecorationRange>) {
+        self.applied.insert(type_key, ranges);
+    }
+    pub fn get_decorations(&self, type_key: &str) -> &[BjbDecorationRange] {
+        self.applied.get(type_key).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+    pub fn remove_type(&mut self, key: &str) {
+        self.decoration_types.retain(|d| d.key != key);
+        self.applied.remove(key);
+    }
+    pub fn type_count(&self) -> usize { self.decoration_types.len() }
+    pub fn total_ranges(&self) -> usize { self.applied.values().map(|v| v.len()).sum() }
+}
+
+
+/// Language status severity (bjc_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BjcLanguageStatusSeverity {
+    Information,
+    Warning,
+    Error,
+}
+
+/// Language status item (bjc_)
+#[derive(Debug, Clone)]
+pub struct BjcLanguageStatusItem {
+    pub id: String,
+    pub name: String,
+    pub selector: String,
+    pub severity: BjcLanguageStatusSeverity,
+    pub text: String,
+    pub detail: Option<String>,
+    pub command: Option<String>,
+    pub is_busy: bool,
+}
+
+/// Language status service (bjc_)
+#[derive(Debug, Clone)]
+pub struct BjcLanguageStatusService {
+    pub items: Vec<BjcLanguageStatusItem>,
+}
+
+impl BjcLanguageStatusService {
+    pub fn new() -> Self { Self { items: Vec::new() } }
+    pub fn add_item(&mut self, item: BjcLanguageStatusItem) {
+        self.items.retain(|i| i.id != item.id);
+        self.items.push(item);
+    }
+    pub fn remove_item(&mut self, id: &str) { self.items.retain(|i| i.id != id); }
+    pub fn get_for_language(&self, lang_id: &str) -> Vec<&BjcLanguageStatusItem> {
+        self.items.iter().filter(|i| i.selector == lang_id || i.selector == "*").collect()
+    }
+    pub fn set_busy(&mut self, id: &str, busy: bool) {
+        if let Some(item) = self.items.iter_mut().find(|i| i.id == id) { item.is_busy = busy; }
+    }
+    pub fn has_errors(&self) -> bool {
+        self.items.iter().any(|i| i.severity == BjcLanguageStatusSeverity::Error)
+    }
+    pub fn item_count(&self) -> usize { self.items.len() }
+}
+
+
+/// Workspace edit file change (bjd_)
+#[derive(Debug, Clone)]
+pub struct BjdFileChange {
+    pub uri: String,
+    pub old_text: String,
+    pub new_text: String,
+    pub is_accepted: Option<bool>,
+}
+
+/// Workspace edit preview (bjd_)
+#[derive(Debug, Clone)]
+pub struct BjdWorkspaceEditPreview {
+    pub label: String,
+    pub changes: Vec<BjdFileChange>,
+    pub is_previewing: bool,
+}
+
+impl BjdWorkspaceEditPreview {
+    pub fn new(label: String) -> Self {
+        Self { label, changes: Vec::new(), is_previewing: false }
+    }
+    pub fn add_change(&mut self, change: BjdFileChange) { self.changes.push(change); }
+    pub fn accept_file(&mut self, uri: &str) {
+        if let Some(c) = self.changes.iter_mut().find(|c| c.uri == uri) { c.is_accepted = Some(true); }
+    }
+    pub fn reject_file(&mut self, uri: &str) {
+        if let Some(c) = self.changes.iter_mut().find(|c| c.uri == uri) { c.is_accepted = Some(false); }
+    }
+    pub fn accept_all(&mut self) {
+        for c in &mut self.changes { c.is_accepted = Some(true); }
+    }
+    pub fn reject_all(&mut self) {
+        for c in &mut self.changes { c.is_accepted = Some(false); }
+    }
+    pub fn start_preview(&mut self) { self.is_previewing = true; }
+    pub fn accepted_changes(&self) -> Vec<&BjdFileChange> {
+        self.changes.iter().filter(|c| c.is_accepted == Some(true)).collect()
+    }
+    pub fn pending_count(&self) -> usize {
+        self.changes.iter().filter(|c| c.is_accepted.is_none()).count()
+    }
+    pub fn file_count(&self) -> usize { self.changes.len() }
+}
+
+
+/// File event kind (bje_)
+#[derive(Debug, Clone, PartialEq)]
+pub enum BjeFileEventKind {
+    Created,
+    Changed,
+    Deleted,
+    Renamed { old_uri: String },
+}
+
+/// File event (bje_)
+#[derive(Debug, Clone)]
+pub struct BjeFileEvent {
+    pub uri: String,
+    pub kind: BjeFileEventKind,
+    pub timestamp: u64,
+    pub is_directory: bool,
+}
+
+/// File event service (bje_)
+#[derive(Debug, Clone)]
+pub struct BjeFileEventService {
+    pub events: Vec<BjeFileEvent>,
+    pub filters: Vec<String>,
+    pub max_batch_size: usize,
+}
+
+impl BjeFileEventService {
+    pub fn new(max_batch: usize) -> Self {
+        Self { events: Vec::new(), filters: Vec::new(), max_batch_size: max_batch }
+    }
+    pub fn emit(&mut self, event: BjeFileEvent) {
+        if !self.is_filtered(&event.uri) {
+            self.events.push(event);
+            if self.events.len() > self.max_batch_size {
+                self.events.remove(0);
+            }
+        }
+    }
+    pub fn add_filter(&mut self, glob: String) { self.filters.push(glob); }
+    fn is_filtered(&self, uri: &str) -> bool {
+        self.filters.iter().any(|f| uri.contains(f))
+    }
+    pub fn events_for_uri(&self, uri: &str) -> Vec<&BjeFileEvent> {
+        self.events.iter().filter(|e| e.uri == uri).collect()
+    }
+    pub fn created_events(&self) -> Vec<&BjeFileEvent> {
+        self.events.iter().filter(|e| e.kind == BjeFileEventKind::Created).collect()
+    }
+    pub fn deleted_events(&self) -> Vec<&BjeFileEvent> {
+        self.events.iter().filter(|e| e.kind == BjeFileEventKind::Deleted).collect()
+    }
+    pub fn flush(&mut self) -> Vec<BjeFileEvent> { std::mem::take(&mut self.events) }
+    pub fn event_count(&self) -> usize { self.events.len() }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -92463,6 +92722,334 @@ mod tests_bfo {
     fn test_biz_restore_nonexistent() {
         let s = BizBackupService::new("/tmp".into());
         assert!(s.restore("missing").is_none());
+    }
+
+
+    #[test]
+    fn test_bja_decoration_provider_new() {
+        let p = BjaDecorationProvider::new("git".into(), "Git".into());
+        assert_eq!(p.decoration_count(), 0);
+    }
+    #[test]
+    fn test_bja_set_get_decoration() {
+        let mut p = BjaDecorationProvider::new("git".into(), "Git".into());
+        p.set_decoration("file.rs".into(), BjaFileDecoration { badge: Some("M".into()), tooltip: Some("Modified".into()), color: Some("#e2c08d".into()), propagate: true });
+        assert_eq!(p.get_decoration("file.rs").unwrap().badge.as_deref(), Some("M"));
+    }
+    #[test]
+    fn test_bja_remove_decoration() {
+        let mut p = BjaDecorationProvider::new("git".into(), "Git".into());
+        p.set_decoration("f.rs".into(), BjaFileDecoration { badge: None, tooltip: None, color: None, propagate: false });
+        p.remove_decoration("f.rs");
+        assert!(p.get_decoration("f.rs").is_none());
+    }
+    #[test]
+    fn test_bja_clear() {
+        let mut p = BjaDecorationProvider::new("git".into(), "Git".into());
+        p.set_decoration("a".into(), BjaFileDecoration { badge: None, tooltip: None, color: None, propagate: false });
+        p.clear();
+        assert_eq!(p.decoration_count(), 0);
+    }
+    #[test]
+    fn test_bja_decoration_service_new() {
+        let s = BjaDecorationService::new();
+        assert_eq!(s.provider_count(), 0);
+    }
+    #[test]
+    fn test_bja_merged_decoration() {
+        let mut s = BjaDecorationService::new();
+        let mut p1 = BjaDecorationProvider::new("git".into(), "Git".into());
+        p1.set_decoration("f.rs".into(), BjaFileDecoration { badge: Some("M".into()), tooltip: None, color: Some("#ff0".into()), propagate: false });
+        let mut p2 = BjaDecorationProvider::new("ext".into(), "Ext".into());
+        p2.set_decoration("f.rs".into(), BjaFileDecoration { badge: None, tooltip: Some("Custom".into()), color: None, propagate: true });
+        s.register_provider(p1);
+        s.register_provider(p2);
+        let merged = s.get_merged("f.rs").unwrap();
+        assert_eq!(merged.badge.as_deref(), Some("M"));
+        assert!(merged.propagate);
+    }
+    #[test]
+    fn test_bja_no_decoration() {
+        let s = BjaDecorationService::new();
+        assert!(s.get_merged("missing").is_none());
+    }
+    #[test]
+    fn test_bja_propagate() {
+        let d = BjaFileDecoration { badge: Some("!".into()), tooltip: None, color: None, propagate: true };
+        assert!(d.propagate);
+    }
+    #[test]
+    fn test_bja_color_decoration() {
+        let d = BjaFileDecoration { badge: None, tooltip: None, color: Some("#73c991".into()), propagate: false };
+        assert_eq!(d.color.as_deref(), Some("#73c991"));
+    }
+    #[test]
+    fn test_bja_multiple_providers() {
+        let mut s = BjaDecorationService::new();
+        s.register_provider(BjaDecorationProvider::new("a".into(), "A".into()));
+        s.register_provider(BjaDecorationProvider::new("b".into(), "B".into()));
+        assert_eq!(s.provider_count(), 2);
+    }
+
+
+    #[test]
+    fn test_bjb_decorations_new() {
+        let d = BjbEditorDecorations::new();
+        assert_eq!(d.type_count(), 0);
+        assert_eq!(d.total_ranges(), 0);
+    }
+    #[test]
+    fn test_bjb_create_type() {
+        let mut d = BjbEditorDecorations::new();
+        d.create_type(BjbDecorationType { key: "error".into(), position: BjbDecorationPosition::InlineText, color: Some("#f00".into()), background_color: None, border: None, font_style: None, is_whole_line: false });
+        assert_eq!(d.type_count(), 1);
+    }
+    #[test]
+    fn test_bjb_set_get_decorations() {
+        let mut d = BjbEditorDecorations::new();
+        d.set_decorations("err".into(), vec![BjbDecorationRange { start_line: 5, start_col: 0, end_line: 5, end_col: 10, hover_message: Some("Error here".into()) }]);
+        assert_eq!(d.get_decorations("err").len(), 1);
+    }
+    #[test]
+    fn test_bjb_remove_type() {
+        let mut d = BjbEditorDecorations::new();
+        d.create_type(BjbDecorationType { key: "warn".into(), position: BjbDecorationPosition::WholeLine, color: None, background_color: Some("#ff0".into()), border: None, font_style: None, is_whole_line: true });
+        d.set_decorations("warn".into(), vec![BjbDecorationRange { start_line: 1, start_col: 0, end_line: 1, end_col: 0, hover_message: None }]);
+        d.remove_type("warn");
+        assert_eq!(d.type_count(), 0);
+        assert_eq!(d.total_ranges(), 0);
+    }
+    #[test]
+    fn test_bjb_gutter_decoration() {
+        let dt = BjbDecorationType { key: "bp".into(), position: BjbDecorationPosition::GutterIcon, color: Some("#f00".into()), background_color: None, border: None, font_style: None, is_whole_line: false };
+        assert_eq!(dt.position, BjbDecorationPosition::GutterIcon);
+    }
+    #[test]
+    fn test_bjb_overview_ruler() {
+        let dt = BjbDecorationType { key: "or".into(), position: BjbDecorationPosition::OverviewRuler, color: Some("#00f".into()), background_color: None, border: None, font_style: None, is_whole_line: false };
+        assert_eq!(dt.position, BjbDecorationPosition::OverviewRuler);
+    }
+    #[test]
+    fn test_bjb_hover_message() {
+        let r = BjbDecorationRange { start_line: 10, start_col: 5, end_line: 10, end_col: 15, hover_message: Some("Unused variable".into()) };
+        assert_eq!(r.hover_message.as_deref(), Some("Unused variable"));
+    }
+    #[test]
+    fn test_bjb_total_ranges() {
+        let mut d = BjbEditorDecorations::new();
+        d.set_decorations("a".into(), vec![BjbDecorationRange { start_line: 1, start_col: 0, end_line: 1, end_col: 5, hover_message: None }]);
+        d.set_decorations("b".into(), vec![BjbDecorationRange { start_line: 2, start_col: 0, end_line: 2, end_col: 5, hover_message: None }, BjbDecorationRange { start_line: 3, start_col: 0, end_line: 3, end_col: 5, hover_message: None }]);
+        assert_eq!(d.total_ranges(), 3);
+    }
+    #[test]
+    fn test_bjb_font_style() {
+        let dt = BjbDecorationType { key: "ital".into(), position: BjbDecorationPosition::InlineText, color: None, background_color: None, border: None, font_style: Some("italic".into()), is_whole_line: false };
+        assert_eq!(dt.font_style.as_deref(), Some("italic"));
+    }
+    #[test]
+    fn test_bjb_empty_get() {
+        let d = BjbEditorDecorations::new();
+        assert!(d.get_decorations("nonexistent").is_empty());
+    }
+
+
+    #[test]
+    fn test_bjc_status_service_new() {
+        let s = BjcLanguageStatusService::new();
+        assert_eq!(s.item_count(), 0);
+    }
+    #[test]
+    fn test_bjc_add_item() {
+        let mut s = BjcLanguageStatusService::new();
+        s.add_item(BjcLanguageStatusItem { id: "rust-analyzer".into(), name: "rust-analyzer".into(), selector: "rust".into(), severity: BjcLanguageStatusSeverity::Information, text: "Ready".into(), detail: None, command: None, is_busy: false });
+        assert_eq!(s.item_count(), 1);
+    }
+    #[test]
+    fn test_bjc_replace_item() {
+        let mut s = BjcLanguageStatusService::new();
+        s.add_item(BjcLanguageStatusItem { id: "ra".into(), name: "RA".into(), selector: "rust".into(), severity: BjcLanguageStatusSeverity::Information, text: "Loading".into(), detail: None, command: None, is_busy: true });
+        s.add_item(BjcLanguageStatusItem { id: "ra".into(), name: "RA".into(), selector: "rust".into(), severity: BjcLanguageStatusSeverity::Information, text: "Ready".into(), detail: None, command: None, is_busy: false });
+        assert_eq!(s.item_count(), 1);
+        assert_eq!(s.items[0].text, "Ready");
+    }
+    #[test]
+    fn test_bjc_remove_item() {
+        let mut s = BjcLanguageStatusService::new();
+        s.add_item(BjcLanguageStatusItem { id: "x".into(), name: "X".into(), selector: "*".into(), severity: BjcLanguageStatusSeverity::Information, text: "T".into(), detail: None, command: None, is_busy: false });
+        s.remove_item("x");
+        assert_eq!(s.item_count(), 0);
+    }
+    #[test]
+    fn test_bjc_get_for_language() {
+        let mut s = BjcLanguageStatusService::new();
+        s.add_item(BjcLanguageStatusItem { id: "ra".into(), name: "RA".into(), selector: "rust".into(), severity: BjcLanguageStatusSeverity::Information, text: "R".into(), detail: None, command: None, is_busy: false });
+        s.add_item(BjcLanguageStatusItem { id: "py".into(), name: "Py".into(), selector: "python".into(), severity: BjcLanguageStatusSeverity::Information, text: "P".into(), detail: None, command: None, is_busy: false });
+        assert_eq!(s.get_for_language("rust").len(), 1);
+    }
+    #[test]
+    fn test_bjc_wildcard_selector() {
+        let mut s = BjcLanguageStatusService::new();
+        s.add_item(BjcLanguageStatusItem { id: "spell".into(), name: "Spell".into(), selector: "*".into(), severity: BjcLanguageStatusSeverity::Information, text: "OK".into(), detail: None, command: None, is_busy: false });
+        assert_eq!(s.get_for_language("anything").len(), 1);
+    }
+    #[test]
+    fn test_bjc_set_busy() {
+        let mut s = BjcLanguageStatusService::new();
+        s.add_item(BjcLanguageStatusItem { id: "ra".into(), name: "RA".into(), selector: "rust".into(), severity: BjcLanguageStatusSeverity::Information, text: "T".into(), detail: None, command: None, is_busy: false });
+        s.set_busy("ra", true);
+        assert!(s.items[0].is_busy);
+    }
+    #[test]
+    fn test_bjc_has_errors() {
+        let mut s = BjcLanguageStatusService::new();
+        s.add_item(BjcLanguageStatusItem { id: "ra".into(), name: "RA".into(), selector: "rust".into(), severity: BjcLanguageStatusSeverity::Error, text: "Failed".into(), detail: Some("Crash".into()), command: None, is_busy: false });
+        assert!(s.has_errors());
+    }
+    #[test]
+    fn test_bjc_no_errors() {
+        let mut s = BjcLanguageStatusService::new();
+        s.add_item(BjcLanguageStatusItem { id: "ra".into(), name: "RA".into(), selector: "rust".into(), severity: BjcLanguageStatusSeverity::Warning, text: "Slow".into(), detail: None, command: None, is_busy: false });
+        assert!(!s.has_errors());
+    }
+    #[test]
+    fn test_bjc_command_item() {
+        let i = BjcLanguageStatusItem { id: "x".into(), name: "X".into(), selector: "rust".into(), severity: BjcLanguageStatusSeverity::Information, text: "T".into(), detail: None, command: Some("rust-analyzer.status".into()), is_busy: false };
+        assert!(i.command.is_some());
+    }
+
+
+    #[test]
+    fn test_bjd_preview_new() {
+        let p = BjdWorkspaceEditPreview::new("Rename".into());
+        assert_eq!(p.file_count(), 0);
+        assert!(!p.is_previewing);
+    }
+    #[test]
+    fn test_bjd_add_change() {
+        let mut p = BjdWorkspaceEditPreview::new("Rename".into());
+        p.add_change(BjdFileChange { uri: "a.rs".into(), old_text: "foo".into(), new_text: "bar".into(), is_accepted: None });
+        assert_eq!(p.file_count(), 1);
+    }
+    #[test]
+    fn test_bjd_accept_reject() {
+        let mut p = BjdWorkspaceEditPreview::new("R".into());
+        p.add_change(BjdFileChange { uri: "a.rs".into(), old_text: "x".into(), new_text: "y".into(), is_accepted: None });
+        p.add_change(BjdFileChange { uri: "b.rs".into(), old_text: "x".into(), new_text: "y".into(), is_accepted: None });
+        p.accept_file("a.rs");
+        p.reject_file("b.rs");
+        assert_eq!(p.accepted_changes().len(), 1);
+    }
+    #[test]
+    fn test_bjd_accept_all() {
+        let mut p = BjdWorkspaceEditPreview::new("R".into());
+        p.add_change(BjdFileChange { uri: "a.rs".into(), old_text: "x".into(), new_text: "y".into(), is_accepted: None });
+        p.add_change(BjdFileChange { uri: "b.rs".into(), old_text: "x".into(), new_text: "y".into(), is_accepted: None });
+        p.accept_all();
+        assert_eq!(p.accepted_changes().len(), 2);
+    }
+    #[test]
+    fn test_bjd_reject_all() {
+        let mut p = BjdWorkspaceEditPreview::new("R".into());
+        p.add_change(BjdFileChange { uri: "a.rs".into(), old_text: "x".into(), new_text: "y".into(), is_accepted: None });
+        p.reject_all();
+        assert_eq!(p.accepted_changes().len(), 0);
+    }
+    #[test]
+    fn test_bjd_pending_count() {
+        let mut p = BjdWorkspaceEditPreview::new("R".into());
+        p.add_change(BjdFileChange { uri: "a.rs".into(), old_text: "x".into(), new_text: "y".into(), is_accepted: None });
+        p.add_change(BjdFileChange { uri: "b.rs".into(), old_text: "x".into(), new_text: "y".into(), is_accepted: None });
+        p.accept_file("a.rs");
+        assert_eq!(p.pending_count(), 1);
+    }
+    #[test]
+    fn test_bjd_start_preview() {
+        let mut p = BjdWorkspaceEditPreview::new("R".into());
+        p.start_preview();
+        assert!(p.is_previewing);
+    }
+    #[test]
+    fn test_bjd_change_texts() {
+        let c = BjdFileChange { uri: "f.rs".into(), old_text: "fn old()".into(), new_text: "fn new()".into(), is_accepted: None };
+        assert_ne!(c.old_text, c.new_text);
+    }
+    #[test]
+    fn test_bjd_label() {
+        let p = BjdWorkspaceEditPreview::new("Extract Method".into());
+        assert_eq!(p.label, "Extract Method");
+    }
+    #[test]
+    fn test_bjd_initially_pending() {
+        let mut p = BjdWorkspaceEditPreview::new("R".into());
+        p.add_change(BjdFileChange { uri: "a".into(), old_text: "".into(), new_text: "".into(), is_accepted: None });
+        assert_eq!(p.pending_count(), 1);
+    }
+
+
+    #[test]
+    fn test_bje_service_new() {
+        let s = BjeFileEventService::new(100);
+        assert_eq!(s.event_count(), 0);
+    }
+    #[test]
+    fn test_bje_emit_event() {
+        let mut s = BjeFileEventService::new(100);
+        s.emit(BjeFileEvent { uri: "file.rs".into(), kind: BjeFileEventKind::Created, timestamp: 100, is_directory: false });
+        assert_eq!(s.event_count(), 1);
+    }
+    #[test]
+    fn test_bje_max_batch() {
+        let mut s = BjeFileEventService::new(3);
+        for i in 0..5 {
+            s.emit(BjeFileEvent { uri: format!("f{i}.rs"), kind: BjeFileEventKind::Changed, timestamp: i, is_directory: false });
+        }
+        assert_eq!(s.event_count(), 3);
+    }
+    #[test]
+    fn test_bje_filter() {
+        let mut s = BjeFileEventService::new(100);
+        s.add_filter("node_modules".into());
+        s.emit(BjeFileEvent { uri: "node_modules/pkg/index.js".into(), kind: BjeFileEventKind::Changed, timestamp: 100, is_directory: false });
+        assert_eq!(s.event_count(), 0);
+    }
+    #[test]
+    fn test_bje_events_for_uri() {
+        let mut s = BjeFileEventService::new(100);
+        s.emit(BjeFileEvent { uri: "a.rs".into(), kind: BjeFileEventKind::Changed, timestamp: 100, is_directory: false });
+        s.emit(BjeFileEvent { uri: "b.rs".into(), kind: BjeFileEventKind::Changed, timestamp: 200, is_directory: false });
+        assert_eq!(s.events_for_uri("a.rs").len(), 1);
+    }
+    #[test]
+    fn test_bje_created_events() {
+        let mut s = BjeFileEventService::new(100);
+        s.emit(BjeFileEvent { uri: "new.rs".into(), kind: BjeFileEventKind::Created, timestamp: 100, is_directory: false });
+        s.emit(BjeFileEvent { uri: "old.rs".into(), kind: BjeFileEventKind::Deleted, timestamp: 200, is_directory: false });
+        assert_eq!(s.created_events().len(), 1);
+    }
+    #[test]
+    fn test_bje_deleted_events() {
+        let mut s = BjeFileEventService::new(100);
+        s.emit(BjeFileEvent { uri: "x.rs".into(), kind: BjeFileEventKind::Deleted, timestamp: 100, is_directory: false });
+        assert_eq!(s.deleted_events().len(), 1);
+    }
+    #[test]
+    fn test_bje_rename_event() {
+        let mut s = BjeFileEventService::new(100);
+        s.emit(BjeFileEvent { uri: "new_name.rs".into(), kind: BjeFileEventKind::Renamed { old_uri: "old_name.rs".into() }, timestamp: 100, is_directory: false });
+        assert_eq!(s.event_count(), 1);
+    }
+    #[test]
+    fn test_bje_flush() {
+        let mut s = BjeFileEventService::new(100);
+        s.emit(BjeFileEvent { uri: "a.rs".into(), kind: BjeFileEventKind::Created, timestamp: 100, is_directory: false });
+        let flushed = s.flush();
+        assert_eq!(flushed.len(), 1);
+        assert_eq!(s.event_count(), 0);
+    }
+    #[test]
+    fn test_bje_directory_event() {
+        let e = BjeFileEvent { uri: "src/".into(), kind: BjeFileEventKind::Created, timestamp: 100, is_directory: true };
+        assert!(e.is_directory);
     }
 
 }
