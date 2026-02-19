@@ -65939,3 +65939,173 @@ mod bcv_tests {
         assert!(c.format(BcvColorFormat::Rgb).starts_with("rgb("));
     }
 }
+
+
+// --- bcw_: Editor timeline view ---
+
+/// Timeline entry source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BcwTimelineSource { Git, LocalHistory, SavePoint }
+
+/// A timeline entry.
+#[derive(Debug, Clone)]
+pub struct BcwTimelineEntry {
+    pub id: String,
+    pub label: String,
+    pub description: Option<String>,
+    pub timestamp: u64,
+    pub source: BcwTimelineSource,
+    pub detail: Option<String>,
+}
+
+impl BcwTimelineEntry {
+    pub fn new(id: &str, label: &str, ts: u64, src: BcwTimelineSource) -> Self {
+        Self { id: id.to_string(), label: label.to_string(), description: None, timestamp: ts, source: src, detail: None }
+    }
+
+    pub fn with_description(mut self, d: &str) -> Self { self.description = Some(d.to_string()); self }
+    pub fn with_detail(mut self, d: &str) -> Self { self.detail = Some(d.to_string()); self }
+
+    pub fn source_icon(&self) -> &str {
+        match self.source { BcwTimelineSource::Git => "⎇", BcwTimelineSource::LocalHistory => "🕑", BcwTimelineSource::SavePoint => "💾" }
+    }
+
+    pub fn display(&self) -> String {
+        let desc = self.description.as_deref().unwrap_or("");
+        format!("{} {} {} ({})", self.source_icon(), self.label, desc, self.relative_time())
+    }
+
+    pub fn relative_time(&self) -> String {
+        let now = 1700000000u64; // placeholder
+        let diff = now.saturating_sub(self.timestamp);
+        if diff < 60 { "just now".to_string() }
+        else if diff < 3600 { format!("{} min ago", diff / 60) }
+        else if diff < 86400 { format!("{} hours ago", diff / 3600) }
+        else { format!("{} days ago", diff / 86400) }
+    }
+}
+
+/// The timeline view.
+#[derive(Debug)]
+pub struct BcwTimelineView {
+    entries: Vec<BcwTimelineEntry>,
+    cursor: usize,
+    show_git: bool,
+    show_local: bool,
+    file_path: Option<String>,
+}
+
+impl BcwTimelineView {
+    pub fn new() -> Self {
+        Self { entries: Vec::new(), cursor: 0, show_git: true, show_local: true, file_path: None }
+    }
+
+    pub fn set_entries(&mut self, entries: Vec<BcwTimelineEntry>) {
+        self.entries = entries;
+        self.entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        self.cursor = 0;
+    }
+
+    pub fn set_file(&mut self, path: &str) { self.file_path = Some(path.to_string()); }
+    pub fn toggle_git(&mut self) { self.show_git = !self.show_git; }
+    pub fn toggle_local(&mut self) { self.show_local = !self.show_local; }
+
+    pub fn visible_entries(&self) -> Vec<&BcwTimelineEntry> {
+        self.entries.iter().filter(|e| match e.source {
+            BcwTimelineSource::Git => self.show_git,
+            BcwTimelineSource::LocalHistory | BcwTimelineSource::SavePoint => self.show_local,
+        }).collect()
+    }
+
+    pub fn cursor_entry(&self) -> Option<&BcwTimelineEntry> { self.visible_entries().get(self.cursor).copied() }
+
+    pub fn move_cursor(&mut self, delta: i32) {
+        let count = self.visible_entries().len();
+        if count == 0 { return; }
+        self.cursor = ((self.cursor as i32 + delta).rem_euclid(count as i32)) as usize;
+    }
+
+    pub fn entry_count(&self) -> usize { self.entries.len() }
+    pub fn file_path(&self) -> Option<&str> { self.file_path.as_deref() }
+}
+
+#[cfg(test)]
+mod bcw_tests {
+    use super::*;
+
+    #[test]
+    fn test_bcw_entry() {
+        let e = BcwTimelineEntry::new("c1", "Fix bug", 1699999000, BcwTimelineSource::Git);
+        assert_eq!(e.source_icon(), "⎇");
+    }
+
+    #[test]
+    fn test_bcw_display() {
+        let e = BcwTimelineEntry::new("c1", "Fix", 1699999000, BcwTimelineSource::Git).with_description("author");
+        assert!(e.display().contains("Fix"));
+    }
+
+    #[test]
+    fn test_bcw_relative_time() {
+        let e = BcwTimelineEntry::new("c1", "X", 1700000000 - 120, BcwTimelineSource::Git);
+        assert!(e.relative_time().contains("min"));
+    }
+
+    #[test]
+    fn test_bcw_view() {
+        let mut v = BcwTimelineView::new();
+        v.set_entries(vec![
+            BcwTimelineEntry::new("a", "A", 100, BcwTimelineSource::Git),
+            BcwTimelineEntry::new("b", "B", 200, BcwTimelineSource::LocalHistory),
+        ]);
+        assert_eq!(v.entry_count(), 2);
+        assert_eq!(v.visible_entries()[0].id, "b"); // newer first
+    }
+
+    #[test]
+    fn test_bcw_toggle_git() {
+        let mut v = BcwTimelineView::new();
+        v.set_entries(vec![
+            BcwTimelineEntry::new("a", "A", 100, BcwTimelineSource::Git),
+            BcwTimelineEntry::new("b", "B", 200, BcwTimelineSource::LocalHistory),
+        ]);
+        v.toggle_git();
+        assert_eq!(v.visible_entries().len(), 1);
+    }
+
+    #[test]
+    fn test_bcw_cursor() {
+        let mut v = BcwTimelineView::new();
+        v.set_entries(vec![
+            BcwTimelineEntry::new("a", "A", 100, BcwTimelineSource::Git),
+            BcwTimelineEntry::new("b", "B", 200, BcwTimelineSource::Git),
+        ]);
+        v.move_cursor(1);
+        assert_eq!(v.cursor_entry().unwrap().id, "a"); // sorted desc, so a is second
+    }
+
+    #[test]
+    fn test_bcw_file() {
+        let mut v = BcwTimelineView::new();
+        v.set_file("src/main.rs");
+        assert_eq!(v.file_path(), Some("src/main.rs"));
+    }
+
+    #[test]
+    fn test_bcw_save_point() {
+        let e = BcwTimelineEntry::new("s1", "Save", 1000, BcwTimelineSource::SavePoint);
+        assert_eq!(e.source_icon(), "💾");
+    }
+
+    #[test]
+    fn test_bcw_detail() {
+        let e = BcwTimelineEntry::new("c1", "X", 100, BcwTimelineSource::Git).with_detail("+5 -3");
+        assert_eq!(e.detail.as_deref(), Some("+5 -3"));
+    }
+
+    #[test]
+    fn test_bcw_empty() {
+        let v = BcwTimelineView::new();
+        assert!(v.cursor_entry().is_none());
+    }
+}
