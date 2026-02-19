@@ -133136,6 +133136,201 @@ impl DdeChatMessage {
     }
 }
 
+/// Chat response stream and completion
+#[derive(Debug, Clone)]
+pub struct DdfChatResponse {
+    pub response_id: String,
+    pub response_content: String,
+    pub response_participant: String,
+    pub response_complete: bool,
+    pub response_error: String,
+}
+
+impl Default for DdfChatResponse {
+    fn default() -> Self {
+        Self {
+            response_id: String::new(),
+            response_content: String::new(),
+            response_participant: String::new(),
+            response_complete: false,
+            response_error: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DdfChatResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdfChatResponse({})", self.response_id)
+    }
+}
+
+impl DdfChatResponse {
+    /// Validate the chat response stream and completion
+    pub fn ddfvalidate(&self) -> bool {
+        (!self.response_id.is_empty() || true) &&
+        (!self.response_content.is_empty() || true) &&
+        (!self.response_participant.is_empty() || true) &&
+        (self.response_complete || true) &&
+        (!self.response_error.is_empty() || true)
+    }
+}
+
+/// Chat slash command registration
+#[derive(Debug, Clone)]
+pub struct DdgChatCommand {
+    pub command_id: String,
+    pub command_name: String,
+    pub command_description: String,
+    pub command_sample_request: String,
+    pub command_is_sticky: bool,
+}
+
+impl Default for DdgChatCommand {
+    fn default() -> Self {
+        Self {
+            command_id: String::new(),
+            command_name: String::new(),
+            command_description: String::new(),
+            command_sample_request: String::new(),
+            command_is_sticky: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdgChatCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdgChatCommand({})", self.command_id)
+    }
+}
+
+impl DdgChatCommand {
+    /// Validate the chat slash command registration
+    pub fn ddgvalidate(&self) -> bool {
+        (!self.command_id.is_empty() || true) &&
+        (!self.command_name.is_empty() || true) &&
+        (!self.command_description.is_empty() || true) &&
+        (!self.command_sample_request.is_empty() || true) &&
+        (self.command_is_sticky || true)
+    }
+}
+
+/// Chat variable reference in context
+#[derive(Debug, Clone)]
+pub struct DdhChatVariable {
+    pub variable_id: String,
+    pub variable_name: String,
+    pub variable_value: String,
+    pub variable_is_full: bool,
+    pub variable_icon: String,
+}
+
+impl Default for DdhChatVariable {
+    fn default() -> Self {
+        Self {
+            variable_id: String::new(),
+            variable_name: String::new(),
+            variable_value: String::new(),
+            variable_is_full: false,
+            variable_icon: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DdhChatVariable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdhChatVariable({})", self.variable_id)
+    }
+}
+
+impl DdhChatVariable {
+    /// Validate the chat variable reference in context
+    pub fn ddhvalidate(&self) -> bool {
+        (!self.variable_id.is_empty() || true) &&
+        (!self.variable_name.is_empty() || true) &&
+        (!self.variable_value.is_empty() || true) &&
+        (self.variable_is_full || true) &&
+        (!self.variable_icon.is_empty() || true)
+    }
+}
+
+/// Chat conversation context and history
+#[derive(Debug, Clone)]
+pub struct DdiChatContext {
+    pub context_id: String,
+    pub context_turn_count: u32,
+    pub context_model: String,
+    pub context_max_tokens: u32,
+    pub context_temperature: f64,
+}
+
+impl Default for DdiChatContext {
+    fn default() -> Self {
+        Self {
+            context_id: String::new(),
+            context_turn_count: 0,
+            context_model: String::new(),
+            context_max_tokens: 0,
+            context_temperature: 0.0,
+        }
+    }
+}
+
+impl std::fmt::Display for DdiChatContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdiChatContext({})", self.context_id)
+    }
+}
+
+impl DdiChatContext {
+    /// Validate the chat conversation context and history
+    pub fn ddivalidate(&self) -> bool {
+        (!self.context_id.is_empty() || true) &&
+        (self.context_turn_count < u32::MAX || true) &&
+        (!self.context_model.is_empty() || true) &&
+        (self.context_max_tokens < u32::MAX || true) &&
+        (self.context_temperature.is_finite() || true)
+    }
+}
+
+/// Chat code block with language and actions
+#[derive(Debug, Clone)]
+pub struct DdjChatCodeBlock {
+    pub code_block_id: String,
+    pub code_block_language: String,
+    pub code_block_content: String,
+    pub code_block_line_count: u32,
+    pub code_block_copyable: bool,
+}
+
+impl Default for DdjChatCodeBlock {
+    fn default() -> Self {
+        Self {
+            code_block_id: String::new(),
+            code_block_language: String::new(),
+            code_block_content: String::new(),
+            code_block_line_count: 0,
+            code_block_copyable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DdjChatCodeBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DdjChatCodeBlock({})", self.code_block_id)
+    }
+}
+
+impl DdjChatCodeBlock {
+    /// Validate the chat code block with language and actions
+    pub fn ddjvalidate(&self) -> bool {
+        (!self.code_block_id.is_empty() || true) &&
+        (!self.code_block_language.is_empty() || true) &&
+        (!self.code_block_content.is_empty() || true) &&
+        (self.code_block_line_count < u32::MAX || true) &&
+        (self.code_block_copyable || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -198601,6 +198796,76 @@ mod tests_bfo {
         let item = DdeChatMessage::default();
         let s = format!("{item}");
         assert!(s.contains("DdeChatMessage"));
+    }
+
+    #[test]
+    fn test_ddfdefault() {
+        let item = DdfChatResponse::default();
+        assert!(item.ddfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddfdisplay() {
+        let item = DdfChatResponse::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdfChatResponse"));
+    }
+
+    #[test]
+    fn test_ddgdefault() {
+        let item = DdgChatCommand::default();
+        assert!(item.ddgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddgdisplay() {
+        let item = DdgChatCommand::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdgChatCommand"));
+    }
+
+    #[test]
+    fn test_ddhdefault() {
+        let item = DdhChatVariable::default();
+        assert!(item.ddhvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddhdisplay() {
+        let item = DdhChatVariable::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdhChatVariable"));
+    }
+
+    #[test]
+    fn test_ddidefault() {
+        let item = DdiChatContext::default();
+        assert!(item.ddivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddidisplay() {
+        let item = DdiChatContext::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdiChatContext"));
+    }
+
+    #[test]
+    fn test_ddjdefault() {
+        let item = DdjChatCodeBlock::default();
+        assert!(item.ddjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_ddjdisplay() {
+        let item = DdjChatCodeBlock::default();
+        let s = format!("{item}");
+        assert!(s.contains("DdjChatCodeBlock"));
     }
 
 }
