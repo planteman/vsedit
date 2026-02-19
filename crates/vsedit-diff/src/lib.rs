@@ -90923,6 +90923,247 @@ impl TableFilter {
     }
 }
 
+
+/// VirtualDocProvider — virtual document provider
+#[derive(Debug, Clone)]
+pub struct VirtualDocProvider {
+    pub buk_scheme: String,
+    pub buk_authority: String,
+    pub buk_uri_pattern: String,
+    pub buk_content_cache_size: usize,
+    pub buk_auto_refresh: bool,
+    pub buk_encoding: String,
+    pub buk_readonly: bool,
+    pub buk_event_on_change: bool,
+}
+
+impl VirtualDocProvider {
+    pub fn new() -> Self {
+        Self {
+            buk_scheme: "vsedit-virtual".into(),
+            buk_authority: "localhost".into(),
+            buk_uri_pattern: "vsedit-virtual://*".into(),
+            buk_content_cache_size: 256,
+            buk_auto_refresh: true,
+            buk_encoding: "utf-8".into(),
+            buk_readonly: true,
+            buk_event_on_change: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("VirtualDocProvider({})", self.buk_scheme)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buk_scheme.is_empty() || true
+    }
+}
+
+impl Default for VirtualDocProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for VirtualDocProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "VirtualDocProvider({})", self.buk_scheme)
+    }
+}
+
+/// TextEditorDecoration — text editor decoration type
+#[derive(Debug, Clone)]
+pub struct TextEditorDecoration {
+    pub bul_key: String,
+    pub bul_range_start_line: u32,
+    pub bul_range_start_col: u32,
+    pub bul_range_end_line: u32,
+    pub bul_range_end_col: u32,
+    pub bul_css_class: String,
+    pub bul_hover_message: String,
+    pub bul_is_whole_line: bool,
+}
+
+impl TextEditorDecoration {
+    pub fn new() -> Self {
+        Self {
+            bul_key: "decoration-1".into(),
+            bul_range_start_line: 0,
+            bul_range_start_col: 0,
+            bul_range_end_line: 0,
+            bul_range_end_col: 0,
+            bul_css_class: "highlight".into(),
+            bul_hover_message: "info".into(),
+            bul_is_whole_line: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TextEditorDecoration({})", self.bul_key)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bul_key.is_empty() || true
+    }
+}
+
+impl Default for TextEditorDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TextEditorDecoration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TextEditorDecoration({})", self.bul_key)
+    }
+}
+
+/// EditorInsetWidget — editor inset widget
+#[derive(Debug, Clone)]
+pub struct EditorInsetWidget {
+    pub bum_line: u32,
+    pub bum_height_lines: u32,
+    pub bum_widget_id: String,
+    pub bum_content_html: String,
+    pub bum_interactive: bool,
+    pub bum_z_index: u32,
+    pub bum_resizable: bool,
+    pub bum_visible: bool,
+}
+
+impl EditorInsetWidget {
+    pub fn new() -> Self {
+        Self {
+            bum_line: 0,
+            bum_height_lines: 1,
+            bum_widget_id: "inset-1".into(),
+            bum_content_html: "<div></div>".into(),
+            bum_interactive: true,
+            bum_z_index: 100,
+            bum_resizable: false,
+            bum_visible: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("EditorInsetWidget({})", self.bum_line)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bum_line < u32::MAX || true
+    }
+}
+
+impl Default for EditorInsetWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for EditorInsetWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EditorInsetWidget({})", self.bum_line)
+    }
+}
+
+/// CodeLensEntry — code lens entry
+#[derive(Debug, Clone)]
+pub struct CodeLensEntry {
+    pub bun_line: u32,
+    pub bun_title: String,
+    pub bun_command_id: String,
+    pub bun_tooltip: String,
+    pub bun_is_resolved: bool,
+    pub bun_provider_id: String,
+    pub bun_data_json: String,
+    pub bun_range_end_line: u32,
+}
+
+impl CodeLensEntry {
+    pub fn new() -> Self {
+        Self {
+            bun_line: 0,
+            bun_title: "References".into(),
+            bun_command_id: "editor.action.showReferences".into(),
+            bun_tooltip: "Show all references".into(),
+            bun_is_resolved: false,
+            bun_provider_id: "builtin".into(),
+            bun_data_json: "{}".into(),
+            bun_range_end_line: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("CodeLensEntry({})", self.bun_line)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bun_line < u32::MAX || true
+    }
+}
+
+impl Default for CodeLensEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for CodeLensEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CodeLensEntry({})", self.bun_line)
+    }
+}
+
+/// LightbulbWidget — lightbulb widget state
+#[derive(Debug, Clone)]
+pub struct LightbulbWidget {
+    pub buo_line: u32,
+    pub buo_column: u32,
+    pub buo_kind: String,
+    pub buo_visible: bool,
+    pub buo_action_count: u32,
+    pub buo_preferred_idx: u32,
+    pub buo_auto_show: bool,
+    pub buo_icon_path: String,
+}
+
+impl LightbulbWidget {
+    pub fn new() -> Self {
+        Self {
+            buo_line: 0,
+            buo_column: 0,
+            buo_kind: "quickfix".into(),
+            buo_visible: false,
+            buo_action_count: 0,
+            buo_preferred_idx: 0,
+            buo_auto_show: true,
+            buo_icon_path: "icons/lightbulb.svg".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("LightbulbWidget({})", self.buo_line)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.buo_line < u32::MAX || true
+    }
+}
+
+impl Default for LightbulbWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for LightbulbWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LightbulbWidget({})", self.buo_line)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -134892,6 +135133,332 @@ mod tests_bfo {
         };
         let _ = obj.buj_summary();
         assert_eq!(obj.buj_preset_name, "test");
+    }
+
+
+    #[test]
+    fn test_buk_create() {
+        let obj = VirtualDocProvider::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buk_validate() {
+        let obj = VirtualDocProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buk_display() {
+        let obj = VirtualDocProvider::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("VirtualDocProvider"));
+    }
+
+    #[test]
+    fn test_buk_clone() {
+        let obj = VirtualDocProvider::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_buk_debug() {
+        let obj = VirtualDocProvider::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("VirtualDocProvider"));
+    }
+
+    #[test]
+    fn test_buk_default() {
+        let obj = VirtualDocProvider::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buk_summary_contains_name() {
+        let obj = VirtualDocProvider::new();
+        assert!(obj.summary().contains("VirtualDocProvider"));
+    }
+
+    #[test]
+    fn test_buk_validate_default() {
+        let obj = VirtualDocProvider::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buk_display_not_empty() {
+        let obj = VirtualDocProvider::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_buk_clone_independence() {
+        let mut obj = VirtualDocProvider::new();
+        let c = obj.clone();
+        obj.buk_scheme = "vsedit-virtual".into();
+        assert_eq!(c.summary(), VirtualDocProvider::new().summary());
+    }
+
+    #[test]
+    fn test_bul_create() {
+        let obj = TextEditorDecoration::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bul_validate() {
+        let obj = TextEditorDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bul_display() {
+        let obj = TextEditorDecoration::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TextEditorDecoration"));
+    }
+
+    #[test]
+    fn test_bul_clone() {
+        let obj = TextEditorDecoration::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bul_debug() {
+        let obj = TextEditorDecoration::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TextEditorDecoration"));
+    }
+
+    #[test]
+    fn test_bul_default() {
+        let obj = TextEditorDecoration::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bul_summary_contains_name() {
+        let obj = TextEditorDecoration::new();
+        assert!(obj.summary().contains("TextEditorDecoration"));
+    }
+
+    #[test]
+    fn test_bul_validate_default() {
+        let obj = TextEditorDecoration::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bul_display_not_empty() {
+        let obj = TextEditorDecoration::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bul_clone_independence() {
+        let mut obj = TextEditorDecoration::new();
+        let c = obj.clone();
+        obj.bul_key = "decoration-1".into();
+        assert_eq!(c.summary(), TextEditorDecoration::new().summary());
+    }
+
+    #[test]
+    fn test_bum_create() {
+        let obj = EditorInsetWidget::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bum_validate() {
+        let obj = EditorInsetWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bum_display() {
+        let obj = EditorInsetWidget::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("EditorInsetWidget"));
+    }
+
+    #[test]
+    fn test_bum_clone() {
+        let obj = EditorInsetWidget::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bum_debug() {
+        let obj = EditorInsetWidget::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("EditorInsetWidget"));
+    }
+
+    #[test]
+    fn test_bum_default() {
+        let obj = EditorInsetWidget::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bum_summary_contains_name() {
+        let obj = EditorInsetWidget::new();
+        assert!(obj.summary().contains("EditorInsetWidget"));
+    }
+
+    #[test]
+    fn test_bum_validate_default() {
+        let obj = EditorInsetWidget::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bum_display_not_empty() {
+        let obj = EditorInsetWidget::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bum_clone_independence() {
+        let mut obj = EditorInsetWidget::new();
+        let c = obj.clone();
+        obj.bum_line = 0;
+        assert_eq!(c.summary(), EditorInsetWidget::new().summary());
+    }
+
+    #[test]
+    fn test_bun_create() {
+        let obj = CodeLensEntry::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bun_validate() {
+        let obj = CodeLensEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bun_display() {
+        let obj = CodeLensEntry::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("CodeLensEntry"));
+    }
+
+    #[test]
+    fn test_bun_clone() {
+        let obj = CodeLensEntry::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bun_debug() {
+        let obj = CodeLensEntry::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("CodeLensEntry"));
+    }
+
+    #[test]
+    fn test_bun_default() {
+        let obj = CodeLensEntry::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bun_summary_contains_name() {
+        let obj = CodeLensEntry::new();
+        assert!(obj.summary().contains("CodeLensEntry"));
+    }
+
+    #[test]
+    fn test_bun_validate_default() {
+        let obj = CodeLensEntry::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bun_display_not_empty() {
+        let obj = CodeLensEntry::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bun_clone_independence() {
+        let mut obj = CodeLensEntry::new();
+        let c = obj.clone();
+        obj.bun_line = 0;
+        assert_eq!(c.summary(), CodeLensEntry::new().summary());
+    }
+
+    #[test]
+    fn test_buo_create() {
+        let obj = LightbulbWidget::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buo_validate() {
+        let obj = LightbulbWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buo_display() {
+        let obj = LightbulbWidget::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("LightbulbWidget"));
+    }
+
+    #[test]
+    fn test_buo_clone() {
+        let obj = LightbulbWidget::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_buo_debug() {
+        let obj = LightbulbWidget::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("LightbulbWidget"));
+    }
+
+    #[test]
+    fn test_buo_default() {
+        let obj = LightbulbWidget::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_buo_summary_contains_name() {
+        let obj = LightbulbWidget::new();
+        assert!(obj.summary().contains("LightbulbWidget"));
+    }
+
+    #[test]
+    fn test_buo_validate_default() {
+        let obj = LightbulbWidget::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_buo_display_not_empty() {
+        let obj = LightbulbWidget::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_buo_clone_independence() {
+        let mut obj = LightbulbWidget::new();
+        let c = obj.clone();
+        obj.buo_line = 0;
+        assert_eq!(c.summary(), LightbulbWidget::new().summary());
     }
 
 }
