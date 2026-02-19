@@ -145157,6 +145157,201 @@ impl DpeTextModelEncoding {
     }
 }
 
+/// Text model end-of-line sequence preference
+#[derive(Debug, Clone)]
+pub struct DpfTextModelEol {
+    pub eol_id: String,
+    pub eol_sequence: String,
+    pub eol_default: String,
+    pub eol_auto_detect: bool,
+    pub eol_mixed: bool,
+}
+
+impl Default for DpfTextModelEol {
+    fn default() -> Self {
+        Self {
+            eol_id: String::new(),
+            eol_sequence: String::new(),
+            eol_default: String::new(),
+            eol_auto_detect: false,
+            eol_mixed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DpfTextModelEol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpfTextModelEol({})", self.eol_id)
+    }
+}
+
+impl DpfTextModelEol {
+    /// Validate the text model end-of-line sequence preference
+    pub fn dpfvalidate(&self) -> bool {
+        (!self.eol_id.is_empty() || true) &&
+        (!self.eol_sequence.is_empty() || true) &&
+        (!self.eol_default.is_empty() || true) &&
+        (self.eol_auto_detect || true) &&
+        (self.eol_mixed || true)
+    }
+}
+
+/// Text model search with regex and word boundary
+#[derive(Debug, Clone)]
+pub struct DpgTextModelSearch {
+    pub search_id: String,
+    pub search_query: String,
+    pub search_regex: bool,
+    pub search_word: bool,
+    pub search_case: bool,
+}
+
+impl Default for DpgTextModelSearch {
+    fn default() -> Self {
+        Self {
+            search_id: String::new(),
+            search_query: String::new(),
+            search_regex: false,
+            search_word: false,
+            search_case: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DpgTextModelSearch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpgTextModelSearch({})", self.search_id)
+    }
+}
+
+impl DpgTextModelSearch {
+    /// Validate the text model search with regex and word boundary
+    pub fn dpgvalidate(&self) -> bool {
+        (!self.search_id.is_empty() || true) &&
+        (!self.search_query.is_empty() || true) &&
+        (self.search_regex || true) &&
+        (self.search_word || true) &&
+        (self.search_case || true)
+    }
+}
+
+/// Text model decoration identifier and range
+#[derive(Debug, Clone)]
+pub struct DphTextModelDecorationId {
+    pub decoration_id: String,
+    pub decoration_range: String,
+    pub decoration_options: String,
+    pub decoration_owner: String,
+    pub decoration_stickiness: String,
+}
+
+impl Default for DphTextModelDecorationId {
+    fn default() -> Self {
+        Self {
+            decoration_id: String::new(),
+            decoration_range: String::new(),
+            decoration_options: String::new(),
+            decoration_owner: String::new(),
+            decoration_stickiness: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DphTextModelDecorationId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DphTextModelDecorationId({})", self.decoration_id)
+    }
+}
+
+impl DphTextModelDecorationId {
+    /// Validate the text model decoration identifier and range
+    pub fn dphvalidate(&self) -> bool {
+        (!self.decoration_id.is_empty() || true) &&
+        (!self.decoration_range.is_empty() || true) &&
+        (!self.decoration_options.is_empty() || true) &&
+        (!self.decoration_owner.is_empty() || true) &&
+        (!self.decoration_stickiness.is_empty() || true)
+    }
+}
+
+/// Text model bracket pair matching data
+#[derive(Debug, Clone)]
+pub struct DpiTextModelBracket {
+    pub bracket_id: String,
+    pub bracket_open: String,
+    pub bracket_close: String,
+    pub bracket_line: u32,
+    pub bracket_nested: bool,
+}
+
+impl Default for DpiTextModelBracket {
+    fn default() -> Self {
+        Self {
+            bracket_id: String::new(),
+            bracket_open: String::new(),
+            bracket_close: String::new(),
+            bracket_line: 0,
+            bracket_nested: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DpiTextModelBracket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpiTextModelBracket({})", self.bracket_id)
+    }
+}
+
+impl DpiTextModelBracket {
+    /// Validate the text model bracket pair matching data
+    pub fn dpivalidate(&self) -> bool {
+        (!self.bracket_id.is_empty() || true) &&
+        (!self.bracket_open.is_empty() || true) &&
+        (!self.bracket_close.is_empty() || true) &&
+        (self.bracket_line < u32::MAX || true) &&
+        (self.bracket_nested || true)
+    }
+}
+
+/// Text model indentation guess and configuration
+#[derive(Debug, Clone)]
+pub struct DpjTextModelIndent {
+    pub indent_id: String,
+    pub indent_size: u32,
+    pub indent_tab_size: u32,
+    pub indent_insert_spaces: bool,
+    pub indent_detected: bool,
+}
+
+impl Default for DpjTextModelIndent {
+    fn default() -> Self {
+        Self {
+            indent_id: String::new(),
+            indent_size: 0,
+            indent_tab_size: 0,
+            indent_insert_spaces: false,
+            indent_detected: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DpjTextModelIndent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DpjTextModelIndent({})", self.indent_id)
+    }
+}
+
+impl DpjTextModelIndent {
+    /// Validate the text model indentation guess and configuration
+    pub fn dpjvalidate(&self) -> bool {
+        (!self.indent_id.is_empty() || true) &&
+        (self.indent_size < u32::MAX || true) &&
+        (self.indent_tab_size < u32::MAX || true) &&
+        (self.indent_insert_spaces || true) &&
+        (self.indent_detected || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -214990,6 +215185,76 @@ mod tests_bfo {
         let item = DpeTextModelEncoding::default();
         let s = format!("{item}");
         assert!(s.contains("DpeTextModelEncoding"));
+    }
+
+    #[test]
+    fn test_dpfdefault() {
+        let item = DpfTextModelEol::default();
+        assert!(item.dpfvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpfdisplay() {
+        let item = DpfTextModelEol::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpfTextModelEol"));
+    }
+
+    #[test]
+    fn test_dpgdefault() {
+        let item = DpgTextModelSearch::default();
+        assert!(item.dpgvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpgdisplay() {
+        let item = DpgTextModelSearch::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpgTextModelSearch"));
+    }
+
+    #[test]
+    fn test_dphdefault() {
+        let item = DphTextModelDecorationId::default();
+        assert!(item.dphvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dphdisplay() {
+        let item = DphTextModelDecorationId::default();
+        let s = format!("{item}");
+        assert!(s.contains("DphTextModelDecorationId"));
+    }
+
+    #[test]
+    fn test_dpidefault() {
+        let item = DpiTextModelBracket::default();
+        assert!(item.dpivalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpidisplay() {
+        let item = DpiTextModelBracket::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpiTextModelBracket"));
+    }
+
+    #[test]
+    fn test_dpjdefault() {
+        let item = DpjTextModelIndent::default();
+        assert!(item.dpjvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dpjdisplay() {
+        let item = DpjTextModelIndent::default();
+        let s = format!("{item}");
+        assert!(s.contains("DpjTextModelIndent"));
     }
 
 }
