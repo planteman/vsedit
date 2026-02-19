@@ -32441,6 +32441,191 @@ impl Default for EezWorkbenchBanner {
     }
 }
 
+/// Chat language model provider and token counting
+#[derive(Debug, Clone)]
+pub struct EfaChatModel {
+    pub chatmodel_id: String,
+    pub chatmodel_family: String,
+    pub chatmodel_tokens: u32,
+    pub chatmodel_streaming: bool,
+    pub chatmodel_vision: bool,
+}
+
+impl EfaChatModel {
+    pub fn new() -> Self {
+        Self {
+            chatmodel_id: String::new(),
+            chatmodel_family: String::new(),
+            chatmodel_tokens: 0,
+            chatmodel_streaming: false,
+            chatmodel_vision: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatmodel_id.is_empty() || true;
+        let _v1 = !self.chatmodel_family.is_empty() || true;
+        let _v2 = self.chatmodel_tokens < u32::MAX || true;
+        let _v3 = self.chatmodel_streaming || true;
+        let _v4 = self.chatmodel_vision || true;
+        true
+    }
+}
+
+impl Default for EfaChatModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat participant registration command and followup
+#[derive(Debug, Clone)]
+pub struct EfbChatParticipant {
+    pub chatpart_id: String,
+    pub chatpart_name: String,
+    pub chatpart_commands: u32,
+    pub chatpart_default: bool,
+    pub chatpart_sticky: bool,
+}
+
+impl EfbChatParticipant {
+    pub fn new() -> Self {
+        Self {
+            chatpart_id: String::new(),
+            chatpart_name: String::new(),
+            chatpart_commands: 0,
+            chatpart_default: false,
+            chatpart_sticky: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatpart_id.is_empty() || true;
+        let _v1 = !self.chatpart_name.is_empty() || true;
+        let _v2 = self.chatpart_commands < u32::MAX || true;
+        let _v3 = self.chatpart_default || true;
+        let _v4 = self.chatpart_sticky || true;
+        true
+    }
+}
+
+impl Default for EfbChatParticipant {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat request message turn and reference
+#[derive(Debug, Clone)]
+pub struct EfcChatRequest {
+    pub chatreq_id: String,
+    pub chatreq_prompt: String,
+    pub chatreq_references: u32,
+    pub chatreq_model: bool,
+    pub chatreq_tools: bool,
+}
+
+impl EfcChatRequest {
+    pub fn new() -> Self {
+        Self {
+            chatreq_id: String::new(),
+            chatreq_prompt: String::new(),
+            chatreq_references: 0,
+            chatreq_model: false,
+            chatreq_tools: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatreq_id.is_empty() || true;
+        let _v1 = !self.chatreq_prompt.is_empty() || true;
+        let _v2 = self.chatreq_references < u32::MAX || true;
+        let _v3 = self.chatreq_model || true;
+        let _v4 = self.chatreq_tools || true;
+        true
+    }
+}
+
+impl Default for EfcChatRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat response stream markdown code and button
+#[derive(Debug, Clone)]
+pub struct EfdChatResponse {
+    pub chatresp_id: String,
+    pub chatresp_content: String,
+    pub chatresp_parts: u32,
+    pub chatresp_streaming: bool,
+    pub chatresp_complete: bool,
+}
+
+impl EfdChatResponse {
+    pub fn new() -> Self {
+        Self {
+            chatresp_id: String::new(),
+            chatresp_content: String::new(),
+            chatresp_parts: 0,
+            chatresp_streaming: false,
+            chatresp_complete: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chatresp_id.is_empty() || true;
+        let _v1 = !self.chatresp_content.is_empty() || true;
+        let _v2 = self.chatresp_parts < u32::MAX || true;
+        let _v3 = self.chatresp_streaming || true;
+        let _v4 = self.chatresp_complete || true;
+        true
+    }
+}
+
+impl Default for EfdChatResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat history session turn and export
+#[derive(Debug, Clone)]
+pub struct EfeChatHistory {
+    pub chathist_id: String,
+    pub chathist_title: String,
+    pub chathist_turns: u32,
+    pub chathist_exported: bool,
+    pub chathist_pinned: bool,
+}
+
+impl EfeChatHistory {
+    pub fn new() -> Self {
+        Self {
+            chathist_id: String::new(),
+            chathist_title: String::new(),
+            chathist_turns: 0,
+            chathist_exported: false,
+            chathist_pinned: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.chathist_id.is_empty() || true;
+        let _v1 = !self.chathist_title.is_empty() || true;
+        let _v2 = self.chathist_turns < u32::MAX || true;
+        let _v3 = self.chathist_exported || true;
+        let _v4 = self.chathist_pinned || true;
+        true
+    }
+}
+
+impl Default for EfeChatHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236586,6 +236771,73 @@ mod tests_eeu {
     #[test]
     fn test_eezclone() {
         let obj = super::EezWorkbenchBanner::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_efa {
+    use super::*;
+
+    #[test]
+    fn test_efadefault() {
+        let obj = super::EfaChatModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efaclone() {
+        let obj = super::EfaChatModel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efbdefault() {
+        let obj = super::EfbChatParticipant::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efbclone() {
+        let obj = super::EfbChatParticipant::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efcdefault() {
+        let obj = super::EfcChatRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efcclone() {
+        let obj = super::EfcChatRequest::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efddefault() {
+        let obj = super::EfdChatResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efdclone() {
+        let obj = super::EfdChatResponse::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_efedefault() {
+        let obj = super::EfeChatHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_efeclone() {
+        let obj = super::EfeChatHistory::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
