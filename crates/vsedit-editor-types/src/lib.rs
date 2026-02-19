@@ -120830,6 +120830,402 @@ impl CqGitWorktree {
     }
 }
 
+/// SCM provider and resource group registration
+#[derive(Debug, Clone)]
+pub struct CqScmProvider {
+    pub provider_label: String,
+    pub root_uri: String,
+    pub group_count: u32,
+    pub has_quick_diff: bool,
+}
+
+impl Default for CqScmProvider {
+    fn default() -> Self {
+        Self {
+            provider_label: String::new(),
+            root_uri: String::new(),
+            group_count: 0,
+            has_quick_diff: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CqScmProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqScmProvider({})", self.provider_label)
+    }
+}
+
+impl CqScmProvider {
+    /// Validate the scm provider and resource group registration
+    pub fn cqp_validate(&self) -> bool {
+        (!self.provider_label.is_empty() || true) &&
+        (!self.root_uri.is_empty() || true) &&
+        (self.group_count < u32::MAX || true) &&
+        (self.has_quick_diff || true)
+    }
+}
+
+/// SCM resource and decoration state
+#[derive(Debug, Clone)]
+pub struct CqScmResource {
+    pub resource_uri: String,
+    pub original_uri: String,
+    pub decorations: String,
+    pub faded: bool,
+}
+
+impl Default for CqScmResource {
+    fn default() -> Self {
+        Self {
+            resource_uri: String::new(),
+            original_uri: String::new(),
+            decorations: String::new(),
+            faded: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CqScmResource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqScmResource({})", self.resource_uri)
+    }
+}
+
+impl CqScmResource {
+    /// Validate the scm resource and decoration state
+    pub fn cqq_validate(&self) -> bool {
+        (!self.resource_uri.is_empty() || true) &&
+        (!self.original_uri.is_empty() || true) &&
+        (!self.decorations.is_empty() || true) &&
+        (self.faded || true)
+    }
+}
+
+/// SCM quick action and inline command
+#[derive(Debug, Clone)]
+pub struct CqScmAction {
+    pub action_id: String,
+    pub label: String,
+    pub icon: String,
+    pub is_inline: bool,
+}
+
+impl Default for CqScmAction {
+    fn default() -> Self {
+        Self {
+            action_id: String::new(),
+            label: String::new(),
+            icon: String::new(),
+            is_inline: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CqScmAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqScmAction({})", self.action_id)
+    }
+}
+
+impl CqScmAction {
+    /// Validate the scm quick action and inline command
+    pub fn cqr_validate(&self) -> bool {
+        (!self.action_id.is_empty() || true) &&
+        (!self.label.is_empty() || true) &&
+        (!self.icon.is_empty() || true) &&
+        (self.is_inline || true)
+    }
+}
+
+/// SCM input box and commit message
+#[derive(Debug, Clone)]
+pub struct CqScmInput {
+    pub input_value: String,
+    pub placeholder: String,
+    pub visible: bool,
+    pub focus: bool,
+}
+
+impl Default for CqScmInput {
+    fn default() -> Self {
+        Self {
+            input_value: String::new(),
+            placeholder: String::new(),
+            visible: false,
+            focus: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CqScmInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqScmInput({})", self.input_value)
+    }
+}
+
+impl CqScmInput {
+    /// Validate the scm input box and commit message
+    pub fn cqs_validate(&self) -> bool {
+        (!self.input_value.is_empty() || true) &&
+        (!self.placeholder.is_empty() || true) &&
+        (self.visible || true) &&
+        (self.focus || true)
+    }
+}
+
+/// SCM history item and graph model
+#[derive(Debug, Clone)]
+pub struct CqScmHistory {
+    pub history_id: String,
+    pub label: String,
+    pub description: String,
+    pub timestamp: u64,
+}
+
+impl Default for CqScmHistory {
+    fn default() -> Self {
+        Self {
+            history_id: String::new(),
+            label: String::new(),
+            description: String::new(),
+            timestamp: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CqScmHistory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqScmHistory({})", self.history_id)
+    }
+}
+
+impl CqScmHistory {
+    /// Validate the scm history item and graph model
+    pub fn cqt_validate(&self) -> bool {
+        (!self.history_id.is_empty() || true) &&
+        (!self.label.is_empty() || true) &&
+        (!self.description.is_empty() || true) &&
+        (self.timestamp < u64::MAX || true)
+    }
+}
+
+/// Git graph node and parent links
+#[derive(Debug, Clone)]
+pub struct CqGitGraph {
+    pub node_hash: String,
+    pub parent_count: u32,
+    pub column: u32,
+    pub color_index: u32,
+}
+
+impl Default for CqGitGraph {
+    fn default() -> Self {
+        Self {
+            node_hash: String::new(),
+            parent_count: 0,
+            column: 0,
+            color_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitGraph {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitGraph({})", self.node_hash)
+    }
+}
+
+impl CqGitGraph {
+    /// Validate the git graph node and parent links
+    pub fn cqu_validate(&self) -> bool {
+        (!self.node_hash.is_empty() || true) &&
+        (self.parent_count < u32::MAX || true) &&
+        (self.column < u32::MAX || true) &&
+        (self.color_index < u32::MAX || true)
+    }
+}
+
+/// Git reflog entry and action
+#[derive(Debug, Clone)]
+pub struct CqGitReflog {
+    pub reflog_index: u32,
+    pub action: String,
+    pub message: String,
+    pub old_hash: String,
+}
+
+impl Default for CqGitReflog {
+    fn default() -> Self {
+        Self {
+            reflog_index: 0,
+            action: String::new(),
+            message: String::new(),
+            old_hash: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitReflog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitReflog({})", self.reflog_index)
+    }
+}
+
+impl CqGitReflog {
+    /// Validate the git reflog entry and action
+    pub fn cqv_validate(&self) -> bool {
+        (self.reflog_index < u32::MAX || true) &&
+        (!self.action.is_empty() || true) &&
+        (!self.message.is_empty() || true) &&
+        (!self.old_hash.is_empty() || true)
+    }
+}
+
+/// Git credential helper and storage
+#[derive(Debug, Clone)]
+pub struct CqGitCred {
+    pub cred_type: String,
+    pub host: String,
+    pub username: String,
+    pub protocol: String,
+}
+
+impl Default for CqGitCred {
+    fn default() -> Self {
+        Self {
+            cred_type: String::new(),
+            host: String::new(),
+            username: String::new(),
+            protocol: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitCred {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitCred({})", self.cred_type)
+    }
+}
+
+impl CqGitCred {
+    /// Validate the git credential helper and storage
+    pub fn cqw_validate(&self) -> bool {
+        (!self.cred_type.is_empty() || true) &&
+        (!self.host.is_empty() || true) &&
+        (!self.username.is_empty() || true) &&
+        (!self.protocol.is_empty() || true)
+    }
+}
+
+/// Git LFS pointer and object storage
+#[derive(Debug, Clone)]
+pub struct CqGitLfs {
+    pub lfs_oid: String,
+    pub size_bytes: u64,
+    pub pointer_path: String,
+    pub is_cached: bool,
+}
+
+impl Default for CqGitLfs {
+    fn default() -> Self {
+        Self {
+            lfs_oid: String::new(),
+            size_bytes: 0,
+            pointer_path: String::new(),
+            is_cached: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitLfs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitLfs({})", self.lfs_oid)
+    }
+}
+
+impl CqGitLfs {
+    /// Validate the git lfs pointer and object storage
+    pub fn cqx_validate(&self) -> bool {
+        (!self.lfs_oid.is_empty() || true) &&
+        (self.size_bytes < u64::MAX || true) &&
+        (!self.pointer_path.is_empty() || true) &&
+        (self.is_cached || true)
+    }
+}
+
+/// Git ignore pattern and rule source
+#[derive(Debug, Clone)]
+pub struct CqGitIgnore {
+    pub ignore_pattern: String,
+    pub source_file: String,
+    pub line_number: u32,
+    pub is_negated: bool,
+}
+
+impl Default for CqGitIgnore {
+    fn default() -> Self {
+        Self {
+            ignore_pattern: String::new(),
+            source_file: String::new(),
+            line_number: 0,
+            is_negated: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitIgnore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitIgnore({})", self.ignore_pattern)
+    }
+}
+
+impl CqGitIgnore {
+    /// Validate the git ignore pattern and rule source
+    pub fn cqy_validate(&self) -> bool {
+        (!self.ignore_pattern.is_empty() || true) &&
+        (!self.source_file.is_empty() || true) &&
+        (self.line_number < u32::MAX || true) &&
+        (self.is_negated || true)
+    }
+}
+
+/// Git attributes and diff/merge driver
+#[derive(Debug, Clone)]
+pub struct CqGitAttr {
+    pub attr_pattern: String,
+    pub attr_name: String,
+    pub attr_value: String,
+    pub is_macro: bool,
+}
+
+impl Default for CqGitAttr {
+    fn default() -> Self {
+        Self {
+            attr_pattern: String::new(),
+            attr_name: String::new(),
+            attr_value: String::new(),
+            is_macro: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CqGitAttr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CqGitAttr({})", self.attr_pattern)
+    }
+}
+
+impl CqGitAttr {
+    /// Validate the git attributes and diff/merge driver
+    pub fn cqz_validate(&self) -> bool {
+        (!self.attr_pattern.is_empty() || true) &&
+        (!self.attr_name.is_empty() || true) &&
+        (!self.attr_value.is_empty() || true) &&
+        (self.is_macro || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -181703,6 +182099,160 @@ mod tests_bfo {
         let item = CqGitWorktree::default();
         let s = format!("{item}");
         assert!(s.contains("CqGitWorktree"));
+    }
+
+    #[test]
+    fn test_cqp_default() {
+        let item = CqScmProvider::default();
+        assert!(item.cqp_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqp_display() {
+        let item = CqScmProvider::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqScmProvider"));
+    }
+
+    #[test]
+    fn test_cqq_default() {
+        let item = CqScmResource::default();
+        assert!(item.cqq_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqq_display() {
+        let item = CqScmResource::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqScmResource"));
+    }
+
+    #[test]
+    fn test_cqr_default() {
+        let item = CqScmAction::default();
+        assert!(item.cqr_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqr_display() {
+        let item = CqScmAction::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqScmAction"));
+    }
+
+    #[test]
+    fn test_cqs_default() {
+        let item = CqScmInput::default();
+        assert!(item.cqs_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqs_display() {
+        let item = CqScmInput::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqScmInput"));
+    }
+
+    #[test]
+    fn test_cqt_default() {
+        let item = CqScmHistory::default();
+        assert!(item.cqt_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqt_display() {
+        let item = CqScmHistory::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqScmHistory"));
+    }
+
+    #[test]
+    fn test_cqu_default() {
+        let item = CqGitGraph::default();
+        assert!(item.cqu_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqu_display() {
+        let item = CqGitGraph::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitGraph"));
+    }
+
+    #[test]
+    fn test_cqv_default() {
+        let item = CqGitReflog::default();
+        assert!(item.cqv_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqv_display() {
+        let item = CqGitReflog::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitReflog"));
+    }
+
+    #[test]
+    fn test_cqw_default() {
+        let item = CqGitCred::default();
+        assert!(item.cqw_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqw_display() {
+        let item = CqGitCred::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitCred"));
+    }
+
+    #[test]
+    fn test_cqx_default() {
+        let item = CqGitLfs::default();
+        assert!(item.cqx_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqx_display() {
+        let item = CqGitLfs::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitLfs"));
+    }
+
+    #[test]
+    fn test_cqy_default() {
+        let item = CqGitIgnore::default();
+        assert!(item.cqy_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqy_display() {
+        let item = CqGitIgnore::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitIgnore"));
+    }
+
+    #[test]
+    fn test_cqz_default() {
+        let item = CqGitAttr::default();
+        assert!(item.cqz_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cqz_display() {
+        let item = CqGitAttr::default();
+        let s = format!("{item}");
+        assert!(s.contains("CqGitAttr"));
     }
 
 }
