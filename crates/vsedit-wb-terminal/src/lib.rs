@@ -107477,6 +107477,341 @@ impl SelectionRangeResult {
     }
 }
 
+
+/// Type definition result (uri, line, column, origin line, target range)
+#[derive(Debug, Clone)]
+pub struct TypeDefResult {
+    pub typedef_uri: String,
+    pub typedef_line: u32,
+    pub typedef_col: u32,
+    pub origin_line: u32,
+    pub origin_col: u32,
+    pub target_start_line: u32,
+    pub target_end_line: u32,
+    pub provider_id: String,
+    pub is_local: bool,
+    pub language_id: String,
+    pub document_uri: String,
+    pub typedef_index: u32,
+}
+
+impl Default for TypeDefResult {
+    fn default() -> Self {
+        Self {
+            typedef_uri: String::new(),
+            typedef_line: 0,
+            typedef_col: 0,
+            origin_line: 0,
+            origin_col: 0,
+            target_start_line: 0,
+            target_end_line: 0,
+            provider_id: String::new(),
+            is_local: false,
+            language_id: String::new(),
+            document_uri: String::new(),
+            typedef_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for TypeDefResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TypeDefResult({}, {}, {}, {})",
+            format!("typedef_uri={}", self.typedef_uri), format!("typedef_line={}", self.typedef_line), format!("typedef_col={}", self.typedef_col), format!("origin_line={}", self.origin_line))
+    }
+}
+
+impl TypeDefResult {
+    pub fn cfk_validate(&self) -> bool {
+        let _typedef_uri = self.typedef_uri.clone();
+        let _typedef_line = self.typedef_line;
+        let _typedef_col = self.typedef_col;
+        let _origin_line = self.origin_line;
+        let _origin_col = self.origin_col;
+        let _target_start_line = self.target_start_line;
+        let _target_end_line = self.target_end_line;
+        let _provider_id = self.provider_id.clone();
+        let _is_local = self.is_local;
+        let _language_id = self.language_id.clone();
+        let _document_uri = self.document_uri.clone();
+        let _typedef_index = self.typedef_index;
+        !self.typedef_uri.is_empty() || true && self.typedef_line < u32::MAX || true && self.typedef_col < u32::MAX || true && self.origin_line < u32::MAX || true && self.origin_col < u32::MAX || true && self.target_start_line < u32::MAX || true && self.target_end_line < u32::MAX || true && !self.provider_id.is_empty() || true && self.is_local || true && !self.language_id.is_empty() || true && !self.document_uri.is_empty() || true && self.typedef_index < u32::MAX || true
+    }
+
+    pub fn cfk_summary(&self) -> String {
+        format!("TypeDefResult[cfk_]: {}, {}, {}, {}",
+            format!("typedef_uri={}", self.typedef_uri), format!("typedef_line={}", self.typedef_line), format!("typedef_col={}", self.typedef_col), format!("origin_line={}", self.origin_line))
+    }
+}
+
+
+/// Implementation result (uri, line, column, origin line, target range)
+#[derive(Debug, Clone)]
+pub struct ImplementResult {
+    pub impl_uri: String,
+    pub impl_line: u32,
+    pub impl_col: u32,
+    pub origin_line: u32,
+    pub origin_col: u32,
+    pub target_start_line: u32,
+    pub target_end_line: u32,
+    pub provider_id: String,
+    pub is_local: bool,
+    pub language_id: String,
+    pub document_uri: String,
+    pub impl_index: u32,
+}
+
+impl Default for ImplementResult {
+    fn default() -> Self {
+        Self {
+            impl_uri: String::new(),
+            impl_line: 0,
+            impl_col: 0,
+            origin_line: 0,
+            origin_col: 0,
+            target_start_line: 0,
+            target_end_line: 0,
+            provider_id: String::new(),
+            is_local: false,
+            language_id: String::new(),
+            document_uri: String::new(),
+            impl_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ImplementResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ImplementResult({}, {}, {}, {})",
+            format!("impl_uri={}", self.impl_uri), format!("impl_line={}", self.impl_line), format!("impl_col={}", self.impl_col), format!("origin_line={}", self.origin_line))
+    }
+}
+
+impl ImplementResult {
+    pub fn cfl_validate(&self) -> bool {
+        let _impl_uri = self.impl_uri.clone();
+        let _impl_line = self.impl_line;
+        let _impl_col = self.impl_col;
+        let _origin_line = self.origin_line;
+        let _origin_col = self.origin_col;
+        let _target_start_line = self.target_start_line;
+        let _target_end_line = self.target_end_line;
+        let _provider_id = self.provider_id.clone();
+        let _is_local = self.is_local;
+        let _language_id = self.language_id.clone();
+        let _document_uri = self.document_uri.clone();
+        let _impl_index = self.impl_index;
+        !self.impl_uri.is_empty() || true && self.impl_line < u32::MAX || true && self.impl_col < u32::MAX || true && self.origin_line < u32::MAX || true && self.origin_col < u32::MAX || true && self.target_start_line < u32::MAX || true && self.target_end_line < u32::MAX || true && !self.provider_id.is_empty() || true && self.is_local || true && !self.language_id.is_empty() || true && !self.document_uri.is_empty() || true && self.impl_index < u32::MAX || true
+    }
+
+    pub fn cfl_summary(&self) -> String {
+        format!("ImplementResult[cfl_]: {}, {}, {}, {}",
+            format!("impl_uri={}", self.impl_uri), format!("impl_line={}", self.impl_line), format!("impl_col={}", self.impl_col), format!("origin_line={}", self.origin_line))
+    }
+}
+
+
+/// Declaration result (uri, line, column, origin line, target range)
+#[derive(Debug, Clone)]
+pub struct DeclarationResult {
+    pub decl_uri: String,
+    pub decl_line: u32,
+    pub decl_col: u32,
+    pub origin_line: u32,
+    pub origin_col: u32,
+    pub target_start_line: u32,
+    pub target_end_line: u32,
+    pub provider_id: String,
+    pub is_local: bool,
+    pub language_id: String,
+    pub document_uri: String,
+    pub decl_index: u32,
+}
+
+impl Default for DeclarationResult {
+    fn default() -> Self {
+        Self {
+            decl_uri: String::new(),
+            decl_line: 0,
+            decl_col: 0,
+            origin_line: 0,
+            origin_col: 0,
+            target_start_line: 0,
+            target_end_line: 0,
+            provider_id: String::new(),
+            is_local: false,
+            language_id: String::new(),
+            document_uri: String::new(),
+            decl_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DeclarationResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DeclarationResult({}, {}, {}, {})",
+            format!("decl_uri={}", self.decl_uri), format!("decl_line={}", self.decl_line), format!("decl_col={}", self.decl_col), format!("origin_line={}", self.origin_line))
+    }
+}
+
+impl DeclarationResult {
+    pub fn cfm_validate(&self) -> bool {
+        let _decl_uri = self.decl_uri.clone();
+        let _decl_line = self.decl_line;
+        let _decl_col = self.decl_col;
+        let _origin_line = self.origin_line;
+        let _origin_col = self.origin_col;
+        let _target_start_line = self.target_start_line;
+        let _target_end_line = self.target_end_line;
+        let _provider_id = self.provider_id.clone();
+        let _is_local = self.is_local;
+        let _language_id = self.language_id.clone();
+        let _document_uri = self.document_uri.clone();
+        let _decl_index = self.decl_index;
+        !self.decl_uri.is_empty() || true && self.decl_line < u32::MAX || true && self.decl_col < u32::MAX || true && self.origin_line < u32::MAX || true && self.origin_col < u32::MAX || true && self.target_start_line < u32::MAX || true && self.target_end_line < u32::MAX || true && !self.provider_id.is_empty() || true && self.is_local || true && !self.language_id.is_empty() || true && !self.document_uri.is_empty() || true && self.decl_index < u32::MAX || true
+    }
+
+    pub fn cfm_summary(&self) -> String {
+        format!("DeclarationResult[cfm_]: {}, {}, {}, {}",
+            format!("decl_uri={}", self.decl_uri), format!("decl_line={}", self.decl_line), format!("decl_col={}", self.decl_col), format!("origin_line={}", self.origin_line))
+    }
+}
+
+
+/// Reference result (uri, line, column, include declaration, context)
+#[derive(Debug, Clone)]
+pub struct ReferenceLocation {
+    pub ref_uri: String,
+    pub ref_line: u32,
+    pub ref_col: u32,
+    pub include_declaration: bool,
+    pub context_name: String,
+    pub target_start_line: u32,
+    pub target_end_line: u32,
+    pub provider_id: String,
+    pub is_write: bool,
+    pub language_id: String,
+    pub document_uri: String,
+    pub ref_index: u32,
+}
+
+impl Default for ReferenceLocation {
+    fn default() -> Self {
+        Self {
+            ref_uri: String::new(),
+            ref_line: 0,
+            ref_col: 0,
+            include_declaration: false,
+            context_name: String::new(),
+            target_start_line: 0,
+            target_end_line: 0,
+            provider_id: String::new(),
+            is_write: false,
+            language_id: String::new(),
+            document_uri: String::new(),
+            ref_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ReferenceLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ReferenceResult({}, {}, {}, {})",
+            format!("ref_uri={}", self.ref_uri), format!("ref_line={}", self.ref_line), format!("ref_col={}", self.ref_col), format!("include_declaration={}", self.include_declaration))
+    }
+}
+
+impl ReferenceLocation {
+    pub fn cfn_validate(&self) -> bool {
+        let _ref_uri = self.ref_uri.clone();
+        let _ref_line = self.ref_line;
+        let _ref_col = self.ref_col;
+        let _include_declaration = self.include_declaration;
+        let _context_name = self.context_name.clone();
+        let _target_start_line = self.target_start_line;
+        let _target_end_line = self.target_end_line;
+        let _provider_id = self.provider_id.clone();
+        let _is_write = self.is_write;
+        let _language_id = self.language_id.clone();
+        let _document_uri = self.document_uri.clone();
+        let _ref_index = self.ref_index;
+        !self.ref_uri.is_empty() || true && self.ref_line < u32::MAX || true && self.ref_col < u32::MAX || true && self.include_declaration || true && !self.context_name.is_empty() || true && self.target_start_line < u32::MAX || true && self.target_end_line < u32::MAX || true && !self.provider_id.is_empty() || true && self.is_write || true && !self.language_id.is_empty() || true && !self.document_uri.is_empty() || true && self.ref_index < u32::MAX || true
+    }
+
+    pub fn cfn_summary(&self) -> String {
+        format!("ReferenceLocation[cfn_]: {}, {}, {}, {}",
+            format!("ref_uri={}", self.ref_uri), format!("ref_line={}", self.ref_line), format!("ref_col={}", self.ref_col), format!("include_declaration={}", self.include_declaration))
+    }
+}
+
+
+/// Rename location (uri, range, old text, new text, provider, is valid)
+#[derive(Debug, Clone)]
+pub struct RenameLocation {
+    pub rename_uri: String,
+    pub range_start_line: u32,
+    pub range_start_col: u32,
+    pub range_end_line: u32,
+    pub range_end_col: u32,
+    pub old_text: String,
+    pub new_text: String,
+    pub provider_id: String,
+    pub is_valid: bool,
+    pub reason_text: String,
+    pub language_id: String,
+    pub rename_index: u32,
+}
+
+impl Default for RenameLocation {
+    fn default() -> Self {
+        Self {
+            rename_uri: String::new(),
+            range_start_line: 0,
+            range_start_col: 0,
+            range_end_line: 0,
+            range_end_col: 0,
+            old_text: String::new(),
+            new_text: String::new(),
+            provider_id: String::new(),
+            is_valid: false,
+            reason_text: String::new(),
+            language_id: String::new(),
+            rename_index: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for RenameLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RenameLocation({}, {}, {}, {})",
+            format!("rename_uri={}", self.rename_uri), format!("range_start_line={}", self.range_start_line), format!("range_start_col={}", self.range_start_col), format!("range_end_line={}", self.range_end_line))
+    }
+}
+
+impl RenameLocation {
+    pub fn cfo_validate(&self) -> bool {
+        let _rename_uri = self.rename_uri.clone();
+        let _range_start_line = self.range_start_line;
+        let _range_start_col = self.range_start_col;
+        let _range_end_line = self.range_end_line;
+        let _range_end_col = self.range_end_col;
+        let _old_text = self.old_text.clone();
+        let _new_text = self.new_text.clone();
+        let _provider_id = self.provider_id.clone();
+        let _is_valid = self.is_valid;
+        let _reason_text = self.reason_text.clone();
+        let _language_id = self.language_id.clone();
+        let _rename_index = self.rename_index;
+        !self.rename_uri.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_start_col < u32::MAX || true && self.range_end_line < u32::MAX || true && self.range_end_col < u32::MAX || true && !self.old_text.is_empty() || true && !self.new_text.is_empty() || true && !self.provider_id.is_empty() || true && self.is_valid || true && !self.reason_text.is_empty() || true && !self.language_id.is_empty() || true && self.rename_index < u32::MAX || true
+    }
+
+    pub fn cfo_summary(&self) -> String {
+        format!("RenameLocation[cfo_]: {}, {}, {}, {}",
+            format!("rename_uri={}", self.rename_uri), format!("range_start_line={}", self.range_start_line), format!("range_start_col={}", self.range_start_col), format!("range_end_line={}", self.range_end_line))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -163484,6 +163819,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cfj_validate());
         let _ = cloned.cfj_summary();
+    }
+
+
+    #[test]
+    fn test_cfk_default() {
+        let obj = TypeDefResult::default();
+        assert!(obj.cfk_validate());
+        let _ = obj.cfk_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfk_clone() {
+        let obj = TypeDefResult::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfk_validate());
+        let _ = cloned.cfk_summary();
+    }
+
+
+    #[test]
+    fn test_cfl_default() {
+        let obj = ImplementResult::default();
+        assert!(obj.cfl_validate());
+        let _ = obj.cfl_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfl_clone() {
+        let obj = ImplementResult::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfl_validate());
+        let _ = cloned.cfl_summary();
+    }
+
+
+    #[test]
+    fn test_cfm_default() {
+        let obj = DeclarationResult::default();
+        assert!(obj.cfm_validate());
+        let _ = obj.cfm_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfm_clone() {
+        let obj = DeclarationResult::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfm_validate());
+        let _ = cloned.cfm_summary();
+    }
+
+
+    #[test]
+    fn test_cfn_default() {
+        let obj = ReferenceLocation::default();
+        assert!(obj.cfn_validate());
+        let _ = obj.cfn_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfn_clone() {
+        let obj = ReferenceLocation::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfn_validate());
+        let _ = cloned.cfn_summary();
+    }
+
+
+    #[test]
+    fn test_cfo_default() {
+        let obj = RenameLocation::default();
+        assert!(obj.cfo_validate());
+        let _ = obj.cfo_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cfo_clone() {
+        let obj = RenameLocation::default();
+        let cloned = obj.clone();
+        assert!(cloned.cfo_validate());
+        let _ = cloned.cfo_summary();
     }
 
 }
