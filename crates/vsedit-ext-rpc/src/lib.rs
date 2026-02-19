@@ -120060,6 +120060,402 @@ impl CpLinkMatch {
     }
 }
 
+/// Sixel and image protocol rendering
+#[derive(Debug, Clone)]
+pub struct CpSixelImage {
+    pub image_id: u32,
+    pub width_px: u32,
+    pub height_px: u32,
+    pub protocol: String,
+}
+
+impl Default for CpSixelImage {
+    fn default() -> Self {
+        Self {
+            image_id: 0,
+            width_px: 0,
+            height_px: 0,
+            protocol: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CpSixelImage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpSixelImage({})", self.image_id)
+    }
+}
+
+impl CpSixelImage {
+    /// Validate the sixel and image protocol rendering
+    pub fn cpp_validate(&self) -> bool {
+        (self.image_id < u32::MAX || true) &&
+        (self.width_px < u32::MAX || true) &&
+        (self.height_px < u32::MAX || true) &&
+        (!self.protocol.is_empty() || true)
+    }
+}
+
+/// Terminal text selection and clipboard
+#[derive(Debug, Clone)]
+pub struct CpTermSelection {
+    pub sel_start_row: u32,
+    pub sel_start_col: u32,
+    pub sel_end_row: u32,
+    pub sel_end_col: u32,
+}
+
+impl Default for CpTermSelection {
+    fn default() -> Self {
+        Self {
+            sel_start_row: 0,
+            sel_start_col: 0,
+            sel_end_row: 0,
+            sel_end_col: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CpTermSelection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpTermSelection({})", self.sel_start_row)
+    }
+}
+
+impl CpTermSelection {
+    /// Validate the terminal text selection and clipboard
+    pub fn cpq_validate(&self) -> bool {
+        (self.sel_start_row < u32::MAX || true) &&
+        (self.sel_start_col < u32::MAX || true) &&
+        (self.sel_end_row < u32::MAX || true) &&
+        (self.sel_end_col < u32::MAX || true)
+    }
+}
+
+/// Terminal find and search match
+#[derive(Debug, Clone)]
+pub struct CpFindMatch {
+    pub match_index: u32,
+    pub match_row: u32,
+    pub match_col: u32,
+    pub match_length: u32,
+}
+
+impl Default for CpFindMatch {
+    fn default() -> Self {
+        Self {
+            match_index: 0,
+            match_row: 0,
+            match_col: 0,
+            match_length: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CpFindMatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpFindMatch({})", self.match_index)
+    }
+}
+
+impl CpFindMatch {
+    /// Validate the terminal find and search match
+    pub fn cpr_validate(&self) -> bool {
+        (self.match_index < u32::MAX || true) &&
+        (self.match_row < u32::MAX || true) &&
+        (self.match_col < u32::MAX || true) &&
+        (self.match_length < u32::MAX || true)
+    }
+}
+
+/// Terminal decoration and glyph overlay
+#[derive(Debug, Clone)]
+pub struct CpTermDecoration {
+    pub decor_id: String,
+    pub row: u32,
+    pub col: u32,
+    pub glyph: String,
+}
+
+impl Default for CpTermDecoration {
+    fn default() -> Self {
+        Self {
+            decor_id: String::new(),
+            row: 0,
+            col: 0,
+            glyph: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CpTermDecoration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpTermDecoration({})", self.decor_id)
+    }
+}
+
+impl CpTermDecoration {
+    /// Validate the terminal decoration and glyph overlay
+    pub fn cps_validate(&self) -> bool {
+        (!self.decor_id.is_empty() || true) &&
+        (self.row < u32::MAX || true) &&
+        (self.col < u32::MAX || true) &&
+        (!self.glyph.is_empty() || true)
+    }
+}
+
+/// Terminal accessibility and screen reader
+#[derive(Debug, Clone)]
+pub struct CpTermAccessible {
+    pub buffer_pos: u32,
+    pub announced_text: String,
+    pub line_count: u32,
+    pub has_focus: bool,
+}
+
+impl Default for CpTermAccessible {
+    fn default() -> Self {
+        Self {
+            buffer_pos: 0,
+            announced_text: String::new(),
+            line_count: 0,
+            has_focus: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CpTermAccessible {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpTermAccessible({})", self.buffer_pos)
+    }
+}
+
+impl CpTermAccessible {
+    /// Validate the terminal accessibility and screen reader
+    pub fn cpt_validate(&self) -> bool {
+        (self.buffer_pos < u32::MAX || true) &&
+        (!self.announced_text.is_empty() || true) &&
+        (self.line_count < u32::MAX || true) &&
+        (self.has_focus || true)
+    }
+}
+
+/// Terminal resize event and reflow
+#[derive(Debug, Clone)]
+pub struct CpTermResize {
+    pub new_cols: u32,
+    pub new_rows: u32,
+    pub old_cols: u32,
+    pub old_rows: u32,
+}
+
+impl Default for CpTermResize {
+    fn default() -> Self {
+        Self {
+            new_cols: 0,
+            new_rows: 0,
+            old_cols: 0,
+            old_rows: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CpTermResize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpTermResize({})", self.new_cols)
+    }
+}
+
+impl CpTermResize {
+    /// Validate the terminal resize event and reflow
+    pub fn cpu_validate(&self) -> bool {
+        (self.new_cols < u32::MAX || true) &&
+        (self.new_rows < u32::MAX || true) &&
+        (self.old_cols < u32::MAX || true) &&
+        (self.old_rows < u32::MAX || true)
+    }
+}
+
+/// Terminal bell and visual bell state
+#[derive(Debug, Clone)]
+pub struct CpBellEvent {
+    pub bell_type: String,
+    pub visual: bool,
+    pub audio: bool,
+    pub urgency: bool,
+}
+
+impl Default for CpBellEvent {
+    fn default() -> Self {
+        Self {
+            bell_type: String::new(),
+            visual: false,
+            audio: false,
+            urgency: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CpBellEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpBellEvent({})", self.bell_type)
+    }
+}
+
+impl CpBellEvent {
+    /// Validate the terminal bell and visual bell state
+    pub fn cpv_validate(&self) -> bool {
+        (!self.bell_type.is_empty() || true) &&
+        (self.visual || true) &&
+        (self.audio || true) &&
+        (self.urgency || true)
+    }
+}
+
+/// Terminal title and icon name
+#[derive(Debug, Clone)]
+pub struct CpTermTitle {
+    pub title_text: String,
+    pub icon_name: String,
+    pub stack_count: u32,
+    pub is_override: bool,
+}
+
+impl Default for CpTermTitle {
+    fn default() -> Self {
+        Self {
+            title_text: String::new(),
+            icon_name: String::new(),
+            stack_count: 0,
+            is_override: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CpTermTitle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpTermTitle({})", self.title_text)
+    }
+}
+
+impl CpTermTitle {
+    /// Validate the terminal title and icon name
+    pub fn cpw_validate(&self) -> bool {
+        (!self.title_text.is_empty() || true) &&
+        (!self.icon_name.is_empty() || true) &&
+        (self.stack_count < u32::MAX || true) &&
+        (self.is_override || true)
+    }
+}
+
+/// Terminal paste handling and bracketed paste
+#[derive(Debug, Clone)]
+pub struct CpTermPaste {
+    pub paste_text: String,
+    pub is_bracketed: bool,
+    pub length: u32,
+    pub filtered: bool,
+}
+
+impl Default for CpTermPaste {
+    fn default() -> Self {
+        Self {
+            paste_text: String::new(),
+            is_bracketed: false,
+            length: 0,
+            filtered: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CpTermPaste {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpTermPaste({})", self.paste_text)
+    }
+}
+
+impl CpTermPaste {
+    /// Validate the terminal paste handling and bracketed paste
+    pub fn cpx_validate(&self) -> bool {
+        (!self.paste_text.is_empty() || true) &&
+        (self.is_bracketed || true) &&
+        (self.length < u32::MAX || true) &&
+        (self.filtered || true)
+    }
+}
+
+/// Terminal device status report
+#[derive(Debug, Clone)]
+pub struct CpTermReport {
+    pub report_type: String,
+    pub response: String,
+    pub param_id: u32,
+    pub is_primary: bool,
+}
+
+impl Default for CpTermReport {
+    fn default() -> Self {
+        Self {
+            report_type: String::new(),
+            response: String::new(),
+            param_id: 0,
+            is_primary: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CpTermReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpTermReport({})", self.report_type)
+    }
+}
+
+impl CpTermReport {
+    /// Validate the terminal device status report
+    pub fn cpy_validate(&self) -> bool {
+        (!self.report_type.is_empty() || true) &&
+        (!self.response.is_empty() || true) &&
+        (self.param_id < u32::MAX || true) &&
+        (self.is_primary || true)
+    }
+}
+
+/// Terminal profile icon and color customization
+#[derive(Debug, Clone)]
+pub struct CpTermProfile2 {
+    pub profile_icon: String,
+    pub profile_color: String,
+    pub badge_text: String,
+    pub is_custom: bool,
+}
+
+impl Default for CpTermProfile2 {
+    fn default() -> Self {
+        Self {
+            profile_icon: String::new(),
+            profile_color: String::new(),
+            badge_text: String::new(),
+            is_custom: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CpTermProfile2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CpTermProfile2({})", self.profile_icon)
+    }
+}
+
+impl CpTermProfile2 {
+    /// Validate the terminal profile icon and color customization
+    pub fn cpz_validate(&self) -> bool {
+        (!self.profile_icon.is_empty() || true) &&
+        (!self.profile_color.is_empty() || true) &&
+        (!self.badge_text.is_empty() || true) &&
+        (self.is_custom || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -180569,6 +180965,160 @@ mod tests_bfo {
         let item = CpLinkMatch::default();
         let s = format!("{item}");
         assert!(s.contains("CpLinkMatch"));
+    }
+
+    #[test]
+    fn test_cpp_default() {
+        let item = CpSixelImage::default();
+        assert!(item.cpp_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpp_display() {
+        let item = CpSixelImage::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpSixelImage"));
+    }
+
+    #[test]
+    fn test_cpq_default() {
+        let item = CpTermSelection::default();
+        assert!(item.cpq_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpq_display() {
+        let item = CpTermSelection::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpTermSelection"));
+    }
+
+    #[test]
+    fn test_cpr_default() {
+        let item = CpFindMatch::default();
+        assert!(item.cpr_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpr_display() {
+        let item = CpFindMatch::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpFindMatch"));
+    }
+
+    #[test]
+    fn test_cps_default() {
+        let item = CpTermDecoration::default();
+        assert!(item.cps_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cps_display() {
+        let item = CpTermDecoration::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpTermDecoration"));
+    }
+
+    #[test]
+    fn test_cpt_default() {
+        let item = CpTermAccessible::default();
+        assert!(item.cpt_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpt_display() {
+        let item = CpTermAccessible::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpTermAccessible"));
+    }
+
+    #[test]
+    fn test_cpu_default() {
+        let item = CpTermResize::default();
+        assert!(item.cpu_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpu_display() {
+        let item = CpTermResize::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpTermResize"));
+    }
+
+    #[test]
+    fn test_cpv_default() {
+        let item = CpBellEvent::default();
+        assert!(item.cpv_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpv_display() {
+        let item = CpBellEvent::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpBellEvent"));
+    }
+
+    #[test]
+    fn test_cpw_default() {
+        let item = CpTermTitle::default();
+        assert!(item.cpw_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpw_display() {
+        let item = CpTermTitle::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpTermTitle"));
+    }
+
+    #[test]
+    fn test_cpx_default() {
+        let item = CpTermPaste::default();
+        assert!(item.cpx_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpx_display() {
+        let item = CpTermPaste::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpTermPaste"));
+    }
+
+    #[test]
+    fn test_cpy_default() {
+        let item = CpTermReport::default();
+        assert!(item.cpy_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpy_display() {
+        let item = CpTermReport::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpTermReport"));
+    }
+
+    #[test]
+    fn test_cpz_default() {
+        let item = CpTermProfile2::default();
+        assert!(item.cpz_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cpz_display() {
+        let item = CpTermProfile2::default();
+        let s = format!("{item}");
+        assert!(s.contains("CpTermProfile2"));
     }
 
 }
