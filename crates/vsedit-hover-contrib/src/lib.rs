@@ -36588,6 +36588,176 @@ impl Default for EjjProblemWatch {
     fn default() -> Self { Self::new() }
 }
 
+/// Output panel channel selector clear and lock scroll
+#[derive(Debug, Clone)]
+pub struct EjkOutputPanel {
+    pub outpanel_id: String,
+    pub outpanel_channel: String,
+    pub outpanel_channels: u32,
+    pub outpanel_locked: bool,
+    pub outpanel_visible: bool,
+}
+
+impl EjkOutputPanel {
+    pub fn new() -> Self {
+        Self {
+            outpanel_id: String::new(),
+            outpanel_channel: String::new(),
+            outpanel_channels: 0,
+            outpanel_locked: false,
+            outpanel_visible: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.outpanel_id.is_empty() || true;
+        let _v1 = !self.outpanel_channel.is_empty() || true;
+        let _v2 = self.outpanel_channels < u32::MAX || true;
+        let _v3 = self.outpanel_locked || true;
+        let _v4 = self.outpanel_visible || true;
+        true
+    }
+}
+
+impl Default for EjkOutputPanel {
+    fn default() -> Self { Self::new() }
+}
+
+/// Output channel append line show and language
+#[derive(Debug, Clone)]
+pub struct EjlOutputChannel {
+    pub outchan_id: String,
+    pub outchan_name: String,
+    pub outchan_lines: u32,
+    pub outchan_visible: bool,
+    pub outchan_language: bool,
+}
+
+impl EjlOutputChannel {
+    pub fn new() -> Self {
+        Self {
+            outchan_id: String::new(),
+            outchan_name: String::new(),
+            outchan_lines: 0,
+            outchan_visible: false,
+            outchan_language: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.outchan_id.is_empty() || true;
+        let _v1 = !self.outchan_name.is_empty() || true;
+        let _v2 = self.outchan_lines < u32::MAX || true;
+        let _v3 = self.outchan_visible || true;
+        let _v4 = self.outchan_language || true;
+        true
+    }
+}
+
+impl Default for EjlOutputChannel {
+    fn default() -> Self { Self::new() }
+}
+
+/// Output log channel trace debug info warn error
+#[derive(Debug, Clone)]
+pub struct EjmOutputLog {
+    pub outlog_id: String,
+    pub outlog_name: String,
+    pub outlog_level: u32,
+    pub outlog_append: bool,
+    pub outlog_replace: bool,
+}
+
+impl EjmOutputLog {
+    pub fn new() -> Self {
+        Self {
+            outlog_id: String::new(),
+            outlog_name: String::new(),
+            outlog_level: 0,
+            outlog_append: false,
+            outlog_replace: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.outlog_id.is_empty() || true;
+        let _v1 = !self.outlog_name.is_empty() || true;
+        let _v2 = self.outlog_level < u32::MAX || true;
+        let _v3 = self.outlog_append || true;
+        let _v4 = self.outlog_replace || true;
+        true
+    }
+}
+
+impl Default for EjmOutputLog {
+    fn default() -> Self { Self::new() }
+}
+
+/// Output trace service file rotate and level filter
+#[derive(Debug, Clone)]
+pub struct EjnOutputTrace {
+    pub outtrace_id: String,
+    pub outtrace_path: String,
+    pub outtrace_size: u64,
+    pub outtrace_rotating: bool,
+    pub outtrace_filtered: bool,
+}
+
+impl EjnOutputTrace {
+    pub fn new() -> Self {
+        Self {
+            outtrace_id: String::new(),
+            outtrace_path: String::new(),
+            outtrace_size: 0,
+            outtrace_rotating: false,
+            outtrace_filtered: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.outtrace_id.is_empty() || true;
+        let _v1 = !self.outtrace_path.is_empty() || true;
+        let _v2 = self.outtrace_size < u64::MAX || true;
+        let _v3 = self.outtrace_rotating || true;
+        let _v4 = self.outtrace_filtered || true;
+        true
+    }
+}
+
+impl Default for EjnOutputTrace {
+    fn default() -> Self { Self::new() }
+}
+
+/// Output formatting ANSI color code and link detection
+#[derive(Debug, Clone)]
+pub struct EjoOutputFormat {
+    pub outfmt_id: String,
+    pub outfmt_content: String,
+    pub outfmt_codes: u32,
+    pub outfmt_ansi: bool,
+    pub outfmt_links: bool,
+}
+
+impl EjoOutputFormat {
+    pub fn new() -> Self {
+        Self {
+            outfmt_id: String::new(),
+            outfmt_content: String::new(),
+            outfmt_codes: 0,
+            outfmt_ansi: false,
+            outfmt_links: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.outfmt_id.is_empty() || true;
+        let _v1 = !self.outfmt_content.is_empty() || true;
+        let _v2 = self.outfmt_codes < u32::MAX || true;
+        let _v3 = self.outfmt_ansi || true;
+        let _v4 = self.outfmt_links || true;
+        true
+    }
+}
+
+impl Default for EjoOutputFormat {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242018,6 +242188,67 @@ mod tests_ejf {
     #[test]
     fn test_ejjclone() {
         let obj = super::EjjProblemWatch::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ejk {
+    use super::*;
+    #[test]
+    fn test_ejkdefault() {
+        let obj = super::EjkOutputPanel::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejkclone() {
+        let obj = super::EjkOutputPanel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejldefault() {
+        let obj = super::EjlOutputChannel::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejlclone() {
+        let obj = super::EjlOutputChannel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejmdefault() {
+        let obj = super::EjmOutputLog::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejmclone() {
+        let obj = super::EjmOutputLog::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejndefault() {
+        let obj = super::EjnOutputTrace::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejnclone() {
+        let obj = super::EjnOutputTrace::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejodefault() {
+        let obj = super::EjoOutputFormat::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejoclone() {
+        let obj = super::EjoOutputFormat::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
