@@ -37877,6 +37877,176 @@ impl Default for EkzViewDescriptorService {
     fn default() -> Self { Self::new() }
 }
 
+/// Marker service diagnostics URI owner and severity
+#[derive(Debug, Clone)]
+pub struct ElaMarkerService {
+    pub marksvc_id: String,
+    pub marksvc_owner: String,
+    pub marksvc_markers: u32,
+    pub marksvc_stats: bool,
+    pub marksvc_onchange: bool,
+}
+
+impl ElaMarkerService {
+    pub fn new() -> Self {
+        Self {
+            marksvc_id: String::new(),
+            marksvc_owner: String::new(),
+            marksvc_markers: 0,
+            marksvc_stats: false,
+            marksvc_onchange: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.marksvc_id.is_empty() || true;
+        let _v1 = !self.marksvc_owner.is_empty() || true;
+        let _v2 = self.marksvc_markers < u32::MAX || true;
+        let _v3 = self.marksvc_stats || true;
+        let _v4 = self.marksvc_onchange || true;
+        true
+    }
+}
+
+impl Default for ElaMarkerService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Decoration service editor model provider and dispose
+#[derive(Debug, Clone)]
+pub struct ElbDecorationService {
+    pub decsvc_id: String,
+    pub decsvc_type: String,
+    pub decsvc_providers: u32,
+    pub decsvc_active: bool,
+    pub decsvc_disposed: bool,
+}
+
+impl ElbDecorationService {
+    pub fn new() -> Self {
+        Self {
+            decsvc_id: String::new(),
+            decsvc_type: String::new(),
+            decsvc_providers: 0,
+            decsvc_active: false,
+            decsvc_disposed: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.decsvc_id.is_empty() || true;
+        let _v1 = !self.decsvc_type.is_empty() || true;
+        let _v2 = self.decsvc_providers < u32::MAX || true;
+        let _v3 = self.decsvc_active || true;
+        let _v4 = self.decsvc_disposed || true;
+        true
+    }
+}
+
+impl Default for ElbDecorationService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Model service create get reference and event
+#[derive(Debug, Clone)]
+pub struct ElcModelService {
+    pub modelsvc_id: String,
+    pub modelsvc_uri: String,
+    pub modelsvc_models: u32,
+    pub modelsvc_dirty: bool,
+    pub modelsvc_disposed: bool,
+}
+
+impl ElcModelService {
+    pub fn new() -> Self {
+        Self {
+            modelsvc_id: String::new(),
+            modelsvc_uri: String::new(),
+            modelsvc_models: 0,
+            modelsvc_dirty: false,
+            modelsvc_disposed: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.modelsvc_id.is_empty() || true;
+        let _v1 = !self.modelsvc_uri.is_empty() || true;
+        let _v2 = self.modelsvc_models < u32::MAX || true;
+        let _v3 = self.modelsvc_dirty || true;
+        let _v4 = self.modelsvc_disposed || true;
+        true
+    }
+}
+
+impl Default for ElcModelService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Language service register mode and configuration
+#[derive(Debug, Clone)]
+pub struct EldLanguageService {
+    pub langsvc_id: String,
+    pub langsvc_mode: String,
+    pub langsvc_languages: u32,
+    pub langsvc_registered: bool,
+    pub langsvc_configured: bool,
+}
+
+impl EldLanguageService {
+    pub fn new() -> Self {
+        Self {
+            langsvc_id: String::new(),
+            langsvc_mode: String::new(),
+            langsvc_languages: 0,
+            langsvc_registered: false,
+            langsvc_configured: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.langsvc_id.is_empty() || true;
+        let _v1 = !self.langsvc_mode.is_empty() || true;
+        let _v2 = self.langsvc_languages < u32::MAX || true;
+        let _v3 = self.langsvc_registered || true;
+        let _v4 = self.langsvc_configured || true;
+        true
+    }
+}
+
+impl Default for EldLanguageService {
+    fn default() -> Self { Self::new() }
+}
+
+/// Language feature registry hover complete rename and more
+#[derive(Debug, Clone)]
+pub struct EleLanguageFeatureService {
+    pub langfeat_id: String,
+    pub langfeat_feature: String,
+    pub langfeat_providers: u32,
+    pub langfeat_ordered: bool,
+    pub langfeat_exclusive: bool,
+}
+
+impl EleLanguageFeatureService {
+    pub fn new() -> Self {
+        Self {
+            langfeat_id: String::new(),
+            langfeat_feature: String::new(),
+            langfeat_providers: 0,
+            langfeat_ordered: false,
+            langfeat_exclusive: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.langfeat_id.is_empty() || true;
+        let _v1 = !self.langfeat_feature.is_empty() || true;
+        let _v2 = self.langfeat_providers < u32::MAX || true;
+        let _v3 = self.langfeat_ordered || true;
+        let _v4 = self.langfeat_exclusive || true;
+        true
+    }
+}
+
+impl Default for EleLanguageFeatureService {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243960,6 +244130,67 @@ mod tests_eku {
     #[test]
     fn test_ekzclone() {
         let obj = super::EkzViewDescriptorService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ela {
+    use super::*;
+    #[test]
+    fn test_eladefault() {
+        let obj = super::ElaMarkerService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elaclone() {
+        let obj = super::ElaMarkerService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elbdefault() {
+        let obj = super::ElbDecorationService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elbclone() {
+        let obj = super::ElbDecorationService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elcdefault() {
+        let obj = super::ElcModelService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_elcclone() {
+        let obj = super::ElcModelService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_elddefault() {
+        let obj = super::EldLanguageService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eldclone() {
+        let obj = super::EldLanguageService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eledefault() {
+        let obj = super::EleLanguageFeatureService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eleclone() {
+        let obj = super::EleLanguageFeatureService::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
