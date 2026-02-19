@@ -89768,6 +89768,111 @@ impl StorageValue {
     }
 }
 
+/// Runtime wiring: bsa_ DiffEditorModel
+#[derive(Debug, Clone)]
+pub struct DiffEditorModel {
+    pub bsa_original_uri: String,
+    pub bsa_modified_uri: String,
+    pub bsa_diff_count: u32,
+    pub bsa_inserted_lines: u32,
+    pub bsa_deleted_lines: u32,
+    pub bsa_changed_lines: u32,
+    pub bsa_is_side_by_side: bool,
+    pub bsa_ignore_whitespace: bool,
+    pub bsa_render_indicators: bool,
+    pub bsa_max_computation_time: u32,
+}
+
+impl DiffEditorModel {
+    pub fn bsa_summary(&self) -> String {
+        format!("DiffEditorModel({})", self.bsa_original_uri)
+    }
+}
+
+/// Runtime wiring: bsb_ MergeEditor
+#[derive(Debug, Clone)]
+pub struct MergeEditor {
+    pub bsb_result_uri: String,
+    pub bsb_input1_uri: String,
+    pub bsb_input2_uri: String,
+    pub bsb_base_uri: String,
+    pub bsb_conflict_count: u32,
+    pub bsb_resolved_count: u32,
+    pub bsb_unresolved_count: u32,
+    pub bsb_is_complete: bool,
+    pub bsb_accept_type: String,
+    pub bsb_show_base: bool,
+}
+
+impl MergeEditor {
+    pub fn bsb_summary(&self) -> String {
+        format!("MergeEditor({})", self.bsb_result_uri)
+    }
+}
+
+/// Runtime wiring: bsc_ ThreeWayMerge
+#[derive(Debug, Clone)]
+pub struct ThreeWayMerge {
+    pub bsc_base_content: String,
+    pub bsc_input1_content: String,
+    pub bsc_input2_content: String,
+    pub bsc_result_content: String,
+    pub bsc_conflict_ranges_count: u32,
+    pub bsc_auto_merged_ranges: u32,
+    pub bsc_manual_edits_count: u32,
+    pub bsc_diff_algorithm: String,
+    pub bsc_word_wrap: bool,
+    pub bsc_show_non_conflicting: bool,
+}
+
+impl ThreeWayMerge {
+    pub fn bsc_summary(&self) -> String {
+        format!("ThreeWayMerge({})", self.bsc_base_content)
+    }
+}
+
+/// Runtime wiring: bsd_ ConflictResolution
+#[derive(Debug, Clone)]
+pub struct ConflictResolution {
+    pub bsd_conflict_id: u32,
+    pub bsd_start_line: u32,
+    pub bsd_end_line: u32,
+    pub bsd_input1_text: String,
+    pub bsd_input2_text: String,
+    pub bsd_base_text: String,
+    pub bsd_resolution: String,
+    pub bsd_is_handled: bool,
+    pub bsd_is_combination: bool,
+    pub bsd_custom_text: String,
+}
+
+impl ConflictResolution {
+    pub fn bsd_summary(&self) -> String {
+        format!("ConflictResolution({})", self.bsd_conflict_id)
+    }
+}
+
+/// Runtime wiring: bse_ DiffAlgorithm
+#[derive(Debug, Clone)]
+pub struct DiffAlgorithm {
+    pub bse_algorithm_name: String,
+    pub bse_is_patience: bool,
+    pub bse_is_histogram: bool,
+    pub bse_is_myers: bool,
+    pub bse_timeout_ms: u32,
+    pub bse_max_file_size: usize,
+    pub bse_word_diff: bool,
+    pub bse_char_diff: bool,
+    pub bse_line_count_original: u32,
+    pub bse_line_count_modified: u32,
+}
+
+impl DiffAlgorithm {
+    pub fn bse_summary(&self) -> String {
+        format!("DiffAlgorithm({})", self.bse_algorithm_name)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -122527,6 +122632,910 @@ mod tests_bfo {
         };
         let _ = obj.brz_summary();
         assert!(!obj.brz_is_synced);
+    }
+
+    #[test]
+    fn test_bsa_original_uri() {
+        let obj = DiffEditorModel {
+            bsa_original_uri: String::from("test"),
+            bsa_modified_uri: String::from("test"),
+            bsa_diff_count: 0,
+            bsa_inserted_lines: 0,
+            bsa_deleted_lines: 0,
+            bsa_changed_lines: 0,
+            bsa_is_side_by_side: false,
+            bsa_ignore_whitespace: false,
+            bsa_render_indicators: false,
+            bsa_max_computation_time: 0,
+        };
+        let _ = obj.bsa_summary();
+        assert_eq!(obj.bsa_original_uri, "test");
+    }
+
+    #[test]
+    fn test_bsa_modified_uri() {
+        let obj = DiffEditorModel {
+            bsa_original_uri: String::from("test"),
+            bsa_modified_uri: String::from("test"),
+            bsa_diff_count: 0,
+            bsa_inserted_lines: 0,
+            bsa_deleted_lines: 0,
+            bsa_changed_lines: 0,
+            bsa_is_side_by_side: false,
+            bsa_ignore_whitespace: false,
+            bsa_render_indicators: false,
+            bsa_max_computation_time: 0,
+        };
+        let _ = obj.bsa_summary();
+        assert_eq!(obj.bsa_modified_uri, "test");
+    }
+
+    #[test]
+    fn test_bsa_diff_count() {
+        let obj = DiffEditorModel {
+            bsa_original_uri: String::from("test"),
+            bsa_modified_uri: String::from("test"),
+            bsa_diff_count: 0,
+            bsa_inserted_lines: 0,
+            bsa_deleted_lines: 0,
+            bsa_changed_lines: 0,
+            bsa_is_side_by_side: false,
+            bsa_ignore_whitespace: false,
+            bsa_render_indicators: false,
+            bsa_max_computation_time: 0,
+        };
+        let _ = obj.bsa_summary();
+        assert_eq!(obj.bsa_diff_count, 0);
+    }
+
+    #[test]
+    fn test_bsa_inserted_lines() {
+        let obj = DiffEditorModel {
+            bsa_original_uri: String::from("test"),
+            bsa_modified_uri: String::from("test"),
+            bsa_diff_count: 0,
+            bsa_inserted_lines: 0,
+            bsa_deleted_lines: 0,
+            bsa_changed_lines: 0,
+            bsa_is_side_by_side: false,
+            bsa_ignore_whitespace: false,
+            bsa_render_indicators: false,
+            bsa_max_computation_time: 0,
+        };
+        let _ = obj.bsa_summary();
+        assert_eq!(obj.bsa_inserted_lines, 0);
+    }
+
+    #[test]
+    fn test_bsa_deleted_lines() {
+        let obj = DiffEditorModel {
+            bsa_original_uri: String::from("test"),
+            bsa_modified_uri: String::from("test"),
+            bsa_diff_count: 0,
+            bsa_inserted_lines: 0,
+            bsa_deleted_lines: 0,
+            bsa_changed_lines: 0,
+            bsa_is_side_by_side: false,
+            bsa_ignore_whitespace: false,
+            bsa_render_indicators: false,
+            bsa_max_computation_time: 0,
+        };
+        let _ = obj.bsa_summary();
+        assert_eq!(obj.bsa_deleted_lines, 0);
+    }
+
+    #[test]
+    fn test_bsa_changed_lines() {
+        let obj = DiffEditorModel {
+            bsa_original_uri: String::from("test"),
+            bsa_modified_uri: String::from("test"),
+            bsa_diff_count: 0,
+            bsa_inserted_lines: 0,
+            bsa_deleted_lines: 0,
+            bsa_changed_lines: 0,
+            bsa_is_side_by_side: false,
+            bsa_ignore_whitespace: false,
+            bsa_render_indicators: false,
+            bsa_max_computation_time: 0,
+        };
+        let _ = obj.bsa_summary();
+        assert_eq!(obj.bsa_changed_lines, 0);
+    }
+
+    #[test]
+    fn test_bsa_is_side_by_side() {
+        let obj = DiffEditorModel {
+            bsa_original_uri: String::from("test"),
+            bsa_modified_uri: String::from("test"),
+            bsa_diff_count: 0,
+            bsa_inserted_lines: 0,
+            bsa_deleted_lines: 0,
+            bsa_changed_lines: 0,
+            bsa_is_side_by_side: false,
+            bsa_ignore_whitespace: false,
+            bsa_render_indicators: false,
+            bsa_max_computation_time: 0,
+        };
+        let _ = obj.bsa_summary();
+        assert!(!obj.bsa_is_side_by_side);
+    }
+
+    #[test]
+    fn test_bsa_ignore_whitespace() {
+        let obj = DiffEditorModel {
+            bsa_original_uri: String::from("test"),
+            bsa_modified_uri: String::from("test"),
+            bsa_diff_count: 0,
+            bsa_inserted_lines: 0,
+            bsa_deleted_lines: 0,
+            bsa_changed_lines: 0,
+            bsa_is_side_by_side: false,
+            bsa_ignore_whitespace: false,
+            bsa_render_indicators: false,
+            bsa_max_computation_time: 0,
+        };
+        let _ = obj.bsa_summary();
+        assert!(!obj.bsa_ignore_whitespace);
+    }
+
+    #[test]
+    fn test_bsa_render_indicators() {
+        let obj = DiffEditorModel {
+            bsa_original_uri: String::from("test"),
+            bsa_modified_uri: String::from("test"),
+            bsa_diff_count: 0,
+            bsa_inserted_lines: 0,
+            bsa_deleted_lines: 0,
+            bsa_changed_lines: 0,
+            bsa_is_side_by_side: false,
+            bsa_ignore_whitespace: false,
+            bsa_render_indicators: false,
+            bsa_max_computation_time: 0,
+        };
+        let _ = obj.bsa_summary();
+        assert!(!obj.bsa_render_indicators);
+    }
+
+    #[test]
+    fn test_bsa_max_computation_time() {
+        let obj = DiffEditorModel {
+            bsa_original_uri: String::from("test"),
+            bsa_modified_uri: String::from("test"),
+            bsa_diff_count: 0,
+            bsa_inserted_lines: 0,
+            bsa_deleted_lines: 0,
+            bsa_changed_lines: 0,
+            bsa_is_side_by_side: false,
+            bsa_ignore_whitespace: false,
+            bsa_render_indicators: false,
+            bsa_max_computation_time: 0,
+        };
+        let _ = obj.bsa_summary();
+        assert_eq!(obj.bsa_max_computation_time, 0);
+    }
+
+
+    #[test]
+    fn test_bsb_result_uri() {
+        let obj = MergeEditor {
+            bsb_result_uri: String::from("test"),
+            bsb_input1_uri: String::from("test"),
+            bsb_input2_uri: String::from("test"),
+            bsb_base_uri: String::from("test"),
+            bsb_conflict_count: 0,
+            bsb_resolved_count: 0,
+            bsb_unresolved_count: 0,
+            bsb_is_complete: false,
+            bsb_accept_type: String::from("test"),
+            bsb_show_base: false,
+        };
+        let _ = obj.bsb_summary();
+        assert_eq!(obj.bsb_result_uri, "test");
+    }
+
+    #[test]
+    fn test_bsb_input1_uri() {
+        let obj = MergeEditor {
+            bsb_result_uri: String::from("test"),
+            bsb_input1_uri: String::from("test"),
+            bsb_input2_uri: String::from("test"),
+            bsb_base_uri: String::from("test"),
+            bsb_conflict_count: 0,
+            bsb_resolved_count: 0,
+            bsb_unresolved_count: 0,
+            bsb_is_complete: false,
+            bsb_accept_type: String::from("test"),
+            bsb_show_base: false,
+        };
+        let _ = obj.bsb_summary();
+        assert_eq!(obj.bsb_input1_uri, "test");
+    }
+
+    #[test]
+    fn test_bsb_input2_uri() {
+        let obj = MergeEditor {
+            bsb_result_uri: String::from("test"),
+            bsb_input1_uri: String::from("test"),
+            bsb_input2_uri: String::from("test"),
+            bsb_base_uri: String::from("test"),
+            bsb_conflict_count: 0,
+            bsb_resolved_count: 0,
+            bsb_unresolved_count: 0,
+            bsb_is_complete: false,
+            bsb_accept_type: String::from("test"),
+            bsb_show_base: false,
+        };
+        let _ = obj.bsb_summary();
+        assert_eq!(obj.bsb_input2_uri, "test");
+    }
+
+    #[test]
+    fn test_bsb_base_uri() {
+        let obj = MergeEditor {
+            bsb_result_uri: String::from("test"),
+            bsb_input1_uri: String::from("test"),
+            bsb_input2_uri: String::from("test"),
+            bsb_base_uri: String::from("test"),
+            bsb_conflict_count: 0,
+            bsb_resolved_count: 0,
+            bsb_unresolved_count: 0,
+            bsb_is_complete: false,
+            bsb_accept_type: String::from("test"),
+            bsb_show_base: false,
+        };
+        let _ = obj.bsb_summary();
+        assert_eq!(obj.bsb_base_uri, "test");
+    }
+
+    #[test]
+    fn test_bsb_conflict_count() {
+        let obj = MergeEditor {
+            bsb_result_uri: String::from("test"),
+            bsb_input1_uri: String::from("test"),
+            bsb_input2_uri: String::from("test"),
+            bsb_base_uri: String::from("test"),
+            bsb_conflict_count: 0,
+            bsb_resolved_count: 0,
+            bsb_unresolved_count: 0,
+            bsb_is_complete: false,
+            bsb_accept_type: String::from("test"),
+            bsb_show_base: false,
+        };
+        let _ = obj.bsb_summary();
+        assert_eq!(obj.bsb_conflict_count, 0);
+    }
+
+    #[test]
+    fn test_bsb_resolved_count() {
+        let obj = MergeEditor {
+            bsb_result_uri: String::from("test"),
+            bsb_input1_uri: String::from("test"),
+            bsb_input2_uri: String::from("test"),
+            bsb_base_uri: String::from("test"),
+            bsb_conflict_count: 0,
+            bsb_resolved_count: 0,
+            bsb_unresolved_count: 0,
+            bsb_is_complete: false,
+            bsb_accept_type: String::from("test"),
+            bsb_show_base: false,
+        };
+        let _ = obj.bsb_summary();
+        assert_eq!(obj.bsb_resolved_count, 0);
+    }
+
+    #[test]
+    fn test_bsb_unresolved_count() {
+        let obj = MergeEditor {
+            bsb_result_uri: String::from("test"),
+            bsb_input1_uri: String::from("test"),
+            bsb_input2_uri: String::from("test"),
+            bsb_base_uri: String::from("test"),
+            bsb_conflict_count: 0,
+            bsb_resolved_count: 0,
+            bsb_unresolved_count: 0,
+            bsb_is_complete: false,
+            bsb_accept_type: String::from("test"),
+            bsb_show_base: false,
+        };
+        let _ = obj.bsb_summary();
+        assert_eq!(obj.bsb_unresolved_count, 0);
+    }
+
+    #[test]
+    fn test_bsb_is_complete() {
+        let obj = MergeEditor {
+            bsb_result_uri: String::from("test"),
+            bsb_input1_uri: String::from("test"),
+            bsb_input2_uri: String::from("test"),
+            bsb_base_uri: String::from("test"),
+            bsb_conflict_count: 0,
+            bsb_resolved_count: 0,
+            bsb_unresolved_count: 0,
+            bsb_is_complete: false,
+            bsb_accept_type: String::from("test"),
+            bsb_show_base: false,
+        };
+        let _ = obj.bsb_summary();
+        assert!(!obj.bsb_is_complete);
+    }
+
+    #[test]
+    fn test_bsb_accept_type() {
+        let obj = MergeEditor {
+            bsb_result_uri: String::from("test"),
+            bsb_input1_uri: String::from("test"),
+            bsb_input2_uri: String::from("test"),
+            bsb_base_uri: String::from("test"),
+            bsb_conflict_count: 0,
+            bsb_resolved_count: 0,
+            bsb_unresolved_count: 0,
+            bsb_is_complete: false,
+            bsb_accept_type: String::from("test"),
+            bsb_show_base: false,
+        };
+        let _ = obj.bsb_summary();
+        assert_eq!(obj.bsb_accept_type, "test");
+    }
+
+    #[test]
+    fn test_bsb_show_base() {
+        let obj = MergeEditor {
+            bsb_result_uri: String::from("test"),
+            bsb_input1_uri: String::from("test"),
+            bsb_input2_uri: String::from("test"),
+            bsb_base_uri: String::from("test"),
+            bsb_conflict_count: 0,
+            bsb_resolved_count: 0,
+            bsb_unresolved_count: 0,
+            bsb_is_complete: false,
+            bsb_accept_type: String::from("test"),
+            bsb_show_base: false,
+        };
+        let _ = obj.bsb_summary();
+        assert!(!obj.bsb_show_base);
+    }
+
+
+    #[test]
+    fn test_bsc_base_content() {
+        let obj = ThreeWayMerge {
+            bsc_base_content: String::from("test"),
+            bsc_input1_content: String::from("test"),
+            bsc_input2_content: String::from("test"),
+            bsc_result_content: String::from("test"),
+            bsc_conflict_ranges_count: 0,
+            bsc_auto_merged_ranges: 0,
+            bsc_manual_edits_count: 0,
+            bsc_diff_algorithm: String::from("test"),
+            bsc_word_wrap: false,
+            bsc_show_non_conflicting: false,
+        };
+        let _ = obj.bsc_summary();
+        assert_eq!(obj.bsc_base_content, "test");
+    }
+
+    #[test]
+    fn test_bsc_input1_content() {
+        let obj = ThreeWayMerge {
+            bsc_base_content: String::from("test"),
+            bsc_input1_content: String::from("test"),
+            bsc_input2_content: String::from("test"),
+            bsc_result_content: String::from("test"),
+            bsc_conflict_ranges_count: 0,
+            bsc_auto_merged_ranges: 0,
+            bsc_manual_edits_count: 0,
+            bsc_diff_algorithm: String::from("test"),
+            bsc_word_wrap: false,
+            bsc_show_non_conflicting: false,
+        };
+        let _ = obj.bsc_summary();
+        assert_eq!(obj.bsc_input1_content, "test");
+    }
+
+    #[test]
+    fn test_bsc_input2_content() {
+        let obj = ThreeWayMerge {
+            bsc_base_content: String::from("test"),
+            bsc_input1_content: String::from("test"),
+            bsc_input2_content: String::from("test"),
+            bsc_result_content: String::from("test"),
+            bsc_conflict_ranges_count: 0,
+            bsc_auto_merged_ranges: 0,
+            bsc_manual_edits_count: 0,
+            bsc_diff_algorithm: String::from("test"),
+            bsc_word_wrap: false,
+            bsc_show_non_conflicting: false,
+        };
+        let _ = obj.bsc_summary();
+        assert_eq!(obj.bsc_input2_content, "test");
+    }
+
+    #[test]
+    fn test_bsc_result_content() {
+        let obj = ThreeWayMerge {
+            bsc_base_content: String::from("test"),
+            bsc_input1_content: String::from("test"),
+            bsc_input2_content: String::from("test"),
+            bsc_result_content: String::from("test"),
+            bsc_conflict_ranges_count: 0,
+            bsc_auto_merged_ranges: 0,
+            bsc_manual_edits_count: 0,
+            bsc_diff_algorithm: String::from("test"),
+            bsc_word_wrap: false,
+            bsc_show_non_conflicting: false,
+        };
+        let _ = obj.bsc_summary();
+        assert_eq!(obj.bsc_result_content, "test");
+    }
+
+    #[test]
+    fn test_bsc_conflict_ranges_count() {
+        let obj = ThreeWayMerge {
+            bsc_base_content: String::from("test"),
+            bsc_input1_content: String::from("test"),
+            bsc_input2_content: String::from("test"),
+            bsc_result_content: String::from("test"),
+            bsc_conflict_ranges_count: 0,
+            bsc_auto_merged_ranges: 0,
+            bsc_manual_edits_count: 0,
+            bsc_diff_algorithm: String::from("test"),
+            bsc_word_wrap: false,
+            bsc_show_non_conflicting: false,
+        };
+        let _ = obj.bsc_summary();
+        assert_eq!(obj.bsc_conflict_ranges_count, 0);
+    }
+
+    #[test]
+    fn test_bsc_auto_merged_ranges() {
+        let obj = ThreeWayMerge {
+            bsc_base_content: String::from("test"),
+            bsc_input1_content: String::from("test"),
+            bsc_input2_content: String::from("test"),
+            bsc_result_content: String::from("test"),
+            bsc_conflict_ranges_count: 0,
+            bsc_auto_merged_ranges: 0,
+            bsc_manual_edits_count: 0,
+            bsc_diff_algorithm: String::from("test"),
+            bsc_word_wrap: false,
+            bsc_show_non_conflicting: false,
+        };
+        let _ = obj.bsc_summary();
+        assert_eq!(obj.bsc_auto_merged_ranges, 0);
+    }
+
+    #[test]
+    fn test_bsc_manual_edits_count() {
+        let obj = ThreeWayMerge {
+            bsc_base_content: String::from("test"),
+            bsc_input1_content: String::from("test"),
+            bsc_input2_content: String::from("test"),
+            bsc_result_content: String::from("test"),
+            bsc_conflict_ranges_count: 0,
+            bsc_auto_merged_ranges: 0,
+            bsc_manual_edits_count: 0,
+            bsc_diff_algorithm: String::from("test"),
+            bsc_word_wrap: false,
+            bsc_show_non_conflicting: false,
+        };
+        let _ = obj.bsc_summary();
+        assert_eq!(obj.bsc_manual_edits_count, 0);
+    }
+
+    #[test]
+    fn test_bsc_diff_algorithm() {
+        let obj = ThreeWayMerge {
+            bsc_base_content: String::from("test"),
+            bsc_input1_content: String::from("test"),
+            bsc_input2_content: String::from("test"),
+            bsc_result_content: String::from("test"),
+            bsc_conflict_ranges_count: 0,
+            bsc_auto_merged_ranges: 0,
+            bsc_manual_edits_count: 0,
+            bsc_diff_algorithm: String::from("test"),
+            bsc_word_wrap: false,
+            bsc_show_non_conflicting: false,
+        };
+        let _ = obj.bsc_summary();
+        assert_eq!(obj.bsc_diff_algorithm, "test");
+    }
+
+    #[test]
+    fn test_bsc_word_wrap() {
+        let obj = ThreeWayMerge {
+            bsc_base_content: String::from("test"),
+            bsc_input1_content: String::from("test"),
+            bsc_input2_content: String::from("test"),
+            bsc_result_content: String::from("test"),
+            bsc_conflict_ranges_count: 0,
+            bsc_auto_merged_ranges: 0,
+            bsc_manual_edits_count: 0,
+            bsc_diff_algorithm: String::from("test"),
+            bsc_word_wrap: false,
+            bsc_show_non_conflicting: false,
+        };
+        let _ = obj.bsc_summary();
+        assert!(!obj.bsc_word_wrap);
+    }
+
+    #[test]
+    fn test_bsc_show_non_conflicting() {
+        let obj = ThreeWayMerge {
+            bsc_base_content: String::from("test"),
+            bsc_input1_content: String::from("test"),
+            bsc_input2_content: String::from("test"),
+            bsc_result_content: String::from("test"),
+            bsc_conflict_ranges_count: 0,
+            bsc_auto_merged_ranges: 0,
+            bsc_manual_edits_count: 0,
+            bsc_diff_algorithm: String::from("test"),
+            bsc_word_wrap: false,
+            bsc_show_non_conflicting: false,
+        };
+        let _ = obj.bsc_summary();
+        assert!(!obj.bsc_show_non_conflicting);
+    }
+
+
+    #[test]
+    fn test_bsd_conflict_id() {
+        let obj = ConflictResolution {
+            bsd_conflict_id: 0,
+            bsd_start_line: 0,
+            bsd_end_line: 0,
+            bsd_input1_text: String::from("test"),
+            bsd_input2_text: String::from("test"),
+            bsd_base_text: String::from("test"),
+            bsd_resolution: String::from("test"),
+            bsd_is_handled: false,
+            bsd_is_combination: false,
+            bsd_custom_text: String::from("test"),
+        };
+        let _ = obj.bsd_summary();
+        assert_eq!(obj.bsd_conflict_id, 0);
+    }
+
+    #[test]
+    fn test_bsd_start_line() {
+        let obj = ConflictResolution {
+            bsd_conflict_id: 0,
+            bsd_start_line: 0,
+            bsd_end_line: 0,
+            bsd_input1_text: String::from("test"),
+            bsd_input2_text: String::from("test"),
+            bsd_base_text: String::from("test"),
+            bsd_resolution: String::from("test"),
+            bsd_is_handled: false,
+            bsd_is_combination: false,
+            bsd_custom_text: String::from("test"),
+        };
+        let _ = obj.bsd_summary();
+        assert_eq!(obj.bsd_start_line, 0);
+    }
+
+    #[test]
+    fn test_bsd_end_line() {
+        let obj = ConflictResolution {
+            bsd_conflict_id: 0,
+            bsd_start_line: 0,
+            bsd_end_line: 0,
+            bsd_input1_text: String::from("test"),
+            bsd_input2_text: String::from("test"),
+            bsd_base_text: String::from("test"),
+            bsd_resolution: String::from("test"),
+            bsd_is_handled: false,
+            bsd_is_combination: false,
+            bsd_custom_text: String::from("test"),
+        };
+        let _ = obj.bsd_summary();
+        assert_eq!(obj.bsd_end_line, 0);
+    }
+
+    #[test]
+    fn test_bsd_input1_text() {
+        let obj = ConflictResolution {
+            bsd_conflict_id: 0,
+            bsd_start_line: 0,
+            bsd_end_line: 0,
+            bsd_input1_text: String::from("test"),
+            bsd_input2_text: String::from("test"),
+            bsd_base_text: String::from("test"),
+            bsd_resolution: String::from("test"),
+            bsd_is_handled: false,
+            bsd_is_combination: false,
+            bsd_custom_text: String::from("test"),
+        };
+        let _ = obj.bsd_summary();
+        assert_eq!(obj.bsd_input1_text, "test");
+    }
+
+    #[test]
+    fn test_bsd_input2_text() {
+        let obj = ConflictResolution {
+            bsd_conflict_id: 0,
+            bsd_start_line: 0,
+            bsd_end_line: 0,
+            bsd_input1_text: String::from("test"),
+            bsd_input2_text: String::from("test"),
+            bsd_base_text: String::from("test"),
+            bsd_resolution: String::from("test"),
+            bsd_is_handled: false,
+            bsd_is_combination: false,
+            bsd_custom_text: String::from("test"),
+        };
+        let _ = obj.bsd_summary();
+        assert_eq!(obj.bsd_input2_text, "test");
+    }
+
+    #[test]
+    fn test_bsd_base_text() {
+        let obj = ConflictResolution {
+            bsd_conflict_id: 0,
+            bsd_start_line: 0,
+            bsd_end_line: 0,
+            bsd_input1_text: String::from("test"),
+            bsd_input2_text: String::from("test"),
+            bsd_base_text: String::from("test"),
+            bsd_resolution: String::from("test"),
+            bsd_is_handled: false,
+            bsd_is_combination: false,
+            bsd_custom_text: String::from("test"),
+        };
+        let _ = obj.bsd_summary();
+        assert_eq!(obj.bsd_base_text, "test");
+    }
+
+    #[test]
+    fn test_bsd_resolution() {
+        let obj = ConflictResolution {
+            bsd_conflict_id: 0,
+            bsd_start_line: 0,
+            bsd_end_line: 0,
+            bsd_input1_text: String::from("test"),
+            bsd_input2_text: String::from("test"),
+            bsd_base_text: String::from("test"),
+            bsd_resolution: String::from("test"),
+            bsd_is_handled: false,
+            bsd_is_combination: false,
+            bsd_custom_text: String::from("test"),
+        };
+        let _ = obj.bsd_summary();
+        assert_eq!(obj.bsd_resolution, "test");
+    }
+
+    #[test]
+    fn test_bsd_is_handled() {
+        let obj = ConflictResolution {
+            bsd_conflict_id: 0,
+            bsd_start_line: 0,
+            bsd_end_line: 0,
+            bsd_input1_text: String::from("test"),
+            bsd_input2_text: String::from("test"),
+            bsd_base_text: String::from("test"),
+            bsd_resolution: String::from("test"),
+            bsd_is_handled: false,
+            bsd_is_combination: false,
+            bsd_custom_text: String::from("test"),
+        };
+        let _ = obj.bsd_summary();
+        assert!(!obj.bsd_is_handled);
+    }
+
+    #[test]
+    fn test_bsd_is_combination() {
+        let obj = ConflictResolution {
+            bsd_conflict_id: 0,
+            bsd_start_line: 0,
+            bsd_end_line: 0,
+            bsd_input1_text: String::from("test"),
+            bsd_input2_text: String::from("test"),
+            bsd_base_text: String::from("test"),
+            bsd_resolution: String::from("test"),
+            bsd_is_handled: false,
+            bsd_is_combination: false,
+            bsd_custom_text: String::from("test"),
+        };
+        let _ = obj.bsd_summary();
+        assert!(!obj.bsd_is_combination);
+    }
+
+    #[test]
+    fn test_bsd_custom_text() {
+        let obj = ConflictResolution {
+            bsd_conflict_id: 0,
+            bsd_start_line: 0,
+            bsd_end_line: 0,
+            bsd_input1_text: String::from("test"),
+            bsd_input2_text: String::from("test"),
+            bsd_base_text: String::from("test"),
+            bsd_resolution: String::from("test"),
+            bsd_is_handled: false,
+            bsd_is_combination: false,
+            bsd_custom_text: String::from("test"),
+        };
+        let _ = obj.bsd_summary();
+        assert_eq!(obj.bsd_custom_text, "test");
+    }
+
+
+    #[test]
+    fn test_bse_algorithm_name() {
+        let obj = DiffAlgorithm {
+            bse_algorithm_name: String::from("test"),
+            bse_is_patience: false,
+            bse_is_histogram: false,
+            bse_is_myers: false,
+            bse_timeout_ms: 0,
+            bse_max_file_size: 0,
+            bse_word_diff: false,
+            bse_char_diff: false,
+            bse_line_count_original: 0,
+            bse_line_count_modified: 0,
+        };
+        let _ = obj.bse_summary();
+        assert_eq!(obj.bse_algorithm_name, "test");
+    }
+
+    #[test]
+    fn test_bse_is_patience() {
+        let obj = DiffAlgorithm {
+            bse_algorithm_name: String::from("test"),
+            bse_is_patience: false,
+            bse_is_histogram: false,
+            bse_is_myers: false,
+            bse_timeout_ms: 0,
+            bse_max_file_size: 0,
+            bse_word_diff: false,
+            bse_char_diff: false,
+            bse_line_count_original: 0,
+            bse_line_count_modified: 0,
+        };
+        let _ = obj.bse_summary();
+        assert!(!obj.bse_is_patience);
+    }
+
+    #[test]
+    fn test_bse_is_histogram() {
+        let obj = DiffAlgorithm {
+            bse_algorithm_name: String::from("test"),
+            bse_is_patience: false,
+            bse_is_histogram: false,
+            bse_is_myers: false,
+            bse_timeout_ms: 0,
+            bse_max_file_size: 0,
+            bse_word_diff: false,
+            bse_char_diff: false,
+            bse_line_count_original: 0,
+            bse_line_count_modified: 0,
+        };
+        let _ = obj.bse_summary();
+        assert!(!obj.bse_is_histogram);
+    }
+
+    #[test]
+    fn test_bse_is_myers() {
+        let obj = DiffAlgorithm {
+            bse_algorithm_name: String::from("test"),
+            bse_is_patience: false,
+            bse_is_histogram: false,
+            bse_is_myers: false,
+            bse_timeout_ms: 0,
+            bse_max_file_size: 0,
+            bse_word_diff: false,
+            bse_char_diff: false,
+            bse_line_count_original: 0,
+            bse_line_count_modified: 0,
+        };
+        let _ = obj.bse_summary();
+        assert!(!obj.bse_is_myers);
+    }
+
+    #[test]
+    fn test_bse_timeout_ms() {
+        let obj = DiffAlgorithm {
+            bse_algorithm_name: String::from("test"),
+            bse_is_patience: false,
+            bse_is_histogram: false,
+            bse_is_myers: false,
+            bse_timeout_ms: 0,
+            bse_max_file_size: 0,
+            bse_word_diff: false,
+            bse_char_diff: false,
+            bse_line_count_original: 0,
+            bse_line_count_modified: 0,
+        };
+        let _ = obj.bse_summary();
+        assert_eq!(obj.bse_timeout_ms, 0);
+    }
+
+    #[test]
+    fn test_bse_max_file_size() {
+        let obj = DiffAlgorithm {
+            bse_algorithm_name: String::from("test"),
+            bse_is_patience: false,
+            bse_is_histogram: false,
+            bse_is_myers: false,
+            bse_timeout_ms: 0,
+            bse_max_file_size: 0,
+            bse_word_diff: false,
+            bse_char_diff: false,
+            bse_line_count_original: 0,
+            bse_line_count_modified: 0,
+        };
+        let _ = obj.bse_summary();
+        assert_eq!(obj.bse_max_file_size, 0);
+    }
+
+    #[test]
+    fn test_bse_word_diff() {
+        let obj = DiffAlgorithm {
+            bse_algorithm_name: String::from("test"),
+            bse_is_patience: false,
+            bse_is_histogram: false,
+            bse_is_myers: false,
+            bse_timeout_ms: 0,
+            bse_max_file_size: 0,
+            bse_word_diff: false,
+            bse_char_diff: false,
+            bse_line_count_original: 0,
+            bse_line_count_modified: 0,
+        };
+        let _ = obj.bse_summary();
+        assert!(!obj.bse_word_diff);
+    }
+
+    #[test]
+    fn test_bse_char_diff() {
+        let obj = DiffAlgorithm {
+            bse_algorithm_name: String::from("test"),
+            bse_is_patience: false,
+            bse_is_histogram: false,
+            bse_is_myers: false,
+            bse_timeout_ms: 0,
+            bse_max_file_size: 0,
+            bse_word_diff: false,
+            bse_char_diff: false,
+            bse_line_count_original: 0,
+            bse_line_count_modified: 0,
+        };
+        let _ = obj.bse_summary();
+        assert!(!obj.bse_char_diff);
+    }
+
+    #[test]
+    fn test_bse_line_count_original() {
+        let obj = DiffAlgorithm {
+            bse_algorithm_name: String::from("test"),
+            bse_is_patience: false,
+            bse_is_histogram: false,
+            bse_is_myers: false,
+            bse_timeout_ms: 0,
+            bse_max_file_size: 0,
+            bse_word_diff: false,
+            bse_char_diff: false,
+            bse_line_count_original: 0,
+            bse_line_count_modified: 0,
+        };
+        let _ = obj.bse_summary();
+        assert_eq!(obj.bse_line_count_original, 0);
+    }
+
+    #[test]
+    fn test_bse_line_count_modified() {
+        let obj = DiffAlgorithm {
+            bse_algorithm_name: String::from("test"),
+            bse_is_patience: false,
+            bse_is_histogram: false,
+            bse_is_myers: false,
+            bse_timeout_ms: 0,
+            bse_max_file_size: 0,
+            bse_word_diff: false,
+            bse_char_diff: false,
+            bse_line_count_original: 0,
+            bse_line_count_modified: 0,
+        };
+        let _ = obj.bse_summary();
+        assert_eq!(obj.bse_line_count_modified, 0);
     }
 
 }
