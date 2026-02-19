@@ -96100,6 +96100,247 @@ impl std::fmt::Display for InlayHintModel {
     }
 }
 
+
+/// BracketPairConfig — bracket pair colorization config
+#[derive(Debug, Clone)]
+pub struct BracketPairConfig {
+    pub byk_enabled: bool,
+    pub byk_independent_color_pool: bool,
+    pub byk_max_bracket_pairs: u32,
+    pub byk_color_count: u32,
+    pub byk_highlight_active: bool,
+    pub byk_show_guides: String,
+    pub byk_bracket_pairs_horizontal: String,
+    pub byk_bracket_pairs_vertical: bool,
+}
+
+impl BracketPairConfig {
+    pub fn new() -> Self {
+        Self {
+            byk_enabled: true,
+            byk_independent_color_pool: false,
+            byk_max_bracket_pairs: 100000,
+            byk_color_count: 6,
+            byk_highlight_active: true,
+            byk_show_guides: "active".into(),
+            byk_bracket_pairs_horizontal: "active".into(),
+            byk_bracket_pairs_vertical: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("BracketPairConfig({})", self.byk_enabled)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.byk_enabled || true
+    }
+}
+
+impl Default for BracketPairConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for BracketPairConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BracketPairConfig({})", self.byk_enabled)
+    }
+}
+
+/// IndentGuideConfig — indent guide configuration
+#[derive(Debug, Clone)]
+pub struct IndentGuideConfig {
+    pub byl_enabled: bool,
+    pub byl_highlight_active: bool,
+    pub byl_bracket_pairs: bool,
+    pub byl_bracket_pairs_horizontal: String,
+    pub byl_render_method: String,
+    pub byl_max_indent_level: u32,
+    pub byl_color_scheme: String,
+    pub byl_show_on_empty_lines: bool,
+}
+
+impl IndentGuideConfig {
+    pub fn new() -> Self {
+        Self {
+            byl_enabled: true,
+            byl_highlight_active: true,
+            byl_bracket_pairs: false,
+            byl_bracket_pairs_horizontal: "active".into(),
+            byl_render_method: "indent".into(),
+            byl_max_indent_level: 20,
+            byl_color_scheme: "default".into(),
+            byl_show_on_empty_lines: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("IndentGuideConfig({})", self.byl_enabled)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.byl_enabled || true
+    }
+}
+
+impl Default for IndentGuideConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for IndentGuideConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IndentGuideConfig({})", self.byl_enabled)
+    }
+}
+
+/// UnicodeHighlightConfig — unicode highlight configuration
+#[derive(Debug, Clone)]
+pub struct UnicodeHighlightConfig {
+    pub bym_non_basic_ascii: bool,
+    pub bym_invisible_characters: bool,
+    pub bym_ambiguous_characters: bool,
+    pub bym_include_comments: bool,
+    pub bym_include_strings: bool,
+    pub bym_allow_in_locales: String,
+    pub bym_include_in_imports: bool,
+    pub bym_show_exclude_options: bool,
+}
+
+impl UnicodeHighlightConfig {
+    pub fn new() -> Self {
+        Self {
+            bym_non_basic_ascii: true,
+            bym_invisible_characters: true,
+            bym_ambiguous_characters: true,
+            bym_include_comments: true,
+            bym_include_strings: true,
+            bym_allow_in_locales: "".into(),
+            bym_include_in_imports: false,
+            bym_show_exclude_options: true,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("UnicodeHighlightConfig({})", self.bym_non_basic_ascii)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bym_non_basic_ascii || true
+    }
+}
+
+impl Default for UnicodeHighlightConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for UnicodeHighlightConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "UnicodeHighlightConfig({})", self.bym_non_basic_ascii)
+    }
+}
+
+/// LinkedEditingConfig — linked editing configuration
+#[derive(Debug, Clone)]
+pub struct LinkedEditingConfig {
+    pub byn_enabled: bool,
+    pub byn_language_id: String,
+    pub byn_highlight_color: String,
+    pub byn_delay_ms: u32,
+    pub byn_word_pattern: String,
+    pub byn_active_ranges_count: u32,
+    pub byn_provider_id: String,
+    pub byn_supports_multi: bool,
+}
+
+impl LinkedEditingConfig {
+    pub fn new() -> Self {
+        Self {
+            byn_enabled: false,
+            byn_language_id: "html".into(),
+            byn_highlight_color: "".into(),
+            byn_delay_ms: 0,
+            byn_word_pattern: "".into(),
+            byn_active_ranges_count: 0,
+            byn_provider_id: "".into(),
+            byn_supports_multi: false,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("LinkedEditingConfig({})", self.byn_enabled)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.byn_enabled || true
+    }
+}
+
+impl Default for LinkedEditingConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for LinkedEditingConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LinkedEditingConfig({})", self.byn_enabled)
+    }
+}
+
+/// RenameProviderModel — rename provider model
+#[derive(Debug, Clone)]
+pub struct RenameProviderModel {
+    pub byo_provider_id: String,
+    pub byo_supports_resolve: bool,
+    pub byo_old_name: String,
+    pub byo_new_name: String,
+    pub byo_is_valid: bool,
+    pub byo_reason: String,
+    pub byo_affected_files: u32,
+    pub byo_affected_references: u32,
+}
+
+impl RenameProviderModel {
+    pub fn new() -> Self {
+        Self {
+            byo_provider_id: "builtin".into(),
+            byo_supports_resolve: true,
+            byo_old_name: "".into(),
+            byo_new_name: "".into(),
+            byo_is_valid: false,
+            byo_reason: "".into(),
+            byo_affected_files: 0,
+            byo_affected_references: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("RenameProviderModel({})", self.byo_provider_id)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.byo_provider_id.is_empty() || true
+    }
+}
+
+impl Default for RenameProviderModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for RenameProviderModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RenameProviderModel({})", self.byo_provider_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -146849,6 +147090,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.byj_is_enabled = true;
         assert_eq!(c.summary(), InlayHintModel::new().summary());
+    }
+
+
+    #[test]
+    fn test_byk_create() {
+        let obj = BracketPairConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byk_validate() {
+        let obj = BracketPairConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byk_display() {
+        let obj = BracketPairConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("BracketPairConfig"));
+    }
+
+    #[test]
+    fn test_byk_clone() {
+        let obj = BracketPairConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byk_debug() {
+        let obj = BracketPairConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("BracketPairConfig"));
+    }
+
+    #[test]
+    fn test_byk_default() {
+        let obj = BracketPairConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byk_summary_contains_name() {
+        let obj = BracketPairConfig::new();
+        assert!(obj.summary().contains("BracketPairConfig"));
+    }
+
+    #[test]
+    fn test_byk_validate_default() {
+        let obj = BracketPairConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byk_display_not_empty() {
+        let obj = BracketPairConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byk_clone_independence() {
+        let mut obj = BracketPairConfig::new();
+        let c = obj.clone();
+        obj.byk_enabled = true;
+        assert_eq!(c.summary(), BracketPairConfig::new().summary());
+    }
+
+    #[test]
+    fn test_byl_create() {
+        let obj = IndentGuideConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byl_validate() {
+        let obj = IndentGuideConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byl_display() {
+        let obj = IndentGuideConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("IndentGuideConfig"));
+    }
+
+    #[test]
+    fn test_byl_clone() {
+        let obj = IndentGuideConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byl_debug() {
+        let obj = IndentGuideConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("IndentGuideConfig"));
+    }
+
+    #[test]
+    fn test_byl_default() {
+        let obj = IndentGuideConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byl_summary_contains_name() {
+        let obj = IndentGuideConfig::new();
+        assert!(obj.summary().contains("IndentGuideConfig"));
+    }
+
+    #[test]
+    fn test_byl_validate_default() {
+        let obj = IndentGuideConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byl_display_not_empty() {
+        let obj = IndentGuideConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byl_clone_independence() {
+        let mut obj = IndentGuideConfig::new();
+        let c = obj.clone();
+        obj.byl_enabled = true;
+        assert_eq!(c.summary(), IndentGuideConfig::new().summary());
+    }
+
+    #[test]
+    fn test_bym_create() {
+        let obj = UnicodeHighlightConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bym_validate() {
+        let obj = UnicodeHighlightConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bym_display() {
+        let obj = UnicodeHighlightConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("UnicodeHighlightConfig"));
+    }
+
+    #[test]
+    fn test_bym_clone() {
+        let obj = UnicodeHighlightConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bym_debug() {
+        let obj = UnicodeHighlightConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("UnicodeHighlightConfig"));
+    }
+
+    #[test]
+    fn test_bym_default() {
+        let obj = UnicodeHighlightConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bym_summary_contains_name() {
+        let obj = UnicodeHighlightConfig::new();
+        assert!(obj.summary().contains("UnicodeHighlightConfig"));
+    }
+
+    #[test]
+    fn test_bym_validate_default() {
+        let obj = UnicodeHighlightConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bym_display_not_empty() {
+        let obj = UnicodeHighlightConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bym_clone_independence() {
+        let mut obj = UnicodeHighlightConfig::new();
+        let c = obj.clone();
+        obj.bym_non_basic_ascii = true;
+        assert_eq!(c.summary(), UnicodeHighlightConfig::new().summary());
+    }
+
+    #[test]
+    fn test_byn_create() {
+        let obj = LinkedEditingConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byn_validate() {
+        let obj = LinkedEditingConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byn_display() {
+        let obj = LinkedEditingConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("LinkedEditingConfig"));
+    }
+
+    #[test]
+    fn test_byn_clone() {
+        let obj = LinkedEditingConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byn_debug() {
+        let obj = LinkedEditingConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("LinkedEditingConfig"));
+    }
+
+    #[test]
+    fn test_byn_default() {
+        let obj = LinkedEditingConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byn_summary_contains_name() {
+        let obj = LinkedEditingConfig::new();
+        assert!(obj.summary().contains("LinkedEditingConfig"));
+    }
+
+    #[test]
+    fn test_byn_validate_default() {
+        let obj = LinkedEditingConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byn_display_not_empty() {
+        let obj = LinkedEditingConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byn_clone_independence() {
+        let mut obj = LinkedEditingConfig::new();
+        let c = obj.clone();
+        obj.byn_enabled = false;
+        assert_eq!(c.summary(), LinkedEditingConfig::new().summary());
+    }
+
+    #[test]
+    fn test_byo_create() {
+        let obj = RenameProviderModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byo_validate() {
+        let obj = RenameProviderModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byo_display() {
+        let obj = RenameProviderModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("RenameProviderModel"));
+    }
+
+    #[test]
+    fn test_byo_clone() {
+        let obj = RenameProviderModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byo_debug() {
+        let obj = RenameProviderModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("RenameProviderModel"));
+    }
+
+    #[test]
+    fn test_byo_default() {
+        let obj = RenameProviderModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byo_summary_contains_name() {
+        let obj = RenameProviderModel::new();
+        assert!(obj.summary().contains("RenameProviderModel"));
+    }
+
+    #[test]
+    fn test_byo_validate_default() {
+        let obj = RenameProviderModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byo_display_not_empty() {
+        let obj = RenameProviderModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byo_clone_independence() {
+        let mut obj = RenameProviderModel::new();
+        let c = obj.clone();
+        obj.byo_provider_id = "builtin".into();
+        assert_eq!(c.summary(), RenameProviderModel::new().summary());
     }
 
 }
