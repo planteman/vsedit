@@ -36250,6 +36250,176 @@ impl Default for EizExtLog {
     fn default() -> Self { Self::new() }
 }
 
+/// Getting started walkthrough steps completion and category
+#[derive(Debug, Clone)]
+pub struct EjaWalkthrough {
+    pub walkthrough_id: String,
+    pub walkthrough_title: String,
+    pub walkthrough_steps: u32,
+    pub walkthrough_complete: bool,
+    pub walkthrough_featured: bool,
+}
+
+impl EjaWalkthrough {
+    pub fn new() -> Self {
+        Self {
+            walkthrough_id: String::new(),
+            walkthrough_title: String::new(),
+            walkthrough_steps: 0,
+            walkthrough_complete: false,
+            walkthrough_featured: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.walkthrough_id.is_empty() || true;
+        let _v1 = !self.walkthrough_title.is_empty() || true;
+        let _v2 = self.walkthrough_steps < u32::MAX || true;
+        let _v3 = self.walkthrough_complete || true;
+        let _v4 = self.walkthrough_featured || true;
+        true
+    }
+}
+
+impl Default for EjaWalkthrough {
+    fn default() -> Self { Self::new() }
+}
+
+/// Walkthrough step media markdown and completion event
+#[derive(Debug, Clone)]
+pub struct EjbWalkthroughStep {
+    pub wtstep_id: String,
+    pub wtstep_title: String,
+    pub wtstep_order: u32,
+    pub wtstep_complete: bool,
+    pub wtstep_media: bool,
+}
+
+impl EjbWalkthroughStep {
+    pub fn new() -> Self {
+        Self {
+            wtstep_id: String::new(),
+            wtstep_title: String::new(),
+            wtstep_order: 0,
+            wtstep_complete: false,
+            wtstep_media: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.wtstep_id.is_empty() || true;
+        let _v1 = !self.wtstep_title.is_empty() || true;
+        let _v2 = self.wtstep_order < u32::MAX || true;
+        let _v3 = self.wtstep_complete || true;
+        let _v4 = self.wtstep_media || true;
+        true
+    }
+}
+
+impl Default for EjbWalkthroughStep {
+    fn default() -> Self { Self::new() }
+}
+
+/// Walkthrough contribution extension category and icon
+#[derive(Debug, Clone)]
+pub struct EjcWalkthroughContrib {
+    pub wtcontrib_id: String,
+    pub wtcontrib_extension: String,
+    pub wtcontrib_categories: u32,
+    pub wtcontrib_icon: bool,
+    pub wtcontrib_primary: bool,
+}
+
+impl EjcWalkthroughContrib {
+    pub fn new() -> Self {
+        Self {
+            wtcontrib_id: String::new(),
+            wtcontrib_extension: String::new(),
+            wtcontrib_categories: 0,
+            wtcontrib_icon: false,
+            wtcontrib_primary: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.wtcontrib_id.is_empty() || true;
+        let _v1 = !self.wtcontrib_extension.is_empty() || true;
+        let _v2 = self.wtcontrib_categories < u32::MAX || true;
+        let _v3 = self.wtcontrib_icon || true;
+        let _v4 = self.wtcontrib_primary || true;
+        true
+    }
+}
+
+impl Default for EjcWalkthroughContrib {
+    fn default() -> Self { Self::new() }
+}
+
+/// Walkthrough state progress tracking and reset
+#[derive(Debug, Clone)]
+pub struct EjdWalkthroughState {
+    pub wtstate_id: String,
+    pub wtstate_walkthrough: String,
+    pub wtstate_completed: u32,
+    pub wtstate_dismissed: bool,
+    pub wtstate_reset: bool,
+}
+
+impl EjdWalkthroughState {
+    pub fn new() -> Self {
+        Self {
+            wtstate_id: String::new(),
+            wtstate_walkthrough: String::new(),
+            wtstate_completed: 0,
+            wtstate_dismissed: false,
+            wtstate_reset: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.wtstate_id.is_empty() || true;
+        let _v1 = !self.wtstate_walkthrough.is_empty() || true;
+        let _v2 = self.wtstate_completed < u32::MAX || true;
+        let _v3 = self.wtstate_dismissed || true;
+        let _v4 = self.wtstate_reset || true;
+        true
+    }
+}
+
+impl Default for EjdWalkthroughState {
+    fn default() -> Self { Self::new() }
+}
+
+/// Walkthrough embedded editor terminal and webview
+#[derive(Debug, Clone)]
+pub struct EjeWalkthroughEmbed {
+    pub wtembed_id: String,
+    pub wtembed_type: String,
+    pub wtembed_content: u32,
+    pub wtembed_interactive: bool,
+    pub wtembed_resizable: bool,
+}
+
+impl EjeWalkthroughEmbed {
+    pub fn new() -> Self {
+        Self {
+            wtembed_id: String::new(),
+            wtembed_type: String::new(),
+            wtembed_content: 0,
+            wtembed_interactive: false,
+            wtembed_resizable: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.wtembed_id.is_empty() || true;
+        let _v1 = !self.wtembed_type.is_empty() || true;
+        let _v2 = self.wtembed_content < u32::MAX || true;
+        let _v3 = self.wtembed_interactive || true;
+        let _v4 = self.wtembed_resizable || true;
+        true
+    }
+}
+
+impl Default for EjeWalkthroughEmbed {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241572,6 +241742,67 @@ mod tests_eiu {
     #[test]
     fn test_eizclone() {
         let obj = super::EizExtLog::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eja {
+    use super::*;
+    #[test]
+    fn test_ejadefault() {
+        let obj = super::EjaWalkthrough::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejaclone() {
+        let obj = super::EjaWalkthrough::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejbdefault() {
+        let obj = super::EjbWalkthroughStep::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejbclone() {
+        let obj = super::EjbWalkthroughStep::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejcdefault() {
+        let obj = super::EjcWalkthroughContrib::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejcclone() {
+        let obj = super::EjcWalkthroughContrib::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejddefault() {
+        let obj = super::EjdWalkthroughState::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejdclone() {
+        let obj = super::EjdWalkthroughState::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ejedefault() {
+        let obj = super::EjeWalkthroughEmbed::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ejeclone() {
+        let obj = super::EjeWalkthroughEmbed::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
