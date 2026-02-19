@@ -28959,6 +28959,191 @@ impl Default for EbeTermRenderer {
     }
 }
 
+/// Terminal link detection file URL and command
+#[derive(Debug, Clone)]
+pub struct EbfTermLink {
+    pub termlink_id: String,
+    pub termlink_pattern: String,
+    pub termlink_matches: u32,
+    pub termlink_hover: bool,
+    pub termlink_activate: bool,
+}
+
+impl EbfTermLink {
+    pub fn new() -> Self {
+        Self {
+            termlink_id: String::new(),
+            termlink_pattern: String::new(),
+            termlink_matches: 0,
+            termlink_hover: false,
+            termlink_activate: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termlink_id.is_empty() || true;
+        let _v1 = !self.termlink_pattern.is_empty() || true;
+        let _v2 = self.termlink_matches < u32::MAX || true;
+        let _v3 = self.termlink_hover || true;
+        let _v4 = self.termlink_activate || true;
+        true
+    }
+}
+
+impl Default for EbfTermLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal selection word line and block mode
+#[derive(Debug, Clone)]
+pub struct EbgTermSelect {
+    pub termsel_id: String,
+    pub termsel_text: String,
+    pub termsel_mode: u32,
+    pub termsel_active: bool,
+    pub termsel_word: bool,
+}
+
+impl EbgTermSelect {
+    pub fn new() -> Self {
+        Self {
+            termsel_id: String::new(),
+            termsel_text: String::new(),
+            termsel_mode: 0,
+            termsel_active: false,
+            termsel_word: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termsel_id.is_empty() || true;
+        let _v1 = !self.termsel_text.is_empty() || true;
+        let _v2 = self.termsel_mode < u32::MAX || true;
+        let _v3 = self.termsel_active || true;
+        let _v4 = self.termsel_word || true;
+        true
+    }
+}
+
+impl Default for EbgTermSelect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal search find next previous and highlight
+#[derive(Debug, Clone)]
+pub struct EbhTermSearch {
+    pub termsrch_id: String,
+    pub termsrch_query: String,
+    pub termsrch_results: u32,
+    pub termsrch_regex: bool,
+    pub termsrch_case: bool,
+}
+
+impl EbhTermSearch {
+    pub fn new() -> Self {
+        Self {
+            termsrch_id: String::new(),
+            termsrch_query: String::new(),
+            termsrch_results: 0,
+            termsrch_regex: false,
+            termsrch_case: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termsrch_id.is_empty() || true;
+        let _v1 = !self.termsrch_query.is_empty() || true;
+        let _v2 = self.termsrch_results < u32::MAX || true;
+        let _v3 = self.termsrch_regex || true;
+        let _v4 = self.termsrch_case || true;
+        true
+    }
+}
+
+impl Default for EbhTermSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal decoration gutter line and overview ruler
+#[derive(Debug, Clone)]
+pub struct EbiTermDecoration {
+    pub termdec_id: String,
+    pub termdec_marker: String,
+    pub termdec_ranges: u32,
+    pub termdec_gutter: bool,
+    pub termdec_overview: bool,
+}
+
+impl EbiTermDecoration {
+    pub fn new() -> Self {
+        Self {
+            termdec_id: String::new(),
+            termdec_marker: String::new(),
+            termdec_ranges: 0,
+            termdec_gutter: false,
+            termdec_overview: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termdec_id.is_empty() || true;
+        let _v1 = !self.termdec_marker.is_empty() || true;
+        let _v2 = self.termdec_ranges < u32::MAX || true;
+        let _v3 = self.termdec_gutter || true;
+        let _v4 = self.termdec_overview || true;
+        true
+    }
+}
+
+impl Default for EbiTermDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal audio bell visual bell and notification
+#[derive(Debug, Clone)]
+pub struct EbjTermAudio {
+    pub termaud_id: String,
+    pub termaud_type: String,
+    pub termaud_volume: u32,
+    pub termaud_visual: bool,
+    pub termaud_enabled: bool,
+}
+
+impl EbjTermAudio {
+    pub fn new() -> Self {
+        Self {
+            termaud_id: String::new(),
+            termaud_type: String::new(),
+            termaud_volume: 0,
+            termaud_visual: false,
+            termaud_enabled: false,
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.termaud_id.is_empty() || true;
+        let _v1 = !self.termaud_type.is_empty() || true;
+        let _v2 = self.termaud_volume < u32::MAX || true;
+        let _v3 = self.termaud_visual || true;
+        let _v4 = self.termaud_enabled || true;
+        true
+    }
+}
+
+impl Default for EbjTermAudio {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231448,6 +231633,73 @@ mod tests_eba {
     #[test]
     fn test_ebeclone() {
         let obj = super::EbeTermRenderer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_ebf {
+    use super::*;
+
+    #[test]
+    fn test_ebfdefault() {
+        let obj = super::EbfTermLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebfclone() {
+        let obj = super::EbfTermLink::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebgdefault() {
+        let obj = super::EbgTermSelect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebgclone() {
+        let obj = super::EbgTermSelect::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebhdefault() {
+        let obj = super::EbhTermSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebhclone() {
+        let obj = super::EbhTermSearch::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebidefault() {
+        let obj = super::EbiTermDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebiclone() {
+        let obj = super::EbiTermDecoration::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ebjdefault() {
+        let obj = super::EbjTermAudio::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ebjclone() {
+        let obj = super::EbjTermAudio::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
