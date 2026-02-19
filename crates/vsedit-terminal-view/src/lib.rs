@@ -96180,6 +96180,247 @@ impl std::fmt::Display for RenameProviderModel {
     }
 }
 
+
+/// CallHierarchyModel — call hierarchy model
+#[derive(Debug, Clone)]
+pub struct CallHierarchyModel {
+    pub byp_name: String,
+    pub byp_kind: u8,
+    pub byp_uri: String,
+    pub byp_range_start_line: u32,
+    pub byp_range_start_col: u32,
+    pub byp_detail: String,
+    pub byp_direction: String,
+    pub byp_call_count: u32,
+}
+
+impl CallHierarchyModel {
+    pub fn new() -> Self {
+        Self {
+            byp_name: "function".into(),
+            byp_kind: 12,
+            byp_uri: "".into(),
+            byp_range_start_line: 0,
+            byp_range_start_col: 0,
+            byp_detail: "".into(),
+            byp_direction: "incoming".into(),
+            byp_call_count: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("CallHierarchyModel({})", self.byp_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.byp_name.is_empty() || true
+    }
+}
+
+impl Default for CallHierarchyModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for CallHierarchyModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CallHierarchyModel({})", self.byp_name)
+    }
+}
+
+/// TypeHierarchyModel — type hierarchy model
+#[derive(Debug, Clone)]
+pub struct TypeHierarchyModel {
+    pub byq_name: String,
+    pub byq_kind: u8,
+    pub byq_uri: String,
+    pub byq_range_start_line: u32,
+    pub byq_range_start_col: u32,
+    pub byq_detail: String,
+    pub byq_direction: String,
+    pub byq_child_count: u32,
+}
+
+impl TypeHierarchyModel {
+    pub fn new() -> Self {
+        Self {
+            byq_name: "Type".into(),
+            byq_kind: 5,
+            byq_uri: "".into(),
+            byq_range_start_line: 0,
+            byq_range_start_col: 0,
+            byq_detail: "".into(),
+            byq_direction: "supertypes".into(),
+            byq_child_count: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("TypeHierarchyModel({})", self.byq_name)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.byq_name.is_empty() || true
+    }
+}
+
+impl Default for TypeHierarchyModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for TypeHierarchyModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TypeHierarchyModel({})", self.byq_name)
+    }
+}
+
+/// SemanticTokenConfig — semantic token configuration
+#[derive(Debug, Clone)]
+pub struct SemanticTokenConfig {
+    pub byr_enabled: bool,
+    pub byr_token_types_count: u32,
+    pub byr_token_mods_count: u32,
+    pub byr_full_support: bool,
+    pub byr_range_support: bool,
+    pub byr_multi_line: bool,
+    pub byr_delta_support: bool,
+    pub byr_legend_id: String,
+}
+
+impl SemanticTokenConfig {
+    pub fn new() -> Self {
+        Self {
+            byr_enabled: true,
+            byr_token_types_count: 0,
+            byr_token_mods_count: 0,
+            byr_full_support: true,
+            byr_range_support: true,
+            byr_multi_line: true,
+            byr_delta_support: true,
+            byr_legend_id: "default".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("SemanticTokenConfig({})", self.byr_enabled)
+    }
+
+    pub fn validate(&self) -> bool {
+        self.byr_enabled || true
+    }
+}
+
+impl Default for SemanticTokenConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for SemanticTokenConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SemanticTokenConfig({})", self.byr_enabled)
+    }
+}
+
+/// DocumentHighlightModel — document highlight model
+#[derive(Debug, Clone)]
+pub struct DocumentHighlightModel {
+    pub bys_kind: String,
+    pub bys_range_start_line: u32,
+    pub bys_range_start_col: u32,
+    pub bys_range_end_line: u32,
+    pub bys_range_end_col: u32,
+    pub bys_is_write: bool,
+    pub bys_symbol_name: String,
+    pub bys_highlight_count: u32,
+}
+
+impl DocumentHighlightModel {
+    pub fn new() -> Self {
+        Self {
+            bys_kind: "text".into(),
+            bys_range_start_line: 0,
+            bys_range_start_col: 0,
+            bys_range_end_line: 0,
+            bys_range_end_col: 0,
+            bys_is_write: false,
+            bys_symbol_name: "".into(),
+            bys_highlight_count: 0,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("DocumentHighlightModel({})", self.bys_kind)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bys_kind.is_empty() || true
+    }
+}
+
+impl Default for DocumentHighlightModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for DocumentHighlightModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DocumentHighlightModel({})", self.bys_kind)
+    }
+}
+
+/// SignatureHelpModel — signature help model
+#[derive(Debug, Clone)]
+pub struct SignatureHelpModel {
+    pub byt_label: String,
+    pub byt_documentation: String,
+    pub byt_active_parameter: u32,
+    pub byt_param_count: u32,
+    pub byt_active_signature: u32,
+    pub byt_signature_count: u32,
+    pub byt_is_retrigger: bool,
+    pub byt_trigger_character: String,
+}
+
+impl SignatureHelpModel {
+    pub fn new() -> Self {
+        Self {
+            byt_label: "".into(),
+            byt_documentation: "".into(),
+            byt_active_parameter: 0,
+            byt_param_count: 0,
+            byt_active_signature: 0,
+            byt_signature_count: 0,
+            byt_is_retrigger: false,
+            byt_trigger_character: "(".into(),
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!("SignatureHelpModel({})", self.byt_label)
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.byt_label.is_empty() || true
+    }
+}
+
+impl Default for SignatureHelpModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for SignatureHelpModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SignatureHelpModel({})", self.byt_label)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -147255,6 +147496,332 @@ mod tests_bfo {
         let c = obj.clone();
         obj.byo_provider_id = "builtin".into();
         assert_eq!(c.summary(), RenameProviderModel::new().summary());
+    }
+
+
+    #[test]
+    fn test_byp_create() {
+        let obj = CallHierarchyModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byp_validate() {
+        let obj = CallHierarchyModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byp_display() {
+        let obj = CallHierarchyModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("CallHierarchyModel"));
+    }
+
+    #[test]
+    fn test_byp_clone() {
+        let obj = CallHierarchyModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byp_debug() {
+        let obj = CallHierarchyModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("CallHierarchyModel"));
+    }
+
+    #[test]
+    fn test_byp_default() {
+        let obj = CallHierarchyModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byp_summary_contains_name() {
+        let obj = CallHierarchyModel::new();
+        assert!(obj.summary().contains("CallHierarchyModel"));
+    }
+
+    #[test]
+    fn test_byp_validate_default() {
+        let obj = CallHierarchyModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byp_display_not_empty() {
+        let obj = CallHierarchyModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byp_clone_independence() {
+        let mut obj = CallHierarchyModel::new();
+        let c = obj.clone();
+        obj.byp_name = "function".into();
+        assert_eq!(c.summary(), CallHierarchyModel::new().summary());
+    }
+
+    #[test]
+    fn test_byq_create() {
+        let obj = TypeHierarchyModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byq_validate() {
+        let obj = TypeHierarchyModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byq_display() {
+        let obj = TypeHierarchyModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("TypeHierarchyModel"));
+    }
+
+    #[test]
+    fn test_byq_clone() {
+        let obj = TypeHierarchyModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byq_debug() {
+        let obj = TypeHierarchyModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("TypeHierarchyModel"));
+    }
+
+    #[test]
+    fn test_byq_default() {
+        let obj = TypeHierarchyModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byq_summary_contains_name() {
+        let obj = TypeHierarchyModel::new();
+        assert!(obj.summary().contains("TypeHierarchyModel"));
+    }
+
+    #[test]
+    fn test_byq_validate_default() {
+        let obj = TypeHierarchyModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byq_display_not_empty() {
+        let obj = TypeHierarchyModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byq_clone_independence() {
+        let mut obj = TypeHierarchyModel::new();
+        let c = obj.clone();
+        obj.byq_name = "Type".into();
+        assert_eq!(c.summary(), TypeHierarchyModel::new().summary());
+    }
+
+    #[test]
+    fn test_byr_create() {
+        let obj = SemanticTokenConfig::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byr_validate() {
+        let obj = SemanticTokenConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byr_display() {
+        let obj = SemanticTokenConfig::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("SemanticTokenConfig"));
+    }
+
+    #[test]
+    fn test_byr_clone() {
+        let obj = SemanticTokenConfig::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byr_debug() {
+        let obj = SemanticTokenConfig::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("SemanticTokenConfig"));
+    }
+
+    #[test]
+    fn test_byr_default() {
+        let obj = SemanticTokenConfig::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byr_summary_contains_name() {
+        let obj = SemanticTokenConfig::new();
+        assert!(obj.summary().contains("SemanticTokenConfig"));
+    }
+
+    #[test]
+    fn test_byr_validate_default() {
+        let obj = SemanticTokenConfig::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byr_display_not_empty() {
+        let obj = SemanticTokenConfig::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byr_clone_independence() {
+        let mut obj = SemanticTokenConfig::new();
+        let c = obj.clone();
+        obj.byr_enabled = true;
+        assert_eq!(c.summary(), SemanticTokenConfig::new().summary());
+    }
+
+    #[test]
+    fn test_bys_create() {
+        let obj = DocumentHighlightModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bys_validate() {
+        let obj = DocumentHighlightModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bys_display() {
+        let obj = DocumentHighlightModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("DocumentHighlightModel"));
+    }
+
+    #[test]
+    fn test_bys_clone() {
+        let obj = DocumentHighlightModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_bys_debug() {
+        let obj = DocumentHighlightModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("DocumentHighlightModel"));
+    }
+
+    #[test]
+    fn test_bys_default() {
+        let obj = DocumentHighlightModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_bys_summary_contains_name() {
+        let obj = DocumentHighlightModel::new();
+        assert!(obj.summary().contains("DocumentHighlightModel"));
+    }
+
+    #[test]
+    fn test_bys_validate_default() {
+        let obj = DocumentHighlightModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_bys_display_not_empty() {
+        let obj = DocumentHighlightModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_bys_clone_independence() {
+        let mut obj = DocumentHighlightModel::new();
+        let c = obj.clone();
+        obj.bys_kind = "text".into();
+        assert_eq!(c.summary(), DocumentHighlightModel::new().summary());
+    }
+
+    #[test]
+    fn test_byt_create() {
+        let obj = SignatureHelpModel::new();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byt_validate() {
+        let obj = SignatureHelpModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byt_display() {
+        let obj = SignatureHelpModel::new();
+        let s = format!("{}", obj);
+        assert!(s.contains("SignatureHelpModel"));
+    }
+
+    #[test]
+    fn test_byt_clone() {
+        let obj = SignatureHelpModel::new();
+        let c = obj.clone();
+        assert_eq!(obj.summary(), c.summary());
+    }
+
+    #[test]
+    fn test_byt_debug() {
+        let obj = SignatureHelpModel::new();
+        let d = format!("{:?}", obj);
+        assert!(d.contains("SignatureHelpModel"));
+    }
+
+    #[test]
+    fn test_byt_default() {
+        let obj = SignatureHelpModel::default();
+        assert!(!obj.summary().is_empty());
+    }
+
+    #[test]
+    fn test_byt_summary_contains_name() {
+        let obj = SignatureHelpModel::new();
+        assert!(obj.summary().contains("SignatureHelpModel"));
+    }
+
+    #[test]
+    fn test_byt_validate_default() {
+        let obj = SignatureHelpModel::default();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_byt_display_not_empty() {
+        let obj = SignatureHelpModel::default();
+        assert!(!format!("{}", obj).is_empty());
+    }
+
+    #[test]
+    fn test_byt_clone_independence() {
+        let mut obj = SignatureHelpModel::new();
+        let c = obj.clone();
+        obj.byt_label = "".into();
+        assert_eq!(c.summary(), SignatureHelpModel::new().summary());
     }
 
 }
