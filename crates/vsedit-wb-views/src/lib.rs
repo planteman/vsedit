@@ -87252,6 +87252,111 @@ impl NotebookSerialization {
     }
 }
 
+/// Runtime wiring: bnk_ CommentThread
+#[derive(Debug, Clone)]
+pub struct CommentThread {
+    pub bnk_thread_id: String,
+    pub bnk_uri: String,
+    pub bnk_range_start_line: u32,
+    pub bnk_range_end_line: u32,
+    pub bnk_comments_count: usize,
+    pub bnk_is_collapsed: bool,
+    pub bnk_label: String,
+    pub bnk_context_value: String,
+    pub bnk_can_reply: bool,
+    pub bnk_state: u8,
+}
+
+impl CommentThread {
+    pub fn bnk_summary(&self) -> String {
+        format!("CommentThread({})", self.bnk_thread_id)
+    }
+}
+
+/// Runtime wiring: bnl_ CommentReply
+#[derive(Debug, Clone)]
+pub struct CommentReply {
+    pub bnl_reply_id: String,
+    pub bnl_author_name: String,
+    pub bnl_author_icon_path: String,
+    pub bnl_body: String,
+    pub bnl_timestamp: u64,
+    pub bnl_mode: u8,
+    pub bnl_reactions: Vec<String>,
+    pub bnl_context_value: String,
+    pub bnl_is_editing: bool,
+    pub bnl_parent_thread_id: String,
+}
+
+impl CommentReply {
+    pub fn bnl_summary(&self) -> String {
+        format!("CommentReply({})", self.bnl_reply_id)
+    }
+}
+
+/// Runtime wiring: bnm_ CommentRange
+#[derive(Debug, Clone)]
+pub struct CommentRange {
+    pub bnm_start_line: u32,
+    pub bnm_start_character: u32,
+    pub bnm_end_line: u32,
+    pub bnm_end_character: u32,
+    pub bnm_is_collapsed: bool,
+    pub bnm_is_empty: bool,
+    pub bnm_line_count: u32,
+    pub bnm_char_count: u32,
+    pub bnm_uri: String,
+    pub bnm_thread_id: String,
+}
+
+impl CommentRange {
+    pub fn bnm_summary(&self) -> String {
+        format!("CommentRange({})", self.bnm_start_line)
+    }
+}
+
+/// Runtime wiring: bnn_ CommentController
+#[derive(Debug, Clone)]
+pub struct CommentController {
+    pub bnn_controller_id: String,
+    pub bnn_label: String,
+    pub bnn_commenting_range_provider: bool,
+    pub bnn_reaction_handler: bool,
+    pub bnn_options_title: String,
+    pub bnn_options_prompt: String,
+    pub bnn_supported_schemes: Vec<String>,
+    pub bnn_comment_count: usize,
+    pub bnn_thread_count: usize,
+    pub bnn_is_active: bool,
+}
+
+impl CommentController {
+    pub fn bnn_summary(&self) -> String {
+        format!("CommentController({})", self.bnn_controller_id)
+    }
+}
+
+/// Runtime wiring: bno_ CommentDecoration
+#[derive(Debug, Clone)]
+pub struct CommentDecoration {
+    pub bno_decoration_id: String,
+    pub bno_gutter_icon_path: String,
+    pub bno_overview_ruler_color: String,
+    pub bno_line_number: u32,
+    pub bno_hover_message: String,
+    pub bno_is_whole_line: bool,
+    pub bno_after_text: String,
+    pub bno_before_text: String,
+    pub bno_border_color: String,
+    pub bno_background_color: String,
+}
+
+impl CommentDecoration {
+    pub fn bno_summary(&self) -> String {
+        format!("CommentDecoration({})", self.bno_decoration_id)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -98314,6 +98419,910 @@ mod tests_bfo {
         };
         let _ = obj.bnj_summary();
         assert_eq!(obj.bnj_version, 0);
+    }
+
+    #[test]
+    fn test_bnk_thread_id() {
+        let obj = CommentThread {
+            bnk_thread_id: String::from("test"),
+            bnk_uri: String::from("test"),
+            bnk_range_start_line: 0,
+            bnk_range_end_line: 0,
+            bnk_comments_count: 0,
+            bnk_is_collapsed: false,
+            bnk_label: String::from("test"),
+            bnk_context_value: String::from("test"),
+            bnk_can_reply: false,
+            bnk_state: 0,
+        };
+        let _ = obj.bnk_summary();
+        assert_eq!(obj.bnk_thread_id, "test");
+    }
+
+    #[test]
+    fn test_bnk_uri() {
+        let obj = CommentThread {
+            bnk_thread_id: String::from("test"),
+            bnk_uri: String::from("test"),
+            bnk_range_start_line: 0,
+            bnk_range_end_line: 0,
+            bnk_comments_count: 0,
+            bnk_is_collapsed: false,
+            bnk_label: String::from("test"),
+            bnk_context_value: String::from("test"),
+            bnk_can_reply: false,
+            bnk_state: 0,
+        };
+        let _ = obj.bnk_summary();
+        assert_eq!(obj.bnk_uri, "test");
+    }
+
+    #[test]
+    fn test_bnk_range_start_line() {
+        let obj = CommentThread {
+            bnk_thread_id: String::from("test"),
+            bnk_uri: String::from("test"),
+            bnk_range_start_line: 0,
+            bnk_range_end_line: 0,
+            bnk_comments_count: 0,
+            bnk_is_collapsed: false,
+            bnk_label: String::from("test"),
+            bnk_context_value: String::from("test"),
+            bnk_can_reply: false,
+            bnk_state: 0,
+        };
+        let _ = obj.bnk_summary();
+        assert_eq!(obj.bnk_range_start_line, 0);
+    }
+
+    #[test]
+    fn test_bnk_range_end_line() {
+        let obj = CommentThread {
+            bnk_thread_id: String::from("test"),
+            bnk_uri: String::from("test"),
+            bnk_range_start_line: 0,
+            bnk_range_end_line: 0,
+            bnk_comments_count: 0,
+            bnk_is_collapsed: false,
+            bnk_label: String::from("test"),
+            bnk_context_value: String::from("test"),
+            bnk_can_reply: false,
+            bnk_state: 0,
+        };
+        let _ = obj.bnk_summary();
+        assert_eq!(obj.bnk_range_end_line, 0);
+    }
+
+    #[test]
+    fn test_bnk_comments_count() {
+        let obj = CommentThread {
+            bnk_thread_id: String::from("test"),
+            bnk_uri: String::from("test"),
+            bnk_range_start_line: 0,
+            bnk_range_end_line: 0,
+            bnk_comments_count: 0,
+            bnk_is_collapsed: false,
+            bnk_label: String::from("test"),
+            bnk_context_value: String::from("test"),
+            bnk_can_reply: false,
+            bnk_state: 0,
+        };
+        let _ = obj.bnk_summary();
+        assert_eq!(obj.bnk_comments_count, 0);
+    }
+
+    #[test]
+    fn test_bnk_is_collapsed() {
+        let obj = CommentThread {
+            bnk_thread_id: String::from("test"),
+            bnk_uri: String::from("test"),
+            bnk_range_start_line: 0,
+            bnk_range_end_line: 0,
+            bnk_comments_count: 0,
+            bnk_is_collapsed: false,
+            bnk_label: String::from("test"),
+            bnk_context_value: String::from("test"),
+            bnk_can_reply: false,
+            bnk_state: 0,
+        };
+        let _ = obj.bnk_summary();
+        assert!(!obj.bnk_is_collapsed);
+    }
+
+    #[test]
+    fn test_bnk_label() {
+        let obj = CommentThread {
+            bnk_thread_id: String::from("test"),
+            bnk_uri: String::from("test"),
+            bnk_range_start_line: 0,
+            bnk_range_end_line: 0,
+            bnk_comments_count: 0,
+            bnk_is_collapsed: false,
+            bnk_label: String::from("test"),
+            bnk_context_value: String::from("test"),
+            bnk_can_reply: false,
+            bnk_state: 0,
+        };
+        let _ = obj.bnk_summary();
+        assert_eq!(obj.bnk_label, "test");
+    }
+
+    #[test]
+    fn test_bnk_context_value() {
+        let obj = CommentThread {
+            bnk_thread_id: String::from("test"),
+            bnk_uri: String::from("test"),
+            bnk_range_start_line: 0,
+            bnk_range_end_line: 0,
+            bnk_comments_count: 0,
+            bnk_is_collapsed: false,
+            bnk_label: String::from("test"),
+            bnk_context_value: String::from("test"),
+            bnk_can_reply: false,
+            bnk_state: 0,
+        };
+        let _ = obj.bnk_summary();
+        assert_eq!(obj.bnk_context_value, "test");
+    }
+
+    #[test]
+    fn test_bnk_can_reply() {
+        let obj = CommentThread {
+            bnk_thread_id: String::from("test"),
+            bnk_uri: String::from("test"),
+            bnk_range_start_line: 0,
+            bnk_range_end_line: 0,
+            bnk_comments_count: 0,
+            bnk_is_collapsed: false,
+            bnk_label: String::from("test"),
+            bnk_context_value: String::from("test"),
+            bnk_can_reply: false,
+            bnk_state: 0,
+        };
+        let _ = obj.bnk_summary();
+        assert!(!obj.bnk_can_reply);
+    }
+
+    #[test]
+    fn test_bnk_state() {
+        let obj = CommentThread {
+            bnk_thread_id: String::from("test"),
+            bnk_uri: String::from("test"),
+            bnk_range_start_line: 0,
+            bnk_range_end_line: 0,
+            bnk_comments_count: 0,
+            bnk_is_collapsed: false,
+            bnk_label: String::from("test"),
+            bnk_context_value: String::from("test"),
+            bnk_can_reply: false,
+            bnk_state: 0,
+        };
+        let _ = obj.bnk_summary();
+        assert_eq!(obj.bnk_state, 0);
+    }
+
+
+    #[test]
+    fn test_bnl_reply_id() {
+        let obj = CommentReply {
+            bnl_reply_id: String::from("test"),
+            bnl_author_name: String::from("test"),
+            bnl_author_icon_path: String::from("test"),
+            bnl_body: String::from("test"),
+            bnl_timestamp: 0,
+            bnl_mode: 0,
+            bnl_reactions: Vec::new(),
+            bnl_context_value: String::from("test"),
+            bnl_is_editing: false,
+            bnl_parent_thread_id: String::from("test"),
+        };
+        let _ = obj.bnl_summary();
+        assert_eq!(obj.bnl_reply_id, "test");
+    }
+
+    #[test]
+    fn test_bnl_author_name() {
+        let obj = CommentReply {
+            bnl_reply_id: String::from("test"),
+            bnl_author_name: String::from("test"),
+            bnl_author_icon_path: String::from("test"),
+            bnl_body: String::from("test"),
+            bnl_timestamp: 0,
+            bnl_mode: 0,
+            bnl_reactions: Vec::new(),
+            bnl_context_value: String::from("test"),
+            bnl_is_editing: false,
+            bnl_parent_thread_id: String::from("test"),
+        };
+        let _ = obj.bnl_summary();
+        assert_eq!(obj.bnl_author_name, "test");
+    }
+
+    #[test]
+    fn test_bnl_author_icon_path() {
+        let obj = CommentReply {
+            bnl_reply_id: String::from("test"),
+            bnl_author_name: String::from("test"),
+            bnl_author_icon_path: String::from("test"),
+            bnl_body: String::from("test"),
+            bnl_timestamp: 0,
+            bnl_mode: 0,
+            bnl_reactions: Vec::new(),
+            bnl_context_value: String::from("test"),
+            bnl_is_editing: false,
+            bnl_parent_thread_id: String::from("test"),
+        };
+        let _ = obj.bnl_summary();
+        assert_eq!(obj.bnl_author_icon_path, "test");
+    }
+
+    #[test]
+    fn test_bnl_body() {
+        let obj = CommentReply {
+            bnl_reply_id: String::from("test"),
+            bnl_author_name: String::from("test"),
+            bnl_author_icon_path: String::from("test"),
+            bnl_body: String::from("test"),
+            bnl_timestamp: 0,
+            bnl_mode: 0,
+            bnl_reactions: Vec::new(),
+            bnl_context_value: String::from("test"),
+            bnl_is_editing: false,
+            bnl_parent_thread_id: String::from("test"),
+        };
+        let _ = obj.bnl_summary();
+        assert_eq!(obj.bnl_body, "test");
+    }
+
+    #[test]
+    fn test_bnl_timestamp() {
+        let obj = CommentReply {
+            bnl_reply_id: String::from("test"),
+            bnl_author_name: String::from("test"),
+            bnl_author_icon_path: String::from("test"),
+            bnl_body: String::from("test"),
+            bnl_timestamp: 0,
+            bnl_mode: 0,
+            bnl_reactions: Vec::new(),
+            bnl_context_value: String::from("test"),
+            bnl_is_editing: false,
+            bnl_parent_thread_id: String::from("test"),
+        };
+        let _ = obj.bnl_summary();
+        assert_eq!(obj.bnl_timestamp, 0);
+    }
+
+    #[test]
+    fn test_bnl_mode() {
+        let obj = CommentReply {
+            bnl_reply_id: String::from("test"),
+            bnl_author_name: String::from("test"),
+            bnl_author_icon_path: String::from("test"),
+            bnl_body: String::from("test"),
+            bnl_timestamp: 0,
+            bnl_mode: 0,
+            bnl_reactions: Vec::new(),
+            bnl_context_value: String::from("test"),
+            bnl_is_editing: false,
+            bnl_parent_thread_id: String::from("test"),
+        };
+        let _ = obj.bnl_summary();
+        assert_eq!(obj.bnl_mode, 0);
+    }
+
+    #[test]
+    fn test_bnl_reactions() {
+        let obj = CommentReply {
+            bnl_reply_id: String::from("test"),
+            bnl_author_name: String::from("test"),
+            bnl_author_icon_path: String::from("test"),
+            bnl_body: String::from("test"),
+            bnl_timestamp: 0,
+            bnl_mode: 0,
+            bnl_reactions: Vec::new(),
+            bnl_context_value: String::from("test"),
+            bnl_is_editing: false,
+            bnl_parent_thread_id: String::from("test"),
+        };
+        let _ = obj.bnl_summary();
+        assert!(obj.bnl_reactions.is_empty());
+    }
+
+    #[test]
+    fn test_bnl_context_value() {
+        let obj = CommentReply {
+            bnl_reply_id: String::from("test"),
+            bnl_author_name: String::from("test"),
+            bnl_author_icon_path: String::from("test"),
+            bnl_body: String::from("test"),
+            bnl_timestamp: 0,
+            bnl_mode: 0,
+            bnl_reactions: Vec::new(),
+            bnl_context_value: String::from("test"),
+            bnl_is_editing: false,
+            bnl_parent_thread_id: String::from("test"),
+        };
+        let _ = obj.bnl_summary();
+        assert_eq!(obj.bnl_context_value, "test");
+    }
+
+    #[test]
+    fn test_bnl_is_editing() {
+        let obj = CommentReply {
+            bnl_reply_id: String::from("test"),
+            bnl_author_name: String::from("test"),
+            bnl_author_icon_path: String::from("test"),
+            bnl_body: String::from("test"),
+            bnl_timestamp: 0,
+            bnl_mode: 0,
+            bnl_reactions: Vec::new(),
+            bnl_context_value: String::from("test"),
+            bnl_is_editing: false,
+            bnl_parent_thread_id: String::from("test"),
+        };
+        let _ = obj.bnl_summary();
+        assert!(!obj.bnl_is_editing);
+    }
+
+    #[test]
+    fn test_bnl_parent_thread_id() {
+        let obj = CommentReply {
+            bnl_reply_id: String::from("test"),
+            bnl_author_name: String::from("test"),
+            bnl_author_icon_path: String::from("test"),
+            bnl_body: String::from("test"),
+            bnl_timestamp: 0,
+            bnl_mode: 0,
+            bnl_reactions: Vec::new(),
+            bnl_context_value: String::from("test"),
+            bnl_is_editing: false,
+            bnl_parent_thread_id: String::from("test"),
+        };
+        let _ = obj.bnl_summary();
+        assert_eq!(obj.bnl_parent_thread_id, "test");
+    }
+
+
+    #[test]
+    fn test_bnm_start_line() {
+        let obj = CommentRange {
+            bnm_start_line: 0,
+            bnm_start_character: 0,
+            bnm_end_line: 0,
+            bnm_end_character: 0,
+            bnm_is_collapsed: false,
+            bnm_is_empty: false,
+            bnm_line_count: 0,
+            bnm_char_count: 0,
+            bnm_uri: String::from("test"),
+            bnm_thread_id: String::from("test"),
+        };
+        let _ = obj.bnm_summary();
+        assert_eq!(obj.bnm_start_line, 0);
+    }
+
+    #[test]
+    fn test_bnm_start_character() {
+        let obj = CommentRange {
+            bnm_start_line: 0,
+            bnm_start_character: 0,
+            bnm_end_line: 0,
+            bnm_end_character: 0,
+            bnm_is_collapsed: false,
+            bnm_is_empty: false,
+            bnm_line_count: 0,
+            bnm_char_count: 0,
+            bnm_uri: String::from("test"),
+            bnm_thread_id: String::from("test"),
+        };
+        let _ = obj.bnm_summary();
+        assert_eq!(obj.bnm_start_character, 0);
+    }
+
+    #[test]
+    fn test_bnm_end_line() {
+        let obj = CommentRange {
+            bnm_start_line: 0,
+            bnm_start_character: 0,
+            bnm_end_line: 0,
+            bnm_end_character: 0,
+            bnm_is_collapsed: false,
+            bnm_is_empty: false,
+            bnm_line_count: 0,
+            bnm_char_count: 0,
+            bnm_uri: String::from("test"),
+            bnm_thread_id: String::from("test"),
+        };
+        let _ = obj.bnm_summary();
+        assert_eq!(obj.bnm_end_line, 0);
+    }
+
+    #[test]
+    fn test_bnm_end_character() {
+        let obj = CommentRange {
+            bnm_start_line: 0,
+            bnm_start_character: 0,
+            bnm_end_line: 0,
+            bnm_end_character: 0,
+            bnm_is_collapsed: false,
+            bnm_is_empty: false,
+            bnm_line_count: 0,
+            bnm_char_count: 0,
+            bnm_uri: String::from("test"),
+            bnm_thread_id: String::from("test"),
+        };
+        let _ = obj.bnm_summary();
+        assert_eq!(obj.bnm_end_character, 0);
+    }
+
+    #[test]
+    fn test_bnm_is_collapsed() {
+        let obj = CommentRange {
+            bnm_start_line: 0,
+            bnm_start_character: 0,
+            bnm_end_line: 0,
+            bnm_end_character: 0,
+            bnm_is_collapsed: false,
+            bnm_is_empty: false,
+            bnm_line_count: 0,
+            bnm_char_count: 0,
+            bnm_uri: String::from("test"),
+            bnm_thread_id: String::from("test"),
+        };
+        let _ = obj.bnm_summary();
+        assert!(!obj.bnm_is_collapsed);
+    }
+
+    #[test]
+    fn test_bnm_is_empty() {
+        let obj = CommentRange {
+            bnm_start_line: 0,
+            bnm_start_character: 0,
+            bnm_end_line: 0,
+            bnm_end_character: 0,
+            bnm_is_collapsed: false,
+            bnm_is_empty: false,
+            bnm_line_count: 0,
+            bnm_char_count: 0,
+            bnm_uri: String::from("test"),
+            bnm_thread_id: String::from("test"),
+        };
+        let _ = obj.bnm_summary();
+        assert!(!obj.bnm_is_empty);
+    }
+
+    #[test]
+    fn test_bnm_line_count() {
+        let obj = CommentRange {
+            bnm_start_line: 0,
+            bnm_start_character: 0,
+            bnm_end_line: 0,
+            bnm_end_character: 0,
+            bnm_is_collapsed: false,
+            bnm_is_empty: false,
+            bnm_line_count: 0,
+            bnm_char_count: 0,
+            bnm_uri: String::from("test"),
+            bnm_thread_id: String::from("test"),
+        };
+        let _ = obj.bnm_summary();
+        assert_eq!(obj.bnm_line_count, 0);
+    }
+
+    #[test]
+    fn test_bnm_char_count() {
+        let obj = CommentRange {
+            bnm_start_line: 0,
+            bnm_start_character: 0,
+            bnm_end_line: 0,
+            bnm_end_character: 0,
+            bnm_is_collapsed: false,
+            bnm_is_empty: false,
+            bnm_line_count: 0,
+            bnm_char_count: 0,
+            bnm_uri: String::from("test"),
+            bnm_thread_id: String::from("test"),
+        };
+        let _ = obj.bnm_summary();
+        assert_eq!(obj.bnm_char_count, 0);
+    }
+
+    #[test]
+    fn test_bnm_uri() {
+        let obj = CommentRange {
+            bnm_start_line: 0,
+            bnm_start_character: 0,
+            bnm_end_line: 0,
+            bnm_end_character: 0,
+            bnm_is_collapsed: false,
+            bnm_is_empty: false,
+            bnm_line_count: 0,
+            bnm_char_count: 0,
+            bnm_uri: String::from("test"),
+            bnm_thread_id: String::from("test"),
+        };
+        let _ = obj.bnm_summary();
+        assert_eq!(obj.bnm_uri, "test");
+    }
+
+    #[test]
+    fn test_bnm_thread_id() {
+        let obj = CommentRange {
+            bnm_start_line: 0,
+            bnm_start_character: 0,
+            bnm_end_line: 0,
+            bnm_end_character: 0,
+            bnm_is_collapsed: false,
+            bnm_is_empty: false,
+            bnm_line_count: 0,
+            bnm_char_count: 0,
+            bnm_uri: String::from("test"),
+            bnm_thread_id: String::from("test"),
+        };
+        let _ = obj.bnm_summary();
+        assert_eq!(obj.bnm_thread_id, "test");
+    }
+
+
+    #[test]
+    fn test_bnn_controller_id() {
+        let obj = CommentController {
+            bnn_controller_id: String::from("test"),
+            bnn_label: String::from("test"),
+            bnn_commenting_range_provider: false,
+            bnn_reaction_handler: false,
+            bnn_options_title: String::from("test"),
+            bnn_options_prompt: String::from("test"),
+            bnn_supported_schemes: Vec::new(),
+            bnn_comment_count: 0,
+            bnn_thread_count: 0,
+            bnn_is_active: false,
+        };
+        let _ = obj.bnn_summary();
+        assert_eq!(obj.bnn_controller_id, "test");
+    }
+
+    #[test]
+    fn test_bnn_label() {
+        let obj = CommentController {
+            bnn_controller_id: String::from("test"),
+            bnn_label: String::from("test"),
+            bnn_commenting_range_provider: false,
+            bnn_reaction_handler: false,
+            bnn_options_title: String::from("test"),
+            bnn_options_prompt: String::from("test"),
+            bnn_supported_schemes: Vec::new(),
+            bnn_comment_count: 0,
+            bnn_thread_count: 0,
+            bnn_is_active: false,
+        };
+        let _ = obj.bnn_summary();
+        assert_eq!(obj.bnn_label, "test");
+    }
+
+    #[test]
+    fn test_bnn_commenting_range_provider() {
+        let obj = CommentController {
+            bnn_controller_id: String::from("test"),
+            bnn_label: String::from("test"),
+            bnn_commenting_range_provider: false,
+            bnn_reaction_handler: false,
+            bnn_options_title: String::from("test"),
+            bnn_options_prompt: String::from("test"),
+            bnn_supported_schemes: Vec::new(),
+            bnn_comment_count: 0,
+            bnn_thread_count: 0,
+            bnn_is_active: false,
+        };
+        let _ = obj.bnn_summary();
+        assert!(!obj.bnn_commenting_range_provider);
+    }
+
+    #[test]
+    fn test_bnn_reaction_handler() {
+        let obj = CommentController {
+            bnn_controller_id: String::from("test"),
+            bnn_label: String::from("test"),
+            bnn_commenting_range_provider: false,
+            bnn_reaction_handler: false,
+            bnn_options_title: String::from("test"),
+            bnn_options_prompt: String::from("test"),
+            bnn_supported_schemes: Vec::new(),
+            bnn_comment_count: 0,
+            bnn_thread_count: 0,
+            bnn_is_active: false,
+        };
+        let _ = obj.bnn_summary();
+        assert!(!obj.bnn_reaction_handler);
+    }
+
+    #[test]
+    fn test_bnn_options_title() {
+        let obj = CommentController {
+            bnn_controller_id: String::from("test"),
+            bnn_label: String::from("test"),
+            bnn_commenting_range_provider: false,
+            bnn_reaction_handler: false,
+            bnn_options_title: String::from("test"),
+            bnn_options_prompt: String::from("test"),
+            bnn_supported_schemes: Vec::new(),
+            bnn_comment_count: 0,
+            bnn_thread_count: 0,
+            bnn_is_active: false,
+        };
+        let _ = obj.bnn_summary();
+        assert_eq!(obj.bnn_options_title, "test");
+    }
+
+    #[test]
+    fn test_bnn_options_prompt() {
+        let obj = CommentController {
+            bnn_controller_id: String::from("test"),
+            bnn_label: String::from("test"),
+            bnn_commenting_range_provider: false,
+            bnn_reaction_handler: false,
+            bnn_options_title: String::from("test"),
+            bnn_options_prompt: String::from("test"),
+            bnn_supported_schemes: Vec::new(),
+            bnn_comment_count: 0,
+            bnn_thread_count: 0,
+            bnn_is_active: false,
+        };
+        let _ = obj.bnn_summary();
+        assert_eq!(obj.bnn_options_prompt, "test");
+    }
+
+    #[test]
+    fn test_bnn_supported_schemes() {
+        let obj = CommentController {
+            bnn_controller_id: String::from("test"),
+            bnn_label: String::from("test"),
+            bnn_commenting_range_provider: false,
+            bnn_reaction_handler: false,
+            bnn_options_title: String::from("test"),
+            bnn_options_prompt: String::from("test"),
+            bnn_supported_schemes: Vec::new(),
+            bnn_comment_count: 0,
+            bnn_thread_count: 0,
+            bnn_is_active: false,
+        };
+        let _ = obj.bnn_summary();
+        assert!(obj.bnn_supported_schemes.is_empty());
+    }
+
+    #[test]
+    fn test_bnn_comment_count() {
+        let obj = CommentController {
+            bnn_controller_id: String::from("test"),
+            bnn_label: String::from("test"),
+            bnn_commenting_range_provider: false,
+            bnn_reaction_handler: false,
+            bnn_options_title: String::from("test"),
+            bnn_options_prompt: String::from("test"),
+            bnn_supported_schemes: Vec::new(),
+            bnn_comment_count: 0,
+            bnn_thread_count: 0,
+            bnn_is_active: false,
+        };
+        let _ = obj.bnn_summary();
+        assert_eq!(obj.bnn_comment_count, 0);
+    }
+
+    #[test]
+    fn test_bnn_thread_count() {
+        let obj = CommentController {
+            bnn_controller_id: String::from("test"),
+            bnn_label: String::from("test"),
+            bnn_commenting_range_provider: false,
+            bnn_reaction_handler: false,
+            bnn_options_title: String::from("test"),
+            bnn_options_prompt: String::from("test"),
+            bnn_supported_schemes: Vec::new(),
+            bnn_comment_count: 0,
+            bnn_thread_count: 0,
+            bnn_is_active: false,
+        };
+        let _ = obj.bnn_summary();
+        assert_eq!(obj.bnn_thread_count, 0);
+    }
+
+    #[test]
+    fn test_bnn_is_active() {
+        let obj = CommentController {
+            bnn_controller_id: String::from("test"),
+            bnn_label: String::from("test"),
+            bnn_commenting_range_provider: false,
+            bnn_reaction_handler: false,
+            bnn_options_title: String::from("test"),
+            bnn_options_prompt: String::from("test"),
+            bnn_supported_schemes: Vec::new(),
+            bnn_comment_count: 0,
+            bnn_thread_count: 0,
+            bnn_is_active: false,
+        };
+        let _ = obj.bnn_summary();
+        assert!(!obj.bnn_is_active);
+    }
+
+
+    #[test]
+    fn test_bno_decoration_id() {
+        let obj = CommentDecoration {
+            bno_decoration_id: String::from("test"),
+            bno_gutter_icon_path: String::from("test"),
+            bno_overview_ruler_color: String::from("test"),
+            bno_line_number: 0,
+            bno_hover_message: String::from("test"),
+            bno_is_whole_line: false,
+            bno_after_text: String::from("test"),
+            bno_before_text: String::from("test"),
+            bno_border_color: String::from("test"),
+            bno_background_color: String::from("test"),
+        };
+        let _ = obj.bno_summary();
+        assert_eq!(obj.bno_decoration_id, "test");
+    }
+
+    #[test]
+    fn test_bno_gutter_icon_path() {
+        let obj = CommentDecoration {
+            bno_decoration_id: String::from("test"),
+            bno_gutter_icon_path: String::from("test"),
+            bno_overview_ruler_color: String::from("test"),
+            bno_line_number: 0,
+            bno_hover_message: String::from("test"),
+            bno_is_whole_line: false,
+            bno_after_text: String::from("test"),
+            bno_before_text: String::from("test"),
+            bno_border_color: String::from("test"),
+            bno_background_color: String::from("test"),
+        };
+        let _ = obj.bno_summary();
+        assert_eq!(obj.bno_gutter_icon_path, "test");
+    }
+
+    #[test]
+    fn test_bno_overview_ruler_color() {
+        let obj = CommentDecoration {
+            bno_decoration_id: String::from("test"),
+            bno_gutter_icon_path: String::from("test"),
+            bno_overview_ruler_color: String::from("test"),
+            bno_line_number: 0,
+            bno_hover_message: String::from("test"),
+            bno_is_whole_line: false,
+            bno_after_text: String::from("test"),
+            bno_before_text: String::from("test"),
+            bno_border_color: String::from("test"),
+            bno_background_color: String::from("test"),
+        };
+        let _ = obj.bno_summary();
+        assert_eq!(obj.bno_overview_ruler_color, "test");
+    }
+
+    #[test]
+    fn test_bno_line_number() {
+        let obj = CommentDecoration {
+            bno_decoration_id: String::from("test"),
+            bno_gutter_icon_path: String::from("test"),
+            bno_overview_ruler_color: String::from("test"),
+            bno_line_number: 0,
+            bno_hover_message: String::from("test"),
+            bno_is_whole_line: false,
+            bno_after_text: String::from("test"),
+            bno_before_text: String::from("test"),
+            bno_border_color: String::from("test"),
+            bno_background_color: String::from("test"),
+        };
+        let _ = obj.bno_summary();
+        assert_eq!(obj.bno_line_number, 0);
+    }
+
+    #[test]
+    fn test_bno_hover_message() {
+        let obj = CommentDecoration {
+            bno_decoration_id: String::from("test"),
+            bno_gutter_icon_path: String::from("test"),
+            bno_overview_ruler_color: String::from("test"),
+            bno_line_number: 0,
+            bno_hover_message: String::from("test"),
+            bno_is_whole_line: false,
+            bno_after_text: String::from("test"),
+            bno_before_text: String::from("test"),
+            bno_border_color: String::from("test"),
+            bno_background_color: String::from("test"),
+        };
+        let _ = obj.bno_summary();
+        assert_eq!(obj.bno_hover_message, "test");
+    }
+
+    #[test]
+    fn test_bno_is_whole_line() {
+        let obj = CommentDecoration {
+            bno_decoration_id: String::from("test"),
+            bno_gutter_icon_path: String::from("test"),
+            bno_overview_ruler_color: String::from("test"),
+            bno_line_number: 0,
+            bno_hover_message: String::from("test"),
+            bno_is_whole_line: false,
+            bno_after_text: String::from("test"),
+            bno_before_text: String::from("test"),
+            bno_border_color: String::from("test"),
+            bno_background_color: String::from("test"),
+        };
+        let _ = obj.bno_summary();
+        assert!(!obj.bno_is_whole_line);
+    }
+
+    #[test]
+    fn test_bno_after_text() {
+        let obj = CommentDecoration {
+            bno_decoration_id: String::from("test"),
+            bno_gutter_icon_path: String::from("test"),
+            bno_overview_ruler_color: String::from("test"),
+            bno_line_number: 0,
+            bno_hover_message: String::from("test"),
+            bno_is_whole_line: false,
+            bno_after_text: String::from("test"),
+            bno_before_text: String::from("test"),
+            bno_border_color: String::from("test"),
+            bno_background_color: String::from("test"),
+        };
+        let _ = obj.bno_summary();
+        assert_eq!(obj.bno_after_text, "test");
+    }
+
+    #[test]
+    fn test_bno_before_text() {
+        let obj = CommentDecoration {
+            bno_decoration_id: String::from("test"),
+            bno_gutter_icon_path: String::from("test"),
+            bno_overview_ruler_color: String::from("test"),
+            bno_line_number: 0,
+            bno_hover_message: String::from("test"),
+            bno_is_whole_line: false,
+            bno_after_text: String::from("test"),
+            bno_before_text: String::from("test"),
+            bno_border_color: String::from("test"),
+            bno_background_color: String::from("test"),
+        };
+        let _ = obj.bno_summary();
+        assert_eq!(obj.bno_before_text, "test");
+    }
+
+    #[test]
+    fn test_bno_border_color() {
+        let obj = CommentDecoration {
+            bno_decoration_id: String::from("test"),
+            bno_gutter_icon_path: String::from("test"),
+            bno_overview_ruler_color: String::from("test"),
+            bno_line_number: 0,
+            bno_hover_message: String::from("test"),
+            bno_is_whole_line: false,
+            bno_after_text: String::from("test"),
+            bno_before_text: String::from("test"),
+            bno_border_color: String::from("test"),
+            bno_background_color: String::from("test"),
+        };
+        let _ = obj.bno_summary();
+        assert_eq!(obj.bno_border_color, "test");
+    }
+
+    #[test]
+    fn test_bno_background_color() {
+        let obj = CommentDecoration {
+            bno_decoration_id: String::from("test"),
+            bno_gutter_icon_path: String::from("test"),
+            bno_overview_ruler_color: String::from("test"),
+            bno_line_number: 0,
+            bno_hover_message: String::from("test"),
+            bno_is_whole_line: false,
+            bno_after_text: String::from("test"),
+            bno_before_text: String::from("test"),
+            bno_border_color: String::from("test"),
+            bno_background_color: String::from("test"),
+        };
+        let _ = obj.bno_summary();
+        assert_eq!(obj.bno_background_color, "test");
     }
 
 }
