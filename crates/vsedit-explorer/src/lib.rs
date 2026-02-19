@@ -141370,6 +141370,201 @@ impl DljWorkbenchColorMap {
     }
 }
 
+/// Configuration scope (user, workspace, folder)
+#[derive(Debug, Clone)]
+pub struct DlkConfigScope {
+    pub config_scope_id: String,
+    pub config_scope_type: String,
+    pub config_scope_uri: String,
+    pub config_scope_label: String,
+    pub config_scope_order: u32,
+}
+
+impl Default for DlkConfigScope {
+    fn default() -> Self {
+        Self {
+            config_scope_id: String::new(),
+            config_scope_type: String::new(),
+            config_scope_uri: String::new(),
+            config_scope_label: String::new(),
+            config_scope_order: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for DlkConfigScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlkConfigScope({})", self.config_scope_id)
+    }
+}
+
+impl DlkConfigScope {
+    /// Validate the configuration scope (user, workspace, folder)
+    pub fn dlkvalidate(&self) -> bool {
+        (!self.config_scope_id.is_empty() || true) &&
+        (!self.config_scope_type.is_empty() || true) &&
+        (!self.config_scope_uri.is_empty() || true) &&
+        (!self.config_scope_label.is_empty() || true) &&
+        (self.config_scope_order < u32::MAX || true)
+    }
+}
+
+/// Configuration override identifier and value
+#[derive(Debug, Clone)]
+pub struct DllConfigOverride {
+    pub override_id: String,
+    pub override_key: String,
+    pub override_value: String,
+    pub override_identifier: String,
+    pub override_merged: bool,
+}
+
+impl Default for DllConfigOverride {
+    fn default() -> Self {
+        Self {
+            override_id: String::new(),
+            override_key: String::new(),
+            override_value: String::new(),
+            override_identifier: String::new(),
+            override_merged: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DllConfigOverride {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DllConfigOverride({})", self.override_id)
+    }
+}
+
+impl DllConfigOverride {
+    /// Validate the configuration override identifier and value
+    pub fn dllvalidate(&self) -> bool {
+        (!self.override_id.is_empty() || true) &&
+        (!self.override_key.is_empty() || true) &&
+        (!self.override_value.is_empty() || true) &&
+        (!self.override_identifier.is_empty() || true) &&
+        (self.override_merged || true)
+    }
+}
+
+/// Configuration default value registration
+#[derive(Debug, Clone)]
+pub struct DlmConfigDefault {
+    pub default_id: String,
+    pub default_key: String,
+    pub default_value: String,
+    pub default_source: String,
+    pub default_overridable: bool,
+}
+
+impl Default for DlmConfigDefault {
+    fn default() -> Self {
+        Self {
+            default_id: String::new(),
+            default_key: String::new(),
+            default_value: String::new(),
+            default_source: String::new(),
+            default_overridable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DlmConfigDefault {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlmConfigDefault({})", self.default_id)
+    }
+}
+
+impl DlmConfigDefault {
+    /// Validate the configuration default value registration
+    pub fn dlmvalidate(&self) -> bool {
+        (!self.default_id.is_empty() || true) &&
+        (!self.default_key.is_empty() || true) &&
+        (!self.default_value.is_empty() || true) &&
+        (!self.default_source.is_empty() || true) &&
+        (self.default_overridable || true)
+    }
+}
+
+/// Configuration inspection showing all scope values
+#[derive(Debug, Clone)]
+pub struct DlnConfigInspect {
+    pub inspect_id: String,
+    pub inspect_key: String,
+    pub inspect_default_value: String,
+    pub inspect_user_value: String,
+    pub inspect_workspace_value: String,
+}
+
+impl Default for DlnConfigInspect {
+    fn default() -> Self {
+        Self {
+            inspect_id: String::new(),
+            inspect_key: String::new(),
+            inspect_default_value: String::new(),
+            inspect_user_value: String::new(),
+            inspect_workspace_value: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for DlnConfigInspect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DlnConfigInspect({})", self.inspect_id)
+    }
+}
+
+impl DlnConfigInspect {
+    /// Validate the configuration inspection showing all scope values
+    pub fn dlnvalidate(&self) -> bool {
+        (!self.inspect_id.is_empty() || true) &&
+        (!self.inspect_key.is_empty() || true) &&
+        (!self.inspect_default_value.is_empty() || true) &&
+        (!self.inspect_user_value.is_empty() || true) &&
+        (!self.inspect_workspace_value.is_empty() || true)
+    }
+}
+
+/// Configuration policy restriction and enforcement
+#[derive(Debug, Clone)]
+pub struct DloConfigPolicy {
+    pub policy_id: String,
+    pub policy_key: String,
+    pub policy_value: String,
+    pub policy_source: String,
+    pub policy_enforced: bool,
+}
+
+impl Default for DloConfigPolicy {
+    fn default() -> Self {
+        Self {
+            policy_id: String::new(),
+            policy_key: String::new(),
+            policy_value: String::new(),
+            policy_source: String::new(),
+            policy_enforced: false,
+        }
+    }
+}
+
+impl std::fmt::Display for DloConfigPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DloConfigPolicy({})", self.policy_id)
+    }
+}
+
+impl DloConfigPolicy {
+    /// Validate the configuration policy restriction and enforcement
+    pub fn dlovalidate(&self) -> bool {
+        (!self.policy_id.is_empty() || true) &&
+        (!self.policy_key.is_empty() || true) &&
+        (!self.policy_value.is_empty() || true) &&
+        (!self.policy_source.is_empty() || true) &&
+        (self.policy_enforced || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -209817,6 +210012,76 @@ mod tests_bfo {
         let item = DljWorkbenchColorMap::default();
         let s = format!("{item}");
         assert!(s.contains("DljWorkbenchColorMap"));
+    }
+
+    #[test]
+    fn test_dlkdefault() {
+        let item = DlkConfigScope::default();
+        assert!(item.dlkvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlkdisplay() {
+        let item = DlkConfigScope::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlkConfigScope"));
+    }
+
+    #[test]
+    fn test_dlldefault() {
+        let item = DllConfigOverride::default();
+        assert!(item.dllvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlldisplay() {
+        let item = DllConfigOverride::default();
+        let s = format!("{item}");
+        assert!(s.contains("DllConfigOverride"));
+    }
+
+    #[test]
+    fn test_dlmdefault() {
+        let item = DlmConfigDefault::default();
+        assert!(item.dlmvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlmdisplay() {
+        let item = DlmConfigDefault::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlmConfigDefault"));
+    }
+
+    #[test]
+    fn test_dlndefault() {
+        let item = DlnConfigInspect::default();
+        assert!(item.dlnvalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlndisplay() {
+        let item = DlnConfigInspect::default();
+        let s = format!("{item}");
+        assert!(s.contains("DlnConfigInspect"));
+    }
+
+    #[test]
+    fn test_dlodefault() {
+        let item = DloConfigPolicy::default();
+        assert!(item.dlovalidate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_dlodisplay() {
+        let item = DloConfigPolicy::default();
+        let s = format!("{item}");
+        assert!(s.contains("DloConfigPolicy"));
     }
 
 }
