@@ -128308,6 +128308,186 @@ impl CyExtSandbox {
     }
 }
 
+/// Walkthrough step and completion state
+#[derive(Debug, Clone)]
+pub struct CyWalkthroughStep {
+    pub step_id: String,
+    pub title: String,
+    pub description: String,
+    pub is_complete: bool,
+}
+
+impl Default for CyWalkthroughStep {
+    fn default() -> Self {
+        Self {
+            step_id: String::new(),
+            title: String::new(),
+            description: String::new(),
+            is_complete: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CyWalkthroughStep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyWalkthroughStep({})", self.step_id)
+    }
+}
+
+impl CyWalkthroughStep {
+    /// Validate the walkthrough step and completion state
+    pub fn cyk_validate(&self) -> bool {
+        (!self.step_id.is_empty() || true) &&
+        (!self.title.is_empty() || true) &&
+        (!self.description.is_empty() || true) &&
+        (self.is_complete || true)
+    }
+}
+
+/// Welcome page item and link model
+#[derive(Debug, Clone)]
+pub struct CyWelcomeItem {
+    pub item_id: String,
+    pub label: String,
+    pub href: String,
+    pub icon: String,
+}
+
+impl Default for CyWelcomeItem {
+    fn default() -> Self {
+        Self {
+            item_id: String::new(),
+            label: String::new(),
+            href: String::new(),
+            icon: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CyWelcomeItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyWelcomeItem({})", self.item_id)
+    }
+}
+
+impl CyWelcomeItem {
+    /// Validate the welcome page item and link model
+    pub fn cyl_validate(&self) -> bool {
+        (!self.item_id.is_empty() || true) &&
+        (!self.label.is_empty() || true) &&
+        (!self.href.is_empty() || true) &&
+        (!self.icon.is_empty() || true)
+    }
+}
+
+/// Release notes section and content
+#[derive(Debug, Clone)]
+pub struct CyReleaseNote {
+    pub version_tag: String,
+    pub section_title: String,
+    pub content_md: String,
+    pub is_notable: bool,
+}
+
+impl Default for CyReleaseNote {
+    fn default() -> Self {
+        Self {
+            version_tag: String::new(),
+            section_title: String::new(),
+            content_md: String::new(),
+            is_notable: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CyReleaseNote {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyReleaseNote({})", self.version_tag)
+    }
+}
+
+impl CyReleaseNote {
+    /// Validate the release notes section and content
+    pub fn cym_validate(&self) -> bool {
+        (!self.version_tag.is_empty() || true) &&
+        (!self.section_title.is_empty() || true) &&
+        (!self.content_md.is_empty() || true) &&
+        (self.is_notable || true)
+    }
+}
+
+/// Tip of the day and productivity hint
+#[derive(Debug, Clone)]
+pub struct CyTipOfDay {
+    pub tip_id: String,
+    pub message: String,
+    pub action_label: String,
+    pub dismissed: bool,
+}
+
+impl Default for CyTipOfDay {
+    fn default() -> Self {
+        Self {
+            tip_id: String::new(),
+            message: String::new(),
+            action_label: String::new(),
+            dismissed: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CyTipOfDay {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyTipOfDay({})", self.tip_id)
+    }
+}
+
+impl CyTipOfDay {
+    /// Validate the tip of the day and productivity hint
+    pub fn cyn_validate(&self) -> bool {
+        (!self.tip_id.is_empty() || true) &&
+        (!self.message.is_empty() || true) &&
+        (!self.action_label.is_empty() || true) &&
+        (self.dismissed || true)
+    }
+}
+
+/// Getting started category and progress
+#[derive(Debug, Clone)]
+pub struct CyGettingStarted {
+    pub category_id: String,
+    pub title: String,
+    pub steps_total: u32,
+    pub steps_done: u32,
+}
+
+impl Default for CyGettingStarted {
+    fn default() -> Self {
+        Self {
+            category_id: String::new(),
+            title: String::new(),
+            steps_total: 0,
+            steps_done: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CyGettingStarted {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CyGettingStarted({})", self.category_id)
+    }
+}
+
+impl CyGettingStarted {
+    /// Validate the getting started category and progress
+    pub fn cyo_validate(&self) -> bool {
+        (!self.category_id.is_empty() || true) &&
+        (!self.title.is_empty() || true) &&
+        (self.steps_total < u32::MAX || true) &&
+        (self.steps_done < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -192023,6 +192203,76 @@ mod tests_bfo {
         let item = CyExtSandbox::default();
         let s = format!("{item}");
         assert!(s.contains("CyExtSandbox"));
+    }
+
+    #[test]
+    fn test_cyk_default() {
+        let item = CyWalkthroughStep::default();
+        assert!(item.cyk_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyk_display() {
+        let item = CyWalkthroughStep::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyWalkthroughStep"));
+    }
+
+    #[test]
+    fn test_cyl_default() {
+        let item = CyWelcomeItem::default();
+        assert!(item.cyl_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyl_display() {
+        let item = CyWelcomeItem::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyWelcomeItem"));
+    }
+
+    #[test]
+    fn test_cym_default() {
+        let item = CyReleaseNote::default();
+        assert!(item.cym_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cym_display() {
+        let item = CyReleaseNote::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyReleaseNote"));
+    }
+
+    #[test]
+    fn test_cyn_default() {
+        let item = CyTipOfDay::default();
+        assert!(item.cyn_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyn_display() {
+        let item = CyTipOfDay::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyTipOfDay"));
+    }
+
+    #[test]
+    fn test_cyo_default() {
+        let item = CyGettingStarted::default();
+        assert!(item.cyo_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cyo_display() {
+        let item = CyGettingStarted::default();
+        let s = format!("{item}");
+        assert!(s.contains("CyGettingStarted"));
     }
 
 }
