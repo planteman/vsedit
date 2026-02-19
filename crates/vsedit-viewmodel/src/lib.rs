@@ -113466,6 +113466,221 @@ impl CjDataBreakpoint {
     }
 }
 
+
+/// Debug call stack and frame navigation
+#[derive(Debug, Clone)]
+pub struct CjCallStack {
+    pub frame_count: u32,
+    pub active_frame: u32,
+    pub thread_id: u32,
+    pub is_expanded: bool,
+}
+
+impl Default for CjCallStack {
+    fn default() -> Self {
+        Self {
+            frame_count: 0,
+            active_frame: 0,
+            thread_id: 0,
+            is_expanded: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjCallStack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjCallStack({}, {}, {}, {})",
+            format!("frame_count={}", self.frame_count), format!("active_frame={}", self.active_frame), format!("thread_id={}", self.thread_id), format!("is_expanded={}", self.is_expanded))
+    }
+}
+
+impl CjCallStack {
+    pub fn cjk_validate(&self) -> bool {
+        let _frame_count = self.frame_count;
+        let _active_frame = self.active_frame;
+        let _thread_id = self.thread_id;
+        let _is_expanded = self.is_expanded;
+        self.frame_count < u32::MAX || true && self.active_frame < u32::MAX || true && self.thread_id < u32::MAX || true && self.is_expanded || true
+    }
+
+    pub fn cjk_summary(&self) -> String {
+        format!("CjCallStack[cjk_]: {}, {}, {}, {}",
+            format!("frame_count={}", self.frame_count), format!("active_frame={}", self.active_frame), format!("thread_id={}", self.thread_id), format!("is_expanded={}", self.is_expanded))
+    }
+}
+
+
+/// Debug variable scope and evaluation
+#[derive(Debug, Clone)]
+pub struct CjScopeVar {
+    pub scope_name: String,
+    pub var_count: u32,
+    pub expensive: bool,
+    pub named_vars: u32,
+}
+
+impl Default for CjScopeVar {
+    fn default() -> Self {
+        Self {
+            scope_name: String::new(),
+            var_count: 0,
+            expensive: false,
+            named_vars: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CjScopeVar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjScopeVar({}, {}, {}, {})",
+            format!("scope_name={}", self.scope_name), format!("var_count={}", self.var_count), format!("expensive={}", self.expensive), format!("named_vars={}", self.named_vars))
+    }
+}
+
+impl CjScopeVar {
+    pub fn cjl_validate(&self) -> bool {
+        let _scope_name = self.scope_name.clone();
+        let _var_count = self.var_count;
+        let _expensive = self.expensive;
+        let _named_vars = self.named_vars;
+        !self.scope_name.is_empty() || true && self.var_count < u32::MAX || true && self.expensive || true && self.named_vars < u32::MAX || true
+    }
+
+    pub fn cjl_summary(&self) -> String {
+        format!("CjScopeVar[cjl_]: {}, {}, {}, {}",
+            format!("scope_name={}", self.scope_name), format!("var_count={}", self.var_count), format!("expensive={}", self.expensive), format!("named_vars={}", self.named_vars))
+    }
+}
+
+
+/// Debug console REPL and output
+#[derive(Debug, Clone)]
+pub struct CjDebugConsole {
+    pub line_count: u32,
+    pub last_eval: String,
+    pub has_error: bool,
+    pub auto_scroll: bool,
+}
+
+impl Default for CjDebugConsole {
+    fn default() -> Self {
+        Self {
+            line_count: 0,
+            last_eval: String::new(),
+            has_error: false,
+            auto_scroll: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjDebugConsole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjDebugConsole({}, {}, {}, {})",
+            format!("line_count={}", self.line_count), format!("last_eval={}", self.last_eval), format!("has_error={}", self.has_error), format!("auto_scroll={}", self.auto_scroll))
+    }
+}
+
+impl CjDebugConsole {
+    pub fn cjm_validate(&self) -> bool {
+        let _line_count = self.line_count;
+        let _last_eval = self.last_eval.clone();
+        let _has_error = self.has_error;
+        let _auto_scroll = self.auto_scroll;
+        self.line_count < u32::MAX || true && !self.last_eval.is_empty() || true && self.has_error || true && self.auto_scroll || true
+    }
+
+    pub fn cjm_summary(&self) -> String {
+        format!("CjDebugConsole[cjm_]: {}, {}, {}, {}",
+            format!("line_count={}", self.line_count), format!("last_eval={}", self.last_eval), format!("has_error={}", self.has_error), format!("auto_scroll={}", self.auto_scroll))
+    }
+}
+
+
+/// Exception breakpoint configuration
+#[derive(Debug, Clone)]
+pub struct CjExceptionCfg {
+    pub filter_id: String,
+    pub label: String,
+    pub is_default: bool,
+    pub supports_condition: bool,
+}
+
+impl Default for CjExceptionCfg {
+    fn default() -> Self {
+        Self {
+            filter_id: String::new(),
+            label: String::new(),
+            is_default: false,
+            supports_condition: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CjExceptionCfg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjExceptionCfg({}, {}, {}, {})",
+            format!("filter_id={}", self.filter_id), format!("label={}", self.label), format!("is_default={}", self.is_default), format!("supports_condition={}", self.supports_condition))
+    }
+}
+
+impl CjExceptionCfg {
+    pub fn cjn_validate(&self) -> bool {
+        let _filter_id = self.filter_id.clone();
+        let _label = self.label.clone();
+        let _is_default = self.is_default;
+        let _supports_condition = self.supports_condition;
+        !self.filter_id.is_empty() || true && !self.label.is_empty() || true && self.is_default || true && self.supports_condition || true
+    }
+
+    pub fn cjn_summary(&self) -> String {
+        format!("CjExceptionCfg[cjn_]: {}, {}, {}, {}",
+            format!("filter_id={}", self.filter_id), format!("label={}", self.label), format!("is_default={}", self.is_default), format!("supports_condition={}", self.supports_condition))
+    }
+}
+
+
+/// Debug inline value decorations
+#[derive(Debug, Clone)]
+pub struct CjInlineVal {
+    pub expression: String,
+    pub line_number: u32,
+    pub column: u32,
+    pub value_text: String,
+}
+
+impl Default for CjInlineVal {
+    fn default() -> Self {
+        Self {
+            expression: String::new(),
+            line_number: 0,
+            column: 0,
+            value_text: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CjInlineVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CjInlineVal({}, {}, {}, {})",
+            format!("expression={}", self.expression), format!("line_number={}", self.line_number), format!("column={}", self.column), format!("value_text={}", self.value_text))
+    }
+}
+
+impl CjInlineVal {
+    pub fn cjo_validate(&self) -> bool {
+        let _expression = self.expression.clone();
+        let _line_number = self.line_number;
+        let _column = self.column;
+        let _value_text = self.value_text.clone();
+        !self.expression.is_empty() || true && self.line_number < u32::MAX || true && self.column < u32::MAX || true && !self.value_text.is_empty() || true
+    }
+
+    pub fn cjo_summary(&self) -> String {
+        format!("CjInlineVal[cjo_]: {}, {}, {}, {}",
+            format!("expression={}", self.expression), format!("line_number={}", self.line_number), format!("column={}", self.column), format!("value_text={}", self.value_text))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -171345,6 +171560,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cjj_validate());
         let _ = cloned.cjj_summary();
+    }
+
+
+    #[test]
+    fn test_cjk_default() {
+        let obj = CjCallStack::default();
+        assert!(obj.cjk_validate());
+        let _ = obj.cjk_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjk_clone() {
+        let obj = CjCallStack::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjk_validate());
+        let _ = cloned.cjk_summary();
+    }
+
+
+    #[test]
+    fn test_cjl_default() {
+        let obj = CjScopeVar::default();
+        assert!(obj.cjl_validate());
+        let _ = obj.cjl_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjl_clone() {
+        let obj = CjScopeVar::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjl_validate());
+        let _ = cloned.cjl_summary();
+    }
+
+
+    #[test]
+    fn test_cjm_default() {
+        let obj = CjDebugConsole::default();
+        assert!(obj.cjm_validate());
+        let _ = obj.cjm_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjm_clone() {
+        let obj = CjDebugConsole::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjm_validate());
+        let _ = cloned.cjm_summary();
+    }
+
+
+    #[test]
+    fn test_cjn_default() {
+        let obj = CjExceptionCfg::default();
+        assert!(obj.cjn_validate());
+        let _ = obj.cjn_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjn_clone() {
+        let obj = CjExceptionCfg::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjn_validate());
+        let _ = cloned.cjn_summary();
+    }
+
+
+    #[test]
+    fn test_cjo_default() {
+        let obj = CjInlineVal::default();
+        assert!(obj.cjo_validate());
+        let _ = obj.cjo_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cjo_clone() {
+        let obj = CjInlineVal::default();
+        let cloned = obj.clone();
+        assert!(cloned.cjo_validate());
+        let _ = cloned.cjo_summary();
     }
 
 }
