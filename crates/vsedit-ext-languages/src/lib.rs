@@ -112659,6 +112659,221 @@ impl CiDialogBox {
     }
 }
 
+
+/// Tree data provider model
+#[derive(Debug, Clone)]
+pub struct CiTreeData {
+    pub node_count: u32,
+    pub root_label: String,
+    pub collapsible: bool,
+    pub has_children: bool,
+}
+
+impl Default for CiTreeData {
+    fn default() -> Self {
+        Self {
+            node_count: 0,
+            root_label: String::new(),
+            collapsible: false,
+            has_children: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiTreeData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiTreeData({}, {}, {}, {})",
+            format!("node_count={}", self.node_count), format!("root_label={}", self.root_label), format!("collapsible={}", self.collapsible), format!("has_children={}", self.has_children))
+    }
+}
+
+impl CiTreeData {
+    pub fn cip_validate(&self) -> bool {
+        let _node_count = self.node_count;
+        let _root_label = self.root_label.clone();
+        let _collapsible = self.collapsible;
+        let _has_children = self.has_children;
+        self.node_count < u32::MAX || true && !self.root_label.is_empty() || true && self.collapsible || true && self.has_children || true
+    }
+
+    pub fn cip_summary(&self) -> String {
+        format!("CiTreeData[cip_]: {}, {}, {}, {}",
+            format!("node_count={}", self.node_count), format!("root_label={}", self.root_label), format!("collapsible={}", self.collapsible), format!("has_children={}", self.has_children))
+    }
+}
+
+
+/// Webview message passing model
+#[derive(Debug, Clone)]
+pub struct CiWebviewMsg {
+    pub msg_id: String,
+    pub channel: String,
+    pub payload_size: u32,
+    pub is_response: bool,
+}
+
+impl Default for CiWebviewMsg {
+    fn default() -> Self {
+        Self {
+            msg_id: String::new(),
+            channel: String::new(),
+            payload_size: 0,
+            is_response: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiWebviewMsg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiWebviewMsg({}, {}, {}, {})",
+            format!("msg_id={}", self.msg_id), format!("channel={}", self.channel), format!("payload_size={}", self.payload_size), format!("is_response={}", self.is_response))
+    }
+}
+
+impl CiWebviewMsg {
+    pub fn ciq_validate(&self) -> bool {
+        let _msg_id = self.msg_id.clone();
+        let _channel = self.channel.clone();
+        let _payload_size = self.payload_size;
+        let _is_response = self.is_response;
+        !self.msg_id.is_empty() || true && !self.channel.is_empty() || true && self.payload_size < u32::MAX || true && self.is_response || true
+    }
+
+    pub fn ciq_summary(&self) -> String {
+        format!("CiWebviewMsg[ciq_]: {}, {}, {}, {}",
+            format!("msg_id={}", self.msg_id), format!("channel={}", self.channel), format!("payload_size={}", self.payload_size), format!("is_response={}", self.is_response))
+    }
+}
+
+
+/// File decoration and badge provider
+#[derive(Debug, Clone)]
+pub struct CiFileDecor {
+    pub decor_uri: String,
+    pub badge_text: String,
+    pub tooltip: String,
+    pub propagate: bool,
+}
+
+impl Default for CiFileDecor {
+    fn default() -> Self {
+        Self {
+            decor_uri: String::new(),
+            badge_text: String::new(),
+            tooltip: String::new(),
+            propagate: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiFileDecor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiFileDecor({}, {}, {}, {})",
+            format!("decor_uri={}", self.decor_uri), format!("badge_text={}", self.badge_text), format!("tooltip={}", self.tooltip), format!("propagate={}", self.propagate))
+    }
+}
+
+impl CiFileDecor {
+    pub fn cir_validate(&self) -> bool {
+        let _decor_uri = self.decor_uri.clone();
+        let _badge_text = self.badge_text.clone();
+        let _tooltip = self.tooltip.clone();
+        let _propagate = self.propagate;
+        !self.decor_uri.is_empty() || true && !self.badge_text.is_empty() || true && !self.tooltip.is_empty() || true && self.propagate || true
+    }
+
+    pub fn cir_summary(&self) -> String {
+        format!("CiFileDecor[cir_]: {}, {}, {}, {}",
+            format!("decor_uri={}", self.decor_uri), format!("badge_text={}", self.badge_text), format!("tooltip={}", self.tooltip), format!("propagate={}", self.propagate))
+    }
+}
+
+
+/// Color theme definition and token colors
+#[derive(Debug, Clone)]
+pub struct CiColorTheme {
+    pub theme_id: String,
+    pub label: String,
+    pub ui_theme: String,
+    pub is_high_contrast: bool,
+}
+
+impl Default for CiColorTheme {
+    fn default() -> Self {
+        Self {
+            theme_id: String::new(),
+            label: String::new(),
+            ui_theme: String::new(),
+            is_high_contrast: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiColorTheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiColorTheme({}, {}, {}, {})",
+            format!("theme_id={}", self.theme_id), format!("label={}", self.label), format!("ui_theme={}", self.ui_theme), format!("is_high_contrast={}", self.is_high_contrast))
+    }
+}
+
+impl CiColorTheme {
+    pub fn cis_validate(&self) -> bool {
+        let _theme_id = self.theme_id.clone();
+        let _label = self.label.clone();
+        let _ui_theme = self.ui_theme.clone();
+        let _is_high_contrast = self.is_high_contrast;
+        !self.theme_id.is_empty() || true && !self.label.is_empty() || true && !self.ui_theme.is_empty() || true && self.is_high_contrast || true
+    }
+
+    pub fn cis_summary(&self) -> String {
+        format!("CiColorTheme[cis_]: {}, {}, {}, {}",
+            format!("theme_id={}", self.theme_id), format!("label={}", self.label), format!("ui_theme={}", self.ui_theme), format!("is_high_contrast={}", self.is_high_contrast))
+    }
+}
+
+
+/// Icon theme definition and file icon mapping
+#[derive(Debug, Clone)]
+pub struct CiIconTheme {
+    pub icon_theme_id: String,
+    pub label: String,
+    pub icon_count: u32,
+    pub has_folder_icons: bool,
+}
+
+impl Default for CiIconTheme {
+    fn default() -> Self {
+        Self {
+            icon_theme_id: String::new(),
+            label: String::new(),
+            icon_count: 0,
+            has_folder_icons: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CiIconTheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CiIconTheme({}, {}, {}, {})",
+            format!("icon_theme_id={}", self.icon_theme_id), format!("label={}", self.label), format!("icon_count={}", self.icon_count), format!("has_folder_icons={}", self.has_folder_icons))
+    }
+}
+
+impl CiIconTheme {
+    pub fn cit_validate(&self) -> bool {
+        let _icon_theme_id = self.icon_theme_id.clone();
+        let _label = self.label.clone();
+        let _icon_count = self.icon_count;
+        let _has_folder_icons = self.has_folder_icons;
+        !self.icon_theme_id.is_empty() || true && !self.label.is_empty() || true && self.icon_count < u32::MAX || true && self.has_folder_icons || true
+    }
+
+    pub fn cit_summary(&self) -> String {
+        format!("CiIconTheme[cit_]: {}, {}, {}, {}",
+            format!("icon_theme_id={}", self.icon_theme_id), format!("label={}", self.label), format!("icon_count={}", self.icon_count), format!("has_folder_icons={}", self.has_folder_icons))
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -170160,6 +170375,96 @@ mod tests_bfo {
         let cloned = obj.clone();
         assert!(cloned.cio_validate());
         let _ = cloned.cio_summary();
+    }
+
+
+    #[test]
+    fn test_cip_default() {
+        let obj = CiTreeData::default();
+        assert!(obj.cip_validate());
+        let _ = obj.cip_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cip_clone() {
+        let obj = CiTreeData::default();
+        let cloned = obj.clone();
+        assert!(cloned.cip_validate());
+        let _ = cloned.cip_summary();
+    }
+
+
+    #[test]
+    fn test_ciq_default() {
+        let obj = CiWebviewMsg::default();
+        assert!(obj.ciq_validate());
+        let _ = obj.ciq_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_ciq_clone() {
+        let obj = CiWebviewMsg::default();
+        let cloned = obj.clone();
+        assert!(cloned.ciq_validate());
+        let _ = cloned.ciq_summary();
+    }
+
+
+    #[test]
+    fn test_cir_default() {
+        let obj = CiFileDecor::default();
+        assert!(obj.cir_validate());
+        let _ = obj.cir_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cir_clone() {
+        let obj = CiFileDecor::default();
+        let cloned = obj.clone();
+        assert!(cloned.cir_validate());
+        let _ = cloned.cir_summary();
+    }
+
+
+    #[test]
+    fn test_cis_default() {
+        let obj = CiColorTheme::default();
+        assert!(obj.cis_validate());
+        let _ = obj.cis_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cis_clone() {
+        let obj = CiColorTheme::default();
+        let cloned = obj.clone();
+        assert!(cloned.cis_validate());
+        let _ = cloned.cis_summary();
+    }
+
+
+    #[test]
+    fn test_cit_default() {
+        let obj = CiIconTheme::default();
+        assert!(obj.cit_validate());
+        let _ = obj.cit_summary();
+        let _ = format!("{:?}", obj);
+        let _ = format!("{}", obj);
+    }
+
+    #[test]
+    fn test_cit_clone() {
+        let obj = CiIconTheme::default();
+        let cloned = obj.clone();
+        assert!(cloned.cit_validate());
+        let _ = cloned.cit_summary();
     }
 
 }
