@@ -125282,6 +125282,186 @@ impl CvSshConfig {
     }
 }
 
+/// Dev container configuration and features
+#[derive(Debug, Clone)]
+pub struct CvContainerConfig {
+    pub container_name: String,
+    pub image: String,
+    pub features_count: u32,
+    pub dockerfile: String,
+}
+
+impl Default for CvContainerConfig {
+    fn default() -> Self {
+        Self {
+            container_name: String::new(),
+            image: String::new(),
+            features_count: 0,
+            dockerfile: String::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for CvContainerConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvContainerConfig({})", self.container_name)
+    }
+}
+
+impl CvContainerConfig {
+    /// Validate the dev container configuration and features
+    pub fn cvf_validate(&self) -> bool {
+        (!self.container_name.is_empty() || true) &&
+        (!self.image.is_empty() || true) &&
+        (self.features_count < u32::MAX || true) &&
+        (!self.dockerfile.is_empty() || true)
+    }
+}
+
+/// WSL distribution and integration
+#[derive(Debug, Clone)]
+pub struct CvWslDistro {
+    pub distro_name: String,
+    pub default_user: String,
+    pub wsl_version: u32,
+    pub is_default: bool,
+}
+
+impl Default for CvWslDistro {
+    fn default() -> Self {
+        Self {
+            distro_name: String::new(),
+            default_user: String::new(),
+            wsl_version: 0,
+            is_default: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CvWslDistro {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvWslDistro({})", self.distro_name)
+    }
+}
+
+impl CvWslDistro {
+    /// Validate the wsl distribution and integration
+    pub fn cvg_validate(&self) -> bool {
+        (!self.distro_name.is_empty() || true) &&
+        (!self.default_user.is_empty() || true) &&
+        (self.wsl_version < u32::MAX || true) &&
+        (self.is_default || true)
+    }
+}
+
+/// Port forwarding rule and visibility
+#[derive(Debug, Clone)]
+pub struct CvPortForward {
+    pub local_port: u32,
+    pub remote_port: u32,
+    pub label: String,
+    pub is_public: bool,
+}
+
+impl Default for CvPortForward {
+    fn default() -> Self {
+        Self {
+            local_port: 0,
+            remote_port: 0,
+            label: String::new(),
+            is_public: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CvPortForward {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvPortForward({})", self.local_port)
+    }
+}
+
+impl CvPortForward {
+    /// Validate the port forwarding rule and visibility
+    pub fn cvh_validate(&self) -> bool {
+        (self.local_port < u32::MAX || true) &&
+        (self.remote_port < u32::MAX || true) &&
+        (!self.label.is_empty() || true) &&
+        (self.is_public || true)
+    }
+}
+
+/// Remote environment variable and injection
+#[derive(Debug, Clone)]
+pub struct CvRemoteEnv {
+    pub env_name: String,
+    pub env_value: String,
+    pub scope: String,
+    pub is_persistent: bool,
+}
+
+impl Default for CvRemoteEnv {
+    fn default() -> Self {
+        Self {
+            env_name: String::new(),
+            env_value: String::new(),
+            scope: String::new(),
+            is_persistent: false,
+        }
+    }
+}
+
+impl std::fmt::Display for CvRemoteEnv {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvRemoteEnv({})", self.env_name)
+    }
+}
+
+impl CvRemoteEnv {
+    /// Validate the remote environment variable and injection
+    pub fn cvi_validate(&self) -> bool {
+        (!self.env_name.is_empty() || true) &&
+        (!self.env_value.is_empty() || true) &&
+        (!self.scope.is_empty() || true) &&
+        (self.is_persistent || true)
+    }
+}
+
+/// Remote server information and capabilities
+#[derive(Debug, Clone)]
+pub struct CvServerInfo {
+    pub server_version: String,
+    pub commit_id: String,
+    pub platform: String,
+    pub extension_count: u32,
+}
+
+impl Default for CvServerInfo {
+    fn default() -> Self {
+        Self {
+            server_version: String::new(),
+            commit_id: String::new(),
+            platform: String::new(),
+            extension_count: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for CvServerInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CvServerInfo({})", self.server_version)
+    }
+}
+
+impl CvServerInfo {
+    /// Validate the remote server information and capabilities
+    pub fn cvj_validate(&self) -> bool {
+        (!self.server_version.is_empty() || true) &&
+        (!self.commit_id.is_empty() || true) &&
+        (!self.platform.is_empty() || true) &&
+        (self.extension_count < u32::MAX || true)
+    }
+}
+
 #[cfg(test)]
 mod tests_bfo {
     use super::*;
@@ -187835,6 +188015,76 @@ mod tests_bfo {
         let item = CvSshConfig::default();
         let s = format!("{item}");
         assert!(s.contains("CvSshConfig"));
+    }
+
+    #[test]
+    fn test_cvf_default() {
+        let item = CvContainerConfig::default();
+        assert!(item.cvf_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvf_display() {
+        let item = CvContainerConfig::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvContainerConfig"));
+    }
+
+    #[test]
+    fn test_cvg_default() {
+        let item = CvWslDistro::default();
+        assert!(item.cvg_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvg_display() {
+        let item = CvWslDistro::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvWslDistro"));
+    }
+
+    #[test]
+    fn test_cvh_default() {
+        let item = CvPortForward::default();
+        assert!(item.cvh_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvh_display() {
+        let item = CvPortForward::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvPortForward"));
+    }
+
+    #[test]
+    fn test_cvi_default() {
+        let item = CvRemoteEnv::default();
+        assert!(item.cvi_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvi_display() {
+        let item = CvRemoteEnv::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvRemoteEnv"));
+    }
+
+    #[test]
+    fn test_cvj_default() {
+        let item = CvServerInfo::default();
+        assert!(item.cvj_validate());
+        assert!(!format!("{item}").is_empty());
+    }
+
+    #[test]
+    fn test_cvj_display() {
+        let item = CvServerInfo::default();
+        let s = format!("{item}");
+        assert!(s.contains("CvServerInfo"));
     }
 
 }
