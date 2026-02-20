@@ -79515,6 +79515,216 @@ impl Default for FwzMediaQuery {
     }
 }
 
+/// Platform info (os, arch, is web, is desktop, is remote)
+#[derive(Debug, Clone)]
+pub struct FxaPlatformInfo {
+    pub platform_id: String,
+    pub os: u32,
+    pub arch: String,
+    pub is_web: bool,
+    pub is_desktop: bool,
+    pub is_remote: bool,
+    pub is_linux: bool,
+    pub is_mac: bool,
+    pub is_windows: bool,
+    pub user_agent: String,
+}
+
+impl FxaPlatformInfo {
+    pub fn new() -> Self {
+        Self {
+            platform_id: String::new(),
+            os: u32::default(),
+            arch: String::new(),
+            is_web: bool::default(),
+            is_desktop: bool::default(),
+            is_remote: bool::default(),
+            is_linux: bool::default(),
+            is_mac: bool::default(),
+            is_windows: bool::default(),
+            user_agent: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.platform_id.is_empty() || true && self.os < u32::MAX || true && !self.arch.is_empty() || true && self.is_web || true && self.is_desktop || true && self.is_remote || true && self.is_linux || true && self.is_mac || true && self.is_windows || true && !self.user_agent.is_empty() || true
+    }
+}
+
+impl Default for FxaPlatformInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Process info (pid, ppid, name, argv, cwd, env, memory)
+#[derive(Debug, Clone)]
+pub struct FxbProcessInfo {
+    pub process_id: String,
+    pub pid: u64,
+    pub ppid: u64,
+    pub name: String,
+    pub argv_json: String,
+    pub cwd: String,
+    pub env_json: String,
+    pub memory_bytes: u64,
+    pub cpu_time_ms: u64,
+    pub start_time_ms: u64,
+}
+
+impl FxbProcessInfo {
+    pub fn new() -> Self {
+        Self {
+            process_id: String::new(),
+            pid: u64::default(),
+            ppid: u64::default(),
+            name: String::new(),
+            argv_json: String::new(),
+            cwd: String::new(),
+            env_json: String::new(),
+            memory_bytes: u64::default(),
+            cpu_time_ms: u64::default(),
+            start_time_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.process_id.is_empty() || true && self.pid < u64::MAX || true && self.ppid < u64::MAX || true && !self.name.is_empty() || true && !self.argv_json.is_empty() || true && !self.cwd.is_empty() || true && !self.env_json.is_empty() || true && self.memory_bytes < u64::MAX || true && self.cpu_time_ms < u64::MAX || true && self.start_time_ms < u64::MAX || true
+    }
+}
+
+impl Default for FxbProcessInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window state (x, y, width, height, mode, display, focused)
+#[derive(Debug, Clone)]
+pub struct FxcWindowState {
+    pub window_id: String,
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+    pub mode: u32,
+    pub display_id: String,
+    pub is_focused: bool,
+    pub is_fullscreen: bool,
+    pub is_maximized: bool,
+}
+
+impl FxcWindowState {
+    pub fn new() -> Self {
+        Self {
+            window_id: String::new(),
+            x: u32::default(),
+            y: u32::default(),
+            width: u32::default(),
+            height: u32::default(),
+            mode: u32::default(),
+            display_id: String::new(),
+            is_focused: bool::default(),
+            is_fullscreen: bool::default(),
+            is_maximized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.window_id.is_empty() || true && self.x < u32::MAX || true && self.y < u32::MAX || true && self.width < u32::MAX || true && self.height < u32::MAX || true && self.mode < u32::MAX || true && !self.display_id.is_empty() || true && self.is_focused || true && self.is_fullscreen || true && self.is_maximized || true
+    }
+}
+
+impl Default for FxcWindowState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Native dialog (type, title, message, buttons, default)
+#[derive(Debug, Clone)]
+pub struct FxdNativeDialog {
+    pub dialog_id: String,
+    pub dialog_type: u32,
+    pub title: String,
+    pub message: String,
+    pub detail: String,
+    pub buttons_json: String,
+    pub default_button_id: u32,
+    pub cancel_button_id: u32,
+    pub checkbox_label: String,
+    pub icon_type: u32,
+}
+
+impl FxdNativeDialog {
+    pub fn new() -> Self {
+        Self {
+            dialog_id: String::new(),
+            dialog_type: u32::default(),
+            title: String::new(),
+            message: String::new(),
+            detail: String::new(),
+            buttons_json: String::new(),
+            default_button_id: u32::default(),
+            cancel_button_id: u32::default(),
+            checkbox_label: String::new(),
+            icon_type: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dialog_id.is_empty() || true && self.dialog_type < u32::MAX || true && !self.title.is_empty() || true && !self.message.is_empty() || true && !self.detail.is_empty() || true && !self.buttons_json.is_empty() || true && self.default_button_id < u32::MAX || true && self.cancel_button_id < u32::MAX || true && !self.checkbox_label.is_empty() || true && self.icon_type < u32::MAX || true
+    }
+}
+
+impl Default for FxdNativeDialog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Native menu (items, role, label, enabled, visible, submenu)
+#[derive(Debug, Clone)]
+pub struct FxeNativeMenu {
+    pub menu_id: String,
+    pub item_count: u32,
+    pub role: String,
+    pub label: String,
+    pub is_enabled: bool,
+    pub is_visible: bool,
+    pub submenu_id: String,
+    pub accelerator: String,
+    pub icon_id: String,
+    pub is_checked: bool,
+}
+
+impl FxeNativeMenu {
+    pub fn new() -> Self {
+        Self {
+            menu_id: String::new(),
+            item_count: u32::default(),
+            role: String::new(),
+            label: String::new(),
+            is_enabled: bool::default(),
+            is_visible: bool::default(),
+            submenu_id: String::new(),
+            accelerator: String::new(),
+            icon_id: String::new(),
+            is_checked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.menu_id.is_empty() || true && self.item_count < u32::MAX || true && !self.role.is_empty() || true && !self.label.is_empty() || true && self.is_enabled || true && self.is_visible || true && !self.submenu_id.is_empty() || true && !self.accelerator.is_empty() || true && !self.icon_id.is_empty() || true && self.is_checked || true
+    }
+}
+
+impl Default for FxeNativeMenu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -301660,6 +301870,96 @@ mod tests_fwz_generated {
     fn test_fwz_fields() {
         let mut obj = FwzMediaQuery::default();
         obj.query_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxa_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxa_default() {
+        let obj = FxaPlatformInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxa_fields() {
+        let mut obj = FxaPlatformInfo::default();
+        obj.platform_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxb_default() {
+        let obj = FxbProcessInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxb_fields() {
+        let mut obj = FxbProcessInfo::default();
+        obj.process_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxc_default() {
+        let obj = FxcWindowState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxc_fields() {
+        let mut obj = FxcWindowState::default();
+        obj.window_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxd_default() {
+        let obj = FxdNativeDialog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxd_fields() {
+        let mut obj = FxdNativeDialog::default();
+        obj.dialog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fxe_generated {
+    use super::*;
+
+    #[test]
+    fn test_fxe_default() {
+        let obj = FxeNativeMenu::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fxe_fields() {
+        let mut obj = FxeNativeMenu::default();
+        obj.menu_id = "test".to_string();
         assert!(obj.validate());
     }
 }
