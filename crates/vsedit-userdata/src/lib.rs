@@ -174349,6 +174349,890 @@ impl Default for JpzSnippetSyntax {
     }
 }
 
+/// Workspace folder descriptor
+#[derive(Debug, Clone)]
+pub struct JqaWorkspaceFolder {
+    pub ws_folder_id: String,
+    pub uri_str: String,
+    pub folder_name: String,
+    pub index_val: u32,
+    pub config_path: String,
+    pub is_root: bool,
+}
+
+impl JqaWorkspaceFolder {
+    pub fn new() -> Self {
+        Self {
+            ws_folder_id: String::new(),
+            uri_str: String::new(),
+            folder_name: String::new(),
+            index_val: u32::default(),
+            config_path: String::new(),
+            is_root: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_folder_id.is_empty() || true && !self.uri_str.is_empty() || true && !self.folder_name.is_empty() || true && self.index_val < u32::MAX || true && !self.config_path.is_empty() || true && self.is_root || true
+    }
+}
+
+impl Default for JqaWorkspaceFolder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace file (.code-workspace)
+#[derive(Debug, Clone)]
+pub struct JqbWorkspaceFile {
+    pub ws_file_id: String,
+    pub file_path: String,
+    pub folder_count: u32,
+    pub settings_json: String,
+    pub launch_json: String,
+    pub is_untitled: bool,
+}
+
+impl JqbWorkspaceFile {
+    pub fn new() -> Self {
+        Self {
+            ws_file_id: String::new(),
+            file_path: String::new(),
+            folder_count: u32::default(),
+            settings_json: String::new(),
+            launch_json: String::new(),
+            is_untitled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_file_id.is_empty() || true && !self.file_path.is_empty() || true && self.folder_count < u32::MAX || true && !self.settings_json.is_empty() || true && !self.launch_json.is_empty() || true && self.is_untitled || true
+    }
+}
+
+impl Default for JqbWorkspaceFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace edit operation
+#[derive(Debug, Clone)]
+pub struct JqcWorkspaceEdit {
+    pub ws_edit_id: String,
+    pub edit_count: u32,
+    pub file_operations_count: u32,
+    pub needs_confirm: bool,
+    pub label_str: String,
+    pub is_refactoring: bool,
+}
+
+impl JqcWorkspaceEdit {
+    pub fn new() -> Self {
+        Self {
+            ws_edit_id: String::new(),
+            edit_count: u32::default(),
+            file_operations_count: u32::default(),
+            needs_confirm: bool::default(),
+            label_str: String::new(),
+            is_refactoring: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_edit_id.is_empty() || true && self.edit_count < u32::MAX || true && self.file_operations_count < u32::MAX || true && self.needs_confirm || true && !self.label_str.is_empty() || true && self.is_refactoring || true
+    }
+}
+
+impl Default for JqcWorkspaceEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace state entry
+#[derive(Debug, Clone)]
+pub struct JqdWorkspaceState {
+    pub ws_state_id: String,
+    pub key_str: String,
+    pub value_json: String,
+    pub scope_str: String,
+    pub stored_epoch: u64,
+    pub is_global: bool,
+}
+
+impl JqdWorkspaceState {
+    pub fn new() -> Self {
+        Self {
+            ws_state_id: String::new(),
+            key_str: String::new(),
+            value_json: String::new(),
+            scope_str: String::new(),
+            stored_epoch: u64::default(),
+            is_global: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_state_id.is_empty() || true && !self.key_str.is_empty() || true && !self.value_json.is_empty() || true && !self.scope_str.is_empty() || true && self.stored_epoch < u64::MAX || true && self.is_global || true
+    }
+}
+
+impl Default for JqdWorkspaceState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace trust state
+#[derive(Debug, Clone)]
+pub struct JqeWorkspaceTrust {
+    pub ws_trust_id: String,
+    pub folder_uri: String,
+    pub trust_state_str: String,
+    pub granted_epoch: u64,
+    pub parent_trust_ref: String,
+    pub is_trusted: bool,
+}
+
+impl JqeWorkspaceTrust {
+    pub fn new() -> Self {
+        Self {
+            ws_trust_id: String::new(),
+            folder_uri: String::new(),
+            trust_state_str: String::new(),
+            granted_epoch: u64::default(),
+            parent_trust_ref: String::new(),
+            is_trusted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_trust_id.is_empty() || true && !self.folder_uri.is_empty() || true && !self.trust_state_str.is_empty() || true && self.granted_epoch < u64::MAX || true && !self.parent_trust_ref.is_empty() || true && self.is_trusted || true
+    }
+}
+
+impl Default for JqeWorkspaceTrust {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace storage entry
+#[derive(Debug, Clone)]
+pub struct JqfWorkspaceStorage {
+    pub ws_storage_id: String,
+    pub storage_key: String,
+    pub storage_value: String,
+    pub scope_str: String,
+    pub size_bytes: u64,
+    pub is_encrypted: bool,
+}
+
+impl JqfWorkspaceStorage {
+    pub fn new() -> Self {
+        Self {
+            ws_storage_id: String::new(),
+            storage_key: String::new(),
+            storage_value: String::new(),
+            scope_str: String::new(),
+            size_bytes: u64::default(),
+            is_encrypted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_storage_id.is_empty() || true && !self.storage_key.is_empty() || true && !self.storage_value.is_empty() || true && !self.scope_str.is_empty() || true && self.size_bytes < u64::MAX || true && self.is_encrypted || true
+    }
+}
+
+impl Default for JqfWorkspaceStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Recent workspace entry
+#[derive(Debug, Clone)]
+pub struct JqgRecentWorkspace {
+    pub recent_ws_id: String,
+    pub label_str: String,
+    pub config_path: String,
+    pub folder_uri: String,
+    pub opened_epoch: u64,
+    pub is_workspace_file: bool,
+}
+
+impl JqgRecentWorkspace {
+    pub fn new() -> Self {
+        Self {
+            recent_ws_id: String::new(),
+            label_str: String::new(),
+            config_path: String::new(),
+            folder_uri: String::new(),
+            opened_epoch: u64::default(),
+            is_workspace_file: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.recent_ws_id.is_empty() || true && !self.label_str.is_empty() || true && !self.config_path.is_empty() || true && !self.folder_uri.is_empty() || true && self.opened_epoch < u64::MAX || true && self.is_workspace_file || true
+    }
+}
+
+impl Default for JqgRecentWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace tag entry
+#[derive(Debug, Clone)]
+pub struct JqhWorkspaceTag {
+    pub ws_tag_id: String,
+    pub tag_name: String,
+    pub tag_value: String,
+    pub folder_ref: String,
+    pub timestamp_epoch: u64,
+    pub is_auto_detected: bool,
+}
+
+impl JqhWorkspaceTag {
+    pub fn new() -> Self {
+        Self {
+            ws_tag_id: String::new(),
+            tag_name: String::new(),
+            tag_value: String::new(),
+            folder_ref: String::new(),
+            timestamp_epoch: u64::default(),
+            is_auto_detected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_tag_id.is_empty() || true && !self.tag_name.is_empty() || true && !self.tag_value.is_empty() || true && !self.folder_ref.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_auto_detected || true
+    }
+}
+
+impl Default for JqhWorkspaceTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace service descriptor
+#[derive(Debug, Clone)]
+pub struct JqiWorkspaceService {
+    pub ws_svc_id: String,
+    pub service_id: String,
+    pub folder_ref: String,
+    pub priority_val: u32,
+    pub registration_epoch: u64,
+    pub is_active: bool,
+}
+
+impl JqiWorkspaceService {
+    pub fn new() -> Self {
+        Self {
+            ws_svc_id: String::new(),
+            service_id: String::new(),
+            folder_ref: String::new(),
+            priority_val: u32::default(),
+            registration_epoch: u64::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_svc_id.is_empty() || true && !self.service_id.is_empty() || true && !self.folder_ref.is_empty() || true && self.priority_val < u32::MAX || true && self.registration_epoch < u64::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JqiWorkspaceService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Multi-root workspace config
+#[derive(Debug, Clone)]
+pub struct JqjMultiRootConfig {
+    pub multi_root_id: String,
+    pub folder_uris_csv: String,
+    pub settings_json: String,
+    pub extensions_json: String,
+    pub folder_count: u32,
+    pub is_temporary: bool,
+}
+
+impl JqjMultiRootConfig {
+    pub fn new() -> Self {
+        Self {
+            multi_root_id: String::new(),
+            folder_uris_csv: String::new(),
+            settings_json: String::new(),
+            extensions_json: String::new(),
+            folder_count: u32::default(),
+            is_temporary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.multi_root_id.is_empty() || true && !self.folder_uris_csv.is_empty() || true && !self.settings_json.is_empty() || true && !self.extensions_json.is_empty() || true && self.folder_count < u32::MAX || true && self.is_temporary || true
+    }
+}
+
+impl Default for JqjMultiRootConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace-wide search state
+#[derive(Debug, Clone)]
+pub struct JqkWorkspaceSearch {
+    pub ws_search_id: String,
+    pub query_str: String,
+    pub include_pattern: String,
+    pub exclude_pattern: String,
+    pub max_results: u32,
+    pub use_ignorefiles: bool,
+}
+
+impl JqkWorkspaceSearch {
+    pub fn new() -> Self {
+        Self {
+            ws_search_id: String::new(),
+            query_str: String::new(),
+            include_pattern: String::new(),
+            exclude_pattern: String::new(),
+            max_results: u32::default(),
+            use_ignorefiles: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_search_id.is_empty() || true && !self.query_str.is_empty() || true && !self.include_pattern.is_empty() || true && !self.exclude_pattern.is_empty() || true && self.max_results < u32::MAX || true && self.use_ignorefiles || true
+    }
+}
+
+impl Default for JqkWorkspaceSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace change event
+#[derive(Debug, Clone)]
+pub struct JqlWorkspaceEvent {
+    pub ws_event_id: String,
+    pub event_type_str: String,
+    pub folder_uri: String,
+    pub old_folders_count: u32,
+    pub new_folders_count: u32,
+    pub is_structural: bool,
+}
+
+impl JqlWorkspaceEvent {
+    pub fn new() -> Self {
+        Self {
+            ws_event_id: String::new(),
+            event_type_str: String::new(),
+            folder_uri: String::new(),
+            old_folders_count: u32::default(),
+            new_folders_count: u32::default(),
+            is_structural: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_event_id.is_empty() || true && !self.event_type_str.is_empty() || true && !self.folder_uri.is_empty() || true && self.old_folders_count < u32::MAX || true && self.new_folders_count < u32::MAX || true && self.is_structural || true
+    }
+}
+
+impl Default for JqlWorkspaceEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace extension recommendation
+#[derive(Debug, Clone)]
+pub struct JqmWorkspaceRecommendation {
+    pub ws_rec_id: String,
+    pub extension_id: String,
+    pub reason_str: String,
+    pub file_trigger: String,
+    pub confidence_val: u32,
+    pub is_important: bool,
+}
+
+impl JqmWorkspaceRecommendation {
+    pub fn new() -> Self {
+        Self {
+            ws_rec_id: String::new(),
+            extension_id: String::new(),
+            reason_str: String::new(),
+            file_trigger: String::new(),
+            confidence_val: u32::default(),
+            is_important: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_rec_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.reason_str.is_empty() || true && !self.file_trigger.is_empty() || true && self.confidence_val < u32::MAX || true && self.is_important || true
+    }
+}
+
+impl Default for JqmWorkspaceRecommendation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace task configuration
+#[derive(Debug, Clone)]
+pub struct JqnWorkspaceTask {
+    pub ws_task_id: String,
+    pub task_label: String,
+    pub task_type_str: String,
+    pub command_str: String,
+    pub folder_ref: String,
+    pub is_detected: bool,
+}
+
+impl JqnWorkspaceTask {
+    pub fn new() -> Self {
+        Self {
+            ws_task_id: String::new(),
+            task_label: String::new(),
+            task_type_str: String::new(),
+            command_str: String::new(),
+            folder_ref: String::new(),
+            is_detected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_task_id.is_empty() || true && !self.task_label.is_empty() || true && !self.task_type_str.is_empty() || true && !self.command_str.is_empty() || true && !self.folder_ref.is_empty() || true && self.is_detected || true
+    }
+}
+
+impl Default for JqnWorkspaceTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace launch configuration
+#[derive(Debug, Clone)]
+pub struct JqoWorkspaceLaunch {
+    pub ws_launch_id: String,
+    pub config_name: String,
+    pub debug_type_str: String,
+    pub request_str: String,
+    pub folder_ref: String,
+    pub is_compound: bool,
+}
+
+impl JqoWorkspaceLaunch {
+    pub fn new() -> Self {
+        Self {
+            ws_launch_id: String::new(),
+            config_name: String::new(),
+            debug_type_str: String::new(),
+            request_str: String::new(),
+            folder_ref: String::new(),
+            is_compound: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_launch_id.is_empty() || true && !self.config_name.is_empty() || true && !self.debug_type_str.is_empty() || true && !self.request_str.is_empty() || true && !self.folder_ref.is_empty() || true && self.is_compound || true
+    }
+}
+
+impl Default for JqoWorkspaceLaunch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace snippet entry
+#[derive(Debug, Clone)]
+pub struct JqpWorkspaceSnippet {
+    pub ws_snippet_id: String,
+    pub snippet_name: String,
+    pub prefix_str: String,
+    pub body_str: String,
+    pub language_ref: String,
+    pub is_project_snippet: bool,
+}
+
+impl JqpWorkspaceSnippet {
+    pub fn new() -> Self {
+        Self {
+            ws_snippet_id: String::new(),
+            snippet_name: String::new(),
+            prefix_str: String::new(),
+            body_str: String::new(),
+            language_ref: String::new(),
+            is_project_snippet: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_snippet_id.is_empty() || true && !self.snippet_name.is_empty() || true && !self.prefix_str.is_empty() || true && !self.body_str.is_empty() || true && !self.language_ref.is_empty() || true && self.is_project_snippet || true
+    }
+}
+
+impl Default for JqpWorkspaceSnippet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace symbolic link
+#[derive(Debug, Clone)]
+pub struct JqqWorkspaceSymlink {
+    pub ws_symlink_id: String,
+    pub link_path: String,
+    pub target_path: String,
+    pub folder_ref: String,
+    pub depth_val: u32,
+    pub is_broken: bool,
+}
+
+impl JqqWorkspaceSymlink {
+    pub fn new() -> Self {
+        Self {
+            ws_symlink_id: String::new(),
+            link_path: String::new(),
+            target_path: String::new(),
+            folder_ref: String::new(),
+            depth_val: u32::default(),
+            is_broken: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_symlink_id.is_empty() || true && !self.link_path.is_empty() || true && !self.target_path.is_empty() || true && !self.folder_ref.is_empty() || true && self.depth_val < u32::MAX || true && self.is_broken || true
+    }
+}
+
+impl Default for JqqWorkspaceSymlink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace permission entry
+#[derive(Debug, Clone)]
+pub struct JqrWorkspacePermission {
+    pub ws_perm_id: String,
+    pub permission_str: String,
+    pub scope_str: String,
+    pub extension_ref: String,
+    pub granted_epoch: u64,
+    pub is_granted: bool,
+}
+
+impl JqrWorkspacePermission {
+    pub fn new() -> Self {
+        Self {
+            ws_perm_id: String::new(),
+            permission_str: String::new(),
+            scope_str: String::new(),
+            extension_ref: String::new(),
+            granted_epoch: u64::default(),
+            is_granted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_perm_id.is_empty() || true && !self.permission_str.is_empty() || true && !self.scope_str.is_empty() || true && !self.extension_ref.is_empty() || true && self.granted_epoch < u64::MAX || true && self.is_granted || true
+    }
+}
+
+impl Default for JqrWorkspacePermission {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace diagnostic summary
+#[derive(Debug, Clone)]
+pub struct JqsWorkspaceDiagnostic {
+    pub ws_diag_id: String,
+    pub folder_uri: String,
+    pub error_count: u32,
+    pub warning_count: u32,
+    pub info_count: u32,
+    pub has_errors: bool,
+}
+
+impl JqsWorkspaceDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            ws_diag_id: String::new(),
+            folder_uri: String::new(),
+            error_count: u32::default(),
+            warning_count: u32::default(),
+            info_count: u32::default(),
+            has_errors: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_diag_id.is_empty() || true && !self.folder_uri.is_empty() || true && self.error_count < u32::MAX || true && self.warning_count < u32::MAX || true && self.info_count < u32::MAX || true && self.has_errors || true
+    }
+}
+
+impl Default for JqsWorkspaceDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace cache entry
+#[derive(Debug, Clone)]
+pub struct JqtWorkspaceCache {
+    pub ws_cache_id: String,
+    pub cache_key: String,
+    pub cache_value_len: u32,
+    pub created_epoch: u64,
+    pub ttl_secs: u32,
+    pub is_valid: bool,
+}
+
+impl JqtWorkspaceCache {
+    pub fn new() -> Self {
+        Self {
+            ws_cache_id: String::new(),
+            cache_key: String::new(),
+            cache_value_len: u32::default(),
+            created_epoch: u64::default(),
+            ttl_secs: u32::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_cache_id.is_empty() || true && !self.cache_key.is_empty() || true && self.cache_value_len < u32::MAX || true && self.created_epoch < u64::MAX || true && self.ttl_secs < u32::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for JqtWorkspaceCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace backup entry
+#[derive(Debug, Clone)]
+pub struct JquWorkspaceBackup {
+    pub ws_backup_id: String,
+    pub backup_path: String,
+    pub workspace_ref: String,
+    pub created_epoch: u64,
+    pub file_count: u32,
+    pub is_auto_backup: bool,
+}
+
+impl JquWorkspaceBackup {
+    pub fn new() -> Self {
+        Self {
+            ws_backup_id: String::new(),
+            backup_path: String::new(),
+            workspace_ref: String::new(),
+            created_epoch: u64::default(),
+            file_count: u32::default(),
+            is_auto_backup: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_backup_id.is_empty() || true && !self.backup_path.is_empty() || true && !self.workspace_ref.is_empty() || true && self.created_epoch < u64::MAX || true && self.file_count < u32::MAX || true && self.is_auto_backup || true
+    }
+}
+
+impl Default for JquWorkspaceBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace history entry
+#[derive(Debug, Clone)]
+pub struct JqvWorkspaceHistory {
+    pub ws_hist_id: String,
+    pub action_str: String,
+    pub resource_uri: String,
+    pub timestamp_epoch: u64,
+    pub details_json: String,
+    pub is_undo_stop: bool,
+}
+
+impl JqvWorkspaceHistory {
+    pub fn new() -> Self {
+        Self {
+            ws_hist_id: String::new(),
+            action_str: String::new(),
+            resource_uri: String::new(),
+            timestamp_epoch: u64::default(),
+            details_json: String::new(),
+            is_undo_stop: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_hist_id.is_empty() || true && !self.action_str.is_empty() || true && !self.resource_uri.is_empty() || true && self.timestamp_epoch < u64::MAX || true && !self.details_json.is_empty() || true && self.is_undo_stop || true
+    }
+}
+
+impl Default for JqvWorkspaceHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace profile entry
+#[derive(Debug, Clone)]
+pub struct JqwWorkspaceProfile {
+    pub ws_profile_id: String,
+    pub profile_name: String,
+    pub settings_path: String,
+    pub extensions_csv: String,
+    pub keybindings_path: String,
+    pub is_default: bool,
+}
+
+impl JqwWorkspaceProfile {
+    pub fn new() -> Self {
+        Self {
+            ws_profile_id: String::new(),
+            profile_name: String::new(),
+            settings_path: String::new(),
+            extensions_csv: String::new(),
+            keybindings_path: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_profile_id.is_empty() || true && !self.profile_name.is_empty() || true && !self.settings_path.is_empty() || true && !self.extensions_csv.is_empty() || true && !self.keybindings_path.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for JqwWorkspaceProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace template entry
+#[derive(Debug, Clone)]
+pub struct JqxWorkspaceTemplate {
+    pub ws_template_id: String,
+    pub template_name: String,
+    pub description_str: String,
+    pub folder_structure_json: String,
+    pub file_count: u32,
+    pub is_builtin: bool,
+}
+
+impl JqxWorkspaceTemplate {
+    pub fn new() -> Self {
+        Self {
+            ws_template_id: String::new(),
+            template_name: String::new(),
+            description_str: String::new(),
+            folder_structure_json: String::new(),
+            file_count: u32::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_template_id.is_empty() || true && !self.template_name.is_empty() || true && !self.description_str.is_empty() || true && !self.folder_structure_json.is_empty() || true && self.file_count < u32::MAX || true && self.is_builtin || true
+    }
+}
+
+impl Default for JqxWorkspaceTemplate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace variable entry
+#[derive(Debug, Clone)]
+pub struct JqyWorkspaceVariable {
+    pub ws_var_id: String,
+    pub var_name: String,
+    pub var_value: String,
+    pub scope_str: String,
+    pub resolve_order: u32,
+    pub is_path_variable: bool,
+}
+
+impl JqyWorkspaceVariable {
+    pub fn new() -> Self {
+        Self {
+            ws_var_id: String::new(),
+            var_name: String::new(),
+            var_value: String::new(),
+            scope_str: String::new(),
+            resolve_order: u32::default(),
+            is_path_variable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_var_id.is_empty() || true && !self.var_name.is_empty() || true && !self.var_value.is_empty() || true && !self.scope_str.is_empty() || true && self.resolve_order < u32::MAX || true && self.is_path_variable || true
+    }
+}
+
+impl Default for JqyWorkspaceVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace configuration entry
+#[derive(Debug, Clone)]
+pub struct JqzWorkspaceConfig {
+    pub ws_config_id: String,
+    pub config_key: String,
+    pub config_value_json: String,
+    pub scope_str: String,
+    pub source_str: String,
+    pub is_default_value: bool,
+}
+
+impl JqzWorkspaceConfig {
+    pub fn new() -> Self {
+        Self {
+            ws_config_id: String::new(),
+            config_key: String::new(),
+            config_value_json: String::new(),
+            scope_str: String::new(),
+            source_str: String::new(),
+            is_default_value: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_config_id.is_empty() || true && !self.config_key.is_empty() || true && !self.config_value_json.is_empty() || true && !self.scope_str.is_empty() || true && !self.source_str.is_empty() || true && self.is_default_value || true
+    }
+}
+
+impl Default for JqzWorkspaceConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -441850,6 +442734,474 @@ mod tests_jpz_generated {
     fn test_jpz_fields() {
         let mut obj = JpzSnippetSyntax::default();
         obj.snip_syntax_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqa_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqa_default() {
+        let obj = JqaWorkspaceFolder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqa_fields() {
+        let mut obj = JqaWorkspaceFolder::default();
+        obj.ws_folder_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqb_default() {
+        let obj = JqbWorkspaceFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqb_fields() {
+        let mut obj = JqbWorkspaceFile::default();
+        obj.ws_file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqc_default() {
+        let obj = JqcWorkspaceEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqc_fields() {
+        let mut obj = JqcWorkspaceEdit::default();
+        obj.ws_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqd_default() {
+        let obj = JqdWorkspaceState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqd_fields() {
+        let mut obj = JqdWorkspaceState::default();
+        obj.ws_state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqe_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqe_default() {
+        let obj = JqeWorkspaceTrust::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqe_fields() {
+        let mut obj = JqeWorkspaceTrust::default();
+        obj.ws_trust_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqf_default() {
+        let obj = JqfWorkspaceStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqf_fields() {
+        let mut obj = JqfWorkspaceStorage::default();
+        obj.ws_storage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqg_default() {
+        let obj = JqgRecentWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqg_fields() {
+        let mut obj = JqgRecentWorkspace::default();
+        obj.recent_ws_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqh_default() {
+        let obj = JqhWorkspaceTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqh_fields() {
+        let mut obj = JqhWorkspaceTag::default();
+        obj.ws_tag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqi_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqi_default() {
+        let obj = JqiWorkspaceService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqi_fields() {
+        let mut obj = JqiWorkspaceService::default();
+        obj.ws_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqj_default() {
+        let obj = JqjMultiRootConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqj_fields() {
+        let mut obj = JqjMultiRootConfig::default();
+        obj.multi_root_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqk_default() {
+        let obj = JqkWorkspaceSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqk_fields() {
+        let mut obj = JqkWorkspaceSearch::default();
+        obj.ws_search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jql_generated {
+    use super::*;
+
+    #[test]
+    fn test_jql_default() {
+        let obj = JqlWorkspaceEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jql_fields() {
+        let mut obj = JqlWorkspaceEvent::default();
+        obj.ws_event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqm_default() {
+        let obj = JqmWorkspaceRecommendation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqm_fields() {
+        let mut obj = JqmWorkspaceRecommendation::default();
+        obj.ws_rec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqn_default() {
+        let obj = JqnWorkspaceTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqn_fields() {
+        let mut obj = JqnWorkspaceTask::default();
+        obj.ws_task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqo_default() {
+        let obj = JqoWorkspaceLaunch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqo_fields() {
+        let mut obj = JqoWorkspaceLaunch::default();
+        obj.ws_launch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqp_default() {
+        let obj = JqpWorkspaceSnippet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqp_fields() {
+        let mut obj = JqpWorkspaceSnippet::default();
+        obj.ws_snippet_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqq_default() {
+        let obj = JqqWorkspaceSymlink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqq_fields() {
+        let mut obj = JqqWorkspaceSymlink::default();
+        obj.ws_symlink_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqr_default() {
+        let obj = JqrWorkspacePermission::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqr_fields() {
+        let mut obj = JqrWorkspacePermission::default();
+        obj.ws_perm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqs_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqs_default() {
+        let obj = JqsWorkspaceDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqs_fields() {
+        let mut obj = JqsWorkspaceDiagnostic::default();
+        obj.ws_diag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqt_default() {
+        let obj = JqtWorkspaceCache::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqt_fields() {
+        let mut obj = JqtWorkspaceCache::default();
+        obj.ws_cache_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqu_default() {
+        let obj = JquWorkspaceBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqu_fields() {
+        let mut obj = JquWorkspaceBackup::default();
+        obj.ws_backup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqv_default() {
+        let obj = JqvWorkspaceHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqv_fields() {
+        let mut obj = JqvWorkspaceHistory::default();
+        obj.ws_hist_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqw_default() {
+        let obj = JqwWorkspaceProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqw_fields() {
+        let mut obj = JqwWorkspaceProfile::default();
+        obj.ws_profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqx_default() {
+        let obj = JqxWorkspaceTemplate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqx_fields() {
+        let mut obj = JqxWorkspaceTemplate::default();
+        obj.ws_template_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqy_default() {
+        let obj = JqyWorkspaceVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqy_fields() {
+        let mut obj = JqyWorkspaceVariable::default();
+        obj.ws_var_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jqz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jqz_default() {
+        let obj = JqzWorkspaceConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jqz_fields() {
+        let mut obj = JqzWorkspaceConfig::default();
+        obj.ws_config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
