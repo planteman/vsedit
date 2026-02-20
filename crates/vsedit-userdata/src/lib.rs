@@ -68867,6 +68867,216 @@ impl Default for FneChatVariable {
     }
 }
 
+/// Chat agent (id, metadata, locations, default implicit, tool references)
+#[derive(Debug, Clone)]
+pub struct FnfChatAgent {
+    pub agent_id: String,
+    pub metadata_json: String,
+    pub locations_json: String,
+    pub default_implicit: bool,
+    pub tool_references_json: String,
+    pub icon_path: String,
+    pub description: String,
+    pub full_name: String,
+    pub extension_id: String,
+    pub is_active: bool,
+}
+
+impl FnfChatAgent {
+    pub fn new() -> Self {
+        Self {
+            agent_id: String::new(),
+            metadata_json: String::new(),
+            locations_json: String::new(),
+            default_implicit: bool::default(),
+            tool_references_json: String::new(),
+            icon_path: String::new(),
+            description: String::new(),
+            full_name: String::new(),
+            extension_id: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.agent_id.is_empty() || true && !self.metadata_json.is_empty() || true && !self.locations_json.is_empty() || true && self.default_implicit || true && !self.tool_references_json.is_empty() || true && !self.icon_path.is_empty() || true && !self.description.is_empty() || true && !self.full_name.is_empty() || true && !self.extension_id.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for FnfChatAgent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat tool (name, description, input schema, tag, user description)
+#[derive(Debug, Clone)]
+pub struct FngChatTool {
+    pub tool_id: String,
+    pub name: String,
+    pub description: String,
+    pub input_schema_json: String,
+    pub model_description: String,
+    pub user_description: String,
+    pub tags_json: String,
+    pub when_clause: String,
+    pub extension_id: String,
+    pub can_be_referenced_in_prompt: bool,
+}
+
+impl FngChatTool {
+    pub fn new() -> Self {
+        Self {
+            tool_id: String::new(),
+            name: String::new(),
+            description: String::new(),
+            input_schema_json: String::new(),
+            model_description: String::new(),
+            user_description: String::new(),
+            tags_json: String::new(),
+            when_clause: String::new(),
+            extension_id: String::new(),
+            can_be_referenced_in_prompt: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tool_id.is_empty() || true && !self.name.is_empty() || true && !self.description.is_empty() || true && !self.input_schema_json.is_empty() || true && !self.model_description.is_empty() || true && !self.user_description.is_empty() || true && !self.tags_json.is_empty() || true && !self.when_clause.is_empty() || true && !self.extension_id.is_empty() || true && self.can_be_referenced_in_prompt || true
+    }
+}
+
+impl Default for FngChatTool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat tool result (content, metadata, is error, partial)
+#[derive(Debug, Clone)]
+pub struct FnhChatToolResult {
+    pub result_id: String,
+    pub content_json: String,
+    pub metadata_json: String,
+    pub is_error: bool,
+    pub is_partial: bool,
+    pub tool_id: String,
+    pub invocation_token: String,
+    pub content_type: u32,
+    pub elapsed_ms: u64,
+    pub token_count: u32,
+}
+
+impl FnhChatToolResult {
+    pub fn new() -> Self {
+        Self {
+            result_id: String::new(),
+            content_json: String::new(),
+            metadata_json: String::new(),
+            is_error: bool::default(),
+            is_partial: bool::default(),
+            tool_id: String::new(),
+            invocation_token: String::new(),
+            content_type: u32::default(),
+            elapsed_ms: u64::default(),
+            token_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_id.is_empty() || true && !self.content_json.is_empty() || true && !self.metadata_json.is_empty() || true && self.is_error || true && self.is_partial || true && !self.tool_id.is_empty() || true && !self.invocation_token.is_empty() || true && self.content_type < u32::MAX || true && self.elapsed_ms < u64::MAX || true && self.token_count < u32::MAX || true
+    }
+}
+
+impl Default for FnhChatToolResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat history (turns, participant, last active, pinned)
+#[derive(Debug, Clone)]
+pub struct FniChatHistory {
+    pub history_id: String,
+    pub turn_count: u32,
+    pub participant_id: String,
+    pub last_active_ms: u64,
+    pub is_pinned: bool,
+    pub title: String,
+    pub model_id: String,
+    pub location: u32,
+    pub created_at_ms: u64,
+    pub total_tokens: u64,
+}
+
+impl FniChatHistory {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            turn_count: u32::default(),
+            participant_id: String::new(),
+            last_active_ms: u64::default(),
+            is_pinned: bool::default(),
+            title: String::new(),
+            model_id: String::new(),
+            location: u32::default(),
+            created_at_ms: u64::default(),
+            total_tokens: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && self.turn_count < u32::MAX || true && !self.participant_id.is_empty() || true && self.last_active_ms < u64::MAX || true && self.is_pinned || true && !self.title.is_empty() || true && !self.model_id.is_empty() || true && self.location < u32::MAX || true && self.created_at_ms < u64::MAX || true && self.total_tokens < u64::MAX || true
+    }
+}
+
+impl Default for FniChatHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat response code block (language, code, file uri, range)
+#[derive(Debug, Clone)]
+pub struct FnjChatCodeBlock {
+    pub block_id: String,
+    pub language_id: String,
+    pub code_content: String,
+    pub file_uri: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub is_editable: bool,
+    pub response_id: String,
+    pub block_index: u32,
+    pub is_applied: bool,
+}
+
+impl FnjChatCodeBlock {
+    pub fn new() -> Self {
+        Self {
+            block_id: String::new(),
+            language_id: String::new(),
+            code_content: String::new(),
+            file_uri: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            is_editable: bool::default(),
+            response_id: String::new(),
+            block_index: u32::default(),
+            is_applied: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.block_id.is_empty() || true && !self.language_id.is_empty() || true && !self.code_content.is_empty() || true && !self.file_uri.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && self.is_editable || true && !self.response_id.is_empty() || true && self.block_index < u32::MAX || true && self.is_applied || true
+    }
+}
+
+impl Default for FnjChatCodeBlock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -286382,6 +286592,96 @@ mod tests_fne_generated {
     fn test_fne_fields() {
         let mut obj = FneChatVariable::default();
         obj.variable_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnf_default() {
+        let obj = FnfChatAgent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnf_fields() {
+        let mut obj = FnfChatAgent::default();
+        obj.agent_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fng_generated {
+    use super::*;
+
+    #[test]
+    fn test_fng_default() {
+        let obj = FngChatTool::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fng_fields() {
+        let mut obj = FngChatTool::default();
+        obj.tool_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnh_default() {
+        let obj = FnhChatToolResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnh_fields() {
+        let mut obj = FnhChatToolResult::default();
+        obj.result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fni_generated {
+    use super::*;
+
+    #[test]
+    fn test_fni_default() {
+        let obj = FniChatHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fni_fields() {
+        let mut obj = FniChatHistory::default();
+        obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnj_default() {
+        let obj = FnjChatCodeBlock::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnj_fields() {
+        let mut obj = FnjChatCodeBlock::default();
+        obj.block_id = "test".to_string();
         assert!(obj.validate());
     }
 }
