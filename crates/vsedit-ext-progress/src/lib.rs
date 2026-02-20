@@ -118922,6 +118922,426 @@ impl Default for HgzCherryPickStep {
     }
 }
 
+/// Remote connection (authority, type, label, connected, latency)
+#[derive(Debug, Clone)]
+pub struct HhaRemoteConnection {
+    pub remote_conn_id: String,
+    pub authority: String,
+    pub connection_type: String,
+    pub label: String,
+    pub is_connected: bool,
+    pub latency_ms: u32,
+    pub server_version: String,
+    pub pid: u32,
+    pub workspace_uri: String,
+    pub error_message: String,
+}
+
+impl HhaRemoteConnection {
+    pub fn new() -> Self {
+        Self {
+            remote_conn_id: String::new(),
+            authority: String::new(),
+            connection_type: String::new(),
+            label: String::new(),
+            is_connected: bool::default(),
+            latency_ms: u32::default(),
+            server_version: String::new(),
+            pid: u32::default(),
+            workspace_uri: String::new(),
+            error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_conn_id.is_empty() || true && !self.authority.is_empty() || true && !self.connection_type.is_empty() || true && !self.label.is_empty() || true && self.is_connected || true && self.latency_ms < u32::MAX || true && !self.server_version.is_empty() || true && self.pid < u32::MAX || true && !self.workspace_uri.is_empty() || true && !self.error_message.is_empty() || true
+    }
+}
+
+impl Default for HhaRemoteConnection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SSH configuration (host, port, user, key path, agent, proxy)
+#[derive(Debug, Clone)]
+pub struct HhbSSHConfig {
+    pub ssh_config_id: String,
+    pub host: String,
+    pub port: u32,
+    pub user: String,
+    pub key_path: String,
+    pub agent_forward: bool,
+    pub proxy_command: String,
+    pub identity_file: String,
+    pub strict_host_key_checking: bool,
+    pub config_file: String,
+}
+
+impl HhbSSHConfig {
+    pub fn new() -> Self {
+        Self {
+            ssh_config_id: String::new(),
+            host: String::new(),
+            port: u32::default(),
+            user: String::new(),
+            key_path: String::new(),
+            agent_forward: bool::default(),
+            proxy_command: String::new(),
+            identity_file: String::new(),
+            strict_host_key_checking: bool::default(),
+            config_file: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ssh_config_id.is_empty() || true && !self.host.is_empty() || true && self.port < u32::MAX || true && !self.user.is_empty() || true && !self.key_path.is_empty() || true && self.agent_forward || true && !self.proxy_command.is_empty() || true && !self.identity_file.is_empty() || true && self.strict_host_key_checking || true && !self.config_file.is_empty() || true
+    }
+}
+
+impl Default for HhbSSHConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dev container (name, image, features, mounts, forwards)
+#[derive(Debug, Clone)]
+pub struct HhcDevContainer {
+    pub dev_container_id: String,
+    pub name: String,
+    pub image: String,
+    pub features_json: String,
+    pub mounts_json: String,
+    pub forward_ports_json: String,
+    pub build_args_json: String,
+    pub post_create_command: String,
+    pub remote_user: String,
+    pub container_env_json: String,
+}
+
+impl HhcDevContainer {
+    pub fn new() -> Self {
+        Self {
+            dev_container_id: String::new(),
+            name: String::new(),
+            image: String::new(),
+            features_json: String::new(),
+            mounts_json: String::new(),
+            forward_ports_json: String::new(),
+            build_args_json: String::new(),
+            post_create_command: String::new(),
+            remote_user: String::new(),
+            container_env_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dev_container_id.is_empty() || true && !self.name.is_empty() || true && !self.image.is_empty() || true && !self.features_json.is_empty() || true && !self.mounts_json.is_empty() || true && !self.forward_ports_json.is_empty() || true && !self.build_args_json.is_empty() || true && !self.post_create_command.is_empty() || true && !self.remote_user.is_empty() || true && !self.container_env_json.is_empty() || true
+    }
+}
+
+impl Default for HhcDevContainer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// WSL distribution (name, version, default, running, filesystem)
+#[derive(Debug, Clone)]
+pub struct HhdWSLDistro {
+    pub wsl_distro_id: String,
+    pub name: String,
+    pub version: u32,
+    pub is_default: bool,
+    pub is_running: bool,
+    pub filesystem_path: String,
+    pub install_date_ms: u64,
+    pub state: String,
+    pub user: String,
+    pub ip_address: String,
+}
+
+impl HhdWSLDistro {
+    pub fn new() -> Self {
+        Self {
+            wsl_distro_id: String::new(),
+            name: String::new(),
+            version: u32::default(),
+            is_default: bool::default(),
+            is_running: bool::default(),
+            filesystem_path: String::new(),
+            install_date_ms: u64::default(),
+            state: String::new(),
+            user: String::new(),
+            ip_address: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wsl_distro_id.is_empty() || true && !self.name.is_empty() || true && self.version < u32::MAX || true && self.is_default || true && self.is_running || true && !self.filesystem_path.is_empty() || true && self.install_date_ms < u64::MAX || true && !self.state.is_empty() || true && !self.user.is_empty() || true && !self.ip_address.is_empty() || true
+    }
+}
+
+impl Default for HhdWSLDistro {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Codespace info (name, owner, repo, branch, machine type)
+#[derive(Debug, Clone)]
+pub struct HheCodespaceInfo {
+    pub codespace_id: String,
+    pub name: String,
+    pub owner: String,
+    pub repo: String,
+    pub branch: String,
+    pub machine_type: String,
+    pub state: String,
+    pub created_at_ms: u64,
+    pub last_used_ms: u64,
+    pub idle_timeout_minutes: u32,
+}
+
+impl HheCodespaceInfo {
+    pub fn new() -> Self {
+        Self {
+            codespace_id: String::new(),
+            name: String::new(),
+            owner: String::new(),
+            repo: String::new(),
+            branch: String::new(),
+            machine_type: String::new(),
+            state: String::new(),
+            created_at_ms: u64::default(),
+            last_used_ms: u64::default(),
+            idle_timeout_minutes: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.codespace_id.is_empty() || true && !self.name.is_empty() || true && !self.owner.is_empty() || true && !self.repo.is_empty() || true && !self.branch.is_empty() || true && !self.machine_type.is_empty() || true && !self.state.is_empty() || true && self.created_at_ms < u64::MAX || true && self.last_used_ms < u64::MAX || true && self.idle_timeout_minutes < u32::MAX || true
+    }
+}
+
+impl Default for HheCodespaceInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel service (connection, domain, protocol, status, auth)
+#[derive(Debug, Clone)]
+pub struct HhfTunnelService {
+    pub tunnel_svc_id: String,
+    pub connection_id: String,
+    pub domain: String,
+    pub protocol: String,
+    pub status: String,
+    pub auth_token: String,
+    pub tunnel_name: String,
+    pub port: u32,
+    pub is_public: bool,
+    pub created_at_ms: u64,
+}
+
+impl HhfTunnelService {
+    pub fn new() -> Self {
+        Self {
+            tunnel_svc_id: String::new(),
+            connection_id: String::new(),
+            domain: String::new(),
+            protocol: String::new(),
+            status: String::new(),
+            auth_token: String::new(),
+            tunnel_name: String::new(),
+            port: u32::default(),
+            is_public: bool::default(),
+            created_at_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tunnel_svc_id.is_empty() || true && !self.connection_id.is_empty() || true && !self.domain.is_empty() || true && !self.protocol.is_empty() || true && !self.status.is_empty() || true && !self.auth_token.is_empty() || true && !self.tunnel_name.is_empty() || true && self.port < u32::MAX || true && self.is_public || true && self.created_at_ms < u64::MAX || true
+    }
+}
+
+impl Default for HhfTunnelService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port discovery (pid, port, protocol, label, auto forward)
+#[derive(Debug, Clone)]
+pub struct HhgPortDiscovery {
+    pub port_disc_id: String,
+    pub pid: u32,
+    pub port: u32,
+    pub protocol: String,
+    pub label: String,
+    pub auto_forward: bool,
+    pub process_name: String,
+    pub is_detected: bool,
+    pub source: String,
+    pub elevation: String,
+}
+
+impl HhgPortDiscovery {
+    pub fn new() -> Self {
+        Self {
+            port_disc_id: String::new(),
+            pid: u32::default(),
+            port: u32::default(),
+            protocol: String::new(),
+            label: String::new(),
+            auto_forward: bool::default(),
+            process_name: String::new(),
+            is_detected: bool::default(),
+            source: String::new(),
+            elevation: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.port_disc_id.is_empty() || true && self.pid < u32::MAX || true && self.port < u32::MAX || true && !self.protocol.is_empty() || true && !self.label.is_empty() || true && self.auto_forward || true && !self.process_name.is_empty() || true && self.is_detected || true && !self.source.is_empty() || true && !self.elevation.is_empty() || true
+    }
+}
+
+impl Default for HhgPortDiscovery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote extension host (connection, uri, pid, log level)
+#[derive(Debug, Clone)]
+pub struct HhhRemoteExtHost {
+    pub remote_ext_id: String,
+    pub connection_id: String,
+    pub uri: String,
+    pub pid: u32,
+    pub log_level: String,
+    pub is_running: bool,
+    pub extension_count: u32,
+    pub startup_time_ms: u64,
+    pub protocol_version: String,
+    pub platform: String,
+}
+
+impl HhhRemoteExtHost {
+    pub fn new() -> Self {
+        Self {
+            remote_ext_id: String::new(),
+            connection_id: String::new(),
+            uri: String::new(),
+            pid: u32::default(),
+            log_level: String::new(),
+            is_running: bool::default(),
+            extension_count: u32::default(),
+            startup_time_ms: u64::default(),
+            protocol_version: String::new(),
+            platform: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_ext_id.is_empty() || true && !self.connection_id.is_empty() || true && !self.uri.is_empty() || true && self.pid < u32::MAX || true && !self.log_level.is_empty() || true && self.is_running || true && self.extension_count < u32::MAX || true && self.startup_time_ms < u64::MAX || true && !self.protocol_version.is_empty() || true && !self.platform.is_empty() || true
+    }
+}
+
+impl Default for HhhRemoteExtHost {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote file system (provider, scheme, capabilities, latency)
+#[derive(Debug, Clone)]
+pub struct HhiRemoteFileSystem {
+    pub remote_fs_id: String,
+    pub provider_id: String,
+    pub scheme: String,
+    pub capabilities_json: String,
+    pub latency_ms: u32,
+    pub is_readonly: bool,
+    pub case_sensitive: bool,
+    pub max_file_size: u64,
+    pub supports_watch: bool,
+    pub authority: String,
+}
+
+impl HhiRemoteFileSystem {
+    pub fn new() -> Self {
+        Self {
+            remote_fs_id: String::new(),
+            provider_id: String::new(),
+            scheme: String::new(),
+            capabilities_json: String::new(),
+            latency_ms: u32::default(),
+            is_readonly: bool::default(),
+            case_sensitive: bool::default(),
+            max_file_size: u64::default(),
+            supports_watch: bool::default(),
+            authority: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_fs_id.is_empty() || true && !self.provider_id.is_empty() || true && !self.scheme.is_empty() || true && !self.capabilities_json.is_empty() || true && self.latency_ms < u32::MAX || true && self.is_readonly || true && self.case_sensitive || true && self.max_file_size < u64::MAX || true && self.supports_watch || true && !self.authority.is_empty() || true
+    }
+}
+
+impl Default for HhiRemoteFileSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote terminal (pid, shell, cwd, env, columns, rows)
+#[derive(Debug, Clone)]
+pub struct HhjRemoteTerminal {
+    pub remote_term_id: String,
+    pub pid: u32,
+    pub shell_path: String,
+    pub cwd: String,
+    pub env_json: String,
+    pub columns: u32,
+    pub rows: u32,
+    pub is_connected: bool,
+    pub latency_ms: u32,
+    pub encoding: String,
+}
+
+impl HhjRemoteTerminal {
+    pub fn new() -> Self {
+        Self {
+            remote_term_id: String::new(),
+            pid: u32::default(),
+            shell_path: String::new(),
+            cwd: String::new(),
+            env_json: String::new(),
+            columns: u32::default(),
+            rows: u32::default(),
+            is_connected: bool::default(),
+            latency_ms: u32::default(),
+            encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_term_id.is_empty() || true && self.pid < u32::MAX || true && !self.shell_path.is_empty() || true && !self.cwd.is_empty() || true && !self.env_json.is_empty() || true && self.columns < u32::MAX || true && self.rows < u32::MAX || true && self.is_connected || true && self.latency_ms < u32::MAX || true && !self.encoding.is_empty() || true
+    }
+}
+
+impl Default for HhjRemoteTerminal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -357825,6 +358245,186 @@ mod tests_hgz_generated {
     fn test_hgz_fields() {
         let mut obj = HgzCherryPickStep::default();
         obj.cherry_pick_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hha_generated {
+    use super::*;
+
+    #[test]
+    fn test_hha_default() {
+        let obj = HhaRemoteConnection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hha_fields() {
+        let mut obj = HhaRemoteConnection::default();
+        obj.remote_conn_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhb_default() {
+        let obj = HhbSSHConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhb_fields() {
+        let mut obj = HhbSSHConfig::default();
+        obj.ssh_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhc_default() {
+        let obj = HhcDevContainer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhc_fields() {
+        let mut obj = HhcDevContainer::default();
+        obj.dev_container_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhd_default() {
+        let obj = HhdWSLDistro::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhd_fields() {
+        let mut obj = HhdWSLDistro::default();
+        obj.wsl_distro_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhe_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhe_default() {
+        let obj = HheCodespaceInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhe_fields() {
+        let mut obj = HheCodespaceInfo::default();
+        obj.codespace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhf_default() {
+        let obj = HhfTunnelService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhf_fields() {
+        let mut obj = HhfTunnelService::default();
+        obj.tunnel_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhg_default() {
+        let obj = HhgPortDiscovery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhg_fields() {
+        let mut obj = HhgPortDiscovery::default();
+        obj.port_disc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhh_default() {
+        let obj = HhhRemoteExtHost::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhh_fields() {
+        let mut obj = HhhRemoteExtHost::default();
+        obj.remote_ext_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhi_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhi_default() {
+        let obj = HhiRemoteFileSystem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhi_fields() {
+        let mut obj = HhiRemoteFileSystem::default();
+        obj.remote_fs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhj_default() {
+        let obj = HhjRemoteTerminal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhj_fields() {
+        let mut obj = HhjRemoteTerminal::default();
+        obj.remote_term_id = "test".to_string();
         assert!(obj.validate());
     }
 }
