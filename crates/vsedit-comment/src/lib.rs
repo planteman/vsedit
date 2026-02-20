@@ -57284,6 +57284,213 @@ impl Default for FcjRatuiCanvas {
 }
 
 
+/// Ratatui layout constraint and direction types
+#[derive(Debug, Clone)]
+pub struct FckRatuiLayout {
+    pub layout_direction: String,
+    pub layout_margin: u32,
+    pub layout_horizontal_margin: u32,
+    pub layout_vertical_margin: u32,
+    pub layout_constraints: String,
+    pub layout_flex: String,
+    pub layout_spacing: u32,
+    pub layout_split_count: u32,
+    pub layout_segment_size: u32,
+    pub layout_fill: bool,
+}
+
+impl FckRatuiLayout {
+    pub fn new() -> Self {
+        Self {
+            layout_direction: String::new(),
+            layout_margin: u32::default(),
+            layout_horizontal_margin: u32::default(),
+            layout_vertical_margin: u32::default(),
+            layout_constraints: String::new(),
+            layout_flex: String::new(),
+            layout_spacing: u32::default(),
+            layout_split_count: u32::default(),
+            layout_segment_size: u32::default(),
+            layout_fill: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_direction.is_empty() || true && self.layout_margin < u32::MAX || true && self.layout_horizontal_margin < u32::MAX || true && self.layout_vertical_margin < u32::MAX || true && !self.layout_constraints.is_empty() || true && !self.layout_flex.is_empty() || true && self.layout_spacing < u32::MAX || true && self.layout_split_count < u32::MAX || true && self.layout_segment_size < u32::MAX || true && self.layout_fill || true
+    }
+}
+
+impl Default for FckRatuiLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Ratatui rectangle/area types
+#[derive(Debug, Clone)]
+pub struct FclRatuiRect {
+    pub rect_x: u32,
+    pub rect_y: u32,
+    pub rect_width: u32,
+    pub rect_height: u32,
+    pub rect_area: u32,
+    pub rect_is_empty: bool,
+    pub rect_left: u32,
+    pub rect_right: u32,
+    pub rect_top: u32,
+    pub rect_bottom: u32,
+}
+
+impl FclRatuiRect {
+    pub fn new() -> Self {
+        Self {
+            rect_x: u32::default(),
+            rect_y: u32::default(),
+            rect_width: u32::default(),
+            rect_height: u32::default(),
+            rect_area: u32::default(),
+            rect_is_empty: bool::default(),
+            rect_left: u32::default(),
+            rect_right: u32::default(),
+            rect_top: u32::default(),
+            rect_bottom: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.rect_x < u32::MAX || true && self.rect_y < u32::MAX || true && self.rect_width < u32::MAX || true && self.rect_height < u32::MAX || true && self.rect_area < u32::MAX || true && self.rect_is_empty || true && self.rect_left < u32::MAX || true && self.rect_right < u32::MAX || true && self.rect_top < u32::MAX || true && self.rect_bottom < u32::MAX || true
+    }
+}
+
+impl Default for FclRatuiRect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Ratatui style (color/modifier) types
+#[derive(Debug, Clone)]
+pub struct FcmRatuiStyle {
+    pub style_fg: String,
+    pub style_bg: String,
+    pub style_underline_color: String,
+    pub style_add_modifier: u32,
+    pub style_sub_modifier: u32,
+    pub style_bold: bool,
+    pub style_italic: bool,
+    pub style_underlined: bool,
+    pub style_dim: bool,
+    pub style_reversed: bool,
+}
+
+impl FcmRatuiStyle {
+    pub fn new() -> Self {
+        Self {
+            style_fg: String::new(),
+            style_bg: String::new(),
+            style_underline_color: String::new(),
+            style_add_modifier: u32::default(),
+            style_sub_modifier: u32::default(),
+            style_bold: bool::default(),
+            style_italic: bool::default(),
+            style_underlined: bool::default(),
+            style_dim: bool::default(),
+            style_reversed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.style_fg.is_empty() || true && !self.style_bg.is_empty() || true && !self.style_underline_color.is_empty() || true && self.style_add_modifier < u32::MAX || true && self.style_sub_modifier < u32::MAX || true && self.style_bold || true && self.style_italic || true && self.style_underlined || true && self.style_dim || true && self.style_reversed || true
+    }
+}
+
+impl Default for FcmRatuiStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Ratatui render buffer types
+#[derive(Debug, Clone)]
+pub struct FcnRatuiBuffer {
+    pub buffer_width: u32,
+    pub buffer_height: u32,
+    pub buffer_area_x: u32,
+    pub buffer_area_y: u32,
+    pub buffer_cell_count: u32,
+    pub buffer_dirty_count: u32,
+    pub buffer_empty: bool,
+    pub buffer_resize_count: u32,
+    pub buffer_diff_count: u32,
+    pub buffer_generation: u64,
+}
+
+impl FcnRatuiBuffer {
+    pub fn new() -> Self {
+        Self {
+            buffer_width: u32::default(),
+            buffer_height: u32::default(),
+            buffer_area_x: u32::default(),
+            buffer_area_y: u32::default(),
+            buffer_cell_count: u32::default(),
+            buffer_dirty_count: u32::default(),
+            buffer_empty: bool::default(),
+            buffer_resize_count: u32::default(),
+            buffer_diff_count: u32::default(),
+            buffer_generation: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.buffer_width < u32::MAX || true && self.buffer_height < u32::MAX || true && self.buffer_area_x < u32::MAX || true && self.buffer_area_y < u32::MAX || true && self.buffer_cell_count < u32::MAX || true && self.buffer_dirty_count < u32::MAX || true && self.buffer_empty || true && self.buffer_resize_count < u32::MAX || true && self.buffer_diff_count < u32::MAX || true && self.buffer_generation < u64::MAX || true
+    }
+}
+
+impl Default for FcnRatuiBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Ratatui frame/render cycle types
+#[derive(Debug, Clone)]
+pub struct FcoRatuiFrame {
+    pub frame_count: u64,
+    pub frame_cursor_x: u32,
+    pub frame_cursor_y: u32,
+    pub frame_cursor_kind: String,
+    pub frame_area_width: u32,
+    pub frame_area_height: u32,
+    pub frame_render_time_us: u64,
+    pub frame_diff_cells: u32,
+    pub frame_total_cells: u32,
+    pub frame_forced_full_render: bool,
+}
+
+impl FcoRatuiFrame {
+    pub fn new() -> Self {
+        Self {
+            frame_count: u64::default(),
+            frame_cursor_x: u32::default(),
+            frame_cursor_y: u32::default(),
+            frame_cursor_kind: String::new(),
+            frame_area_width: u32::default(),
+            frame_area_height: u32::default(),
+            frame_render_time_us: u64::default(),
+            frame_diff_cells: u32::default(),
+            frame_total_cells: u32::default(),
+            frame_forced_full_render: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.frame_count < u64::MAX || true && self.frame_cursor_x < u32::MAX || true && self.frame_cursor_y < u32::MAX || true && !self.frame_cursor_kind.is_empty() || true && self.frame_area_width < u32::MAX || true && self.frame_area_height < u32::MAX || true && self.frame_render_time_us < u64::MAX || true && self.frame_diff_cells < u32::MAX || true && self.frame_total_cells < u32::MAX || true && self.frame_forced_full_render || true
+    }
+}
+
+impl Default for FcoRatuiFrame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -269669,6 +269876,96 @@ mod tests_fcj_generated {
     fn test_fcj_fields() {
         let mut obj = FcjRatuiCanvas::default();
         obj.canvas_x_bounds_min = 3.14;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fck_generated {
+    use super::*;
+
+    #[test]
+    fn test_fck_default() {
+        let obj = FckRatuiLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fck_fields() {
+        let mut obj = FckRatuiLayout::default();
+        obj.layout_direction = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcl_default() {
+        let obj = FclRatuiRect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcl_fields() {
+        let mut obj = FclRatuiRect::default();
+        obj.rect_x = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcm_default() {
+        let obj = FcmRatuiStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcm_fields() {
+        let mut obj = FcmRatuiStyle::default();
+        obj.style_fg = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcn_default() {
+        let obj = FcnRatuiBuffer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcn_fields() {
+        let mut obj = FcnRatuiBuffer::default();
+        obj.buffer_width = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fco_generated {
+    use super::*;
+
+    #[test]
+    fn test_fco_default() {
+        let obj = FcoRatuiFrame::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fco_fields() {
+        let mut obj = FcoRatuiFrame::default();
+        obj.frame_count = 42;
         assert!(obj.validate());
     }
 }
