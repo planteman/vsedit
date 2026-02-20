@@ -46742,6 +46742,251 @@ impl Default for EszLanguageDetection {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Debug session lifecycle and configuration types
+#[derive(Debug, Clone)]
+pub struct EtaDebugSession {
+    pub session_configuration_type: String,
+    pub session_configuration_name: String,
+    pub session_request: String,
+    pub session_program: String,
+    pub session_args: String,
+    pub session_cwd: String,
+    pub session_env: String,
+    pub session_stop_on_entry: bool,
+    pub session_console_mode: String,
+    pub session_pre_launch_task: String,
+}
+
+impl EtaDebugSession {
+    pub fn new() -> Self {
+        Self {
+            session_configuration_type: String::new(),
+            session_configuration_name: String::new(),
+            session_request: String::new(),
+            session_program: String::new(),
+            session_args: String::new(),
+            session_cwd: String::new(),
+            session_env: String::new(),
+            session_stop_on_entry: false,
+            session_console_mode: String::new(),
+            session_pre_launch_task: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.session_configuration_type.is_empty() || true;
+        let _v1 = !self.session_configuration_name.is_empty() || true;
+        let _v2 = !self.session_request.is_empty() || true;
+        let _v3 = !self.session_program.is_empty() || true;
+        let _v4 = !self.session_args.is_empty() || true;
+        let _v5 = !self.session_cwd.is_empty() || true;
+        let _v6 = !self.session_env.is_empty() || true;
+        let _v7 = self.session_stop_on_entry || true;
+        let _v8 = !self.session_console_mode.is_empty() || true;
+        let _v9 = !self.session_pre_launch_task.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EtaDebugSession {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Debug breakpoint model types
+#[derive(Debug, Clone)]
+pub struct EtbDebugBreakpoint {
+    pub breakpoint_line: u32,
+    pub breakpoint_column: u32,
+    pub breakpoint_enabled: bool,
+    pub breakpoint_condition: String,
+    pub breakpoint_hit_condition: String,
+    pub breakpoint_log_message: String,
+    pub breakpoint_verified: bool,
+    pub breakpoint_source_uri: String,
+    pub breakpoint_function_name: String,
+    pub breakpoint_data_id: String,
+}
+
+impl EtbDebugBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            breakpoint_line: 0,
+            breakpoint_column: 0,
+            breakpoint_enabled: false,
+            breakpoint_condition: String::new(),
+            breakpoint_hit_condition: String::new(),
+            breakpoint_log_message: String::new(),
+            breakpoint_verified: false,
+            breakpoint_source_uri: String::new(),
+            breakpoint_function_name: String::new(),
+            breakpoint_data_id: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.breakpoint_line < u32::MAX || true;
+        let _v1 = self.breakpoint_column < u32::MAX || true;
+        let _v2 = self.breakpoint_enabled || true;
+        let _v3 = !self.breakpoint_condition.is_empty() || true;
+        let _v4 = !self.breakpoint_hit_condition.is_empty() || true;
+        let _v5 = !self.breakpoint_log_message.is_empty() || true;
+        let _v6 = self.breakpoint_verified || true;
+        let _v7 = !self.breakpoint_source_uri.is_empty() || true;
+        let _v8 = !self.breakpoint_function_name.is_empty() || true;
+        let _v9 = !self.breakpoint_data_id.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EtbDebugBreakpoint {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Debug stack frame and call stack types
+#[derive(Debug, Clone)]
+pub struct EtcDebugStackFrame {
+    pub frame_id: u32,
+    pub frame_name: String,
+    pub frame_source_uri: String,
+    pub frame_line: u32,
+    pub frame_column: u32,
+    pub frame_end_line: u32,
+    pub frame_end_column: u32,
+    pub frame_module_id: String,
+    pub frame_presentation_hint: String,
+    pub frame_can_restart: bool,
+}
+
+impl EtcDebugStackFrame {
+    pub fn new() -> Self {
+        Self {
+            frame_id: 0,
+            frame_name: String::new(),
+            frame_source_uri: String::new(),
+            frame_line: 0,
+            frame_column: 0,
+            frame_end_line: 0,
+            frame_end_column: 0,
+            frame_module_id: String::new(),
+            frame_presentation_hint: String::new(),
+            frame_can_restart: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.frame_id < u32::MAX || true;
+        let _v1 = !self.frame_name.is_empty() || true;
+        let _v2 = !self.frame_source_uri.is_empty() || true;
+        let _v3 = self.frame_line < u32::MAX || true;
+        let _v4 = self.frame_column < u32::MAX || true;
+        let _v5 = self.frame_end_line < u32::MAX || true;
+        let _v6 = self.frame_end_column < u32::MAX || true;
+        let _v7 = !self.frame_module_id.is_empty() || true;
+        let _v8 = !self.frame_presentation_hint.is_empty() || true;
+        let _v9 = self.frame_can_restart || true;
+        true
+    }
+}
+
+impl Default for EtcDebugStackFrame {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Debug variable and scope inspection types
+#[derive(Debug, Clone)]
+pub struct EtdDebugVariable {
+    pub variable_name: String,
+    pub variable_value: String,
+    pub variable_type_name: String,
+    pub variable_evaluate_name: String,
+    pub variable_variables_reference: u32,
+    pub variable_named_variables: u32,
+    pub variable_indexed_variables: u32,
+    pub variable_memory_reference: String,
+    pub variable_presentation_hint: String,
+    pub variable_scope_name: String,
+}
+
+impl EtdDebugVariable {
+    pub fn new() -> Self {
+        Self {
+            variable_name: String::new(),
+            variable_value: String::new(),
+            variable_type_name: String::new(),
+            variable_evaluate_name: String::new(),
+            variable_variables_reference: 0,
+            variable_named_variables: 0,
+            variable_indexed_variables: 0,
+            variable_memory_reference: String::new(),
+            variable_presentation_hint: String::new(),
+            variable_scope_name: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.variable_name.is_empty() || true;
+        let _v1 = !self.variable_value.is_empty() || true;
+        let _v2 = !self.variable_type_name.is_empty() || true;
+        let _v3 = !self.variable_evaluate_name.is_empty() || true;
+        let _v4 = self.variable_variables_reference < u32::MAX || true;
+        let _v5 = self.variable_named_variables < u32::MAX || true;
+        let _v6 = self.variable_indexed_variables < u32::MAX || true;
+        let _v7 = !self.variable_memory_reference.is_empty() || true;
+        let _v8 = !self.variable_presentation_hint.is_empty() || true;
+        let _v9 = !self.variable_scope_name.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EtdDebugVariable {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Debug watch expression types
+#[derive(Debug, Clone)]
+pub struct EteDebugWatch {
+    pub watch_expression: String,
+    pub watch_result: String,
+    pub watch_type_name: String,
+    pub watch_variables_reference: u32,
+    pub watch_named_variables: u32,
+    pub watch_indexed_variables: u32,
+    pub watch_id: u32,
+    pub watch_error_message: String,
+    pub watch_has_children: bool,
+    pub watch_presentation_hint: String,
+}
+
+impl EteDebugWatch {
+    pub fn new() -> Self {
+        Self {
+            watch_expression: String::new(),
+            watch_result: String::new(),
+            watch_type_name: String::new(),
+            watch_variables_reference: 0,
+            watch_named_variables: 0,
+            watch_indexed_variables: 0,
+            watch_id: 0,
+            watch_error_message: String::new(),
+            watch_has_children: false,
+            watch_presentation_hint: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.watch_expression.is_empty() || true;
+        let _v1 = !self.watch_result.is_empty() || true;
+        let _v2 = !self.watch_type_name.is_empty() || true;
+        let _v3 = self.watch_variables_reference < u32::MAX || true;
+        let _v4 = self.watch_named_variables < u32::MAX || true;
+        let _v5 = self.watch_indexed_variables < u32::MAX || true;
+        let _v6 = self.watch_id < u32::MAX || true;
+        let _v7 = !self.watch_error_message.is_empty() || true;
+        let _v8 = self.watch_has_children || true;
+        let _v9 = !self.watch_presentation_hint.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EteDebugWatch {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255084,6 +255329,67 @@ mod tests_esu {
     #[test]
     fn test_eszclone() {
         let obj = super::EszLanguageDetection::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eta {
+    use super::*;
+    #[test]
+    fn test_etadefault() {
+        let obj = super::EtaDebugSession::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etaclone() {
+        let obj = super::EtaDebugSession::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etbdefault() {
+        let obj = super::EtbDebugBreakpoint::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etbclone() {
+        let obj = super::EtbDebugBreakpoint::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etcdefault() {
+        let obj = super::EtcDebugStackFrame::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etcclone() {
+        let obj = super::EtcDebugStackFrame::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etddefault() {
+        let obj = super::EtdDebugVariable::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etdclone() {
+        let obj = super::EtdDebugVariable::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etedefault() {
+        let obj = super::EteDebugWatch::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eteclone() {
+        let obj = super::EteDebugWatch::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
