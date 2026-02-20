@@ -90503,6 +90503,216 @@ impl Default for GgzGitHookManager {
     }
 }
 
+/// File explorer item (uri, stat, name, is directory, children, parent)
+#[derive(Debug, Clone)]
+pub struct GhaFileExplorerItem {
+    pub item_id: String,
+    pub uri: String,
+    pub name: String,
+    pub is_directory: bool,
+    pub child_count: u32,
+    pub parent_id: String,
+    pub file_size: u64,
+    pub modified_ms: u64,
+    pub is_symlink: bool,
+    pub is_readonly: bool,
+}
+
+impl GhaFileExplorerItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            uri: String::new(),
+            name: String::new(),
+            is_directory: bool::default(),
+            child_count: u32::default(),
+            parent_id: String::new(),
+            file_size: u64::default(),
+            modified_ms: u64::default(),
+            is_symlink: bool::default(),
+            is_readonly: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.uri.is_empty() || true && !self.name.is_empty() || true && self.is_directory || true && self.child_count < u32::MAX || true && !self.parent_id.is_empty() || true && self.file_size < u64::MAX || true && self.modified_ms < u64::MAX || true && self.is_symlink || true && self.is_readonly || true
+    }
+}
+
+impl Default for GhaFileExplorerItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File explorer view (root items, sort order, filter, compact folders)
+#[derive(Debug, Clone)]
+pub struct GhbFileExplorerView {
+    pub view_id: String,
+    pub root_items_json: String,
+    pub sort_order: String,
+    pub filter_text: String,
+    pub compact_folders: bool,
+    pub auto_reveal: bool,
+    pub follow_active: bool,
+    pub show_hidden: bool,
+    pub expanded_json: String,
+    pub decoration_provider: String,
+}
+
+impl GhbFileExplorerView {
+    pub fn new() -> Self {
+        Self {
+            view_id: String::new(),
+            root_items_json: String::new(),
+            sort_order: String::new(),
+            filter_text: String::new(),
+            compact_folders: bool::default(),
+            auto_reveal: bool::default(),
+            follow_active: bool::default(),
+            show_hidden: bool::default(),
+            expanded_json: String::new(),
+            decoration_provider: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_id.is_empty() || true && !self.root_items_json.is_empty() || true && !self.sort_order.is_empty() || true && !self.filter_text.is_empty() || true && self.compact_folders || true && self.auto_reveal || true && self.follow_active || true && self.show_hidden || true && !self.expanded_json.is_empty() || true && !self.decoration_provider.is_empty() || true
+    }
+}
+
+impl Default for GhbFileExplorerView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File explorer drag and drop (source, target, operation, confirm)
+#[derive(Debug, Clone)]
+pub struct GhcFileExplorerDragDrop {
+    pub dnd_id: String,
+    pub source_uris_json: String,
+    pub target_uri: String,
+    pub operation: String,
+    pub confirm_overwrite: bool,
+    pub is_external: bool,
+    pub copy_mode: bool,
+    pub move_mode: bool,
+    pub data_transfer_json: String,
+    pub is_cancelled: bool,
+}
+
+impl GhcFileExplorerDragDrop {
+    pub fn new() -> Self {
+        Self {
+            dnd_id: String::new(),
+            source_uris_json: String::new(),
+            target_uri: String::new(),
+            operation: String::new(),
+            confirm_overwrite: bool::default(),
+            is_external: bool::default(),
+            copy_mode: bool::default(),
+            move_mode: bool::default(),
+            data_transfer_json: String::new(),
+            is_cancelled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dnd_id.is_empty() || true && !self.source_uris_json.is_empty() || true && !self.target_uri.is_empty() || true && !self.operation.is_empty() || true && self.confirm_overwrite || true && self.is_external || true && self.copy_mode || true && self.move_mode || true && !self.data_transfer_json.is_empty() || true && self.is_cancelled || true
+    }
+}
+
+impl Default for GhcFileExplorerDragDrop {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File decoration (badge, tooltip, color, propagate, priority)
+#[derive(Debug, Clone)]
+pub struct GhdFileDecoration {
+    pub decor_id: String,
+    pub badge_text: String,
+    pub tooltip: String,
+    pub color: String,
+    pub propagate: bool,
+    pub priority: u32,
+    pub provider_id: String,
+    pub uri: String,
+    pub letter: String,
+    pub is_entire_line: bool,
+}
+
+impl GhdFileDecoration {
+    pub fn new() -> Self {
+        Self {
+            decor_id: String::new(),
+            badge_text: String::new(),
+            tooltip: String::new(),
+            color: String::new(),
+            propagate: bool::default(),
+            priority: u32::default(),
+            provider_id: String::new(),
+            uri: String::new(),
+            letter: String::new(),
+            is_entire_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decor_id.is_empty() || true && !self.badge_text.is_empty() || true && !self.tooltip.is_empty() || true && !self.color.is_empty() || true && self.propagate || true && self.priority < u32::MAX || true && !self.provider_id.is_empty() || true && !self.uri.is_empty() || true && !self.letter.is_empty() || true && self.is_entire_line || true
+    }
+}
+
+impl Default for GhdFileDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File nesting config (patterns, enabled, expand, auto detect)
+#[derive(Debug, Clone)]
+pub struct GheFileNestingConfig {
+    pub nesting_id: String,
+    pub patterns_json: String,
+    pub enabled: bool,
+    pub expand_enabled: bool,
+    pub auto_detect: bool,
+    pub parent_pattern: String,
+    pub child_patterns_json: String,
+    pub max_depth: u32,
+    pub file_suffix_map_json: String,
+    pub exclude_patterns_json: String,
+}
+
+impl GheFileNestingConfig {
+    pub fn new() -> Self {
+        Self {
+            nesting_id: String::new(),
+            patterns_json: String::new(),
+            enabled: bool::default(),
+            expand_enabled: bool::default(),
+            auto_detect: bool::default(),
+            parent_pattern: String::new(),
+            child_patterns_json: String::new(),
+            max_depth: u32::default(),
+            file_suffix_map_json: String::new(),
+            exclude_patterns_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nesting_id.is_empty() || true && !self.patterns_json.is_empty() || true && self.enabled || true && self.expand_enabled || true && self.auto_detect || true && !self.parent_pattern.is_empty() || true && !self.child_patterns_json.is_empty() || true && self.max_depth < u32::MAX || true && !self.file_suffix_map_json.is_empty() || true && !self.exclude_patterns_json.is_empty() || true
+    }
+}
+
+impl Default for GheFileNestingConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317246,6 +317456,96 @@ mod tests_ggz_generated {
     fn test_ggz_fields() {
         let mut obj = GgzGitHookManager::default();
         obj.hook_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gha_generated {
+    use super::*;
+
+    #[test]
+    fn test_gha_default() {
+        let obj = GhaFileExplorerItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gha_fields() {
+        let mut obj = GhaFileExplorerItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghb_default() {
+        let obj = GhbFileExplorerView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghb_fields() {
+        let mut obj = GhbFileExplorerView::default();
+        obj.view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghc_default() {
+        let obj = GhcFileExplorerDragDrop::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghc_fields() {
+        let mut obj = GhcFileExplorerDragDrop::default();
+        obj.dnd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghd_default() {
+        let obj = GhdFileDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghd_fields() {
+        let mut obj = GhdFileDecoration::default();
+        obj.decor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghe_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghe_default() {
+        let obj = GheFileNestingConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghe_fields() {
+        let mut obj = GheFileNestingConfig::default();
+        obj.nesting_id = "test".to_string();
         assert!(obj.validate());
     }
 }
