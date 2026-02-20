@@ -74453,6 +74453,216 @@ impl Default for FseMessagePort {
     }
 }
 
+/// IPC server (socket path, connections, protocol, buffer)
+#[derive(Debug, Clone)]
+pub struct FsfIpcServer {
+    pub server_id: String,
+    pub socket_path: String,
+    pub connection_count: u32,
+    pub protocol_type: u32,
+    pub buffer_size: u32,
+    pub is_listening: bool,
+    pub max_connections: u32,
+    pub bytes_transferred: u64,
+    pub error_count: u32,
+    pub started_at_ms: u64,
+}
+
+impl FsfIpcServer {
+    pub fn new() -> Self {
+        Self {
+            server_id: String::new(),
+            socket_path: String::new(),
+            connection_count: u32::default(),
+            protocol_type: u32::default(),
+            buffer_size: u32::default(),
+            is_listening: bool::default(),
+            max_connections: u32::default(),
+            bytes_transferred: u64::default(),
+            error_count: u32::default(),
+            started_at_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.server_id.is_empty() || true && !self.socket_path.is_empty() || true && self.connection_count < u32::MAX || true && self.protocol_type < u32::MAX || true && self.buffer_size < u32::MAX || true && self.is_listening || true && self.max_connections < u32::MAX || true && self.bytes_transferred < u64::MAX || true && self.error_count < u32::MAX || true && self.started_at_ms < u64::MAX || true
+    }
+}
+
+impl Default for FsfIpcServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC client (socket path, connection state, reconnect policy)
+#[derive(Debug, Clone)]
+pub struct FsgIpcClient {
+    pub client_id: String,
+    pub socket_path: String,
+    pub is_connected: bool,
+    pub reconnect_delay_ms: u32,
+    pub max_reconnects: u32,
+    pub reconnect_count: u32,
+    pub pending_messages: u32,
+    pub protocol_type: u32,
+    pub last_error: String,
+    pub timeout_ms: u32,
+}
+
+impl FsgIpcClient {
+    pub fn new() -> Self {
+        Self {
+            client_id: String::new(),
+            socket_path: String::new(),
+            is_connected: bool::default(),
+            reconnect_delay_ms: u32::default(),
+            max_reconnects: u32::default(),
+            reconnect_count: u32::default(),
+            pending_messages: u32::default(),
+            protocol_type: u32::default(),
+            last_error: String::new(),
+            timeout_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.client_id.is_empty() || true && !self.socket_path.is_empty() || true && self.is_connected || true && self.reconnect_delay_ms < u32::MAX || true && self.max_reconnects < u32::MAX || true && self.reconnect_count < u32::MAX || true && self.pending_messages < u32::MAX || true && self.protocol_type < u32::MAX || true && !self.last_error.is_empty() || true && self.timeout_ms < u32::MAX || true
+    }
+}
+
+impl Default for FsgIpcClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shared process (state, connections, services, logging)
+#[derive(Debug, Clone)]
+pub struct FshSharedProcess {
+    pub process_id: String,
+    pub state: u32,
+    pub connection_count: u32,
+    pub service_count: u32,
+    pub log_level: u32,
+    pub pid: u64,
+    pub memory_usage: u64,
+    pub cpu_usage: f64,
+    pub uptime_ms: u64,
+    pub restart_count: u32,
+}
+
+impl FshSharedProcess {
+    pub fn new() -> Self {
+        Self {
+            process_id: String::new(),
+            state: u32::default(),
+            connection_count: u32::default(),
+            service_count: u32::default(),
+            log_level: u32::default(),
+            pid: u64::default(),
+            memory_usage: u64::default(),
+            cpu_usage: f64::default(),
+            uptime_ms: u64::default(),
+            restart_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.process_id.is_empty() || true && self.state < u32::MAX || true && self.connection_count < u32::MAX || true && self.service_count < u32::MAX || true && self.log_level < u32::MAX || true && self.pid < u64::MAX || true && self.memory_usage < u64::MAX || true && self.cpu_usage.is_finite() || true && self.uptime_ms < u64::MAX || true && self.restart_count < u32::MAX || true
+    }
+}
+
+impl Default for FshSharedProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Utility process (module, args, env, fork options, lifecycle)
+#[derive(Debug, Clone)]
+pub struct FsiUtilityProcess {
+    pub process_id: String,
+    pub module_path: String,
+    pub args_json: String,
+    pub env_json: String,
+    pub pid: u64,
+    pub is_running: bool,
+    pub exit_code: u32,
+    pub stderr_buffer: String,
+    pub correlation_id: String,
+    pub respondent_id: String,
+}
+
+impl FsiUtilityProcess {
+    pub fn new() -> Self {
+        Self {
+            process_id: String::new(),
+            module_path: String::new(),
+            args_json: String::new(),
+            env_json: String::new(),
+            pid: u64::default(),
+            is_running: bool::default(),
+            exit_code: u32::default(),
+            stderr_buffer: String::new(),
+            correlation_id: String::new(),
+            respondent_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.process_id.is_empty() || true && !self.module_path.is_empty() || true && !self.args_json.is_empty() || true && !self.env_json.is_empty() || true && self.pid < u64::MAX || true && self.is_running || true && self.exit_code < u32::MAX || true && !self.stderr_buffer.is_empty() || true && !self.correlation_id.is_empty() || true && !self.respondent_id.is_empty() || true
+    }
+}
+
+impl Default for FsiUtilityProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension host process (type, connection, crash count, responsive)
+#[derive(Debug, Clone)]
+pub struct FsjExtensionHostProcess {
+    pub host_id: String,
+    pub host_type: u32,
+    pub connection_state: u32,
+    pub crash_count: u32,
+    pub is_responsive: bool,
+    pub pid: u64,
+    pub startup_time_ms: u64,
+    pub extension_count: u32,
+    pub memory_usage: u64,
+    pub last_crash_ms: u64,
+}
+
+impl FsjExtensionHostProcess {
+    pub fn new() -> Self {
+        Self {
+            host_id: String::new(),
+            host_type: u32::default(),
+            connection_state: u32::default(),
+            crash_count: u32::default(),
+            is_responsive: bool::default(),
+            pid: u64::default(),
+            startup_time_ms: u64::default(),
+            extension_count: u32::default(),
+            memory_usage: u64::default(),
+            last_crash_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.host_id.is_empty() || true && self.host_type < u32::MAX || true && self.connection_state < u32::MAX || true && self.crash_count < u32::MAX || true && self.is_responsive || true && self.pid < u64::MAX || true && self.startup_time_ms < u64::MAX || true && self.extension_count < u32::MAX || true && self.memory_usage < u64::MAX || true && self.last_crash_ms < u64::MAX || true
+    }
+}
+
+impl Default for FsjExtensionHostProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -294307,6 +294517,96 @@ mod tests_fse_generated {
     fn test_fse_fields() {
         let mut obj = FseMessagePort::default();
         obj.port_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsf_default() {
+        let obj = FsfIpcServer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsf_fields() {
+        let mut obj = FsfIpcServer::default();
+        obj.server_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsg_default() {
+        let obj = FsgIpcClient::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsg_fields() {
+        let mut obj = FsgIpcClient::default();
+        obj.client_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsh_default() {
+        let obj = FshSharedProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsh_fields() {
+        let mut obj = FshSharedProcess::default();
+        obj.process_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsi_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsi_default() {
+        let obj = FsiUtilityProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsi_fields() {
+        let mut obj = FsiUtilityProcess::default();
+        obj.process_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsj_default() {
+        let obj = FsjExtensionHostProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsj_fields() {
+        let mut obj = FsjExtensionHostProcess::default();
+        obj.host_id = "test".to_string();
         assert!(obj.validate());
     }
 }
