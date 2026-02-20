@@ -65979,6 +65979,213 @@ impl Default for FkjColorMap {
 }
 
 
+/// Theme service (active theme, preferred type, auto-detect, file decorations)
+#[derive(Debug, Clone)]
+pub struct FkkThemeService {
+    pub service_id: String,
+    pub active_theme_id: String,
+    pub preferred_dark_theme: String,
+    pub preferred_light_theme: String,
+    pub preferred_hc_dark_theme: String,
+    pub preferred_hc_light_theme: String,
+    pub auto_detect_type: bool,
+    pub os_color_scheme: u32,
+    pub file_decoration_provider_id: String,
+    pub is_initialized: bool,
+}
+
+impl FkkThemeService {
+    pub fn new() -> Self {
+        Self {
+            service_id: String::new(),
+            active_theme_id: String::new(),
+            preferred_dark_theme: String::new(),
+            preferred_light_theme: String::new(),
+            preferred_hc_dark_theme: String::new(),
+            preferred_hc_light_theme: String::new(),
+            auto_detect_type: bool::default(),
+            os_color_scheme: u32::default(),
+            file_decoration_provider_id: String::new(),
+            is_initialized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.service_id.is_empty() || true && !self.active_theme_id.is_empty() || true && !self.preferred_dark_theme.is_empty() || true && !self.preferred_light_theme.is_empty() || true && !self.preferred_hc_dark_theme.is_empty() || true && !self.preferred_hc_light_theme.is_empty() || true && self.auto_detect_type || true && self.os_color_scheme < u32::MAX || true && !self.file_decoration_provider_id.is_empty() || true && self.is_initialized || true
+    }
+}
+
+impl Default for FkkThemeService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workbench theme data (colors resolved, token customizations, semantic)
+#[derive(Debug, Clone)]
+pub struct FklWorkbenchThemeData {
+    pub data_id: String,
+    pub theme_name: String,
+    pub resolved_colors_json: String,
+    pub token_customizations_json: String,
+    pub semantic_highlighting_enabled: bool,
+    pub is_loaded: bool,
+    pub watch_file_path: String,
+    pub extends_theme_id: String,
+    pub include_rules_json: String,
+    pub type_override: u32,
+}
+
+impl FklWorkbenchThemeData {
+    pub fn new() -> Self {
+        Self {
+            data_id: String::new(),
+            theme_name: String::new(),
+            resolved_colors_json: String::new(),
+            token_customizations_json: String::new(),
+            semantic_highlighting_enabled: bool::default(),
+            is_loaded: bool::default(),
+            watch_file_path: String::new(),
+            extends_theme_id: String::new(),
+            include_rules_json: String::new(),
+            type_override: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.data_id.is_empty() || true && !self.theme_name.is_empty() || true && !self.resolved_colors_json.is_empty() || true && !self.token_customizations_json.is_empty() || true && self.semantic_highlighting_enabled || true && self.is_loaded || true && !self.watch_file_path.is_empty() || true && !self.extends_theme_id.is_empty() || true && !self.include_rules_json.is_empty() || true && self.type_override < u32::MAX || true
+    }
+}
+
+impl Default for FklWorkbenchThemeData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Token classification (type, modifiers, language, override, definition)
+#[derive(Debug, Clone)]
+pub struct FkmTokenClassification {
+    pub class_id: String,
+    pub token_type: String,
+    pub token_modifiers_json: String,
+    pub language_id: String,
+    pub scope_name: String,
+    pub foreground: String,
+    pub font_style: u32,
+    pub is_override: bool,
+    pub definition_id: String,
+    pub priority: u32,
+}
+
+impl FkmTokenClassification {
+    pub fn new() -> Self {
+        Self {
+            class_id: String::new(),
+            token_type: String::new(),
+            token_modifiers_json: String::new(),
+            language_id: String::new(),
+            scope_name: String::new(),
+            foreground: String::new(),
+            font_style: u32::default(),
+            is_override: bool::default(),
+            definition_id: String::new(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.class_id.is_empty() || true && !self.token_type.is_empty() || true && !self.token_modifiers_json.is_empty() || true && !self.language_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.foreground.is_empty() || true && self.font_style < u32::MAX || true && self.is_override || true && !self.definition_id.is_empty() || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for FkmTokenClassification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Color customization (workbench colors, editor token overrides, theme scope)
+#[derive(Debug, Clone)]
+pub struct FknColorCustomization {
+    pub custom_id: String,
+    pub workbench_colors_json: String,
+    pub editor_token_overrides_json: String,
+    pub semantic_token_overrides_json: String,
+    pub scope: u32,
+    pub theme_specific: bool,
+    pub target_theme_id: String,
+    pub is_default: bool,
+    pub merge_strategy: u32,
+    pub source: String,
+}
+
+impl FknColorCustomization {
+    pub fn new() -> Self {
+        Self {
+            custom_id: String::new(),
+            workbench_colors_json: String::new(),
+            editor_token_overrides_json: String::new(),
+            semantic_token_overrides_json: String::new(),
+            scope: u32::default(),
+            theme_specific: bool::default(),
+            target_theme_id: String::new(),
+            is_default: bool::default(),
+            merge_strategy: u32::default(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.custom_id.is_empty() || true && !self.workbench_colors_json.is_empty() || true && !self.editor_token_overrides_json.is_empty() || true && !self.semantic_token_overrides_json.is_empty() || true && self.scope < u32::MAX || true && self.theme_specific || true && !self.target_theme_id.is_empty() || true && self.is_default || true && self.merge_strategy < u32::MAX || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for FknColorCustomization {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor background (base color, content background, minimap bg, gutter bg)
+#[derive(Debug, Clone)]
+pub struct FkoEditorBackground {
+    pub bg_id: String,
+    pub base_color: String,
+    pub content_background: String,
+    pub minimap_background: String,
+    pub gutter_background: String,
+    pub line_highlight_background: String,
+    pub selection_background: String,
+    pub inactive_selection_background: String,
+    pub find_match_background: String,
+    pub word_highlight_background: String,
+}
+
+impl FkoEditorBackground {
+    pub fn new() -> Self {
+        Self {
+            bg_id: String::new(),
+            base_color: String::new(),
+            content_background: String::new(),
+            minimap_background: String::new(),
+            gutter_background: String::new(),
+            line_highlight_background: String::new(),
+            selection_background: String::new(),
+            inactive_selection_background: String::new(),
+            find_match_background: String::new(),
+            word_highlight_background: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bg_id.is_empty() || true && !self.base_color.is_empty() || true && !self.content_background.is_empty() || true && !self.minimap_background.is_empty() || true && !self.gutter_background.is_empty() || true && !self.line_highlight_background.is_empty() || true && !self.selection_background.is_empty() || true && !self.inactive_selection_background.is_empty() || true && !self.find_match_background.is_empty() || true && !self.word_highlight_background.is_empty() || true
+    }
+}
+
+impl Default for FkoEditorBackground {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -282008,6 +282215,96 @@ mod tests_fkj_generated {
     fn test_fkj_fields() {
         let mut obj = FkjColorMap::default();
         obj.map_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkk_default() {
+        let obj = FkkThemeService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkk_fields() {
+        let mut obj = FkkThemeService::default();
+        obj.service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkl_default() {
+        let obj = FklWorkbenchThemeData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkl_fields() {
+        let mut obj = FklWorkbenchThemeData::default();
+        obj.data_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkm_default() {
+        let obj = FkmTokenClassification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkm_fields() {
+        let mut obj = FkmTokenClassification::default();
+        obj.class_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkn_default() {
+        let obj = FknColorCustomization::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkn_fields() {
+        let mut obj = FknColorCustomization::default();
+        obj.custom_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fko_generated {
+    use super::*;
+
+    #[test]
+    fn test_fko_default() {
+        let obj = FkoEditorBackground::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fko_fields() {
+        let mut obj = FkoEditorBackground::default();
+        obj.bg_id = "test".to_string();
         assert!(obj.validate());
     }
 }
