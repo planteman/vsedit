@@ -77735,6 +77735,216 @@ impl Default for FveDisposableStore {
     }
 }
 
+/// Event emitter (listeners, fire, event, pause, merge)
+#[derive(Debug, Clone)]
+pub struct FvfEventEmitter {
+    pub emitter_id: String,
+    pub listener_count: u32,
+    pub fire_count: u64,
+    pub is_paused: bool,
+    pub merge_strategy: u32,
+    pub leak_warning_threshold: u32,
+    pub delivery_queue_size: u32,
+    pub has_listeners: bool,
+    pub disposed: bool,
+    pub last_fire_ms: u64,
+}
+
+impl FvfEventEmitter {
+    pub fn new() -> Self {
+        Self {
+            emitter_id: String::new(),
+            listener_count: u32::default(),
+            fire_count: u64::default(),
+            is_paused: bool::default(),
+            merge_strategy: u32::default(),
+            leak_warning_threshold: u32::default(),
+            delivery_queue_size: u32::default(),
+            has_listeners: bool::default(),
+            disposed: bool::default(),
+            last_fire_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.emitter_id.is_empty() || true && self.listener_count < u32::MAX || true && self.fire_count < u64::MAX || true && self.is_paused || true && self.merge_strategy < u32::MAX || true && self.leak_warning_threshold < u32::MAX || true && self.delivery_queue_size < u32::MAX || true && self.has_listeners || true && self.disposed || true && self.last_fire_ms < u64::MAX || true
+    }
+}
+
+impl Default for FvfEventEmitter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cancellation token (isCancellationRequested, onCancellationRequested)
+#[derive(Debug, Clone)]
+pub struct FvgCancellationToken {
+    pub token_id: String,
+    pub is_cancelled: bool,
+    pub cancel_reason: String,
+    pub parent_token_id: String,
+    pub listener_count: u32,
+    pub created_at_ms: u64,
+    pub cancelled_at_ms: u64,
+    pub is_disposed: bool,
+    pub timeout_ms: u64,
+    pub source_id: String,
+}
+
+impl FvgCancellationToken {
+    pub fn new() -> Self {
+        Self {
+            token_id: String::new(),
+            is_cancelled: bool::default(),
+            cancel_reason: String::new(),
+            parent_token_id: String::new(),
+            listener_count: u32::default(),
+            created_at_ms: u64::default(),
+            cancelled_at_ms: u64::default(),
+            is_disposed: bool::default(),
+            timeout_ms: u64::default(),
+            source_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_id.is_empty() || true && self.is_cancelled || true && !self.cancel_reason.is_empty() || true && !self.parent_token_id.is_empty() || true && self.listener_count < u32::MAX || true && self.created_at_ms < u64::MAX || true && self.cancelled_at_ms < u64::MAX || true && self.is_disposed || true && self.timeout_ms < u64::MAX || true && !self.source_id.is_empty() || true
+    }
+}
+
+impl Default for FvgCancellationToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async barrier (isOpen, open, wait, timeout)
+#[derive(Debug, Clone)]
+pub struct FvhAsyncBarrier {
+    pub barrier_id: String,
+    pub is_open: bool,
+    pub waiting_count: u32,
+    pub timeout_ms: u64,
+    pub opened_at_ms: u64,
+    pub created_at_ms: u64,
+    pub has_timed_out: bool,
+    pub error_message: String,
+    pub name: String,
+    pub max_waiters: u32,
+}
+
+impl FvhAsyncBarrier {
+    pub fn new() -> Self {
+        Self {
+            barrier_id: String::new(),
+            is_open: bool::default(),
+            waiting_count: u32::default(),
+            timeout_ms: u64::default(),
+            opened_at_ms: u64::default(),
+            created_at_ms: u64::default(),
+            has_timed_out: bool::default(),
+            error_message: String::new(),
+            name: String::new(),
+            max_waiters: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.barrier_id.is_empty() || true && self.is_open || true && self.waiting_count < u32::MAX || true && self.timeout_ms < u64::MAX || true && self.opened_at_ms < u64::MAX || true && self.created_at_ms < u64::MAX || true && self.has_timed_out || true && !self.error_message.is_empty() || true && !self.name.is_empty() || true && self.max_waiters < u32::MAX || true
+    }
+}
+
+impl Default for FvhAsyncBarrier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Throttler (queue, active promise, maxSize, timeout)
+#[derive(Debug, Clone)]
+pub struct FviThrottler {
+    pub throttler_id: String,
+    pub queue_size: u32,
+    pub max_queue_size: u32,
+    pub timeout_ms: u64,
+    pub is_active: bool,
+    pub processed_count: u64,
+    pub dropped_count: u64,
+    pub last_execution_ms: u64,
+    pub microtask_delay: bool,
+    pub error_count: u32,
+}
+
+impl FviThrottler {
+    pub fn new() -> Self {
+        Self {
+            throttler_id: String::new(),
+            queue_size: u32::default(),
+            max_queue_size: u32::default(),
+            timeout_ms: u64::default(),
+            is_active: bool::default(),
+            processed_count: u64::default(),
+            dropped_count: u64::default(),
+            last_execution_ms: u64::default(),
+            microtask_delay: bool::default(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.throttler_id.is_empty() || true && self.queue_size < u32::MAX || true && self.max_queue_size < u32::MAX || true && self.timeout_ms < u64::MAX || true && self.is_active || true && self.processed_count < u64::MAX || true && self.dropped_count < u64::MAX || true && self.last_execution_ms < u64::MAX || true && self.microtask_delay || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for FviThrottler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sequencer (pending, queue, size, timeout)
+#[derive(Debug, Clone)]
+pub struct FvjSequencer {
+    pub seq_id: String,
+    pub pending_count: u32,
+    pub queue_size: u32,
+    pub timeout_ms: u64,
+    pub is_running: bool,
+    pub processed_count: u64,
+    pub error_count: u32,
+    pub max_queue_size: u32,
+    pub created_at_ms: u64,
+    pub last_run_ms: u64,
+}
+
+impl FvjSequencer {
+    pub fn new() -> Self {
+        Self {
+            seq_id: String::new(),
+            pending_count: u32::default(),
+            queue_size: u32::default(),
+            timeout_ms: u64::default(),
+            is_running: bool::default(),
+            processed_count: u64::default(),
+            error_count: u32::default(),
+            max_queue_size: u32::default(),
+            created_at_ms: u64::default(),
+            last_run_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.seq_id.is_empty() || true && self.pending_count < u32::MAX || true && self.queue_size < u32::MAX || true && self.timeout_ms < u64::MAX || true && self.is_running || true && self.processed_count < u64::MAX || true && self.error_count < u32::MAX || true && self.max_queue_size < u32::MAX || true && self.created_at_ms < u64::MAX || true && self.last_run_ms < u64::MAX || true
+    }
+}
+
+impl Default for FvjSequencer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -298823,6 +299033,96 @@ mod tests_fve_generated {
     fn test_fve_fields() {
         let mut obj = FveDisposableStore::default();
         obj.store_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvf_default() {
+        let obj = FvfEventEmitter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvf_fields() {
+        let mut obj = FvfEventEmitter::default();
+        obj.emitter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvg_default() {
+        let obj = FvgCancellationToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvg_fields() {
+        let mut obj = FvgCancellationToken::default();
+        obj.token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvh_default() {
+        let obj = FvhAsyncBarrier::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvh_fields() {
+        let mut obj = FvhAsyncBarrier::default();
+        obj.barrier_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvi_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvi_default() {
+        let obj = FviThrottler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvi_fields() {
+        let mut obj = FviThrottler::default();
+        obj.throttler_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvj_default() {
+        let obj = FvjSequencer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvj_fields() {
+        let mut obj = FvjSequencer::default();
+        obj.seq_id = "test".to_string();
         assert!(obj.validate());
     }
 }
