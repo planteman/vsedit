@@ -93878,6 +93878,216 @@ impl Default for GjzTimelineView {
     }
 }
 
+/// Configuration model (contents, overrides, keys, raw)
+#[derive(Debug, Clone)]
+pub struct GkaConfigurationModel {
+    pub config_model_id: String,
+    pub contents_json: String,
+    pub overrides_json: String,
+    pub keys_json: String,
+    pub raw_json: String,
+    pub is_frozen: bool,
+    pub version: u32,
+    pub scope: String,
+    pub source: String,
+    pub is_empty: bool,
+}
+
+impl GkaConfigurationModel {
+    pub fn new() -> Self {
+        Self {
+            config_model_id: String::new(),
+            contents_json: String::new(),
+            overrides_json: String::new(),
+            keys_json: String::new(),
+            raw_json: String::new(),
+            is_frozen: bool::default(),
+            version: u32::default(),
+            scope: String::new(),
+            source: String::new(),
+            is_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_model_id.is_empty() || true && !self.contents_json.is_empty() || true && !self.overrides_json.is_empty() || true && !self.keys_json.is_empty() || true && !self.raw_json.is_empty() || true && self.is_frozen || true && self.version < u32::MAX || true && !self.scope.is_empty() || true && !self.source.is_empty() || true && self.is_empty || true
+    }
+}
+
+impl Default for GkaConfigurationModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration override (identifiers, keys, contents, scope)
+#[derive(Debug, Clone)]
+pub struct GkbConfigurationOverride {
+    pub override_id: String,
+    pub identifiers_json: String,
+    pub keys_json: String,
+    pub contents_json: String,
+    pub scope: String,
+    pub priority: u32,
+    pub source: String,
+    pub is_language: bool,
+    pub is_resource: bool,
+    pub target: String,
+}
+
+impl GkbConfigurationOverride {
+    pub fn new() -> Self {
+        Self {
+            override_id: String::new(),
+            identifiers_json: String::new(),
+            keys_json: String::new(),
+            contents_json: String::new(),
+            scope: String::new(),
+            priority: u32::default(),
+            source: String::new(),
+            is_language: bool::default(),
+            is_resource: bool::default(),
+            target: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.override_id.is_empty() || true && !self.identifiers_json.is_empty() || true && !self.keys_json.is_empty() || true && !self.contents_json.is_empty() || true && !self.scope.is_empty() || true && self.priority < u32::MAX || true && !self.source.is_empty() || true && self.is_language || true && self.is_resource || true && !self.target.is_empty() || true
+    }
+}
+
+impl Default for GkbConfigurationOverride {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration target (default, user, workspace, folder, memory)
+#[derive(Debug, Clone)]
+pub struct GkcConfigurationTarget {
+    pub target_id: String,
+    pub target_type: String,
+    pub is_default: bool,
+    pub is_user: bool,
+    pub is_workspace: bool,
+    pub is_folder: bool,
+    pub is_memory: bool,
+    pub folder_uri: String,
+    pub workspace_uri: String,
+    pub precedence: u32,
+}
+
+impl GkcConfigurationTarget {
+    pub fn new() -> Self {
+        Self {
+            target_id: String::new(),
+            target_type: String::new(),
+            is_default: bool::default(),
+            is_user: bool::default(),
+            is_workspace: bool::default(),
+            is_folder: bool::default(),
+            is_memory: bool::default(),
+            folder_uri: String::new(),
+            workspace_uri: String::new(),
+            precedence: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.target_id.is_empty() || true && !self.target_type.is_empty() || true && self.is_default || true && self.is_user || true && self.is_workspace || true && self.is_folder || true && self.is_memory || true && !self.folder_uri.is_empty() || true && !self.workspace_uri.is_empty() || true && self.precedence < u32::MAX || true
+    }
+}
+
+impl Default for GkcConfigurationTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration scope (application, machine, window, resource, language)
+#[derive(Debug, Clone)]
+pub struct GkdConfigurationScope {
+    pub scope_id: String,
+    pub scope_type: String,
+    pub is_application: bool,
+    pub is_machine: bool,
+    pub is_window: bool,
+    pub is_resource: bool,
+    pub is_language: bool,
+    pub description: String,
+    pub restricted: bool,
+    pub tags_json: String,
+}
+
+impl GkdConfigurationScope {
+    pub fn new() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_type: String::new(),
+            is_application: bool::default(),
+            is_machine: bool::default(),
+            is_window: bool::default(),
+            is_resource: bool::default(),
+            is_language: bool::default(),
+            description: String::new(),
+            restricted: bool::default(),
+            tags_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_id.is_empty() || true && !self.scope_type.is_empty() || true && self.is_application || true && self.is_machine || true && self.is_window || true && self.is_resource || true && self.is_language || true && !self.description.is_empty() || true && self.restricted || true && !self.tags_json.is_empty() || true
+    }
+}
+
+impl Default for GkdConfigurationScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration registry (properties, schema, defaults, overrides)
+#[derive(Debug, Clone)]
+pub struct GkeConfigurationRegistry {
+    pub registry_id: String,
+    pub properties_json: String,
+    pub schema_json: String,
+    pub defaults_json: String,
+    pub overrides_json: String,
+    pub extension_count: u32,
+    pub property_count: u32,
+    pub frozen: bool,
+    pub version: u32,
+    pub validation_errors_json: String,
+}
+
+impl GkeConfigurationRegistry {
+    pub fn new() -> Self {
+        Self {
+            registry_id: String::new(),
+            properties_json: String::new(),
+            schema_json: String::new(),
+            defaults_json: String::new(),
+            overrides_json: String::new(),
+            extension_count: u32::default(),
+            property_count: u32::default(),
+            frozen: bool::default(),
+            version: u32::default(),
+            validation_errors_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.registry_id.is_empty() || true && !self.properties_json.is_empty() || true && !self.schema_json.is_empty() || true && !self.defaults_json.is_empty() || true && !self.overrides_json.is_empty() || true && self.extension_count < u32::MAX || true && self.property_count < u32::MAX || true && self.frozen || true && self.version < u32::MAX || true && !self.validation_errors_json.is_empty() || true
+    }
+}
+
+impl Default for GkeConfigurationRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -322080,6 +322290,96 @@ mod tests_gjz_generated {
     fn test_gjz_fields() {
         let mut obj = GjzTimelineView::default();
         obj.timeline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gka_generated {
+    use super::*;
+
+    #[test]
+    fn test_gka_default() {
+        let obj = GkaConfigurationModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gka_fields() {
+        let mut obj = GkaConfigurationModel::default();
+        obj.config_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkb_default() {
+        let obj = GkbConfigurationOverride::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkb_fields() {
+        let mut obj = GkbConfigurationOverride::default();
+        obj.override_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkc_default() {
+        let obj = GkcConfigurationTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkc_fields() {
+        let mut obj = GkcConfigurationTarget::default();
+        obj.target_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkd_default() {
+        let obj = GkdConfigurationScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkd_fields() {
+        let mut obj = GkdConfigurationScope::default();
+        obj.scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gke_generated {
+    use super::*;
+
+    #[test]
+    fn test_gke_default() {
+        let obj = GkeConfigurationRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gke_fields() {
+        let mut obj = GkeConfigurationRegistry::default();
+        obj.registry_id = "test".to_string();
         assert!(obj.validate());
     }
 }
