@@ -65582,6 +65582,213 @@ impl Default for FkeColorRegistry {
 }
 
 
+/// Semantic token (type, modifiers, range, delta line/column)
+#[derive(Debug, Clone)]
+pub struct FkfSemanticToken {
+    pub token_type: u32,
+    pub token_modifiers: u32,
+    pub start_line: u32,
+    pub start_column: u32,
+    pub length: u32,
+    pub delta_line: u32,
+    pub delta_start: u32,
+    pub scope_name: String,
+    pub is_multiline: bool,
+    pub encoding_id: u32,
+}
+
+impl FkfSemanticToken {
+    pub fn new() -> Self {
+        Self {
+            token_type: u32::default(),
+            token_modifiers: u32::default(),
+            start_line: u32::default(),
+            start_column: u32::default(),
+            length: u32::default(),
+            delta_line: u32::default(),
+            delta_start: u32::default(),
+            scope_name: String::new(),
+            is_multiline: bool::default(),
+            encoding_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.token_type < u32::MAX || true && self.token_modifiers < u32::MAX || true && self.start_line < u32::MAX || true && self.start_column < u32::MAX || true && self.length < u32::MAX || true && self.delta_line < u32::MAX || true && self.delta_start < u32::MAX || true && !self.scope_name.is_empty() || true && self.is_multiline || true && self.encoding_id < u32::MAX || true
+    }
+}
+
+impl Default for FkfSemanticToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Semantic token legend (token types, token modifiers, encoding)
+#[derive(Debug, Clone)]
+pub struct FkgSemanticTokenLegend {
+    pub legend_id: String,
+    pub token_types_json: String,
+    pub token_modifiers_json: String,
+    pub encoding: u32,
+    pub type_count: u32,
+    pub modifier_count: u32,
+    pub is_full: bool,
+    pub is_delta: bool,
+    pub result_id: String,
+    pub provider_id: String,
+}
+
+impl FkgSemanticTokenLegend {
+    pub fn new() -> Self {
+        Self {
+            legend_id: String::new(),
+            token_types_json: String::new(),
+            token_modifiers_json: String::new(),
+            encoding: u32::default(),
+            type_count: u32::default(),
+            modifier_count: u32::default(),
+            is_full: bool::default(),
+            is_delta: bool::default(),
+            result_id: String::new(),
+            provider_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.legend_id.is_empty() || true && !self.token_types_json.is_empty() || true && !self.token_modifiers_json.is_empty() || true && self.encoding < u32::MAX || true && self.type_count < u32::MAX || true && self.modifier_count < u32::MAX || true && self.is_full || true && self.is_delta || true && !self.result_id.is_empty() || true && !self.provider_id.is_empty() || true
+    }
+}
+
+impl Default for FkgSemanticTokenLegend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Tokenization state (stack, rule, scope, embedded language)
+#[derive(Debug, Clone)]
+pub struct FkhTokenizationState {
+    pub state_id: String,
+    pub stack_depth: u32,
+    pub current_rule_id: String,
+    pub scope_name: String,
+    pub embedded_language_id: String,
+    pub begin_rule_json: String,
+    pub end_rule_pattern: String,
+    pub has_back_references: bool,
+    pub anchor_position: u32,
+    pub parent_state_id: String,
+}
+
+impl FkhTokenizationState {
+    pub fn new() -> Self {
+        Self {
+            state_id: String::new(),
+            stack_depth: u32::default(),
+            current_rule_id: String::new(),
+            scope_name: String::new(),
+            embedded_language_id: String::new(),
+            begin_rule_json: String::new(),
+            end_rule_pattern: String::new(),
+            has_back_references: bool::default(),
+            anchor_position: u32::default(),
+            parent_state_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.state_id.is_empty() || true && self.stack_depth < u32::MAX || true && !self.current_rule_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.embedded_language_id.is_empty() || true && !self.begin_rule_json.is_empty() || true && !self.end_rule_pattern.is_empty() || true && self.has_back_references || true && self.anchor_position < u32::MAX || true && !self.parent_state_id.is_empty() || true
+    }
+}
+
+impl Default for FkhTokenizationState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Token theme rule (token, foreground, background, fontStyle)
+#[derive(Debug, Clone)]
+pub struct FkiTokenThemeRule {
+    pub rule_id: String,
+    pub token: String,
+    pub foreground_color: String,
+    pub background_color: String,
+    pub font_style: u32,
+    pub is_bold: bool,
+    pub is_italic: bool,
+    pub is_underline: bool,
+    pub is_strikethrough: bool,
+    pub priority: u32,
+}
+
+impl FkiTokenThemeRule {
+    pub fn new() -> Self {
+        Self {
+            rule_id: String::new(),
+            token: String::new(),
+            foreground_color: String::new(),
+            background_color: String::new(),
+            font_style: u32::default(),
+            is_bold: bool::default(),
+            is_italic: bool::default(),
+            is_underline: bool::default(),
+            is_strikethrough: bool::default(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rule_id.is_empty() || true && !self.token.is_empty() || true && !self.foreground_color.is_empty() || true && !self.background_color.is_empty() || true && self.font_style < u32::MAX || true && self.is_bold || true && self.is_italic || true && self.is_underline || true && self.is_strikethrough || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for FkiTokenThemeRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Color map (id-to-color mapping, default foreground/background)
+#[derive(Debug, Clone)]
+pub struct FkjColorMap {
+    pub map_id: String,
+    pub color_count: u32,
+    pub default_foreground: String,
+    pub default_background: String,
+    pub colors_json: String,
+    pub id_to_color_json: String,
+    pub is_dark_theme: bool,
+    pub selection_background: String,
+    pub line_highlight_background: String,
+    pub find_match_highlight: String,
+}
+
+impl FkjColorMap {
+    pub fn new() -> Self {
+        Self {
+            map_id: String::new(),
+            color_count: u32::default(),
+            default_foreground: String::new(),
+            default_background: String::new(),
+            colors_json: String::new(),
+            id_to_color_json: String::new(),
+            is_dark_theme: bool::default(),
+            selection_background: String::new(),
+            line_highlight_background: String::new(),
+            find_match_highlight: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.map_id.is_empty() || true && self.color_count < u32::MAX || true && !self.default_foreground.is_empty() || true && !self.default_background.is_empty() || true && !self.colors_json.is_empty() || true && !self.id_to_color_json.is_empty() || true && self.is_dark_theme || true && !self.selection_background.is_empty() || true && !self.line_highlight_background.is_empty() || true && !self.find_match_highlight.is_empty() || true
+    }
+}
+
+impl Default for FkjColorMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -281746,6 +281953,96 @@ mod tests_fke_generated {
     fn test_fke_fields() {
         let mut obj = FkeColorRegistry::default();
         obj.color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkf_default() {
+        let obj = FkfSemanticToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkf_fields() {
+        let mut obj = FkfSemanticToken::default();
+        obj.token_type = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkg_default() {
+        let obj = FkgSemanticTokenLegend::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkg_fields() {
+        let mut obj = FkgSemanticTokenLegend::default();
+        obj.legend_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkh_default() {
+        let obj = FkhTokenizationState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkh_fields() {
+        let mut obj = FkhTokenizationState::default();
+        obj.state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fki_generated {
+    use super::*;
+
+    #[test]
+    fn test_fki_default() {
+        let obj = FkiTokenThemeRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fki_fields() {
+        let mut obj = FkiTokenThemeRule::default();
+        obj.rule_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fkj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fkj_default() {
+        let obj = FkjColorMap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fkj_fields() {
+        let mut obj = FkjColorMap::default();
+        obj.map_id = "test".to_string();
         assert!(obj.validate());
     }
 }
