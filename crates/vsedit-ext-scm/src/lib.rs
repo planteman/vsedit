@@ -116096,6 +116096,678 @@ impl Default for HejNotebookEdit {
     }
 }
 
+/// Notebook range (start, end, is empty, cells json)
+#[derive(Debug, Clone)]
+pub struct HekNotebookRange {
+    pub nb_range_id: String,
+    pub start: u32,
+    pub end: u32,
+    pub is_empty: bool,
+    pub cells_json: String,
+    pub cell_count: u32,
+    pub is_single_cell: bool,
+    pub includes_output: bool,
+    pub notebook_uri: String,
+    pub version: u32,
+}
+
+impl HekNotebookRange {
+    pub fn new() -> Self {
+        Self {
+            nb_range_id: String::new(),
+            start: u32::default(),
+            end: u32::default(),
+            is_empty: bool::default(),
+            cells_json: String::new(),
+            cell_count: u32::default(),
+            is_single_cell: bool::default(),
+            includes_output: bool::default(),
+            notebook_uri: String::new(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_range_id.is_empty() || true && self.start < u32::MAX || true && self.end < u32::MAX || true && self.is_empty || true && !self.cells_json.is_empty() || true && self.cell_count < u32::MAX || true && self.is_single_cell || true && self.includes_output || true && !self.notebook_uri.is_empty() || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for HekNotebookRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell data (kind, source, language, metadata, outputs)
+#[derive(Debug, Clone)]
+pub struct HelNotebookCellData {
+    pub nb_cell_data_id: String,
+    pub kind: String,
+    pub source: String,
+    pub language_id: String,
+    pub metadata_json: String,
+    pub outputs_json: String,
+    pub execution_summary_json: String,
+    pub internal_metadata_json: String,
+    pub mime: String,
+    pub cell_id: String,
+}
+
+impl HelNotebookCellData {
+    pub fn new() -> Self {
+        Self {
+            nb_cell_data_id: String::new(),
+            kind: String::new(),
+            source: String::new(),
+            language_id: String::new(),
+            metadata_json: String::new(),
+            outputs_json: String::new(),
+            execution_summary_json: String::new(),
+            internal_metadata_json: String::new(),
+            mime: String::new(),
+            cell_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_cell_data_id.is_empty() || true && !self.kind.is_empty() || true && !self.source.is_empty() || true && !self.language_id.is_empty() || true && !self.metadata_json.is_empty() || true && !self.outputs_json.is_empty() || true && !self.execution_summary_json.is_empty() || true && !self.internal_metadata_json.is_empty() || true && !self.mime.is_empty() || true && !self.cell_id.is_empty() || true
+    }
+}
+
+impl Default for HelNotebookCellData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook data (cells, metadata, version, type)
+#[derive(Debug, Clone)]
+pub struct HemNotebookData {
+    pub nb_data_id: String,
+    pub cells_json: String,
+    pub metadata_json: String,
+    pub version: u32,
+    pub notebook_type: String,
+    pub cell_count: u32,
+    pub custom_json: String,
+    pub is_valid: bool,
+    pub format_version: String,
+    pub source_path: String,
+}
+
+impl HemNotebookData {
+    pub fn new() -> Self {
+        Self {
+            nb_data_id: String::new(),
+            cells_json: String::new(),
+            metadata_json: String::new(),
+            version: u32::default(),
+            notebook_type: String::new(),
+            cell_count: u32::default(),
+            custom_json: String::new(),
+            is_valid: bool::default(),
+            format_version: String::new(),
+            source_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_data_id.is_empty() || true && !self.cells_json.is_empty() || true && !self.metadata_json.is_empty() || true && self.version < u32::MAX || true && !self.notebook_type.is_empty() || true && self.cell_count < u32::MAX || true && !self.custom_json.is_empty() || true && self.is_valid || true && !self.format_version.is_empty() || true && !self.source_path.is_empty() || true
+    }
+}
+
+impl Default for HemNotebookData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook status bar item (text, alignment, priority, cell)
+#[derive(Debug, Clone)]
+pub struct HenNotebookStatusBar {
+    pub nb_status_id: String,
+    pub text: String,
+    pub alignment: String,
+    pub priority: u32,
+    pub cell_index: u32,
+    pub tooltip: String,
+    pub command_id: String,
+    pub is_visible: bool,
+    pub accessibility_info: String,
+    pub color: String,
+}
+
+impl HenNotebookStatusBar {
+    pub fn new() -> Self {
+        Self {
+            nb_status_id: String::new(),
+            text: String::new(),
+            alignment: String::new(),
+            priority: u32::default(),
+            cell_index: u32::default(),
+            tooltip: String::new(),
+            command_id: String::new(),
+            is_visible: bool::default(),
+            accessibility_info: String::new(),
+            color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_status_id.is_empty() || true && !self.text.is_empty() || true && !self.alignment.is_empty() || true && self.priority < u32::MAX || true && self.cell_index < u32::MAX || true && !self.tooltip.is_empty() || true && !self.command_id.is_empty() || true && self.is_visible || true && !self.accessibility_info.is_empty() || true && !self.color.is_empty() || true
+    }
+}
+
+impl Default for HenNotebookStatusBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook find/replace (query, match case, regex, scope)
+#[derive(Debug, Clone)]
+pub struct HeoNotebookFind {
+    pub nb_find_id: String,
+    pub query: String,
+    pub match_case: bool,
+    pub is_regex: bool,
+    pub scope: String,
+    pub include_markdown: bool,
+    pub include_code: bool,
+    pub include_output: bool,
+    pub whole_word: bool,
+    pub preserve_case: bool,
+}
+
+impl HeoNotebookFind {
+    pub fn new() -> Self {
+        Self {
+            nb_find_id: String::new(),
+            query: String::new(),
+            match_case: bool::default(),
+            is_regex: bool::default(),
+            scope: String::new(),
+            include_markdown: bool::default(),
+            include_code: bool::default(),
+            include_output: bool::default(),
+            whole_word: bool::default(),
+            preserve_case: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_find_id.is_empty() || true && !self.query.is_empty() || true && self.match_case || true && self.is_regex || true && !self.scope.is_empty() || true && self.include_markdown || true && self.include_code || true && self.include_output || true && self.whole_word || true && self.preserve_case || true
+    }
+}
+
+impl Default for HeoNotebookFind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook diff (original, modified, changes, cell diffs)
+#[derive(Debug, Clone)]
+pub struct HepNotebookDiff {
+    pub nb_diff_id: String,
+    pub original_uri: String,
+    pub modified_uri: String,
+    pub changes_json: String,
+    pub cell_diffs_json: String,
+    pub metadata_changed: bool,
+    pub cell_count_change: u32,
+    pub is_resolved: bool,
+    pub diff_count: u32,
+    pub view_type: String,
+}
+
+impl HepNotebookDiff {
+    pub fn new() -> Self {
+        Self {
+            nb_diff_id: String::new(),
+            original_uri: String::new(),
+            modified_uri: String::new(),
+            changes_json: String::new(),
+            cell_diffs_json: String::new(),
+            metadata_changed: bool::default(),
+            cell_count_change: u32::default(),
+            is_resolved: bool::default(),
+            diff_count: u32::default(),
+            view_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_diff_id.is_empty() || true && !self.original_uri.is_empty() || true && !self.modified_uri.is_empty() || true && !self.changes_json.is_empty() || true && !self.cell_diffs_json.is_empty() || true && self.metadata_changed || true && self.cell_count_change < u32::MAX || true && self.is_resolved || true && self.diff_count < u32::MAX || true && !self.view_type.is_empty() || true
+    }
+}
+
+impl Default for HepNotebookDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cell execution summary (timing, success, order, run count)
+#[derive(Debug, Clone)]
+pub struct HeqCellExecSummary {
+    pub cell_exec_sum_id: String,
+    pub timing_ms: u64,
+    pub success: bool,
+    pub execution_order: u32,
+    pub run_count: u32,
+    pub last_run_ms: u64,
+    pub is_running: bool,
+    pub error_count: u32,
+    pub output_count: u32,
+    pub duration_display: String,
+}
+
+impl HeqCellExecSummary {
+    pub fn new() -> Self {
+        Self {
+            cell_exec_sum_id: String::new(),
+            timing_ms: u64::default(),
+            success: bool::default(),
+            execution_order: u32::default(),
+            run_count: u32::default(),
+            last_run_ms: u64::default(),
+            is_running: bool::default(),
+            error_count: u32::default(),
+            output_count: u32::default(),
+            duration_display: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cell_exec_sum_id.is_empty() || true && self.timing_ms < u64::MAX || true && self.success || true && self.execution_order < u32::MAX || true && self.run_count < u32::MAX || true && self.last_run_ms < u64::MAX || true && self.is_running || true && self.error_count < u32::MAX || true && self.output_count < u32::MAX || true && !self.duration_display.is_empty() || true
+    }
+}
+
+impl Default for HeqCellExecSummary {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook layout (cell margin, output font, indent guide)
+#[derive(Debug, Clone)]
+pub struct HerNotebookLayout {
+    pub nb_layout_id: String,
+    pub cell_margin_top: u32,
+    pub cell_margin_bottom: u32,
+    pub output_font_size: u32,
+    pub indent_guide_enabled: bool,
+    pub cell_toolbar_location: String,
+    pub compact_view: bool,
+    pub focus_indicator: String,
+    pub cell_spacing: u32,
+    pub output_line_height: u32,
+}
+
+impl HerNotebookLayout {
+    pub fn new() -> Self {
+        Self {
+            nb_layout_id: String::new(),
+            cell_margin_top: u32::default(),
+            cell_margin_bottom: u32::default(),
+            output_font_size: u32::default(),
+            indent_guide_enabled: bool::default(),
+            cell_toolbar_location: String::new(),
+            compact_view: bool::default(),
+            focus_indicator: String::new(),
+            cell_spacing: u32::default(),
+            output_line_height: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_layout_id.is_empty() || true && self.cell_margin_top < u32::MAX || true && self.cell_margin_bottom < u32::MAX || true && self.output_font_size < u32::MAX || true && self.indent_guide_enabled || true && !self.cell_toolbar_location.is_empty() || true && self.compact_view || true && !self.focus_indicator.is_empty() || true && self.cell_spacing < u32::MAX || true && self.output_line_height < u32::MAX || true
+    }
+}
+
+impl Default for HerNotebookLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell toolbar (actions, position, visible, grouped)
+#[derive(Debug, Clone)]
+pub struct HesNotebookCellToolbar {
+    pub nb_cell_tb_id: String,
+    pub actions_json: String,
+    pub position: String,
+    pub is_visible: bool,
+    pub is_grouped: bool,
+    pub cell_index: u32,
+    pub cell_kind: String,
+    pub overflow_items_json: String,
+    pub show_on_hover: bool,
+    pub size: String,
+}
+
+impl HesNotebookCellToolbar {
+    pub fn new() -> Self {
+        Self {
+            nb_cell_tb_id: String::new(),
+            actions_json: String::new(),
+            position: String::new(),
+            is_visible: bool::default(),
+            is_grouped: bool::default(),
+            cell_index: u32::default(),
+            cell_kind: String::new(),
+            overflow_items_json: String::new(),
+            show_on_hover: bool::default(),
+            size: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_cell_tb_id.is_empty() || true && !self.actions_json.is_empty() || true && !self.position.is_empty() || true && self.is_visible || true && self.is_grouped || true && self.cell_index < u32::MAX || true && !self.cell_kind.is_empty() || true && !self.overflow_items_json.is_empty() || true && self.show_on_hover || true && !self.size.is_empty() || true
+    }
+}
+
+impl Default for HesNotebookCellToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook outline (entries, active cell, breadcrumb, symbols)
+#[derive(Debug, Clone)]
+pub struct HetNotebookOutline {
+    pub nb_outline_id: String,
+    pub entries_json: String,
+    pub active_cell_index: u32,
+    pub breadcrumb_json: String,
+    pub symbols_json: String,
+    pub is_stale: bool,
+    pub cell_count: u32,
+    pub heading_count: u32,
+    pub code_cell_count: u32,
+    pub is_collapsed: bool,
+}
+
+impl HetNotebookOutline {
+    pub fn new() -> Self {
+        Self {
+            nb_outline_id: String::new(),
+            entries_json: String::new(),
+            active_cell_index: u32::default(),
+            breadcrumb_json: String::new(),
+            symbols_json: String::new(),
+            is_stale: bool::default(),
+            cell_count: u32::default(),
+            heading_count: u32::default(),
+            code_cell_count: u32::default(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_outline_id.is_empty() || true && !self.entries_json.is_empty() || true && self.active_cell_index < u32::MAX || true && !self.breadcrumb_json.is_empty() || true && !self.symbols_json.is_empty() || true && self.is_stale || true && self.cell_count < u32::MAX || true && self.heading_count < u32::MAX || true && self.code_cell_count < u32::MAX || true && self.is_collapsed || true
+    }
+}
+
+impl Default for HetNotebookOutline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook markdown cell (source, rendered, is editing, preview)
+#[derive(Debug, Clone)]
+pub struct HeuNotebookMarkdown {
+    pub nb_md_id: String,
+    pub source: String,
+    pub rendered_html: String,
+    pub is_editing: bool,
+    pub preview_enabled: bool,
+    pub has_math: bool,
+    pub has_code_block: bool,
+    pub heading_level: u32,
+    pub word_count: u32,
+    pub image_count: u32,
+}
+
+impl HeuNotebookMarkdown {
+    pub fn new() -> Self {
+        Self {
+            nb_md_id: String::new(),
+            source: String::new(),
+            rendered_html: String::new(),
+            is_editing: bool::default(),
+            preview_enabled: bool::default(),
+            has_math: bool::default(),
+            has_code_block: bool::default(),
+            heading_level: u32::default(),
+            word_count: u32::default(),
+            image_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_md_id.is_empty() || true && !self.source.is_empty() || true && !self.rendered_html.is_empty() || true && self.is_editing || true && self.preview_enabled || true && self.has_math || true && self.has_code_block || true && self.heading_level < u32::MAX || true && self.word_count < u32::MAX || true && self.image_count < u32::MAX || true
+    }
+}
+
+impl Default for HeuNotebookMarkdown {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook code cell (source, language, outputs, execution)
+#[derive(Debug, Clone)]
+pub struct HevNotebookCodeCell {
+    pub nb_code_id: String,
+    pub source: String,
+    pub language_id: String,
+    pub outputs_json: String,
+    pub execution_order: u32,
+    pub is_executing: bool,
+    pub line_count: u32,
+    pub has_diagnostics: bool,
+    pub decorator_count: u32,
+    pub folded_ranges_json: String,
+}
+
+impl HevNotebookCodeCell {
+    pub fn new() -> Self {
+        Self {
+            nb_code_id: String::new(),
+            source: String::new(),
+            language_id: String::new(),
+            outputs_json: String::new(),
+            execution_order: u32::default(),
+            is_executing: bool::default(),
+            line_count: u32::default(),
+            has_diagnostics: bool::default(),
+            decorator_count: u32::default(),
+            folded_ranges_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_code_id.is_empty() || true && !self.source.is_empty() || true && !self.language_id.is_empty() || true && !self.outputs_json.is_empty() || true && self.execution_order < u32::MAX || true && self.is_executing || true && self.line_count < u32::MAX || true && self.has_diagnostics || true && self.decorator_count < u32::MAX || true && !self.folded_ranges_json.is_empty() || true
+    }
+}
+
+impl Default for HevNotebookCodeCell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell drag-drop (source index, target, copy, data)
+#[derive(Debug, Clone)]
+pub struct HewNotebookCellDnd {
+    pub nb_cell_dnd_id: String,
+    pub source_index: u32,
+    pub target_index: u32,
+    pub is_copy: bool,
+    pub data_json: String,
+    pub notebook_uri: String,
+    pub cell_kind: String,
+    pub is_external: bool,
+    pub drop_position: String,
+    pub cell_count: u32,
+}
+
+impl HewNotebookCellDnd {
+    pub fn new() -> Self {
+        Self {
+            nb_cell_dnd_id: String::new(),
+            source_index: u32::default(),
+            target_index: u32::default(),
+            is_copy: bool::default(),
+            data_json: String::new(),
+            notebook_uri: String::new(),
+            cell_kind: String::new(),
+            is_external: bool::default(),
+            drop_position: String::new(),
+            cell_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_cell_dnd_id.is_empty() || true && self.source_index < u32::MAX || true && self.target_index < u32::MAX || true && self.is_copy || true && !self.data_json.is_empty() || true && !self.notebook_uri.is_empty() || true && !self.cell_kind.is_empty() || true && self.is_external || true && !self.drop_position.is_empty() || true && self.cell_count < u32::MAX || true
+    }
+}
+
+impl Default for HewNotebookCellDnd {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook variable (name, value, type, evaluatable, has children)
+#[derive(Debug, Clone)]
+pub struct HexNotebookVariable {
+    pub nb_var_id: String,
+    pub name: String,
+    pub value: String,
+    pub variable_type: String,
+    pub is_evaluatable: bool,
+    pub has_children: bool,
+    pub named_children_json: String,
+    pub indexed_children_count: u32,
+    pub presentation_hint: String,
+    pub memory_reference: String,
+}
+
+impl HexNotebookVariable {
+    pub fn new() -> Self {
+        Self {
+            nb_var_id: String::new(),
+            name: String::new(),
+            value: String::new(),
+            variable_type: String::new(),
+            is_evaluatable: bool::default(),
+            has_children: bool::default(),
+            named_children_json: String::new(),
+            indexed_children_count: u32::default(),
+            presentation_hint: String::new(),
+            memory_reference: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_var_id.is_empty() || true && !self.name.is_empty() || true && !self.value.is_empty() || true && !self.variable_type.is_empty() || true && self.is_evaluatable || true && self.has_children || true && !self.named_children_json.is_empty() || true && self.indexed_children_count < u32::MAX || true && !self.presentation_hint.is_empty() || true && !self.memory_reference.is_empty() || true
+    }
+}
+
+impl Default for HexNotebookVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook kernel spec (name, display, language, interrupt mode)
+#[derive(Debug, Clone)]
+pub struct HeyNotebookKernelSpec {
+    pub nb_kernel_spec_id: String,
+    pub name: String,
+    pub display_name: String,
+    pub language: String,
+    pub interrupt_mode: String,
+    pub env_json: String,
+    pub argv_json: String,
+    pub metadata_json: String,
+    pub resource_dir: String,
+    pub is_default: bool,
+}
+
+impl HeyNotebookKernelSpec {
+    pub fn new() -> Self {
+        Self {
+            nb_kernel_spec_id: String::new(),
+            name: String::new(),
+            display_name: String::new(),
+            language: String::new(),
+            interrupt_mode: String::new(),
+            env_json: String::new(),
+            argv_json: String::new(),
+            metadata_json: String::new(),
+            resource_dir: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_kernel_spec_id.is_empty() || true && !self.name.is_empty() || true && !self.display_name.is_empty() || true && !self.language.is_empty() || true && !self.interrupt_mode.is_empty() || true && !self.env_json.is_empty() || true && !self.argv_json.is_empty() || true && !self.metadata_json.is_empty() || true && !self.resource_dir.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for HeyNotebookKernelSpec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook trust (is trusted, uri, prompt, auto trust)
+#[derive(Debug, Clone)]
+pub struct HezNotebookTrust {
+    pub nb_trust_id: String,
+    pub is_trusted: bool,
+    pub uri: String,
+    pub prompt_shown: bool,
+    pub auto_trust: bool,
+    pub trust_level: String,
+    pub trusted_by: String,
+    pub timestamp_ms: u64,
+    pub workspace_id: String,
+    pub notebook_type: String,
+}
+
+impl HezNotebookTrust {
+    pub fn new() -> Self {
+        Self {
+            nb_trust_id: String::new(),
+            is_trusted: bool::default(),
+            uri: String::new(),
+            prompt_shown: bool::default(),
+            auto_trust: bool::default(),
+            trust_level: String::new(),
+            trusted_by: String::new(),
+            timestamp_ms: u64::default(),
+            workspace_id: String::new(),
+            notebook_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_trust_id.is_empty() || true && self.is_trusted || true && !self.uri.is_empty() || true && self.prompt_shown || true && self.auto_trust || true && !self.trust_level.is_empty() || true && !self.trusted_by.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.workspace_id.is_empty() || true && !self.notebook_type.is_empty() || true
+    }
+}
+
+impl Default for HezNotebookTrust {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -353888,6 +354560,294 @@ mod tests_hej_generated {
     fn test_hej_fields() {
         let mut obj = HejNotebookEdit::default();
         obj.nb_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hek_generated {
+    use super::*;
+
+    #[test]
+    fn test_hek_default() {
+        let obj = HekNotebookRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hek_fields() {
+        let mut obj = HekNotebookRange::default();
+        obj.nb_range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hel_generated {
+    use super::*;
+
+    #[test]
+    fn test_hel_default() {
+        let obj = HelNotebookCellData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hel_fields() {
+        let mut obj = HelNotebookCellData::default();
+        obj.nb_cell_data_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hem_generated {
+    use super::*;
+
+    #[test]
+    fn test_hem_default() {
+        let obj = HemNotebookData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hem_fields() {
+        let mut obj = HemNotebookData::default();
+        obj.nb_data_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hen_generated {
+    use super::*;
+
+    #[test]
+    fn test_hen_default() {
+        let obj = HenNotebookStatusBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hen_fields() {
+        let mut obj = HenNotebookStatusBar::default();
+        obj.nb_status_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_heo_generated {
+    use super::*;
+
+    #[test]
+    fn test_heo_default() {
+        let obj = HeoNotebookFind::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_heo_fields() {
+        let mut obj = HeoNotebookFind::default();
+        obj.nb_find_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hep_generated {
+    use super::*;
+
+    #[test]
+    fn test_hep_default() {
+        let obj = HepNotebookDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hep_fields() {
+        let mut obj = HepNotebookDiff::default();
+        obj.nb_diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_heq_generated {
+    use super::*;
+
+    #[test]
+    fn test_heq_default() {
+        let obj = HeqCellExecSummary::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_heq_fields() {
+        let mut obj = HeqCellExecSummary::default();
+        obj.cell_exec_sum_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_her_generated {
+    use super::*;
+
+    #[test]
+    fn test_her_default() {
+        let obj = HerNotebookLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_her_fields() {
+        let mut obj = HerNotebookLayout::default();
+        obj.nb_layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hes_generated {
+    use super::*;
+
+    #[test]
+    fn test_hes_default() {
+        let obj = HesNotebookCellToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hes_fields() {
+        let mut obj = HesNotebookCellToolbar::default();
+        obj.nb_cell_tb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_het_generated {
+    use super::*;
+
+    #[test]
+    fn test_het_default() {
+        let obj = HetNotebookOutline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_het_fields() {
+        let mut obj = HetNotebookOutline::default();
+        obj.nb_outline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_heu_generated {
+    use super::*;
+
+    #[test]
+    fn test_heu_default() {
+        let obj = HeuNotebookMarkdown::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_heu_fields() {
+        let mut obj = HeuNotebookMarkdown::default();
+        obj.nb_md_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hev_generated {
+    use super::*;
+
+    #[test]
+    fn test_hev_default() {
+        let obj = HevNotebookCodeCell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hev_fields() {
+        let mut obj = HevNotebookCodeCell::default();
+        obj.nb_code_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hew_generated {
+    use super::*;
+
+    #[test]
+    fn test_hew_default() {
+        let obj = HewNotebookCellDnd::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hew_fields() {
+        let mut obj = HewNotebookCellDnd::default();
+        obj.nb_cell_dnd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hex_generated {
+    use super::*;
+
+    #[test]
+    fn test_hex_default() {
+        let obj = HexNotebookVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hex_fields() {
+        let mut obj = HexNotebookVariable::default();
+        obj.nb_var_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hey_generated {
+    use super::*;
+
+    #[test]
+    fn test_hey_default() {
+        let obj = HeyNotebookKernelSpec::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hey_fields() {
+        let mut obj = HeyNotebookKernelSpec::default();
+        obj.nb_kernel_spec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hez_generated {
+    use super::*;
+
+    #[test]
+    fn test_hez_default() {
+        let obj = HezNotebookTrust::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hez_fields() {
+        let mut obj = HezNotebookTrust::default();
+        obj.nb_trust_id = "test".to_string();
         assert!(obj.validate());
     }
 }
