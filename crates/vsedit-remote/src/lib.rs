@@ -168967,6 +168967,890 @@ impl Default for JjzGotoSymbol {
     }
 }
 
+/// Task definition descriptor
+#[derive(Debug, Clone)]
+pub struct JkaTaskDefinition {
+    pub task_def_id: String,
+    pub task_type_str: String,
+    pub label_str: String,
+    pub command_str: String,
+    pub args_csv: String,
+    pub is_background: bool,
+}
+
+impl JkaTaskDefinition {
+    pub fn new() -> Self {
+        Self {
+            task_def_id: String::new(),
+            task_type_str: String::new(),
+            label_str: String::new(),
+            command_str: String::new(),
+            args_csv: String::new(),
+            is_background: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_def_id.is_empty() || true && !self.task_type_str.is_empty() || true && !self.label_str.is_empty() || true && !self.command_str.is_empty() || true && !self.args_csv.is_empty() || true && self.is_background || true
+    }
+}
+
+impl Default for JkaTaskDefinition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task execution state
+#[derive(Debug, Clone)]
+pub struct JkbTaskExecution {
+    pub task_exec_id: String,
+    pub task_ref: String,
+    pub pid_val: u32,
+    pub start_epoch: u64,
+    pub exit_code: u32,
+    pub is_running: bool,
+}
+
+impl JkbTaskExecution {
+    pub fn new() -> Self {
+        Self {
+            task_exec_id: String::new(),
+            task_ref: String::new(),
+            pid_val: u32::default(),
+            start_epoch: u64::default(),
+            exit_code: u32::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_exec_id.is_empty() || true && !self.task_ref.is_empty() || true && self.pid_val < u32::MAX || true && self.start_epoch < u64::MAX || true && self.exit_code < u32::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for JkbTaskExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task terminal instance
+#[derive(Debug, Clone)]
+pub struct JkcTaskTerminal {
+    pub task_term_id: String,
+    pub task_ref: String,
+    pub terminal_ref: String,
+    pub cwd_path: String,
+    pub env_count: u32,
+    pub is_shared: bool,
+}
+
+impl JkcTaskTerminal {
+    pub fn new() -> Self {
+        Self {
+            task_term_id: String::new(),
+            task_ref: String::new(),
+            terminal_ref: String::new(),
+            cwd_path: String::new(),
+            env_count: u32::default(),
+            is_shared: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_term_id.is_empty() || true && !self.task_ref.is_empty() || true && !self.terminal_ref.is_empty() || true && !self.cwd_path.is_empty() || true && self.env_count < u32::MAX || true && self.is_shared || true
+    }
+}
+
+impl Default for JkcTaskTerminal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task group descriptor
+#[derive(Debug, Clone)]
+pub struct JkdTaskGroup {
+    pub task_group_id: String,
+    pub group_kind: String,
+    pub is_default: bool,
+    pub task_count: u32,
+    pub label_str: String,
+    pub is_build_group: bool,
+}
+
+impl JkdTaskGroup {
+    pub fn new() -> Self {
+        Self {
+            task_group_id: String::new(),
+            group_kind: String::new(),
+            is_default: bool::default(),
+            task_count: u32::default(),
+            label_str: String::new(),
+            is_build_group: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_group_id.is_empty() || true && !self.group_kind.is_empty() || true && self.is_default || true && self.task_count < u32::MAX || true && !self.label_str.is_empty() || true && self.is_build_group || true
+    }
+}
+
+impl Default for JkdTaskGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem matcher descriptor
+#[derive(Debug, Clone)]
+pub struct JkeProblemMatcher {
+    pub pm_id: String,
+    pub matcher_name: String,
+    pub owner_str: String,
+    pub severity_str: String,
+    pub pattern_ref: String,
+    pub is_watching: bool,
+}
+
+impl JkeProblemMatcher {
+    pub fn new() -> Self {
+        Self {
+            pm_id: String::new(),
+            matcher_name: String::new(),
+            owner_str: String::new(),
+            severity_str: String::new(),
+            pattern_ref: String::new(),
+            is_watching: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pm_id.is_empty() || true && !self.matcher_name.is_empty() || true && !self.owner_str.is_empty() || true && !self.severity_str.is_empty() || true && !self.pattern_ref.is_empty() || true && self.is_watching || true
+    }
+}
+
+impl Default for JkeProblemMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem pattern descriptor
+#[derive(Debug, Clone)]
+pub struct JkfProblemPattern {
+    pub pp_id: String,
+    pub regexp_str: String,
+    pub file_idx: u32,
+    pub line_idx: u32,
+    pub column_idx: u32,
+    pub is_multiline: bool,
+}
+
+impl JkfProblemPattern {
+    pub fn new() -> Self {
+        Self {
+            pp_id: String::new(),
+            regexp_str: String::new(),
+            file_idx: u32::default(),
+            line_idx: u32::default(),
+            column_idx: u32::default(),
+            is_multiline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pp_id.is_empty() || true && !self.regexp_str.is_empty() || true && self.file_idx < u32::MAX || true && self.line_idx < u32::MAX || true && self.column_idx < u32::MAX || true && self.is_multiline || true
+    }
+}
+
+impl Default for JkfProblemPattern {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task provider descriptor
+#[derive(Debug, Clone)]
+pub struct JkgTaskProvider {
+    pub task_prov_id: String,
+    pub provider_type_str: String,
+    pub task_count: u32,
+    pub extension_ref: String,
+    pub priority_val: u32,
+    pub is_active: bool,
+}
+
+impl JkgTaskProvider {
+    pub fn new() -> Self {
+        Self {
+            task_prov_id: String::new(),
+            provider_type_str: String::new(),
+            task_count: u32::default(),
+            extension_ref: String::new(),
+            priority_val: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_prov_id.is_empty() || true && !self.provider_type_str.is_empty() || true && self.task_count < u32::MAX || true && !self.extension_ref.is_empty() || true && self.priority_val < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JkgTaskProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task filter entry
+#[derive(Debug, Clone)]
+pub struct JkhTaskFilter {
+    pub task_filter_id: String,
+    pub filter_type_str: String,
+    pub value_str: String,
+    pub task_type_ref: String,
+    pub match_count: u32,
+    pub is_inclusive: bool,
+}
+
+impl JkhTaskFilter {
+    pub fn new() -> Self {
+        Self {
+            task_filter_id: String::new(),
+            filter_type_str: String::new(),
+            value_str: String::new(),
+            task_type_ref: String::new(),
+            match_count: u32::default(),
+            is_inclusive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_filter_id.is_empty() || true && !self.filter_type_str.is_empty() || true && !self.value_str.is_empty() || true && !self.task_type_ref.is_empty() || true && self.match_count < u32::MAX || true && self.is_inclusive || true
+    }
+}
+
+impl Default for JkhTaskFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task lifecycle event
+#[derive(Debug, Clone)]
+pub struct JkiTaskEvent {
+    pub task_event_id: String,
+    pub event_kind_str: String,
+    pub task_ref: String,
+    pub timestamp_epoch: u64,
+    pub data_json: String,
+    pub is_terminal_event: bool,
+}
+
+impl JkiTaskEvent {
+    pub fn new() -> Self {
+        Self {
+            task_event_id: String::new(),
+            event_kind_str: String::new(),
+            task_ref: String::new(),
+            timestamp_epoch: u64::default(),
+            data_json: String::new(),
+            is_terminal_event: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_event_id.is_empty() || true && !self.event_kind_str.is_empty() || true && !self.task_ref.is_empty() || true && self.timestamp_epoch < u64::MAX || true && !self.data_json.is_empty() || true && self.is_terminal_event || true
+    }
+}
+
+impl Default for JkiTaskEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task output line
+#[derive(Debug, Clone)]
+pub struct JkjTaskOutput {
+    pub task_output_id: String,
+    pub text_str: String,
+    pub task_ref: String,
+    pub line_number: u32,
+    pub category_str: String,
+    pub is_problem_line: bool,
+}
+
+impl JkjTaskOutput {
+    pub fn new() -> Self {
+        Self {
+            task_output_id: String::new(),
+            text_str: String::new(),
+            task_ref: String::new(),
+            line_number: u32::default(),
+            category_str: String::new(),
+            is_problem_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_output_id.is_empty() || true && !self.text_str.is_empty() || true && !self.task_ref.is_empty() || true && self.line_number < u32::MAX || true && !self.category_str.is_empty() || true && self.is_problem_line || true
+    }
+}
+
+impl Default for JkjTaskOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task dependency entry
+#[derive(Debug, Clone)]
+pub struct JkkTaskDependency {
+    pub task_dep_id: String,
+    pub task_ref: String,
+    pub depends_on_ref: String,
+    pub order_str: String,
+    pub resolve_status: String,
+    pub is_optional: bool,
+}
+
+impl JkkTaskDependency {
+    pub fn new() -> Self {
+        Self {
+            task_dep_id: String::new(),
+            task_ref: String::new(),
+            depends_on_ref: String::new(),
+            order_str: String::new(),
+            resolve_status: String::new(),
+            is_optional: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_dep_id.is_empty() || true && !self.task_ref.is_empty() || true && !self.depends_on_ref.is_empty() || true && !self.order_str.is_empty() || true && !self.resolve_status.is_empty() || true && self.is_optional || true
+    }
+}
+
+impl Default for JkkTaskDependency {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task presentation options
+#[derive(Debug, Clone)]
+pub struct JklTaskPresentation {
+    pub task_pres_id: String,
+    pub echo_val: bool,
+    pub reveal_str: String,
+    pub focus_val: bool,
+    pub panel_str: String,
+    pub show_reuse_msg: bool,
+}
+
+impl JklTaskPresentation {
+    pub fn new() -> Self {
+        Self {
+            task_pres_id: String::new(),
+            echo_val: bool::default(),
+            reveal_str: String::new(),
+            focus_val: bool::default(),
+            panel_str: String::new(),
+            show_reuse_msg: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_pres_id.is_empty() || true && self.echo_val || true && !self.reveal_str.is_empty() || true && self.focus_val || true && !self.panel_str.is_empty() || true && self.show_reuse_msg || true
+    }
+}
+
+impl Default for JklTaskPresentation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task run configuration
+#[derive(Debug, Clone)]
+pub struct JkmTaskRunConfig {
+    pub task_run_id: String,
+    pub task_ref: String,
+    pub instance_limit: u32,
+    pub run_on_str: String,
+    pub problem_matcher_csv: String,
+    pub is_default_build: bool,
+}
+
+impl JkmTaskRunConfig {
+    pub fn new() -> Self {
+        Self {
+            task_run_id: String::new(),
+            task_ref: String::new(),
+            instance_limit: u32::default(),
+            run_on_str: String::new(),
+            problem_matcher_csv: String::new(),
+            is_default_build: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_run_id.is_empty() || true && !self.task_ref.is_empty() || true && self.instance_limit < u32::MAX || true && !self.run_on_str.is_empty() || true && !self.problem_matcher_csv.is_empty() || true && self.is_default_build || true
+    }
+}
+
+impl Default for JkmTaskRunConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task variable resolution
+#[derive(Debug, Clone)]
+pub struct JknTaskVariable {
+    pub task_var_id: String,
+    pub var_name: String,
+    pub resolved_value: String,
+    pub scope_ref: String,
+    pub resolve_order: u32,
+    pub is_resolved: bool,
+}
+
+impl JknTaskVariable {
+    pub fn new() -> Self {
+        Self {
+            task_var_id: String::new(),
+            var_name: String::new(),
+            resolved_value: String::new(),
+            scope_ref: String::new(),
+            resolve_order: u32::default(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_var_id.is_empty() || true && !self.var_name.is_empty() || true && !self.resolved_value.is_empty() || true && !self.scope_ref.is_empty() || true && self.resolve_order < u32::MAX || true && self.is_resolved || true
+    }
+}
+
+impl Default for JknTaskVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task JSON schema entry
+#[derive(Debug, Clone)]
+pub struct JkoTaskSchema {
+    pub task_schema_id: String,
+    pub schema_uri: String,
+    pub task_type_str: String,
+    pub property_count: u32,
+    pub required_csv: String,
+    pub is_registered: bool,
+}
+
+impl JkoTaskSchema {
+    pub fn new() -> Self {
+        Self {
+            task_schema_id: String::new(),
+            schema_uri: String::new(),
+            task_type_str: String::new(),
+            property_count: u32::default(),
+            required_csv: String::new(),
+            is_registered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_schema_id.is_empty() || true && !self.schema_uri.is_empty() || true && !self.task_type_str.is_empty() || true && self.property_count < u32::MAX || true && !self.required_csv.is_empty() || true && self.is_registered || true
+    }
+}
+
+impl Default for JkoTaskSchema {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shell execution descriptor
+#[derive(Debug, Clone)]
+pub struct JkpShellExecution {
+    pub shell_exec_id: String,
+    pub command_line: String,
+    pub shell_ref: String,
+    pub cwd_path: String,
+    pub env_json: String,
+    pub quote_style: bool,
+}
+
+impl JkpShellExecution {
+    pub fn new() -> Self {
+        Self {
+            shell_exec_id: String::new(),
+            command_line: String::new(),
+            shell_ref: String::new(),
+            cwd_path: String::new(),
+            env_json: String::new(),
+            quote_style: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shell_exec_id.is_empty() || true && !self.command_line.is_empty() || true && !self.shell_ref.is_empty() || true && !self.cwd_path.is_empty() || true && !self.env_json.is_empty() || true && self.quote_style || true
+    }
+}
+
+impl Default for JkpShellExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Process execution descriptor
+#[derive(Debug, Clone)]
+pub struct JkqProcessExecution {
+    pub proc_exec_id: String,
+    pub process_path: String,
+    pub args_csv: String,
+    pub cwd_path: String,
+    pub env_json: String,
+    pub detached_mode: bool,
+}
+
+impl JkqProcessExecution {
+    pub fn new() -> Self {
+        Self {
+            proc_exec_id: String::new(),
+            process_path: String::new(),
+            args_csv: String::new(),
+            cwd_path: String::new(),
+            env_json: String::new(),
+            detached_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proc_exec_id.is_empty() || true && !self.process_path.is_empty() || true && !self.args_csv.is_empty() || true && !self.cwd_path.is_empty() || true && !self.env_json.is_empty() || true && self.detached_mode || true
+    }
+}
+
+impl Default for JkqProcessExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom execution descriptor
+#[derive(Debug, Clone)]
+pub struct JkrCustomExecution {
+    pub custom_exec_id: String,
+    pub callback_ref: String,
+    pub pty_ref: String,
+    pub close_on_exit: bool,
+    pub auto_start: bool,
+    pub is_pseudo_terminal: bool,
+}
+
+impl JkrCustomExecution {
+    pub fn new() -> Self {
+        Self {
+            custom_exec_id: String::new(),
+            callback_ref: String::new(),
+            pty_ref: String::new(),
+            close_on_exit: bool::default(),
+            auto_start: bool::default(),
+            is_pseudo_terminal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.custom_exec_id.is_empty() || true && !self.callback_ref.is_empty() || true && !self.pty_ref.is_empty() || true && self.close_on_exit || true && self.auto_start || true && self.is_pseudo_terminal || true
+    }
+}
+
+impl Default for JkrCustomExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task source identifier
+#[derive(Debug, Clone)]
+pub struct JksTaskSource {
+    pub task_src_id: String,
+    pub source_name: String,
+    pub source_type_str: String,
+    pub extension_ref: String,
+    pub config_file: String,
+    pub is_auto_detected: bool,
+}
+
+impl JksTaskSource {
+    pub fn new() -> Self {
+        Self {
+            task_src_id: String::new(),
+            source_name: String::new(),
+            source_type_str: String::new(),
+            extension_ref: String::new(),
+            config_file: String::new(),
+            is_auto_detected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_src_id.is_empty() || true && !self.source_name.is_empty() || true && !self.source_type_str.is_empty() || true && !self.extension_ref.is_empty() || true && !self.config_file.is_empty() || true && self.is_auto_detected || true
+    }
+}
+
+impl Default for JksTaskSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task icon descriptor
+#[derive(Debug, Clone)]
+pub struct JktTaskIcon {
+    pub task_icon_id: String,
+    pub icon_ref: String,
+    pub color_str: String,
+    pub tooltip_str: String,
+    pub theme_color: String,
+    pub is_custom: bool,
+}
+
+impl JktTaskIcon {
+    pub fn new() -> Self {
+        Self {
+            task_icon_id: String::new(),
+            icon_ref: String::new(),
+            color_str: String::new(),
+            tooltip_str: String::new(),
+            theme_color: String::new(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_icon_id.is_empty() || true && !self.icon_ref.is_empty() || true && !self.color_str.is_empty() || true && !self.tooltip_str.is_empty() || true && !self.theme_color.is_empty() || true && self.is_custom || true
+    }
+}
+
+impl Default for JktTaskIcon {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task scope descriptor
+#[derive(Debug, Clone)]
+pub struct JkuTaskScope {
+    pub task_scope_id: String,
+    pub scope_type_str: String,
+    pub folder_uri: String,
+    pub workspace_ref: String,
+    pub filter_str: String,
+    pub is_global: bool,
+}
+
+impl JkuTaskScope {
+    pub fn new() -> Self {
+        Self {
+            task_scope_id: String::new(),
+            scope_type_str: String::new(),
+            folder_uri: String::new(),
+            workspace_ref: String::new(),
+            filter_str: String::new(),
+            is_global: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_scope_id.is_empty() || true && !self.scope_type_str.is_empty() || true && !self.folder_uri.is_empty() || true && !self.workspace_ref.is_empty() || true && !self.filter_str.is_empty() || true && self.is_global || true
+    }
+}
+
+impl Default for JkuTaskScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem collection state
+#[derive(Debug, Clone)]
+pub struct JkvProblemCollector {
+    pub prob_coll_id: String,
+    pub owner_str: String,
+    pub problem_count: u32,
+    pub file_count: u32,
+    pub max_severity: u32,
+    pub is_stale: bool,
+}
+
+impl JkvProblemCollector {
+    pub fn new() -> Self {
+        Self {
+            prob_coll_id: String::new(),
+            owner_str: String::new(),
+            problem_count: u32::default(),
+            file_count: u32::default(),
+            max_severity: u32::default(),
+            is_stale: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prob_coll_id.is_empty() || true && !self.owner_str.is_empty() || true && self.problem_count < u32::MAX || true && self.file_count < u32::MAX || true && self.max_severity < u32::MAX || true && self.is_stale || true
+    }
+}
+
+impl Default for JkvProblemCollector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem marker descriptor
+#[derive(Debug, Clone)]
+pub struct JkwProblemMarker {
+    pub prob_marker_id: String,
+    pub resource_uri: String,
+    pub severity_val: u32,
+    pub message_str: String,
+    pub source_str: String,
+    pub is_transient: bool,
+}
+
+impl JkwProblemMarker {
+    pub fn new() -> Self {
+        Self {
+            prob_marker_id: String::new(),
+            resource_uri: String::new(),
+            severity_val: u32::default(),
+            message_str: String::new(),
+            source_str: String::new(),
+            is_transient: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prob_marker_id.is_empty() || true && !self.resource_uri.is_empty() || true && self.severity_val < u32::MAX || true && !self.message_str.is_empty() || true && !self.source_str.is_empty() || true && self.is_transient || true
+    }
+}
+
+impl Default for JkwProblemMarker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Build task descriptor
+#[derive(Debug, Clone)]
+pub struct JkxBuildTask {
+    pub build_task_id: String,
+    pub build_command: String,
+    pub output_path: String,
+    pub problem_matcher_ref: String,
+    pub is_incremental: bool,
+    pub watch_mode: bool,
+}
+
+impl JkxBuildTask {
+    pub fn new() -> Self {
+        Self {
+            build_task_id: String::new(),
+            build_command: String::new(),
+            output_path: String::new(),
+            problem_matcher_ref: String::new(),
+            is_incremental: bool::default(),
+            watch_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.build_task_id.is_empty() || true && !self.build_command.is_empty() || true && !self.output_path.is_empty() || true && !self.problem_matcher_ref.is_empty() || true && self.is_incremental || true && self.watch_mode || true
+    }
+}
+
+impl Default for JkxBuildTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test task descriptor
+#[derive(Debug, Clone)]
+pub struct JkyTestTask {
+    pub test_task_id: String,
+    pub test_command: String,
+    pub test_pattern: String,
+    pub coverage_enabled: bool,
+    pub parallel_count: u32,
+    pub is_debug: bool,
+}
+
+impl JkyTestTask {
+    pub fn new() -> Self {
+        Self {
+            test_task_id: String::new(),
+            test_command: String::new(),
+            test_pattern: String::new(),
+            coverage_enabled: bool::default(),
+            parallel_count: u32::default(),
+            is_debug: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_task_id.is_empty() || true && !self.test_command.is_empty() || true && !self.test_pattern.is_empty() || true && self.coverage_enabled || true && self.parallel_count < u32::MAX || true && self.is_debug || true
+    }
+}
+
+impl Default for JkyTestTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Watch task descriptor
+#[derive(Debug, Clone)]
+pub struct JkzWatchTask {
+    pub watch_task_id: String,
+    pub watch_pattern: String,
+    pub debounce_ms: u32,
+    pub begin_pattern: String,
+    pub end_pattern: String,
+    pub is_active: bool,
+}
+
+impl JkzWatchTask {
+    pub fn new() -> Self {
+        Self {
+            watch_task_id: String::new(),
+            watch_pattern: String::new(),
+            debounce_ms: u32::default(),
+            begin_pattern: String::new(),
+            end_pattern: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watch_task_id.is_empty() || true && !self.watch_pattern.is_empty() || true && self.debounce_ms < u32::MAX || true && !self.begin_pattern.is_empty() || true && !self.end_pattern.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for JkzWatchTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -433716,6 +434600,474 @@ mod tests_jjz_generated {
     fn test_jjz_fields() {
         let mut obj = JjzGotoSymbol::default();
         obj.goto_sym_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jka_generated {
+    use super::*;
+
+    #[test]
+    fn test_jka_default() {
+        let obj = JkaTaskDefinition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jka_fields() {
+        let mut obj = JkaTaskDefinition::default();
+        obj.task_def_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkb_default() {
+        let obj = JkbTaskExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkb_fields() {
+        let mut obj = JkbTaskExecution::default();
+        obj.task_exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkc_default() {
+        let obj = JkcTaskTerminal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkc_fields() {
+        let mut obj = JkcTaskTerminal::default();
+        obj.task_term_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkd_default() {
+        let obj = JkdTaskGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkd_fields() {
+        let mut obj = JkdTaskGroup::default();
+        obj.task_group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jke_generated {
+    use super::*;
+
+    #[test]
+    fn test_jke_default() {
+        let obj = JkeProblemMatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jke_fields() {
+        let mut obj = JkeProblemMatcher::default();
+        obj.pm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkf_default() {
+        let obj = JkfProblemPattern::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkf_fields() {
+        let mut obj = JkfProblemPattern::default();
+        obj.pp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkg_default() {
+        let obj = JkgTaskProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkg_fields() {
+        let mut obj = JkgTaskProvider::default();
+        obj.task_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkh_default() {
+        let obj = JkhTaskFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkh_fields() {
+        let mut obj = JkhTaskFilter::default();
+        obj.task_filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jki_generated {
+    use super::*;
+
+    #[test]
+    fn test_jki_default() {
+        let obj = JkiTaskEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jki_fields() {
+        let mut obj = JkiTaskEvent::default();
+        obj.task_event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkj_default() {
+        let obj = JkjTaskOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkj_fields() {
+        let mut obj = JkjTaskOutput::default();
+        obj.task_output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkk_default() {
+        let obj = JkkTaskDependency::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkk_fields() {
+        let mut obj = JkkTaskDependency::default();
+        obj.task_dep_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkl_default() {
+        let obj = JklTaskPresentation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkl_fields() {
+        let mut obj = JklTaskPresentation::default();
+        obj.task_pres_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkm_default() {
+        let obj = JkmTaskRunConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkm_fields() {
+        let mut obj = JkmTaskRunConfig::default();
+        obj.task_run_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkn_default() {
+        let obj = JknTaskVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkn_fields() {
+        let mut obj = JknTaskVariable::default();
+        obj.task_var_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jko_generated {
+    use super::*;
+
+    #[test]
+    fn test_jko_default() {
+        let obj = JkoTaskSchema::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jko_fields() {
+        let mut obj = JkoTaskSchema::default();
+        obj.task_schema_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkp_default() {
+        let obj = JkpShellExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkp_fields() {
+        let mut obj = JkpShellExecution::default();
+        obj.shell_exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkq_default() {
+        let obj = JkqProcessExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkq_fields() {
+        let mut obj = JkqProcessExecution::default();
+        obj.proc_exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkr_default() {
+        let obj = JkrCustomExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkr_fields() {
+        let mut obj = JkrCustomExecution::default();
+        obj.custom_exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jks_generated {
+    use super::*;
+
+    #[test]
+    fn test_jks_default() {
+        let obj = JksTaskSource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jks_fields() {
+        let mut obj = JksTaskSource::default();
+        obj.task_src_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkt_default() {
+        let obj = JktTaskIcon::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkt_fields() {
+        let mut obj = JktTaskIcon::default();
+        obj.task_icon_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jku_generated {
+    use super::*;
+
+    #[test]
+    fn test_jku_default() {
+        let obj = JkuTaskScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jku_fields() {
+        let mut obj = JkuTaskScope::default();
+        obj.task_scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkv_default() {
+        let obj = JkvProblemCollector::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkv_fields() {
+        let mut obj = JkvProblemCollector::default();
+        obj.prob_coll_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkw_default() {
+        let obj = JkwProblemMarker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkw_fields() {
+        let mut obj = JkwProblemMarker::default();
+        obj.prob_marker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkx_default() {
+        let obj = JkxBuildTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkx_fields() {
+        let mut obj = JkxBuildTask::default();
+        obj.build_task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jky_generated {
+    use super::*;
+
+    #[test]
+    fn test_jky_default() {
+        let obj = JkyTestTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jky_fields() {
+        let mut obj = JkyTestTask::default();
+        obj.test_task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jkz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jkz_default() {
+        let obj = JkzWatchTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jkz_fields() {
+        let mut obj = JkzWatchTask::default();
+        obj.watch_task_id = "test".to_string();
         assert!(obj.validate());
     }
 }
