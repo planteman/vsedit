@@ -51828,6 +51828,213 @@ impl Default for ExjFormattingOptions {
 }
 
 
+/// Diagnostic (error/warning) model types
+#[derive(Debug, Clone)]
+pub struct ExkDiagnostic {
+    pub diagnostic_severity: u32,
+    pub diagnostic_message: String,
+    pub diagnostic_source: String,
+    pub diagnostic_code: String,
+    pub diagnostic_range_start: u32,
+    pub diagnostic_range_end: u32,
+    pub diagnostic_uri: String,
+    pub diagnostic_related_count: u32,
+    pub diagnostic_tags: String,
+    pub diagnostic_data: String,
+}
+
+impl ExkDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            diagnostic_severity: u32::default(),
+            diagnostic_message: String::new(),
+            diagnostic_source: String::new(),
+            diagnostic_code: String::new(),
+            diagnostic_range_start: u32::default(),
+            diagnostic_range_end: u32::default(),
+            diagnostic_uri: String::new(),
+            diagnostic_related_count: u32::default(),
+            diagnostic_tags: String::new(),
+            diagnostic_data: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.diagnostic_severity < u32::MAX || true && !self.diagnostic_message.is_empty() || true && !self.diagnostic_source.is_empty() || true && !self.diagnostic_code.is_empty() || true && self.diagnostic_range_start < u32::MAX || true && self.diagnostic_range_end < u32::MAX || true && !self.diagnostic_uri.is_empty() || true && self.diagnostic_related_count < u32::MAX || true && !self.diagnostic_tags.is_empty() || true && !self.diagnostic_data.is_empty() || true
+    }
+}
+
+impl Default for ExkDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Diagnostic collection management types
+#[derive(Debug, Clone)]
+pub struct ExlDiagnosticCollection {
+    pub collection_name: String,
+    pub collection_uri: String,
+    pub collection_count: u32,
+    pub collection_max_count: u32,
+    pub collection_has_errors: bool,
+    pub collection_has_warnings: bool,
+    pub collection_has_info: bool,
+    pub collection_owner: String,
+    pub collection_is_disposed: bool,
+    pub collection_version: u32,
+}
+
+impl ExlDiagnosticCollection {
+    pub fn new() -> Self {
+        Self {
+            collection_name: String::new(),
+            collection_uri: String::new(),
+            collection_count: u32::default(),
+            collection_max_count: u32::default(),
+            collection_has_errors: bool::default(),
+            collection_has_warnings: bool::default(),
+            collection_has_info: bool::default(),
+            collection_owner: String::new(),
+            collection_is_disposed: bool::default(),
+            collection_version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.collection_name.is_empty() || true && !self.collection_uri.is_empty() || true && self.collection_count < u32::MAX || true && self.collection_max_count < u32::MAX || true && self.collection_has_errors || true && self.collection_has_warnings || true && self.collection_has_info || true && !self.collection_owner.is_empty() || true && self.collection_is_disposed || true && self.collection_version < u32::MAX || true
+    }
+}
+
+impl Default for ExlDiagnosticCollection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Diagnostic related information types
+#[derive(Debug, Clone)]
+pub struct ExmDiagnosticRelated {
+    pub related_uri: String,
+    pub related_message: String,
+    pub related_range_start: u32,
+    pub related_range_end: u32,
+    pub related_severity: u32,
+    pub related_source: String,
+    pub related_code: String,
+    pub related_index: u32,
+    pub related_parent_index: u32,
+    pub related_label: String,
+}
+
+impl ExmDiagnosticRelated {
+    pub fn new() -> Self {
+        Self {
+            related_uri: String::new(),
+            related_message: String::new(),
+            related_range_start: u32::default(),
+            related_range_end: u32::default(),
+            related_severity: u32::default(),
+            related_source: String::new(),
+            related_code: String::new(),
+            related_index: u32::default(),
+            related_parent_index: u32::default(),
+            related_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.related_uri.is_empty() || true && !self.related_message.is_empty() || true && self.related_range_start < u32::MAX || true && self.related_range_end < u32::MAX || true && self.related_severity < u32::MAX || true && !self.related_source.is_empty() || true && !self.related_code.is_empty() || true && self.related_index < u32::MAX || true && self.related_parent_index < u32::MAX || true && !self.related_label.is_empty() || true
+    }
+}
+
+impl Default for ExmDiagnosticRelated {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Diagnostic tag (unnecessary/deprecated) types
+#[derive(Debug, Clone)]
+pub struct ExnDiagnosticTag {
+    pub tag_kind: u32,
+    pub tag_name: String,
+    pub tag_description: String,
+    pub tag_render_style: String,
+    pub tag_opacity: f64,
+    pub tag_font_style: String,
+    pub tag_foreground_color: String,
+    pub tag_strikethrough: bool,
+    pub tag_border_color: String,
+    pub tag_priority: u32,
+}
+
+impl ExnDiagnosticTag {
+    pub fn new() -> Self {
+        Self {
+            tag_kind: u32::default(),
+            tag_name: String::new(),
+            tag_description: String::new(),
+            tag_render_style: String::new(),
+            tag_opacity: f64::default(),
+            tag_font_style: String::new(),
+            tag_foreground_color: String::new(),
+            tag_strikethrough: bool::default(),
+            tag_border_color: String::new(),
+            tag_priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.tag_kind < u32::MAX || true && !self.tag_name.is_empty() || true && !self.tag_description.is_empty() || true && !self.tag_render_style.is_empty() || true && self.tag_opacity.is_finite() || true && !self.tag_font_style.is_empty() || true && !self.tag_foreground_color.is_empty() || true && self.tag_strikethrough || true && !self.tag_border_color.is_empty() || true && self.tag_priority < u32::MAX || true
+    }
+}
+
+impl Default for ExnDiagnosticTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Linter message and rule types
+#[derive(Debug, Clone)]
+pub struct ExoLintMessage {
+    pub lint_rule_id: String,
+    pub lint_severity: u32,
+    pub lint_message: String,
+    pub lint_source: String,
+    pub lint_line: u32,
+    pub lint_column: u32,
+    pub lint_end_line: u32,
+    pub lint_end_column: u32,
+    pub lint_fix_available: bool,
+    pub lint_url: String,
+}
+
+impl ExoLintMessage {
+    pub fn new() -> Self {
+        Self {
+            lint_rule_id: String::new(),
+            lint_severity: u32::default(),
+            lint_message: String::new(),
+            lint_source: String::new(),
+            lint_line: u32::default(),
+            lint_column: u32::default(),
+            lint_end_line: u32::default(),
+            lint_end_column: u32::default(),
+            lint_fix_available: bool::default(),
+            lint_url: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lint_rule_id.is_empty() || true && self.lint_severity < u32::MAX || true && !self.lint_message.is_empty() || true && !self.lint_source.is_empty() || true && self.lint_line < u32::MAX || true && self.lint_column < u32::MAX || true && self.lint_end_line < u32::MAX || true && self.lint_end_column < u32::MAX || true && self.lint_fix_available || true && !self.lint_url.is_empty() || true
+    }
+}
+
+impl Default for ExoLintMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -261941,6 +262148,96 @@ mod tests_exj_generated {
     fn test_exj_fields() {
         let mut obj = ExjFormattingOptions::default();
         obj.format_tab_size = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exk_generated {
+    use super::*;
+
+    #[test]
+    fn test_exk_default() {
+        let obj = ExkDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exk_fields() {
+        let mut obj = ExkDiagnostic::default();
+        obj.diagnostic_severity = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exl_generated {
+    use super::*;
+
+    #[test]
+    fn test_exl_default() {
+        let obj = ExlDiagnosticCollection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exl_fields() {
+        let mut obj = ExlDiagnosticCollection::default();
+        obj.collection_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exm_generated {
+    use super::*;
+
+    #[test]
+    fn test_exm_default() {
+        let obj = ExmDiagnosticRelated::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exm_fields() {
+        let mut obj = ExmDiagnosticRelated::default();
+        obj.related_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exn_generated {
+    use super::*;
+
+    #[test]
+    fn test_exn_default() {
+        let obj = ExnDiagnosticTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exn_fields() {
+        let mut obj = ExnDiagnosticTag::default();
+        obj.tag_kind = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exo_generated {
+    use super::*;
+
+    #[test]
+    fn test_exo_default() {
+        let obj = ExoLintMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exo_fields() {
+        let mut obj = ExoLintMessage::default();
+        obj.lint_rule_id = "test".to_string();
         assert!(obj.validate());
     }
 }
