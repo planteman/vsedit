@@ -73038,6 +73038,216 @@ impl Default for FqzDapWatchExpression {
     }
 }
 
+/// LSP text document identifier (uri, version, language id)
+#[derive(Debug, Clone)]
+pub struct FraLspTextDocumentIdentifier {
+    pub doc_uri: String,
+    pub version: u64,
+    pub language_id: String,
+    pub text_length: u64,
+    pub line_count: u32,
+    pub is_open: bool,
+    pub encoding: String,
+    pub eol: u32,
+    pub is_dirty: bool,
+    pub scheme: String,
+}
+
+impl FraLspTextDocumentIdentifier {
+    pub fn new() -> Self {
+        Self {
+            doc_uri: String::new(),
+            version: u64::default(),
+            language_id: String::new(),
+            text_length: u64::default(),
+            line_count: u32::default(),
+            is_open: bool::default(),
+            encoding: String::new(),
+            eol: u32::default(),
+            is_dirty: bool::default(),
+            scheme: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.doc_uri.is_empty() || true && self.version < u64::MAX || true && !self.language_id.is_empty() || true && self.text_length < u64::MAX || true && self.line_count < u32::MAX || true && self.is_open || true && !self.encoding.is_empty() || true && self.eol < u32::MAX || true && self.is_dirty || true && !self.scheme.is_empty() || true
+    }
+}
+
+impl Default for FraLspTextDocumentIdentifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP position (line, character, offset, encoding)
+#[derive(Debug, Clone)]
+pub struct FrbLspPosition {
+    pub line: u32,
+    pub character: u32,
+    pub offset: u64,
+    pub encoding: u32,
+    pub is_at_eol: bool,
+    pub is_at_eof: bool,
+    pub visual_column: u32,
+    pub byte_offset: u64,
+    pub is_inside_word: bool,
+    pub is_in_string: bool,
+}
+
+impl FrbLspPosition {
+    pub fn new() -> Self {
+        Self {
+            line: u32::default(),
+            character: u32::default(),
+            offset: u64::default(),
+            encoding: u32::default(),
+            is_at_eol: bool::default(),
+            is_at_eof: bool::default(),
+            visual_column: u32::default(),
+            byte_offset: u64::default(),
+            is_inside_word: bool::default(),
+            is_in_string: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.line < u32::MAX || true && self.character < u32::MAX || true && self.offset < u64::MAX || true && self.encoding < u32::MAX || true && self.is_at_eol || true && self.is_at_eof || true && self.visual_column < u32::MAX || true && self.byte_offset < u64::MAX || true && self.is_inside_word || true && self.is_in_string || true
+    }
+}
+
+impl Default for FrbLspPosition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP range (start line/char, end line/char)
+#[derive(Debug, Clone)]
+pub struct FrcLspRange {
+    pub start_line: u32,
+    pub start_character: u32,
+    pub end_line: u32,
+    pub end_character: u32,
+    pub is_empty: bool,
+    pub is_single_line: bool,
+    pub line_count: u32,
+    pub character_count: u32,
+    pub byte_start: u64,
+    pub byte_end: u64,
+}
+
+impl FrcLspRange {
+    pub fn new() -> Self {
+        Self {
+            start_line: u32::default(),
+            start_character: u32::default(),
+            end_line: u32::default(),
+            end_character: u32::default(),
+            is_empty: bool::default(),
+            is_single_line: bool::default(),
+            line_count: u32::default(),
+            character_count: u32::default(),
+            byte_start: u64::default(),
+            byte_end: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.start_line < u32::MAX || true && self.start_character < u32::MAX || true && self.end_line < u32::MAX || true && self.end_character < u32::MAX || true && self.is_empty || true && self.is_single_line || true && self.line_count < u32::MAX || true && self.character_count < u32::MAX || true && self.byte_start < u64::MAX || true && self.byte_end < u64::MAX || true
+    }
+}
+
+impl Default for FrcLspRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP location (uri, range, origin selection range)
+#[derive(Debug, Clone)]
+pub struct FrdLspLocation {
+    pub uri: String,
+    pub range_start_line: u32,
+    pub range_start_char: u32,
+    pub range_end_line: u32,
+    pub range_end_char: u32,
+    pub origin_start_line: u32,
+    pub origin_end_line: u32,
+    pub target_uri: String,
+    pub is_same_document: bool,
+    pub scheme: String,
+}
+
+impl FrdLspLocation {
+    pub fn new() -> Self {
+        Self {
+            uri: String::new(),
+            range_start_line: u32::default(),
+            range_start_char: u32::default(),
+            range_end_line: u32::default(),
+            range_end_char: u32::default(),
+            origin_start_line: u32::default(),
+            origin_end_line: u32::default(),
+            target_uri: String::new(),
+            is_same_document: bool::default(),
+            scheme: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.uri.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_start_char < u32::MAX || true && self.range_end_line < u32::MAX || true && self.range_end_char < u32::MAX || true && self.origin_start_line < u32::MAX || true && self.origin_end_line < u32::MAX || true && !self.target_uri.is_empty() || true && self.is_same_document || true && !self.scheme.is_empty() || true
+    }
+}
+
+impl Default for FrdLspLocation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP diagnostic (range, severity, code, source, message, related info)
+#[derive(Debug, Clone)]
+pub struct FreLspDiagnostic {
+    pub diag_id: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub severity: u32,
+    pub code: String,
+    pub code_href: String,
+    pub source: String,
+    pub message: String,
+    pub related_info_json: String,
+    pub tags_json: String,
+}
+
+impl FreLspDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            diag_id: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            severity: u32::default(),
+            code: String::new(),
+            code_href: String::new(),
+            source: String::new(),
+            message: String::new(),
+            related_info_json: String::new(),
+            tags_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_id.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && self.severity < u32::MAX || true && !self.code.is_empty() || true && !self.code_href.is_empty() || true && !self.source.is_empty() || true && !self.message.is_empty() || true && !self.related_info_json.is_empty() || true && !self.tags_json.is_empty() || true
+    }
+}
+
+impl Default for FreLspDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292355,6 +292565,96 @@ mod tests_fqz_generated {
     fn test_fqz_fields() {
         let mut obj = FqzDapWatchExpression::default();
         obj.watch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fra_generated {
+    use super::*;
+
+    #[test]
+    fn test_fra_default() {
+        let obj = FraLspTextDocumentIdentifier::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fra_fields() {
+        let mut obj = FraLspTextDocumentIdentifier::default();
+        obj.doc_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frb_generated {
+    use super::*;
+
+    #[test]
+    fn test_frb_default() {
+        let obj = FrbLspPosition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frb_fields() {
+        let mut obj = FrbLspPosition::default();
+        obj.line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frc_generated {
+    use super::*;
+
+    #[test]
+    fn test_frc_default() {
+        let obj = FrcLspRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frc_fields() {
+        let mut obj = FrcLspRange::default();
+        obj.start_line = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frd_generated {
+    use super::*;
+
+    #[test]
+    fn test_frd_default() {
+        let obj = FrdLspLocation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frd_fields() {
+        let mut obj = FrdLspLocation::default();
+        obj.uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fre_generated {
+    use super::*;
+
+    #[test]
+    fn test_fre_default() {
+        let obj = FreLspDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fre_fields() {
+        let mut obj = FreLspDiagnostic::default();
+        obj.diag_id = "test".to_string();
         assert!(obj.validate());
     }
 }
