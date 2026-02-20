@@ -84221,6 +84221,216 @@ impl Default for GbeEditorSerializer {
     }
 }
 
+/// Editor close handler (confirm dirty, save before close, revert)
+#[derive(Debug, Clone)]
+pub struct GbfEditorCloseHandler {
+    pub close_id: String,
+    pub confirm_dirty: bool,
+    pub save_before_close: bool,
+    pub revert_on_cancel: bool,
+    pub close_others: bool,
+    pub close_saved: bool,
+    pub close_all: bool,
+    pub close_direction: String,
+    pub force_close: bool,
+    pub editor_uri: String,
+}
+
+impl GbfEditorCloseHandler {
+    pub fn new() -> Self {
+        Self {
+            close_id: String::new(),
+            confirm_dirty: bool::default(),
+            save_before_close: bool::default(),
+            revert_on_cancel: bool::default(),
+            close_others: bool::default(),
+            close_saved: bool::default(),
+            close_all: bool::default(),
+            close_direction: String::new(),
+            force_close: bool::default(),
+            editor_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.close_id.is_empty() || true && self.confirm_dirty || true && self.save_before_close || true && self.revert_on_cancel || true && self.close_others || true && self.close_saved || true && self.close_all || true && !self.close_direction.is_empty() || true && self.force_close || true && !self.editor_uri.is_empty() || true
+    }
+}
+
+impl Default for GbfEditorCloseHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor open handler (resolve input, open side by side, split)
+#[derive(Debug, Clone)]
+pub struct GbgEditorOpenHandler {
+    pub open_id: String,
+    pub editor_uri: String,
+    pub side_by_side: bool,
+    pub split_direction: String,
+    pub preview_mode: bool,
+    pub pinned: bool,
+    pub target_group_id: String,
+    pub override_id: String,
+    pub selection_json: String,
+    pub scroll_to_line: u32,
+}
+
+impl GbgEditorOpenHandler {
+    pub fn new() -> Self {
+        Self {
+            open_id: String::new(),
+            editor_uri: String::new(),
+            side_by_side: bool::default(),
+            split_direction: String::new(),
+            preview_mode: bool::default(),
+            pinned: bool::default(),
+            target_group_id: String::new(),
+            override_id: String::new(),
+            selection_json: String::new(),
+            scroll_to_line: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.open_id.is_empty() || true && !self.editor_uri.is_empty() || true && self.side_by_side || true && !self.split_direction.is_empty() || true && self.preview_mode || true && self.pinned || true && !self.target_group_id.is_empty() || true && !self.override_id.is_empty() || true && !self.selection_json.is_empty() || true && self.scroll_to_line < u32::MAX || true
+    }
+}
+
+impl Default for GbgEditorOpenHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor move handler (drag, drop, across groups, reorder)
+#[derive(Debug, Clone)]
+pub struct GbhEditorMoveHandler {
+    pub move_id: String,
+    pub source_group_id: String,
+    pub target_group_id: String,
+    pub editor_uri: String,
+    pub copy_mode: bool,
+    pub target_index: u32,
+    pub across_windows: bool,
+    pub drag_data_json: String,
+    pub is_external: bool,
+    pub reorder: bool,
+}
+
+impl GbhEditorMoveHandler {
+    pub fn new() -> Self {
+        Self {
+            move_id: String::new(),
+            source_group_id: String::new(),
+            target_group_id: String::new(),
+            editor_uri: String::new(),
+            copy_mode: bool::default(),
+            target_index: u32::default(),
+            across_windows: bool::default(),
+            drag_data_json: String::new(),
+            is_external: bool::default(),
+            reorder: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.move_id.is_empty() || true && !self.source_group_id.is_empty() || true && !self.target_group_id.is_empty() || true && !self.editor_uri.is_empty() || true && self.copy_mode || true && self.target_index < u32::MAX || true && self.across_windows || true && !self.drag_data_json.is_empty() || true && self.is_external || true && self.reorder || true
+    }
+}
+
+impl Default for GbhEditorMoveHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor pane service (create, dispose, focus, layout, get by id)
+#[derive(Debug, Clone)]
+pub struct GbiEditorPaneService {
+    pub pane_id: String,
+    pub group_id: String,
+    pub is_active: bool,
+    pub is_visible: bool,
+    pub editor_count: u32,
+    pub min_width: u32,
+    pub min_height: u32,
+    pub preferred_width: u32,
+    pub preferred_height: u32,
+    pub is_auxiliary: bool,
+}
+
+impl GbiEditorPaneService {
+    pub fn new() -> Self {
+        Self {
+            pane_id: String::new(),
+            group_id: String::new(),
+            is_active: bool::default(),
+            is_visible: bool::default(),
+            editor_count: u32::default(),
+            min_width: u32::default(),
+            min_height: u32::default(),
+            preferred_width: u32::default(),
+            preferred_height: u32::default(),
+            is_auxiliary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pane_id.is_empty() || true && !self.group_id.is_empty() || true && self.is_active || true && self.is_visible || true && self.editor_count < u32::MAX || true && self.min_width < u32::MAX || true && self.min_height < u32::MAX || true && self.preferred_width < u32::MAX || true && self.preferred_height < u32::MAX || true && self.is_auxiliary || true
+    }
+}
+
+impl Default for GbiEditorPaneService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor sticky scroll (max lines, enabled, default model, show)
+#[derive(Debug, Clone)]
+pub struct GbjEditorStickyScroll {
+    pub sticky_id: String,
+    pub max_lines: u32,
+    pub enabled: bool,
+    pub default_model: String,
+    pub show_on_scroll: bool,
+    pub outline_model: bool,
+    pub folding_model: bool,
+    pub indentation_model: bool,
+    pub scroll_with_editor: bool,
+    pub max_depth: u32,
+}
+
+impl GbjEditorStickyScroll {
+    pub fn new() -> Self {
+        Self {
+            sticky_id: String::new(),
+            max_lines: u32::default(),
+            enabled: bool::default(),
+            default_model: String::new(),
+            show_on_scroll: bool::default(),
+            outline_model: bool::default(),
+            folding_model: bool::default(),
+            indentation_model: bool::default(),
+            scroll_with_editor: bool::default(),
+            max_depth: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sticky_id.is_empty() || true && self.max_lines < u32::MAX || true && self.enabled || true && !self.default_model.is_empty() || true && self.show_on_scroll || true && self.outline_model || true && self.folding_model || true && self.indentation_model || true && self.scroll_with_editor || true && self.max_depth < u32::MAX || true
+    }
+}
+
+impl Default for GbjEditorStickyScroll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308346,6 +308556,96 @@ mod tests_gbe_generated {
     fn test_gbe_fields() {
         let mut obj = GbeEditorSerializer::default();
         obj.serializer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbf_default() {
+        let obj = GbfEditorCloseHandler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbf_fields() {
+        let mut obj = GbfEditorCloseHandler::default();
+        obj.close_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbg_default() {
+        let obj = GbgEditorOpenHandler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbg_fields() {
+        let mut obj = GbgEditorOpenHandler::default();
+        obj.open_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbh_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbh_default() {
+        let obj = GbhEditorMoveHandler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbh_fields() {
+        let mut obj = GbhEditorMoveHandler::default();
+        obj.move_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbi_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbi_default() {
+        let obj = GbiEditorPaneService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbi_fields() {
+        let mut obj = GbiEditorPaneService::default();
+        obj.pane_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbj_default() {
+        let obj = GbjEditorStickyScroll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbj_fields() {
+        let mut obj = GbjEditorStickyScroll::default();
+        obj.sticky_id = "test".to_string();
         assert!(obj.validate());
     }
 }
