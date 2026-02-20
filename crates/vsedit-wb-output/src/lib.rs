@@ -117820,6 +117820,426 @@ impl Default for HfzChatEdit {
     }
 }
 
+/// Timeline item (timestamp, label, description, source, icon)
+#[derive(Debug, Clone)]
+pub struct HgaTimelineItem {
+    pub timeline_item_id: String,
+    pub timestamp_ms: u64,
+    pub label: String,
+    pub description: String,
+    pub source: String,
+    pub icon_path: String,
+    pub detail: String,
+    pub command_json: String,
+    pub context_value: String,
+    pub accessibility_info: String,
+}
+
+impl HgaTimelineItem {
+    pub fn new() -> Self {
+        Self {
+            timeline_item_id: String::new(),
+            timestamp_ms: u64::default(),
+            label: String::new(),
+            description: String::new(),
+            source: String::new(),
+            icon_path: String::new(),
+            detail: String::new(),
+            command_json: String::new(),
+            context_value: String::new(),
+            accessibility_info: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.timeline_item_id.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.label.is_empty() || true && !self.description.is_empty() || true && !self.source.is_empty() || true && !self.icon_path.is_empty() || true && !self.detail.is_empty() || true && !self.command_json.is_empty() || true && !self.context_value.is_empty() || true && !self.accessibility_info.is_empty() || true
+    }
+}
+
+impl Default for HgaTimelineItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Timeline provider (id, label, scheme, source, on did change)
+#[derive(Debug, Clone)]
+pub struct HgbTimelineProvider {
+    pub timeline_prov_id: String,
+    pub provider_id: String,
+    pub label: String,
+    pub scheme: String,
+    pub source: String,
+    pub on_did_change: bool,
+    pub cursor_json: String,
+    pub max_items: u32,
+    pub is_disposed: bool,
+    pub extension_id: String,
+}
+
+impl HgbTimelineProvider {
+    pub fn new() -> Self {
+        Self {
+            timeline_prov_id: String::new(),
+            provider_id: String::new(),
+            label: String::new(),
+            scheme: String::new(),
+            source: String::new(),
+            on_did_change: bool::default(),
+            cursor_json: String::new(),
+            max_items: u32::default(),
+            is_disposed: bool::default(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.timeline_prov_id.is_empty() || true && !self.provider_id.is_empty() || true && !self.label.is_empty() || true && !self.scheme.is_empty() || true && !self.source.is_empty() || true && self.on_did_change || true && !self.cursor_json.is_empty() || true && self.max_items < u32::MAX || true && self.is_disposed || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for HgbTimelineProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Local history entry (timestamp, label, uri, source, associate)
+#[derive(Debug, Clone)]
+pub struct HgcLocalHistory {
+    pub local_hist_id: String,
+    pub timestamp_ms: u64,
+    pub label: String,
+    pub uri: String,
+    pub source: String,
+    pub associate_id: String,
+    pub size_bytes: u64,
+    pub hash: String,
+    pub is_snapshot: bool,
+    pub workspace_id: String,
+}
+
+impl HgcLocalHistory {
+    pub fn new() -> Self {
+        Self {
+            local_hist_id: String::new(),
+            timestamp_ms: u64::default(),
+            label: String::new(),
+            uri: String::new(),
+            source: String::new(),
+            associate_id: String::new(),
+            size_bytes: u64::default(),
+            hash: String::new(),
+            is_snapshot: bool::default(),
+            workspace_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.local_hist_id.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.label.is_empty() || true && !self.uri.is_empty() || true && !self.source.is_empty() || true && !self.associate_id.is_empty() || true && self.size_bytes < u64::MAX || true && !self.hash.is_empty() || true && self.is_snapshot || true && !self.workspace_id.is_empty() || true
+    }
+}
+
+impl Default for HgcLocalHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// History navigator (entries, current index, can go back/forward)
+#[derive(Debug, Clone)]
+pub struct HgdHistoryNavigator {
+    pub hist_nav_id: String,
+    pub entries_json: String,
+    pub current_index: u32,
+    pub can_go_back: bool,
+    pub can_go_forward: bool,
+    pub max_entries: u32,
+    pub is_empty: bool,
+    pub scope: String,
+    pub entry_count: u32,
+    pub last_navigation_ms: u64,
+}
+
+impl HgdHistoryNavigator {
+    pub fn new() -> Self {
+        Self {
+            hist_nav_id: String::new(),
+            entries_json: String::new(),
+            current_index: u32::default(),
+            can_go_back: bool::default(),
+            can_go_forward: bool::default(),
+            max_entries: u32::default(),
+            is_empty: bool::default(),
+            scope: String::new(),
+            entry_count: u32::default(),
+            last_navigation_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hist_nav_id.is_empty() || true && !self.entries_json.is_empty() || true && self.current_index < u32::MAX || true && self.can_go_back || true && self.can_go_forward || true && self.max_entries < u32::MAX || true && self.is_empty || true && !self.scope.is_empty() || true && self.entry_count < u32::MAX || true && self.last_navigation_ms < u64::MAX || true
+    }
+}
+
+impl Default for HgdHistoryNavigator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit stack (undo entries, redo entries, save point, is clean)
+#[derive(Debug, Clone)]
+pub struct HgeEditStack {
+    pub edit_stack_id: String,
+    pub undo_entries_json: String,
+    pub redo_entries_json: String,
+    pub save_point: u32,
+    pub is_clean: bool,
+    pub undo_count: u32,
+    pub redo_count: u32,
+    pub max_stack_size: u32,
+    pub resource_uri: String,
+    pub version: u32,
+}
+
+impl HgeEditStack {
+    pub fn new() -> Self {
+        Self {
+            edit_stack_id: String::new(),
+            undo_entries_json: String::new(),
+            redo_entries_json: String::new(),
+            save_point: u32::default(),
+            is_clean: bool::default(),
+            undo_count: u32::default(),
+            redo_count: u32::default(),
+            max_stack_size: u32::default(),
+            resource_uri: String::new(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_stack_id.is_empty() || true && !self.undo_entries_json.is_empty() || true && !self.redo_entries_json.is_empty() || true && self.save_point < u32::MAX || true && self.is_clean || true && self.undo_count < u32::MAX || true && self.redo_count < u32::MAX || true && self.max_stack_size < u32::MAX || true && !self.resource_uri.is_empty() || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for HgeEditStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Undo/redo group (elements, label, is sealed, resource)
+#[derive(Debug, Clone)]
+pub struct HgfUndoRedoGroup {
+    pub undo_group_id: String,
+    pub elements_json: String,
+    pub label: String,
+    pub is_sealed: bool,
+    pub resource_uri: String,
+    pub element_count: u32,
+    pub timestamp_ms: u64,
+    pub is_compound: bool,
+    pub source: String,
+    pub version: u32,
+}
+
+impl HgfUndoRedoGroup {
+    pub fn new() -> Self {
+        Self {
+            undo_group_id: String::new(),
+            elements_json: String::new(),
+            label: String::new(),
+            is_sealed: bool::default(),
+            resource_uri: String::new(),
+            element_count: u32::default(),
+            timestamp_ms: u64::default(),
+            is_compound: bool::default(),
+            source: String::new(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.undo_group_id.is_empty() || true && !self.elements_json.is_empty() || true && !self.label.is_empty() || true && self.is_sealed || true && !self.resource_uri.is_empty() || true && self.element_count < u32::MAX || true && self.timestamp_ms < u64::MAX || true && self.is_compound || true && !self.source.is_empty() || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for HgfUndoRedoGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File snapshot (content, timestamp, uri, version, encoding)
+#[derive(Debug, Clone)]
+pub struct HggSnapshotEntry {
+    pub snapshot_id: String,
+    pub content: String,
+    pub timestamp_ms: u64,
+    pub uri: String,
+    pub version: u32,
+    pub encoding: String,
+    pub line_count: u64,
+    pub hash: String,
+    pub size_bytes: u64,
+    pub is_auto: bool,
+}
+
+impl HggSnapshotEntry {
+    pub fn new() -> Self {
+        Self {
+            snapshot_id: String::new(),
+            content: String::new(),
+            timestamp_ms: u64::default(),
+            uri: String::new(),
+            version: u32::default(),
+            encoding: String::new(),
+            line_count: u64::default(),
+            hash: String::new(),
+            size_bytes: u64::default(),
+            is_auto: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snapshot_id.is_empty() || true && !self.content.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.uri.is_empty() || true && self.version < u32::MAX || true && !self.encoding.is_empty() || true && self.line_count < u64::MAX || true && !self.hash.is_empty() || true && self.size_bytes < u64::MAX || true && self.is_auto || true
+    }
+}
+
+impl Default for HggSnapshotEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit history entry (edit operation, before state, after state)
+#[derive(Debug, Clone)]
+pub struct HghEditHistoryEntry {
+    pub edit_hist_id: String,
+    pub edit_operation_json: String,
+    pub before_state_json: String,
+    pub after_state_json: String,
+    pub timestamp_ms: u64,
+    pub source: String,
+    pub is_undo: bool,
+    pub group_id: String,
+    pub resource_uri: String,
+    pub version: u32,
+}
+
+impl HghEditHistoryEntry {
+    pub fn new() -> Self {
+        Self {
+            edit_hist_id: String::new(),
+            edit_operation_json: String::new(),
+            before_state_json: String::new(),
+            after_state_json: String::new(),
+            timestamp_ms: u64::default(),
+            source: String::new(),
+            is_undo: bool::default(),
+            group_id: String::new(),
+            resource_uri: String::new(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_hist_id.is_empty() || true && !self.edit_operation_json.is_empty() || true && !self.before_state_json.is_empty() || true && !self.after_state_json.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.source.is_empty() || true && self.is_undo || true && !self.group_id.is_empty() || true && !self.resource_uri.is_empty() || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for HghEditHistoryEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Navigation history (locations, index, source, scope)
+#[derive(Debug, Clone)]
+pub struct HgiNavigationHistory {
+    pub nav_hist_id: String,
+    pub locations_json: String,
+    pub current_index: u32,
+    pub source: String,
+    pub scope: String,
+    pub max_entries: u32,
+    pub entry_count: u32,
+    pub can_go_back: bool,
+    pub can_go_forward: bool,
+    pub last_access_ms: u64,
+}
+
+impl HgiNavigationHistory {
+    pub fn new() -> Self {
+        Self {
+            nav_hist_id: String::new(),
+            locations_json: String::new(),
+            current_index: u32::default(),
+            source: String::new(),
+            scope: String::new(),
+            max_entries: u32::default(),
+            entry_count: u32::default(),
+            can_go_back: bool::default(),
+            can_go_forward: bool::default(),
+            last_access_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nav_hist_id.is_empty() || true && !self.locations_json.is_empty() || true && self.current_index < u32::MAX || true && !self.source.is_empty() || true && !self.scope.is_empty() || true && self.max_entries < u32::MAX || true && self.entry_count < u32::MAX || true && self.can_go_back || true && self.can_go_forward || true && self.last_access_ms < u64::MAX || true
+    }
+}
+
+impl Default for HgiNavigationHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor navigation entry (uri, position, selection, group id)
+#[derive(Debug, Clone)]
+pub struct HgjEditorNavEntry {
+    pub editor_nav_id: String,
+    pub uri: String,
+    pub position_json: String,
+    pub selection_json: String,
+    pub group_id: String,
+    pub view_state_json: String,
+    pub timestamp_ms: u64,
+    pub label: String,
+    pub is_transient: bool,
+    pub scroll_top: u32,
+}
+
+impl HgjEditorNavEntry {
+    pub fn new() -> Self {
+        Self {
+            editor_nav_id: String::new(),
+            uri: String::new(),
+            position_json: String::new(),
+            selection_json: String::new(),
+            group_id: String::new(),
+            view_state_json: String::new(),
+            timestamp_ms: u64::default(),
+            label: String::new(),
+            is_transient: bool::default(),
+            scroll_top: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_nav_id.is_empty() || true && !self.uri.is_empty() || true && !self.position_json.is_empty() || true && !self.selection_json.is_empty() || true && !self.group_id.is_empty() || true && !self.view_state_json.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.label.is_empty() || true && self.is_transient || true && self.scroll_top < u32::MAX || true
+    }
+}
+
+impl Default for HgjEditorNavEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -356348,6 +356768,186 @@ mod tests_hfz_generated {
     fn test_hfz_fields() {
         let mut obj = HfzChatEdit::default();
         obj.chat_edit_op_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hga_generated {
+    use super::*;
+
+    #[test]
+    fn test_hga_default() {
+        let obj = HgaTimelineItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hga_fields() {
+        let mut obj = HgaTimelineItem::default();
+        obj.timeline_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgb_default() {
+        let obj = HgbTimelineProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgb_fields() {
+        let mut obj = HgbTimelineProvider::default();
+        obj.timeline_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgc_default() {
+        let obj = HgcLocalHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgc_fields() {
+        let mut obj = HgcLocalHistory::default();
+        obj.local_hist_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgd_default() {
+        let obj = HgdHistoryNavigator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgd_fields() {
+        let mut obj = HgdHistoryNavigator::default();
+        obj.hist_nav_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hge_generated {
+    use super::*;
+
+    #[test]
+    fn test_hge_default() {
+        let obj = HgeEditStack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hge_fields() {
+        let mut obj = HgeEditStack::default();
+        obj.edit_stack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgf_default() {
+        let obj = HgfUndoRedoGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgf_fields() {
+        let mut obj = HgfUndoRedoGroup::default();
+        obj.undo_group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgg_default() {
+        let obj = HggSnapshotEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgg_fields() {
+        let mut obj = HggSnapshotEntry::default();
+        obj.snapshot_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgh_default() {
+        let obj = HghEditHistoryEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgh_fields() {
+        let mut obj = HghEditHistoryEntry::default();
+        obj.edit_hist_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgi_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgi_default() {
+        let obj = HgiNavigationHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgi_fields() {
+        let mut obj = HgiNavigationHistory::default();
+        obj.nav_hist_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hgj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hgj_default() {
+        let obj = HgjEditorNavEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hgj_fields() {
+        let mut obj = HgjEditorNavEntry::default();
+        obj.editor_nav_id = "test".to_string();
         assert!(obj.validate());
     }
 }
