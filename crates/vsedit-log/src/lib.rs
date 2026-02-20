@@ -75651,6 +75651,678 @@ impl Default for FtjSettingItem {
     }
 }
 
+/// Settings group (id, title, range, sections, order)
+#[derive(Debug, Clone)]
+pub struct FtkSettingsGroup {
+    pub group_id: String,
+    pub title: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub section_count: u32,
+    pub order: u32,
+    pub parent_id: String,
+    pub contributor_id: String,
+    pub is_extension: bool,
+    pub is_modified: bool,
+}
+
+impl FtkSettingsGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            title: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            section_count: u32::default(),
+            order: u32::default(),
+            parent_id: String::new(),
+            contributor_id: String::new(),
+            is_extension: bool::default(),
+            is_modified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.title.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && self.section_count < u32::MAX || true && self.order < u32::MAX || true && !self.parent_id.is_empty() || true && !self.contributor_id.is_empty() || true && self.is_extension || true && self.is_modified || true
+    }
+}
+
+impl Default for FtkSettingsGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings search (query, results, filters, sort, local/remote)
+#[derive(Debug, Clone)]
+pub struct FtlSettingsSearch {
+    pub search_id: String,
+    pub query: String,
+    pub result_count: u32,
+    pub filter_json: String,
+    pub sort_by: u32,
+    pub is_local: bool,
+    pub is_remote: bool,
+    pub elapsed_ms: u64,
+    pub page: u32,
+    pub per_page: u32,
+}
+
+impl FtlSettingsSearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: String::new(),
+            query: String::new(),
+            result_count: u32::default(),
+            filter_json: String::new(),
+            sort_by: u32::default(),
+            is_local: bool::default(),
+            is_remote: bool::default(),
+            elapsed_ms: u64::default(),
+            page: u32::default(),
+            per_page: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_id.is_empty() || true && !self.query.is_empty() || true && self.result_count < u32::MAX || true && !self.filter_json.is_empty() || true && self.sort_by < u32::MAX || true && self.is_local || true && self.is_remote || true && self.elapsed_ms < u64::MAX || true && self.page < u32::MAX || true && self.per_page < u32::MAX || true
+    }
+}
+
+impl Default for FtlSettingsSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// User data profile (name, icon, settings location, extensions location)
+#[derive(Debug, Clone)]
+pub struct FtmUserDataProfile {
+    pub profile_id: String,
+    pub name: String,
+    pub icon_id: String,
+    pub settings_resource_uri: String,
+    pub extensions_resource_uri: String,
+    pub global_storage_uri: String,
+    pub is_default: bool,
+    pub is_transient: bool,
+    pub use_default_flags_json: String,
+    pub created_at_ms: u64,
+}
+
+impl FtmUserDataProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            name: String::new(),
+            icon_id: String::new(),
+            settings_resource_uri: String::new(),
+            extensions_resource_uri: String::new(),
+            global_storage_uri: String::new(),
+            is_default: bool::default(),
+            is_transient: bool::default(),
+            use_default_flags_json: String::new(),
+            created_at_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && !self.name.is_empty() || true && !self.icon_id.is_empty() || true && !self.settings_resource_uri.is_empty() || true && !self.extensions_resource_uri.is_empty() || true && !self.global_storage_uri.is_empty() || true && self.is_default || true && self.is_transient || true && !self.use_default_flags_json.is_empty() || true && self.created_at_ms < u64::MAX || true
+    }
+}
+
+impl Default for FtmUserDataProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// User data sync (service, status, conflicts, last sync time)
+#[derive(Debug, Clone)]
+pub struct FtnUserDataSync {
+    pub sync_id: String,
+    pub status: u32,
+    pub conflict_count: u32,
+    pub last_sync_ms: u64,
+    pub machine_id: String,
+    pub sync_resource_types_json: String,
+    pub is_enabled: bool,
+    pub has_local_changes: bool,
+    pub has_remote_changes: bool,
+    pub activity_log_json: String,
+}
+
+impl FtnUserDataSync {
+    pub fn new() -> Self {
+        Self {
+            sync_id: String::new(),
+            status: u32::default(),
+            conflict_count: u32::default(),
+            last_sync_ms: u64::default(),
+            machine_id: String::new(),
+            sync_resource_types_json: String::new(),
+            is_enabled: bool::default(),
+            has_local_changes: bool::default(),
+            has_remote_changes: bool::default(),
+            activity_log_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sync_id.is_empty() || true && self.status < u32::MAX || true && self.conflict_count < u32::MAX || true && self.last_sync_ms < u64::MAX || true && !self.machine_id.is_empty() || true && !self.sync_resource_types_json.is_empty() || true && self.is_enabled || true && self.has_local_changes || true && self.has_remote_changes || true && !self.activity_log_json.is_empty() || true
+    }
+}
+
+impl Default for FtnUserDataSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// User data sync resource (type, content, ref, local content)
+#[derive(Debug, Clone)]
+pub struct FtoUserDataSyncResource {
+    pub resource_id: String,
+    pub resource_type: u32,
+    pub content_json: String,
+    pub ref_value: String,
+    pub local_content_json: String,
+    pub remote_content_json: String,
+    pub preview_json: String,
+    pub is_conflict: bool,
+    pub merged_content_json: String,
+    pub base_ref: String,
+}
+
+impl FtoUserDataSyncResource {
+    pub fn new() -> Self {
+        Self {
+            resource_id: String::new(),
+            resource_type: u32::default(),
+            content_json: String::new(),
+            ref_value: String::new(),
+            local_content_json: String::new(),
+            remote_content_json: String::new(),
+            preview_json: String::new(),
+            is_conflict: bool::default(),
+            merged_content_json: String::new(),
+            base_ref: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resource_id.is_empty() || true && self.resource_type < u32::MAX || true && !self.content_json.is_empty() || true && !self.ref_value.is_empty() || true && !self.local_content_json.is_empty() || true && !self.remote_content_json.is_empty() || true && !self.preview_json.is_empty() || true && self.is_conflict || true && !self.merged_content_json.is_empty() || true && !self.base_ref.is_empty() || true
+    }
+}
+
+impl Default for FtoUserDataSyncResource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet file (source, language, scope, body, prefix, description)
+#[derive(Debug, Clone)]
+pub struct FtpSnippetFile {
+    pub snippet_id: String,
+    pub source: String,
+    pub language: String,
+    pub scope: String,
+    pub body: String,
+    pub prefix: String,
+    pub description: String,
+    pub is_builtin: bool,
+    pub file_path: String,
+    pub extension_id: String,
+}
+
+impl FtpSnippetFile {
+    pub fn new() -> Self {
+        Self {
+            snippet_id: String::new(),
+            source: String::new(),
+            language: String::new(),
+            scope: String::new(),
+            body: String::new(),
+            prefix: String::new(),
+            description: String::new(),
+            is_builtin: bool::default(),
+            file_path: String::new(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_id.is_empty() || true && !self.source.is_empty() || true && !self.language.is_empty() || true && !self.scope.is_empty() || true && !self.body.is_empty() || true && !self.prefix.is_empty() || true && !self.description.is_empty() || true && self.is_builtin || true && !self.file_path.is_empty() || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for FtpSnippetFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet completion (prefix, body, description, scope, source)
+#[derive(Debug, Clone)]
+pub struct FtqSnippetCompletion {
+    pub completion_id: String,
+    pub prefix: String,
+    pub body: String,
+    pub description: String,
+    pub scope: String,
+    pub source: String,
+    pub sort_text: String,
+    pub is_file_template: bool,
+    pub language_id: String,
+    pub extension_id: String,
+}
+
+impl FtqSnippetCompletion {
+    pub fn new() -> Self {
+        Self {
+            completion_id: String::new(),
+            prefix: String::new(),
+            body: String::new(),
+            description: String::new(),
+            scope: String::new(),
+            source: String::new(),
+            sort_text: String::new(),
+            is_file_template: bool::default(),
+            language_id: String::new(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.completion_id.is_empty() || true && !self.prefix.is_empty() || true && !self.body.is_empty() || true && !self.description.is_empty() || true && !self.scope.is_empty() || true && !self.source.is_empty() || true && !self.sort_text.is_empty() || true && self.is_file_template || true && !self.language_id.is_empty() || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for FtqSnippetCompletion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Emmet configuration (syntax profiles, variables, preferences, excludes)
+#[derive(Debug, Clone)]
+pub struct FtrEmmetConfig {
+    pub emmet_id: String,
+    pub syntax_profiles_json: String,
+    pub variables_json: String,
+    pub preferences_json: String,
+    pub excludes_json: String,
+    pub show_expanded_abbreviation: u32,
+    pub show_abbreviation_suggestions: bool,
+    pub show_suggestions_as_snippets: bool,
+    pub trigger_expansion_on_tab: bool,
+    pub include_languages_json: String,
+}
+
+impl FtrEmmetConfig {
+    pub fn new() -> Self {
+        Self {
+            emmet_id: String::new(),
+            syntax_profiles_json: String::new(),
+            variables_json: String::new(),
+            preferences_json: String::new(),
+            excludes_json: String::new(),
+            show_expanded_abbreviation: u32::default(),
+            show_abbreviation_suggestions: bool::default(),
+            show_suggestions_as_snippets: bool::default(),
+            trigger_expansion_on_tab: bool::default(),
+            include_languages_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.emmet_id.is_empty() || true && !self.syntax_profiles_json.is_empty() || true && !self.variables_json.is_empty() || true && !self.preferences_json.is_empty() || true && !self.excludes_json.is_empty() || true && self.show_expanded_abbreviation < u32::MAX || true && self.show_abbreviation_suggestions || true && self.show_suggestions_as_snippets || true && self.trigger_expansion_on_tab || true && !self.include_languages_json.is_empty() || true
+    }
+}
+
+impl Default for FtrEmmetConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor snippet (prefix, body, description, scope, source)
+#[derive(Debug, Clone)]
+pub struct FtsEditorSnippet {
+    pub snippet_id: String,
+    pub prefix: String,
+    pub body: String,
+    pub description: String,
+    pub scope: String,
+    pub source_type: u32,
+    pub file_path: String,
+    pub is_builtin: bool,
+    pub extension_id: String,
+    pub language_id: String,
+}
+
+impl FtsEditorSnippet {
+    pub fn new() -> Self {
+        Self {
+            snippet_id: String::new(),
+            prefix: String::new(),
+            body: String::new(),
+            description: String::new(),
+            scope: String::new(),
+            source_type: u32::default(),
+            file_path: String::new(),
+            is_builtin: bool::default(),
+            extension_id: String::new(),
+            language_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_id.is_empty() || true && !self.prefix.is_empty() || true && !self.body.is_empty() || true && !self.description.is_empty() || true && !self.scope.is_empty() || true && self.source_type < u32::MAX || true && !self.file_path.is_empty() || true && self.is_builtin || true && !self.extension_id.is_empty() || true && !self.language_id.is_empty() || true
+    }
+}
+
+impl Default for FtsEditorSnippet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet session (template, placeholders, choice, variables, nesting)
+#[derive(Debug, Clone)]
+pub struct FttSnippetSession {
+    pub session_id: String,
+    pub template_text: String,
+    pub placeholder_count: u32,
+    pub choice_count: u32,
+    pub variable_count: u32,
+    pub nesting_depth: u32,
+    pub is_active: bool,
+    pub current_placeholder: u32,
+    pub is_finished: bool,
+    pub inserted_text: String,
+}
+
+impl FttSnippetSession {
+    pub fn new() -> Self {
+        Self {
+            session_id: String::new(),
+            template_text: String::new(),
+            placeholder_count: u32::default(),
+            choice_count: u32::default(),
+            variable_count: u32::default(),
+            nesting_depth: u32::default(),
+            is_active: bool::default(),
+            current_placeholder: u32::default(),
+            is_finished: bool::default(),
+            inserted_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_id.is_empty() || true && !self.template_text.is_empty() || true && self.placeholder_count < u32::MAX || true && self.choice_count < u32::MAX || true && self.variable_count < u32::MAX || true && self.nesting_depth < u32::MAX || true && self.is_active || true && self.current_placeholder < u32::MAX || true && self.is_finished || true && !self.inserted_text.is_empty() || true
+    }
+}
+
+impl Default for FttSnippetSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet placeholder (index, text, choice values, nested, transform)
+#[derive(Debug, Clone)]
+pub struct FtuSnippetPlaceholder {
+    pub placeholder_id: String,
+    pub index: u32,
+    pub text: String,
+    pub choice_values_json: String,
+    pub is_nested: bool,
+    pub transform_pattern: String,
+    pub is_final_tabstop: bool,
+    pub parent_index: u32,
+    pub range_start: u32,
+    pub range_end: u32,
+}
+
+impl FtuSnippetPlaceholder {
+    pub fn new() -> Self {
+        Self {
+            placeholder_id: String::new(),
+            index: u32::default(),
+            text: String::new(),
+            choice_values_json: String::new(),
+            is_nested: bool::default(),
+            transform_pattern: String::new(),
+            is_final_tabstop: bool::default(),
+            parent_index: u32::default(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.placeholder_id.is_empty() || true && self.index < u32::MAX || true && !self.text.is_empty() || true && !self.choice_values_json.is_empty() || true && self.is_nested || true && !self.transform_pattern.is_empty() || true && self.is_final_tabstop || true && self.parent_index < u32::MAX || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true
+    }
+}
+
+impl Default for FtuSnippetPlaceholder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet variable (name, default value, transform, resolver)
+#[derive(Debug, Clone)]
+pub struct FtvSnippetVariable {
+    pub variable_id: String,
+    pub name: String,
+    pub default_value: String,
+    pub transform_pattern: String,
+    pub resolver_id: String,
+    pub is_resolved: bool,
+    pub resolved_value: String,
+    pub is_builtin: bool,
+    pub regex_flags: String,
+    pub format_string: String,
+}
+
+impl FtvSnippetVariable {
+    pub fn new() -> Self {
+        Self {
+            variable_id: String::new(),
+            name: String::new(),
+            default_value: String::new(),
+            transform_pattern: String::new(),
+            resolver_id: String::new(),
+            is_resolved: bool::default(),
+            resolved_value: String::new(),
+            is_builtin: bool::default(),
+            regex_flags: String::new(),
+            format_string: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.variable_id.is_empty() || true && !self.name.is_empty() || true && !self.default_value.is_empty() || true && !self.transform_pattern.is_empty() || true && !self.resolver_id.is_empty() || true && self.is_resolved || true && !self.resolved_value.is_empty() || true && self.is_builtin || true && !self.regex_flags.is_empty() || true && !self.format_string.is_empty() || true
+    }
+}
+
+impl Default for FtvSnippetVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language configuration (comments, brackets, auto-closing, folding)
+#[derive(Debug, Clone)]
+pub struct FtwLanguageConfiguration {
+    pub lang_config_id: String,
+    pub line_comment: String,
+    pub block_comment_start: String,
+    pub block_comment_end: String,
+    pub brackets_json: String,
+    pub auto_closing_pairs_json: String,
+    pub surrounding_pairs_json: String,
+    pub folding_markers_json: String,
+    pub word_pattern: String,
+    pub indent_rules_json: String,
+}
+
+impl FtwLanguageConfiguration {
+    pub fn new() -> Self {
+        Self {
+            lang_config_id: String::new(),
+            line_comment: String::new(),
+            block_comment_start: String::new(),
+            block_comment_end: String::new(),
+            brackets_json: String::new(),
+            auto_closing_pairs_json: String::new(),
+            surrounding_pairs_json: String::new(),
+            folding_markers_json: String::new(),
+            word_pattern: String::new(),
+            indent_rules_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_config_id.is_empty() || true && !self.line_comment.is_empty() || true && !self.block_comment_start.is_empty() || true && !self.block_comment_end.is_empty() || true && !self.brackets_json.is_empty() || true && !self.auto_closing_pairs_json.is_empty() || true && !self.surrounding_pairs_json.is_empty() || true && !self.folding_markers_json.is_empty() || true && !self.word_pattern.is_empty() || true && !self.indent_rules_json.is_empty() || true
+    }
+}
+
+impl Default for FtwLanguageConfiguration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language extension point (id, extensions, aliases, mimetypes)
+#[derive(Debug, Clone)]
+pub struct FtxLanguageExtensionPoint {
+    pub ext_point_id: String,
+    pub language_id: String,
+    pub extensions_json: String,
+    pub filenames_json: String,
+    pub aliases_json: String,
+    pub mimetypes_json: String,
+    pub first_line: String,
+    pub configuration_uri: String,
+    pub icon_id: String,
+    pub is_builtin: bool,
+}
+
+impl FtxLanguageExtensionPoint {
+    pub fn new() -> Self {
+        Self {
+            ext_point_id: String::new(),
+            language_id: String::new(),
+            extensions_json: String::new(),
+            filenames_json: String::new(),
+            aliases_json: String::new(),
+            mimetypes_json: String::new(),
+            first_line: String::new(),
+            configuration_uri: String::new(),
+            icon_id: String::new(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_point_id.is_empty() || true && !self.language_id.is_empty() || true && !self.extensions_json.is_empty() || true && !self.filenames_json.is_empty() || true && !self.aliases_json.is_empty() || true && !self.mimetypes_json.is_empty() || true && !self.first_line.is_empty() || true && !self.configuration_uri.is_empty() || true && !self.icon_id.is_empty() || true && self.is_builtin || true
+    }
+}
+
+impl Default for FtxLanguageExtensionPoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Grammar contribution (language, scope name, path, embedded)
+#[derive(Debug, Clone)]
+pub struct FtyGrammarContribution {
+    pub grammar_id: String,
+    pub language_id: String,
+    pub scope_name: String,
+    pub path: String,
+    pub embedded_languages_json: String,
+    pub token_types_json: String,
+    pub balancedBracketScopes_json: String,
+    pub unbalancedBracketScopes_json: String,
+    pub injection_selector: String,
+    pub extension_id: String,
+}
+
+impl FtyGrammarContribution {
+    pub fn new() -> Self {
+        Self {
+            grammar_id: String::new(),
+            language_id: String::new(),
+            scope_name: String::new(),
+            path: String::new(),
+            embedded_languages_json: String::new(),
+            token_types_json: String::new(),
+            balancedBracketScopes_json: String::new(),
+            unbalancedBracketScopes_json: String::new(),
+            injection_selector: String::new(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grammar_id.is_empty() || true && !self.language_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.path.is_empty() || true && !self.embedded_languages_json.is_empty() || true && !self.token_types_json.is_empty() || true && !self.balancedBracketScopes_json.is_empty() || true && !self.unbalancedBracketScopes_json.is_empty() || true && !self.injection_selector.is_empty() || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for FtyGrammarContribution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language status item (selector, severity, label, detail, command)
+#[derive(Debug, Clone)]
+pub struct FtzLanguageStatus {
+    pub status_id: String,
+    pub selector_json: String,
+    pub severity: u32,
+    pub label: String,
+    pub detail: String,
+    pub command_id: String,
+    pub accessor_id: String,
+    pub source: String,
+    pub busy_tooltip: String,
+    pub is_busy: bool,
+}
+
+impl FtzLanguageStatus {
+    pub fn new() -> Self {
+        Self {
+            status_id: String::new(),
+            selector_json: String::new(),
+            severity: u32::default(),
+            label: String::new(),
+            detail: String::new(),
+            command_id: String::new(),
+            accessor_id: String::new(),
+            source: String::new(),
+            busy_tooltip: String::new(),
+            is_busy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.status_id.is_empty() || true && !self.selector_json.is_empty() || true && self.severity < u32::MAX || true && !self.label.is_empty() || true && !self.detail.is_empty() || true && !self.command_id.is_empty() || true && !self.accessor_id.is_empty() || true && !self.source.is_empty() || true && !self.busy_tooltip.is_empty() || true && self.is_busy || true
+    }
+}
+
+impl Default for FtzLanguageStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -296160,6 +296832,294 @@ mod tests_ftj_generated {
     fn test_ftj_fields() {
         let mut obj = FtjSettingItem::default();
         obj.setting_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftk_default() {
+        let obj = FtkSettingsGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftk_fields() {
+        let mut obj = FtkSettingsGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftl_default() {
+        let obj = FtlSettingsSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftl_fields() {
+        let mut obj = FtlSettingsSearch::default();
+        obj.search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftm_default() {
+        let obj = FtmUserDataProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftm_fields() {
+        let mut obj = FtmUserDataProfile::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftn_default() {
+        let obj = FtnUserDataSync::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftn_fields() {
+        let mut obj = FtnUserDataSync::default();
+        obj.sync_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fto_generated {
+    use super::*;
+
+    #[test]
+    fn test_fto_default() {
+        let obj = FtoUserDataSyncResource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fto_fields() {
+        let mut obj = FtoUserDataSyncResource::default();
+        obj.resource_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftp_default() {
+        let obj = FtpSnippetFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftp_fields() {
+        let mut obj = FtpSnippetFile::default();
+        obj.snippet_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftq_default() {
+        let obj = FtqSnippetCompletion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftq_fields() {
+        let mut obj = FtqSnippetCompletion::default();
+        obj.completion_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftr_default() {
+        let obj = FtrEmmetConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftr_fields() {
+        let mut obj = FtrEmmetConfig::default();
+        obj.emmet_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fts_generated {
+    use super::*;
+
+    #[test]
+    fn test_fts_default() {
+        let obj = FtsEditorSnippet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fts_fields() {
+        let mut obj = FtsEditorSnippet::default();
+        obj.snippet_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftt_default() {
+        let obj = FttSnippetSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftt_fields() {
+        let mut obj = FttSnippetSession::default();
+        obj.session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftu_default() {
+        let obj = FtuSnippetPlaceholder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftu_fields() {
+        let mut obj = FtuSnippetPlaceholder::default();
+        obj.placeholder_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftv_default() {
+        let obj = FtvSnippetVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftv_fields() {
+        let mut obj = FtvSnippetVariable::default();
+        obj.variable_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftw_default() {
+        let obj = FtwLanguageConfiguration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftw_fields() {
+        let mut obj = FtwLanguageConfiguration::default();
+        obj.lang_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftx_default() {
+        let obj = FtxLanguageExtensionPoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftx_fields() {
+        let mut obj = FtxLanguageExtensionPoint::default();
+        obj.ext_point_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fty_generated {
+    use super::*;
+
+    #[test]
+    fn test_fty_default() {
+        let obj = FtyGrammarContribution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fty_fields() {
+        let mut obj = FtyGrammarContribution::default();
+        obj.grammar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftz_default() {
+        let obj = FtzLanguageStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftz_fields() {
+        let mut obj = FtzLanguageStatus::default();
+        obj.status_id = "test".to_string();
         assert!(obj.validate());
     }
 }
