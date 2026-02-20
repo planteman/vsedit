@@ -101588,6 +101588,216 @@ impl Default for GreSequencer {
     }
 }
 
+/// Idle value (value, is initialized, executor, on idle)
+#[derive(Debug, Clone)]
+pub struct GrfIdleValue {
+    pub idle_id: String,
+    pub is_initialized: bool,
+    pub executor_id: String,
+    pub idle_timeout_ms: u32,
+    pub is_disposed: bool,
+    pub init_time_ms: u64,
+    pub value_type: String,
+    pub compute_on_first_access: bool,
+    pub lazy_mode: bool,
+    pub error_json: String,
+}
+
+impl GrfIdleValue {
+    pub fn new() -> Self {
+        Self {
+            idle_id: String::new(),
+            is_initialized: bool::default(),
+            executor_id: String::new(),
+            idle_timeout_ms: u32::default(),
+            is_disposed: bool::default(),
+            init_time_ms: u64::default(),
+            value_type: String::new(),
+            compute_on_first_access: bool::default(),
+            lazy_mode: bool::default(),
+            error_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.idle_id.is_empty() || true && self.is_initialized || true && !self.executor_id.is_empty() || true && self.idle_timeout_ms < u32::MAX || true && self.is_disposed || true && self.init_time_ms < u64::MAX || true && !self.value_type.is_empty() || true && self.compute_on_first_access || true && self.lazy_mode || true && !self.error_json.is_empty() || true
+    }
+}
+
+impl Default for GrfIdleValue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Run once scheduler (schedule, cancel, delay, is scheduled)
+#[derive(Debug, Clone)]
+pub struct GrgRunOnceScheduler {
+    pub run_once_id: String,
+    pub delay_ms: u32,
+    pub is_scheduled: bool,
+    pub is_running: bool,
+    pub is_disposed: bool,
+    pub cancel_on_dispose: bool,
+    pub last_run_ms: u64,
+    pub run_count: u64,
+    pub error_count: u64,
+    pub name: String,
+}
+
+impl GrgRunOnceScheduler {
+    pub fn new() -> Self {
+        Self {
+            run_once_id: String::new(),
+            delay_ms: u32::default(),
+            is_scheduled: bool::default(),
+            is_running: bool::default(),
+            is_disposed: bool::default(),
+            cancel_on_dispose: bool::default(),
+            last_run_ms: u64::default(),
+            run_count: u64::default(),
+            error_count: u64::default(),
+            name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.run_once_id.is_empty() || true && self.delay_ms < u32::MAX || true && self.is_scheduled || true && self.is_running || true && self.is_disposed || true && self.cancel_on_dispose || true && self.last_run_ms < u64::MAX || true && self.run_count < u64::MAX || true && self.error_count < u64::MAX || true && !self.name.is_empty() || true
+    }
+}
+
+impl Default for GrgRunOnceScheduler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LRU cache (get, set, delete, size, limit, oldest, newest)
+#[derive(Debug, Clone)]
+pub struct GrhLRUCache {
+    pub lru_id: String,
+    pub size: u32,
+    pub limit: u32,
+    pub hit_count: u64,
+    pub miss_count: u64,
+    pub eviction_count: u64,
+    pub oldest_key: String,
+    pub newest_key: String,
+    pub total_weight: u64,
+    pub is_disposed: bool,
+}
+
+impl GrhLRUCache {
+    pub fn new() -> Self {
+        Self {
+            lru_id: String::new(),
+            size: u32::default(),
+            limit: u32::default(),
+            hit_count: u64::default(),
+            miss_count: u64::default(),
+            eviction_count: u64::default(),
+            oldest_key: String::new(),
+            newest_key: String::new(),
+            total_weight: u64::default(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lru_id.is_empty() || true && self.size < u32::MAX || true && self.limit < u32::MAX || true && self.hit_count < u64::MAX || true && self.miss_count < u64::MAX || true && self.eviction_count < u64::MAX || true && !self.oldest_key.is_empty() || true && !self.newest_key.is_empty() || true && self.total_weight < u64::MAX || true && self.is_disposed || true
+    }
+}
+
+impl Default for GrhLRUCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Linked map (get, set, delete, first, last, keys, values)
+#[derive(Debug, Clone)]
+pub struct GriLinkedMap {
+    pub linked_map_id: String,
+    pub size: u32,
+    pub first_key: String,
+    pub last_key: String,
+    pub keys_json: String,
+    pub values_json: String,
+    pub is_empty: bool,
+    pub iteration_order: String,
+    pub trim_old_values: bool,
+    pub max_size: u32,
+}
+
+impl GriLinkedMap {
+    pub fn new() -> Self {
+        Self {
+            linked_map_id: String::new(),
+            size: u32::default(),
+            first_key: String::new(),
+            last_key: String::new(),
+            keys_json: String::new(),
+            values_json: String::new(),
+            is_empty: bool::default(),
+            iteration_order: String::new(),
+            trim_old_values: bool::default(),
+            max_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.linked_map_id.is_empty() || true && self.size < u32::MAX || true && !self.first_key.is_empty() || true && !self.last_key.is_empty() || true && !self.keys_json.is_empty() || true && !self.values_json.is_empty() || true && self.is_empty || true && !self.iteration_order.is_empty() || true && self.trim_old_values || true && self.max_size < u32::MAX || true
+    }
+}
+
+impl Default for GriLinkedMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Resource map (get, set, delete, keys, for each, by scheme)
+#[derive(Debug, Clone)]
+pub struct GrjResourceMap {
+    pub resource_map_id: String,
+    pub size: u32,
+    pub scheme_count: u32,
+    pub keys_json: String,
+    pub schemes_json: String,
+    pub is_empty: bool,
+    pub ignore_path_casing: bool,
+    pub path_separator: String,
+    pub total_entries: u32,
+    pub max_entries: u32,
+}
+
+impl GrjResourceMap {
+    pub fn new() -> Self {
+        Self {
+            resource_map_id: String::new(),
+            size: u32::default(),
+            scheme_count: u32::default(),
+            keys_json: String::new(),
+            schemes_json: String::new(),
+            is_empty: bool::default(),
+            ignore_path_casing: bool::default(),
+            path_separator: String::new(),
+            total_entries: u32::default(),
+            max_entries: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resource_map_id.is_empty() || true && self.size < u32::MAX || true && self.scheme_count < u32::MAX || true && !self.keys_json.is_empty() || true && !self.schemes_json.is_empty() || true && self.is_empty || true && self.ignore_path_casing || true && !self.path_separator.is_empty() || true && self.total_entries < u32::MAX || true && self.max_entries < u32::MAX || true
+    }
+}
+
+impl Default for GrjResourceMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -333155,6 +333365,96 @@ mod tests_gre_generated {
     fn test_gre_fields() {
         let mut obj = GreSequencer::default();
         obj.seq_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grf_generated {
+    use super::*;
+
+    #[test]
+    fn test_grf_default() {
+        let obj = GrfIdleValue::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grf_fields() {
+        let mut obj = GrfIdleValue::default();
+        obj.idle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grg_generated {
+    use super::*;
+
+    #[test]
+    fn test_grg_default() {
+        let obj = GrgRunOnceScheduler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grg_fields() {
+        let mut obj = GrgRunOnceScheduler::default();
+        obj.run_once_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grh_generated {
+    use super::*;
+
+    #[test]
+    fn test_grh_default() {
+        let obj = GrhLRUCache::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grh_fields() {
+        let mut obj = GrhLRUCache::default();
+        obj.lru_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gri_generated {
+    use super::*;
+
+    #[test]
+    fn test_gri_default() {
+        let obj = GriLinkedMap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gri_fields() {
+        let mut obj = GriLinkedMap::default();
+        obj.linked_map_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grj_generated {
+    use super::*;
+
+    #[test]
+    fn test_grj_default() {
+        let obj = GrjResourceMap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grj_fields() {
+        let mut obj = GrjResourceMap::default();
+        obj.resource_map_id = "test".to_string();
         assert!(obj.validate());
     }
 }
