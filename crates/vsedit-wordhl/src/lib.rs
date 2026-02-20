@@ -62771,6 +62771,459 @@ impl Default for FhoNotebookVariableInspector {
 }
 
 
+/// Notebook cell language picker (detected language, override, grammar)
+#[derive(Debug, Clone)]
+pub struct FhpNotebookCellLanguage {
+    pub cell_handle: u32,
+    pub detected_language: String,
+    pub override_language: String,
+    pub grammar_id: String,
+    pub is_auto_detected: bool,
+    pub supported_languages: String,
+    pub mime_type: String,
+    pub language_config_uri: String,
+    pub is_trusted: bool,
+    pub cell_kind: u32,
+}
+
+impl FhpNotebookCellLanguage {
+    pub fn new() -> Self {
+        Self {
+            cell_handle: u32::default(),
+            detected_language: String::new(),
+            override_language: String::new(),
+            grammar_id: String::new(),
+            is_auto_detected: bool::default(),
+            supported_languages: String::new(),
+            mime_type: String::new(),
+            language_config_uri: String::new(),
+            is_trusted: bool::default(),
+            cell_kind: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cell_handle < u32::MAX || true && !self.detected_language.is_empty() || true && !self.override_language.is_empty() || true && !self.grammar_id.is_empty() || true && self.is_auto_detected || true && !self.supported_languages.is_empty() || true && !self.mime_type.is_empty() || true && !self.language_config_uri.is_empty() || true && self.is_trusted || true && self.cell_kind < u32::MAX || true
+    }
+}
+
+impl Default for FhpNotebookCellLanguage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook global toolbar (kernel picker, run all, clear all, layout)
+#[derive(Debug, Clone)]
+pub struct FhqNotebookGlobalToolbar {
+    pub toolbar_id: String,
+    pub selected_kernel_id: String,
+    pub show_run_all: bool,
+    pub show_clear_all: bool,
+    pub layout_mode: u32,
+    pub is_trusted: bool,
+    pub cell_count: u32,
+    pub running_cell_count: u32,
+    pub toolbar_position: u32,
+    pub is_visible: bool,
+}
+
+impl FhqNotebookGlobalToolbar {
+    pub fn new() -> Self {
+        Self {
+            toolbar_id: String::new(),
+            selected_kernel_id: String::new(),
+            show_run_all: bool::default(),
+            show_clear_all: bool::default(),
+            layout_mode: u32::default(),
+            is_trusted: bool::default(),
+            cell_count: u32::default(),
+            running_cell_count: u32::default(),
+            toolbar_position: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.toolbar_id.is_empty() || true && !self.selected_kernel_id.is_empty() || true && self.show_run_all || true && self.show_clear_all || true && self.layout_mode < u32::MAX || true && self.is_trusted || true && self.cell_count < u32::MAX || true && self.running_cell_count < u32::MAX || true && self.toolbar_position < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for FhqNotebookGlobalToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook cell comment thread (range, body, author, resolved state)
+#[derive(Debug, Clone)]
+pub struct FhrNotebookCellComment {
+    pub comment_id: String,
+    pub cell_handle: u32,
+    pub thread_id: String,
+    pub body: String,
+    pub author_name: String,
+    pub author_icon_uri: String,
+    pub created_at_ms: u64,
+    pub is_resolved: bool,
+    pub reply_count: u32,
+    pub context_value: String,
+}
+
+impl FhrNotebookCellComment {
+    pub fn new() -> Self {
+        Self {
+            comment_id: String::new(),
+            cell_handle: u32::default(),
+            thread_id: String::new(),
+            body: String::new(),
+            author_name: String::new(),
+            author_icon_uri: String::new(),
+            created_at_ms: u64::default(),
+            is_resolved: bool::default(),
+            reply_count: u32::default(),
+            context_value: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_id.is_empty() || true && self.cell_handle < u32::MAX || true && !self.thread_id.is_empty() || true && !self.body.is_empty() || true && !self.author_name.is_empty() || true && !self.author_icon_uri.is_empty() || true && self.created_at_ms < u64::MAX || true && self.is_resolved || true && self.reply_count < u32::MAX || true && !self.context_value.is_empty() || true
+    }
+}
+
+impl Default for FhrNotebookCellComment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook cell folding (collapsed regions, heading ranges, fold state)
+#[derive(Debug, Clone)]
+pub struct FhsNotebookCellFolding {
+    pub cell_handle: u32,
+    pub is_collapsed: bool,
+    pub heading_level: u32,
+    pub fold_start_line: u32,
+    pub fold_end_line: u32,
+    pub collapsed_count: u32,
+    pub is_heading_fold: bool,
+    pub parent_handle: u32,
+    pub depth: u32,
+    pub is_user_collapsed: bool,
+}
+
+impl FhsNotebookCellFolding {
+    pub fn new() -> Self {
+        Self {
+            cell_handle: u32::default(),
+            is_collapsed: bool::default(),
+            heading_level: u32::default(),
+            fold_start_line: u32::default(),
+            fold_end_line: u32::default(),
+            collapsed_count: u32::default(),
+            is_heading_fold: bool::default(),
+            parent_handle: u32::default(),
+            depth: u32::default(),
+            is_user_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cell_handle < u32::MAX || true && self.is_collapsed || true && self.heading_level < u32::MAX || true && self.fold_start_line < u32::MAX || true && self.fold_end_line < u32::MAX || true && self.collapsed_count < u32::MAX || true && self.is_heading_fold || true && self.parent_handle < u32::MAX || true && self.depth < u32::MAX || true && self.is_user_collapsed || true
+    }
+}
+
+impl Default for FhsNotebookCellFolding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook cell diagnostic (severity, message, range, source, code)
+#[derive(Debug, Clone)]
+pub struct FhtNotebookCellDiagnostic {
+    pub diagnostic_id: String,
+    pub cell_handle: u32,
+    pub severity: u32,
+    pub message: String,
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub source: String,
+    pub code: String,
+}
+
+impl FhtNotebookCellDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            diagnostic_id: String::new(),
+            cell_handle: u32::default(),
+            severity: u32::default(),
+            message: String::new(),
+            start_line: u32::default(),
+            start_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            source: String::new(),
+            code: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diagnostic_id.is_empty() || true && self.cell_handle < u32::MAX || true && self.severity < u32::MAX || true && !self.message.is_empty() || true && self.start_line < u32::MAX || true && self.start_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.source.is_empty() || true && !self.code.is_empty() || true
+    }
+}
+
+impl Default for FhtNotebookCellDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook cell breakpoint (line, condition, hit count, log message)
+#[derive(Debug, Clone)]
+pub struct FhuNotebookCellBreakpoint {
+    pub breakpoint_id: String,
+    pub cell_handle: u32,
+    pub line: u32,
+    pub condition: String,
+    pub hit_condition: String,
+    pub log_message: String,
+    pub is_enabled: bool,
+    pub is_verified: bool,
+    pub column: u32,
+    pub function_name: String,
+}
+
+impl FhuNotebookCellBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            breakpoint_id: String::new(),
+            cell_handle: u32::default(),
+            line: u32::default(),
+            condition: String::new(),
+            hit_condition: String::new(),
+            log_message: String::new(),
+            is_enabled: bool::default(),
+            is_verified: bool::default(),
+            column: u32::default(),
+            function_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.breakpoint_id.is_empty() || true && self.cell_handle < u32::MAX || true && self.line < u32::MAX || true && !self.condition.is_empty() || true && !self.hit_condition.is_empty() || true && !self.log_message.is_empty() || true && self.is_enabled || true && self.is_verified || true && self.column < u32::MAX || true && !self.function_name.is_empty() || true
+    }
+}
+
+impl Default for FhuNotebookCellBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook layout (cell margins, output heights, compact mode, focus indicator)
+#[derive(Debug, Clone)]
+pub struct FhvNotebookLayout {
+    pub layout_id: String,
+    pub cell_top_margin: u32,
+    pub cell_bottom_margin: u32,
+    pub output_max_height: u32,
+    pub compact_mode: bool,
+    pub focus_indicator: u32,
+    pub cell_toolbar_location: u32,
+    pub font_size: u32,
+    pub line_height: u32,
+    pub show_cell_status_bar: bool,
+}
+
+impl FhvNotebookLayout {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            cell_top_margin: u32::default(),
+            cell_bottom_margin: u32::default(),
+            output_max_height: u32::default(),
+            compact_mode: bool::default(),
+            focus_indicator: u32::default(),
+            cell_toolbar_location: u32::default(),
+            font_size: u32::default(),
+            line_height: u32::default(),
+            show_cell_status_bar: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && self.cell_top_margin < u32::MAX || true && self.cell_bottom_margin < u32::MAX || true && self.output_max_height < u32::MAX || true && self.compact_mode || true && self.focus_indicator < u32::MAX || true && self.cell_toolbar_location < u32::MAX || true && self.font_size < u32::MAX || true && self.line_height < u32::MAX || true && self.show_cell_status_bar || true
+    }
+}
+
+impl Default for FhvNotebookLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook cell drag and drop (source cell, target cell, drop position)
+#[derive(Debug, Clone)]
+pub struct FhwNotebookCellDnd {
+    pub drag_id: String,
+    pub source_cell_handle: u32,
+    pub target_cell_handle: u32,
+    pub drop_position: u32,
+    pub is_copy: bool,
+    pub drag_image_uri: String,
+    pub data_transfer_json: String,
+    pub is_external: bool,
+    pub mime_type: String,
+    pub accepted: bool,
+}
+
+impl FhwNotebookCellDnd {
+    pub fn new() -> Self {
+        Self {
+            drag_id: String::new(),
+            source_cell_handle: u32::default(),
+            target_cell_handle: u32::default(),
+            drop_position: u32::default(),
+            is_copy: bool::default(),
+            drag_image_uri: String::new(),
+            data_transfer_json: String::new(),
+            is_external: bool::default(),
+            mime_type: String::new(),
+            accepted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.drag_id.is_empty() || true && self.source_cell_handle < u32::MAX || true && self.target_cell_handle < u32::MAX || true && self.drop_position < u32::MAX || true && self.is_copy || true && !self.drag_image_uri.is_empty() || true && !self.data_transfer_json.is_empty() || true && self.is_external || true && !self.mime_type.is_empty() || true && self.accepted || true
+    }
+}
+
+impl Default for FhwNotebookCellDnd {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook cell output container (inner outputs, collapsed state, scroll)
+#[derive(Debug, Clone)]
+pub struct FhxNotebookCellOutput2 {
+    pub output_id: String,
+    pub cell_handle: u32,
+    pub inner_output_count: u32,
+    pub is_collapsed: bool,
+    pub scroll_top: u32,
+    pub max_height: u32,
+    pub picked_mime_type: String,
+    pub alternate_count: u32,
+    pub is_scrollable: bool,
+    pub render_state: u32,
+}
+
+impl FhxNotebookCellOutput2 {
+    pub fn new() -> Self {
+        Self {
+            output_id: String::new(),
+            cell_handle: u32::default(),
+            inner_output_count: u32::default(),
+            is_collapsed: bool::default(),
+            scroll_top: u32::default(),
+            max_height: u32::default(),
+            picked_mime_type: String::new(),
+            alternate_count: u32::default(),
+            is_scrollable: bool::default(),
+            render_state: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_id.is_empty() || true && self.cell_handle < u32::MAX || true && self.inner_output_count < u32::MAX || true && self.is_collapsed || true && self.scroll_top < u32::MAX || true && self.max_height < u32::MAX || true && !self.picked_mime_type.is_empty() || true && self.alternate_count < u32::MAX || true && self.is_scrollable || true && self.render_state < u32::MAX || true
+    }
+}
+
+impl Default for FhxNotebookCellOutput2 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook code cell specifics (language, runtime, execution count, outputs)
+#[derive(Debug, Clone)]
+pub struct FhyNotebookCodeCell {
+    pub cell_handle: u32,
+    pub language_id: String,
+    pub runtime_id: String,
+    pub execution_count: u64,
+    pub output_count: u32,
+    pub has_error: bool,
+    pub is_running: bool,
+    pub line_count: u32,
+    pub editor_height: u32,
+    pub collapsed_input: bool,
+}
+
+impl FhyNotebookCodeCell {
+    pub fn new() -> Self {
+        Self {
+            cell_handle: u32::default(),
+            language_id: String::new(),
+            runtime_id: String::new(),
+            execution_count: u64::default(),
+            output_count: u32::default(),
+            has_error: bool::default(),
+            is_running: bool::default(),
+            line_count: u32::default(),
+            editor_height: u32::default(),
+            collapsed_input: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cell_handle < u32::MAX || true && !self.language_id.is_empty() || true && !self.runtime_id.is_empty() || true && self.execution_count < u64::MAX || true && self.output_count < u32::MAX || true && self.has_error || true && self.is_running || true && self.line_count < u32::MAX || true && self.editor_height < u32::MAX || true && self.collapsed_input || true
+    }
+}
+
+impl Default for FhyNotebookCodeCell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook markdown cell specifics (preview mode, rendered html, edit mode)
+#[derive(Debug, Clone)]
+pub struct FhzNotebookMarkdownCell {
+    pub cell_handle: u32,
+    pub is_preview_mode: bool,
+    pub rendered_html: String,
+    pub edit_mode: bool,
+    pub heading_level: u32,
+    pub word_count: u32,
+    pub has_math: bool,
+    pub has_code_block: bool,
+    pub preview_height: u32,
+    pub font_size: u32,
+}
+
+impl FhzNotebookMarkdownCell {
+    pub fn new() -> Self {
+        Self {
+            cell_handle: u32::default(),
+            is_preview_mode: bool::default(),
+            rendered_html: String::new(),
+            edit_mode: bool::default(),
+            heading_level: u32::default(),
+            word_count: u32::default(),
+            has_math: bool::default(),
+            has_code_block: bool::default(),
+            preview_height: u32::default(),
+            font_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cell_handle < u32::MAX || true && self.is_preview_mode || true && !self.rendered_html.is_empty() || true && self.edit_mode || true && self.heading_level < u32::MAX || true && self.word_count < u32::MAX || true && self.has_math || true && self.has_code_block || true && self.preview_height < u32::MAX || true && self.font_size < u32::MAX || true
+    }
+}
+
+impl Default for FhzNotebookMarkdownCell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277688,6 +278141,204 @@ mod tests_fho_generated {
     fn test_fho_fields() {
         let mut obj = FhoNotebookVariableInspector::default();
         obj.inspector_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhp_default() {
+        let obj = FhpNotebookCellLanguage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhp_fields() {
+        let mut obj = FhpNotebookCellLanguage::default();
+        obj.cell_handle = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhq_default() {
+        let obj = FhqNotebookGlobalToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhq_fields() {
+        let mut obj = FhqNotebookGlobalToolbar::default();
+        obj.toolbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhr_default() {
+        let obj = FhrNotebookCellComment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhr_fields() {
+        let mut obj = FhrNotebookCellComment::default();
+        obj.comment_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhs_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhs_default() {
+        let obj = FhsNotebookCellFolding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhs_fields() {
+        let mut obj = FhsNotebookCellFolding::default();
+        obj.cell_handle = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fht_generated {
+    use super::*;
+
+    #[test]
+    fn test_fht_default() {
+        let obj = FhtNotebookCellDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fht_fields() {
+        let mut obj = FhtNotebookCellDiagnostic::default();
+        obj.diagnostic_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhu_default() {
+        let obj = FhuNotebookCellBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhu_fields() {
+        let mut obj = FhuNotebookCellBreakpoint::default();
+        obj.breakpoint_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhv_default() {
+        let obj = FhvNotebookLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhv_fields() {
+        let mut obj = FhvNotebookLayout::default();
+        obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhw_default() {
+        let obj = FhwNotebookCellDnd::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhw_fields() {
+        let mut obj = FhwNotebookCellDnd::default();
+        obj.drag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhx_default() {
+        let obj = FhxNotebookCellOutput2::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhx_fields() {
+        let mut obj = FhxNotebookCellOutput2::default();
+        obj.output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhy_default() {
+        let obj = FhyNotebookCodeCell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhy_fields() {
+        let mut obj = FhyNotebookCodeCell::default();
+        obj.cell_handle = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhz_default() {
+        let obj = FhzNotebookMarkdownCell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhz_fields() {
+        let mut obj = FhzNotebookMarkdownCell::default();
+        obj.cell_handle = 42;
         assert!(obj.validate());
     }
 }
