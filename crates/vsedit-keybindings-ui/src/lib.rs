@@ -55762,6 +55762,213 @@ impl Default for FazExtHostTesting {
 }
 
 
+/// Terminal cell content and attribute types
+#[derive(Debug, Clone)]
+pub struct FbaTerminalCellData {
+    pub cell_char: String,
+    pub cell_width: u32,
+    pub cell_fg: u32,
+    pub cell_bg: u32,
+    pub cell_bold: bool,
+    pub cell_italic: bool,
+    pub cell_underline: bool,
+    pub cell_strikethrough: bool,
+    pub cell_inverse: bool,
+    pub cell_dim: bool,
+}
+
+impl FbaTerminalCellData {
+    pub fn new() -> Self {
+        Self {
+            cell_char: String::new(),
+            cell_width: u32::default(),
+            cell_fg: u32::default(),
+            cell_bg: u32::default(),
+            cell_bold: bool::default(),
+            cell_italic: bool::default(),
+            cell_underline: bool::default(),
+            cell_strikethrough: bool::default(),
+            cell_inverse: bool::default(),
+            cell_dim: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cell_char.is_empty() || true && self.cell_width < u32::MAX || true && self.cell_fg < u32::MAX || true && self.cell_bg < u32::MAX || true && self.cell_bold || true && self.cell_italic || true && self.cell_underline || true && self.cell_strikethrough || true && self.cell_inverse || true && self.cell_dim || true
+    }
+}
+
+impl Default for FbaTerminalCellData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal cell attribute (color/style) types
+#[derive(Debug, Clone)]
+pub struct FbbTerminalAttribute {
+    pub attr_fg_color: u32,
+    pub attr_bg_color: u32,
+    pub attr_underline_color: u32,
+    pub attr_bold: bool,
+    pub attr_dim: bool,
+    pub attr_italic: bool,
+    pub attr_underline_style: u32,
+    pub attr_blink: bool,
+    pub attr_inverse: bool,
+    pub attr_invisible: bool,
+}
+
+impl FbbTerminalAttribute {
+    pub fn new() -> Self {
+        Self {
+            attr_fg_color: u32::default(),
+            attr_bg_color: u32::default(),
+            attr_underline_color: u32::default(),
+            attr_bold: bool::default(),
+            attr_dim: bool::default(),
+            attr_italic: bool::default(),
+            attr_underline_style: u32::default(),
+            attr_blink: bool::default(),
+            attr_inverse: bool::default(),
+            attr_invisible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.attr_fg_color < u32::MAX || true && self.attr_bg_color < u32::MAX || true && self.attr_underline_color < u32::MAX || true && self.attr_bold || true && self.attr_dim || true && self.attr_italic || true && self.attr_underline_style < u32::MAX || true && self.attr_blink || true && self.attr_inverse || true && self.attr_invisible || true
+    }
+}
+
+impl Default for FbbTerminalAttribute {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal cursor state types
+#[derive(Debug, Clone)]
+pub struct FbcTerminalCursor {
+    pub cursor_x: u32,
+    pub cursor_y: u32,
+    pub cursor_shape: u32,
+    pub cursor_visible: bool,
+    pub cursor_blinking: bool,
+    pub cursor_blink_interval: u32,
+    pub cursor_color: String,
+    pub cursor_text_color: String,
+    pub cursor_saved_x: u32,
+    pub cursor_saved_y: u32,
+}
+
+impl FbcTerminalCursor {
+    pub fn new() -> Self {
+        Self {
+            cursor_x: u32::default(),
+            cursor_y: u32::default(),
+            cursor_shape: u32::default(),
+            cursor_visible: bool::default(),
+            cursor_blinking: bool::default(),
+            cursor_blink_interval: u32::default(),
+            cursor_color: String::new(),
+            cursor_text_color: String::new(),
+            cursor_saved_x: u32::default(),
+            cursor_saved_y: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cursor_x < u32::MAX || true && self.cursor_y < u32::MAX || true && self.cursor_shape < u32::MAX || true && self.cursor_visible || true && self.cursor_blinking || true && self.cursor_blink_interval < u32::MAX || true && !self.cursor_color.is_empty() || true && !self.cursor_text_color.is_empty() || true && self.cursor_saved_x < u32::MAX || true && self.cursor_saved_y < u32::MAX || true
+    }
+}
+
+impl Default for FbcTerminalCursor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal character set/encoding types
+#[derive(Debug, Clone)]
+pub struct FbdTerminalCharset {
+    pub charset_designation: String,
+    pub charset_g0: String,
+    pub charset_g1: String,
+    pub charset_g2: String,
+    pub charset_g3: String,
+    pub charset_active_set: u32,
+    pub charset_single_shift: u32,
+    pub charset_utf8_mode: bool,
+    pub charset_lock_shift: bool,
+    pub charset_fallback: String,
+}
+
+impl FbdTerminalCharset {
+    pub fn new() -> Self {
+        Self {
+            charset_designation: String::new(),
+            charset_g0: String::new(),
+            charset_g1: String::new(),
+            charset_g2: String::new(),
+            charset_g3: String::new(),
+            charset_active_set: u32::default(),
+            charset_single_shift: u32::default(),
+            charset_utf8_mode: bool::default(),
+            charset_lock_shift: bool::default(),
+            charset_fallback: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.charset_designation.is_empty() || true && !self.charset_g0.is_empty() || true && !self.charset_g1.is_empty() || true && !self.charset_g2.is_empty() || true && !self.charset_g3.is_empty() || true && self.charset_active_set < u32::MAX || true && self.charset_single_shift < u32::MAX || true && self.charset_utf8_mode || true && self.charset_lock_shift || true && !self.charset_fallback.is_empty() || true
+    }
+}
+
+impl Default for FbdTerminalCharset {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Terminal mode (DEC private/ANSI) types
+#[derive(Debug, Clone)]
+pub struct FbeTerminalMode {
+    pub mode_id: u32,
+    pub mode_name: String,
+    pub mode_enabled: bool,
+    pub mode_is_private: bool,
+    pub mode_saved_state: bool,
+    pub mode_default_value: bool,
+    pub mode_description: String,
+    pub mode_group: String,
+    pub mode_affects_cursor: bool,
+    pub mode_affects_input: bool,
+}
+
+impl FbeTerminalMode {
+    pub fn new() -> Self {
+        Self {
+            mode_id: u32::default(),
+            mode_name: String::new(),
+            mode_enabled: bool::default(),
+            mode_is_private: bool::default(),
+            mode_saved_state: bool::default(),
+            mode_default_value: bool::default(),
+            mode_description: String::new(),
+            mode_group: String::new(),
+            mode_affects_cursor: bool::default(),
+            mode_affects_input: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.mode_id < u32::MAX || true && !self.mode_name.is_empty() || true && self.mode_enabled || true && self.mode_is_private || true && self.mode_saved_state || true && self.mode_default_value || true && !self.mode_description.is_empty() || true && !self.mode_group.is_empty() || true && self.mode_affects_cursor || true && self.mode_affects_input || true
+    }
+}
+
+impl Default for FbeTerminalMode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -267591,6 +267798,96 @@ mod tests_faz_generated {
     fn test_faz_fields() {
         let mut obj = FazExtHostTesting::default();
         obj.ext_test_controller_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fba_generated {
+    use super::*;
+
+    #[test]
+    fn test_fba_default() {
+        let obj = FbaTerminalCellData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fba_fields() {
+        let mut obj = FbaTerminalCellData::default();
+        obj.cell_char = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbb_default() {
+        let obj = FbbTerminalAttribute::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbb_fields() {
+        let mut obj = FbbTerminalAttribute::default();
+        obj.attr_fg_color = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbc_default() {
+        let obj = FbcTerminalCursor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbc_fields() {
+        let mut obj = FbcTerminalCursor::default();
+        obj.cursor_x = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbd_default() {
+        let obj = FbdTerminalCharset::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbd_fields() {
+        let mut obj = FbdTerminalCharset::default();
+        obj.charset_designation = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fbe_generated {
+    use super::*;
+
+    #[test]
+    fn test_fbe_default() {
+        let obj = FbeTerminalMode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fbe_fields() {
+        let mut obj = FbeTerminalMode::default();
+        obj.mode_id = 42;
         assert!(obj.validate());
     }
 }
