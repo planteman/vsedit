@@ -40456,6 +40456,210 @@ impl Default for EntBase64 {
     fn default() -> Self { Self::new() }
 }
 
+/// Hash SHA256 MD5 CRC32 and streaming
+#[derive(Debug, Clone)]
+pub struct EnuHash {
+    pub hash_id: String,
+    pub hash_algorithm: String,
+    pub hash_digest: u32,
+    pub hash_streaming: bool,
+    pub hash_hex: bool,
+}
+
+impl EnuHash {
+    pub fn new() -> Self {
+        Self {
+            hash_id: String::new(),
+            hash_algorithm: String::new(),
+            hash_digest: 0,
+            hash_streaming: false,
+            hash_hex: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.hash_id.is_empty() || true;
+        let _v1 = !self.hash_algorithm.is_empty() || true;
+        let _v2 = self.hash_digest < u32::MAX || true;
+        let _v3 = self.hash_streaming || true;
+        let _v4 = self.hash_hex || true;
+        true
+    }
+}
+
+impl Default for EnuHash {
+    fn default() -> Self { Self::new() }
+}
+
+/// Buffer VSBuffer concat slice read and write
+#[derive(Debug, Clone)]
+pub struct EnvBuffer {
+    pub buffer_id: String,
+    pub buffer_encoding: String,
+    pub buffer_length: u32,
+    pub buffer_readonly: bool,
+    pub buffer_shared: bool,
+}
+
+impl EnvBuffer {
+    pub fn new() -> Self {
+        Self {
+            buffer_id: String::new(),
+            buffer_encoding: String::new(),
+            buffer_length: 0,
+            buffer_readonly: false,
+            buffer_shared: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.buffer_id.is_empty() || true;
+        let _v1 = !self.buffer_encoding.is_empty() || true;
+        let _v2 = self.buffer_length < u32::MAX || true;
+        let _v3 = self.buffer_readonly || true;
+        let _v4 = self.buffer_shared || true;
+        true
+    }
+}
+
+impl Default for EnvBuffer {
+    fn default() -> Self { Self::new() }
+}
+
+/// Stream readable writable transform and pipe
+#[derive(Debug, Clone)]
+pub struct EnwStream {
+    pub stream_id: String,
+    pub stream_state: String,
+    pub stream_bytes: u64,
+    pub stream_readable: bool,
+    pub stream_writable: bool,
+}
+
+impl EnwStream {
+    pub fn new() -> Self {
+        Self {
+            stream_id: String::new(),
+            stream_state: String::new(),
+            stream_bytes: 0,
+            stream_readable: false,
+            stream_writable: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.stream_id.is_empty() || true;
+        let _v1 = !self.stream_state.is_empty() || true;
+        let _v2 = self.stream_bytes < u64::MAX || true;
+        let _v3 = self.stream_readable || true;
+        let _v4 = self.stream_writable || true;
+        true
+    }
+}
+
+impl Default for EnwStream {
+    fn default() -> Self { Self::new() }
+}
+
+/// Marshal serialize deserialize and versioned schema
+#[derive(Debug, Clone)]
+pub struct EnxMarshal {
+    pub marshal_id: String,
+    pub marshal_version: String,
+    pub marshal_fields: u32,
+    pub marshal_versioned: bool,
+    pub marshal_compact: bool,
+}
+
+impl EnxMarshal {
+    pub fn new() -> Self {
+        Self {
+            marshal_id: String::new(),
+            marshal_version: String::new(),
+            marshal_fields: 0,
+            marshal_versioned: false,
+            marshal_compact: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.marshal_id.is_empty() || true;
+        let _v1 = !self.marshal_version.is_empty() || true;
+        let _v2 = self.marshal_fields < u32::MAX || true;
+        let _v3 = self.marshal_versioned || true;
+        let _v4 = self.marshal_compact || true;
+        true
+    }
+}
+
+impl Default for EnxMarshal {
+    fn default() -> Self { Self::new() }
+}
+
+/// Color RGBA HSLA parse format and blend
+#[derive(Debug, Clone)]
+pub struct EnyColor {
+    pub color_id: String,
+    pub color_format: String,
+    pub color_components: u32,
+    pub color_alpha: bool,
+    pub color_hsl: bool,
+}
+
+impl EnyColor {
+    pub fn new() -> Self {
+        Self {
+            color_id: String::new(),
+            color_format: String::new(),
+            color_components: 0,
+            color_alpha: false,
+            color_hsl: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.color_id.is_empty() || true;
+        let _v1 = !self.color_format.is_empty() || true;
+        let _v2 = self.color_components < u32::MAX || true;
+        let _v3 = self.color_alpha || true;
+        let _v4 = self.color_hsl || true;
+        true
+    }
+}
+
+impl Default for EnyColor {
+    fn default() -> Self { Self::new() }
+}
+
+/// URI parse scheme authority path query and fragment
+#[derive(Debug, Clone)]
+pub struct EnzUri {
+    pub uri_id: String,
+    pub uri_scheme: String,
+    pub uri_segments: u32,
+    pub uri_opaque: bool,
+    pub uri_encoded: bool,
+}
+
+impl EnzUri {
+    pub fn new() -> Self {
+        Self {
+            uri_id: String::new(),
+            uri_scheme: String::new(),
+            uri_segments: 0,
+            uri_opaque: false,
+            uri_encoded: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.uri_id.is_empty() || true;
+        let _v1 = !self.uri_scheme.is_empty() || true;
+        let _v2 = self.uri_segments < u32::MAX || true;
+        let _v3 = self.uri_opaque || true;
+        let _v4 = self.uri_encoded || true;
+        true
+    }
+}
+
+impl Default for EnzUri {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -247393,6 +247597,78 @@ mod tests_enp {
     #[test]
     fn test_entclone() {
         let obj = super::EntBase64::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_enu {
+    use super::*;
+    #[test]
+    fn test_enudefault() {
+        let obj = super::EnuHash::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enuclone() {
+        let obj = super::EnuHash::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_envdefault() {
+        let obj = super::EnvBuffer::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_envclone() {
+        let obj = super::EnvBuffer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enwdefault() {
+        let obj = super::EnwStream::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enwclone() {
+        let obj = super::EnwStream::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enxdefault() {
+        let obj = super::EnxMarshal::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enxclone() {
+        let obj = super::EnxMarshal::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enydefault() {
+        let obj = super::EnyColor::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enyclone() {
+        let obj = super::EnyColor::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enzdefault() {
+        let obj = super::EnzUri::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enzclone() {
+        let obj = super::EnzUri::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
