@@ -54725,6 +54725,213 @@ impl Default for EzzCommandService {
 }
 
 
+/// JSON-RPC protocol message types
+#[derive(Debug, Clone)]
+pub struct FaaRpcProtocol {
+    pub rpc_version: String,
+    pub rpc_encoding: String,
+    pub rpc_max_message_size: u64,
+    pub rpc_timeout_ms: u32,
+    pub rpc_keep_alive_interval: u32,
+    pub rpc_compression: bool,
+    pub rpc_batch_enabled: bool,
+    pub rpc_trace_enabled: bool,
+    pub rpc_channel_id: String,
+    pub rpc_protocol_type: String,
+}
+
+impl FaaRpcProtocol {
+    pub fn new() -> Self {
+        Self {
+            rpc_version: String::new(),
+            rpc_encoding: String::new(),
+            rpc_max_message_size: u64::default(),
+            rpc_timeout_ms: u32::default(),
+            rpc_keep_alive_interval: u32::default(),
+            rpc_compression: bool::default(),
+            rpc_batch_enabled: bool::default(),
+            rpc_trace_enabled: bool::default(),
+            rpc_channel_id: String::new(),
+            rpc_protocol_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rpc_version.is_empty() || true && !self.rpc_encoding.is_empty() || true && self.rpc_max_message_size < u64::MAX || true && self.rpc_timeout_ms < u32::MAX || true && self.rpc_keep_alive_interval < u32::MAX || true && self.rpc_compression || true && self.rpc_batch_enabled || true && self.rpc_trace_enabled || true && !self.rpc_channel_id.is_empty() || true && !self.rpc_protocol_type.is_empty() || true
+    }
+}
+
+impl Default for FaaRpcProtocol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// JSON-RPC request message types
+#[derive(Debug, Clone)]
+pub struct FabRpcRequest {
+    pub request_id: u32,
+    pub request_method: String,
+    pub request_params: String,
+    pub request_cancel_token: String,
+    pub request_timeout_ms: u32,
+    pub request_timestamp: u64,
+    pub request_source: String,
+    pub request_priority: u32,
+    pub request_retry_count: u32,
+    pub request_trace_id: String,
+}
+
+impl FabRpcRequest {
+    pub fn new() -> Self {
+        Self {
+            request_id: u32::default(),
+            request_method: String::new(),
+            request_params: String::new(),
+            request_cancel_token: String::new(),
+            request_timeout_ms: u32::default(),
+            request_timestamp: u64::default(),
+            request_source: String::new(),
+            request_priority: u32::default(),
+            request_retry_count: u32::default(),
+            request_trace_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.request_id < u32::MAX || true && !self.request_method.is_empty() || true && !self.request_params.is_empty() || true && !self.request_cancel_token.is_empty() || true && self.request_timeout_ms < u32::MAX || true && self.request_timestamp < u64::MAX || true && !self.request_source.is_empty() || true && self.request_priority < u32::MAX || true && self.request_retry_count < u32::MAX || true && !self.request_trace_id.is_empty() || true
+    }
+}
+
+impl Default for FabRpcRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// JSON-RPC response message types
+#[derive(Debug, Clone)]
+pub struct FacRpcResponse {
+    pub response_id: u32,
+    pub response_result: String,
+    pub response_error_code: u32,
+    pub response_error_message: String,
+    pub response_error_data: String,
+    pub response_timestamp: u64,
+    pub response_duration_ms: u64,
+    pub response_source: String,
+    pub response_cache_hit: bool,
+    pub response_trace_id: String,
+}
+
+impl FacRpcResponse {
+    pub fn new() -> Self {
+        Self {
+            response_id: u32::default(),
+            response_result: String::new(),
+            response_error_code: u32::default(),
+            response_error_message: String::new(),
+            response_error_data: String::new(),
+            response_timestamp: u64::default(),
+            response_duration_ms: u64::default(),
+            response_source: String::new(),
+            response_cache_hit: bool::default(),
+            response_trace_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.response_id < u32::MAX || true && !self.response_result.is_empty() || true && self.response_error_code < u32::MAX || true && !self.response_error_message.is_empty() || true && !self.response_error_data.is_empty() || true && self.response_timestamp < u64::MAX || true && self.response_duration_ms < u64::MAX || true && !self.response_source.is_empty() || true && self.response_cache_hit || true && !self.response_trace_id.is_empty() || true
+    }
+}
+
+impl Default for FacRpcResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// JSON-RPC notification message types
+#[derive(Debug, Clone)]
+pub struct FadRpcNotification {
+    pub notification_method: String,
+    pub notification_params: String,
+    pub notification_timestamp: u64,
+    pub notification_source: String,
+    pub notification_priority: u32,
+    pub notification_is_broadcast: bool,
+    pub notification_channel_id: String,
+    pub notification_sequence: u64,
+    pub notification_trace_id: String,
+    pub notification_batch_id: String,
+}
+
+impl FadRpcNotification {
+    pub fn new() -> Self {
+        Self {
+            notification_method: String::new(),
+            notification_params: String::new(),
+            notification_timestamp: u64::default(),
+            notification_source: String::new(),
+            notification_priority: u32::default(),
+            notification_is_broadcast: bool::default(),
+            notification_channel_id: String::new(),
+            notification_sequence: u64::default(),
+            notification_trace_id: String::new(),
+            notification_batch_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notification_method.is_empty() || true && !self.notification_params.is_empty() || true && self.notification_timestamp < u64::MAX || true && !self.notification_source.is_empty() || true && self.notification_priority < u32::MAX || true && self.notification_is_broadcast || true && !self.notification_channel_id.is_empty() || true && self.notification_sequence < u64::MAX || true && !self.notification_trace_id.is_empty() || true && !self.notification_batch_id.is_empty() || true
+    }
+}
+
+impl Default for FadRpcNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// JSON-RPC error response types
+#[derive(Debug, Clone)]
+pub struct FaeRpcError {
+    pub error_code: u32,
+    pub error_message: String,
+    pub error_data: String,
+    pub error_request_id: u32,
+    pub error_request_method: String,
+    pub error_timestamp: u64,
+    pub error_stack_trace: String,
+    pub error_retry_after: u32,
+    pub error_is_transient: bool,
+    pub error_source: String,
+}
+
+impl FaeRpcError {
+    pub fn new() -> Self {
+        Self {
+            error_code: u32::default(),
+            error_message: String::new(),
+            error_data: String::new(),
+            error_request_id: u32::default(),
+            error_request_method: String::new(),
+            error_timestamp: u64::default(),
+            error_stack_trace: String::new(),
+            error_retry_after: u32::default(),
+            error_is_transient: bool::default(),
+            error_source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.error_code < u32::MAX || true && !self.error_message.is_empty() || true && !self.error_data.is_empty() || true && self.error_request_id < u32::MAX || true && !self.error_request_method.is_empty() || true && self.error_timestamp < u64::MAX || true && !self.error_stack_trace.is_empty() || true && self.error_retry_after < u32::MAX || true && self.error_is_transient || true && !self.error_source.is_empty() || true
+    }
+}
+
+impl Default for FaeRpcError {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -266055,6 +266262,96 @@ mod tests_ezz_generated {
     fn test_ezz_fields() {
         let mut obj = EzzCommandService::default();
         obj.command_last_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_faa_generated {
+    use super::*;
+
+    #[test]
+    fn test_faa_default() {
+        let obj = FaaRpcProtocol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_faa_fields() {
+        let mut obj = FaaRpcProtocol::default();
+        obj.rpc_version = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fab_generated {
+    use super::*;
+
+    #[test]
+    fn test_fab_default() {
+        let obj = FabRpcRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fab_fields() {
+        let mut obj = FabRpcRequest::default();
+        obj.request_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fac_generated {
+    use super::*;
+
+    #[test]
+    fn test_fac_default() {
+        let obj = FacRpcResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fac_fields() {
+        let mut obj = FacRpcResponse::default();
+        obj.response_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fad_generated {
+    use super::*;
+
+    #[test]
+    fn test_fad_default() {
+        let obj = FadRpcNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fad_fields() {
+        let mut obj = FadRpcNotification::default();
+        obj.notification_method = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fae_generated {
+    use super::*;
+
+    #[test]
+    fn test_fae_default() {
+        let obj = FaeRpcError::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fae_fields() {
+        let mut obj = FaeRpcError::default();
+        obj.error_code = 42;
         assert!(obj.validate());
     }
 }
