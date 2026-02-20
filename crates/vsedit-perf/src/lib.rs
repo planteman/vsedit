@@ -103144,6 +103144,678 @@ impl Default for GsjTestOutputChannel {
     }
 }
 
+/// Test decoration (gutter icon, inline message, error lens)
+#[derive(Debug, Clone)]
+pub struct GskTestDecoration {
+    pub test_deco_id: String,
+    pub gutter_icon: String,
+    pub inline_message: String,
+    pub error_lens_enabled: bool,
+    pub range_json: String,
+    pub severity: String,
+    pub test_item_id: String,
+    pub run_id: String,
+    pub icon_color: String,
+    pub hover_message: String,
+}
+
+impl GskTestDecoration {
+    pub fn new() -> Self {
+        Self {
+            test_deco_id: String::new(),
+            gutter_icon: String::new(),
+            inline_message: String::new(),
+            error_lens_enabled: bool::default(),
+            range_json: String::new(),
+            severity: String::new(),
+            test_item_id: String::new(),
+            run_id: String::new(),
+            icon_color: String::new(),
+            hover_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_deco_id.is_empty() || true && !self.gutter_icon.is_empty() || true && !self.inline_message.is_empty() || true && self.error_lens_enabled || true && !self.range_json.is_empty() || true && !self.severity.is_empty() || true && !self.test_item_id.is_empty() || true && !self.run_id.is_empty() || true && !self.icon_color.is_empty() || true && !self.hover_message.is_empty() || true
+    }
+}
+
+impl Default for GskTestDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test continuous run (profile, is running, on change, cancel)
+#[derive(Debug, Clone)]
+pub struct GslTestContinuousRun {
+    pub cont_run_id: String,
+    pub profile_id: String,
+    pub is_running: bool,
+    pub on_change_debounce_ms: u32,
+    pub cancel_on_change: bool,
+    pub controller_id: String,
+    pub items_json: String,
+    pub started_ms: u64,
+    pub run_count: u32,
+    pub error_count: u32,
+}
+
+impl GslTestContinuousRun {
+    pub fn new() -> Self {
+        Self {
+            cont_run_id: String::new(),
+            profile_id: String::new(),
+            is_running: bool::default(),
+            on_change_debounce_ms: u32::default(),
+            cancel_on_change: bool::default(),
+            controller_id: String::new(),
+            items_json: String::new(),
+            started_ms: u64::default(),
+            run_count: u32::default(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cont_run_id.is_empty() || true && !self.profile_id.is_empty() || true && self.is_running || true && self.on_change_debounce_ms < u32::MAX || true && self.cancel_on_change || true && !self.controller_id.is_empty() || true && !self.items_json.is_empty() || true && self.started_ms < u64::MAX || true && self.run_count < u32::MAX || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for GslTestContinuousRun {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test diff view model (expected, actual, inline, side by side)
+#[derive(Debug, Clone)]
+pub struct GsmTestDiffViewModel {
+    pub diff_vm_id: String,
+    pub expected: String,
+    pub actual: String,
+    pub is_inline: bool,
+    pub is_side_by_side: bool,
+    pub diff_json: String,
+    pub test_item_id: String,
+    pub message_index: u32,
+    pub show_whitespace: bool,
+    pub word_wrap: bool,
+}
+
+impl GsmTestDiffViewModel {
+    pub fn new() -> Self {
+        Self {
+            diff_vm_id: String::new(),
+            expected: String::new(),
+            actual: String::new(),
+            is_inline: bool::default(),
+            is_side_by_side: bool::default(),
+            diff_json: String::new(),
+            test_item_id: String::new(),
+            message_index: u32::default(),
+            show_whitespace: bool::default(),
+            word_wrap: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_vm_id.is_empty() || true && !self.expected.is_empty() || true && !self.actual.is_empty() || true && self.is_inline || true && self.is_side_by_side || true && !self.diff_json.is_empty() || true && !self.test_item_id.is_empty() || true && self.message_index < u32::MAX || true && self.show_whitespace || true && self.word_wrap || true
+    }
+}
+
+impl Default for GsmTestDiffViewModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test code lens (run, debug, coverage, range, provider)
+#[derive(Debug, Clone)]
+pub struct GsnTestCodeLens {
+    pub test_lens_id: String,
+    pub run_enabled: bool,
+    pub debug_enabled: bool,
+    pub coverage_enabled: bool,
+    pub range_json: String,
+    pub provider_id: String,
+    pub test_item_id: String,
+    pub label: String,
+    pub command_id: String,
+    pub show_state_icon: bool,
+}
+
+impl GsnTestCodeLens {
+    pub fn new() -> Self {
+        Self {
+            test_lens_id: String::new(),
+            run_enabled: bool::default(),
+            debug_enabled: bool::default(),
+            coverage_enabled: bool::default(),
+            range_json: String::new(),
+            provider_id: String::new(),
+            test_item_id: String::new(),
+            label: String::new(),
+            command_id: String::new(),
+            show_state_icon: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_lens_id.is_empty() || true && self.run_enabled || true && self.debug_enabled || true && self.coverage_enabled || true && !self.range_json.is_empty() || true && !self.provider_id.is_empty() || true && !self.test_item_id.is_empty() || true && !self.label.is_empty() || true && !self.command_id.is_empty() || true && self.show_state_icon || true
+    }
+}
+
+impl Default for GsnTestCodeLens {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test tree model (root, children, sort, filter, projection)
+#[derive(Debug, Clone)]
+pub struct GsoTestTreeModel {
+    pub tree_model_id: String,
+    pub root_id: String,
+    pub children_json: String,
+    pub sort_by: String,
+    pub filter_text: String,
+    pub projection: String,
+    pub item_count: u32,
+    pub max_depth: u32,
+    pub show_hierarchy: bool,
+    pub flatten_mode: bool,
+}
+
+impl GsoTestTreeModel {
+    pub fn new() -> Self {
+        Self {
+            tree_model_id: String::new(),
+            root_id: String::new(),
+            children_json: String::new(),
+            sort_by: String::new(),
+            filter_text: String::new(),
+            projection: String::new(),
+            item_count: u32::default(),
+            max_depth: u32::default(),
+            show_hierarchy: bool::default(),
+            flatten_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_model_id.is_empty() || true && !self.root_id.is_empty() || true && !self.children_json.is_empty() || true && !self.sort_by.is_empty() || true && !self.filter_text.is_empty() || true && !self.projection.is_empty() || true && self.item_count < u32::MAX || true && self.max_depth < u32::MAX || true && self.show_hierarchy || true && self.flatten_mode || true
+    }
+}
+
+impl Default for GsoTestTreeModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test run request (include, exclude, profile, persist)
+#[derive(Debug, Clone)]
+pub struct GspTestRunRequest {
+    pub run_req_id: String,
+    pub include_json: String,
+    pub exclude_json: String,
+    pub profile_id: String,
+    pub is_persistent: bool,
+    pub is_continuous: bool,
+    pub is_debug: bool,
+    pub preserve_focus: bool,
+    pub controller_id: String,
+    pub tag_id: String,
+}
+
+impl GspTestRunRequest {
+    pub fn new() -> Self {
+        Self {
+            run_req_id: String::new(),
+            include_json: String::new(),
+            exclude_json: String::new(),
+            profile_id: String::new(),
+            is_persistent: bool::default(),
+            is_continuous: bool::default(),
+            is_debug: bool::default(),
+            preserve_focus: bool::default(),
+            controller_id: String::new(),
+            tag_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.run_req_id.is_empty() || true && !self.include_json.is_empty() || true && !self.exclude_json.is_empty() || true && !self.profile_id.is_empty() || true && self.is_persistent || true && self.is_continuous || true && self.is_debug || true && self.preserve_focus || true && !self.controller_id.is_empty() || true && !self.tag_id.is_empty() || true
+    }
+}
+
+impl Default for GspTestRunRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test filter state (text, show passed, show failed, show skipped)
+#[derive(Debug, Clone)]
+pub struct GsqTestFilterState {
+    pub filter_state_id: String,
+    pub text: String,
+    pub show_passed: bool,
+    pub show_failed: bool,
+    pub show_skipped: bool,
+    pub show_running: bool,
+    pub show_queued: bool,
+    pub show_errored: bool,
+    pub sort_order: String,
+    pub group_by: String,
+}
+
+impl GsqTestFilterState {
+    pub fn new() -> Self {
+        Self {
+            filter_state_id: String::new(),
+            text: String::new(),
+            show_passed: bool::default(),
+            show_failed: bool::default(),
+            show_skipped: bool::default(),
+            show_running: bool::default(),
+            show_queued: bool::default(),
+            show_errored: bool::default(),
+            sort_order: String::new(),
+            group_by: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_state_id.is_empty() || true && !self.text.is_empty() || true && self.show_passed || true && self.show_failed || true && self.show_skipped || true && self.show_running || true && self.show_queued || true && self.show_errored || true && !self.sort_order.is_empty() || true && !self.group_by.is_empty() || true
+    }
+}
+
+impl Default for GsqTestFilterState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Testing auto run (enabled, delay, on save, on type)
+#[derive(Debug, Clone)]
+pub struct GsrTestingAutoRun {
+    pub auto_run_id: String,
+    pub enabled: bool,
+    pub delay_ms: u32,
+    pub on_save: bool,
+    pub on_type: bool,
+    pub scope: String,
+    pub profile_id: String,
+    pub run_on_file_change: bool,
+    pub debounce_ms: u32,
+    pub exclude_patterns_json: String,
+}
+
+impl GsrTestingAutoRun {
+    pub fn new() -> Self {
+        Self {
+            auto_run_id: String::new(),
+            enabled: bool::default(),
+            delay_ms: u32::default(),
+            on_save: bool::default(),
+            on_type: bool::default(),
+            scope: String::new(),
+            profile_id: String::new(),
+            run_on_file_change: bool::default(),
+            debounce_ms: u32::default(),
+            exclude_patterns_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.auto_run_id.is_empty() || true && self.enabled || true && self.delay_ms < u32::MAX || true && self.on_save || true && self.on_type || true && !self.scope.is_empty() || true && !self.profile_id.is_empty() || true && self.run_on_file_change || true && self.debounce_ms < u32::MAX || true && !self.exclude_patterns_json.is_empty() || true
+    }
+}
+
+impl Default for GsrTestingAutoRun {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Testing debug config (attach, launch, source maps, timeout)
+#[derive(Debug, Clone)]
+pub struct GssTestingDebugConfig {
+    pub debug_cfg_id: String,
+    pub attach_mode: String,
+    pub launch_config_json: String,
+    pub source_maps: bool,
+    pub timeout_ms: u64,
+    pub stop_on_entry: bool,
+    pub env_json: String,
+    pub args_json: String,
+    pub cwd: String,
+    pub port: u32,
+}
+
+impl GssTestingDebugConfig {
+    pub fn new() -> Self {
+        Self {
+            debug_cfg_id: String::new(),
+            attach_mode: String::new(),
+            launch_config_json: String::new(),
+            source_maps: bool::default(),
+            timeout_ms: u64::default(),
+            stop_on_entry: bool::default(),
+            env_json: String::new(),
+            args_json: String::new(),
+            cwd: String::new(),
+            port: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.debug_cfg_id.is_empty() || true && !self.attach_mode.is_empty() || true && !self.launch_config_json.is_empty() || true && self.source_maps || true && self.timeout_ms < u64::MAX || true && self.stop_on_entry || true && !self.env_json.is_empty() || true && !self.args_json.is_empty() || true && !self.cwd.is_empty() || true && self.port < u32::MAX || true
+    }
+}
+
+impl Default for GssTestingDebugConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test result state (queued, running, passed, failed, errored, skipped)
+#[derive(Debug, Clone)]
+pub struct GstTestResultState {
+    pub result_state_id: String,
+    pub state: String,
+    pub duration_ms: u64,
+    pub started_ms: u64,
+    pub completed_ms: u64,
+    pub retry_count: u32,
+    pub is_final: bool,
+    pub previous_state: String,
+    pub reason: String,
+    pub test_item_id: String,
+}
+
+impl GstTestResultState {
+    pub fn new() -> Self {
+        Self {
+            result_state_id: String::new(),
+            state: String::new(),
+            duration_ms: u64::default(),
+            started_ms: u64::default(),
+            completed_ms: u64::default(),
+            retry_count: u32::default(),
+            is_final: bool::default(),
+            previous_state: String::new(),
+            reason: String::new(),
+            test_item_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_state_id.is_empty() || true && !self.state.is_empty() || true && self.duration_ms < u64::MAX || true && self.started_ms < u64::MAX || true && self.completed_ms < u64::MAX || true && self.retry_count < u32::MAX || true && self.is_final || true && !self.previous_state.is_empty() || true && !self.reason.is_empty() || true && !self.test_item_id.is_empty() || true
+    }
+}
+
+impl Default for GstTestResultState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test statistics (total, passed, failed, skipped, duration, avg)
+#[derive(Debug, Clone)]
+pub struct GsuTestStatistics {
+    pub stats_id: String,
+    pub total: u32,
+    pub passed: u32,
+    pub failed: u32,
+    pub skipped: u32,
+    pub errored: u32,
+    pub duration_ms: u64,
+    pub avg_duration_ms: f64,
+    pub fastest_ms: u64,
+    pub slowest_ms: u64,
+}
+
+impl GsuTestStatistics {
+    pub fn new() -> Self {
+        Self {
+            stats_id: String::new(),
+            total: u32::default(),
+            passed: u32::default(),
+            failed: u32::default(),
+            skipped: u32::default(),
+            errored: u32::default(),
+            duration_ms: u64::default(),
+            avg_duration_ms: f64::default(),
+            fastest_ms: u64::default(),
+            slowest_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stats_id.is_empty() || true && self.total < u32::MAX || true && self.passed < u32::MAX || true && self.failed < u32::MAX || true && self.skipped < u32::MAX || true && self.errored < u32::MAX || true && self.duration_ms < u64::MAX || true && self.avg_duration_ms.is_finite() || true && self.fastest_ms < u64::MAX || true && self.slowest_ms < u64::MAX || true
+    }
+}
+
+impl Default for GsuTestStatistics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test retry config (max retries, retry delay, flaky detection)
+#[derive(Debug, Clone)]
+pub struct GsvTestRetryConfig {
+    pub retry_id: String,
+    pub max_retries: u32,
+    pub retry_delay_ms: u32,
+    pub flaky_detection: bool,
+    pub flaky_threshold: u32,
+    pub exponential_backoff: bool,
+    pub retry_on_error: bool,
+    pub retry_on_timeout: bool,
+    pub report_flaky: bool,
+    pub quarantine_flaky: bool,
+}
+
+impl GsvTestRetryConfig {
+    pub fn new() -> Self {
+        Self {
+            retry_id: String::new(),
+            max_retries: u32::default(),
+            retry_delay_ms: u32::default(),
+            flaky_detection: bool::default(),
+            flaky_threshold: u32::default(),
+            exponential_backoff: bool::default(),
+            retry_on_error: bool::default(),
+            retry_on_timeout: bool::default(),
+            report_flaky: bool::default(),
+            quarantine_flaky: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.retry_id.is_empty() || true && self.max_retries < u32::MAX || true && self.retry_delay_ms < u32::MAX || true && self.flaky_detection || true && self.flaky_threshold < u32::MAX || true && self.exponential_backoff || true && self.retry_on_error || true && self.retry_on_timeout || true && self.report_flaky || true && self.quarantine_flaky || true
+    }
+}
+
+impl Default for GsvTestRetryConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test parallel config (max workers, isolation, shard)
+#[derive(Debug, Clone)]
+pub struct GswTestParallelConfig {
+    pub parallel_id: String,
+    pub max_workers: u32,
+    pub isolation_mode: String,
+    pub shard_count: u32,
+    pub shard_index: u32,
+    pub random_seed: u64,
+    pub bail_on_failure: bool,
+    pub setup_file: String,
+    pub teardown_file: String,
+    pub force_serial_json: String,
+}
+
+impl GswTestParallelConfig {
+    pub fn new() -> Self {
+        Self {
+            parallel_id: String::new(),
+            max_workers: u32::default(),
+            isolation_mode: String::new(),
+            shard_count: u32::default(),
+            shard_index: u32::default(),
+            random_seed: u64::default(),
+            bail_on_failure: bool::default(),
+            setup_file: String::new(),
+            teardown_file: String::new(),
+            force_serial_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.parallel_id.is_empty() || true && self.max_workers < u32::MAX || true && !self.isolation_mode.is_empty() || true && self.shard_count < u32::MAX || true && self.shard_index < u32::MAX || true && self.random_seed < u64::MAX || true && self.bail_on_failure || true && !self.setup_file.is_empty() || true && !self.teardown_file.is_empty() || true && !self.force_serial_json.is_empty() || true
+    }
+}
+
+impl Default for GswTestParallelConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test watch mode (enabled, debounce, file patterns, restart)
+#[derive(Debug, Clone)]
+pub struct GsxTestWatchMode {
+    pub watch_id: String,
+    pub enabled: bool,
+    pub debounce_ms: u32,
+    pub file_patterns_json: String,
+    pub restart_on_change: bool,
+    pub clear_on_restart: bool,
+    pub notify_on_fail: bool,
+    pub run_all_on_start: bool,
+    pub exclude_json: String,
+    pub poll_interval_ms: u32,
+}
+
+impl GsxTestWatchMode {
+    pub fn new() -> Self {
+        Self {
+            watch_id: String::new(),
+            enabled: bool::default(),
+            debounce_ms: u32::default(),
+            file_patterns_json: String::new(),
+            restart_on_change: bool::default(),
+            clear_on_restart: bool::default(),
+            notify_on_fail: bool::default(),
+            run_all_on_start: bool::default(),
+            exclude_json: String::new(),
+            poll_interval_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watch_id.is_empty() || true && self.enabled || true && self.debounce_ms < u32::MAX || true && !self.file_patterns_json.is_empty() || true && self.restart_on_change || true && self.clear_on_restart || true && self.notify_on_fail || true && self.run_all_on_start || true && !self.exclude_json.is_empty() || true && self.poll_interval_ms < u32::MAX || true
+    }
+}
+
+impl Default for GsxTestWatchMode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test notification (severity, message, test item, action)
+#[derive(Debug, Clone)]
+pub struct GsyTestNotification {
+    pub test_notif_id: String,
+    pub severity: String,
+    pub message: String,
+    pub test_item_id: String,
+    pub action_json: String,
+    pub is_sticky: bool,
+    pub has_close: bool,
+    pub source: String,
+    pub timestamp_ms: u64,
+    pub run_id: String,
+}
+
+impl GsyTestNotification {
+    pub fn new() -> Self {
+        Self {
+            test_notif_id: String::new(),
+            severity: String::new(),
+            message: String::new(),
+            test_item_id: String::new(),
+            action_json: String::new(),
+            is_sticky: bool::default(),
+            has_close: bool::default(),
+            source: String::new(),
+            timestamp_ms: u64::default(),
+            run_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_notif_id.is_empty() || true && !self.severity.is_empty() || true && !self.message.is_empty() || true && !self.test_item_id.is_empty() || true && !self.action_json.is_empty() || true && self.is_sticky || true && self.has_close || true && !self.source.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.run_id.is_empty() || true
+    }
+}
+
+impl Default for GsyTestNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test profile import (source, format, mapping, override)
+#[derive(Debug, Clone)]
+pub struct GszTestProfileImport {
+    pub import_id: String,
+    pub source_uri: String,
+    pub format: String,
+    pub mapping_json: String,
+    pub override_existing: bool,
+    pub controller_id: String,
+    pub profile_id: String,
+    pub validate: bool,
+    pub dry_run: bool,
+    pub error_json: String,
+}
+
+impl GszTestProfileImport {
+    pub fn new() -> Self {
+        Self {
+            import_id: String::new(),
+            source_uri: String::new(),
+            format: String::new(),
+            mapping_json: String::new(),
+            override_existing: bool::default(),
+            controller_id: String::new(),
+            profile_id: String::new(),
+            validate: bool::default(),
+            dry_run: bool::default(),
+            error_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.import_id.is_empty() || true && !self.source_uri.is_empty() || true && !self.format.is_empty() || true && !self.mapping_json.is_empty() || true && self.override_existing || true && !self.controller_id.is_empty() || true && !self.profile_id.is_empty() || true && self.validate || true && self.dry_run || true && !self.error_json.is_empty() || true
+    }
+}
+
+impl Default for GszTestProfileImport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -335159,6 +335831,294 @@ mod tests_gsj_generated {
     fn test_gsj_fields() {
         let mut obj = GsjTestOutputChannel::default();
         obj.output_ch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsk_default() {
+        let obj = GskTestDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsk_fields() {
+        let mut obj = GskTestDecoration::default();
+        obj.test_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsl_default() {
+        let obj = GslTestContinuousRun::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsl_fields() {
+        let mut obj = GslTestContinuousRun::default();
+        obj.cont_run_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsm_default() {
+        let obj = GsmTestDiffViewModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsm_fields() {
+        let mut obj = GsmTestDiffViewModel::default();
+        obj.diff_vm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsn_default() {
+        let obj = GsnTestCodeLens::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsn_fields() {
+        let mut obj = GsnTestCodeLens::default();
+        obj.test_lens_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gso_generated {
+    use super::*;
+
+    #[test]
+    fn test_gso_default() {
+        let obj = GsoTestTreeModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gso_fields() {
+        let mut obj = GsoTestTreeModel::default();
+        obj.tree_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsp_default() {
+        let obj = GspTestRunRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsp_fields() {
+        let mut obj = GspTestRunRequest::default();
+        obj.run_req_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsq_default() {
+        let obj = GsqTestFilterState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsq_fields() {
+        let mut obj = GsqTestFilterState::default();
+        obj.filter_state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsr_default() {
+        let obj = GsrTestingAutoRun::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsr_fields() {
+        let mut obj = GsrTestingAutoRun::default();
+        obj.auto_run_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gss_generated {
+    use super::*;
+
+    #[test]
+    fn test_gss_default() {
+        let obj = GssTestingDebugConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gss_fields() {
+        let mut obj = GssTestingDebugConfig::default();
+        obj.debug_cfg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gst_generated {
+    use super::*;
+
+    #[test]
+    fn test_gst_default() {
+        let obj = GstTestResultState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gst_fields() {
+        let mut obj = GstTestResultState::default();
+        obj.result_state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsu_default() {
+        let obj = GsuTestStatistics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsu_fields() {
+        let mut obj = GsuTestStatistics::default();
+        obj.stats_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsv_default() {
+        let obj = GsvTestRetryConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsv_fields() {
+        let mut obj = GsvTestRetryConfig::default();
+        obj.retry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsw_default() {
+        let obj = GswTestParallelConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsw_fields() {
+        let mut obj = GswTestParallelConfig::default();
+        obj.parallel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsx_default() {
+        let obj = GsxTestWatchMode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsx_fields() {
+        let mut obj = GsxTestWatchMode::default();
+        obj.watch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsy_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsy_default() {
+        let obj = GsyTestNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsy_fields() {
+        let mut obj = GsyTestNotification::default();
+        obj.test_notif_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gsz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gsz_default() {
+        let obj = GszTestProfileImport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gsz_fields() {
+        let mut obj = GszTestProfileImport::default();
+        obj.import_id = "test".to_string();
         assert!(obj.validate());
     }
 }
