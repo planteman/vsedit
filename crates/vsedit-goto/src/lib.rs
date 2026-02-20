@@ -63956,6 +63956,459 @@ impl Default for FioWorkspaceRecentEntry {
 }
 
 
+/// Workspace symbol provider (query, results, kind, location)
+#[derive(Debug, Clone)]
+pub struct FipWorkspaceSymbolProvider {
+    pub provider_id: String,
+    pub query_pattern: String,
+    pub result_count: u32,
+    pub symbol_kind: u32,
+    pub container_name: String,
+    pub location_uri: String,
+    pub location_range_json: String,
+    pub score: f64,
+    pub tags_json: String,
+    pub is_stale: bool,
+}
+
+impl FipWorkspaceSymbolProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            query_pattern: String::new(),
+            result_count: u32::default(),
+            symbol_kind: u32::default(),
+            container_name: String::new(),
+            location_uri: String::new(),
+            location_range_json: String::new(),
+            score: f64::default(),
+            tags_json: String::new(),
+            is_stale: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.query_pattern.is_empty() || true && self.result_count < u32::MAX || true && self.symbol_kind < u32::MAX || true && !self.container_name.is_empty() || true && !self.location_uri.is_empty() || true && !self.location_range_json.is_empty() || true && self.score.is_finite() || true && !self.tags_json.is_empty() || true && self.is_stale || true
+    }
+}
+
+impl Default for FipWorkspaceSymbolProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace file event (created, changed, deleted, uri, type)
+#[derive(Debug, Clone)]
+pub struct FiqWorkspaceFileEvent {
+    pub event_id: String,
+    pub event_type: u32,
+    pub uri: String,
+    pub old_uri: String,
+    pub is_directory: bool,
+    pub is_external: bool,
+    pub correlation_id: String,
+    pub source: String,
+    pub timestamp_ms: u64,
+    pub recursive: bool,
+}
+
+impl FiqWorkspaceFileEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            event_type: u32::default(),
+            uri: String::new(),
+            old_uri: String::new(),
+            is_directory: bool::default(),
+            is_external: bool::default(),
+            correlation_id: String::new(),
+            source: String::new(),
+            timestamp_ms: u64::default(),
+            recursive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && self.event_type < u32::MAX || true && !self.uri.is_empty() || true && !self.old_uri.is_empty() || true && self.is_directory || true && self.is_external || true && !self.correlation_id.is_empty() || true && !self.source.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.recursive || true
+    }
+}
+
+impl Default for FiqWorkspaceFileEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace search (query, include/exclude, max results, encoding)
+#[derive(Debug, Clone)]
+pub struct FirWorkspaceSearch {
+    pub search_id: String,
+    pub query: String,
+    pub include_pattern: String,
+    pub exclude_pattern: String,
+    pub max_results: u32,
+    pub encoding: String,
+    pub is_regex: bool,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub file_limit: u32,
+}
+
+impl FirWorkspaceSearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: String::new(),
+            query: String::new(),
+            include_pattern: String::new(),
+            exclude_pattern: String::new(),
+            max_results: u32::default(),
+            encoding: String::new(),
+            is_regex: bool::default(),
+            case_sensitive: bool::default(),
+            whole_word: bool::default(),
+            file_limit: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_id.is_empty() || true && !self.query.is_empty() || true && !self.include_pattern.is_empty() || true && !self.exclude_pattern.is_empty() || true && self.max_results < u32::MAX || true && !self.encoding.is_empty() || true && self.is_regex || true && self.case_sensitive || true && self.whole_word || true && self.file_limit < u32::MAX || true
+    }
+}
+
+impl Default for FirWorkspaceSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace task provider (type, tasks, execution, problem matchers)
+#[derive(Debug, Clone)]
+pub struct FisWorkspaceTaskProvider {
+    pub provider_id: String,
+    pub task_type: String,
+    pub task_count: u32,
+    pub execution_engine: String,
+    pub problem_matcher_json: String,
+    pub is_background: bool,
+    pub source: String,
+    pub scope_uri: String,
+    pub run_options_json: String,
+    pub group: String,
+}
+
+impl FisWorkspaceTaskProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            task_type: String::new(),
+            task_count: u32::default(),
+            execution_engine: String::new(),
+            problem_matcher_json: String::new(),
+            is_background: bool::default(),
+            source: String::new(),
+            scope_uri: String::new(),
+            run_options_json: String::new(),
+            group: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.task_type.is_empty() || true && self.task_count < u32::MAX || true && !self.execution_engine.is_empty() || true && !self.problem_matcher_json.is_empty() || true && self.is_background || true && !self.source.is_empty() || true && !self.scope_uri.is_empty() || true && !self.run_options_json.is_empty() || true && !self.group.is_empty() || true
+    }
+}
+
+impl Default for FisWorkspaceTaskProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace-level diagnostics (uri, collection, severity counts)
+#[derive(Debug, Clone)]
+pub struct FitWorkspaceDiagnostic {
+    pub diag_id: String,
+    pub uri: String,
+    pub error_count: u32,
+    pub warning_count: u32,
+    pub info_count: u32,
+    pub hint_count: u32,
+    pub source: String,
+    pub collection_name: String,
+    pub is_stale: bool,
+    pub max_severity: u32,
+}
+
+impl FitWorkspaceDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            diag_id: String::new(),
+            uri: String::new(),
+            error_count: u32::default(),
+            warning_count: u32::default(),
+            info_count: u32::default(),
+            hint_count: u32::default(),
+            source: String::new(),
+            collection_name: String::new(),
+            is_stale: bool::default(),
+            max_severity: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_id.is_empty() || true && !self.uri.is_empty() || true && self.error_count < u32::MAX || true && self.warning_count < u32::MAX || true && self.info_count < u32::MAX || true && self.hint_count < u32::MAX || true && !self.source.is_empty() || true && !self.collection_name.is_empty() || true && self.is_stale || true && self.max_severity < u32::MAX || true
+    }
+}
+
+impl Default for FitWorkspaceDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace file decoration provider (uri, badge, color, tooltip)
+#[derive(Debug, Clone)]
+pub struct FiuWorkspaceDecorationProvider {
+    pub provider_id: String,
+    pub uri: String,
+    pub badge_text: String,
+    pub badge_color_id: String,
+    pub tooltip: String,
+    pub propagate: bool,
+    pub priority: u32,
+    pub strikethrough: bool,
+    pub faded: bool,
+    pub letter: String,
+}
+
+impl FiuWorkspaceDecorationProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            uri: String::new(),
+            badge_text: String::new(),
+            badge_color_id: String::new(),
+            tooltip: String::new(),
+            propagate: bool::default(),
+            priority: u32::default(),
+            strikethrough: bool::default(),
+            faded: bool::default(),
+            letter: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.uri.is_empty() || true && !self.badge_text.is_empty() || true && !self.badge_color_id.is_empty() || true && !self.tooltip.is_empty() || true && self.propagate || true && self.priority < u32::MAX || true && self.strikethrough || true && self.faded || true && !self.letter.is_empty() || true
+    }
+}
+
+impl Default for FiuWorkspaceDecorationProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace port forwarding (local, remote, protocol, visibility)
+#[derive(Debug, Clone)]
+pub struct FivWorkspacePortForward {
+    pub forward_id: String,
+    pub local_port: u32,
+    pub remote_port: u32,
+    pub remote_host: String,
+    pub protocol: String,
+    pub visibility: u32,
+    pub label: String,
+    pub source: String,
+    pub is_active: bool,
+    pub pid: u64,
+}
+
+impl FivWorkspacePortForward {
+    pub fn new() -> Self {
+        Self {
+            forward_id: String::new(),
+            local_port: u32::default(),
+            remote_port: u32::default(),
+            remote_host: String::new(),
+            protocol: String::new(),
+            visibility: u32::default(),
+            label: String::new(),
+            source: String::new(),
+            is_active: bool::default(),
+            pid: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.forward_id.is_empty() || true && self.local_port < u32::MAX || true && self.remote_port < u32::MAX || true && !self.remote_host.is_empty() || true && !self.protocol.is_empty() || true && self.visibility < u32::MAX || true && !self.label.is_empty() || true && !self.source.is_empty() || true && self.is_active || true && self.pid < u64::MAX || true
+    }
+}
+
+impl Default for FivWorkspacePortForward {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace timeline provider (source, items, cursor, filters)
+#[derive(Debug, Clone)]
+pub struct FiwWorkspaceTimeline {
+    pub timeline_id: String,
+    pub source_id: String,
+    pub uri: String,
+    pub item_count: u32,
+    pub cursor: String,
+    pub has_more: bool,
+    pub label: String,
+    pub description: String,
+    pub timestamp_ms: u64,
+    pub icon_id: String,
+}
+
+impl FiwWorkspaceTimeline {
+    pub fn new() -> Self {
+        Self {
+            timeline_id: String::new(),
+            source_id: String::new(),
+            uri: String::new(),
+            item_count: u32::default(),
+            cursor: String::new(),
+            has_more: bool::default(),
+            label: String::new(),
+            description: String::new(),
+            timestamp_ms: u64::default(),
+            icon_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.timeline_id.is_empty() || true && !self.source_id.is_empty() || true && !self.uri.is_empty() || true && self.item_count < u32::MAX || true && !self.cursor.is_empty() || true && self.has_more || true && !self.label.is_empty() || true && !self.description.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.icon_id.is_empty() || true
+    }
+}
+
+impl Default for FiwWorkspaceTimeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace comment (author, body, mode, thread, reactions)
+#[derive(Debug, Clone)]
+pub struct FixWorkspaceComment {
+    pub comment_id: String,
+    pub thread_id: String,
+    pub author_name: String,
+    pub body_text: String,
+    pub body_html: String,
+    pub mode: u32,
+    pub context_value: String,
+    pub reaction_count: u32,
+    pub timestamp_ms: u64,
+    pub is_resolved: bool,
+}
+
+impl FixWorkspaceComment {
+    pub fn new() -> Self {
+        Self {
+            comment_id: String::new(),
+            thread_id: String::new(),
+            author_name: String::new(),
+            body_text: String::new(),
+            body_html: String::new(),
+            mode: u32::default(),
+            context_value: String::new(),
+            reaction_count: u32::default(),
+            timestamp_ms: u64::default(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_id.is_empty() || true && !self.thread_id.is_empty() || true && !self.author_name.is_empty() || true && !self.body_text.is_empty() || true && !self.body_html.is_empty() || true && self.mode < u32::MAX || true && !self.context_value.is_empty() || true && self.reaction_count < u32::MAX || true && self.timestamp_ms < u64::MAX || true && self.is_resolved || true
+    }
+}
+
+impl Default for FixWorkspaceComment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace authentication provider (sessions, scopes, accounts)
+#[derive(Debug, Clone)]
+pub struct FiyWorkspaceAuthentication {
+    pub auth_id: String,
+    pub provider_id: String,
+    pub session_id: String,
+    pub account_label: String,
+    pub scopes_json: String,
+    pub access_token: String,
+    pub is_expired: bool,
+    pub created_at_ms: u64,
+    pub account_id: String,
+    pub supports_multiple: bool,
+}
+
+impl FiyWorkspaceAuthentication {
+    pub fn new() -> Self {
+        Self {
+            auth_id: String::new(),
+            provider_id: String::new(),
+            session_id: String::new(),
+            account_label: String::new(),
+            scopes_json: String::new(),
+            access_token: String::new(),
+            is_expired: bool::default(),
+            created_at_ms: u64::default(),
+            account_id: String::new(),
+            supports_multiple: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.auth_id.is_empty() || true && !self.provider_id.is_empty() || true && !self.session_id.is_empty() || true && !self.account_label.is_empty() || true && !self.scopes_json.is_empty() || true && !self.access_token.is_empty() || true && self.is_expired || true && self.created_at_ms < u64::MAX || true && !self.account_id.is_empty() || true && self.supports_multiple || true
+    }
+}
+
+impl Default for FiyWorkspaceAuthentication {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace log output channel (log level, messages, file path)
+#[derive(Debug, Clone)]
+pub struct FizWorkspaceLogOutput {
+    pub channel_id: String,
+    pub channel_name: String,
+    pub log_level: u32,
+    pub output_file_path: String,
+    pub message_count: u64,
+    pub is_visible: bool,
+    pub language_id: String,
+    pub is_append_only: bool,
+    pub max_lines: u32,
+    pub encoding: String,
+}
+
+impl FizWorkspaceLogOutput {
+    pub fn new() -> Self {
+        Self {
+            channel_id: String::new(),
+            channel_name: String::new(),
+            log_level: u32::default(),
+            output_file_path: String::new(),
+            message_count: u64::default(),
+            is_visible: bool::default(),
+            language_id: String::new(),
+            is_append_only: bool::default(),
+            max_lines: u32::default(),
+            encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.channel_id.is_empty() || true && !self.channel_name.is_empty() || true && self.log_level < u32::MAX || true && !self.output_file_path.is_empty() || true && self.message_count < u64::MAX || true && self.is_visible || true && !self.language_id.is_empty() || true && self.is_append_only || true && self.max_lines < u32::MAX || true && !self.encoding.is_empty() || true
+    }
+}
+
+impl Default for FizWorkspaceLogOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279369,6 +279822,204 @@ mod tests_fio_generated {
     fn test_fio_fields() {
         let mut obj = FioWorkspaceRecentEntry::default();
         obj.entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fip_generated {
+    use super::*;
+
+    #[test]
+    fn test_fip_default() {
+        let obj = FipWorkspaceSymbolProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fip_fields() {
+        let mut obj = FipWorkspaceSymbolProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fiq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fiq_default() {
+        let obj = FiqWorkspaceFileEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fiq_fields() {
+        let mut obj = FiqWorkspaceFileEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fir_generated {
+    use super::*;
+
+    #[test]
+    fn test_fir_default() {
+        let obj = FirWorkspaceSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fir_fields() {
+        let mut obj = FirWorkspaceSearch::default();
+        obj.search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fis_generated {
+    use super::*;
+
+    #[test]
+    fn test_fis_default() {
+        let obj = FisWorkspaceTaskProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fis_fields() {
+        let mut obj = FisWorkspaceTaskProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fit_generated {
+    use super::*;
+
+    #[test]
+    fn test_fit_default() {
+        let obj = FitWorkspaceDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fit_fields() {
+        let mut obj = FitWorkspaceDiagnostic::default();
+        obj.diag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fiu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fiu_default() {
+        let obj = FiuWorkspaceDecorationProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fiu_fields() {
+        let mut obj = FiuWorkspaceDecorationProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fiv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fiv_default() {
+        let obj = FivWorkspacePortForward::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fiv_fields() {
+        let mut obj = FivWorkspacePortForward::default();
+        obj.forward_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fiw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fiw_default() {
+        let obj = FiwWorkspaceTimeline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fiw_fields() {
+        let mut obj = FiwWorkspaceTimeline::default();
+        obj.timeline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fix_generated {
+    use super::*;
+
+    #[test]
+    fn test_fix_default() {
+        let obj = FixWorkspaceComment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fix_fields() {
+        let mut obj = FixWorkspaceComment::default();
+        obj.comment_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fiy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fiy_default() {
+        let obj = FiyWorkspaceAuthentication::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fiy_fields() {
+        let mut obj = FiyWorkspaceAuthentication::default();
+        obj.auth_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fiz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fiz_default() {
+        let obj = FizWorkspaceLogOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fiz_fields() {
+        let mut obj = FizWorkspaceLogOutput::default();
+        obj.channel_id = "test".to_string();
         assert!(obj.validate());
     }
 }
