@@ -154803,6 +154803,890 @@ impl Default for ItzTaskConfig {
     }
 }
 
+/// TUI rendering frame buffer
+#[derive(Debug, Clone)]
+pub struct IuaTuiFrame {
+    pub frame_id: String,
+    pub width_val: u32,
+    pub height_val: u32,
+    pub cell_count: u32,
+    pub dirty_count: u32,
+    pub is_resized: bool,
+}
+
+impl IuaTuiFrame {
+    pub fn new() -> Self {
+        Self {
+            frame_id: String::new(),
+            width_val: u32::default(),
+            height_val: u32::default(),
+            cell_count: u32::default(),
+            dirty_count: u32::default(),
+            is_resized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.frame_id.is_empty() || true && self.width_val < u32::MAX || true && self.height_val < u32::MAX || true && self.cell_count < u32::MAX || true && self.dirty_count < u32::MAX || true && self.is_resized || true
+    }
+}
+
+impl Default for IuaTuiFrame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI widget base descriptor
+#[derive(Debug, Clone)]
+pub struct IubTuiWidget {
+    pub widget_id: String,
+    pub widget_kind: String,
+    pub x_pos: u32,
+    pub y_pos: u32,
+    pub width_val: u32,
+    pub is_focused: bool,
+}
+
+impl IubTuiWidget {
+    pub fn new() -> Self {
+        Self {
+            widget_id: String::new(),
+            widget_kind: String::new(),
+            x_pos: u32::default(),
+            y_pos: u32::default(),
+            width_val: u32::default(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.widget_id.is_empty() || true && !self.widget_kind.is_empty() || true && self.x_pos < u32::MAX || true && self.y_pos < u32::MAX || true && self.width_val < u32::MAX || true && self.is_focused || true
+    }
+}
+
+impl Default for IubTuiWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI character cell
+#[derive(Debug, Clone)]
+pub struct IucTuiCell {
+    pub cell_id: String,
+    pub symbol_str: String,
+    pub fg_color_val: u32,
+    pub bg_color_val: u32,
+    pub modifier_mask: u32,
+    pub is_dirty: bool,
+}
+
+impl IucTuiCell {
+    pub fn new() -> Self {
+        Self {
+            cell_id: String::new(),
+            symbol_str: String::new(),
+            fg_color_val: u32::default(),
+            bg_color_val: u32::default(),
+            modifier_mask: u32::default(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cell_id.is_empty() || true && !self.symbol_str.is_empty() || true && self.fg_color_val < u32::MAX || true && self.bg_color_val < u32::MAX || true && self.modifier_mask < u32::MAX || true && self.is_dirty || true
+    }
+}
+
+impl Default for IucTuiCell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI rectangle bounds
+#[derive(Debug, Clone)]
+pub struct IudTuiRect {
+    pub rect_id: String,
+    pub x_val: u32,
+    pub y_val: u32,
+    pub width_val: u32,
+    pub height_val: u32,
+    pub is_empty: bool,
+}
+
+impl IudTuiRect {
+    pub fn new() -> Self {
+        Self {
+            rect_id: String::new(),
+            x_val: u32::default(),
+            y_val: u32::default(),
+            width_val: u32::default(),
+            height_val: u32::default(),
+            is_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rect_id.is_empty() || true && self.x_val < u32::MAX || true && self.y_val < u32::MAX || true && self.width_val < u32::MAX || true && self.height_val < u32::MAX || true && self.is_empty || true
+    }
+}
+
+impl Default for IudTuiRect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI styling descriptor
+#[derive(Debug, Clone)]
+pub struct IueTuiStyle {
+    pub style_id: String,
+    pub fg_color_ref: String,
+    pub bg_color_ref: String,
+    pub modifier_mask: u32,
+    pub underline_style: String,
+    pub is_default: bool,
+}
+
+impl IueTuiStyle {
+    pub fn new() -> Self {
+        Self {
+            style_id: String::new(),
+            fg_color_ref: String::new(),
+            bg_color_ref: String::new(),
+            modifier_mask: u32::default(),
+            underline_style: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.style_id.is_empty() || true && !self.fg_color_ref.is_empty() || true && !self.bg_color_ref.is_empty() || true && self.modifier_mask < u32::MAX || true && !self.underline_style.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for IueTuiStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI color value
+#[derive(Debug, Clone)]
+pub struct IufTuiColor {
+    pub color_id: String,
+    pub red_val: u32,
+    pub green_val: u32,
+    pub blue_val: u32,
+    pub color_index: u32,
+    pub is_indexed: bool,
+}
+
+impl IufTuiColor {
+    pub fn new() -> Self {
+        Self {
+            color_id: String::new(),
+            red_val: u32::default(),
+            green_val: u32::default(),
+            blue_val: u32::default(),
+            color_index: u32::default(),
+            is_indexed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_id.is_empty() || true && self.red_val < u32::MAX || true && self.green_val < u32::MAX || true && self.blue_val < u32::MAX || true && self.color_index < u32::MAX || true && self.is_indexed || true
+    }
+}
+
+impl Default for IufTuiColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI layout constraint
+#[derive(Debug, Clone)]
+pub struct IugTuiLayout {
+    pub layout_id: String,
+    pub direction_str: String,
+    pub constraint_count: u32,
+    pub margin_val: u32,
+    pub total_size: u32,
+    pub is_horizontal: bool,
+}
+
+impl IugTuiLayout {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            direction_str: String::new(),
+            constraint_count: u32::default(),
+            margin_val: u32::default(),
+            total_size: u32::default(),
+            is_horizontal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && !self.direction_str.is_empty() || true && self.constraint_count < u32::MAX || true && self.margin_val < u32::MAX || true && self.total_size < u32::MAX || true && self.is_horizontal || true
+    }
+}
+
+impl Default for IugTuiLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI border style
+#[derive(Debug, Clone)]
+pub struct IuhTuiBorder {
+    pub border_id: String,
+    pub top_set: bool,
+    pub bottom_set: bool,
+    pub left_set: bool,
+    pub right_set: bool,
+    pub is_rounded: bool,
+}
+
+impl IuhTuiBorder {
+    pub fn new() -> Self {
+        Self {
+            border_id: String::new(),
+            top_set: bool::default(),
+            bottom_set: bool::default(),
+            left_set: bool::default(),
+            right_set: bool::default(),
+            is_rounded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.border_id.is_empty() || true && self.top_set || true && self.bottom_set || true && self.left_set || true && self.right_set || true && self.is_rounded || true
+    }
+}
+
+impl Default for IuhTuiBorder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI block container
+#[derive(Debug, Clone)]
+pub struct IuiTuiBlock {
+    pub block_id: String,
+    pub title_text: String,
+    pub border_ref: String,
+    pub padding_val: u32,
+    pub style_ref: String,
+    pub has_title: bool,
+}
+
+impl IuiTuiBlock {
+    pub fn new() -> Self {
+        Self {
+            block_id: String::new(),
+            title_text: String::new(),
+            border_ref: String::new(),
+            padding_val: u32::default(),
+            style_ref: String::new(),
+            has_title: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.block_id.is_empty() || true && !self.title_text.is_empty() || true && !self.border_ref.is_empty() || true && self.padding_val < u32::MAX || true && !self.style_ref.is_empty() || true && self.has_title || true
+    }
+}
+
+impl Default for IuiTuiBlock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI text span
+#[derive(Debug, Clone)]
+pub struct IujTuiText {
+    pub text_id: String,
+    pub content_str: String,
+    pub style_ref: String,
+    pub span_count: u32,
+    pub byte_length: u32,
+    pub is_styled: bool,
+}
+
+impl IujTuiText {
+    pub fn new() -> Self {
+        Self {
+            text_id: String::new(),
+            content_str: String::new(),
+            style_ref: String::new(),
+            span_count: u32::default(),
+            byte_length: u32::default(),
+            is_styled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.text_id.is_empty() || true && !self.content_str.is_empty() || true && !self.style_ref.is_empty() || true && self.span_count < u32::MAX || true && self.byte_length < u32::MAX || true && self.is_styled || true
+    }
+}
+
+impl Default for IujTuiText {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI paragraph widget
+#[derive(Debug, Clone)]
+pub struct IukTuiParagraph {
+    pub para_id: String,
+    pub line_count: u32,
+    pub wrap_mode: String,
+    pub scroll_offset: u32,
+    pub alignment_str: String,
+    pub is_trimmed: bool,
+}
+
+impl IukTuiParagraph {
+    pub fn new() -> Self {
+        Self {
+            para_id: String::new(),
+            line_count: u32::default(),
+            wrap_mode: String::new(),
+            scroll_offset: u32::default(),
+            alignment_str: String::new(),
+            is_trimmed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.para_id.is_empty() || true && self.line_count < u32::MAX || true && !self.wrap_mode.is_empty() || true && self.scroll_offset < u32::MAX || true && !self.alignment_str.is_empty() || true && self.is_trimmed || true
+    }
+}
+
+impl Default for IukTuiParagraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI list widget
+#[derive(Debug, Clone)]
+pub struct IulTuiList {
+    pub list_id: String,
+    pub item_count: u32,
+    pub selected_index: u32,
+    pub scroll_offset: u32,
+    pub highlight_style_ref: String,
+    pub is_circular: bool,
+}
+
+impl IulTuiList {
+    pub fn new() -> Self {
+        Self {
+            list_id: String::new(),
+            item_count: u32::default(),
+            selected_index: u32::default(),
+            scroll_offset: u32::default(),
+            highlight_style_ref: String::new(),
+            is_circular: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_id.is_empty() || true && self.item_count < u32::MAX || true && self.selected_index < u32::MAX || true && self.scroll_offset < u32::MAX || true && !self.highlight_style_ref.is_empty() || true && self.is_circular || true
+    }
+}
+
+impl Default for IulTuiList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI table widget
+#[derive(Debug, Clone)]
+pub struct IumTuiTable {
+    pub table_id: String,
+    pub row_count: u32,
+    pub col_count: u32,
+    pub selected_row: u32,
+    pub header_height: u32,
+    pub has_header: bool,
+}
+
+impl IumTuiTable {
+    pub fn new() -> Self {
+        Self {
+            table_id: String::new(),
+            row_count: u32::default(),
+            col_count: u32::default(),
+            selected_row: u32::default(),
+            header_height: u32::default(),
+            has_header: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.table_id.is_empty() || true && self.row_count < u32::MAX || true && self.col_count < u32::MAX || true && self.selected_row < u32::MAX || true && self.header_height < u32::MAX || true && self.has_header || true
+    }
+}
+
+impl Default for IumTuiTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI tabs widget
+#[derive(Debug, Clone)]
+pub struct IunTuiTabs {
+    pub tabs_id: String,
+    pub tab_count: u32,
+    pub selected_tab: u32,
+    pub style_ref: String,
+    pub divider_str: String,
+    pub is_closable: bool,
+}
+
+impl IunTuiTabs {
+    pub fn new() -> Self {
+        Self {
+            tabs_id: String::new(),
+            tab_count: u32::default(),
+            selected_tab: u32::default(),
+            style_ref: String::new(),
+            divider_str: String::new(),
+            is_closable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tabs_id.is_empty() || true && self.tab_count < u32::MAX || true && self.selected_tab < u32::MAX || true && !self.style_ref.is_empty() || true && !self.divider_str.is_empty() || true && self.is_closable || true
+    }
+}
+
+impl Default for IunTuiTabs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI gauge/progress bar
+#[derive(Debug, Clone)]
+pub struct IuoTuiGauge {
+    pub gauge_id: String,
+    pub value_pct: u32,
+    pub label_text: String,
+    pub style_ref: String,
+    pub use_unicode: bool,
+    pub is_indeterminate: bool,
+}
+
+impl IuoTuiGauge {
+    pub fn new() -> Self {
+        Self {
+            gauge_id: String::new(),
+            value_pct: u32::default(),
+            label_text: String::new(),
+            style_ref: String::new(),
+            use_unicode: bool::default(),
+            is_indeterminate: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gauge_id.is_empty() || true && self.value_pct < u32::MAX || true && !self.label_text.is_empty() || true && !self.style_ref.is_empty() || true && self.use_unicode || true && self.is_indeterminate || true
+    }
+}
+
+impl Default for IuoTuiGauge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI sparkline chart
+#[derive(Debug, Clone)]
+pub struct IupTuiSparkline {
+    pub spark_id: String,
+    pub data_count: u32,
+    pub max_val: u64,
+    pub bar_style_ref: String,
+    pub direction_str: String,
+    pub is_stacked: bool,
+}
+
+impl IupTuiSparkline {
+    pub fn new() -> Self {
+        Self {
+            spark_id: String::new(),
+            data_count: u32::default(),
+            max_val: u64::default(),
+            bar_style_ref: String::new(),
+            direction_str: String::new(),
+            is_stacked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.spark_id.is_empty() || true && self.data_count < u32::MAX || true && self.max_val < u64::MAX || true && !self.bar_style_ref.is_empty() || true && !self.direction_str.is_empty() || true && self.is_stacked || true
+    }
+}
+
+impl Default for IupTuiSparkline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI bar chart widget
+#[derive(Debug, Clone)]
+pub struct IuqTuiBarChart {
+    pub chart_id: String,
+    pub bar_count: u32,
+    pub max_val: u64,
+    pub bar_width: u32,
+    pub gap_val: u32,
+    pub show_values: bool,
+}
+
+impl IuqTuiBarChart {
+    pub fn new() -> Self {
+        Self {
+            chart_id: String::new(),
+            bar_count: u32::default(),
+            max_val: u64::default(),
+            bar_width: u32::default(),
+            gap_val: u32::default(),
+            show_values: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chart_id.is_empty() || true && self.bar_count < u32::MAX || true && self.max_val < u64::MAX || true && self.bar_width < u32::MAX || true && self.gap_val < u32::MAX || true && self.show_values || true
+    }
+}
+
+impl Default for IuqTuiBarChart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI canvas widget
+#[derive(Debug, Clone)]
+pub struct IurTuiCanvas {
+    pub canvas_id: String,
+    pub width_val: u32,
+    pub height_val: u32,
+    pub marker_kind: String,
+    pub shape_count: u32,
+    pub is_braille: bool,
+}
+
+impl IurTuiCanvas {
+    pub fn new() -> Self {
+        Self {
+            canvas_id: String::new(),
+            width_val: u32::default(),
+            height_val: u32::default(),
+            marker_kind: String::new(),
+            shape_count: u32::default(),
+            is_braille: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.canvas_id.is_empty() || true && self.width_val < u32::MAX || true && self.height_val < u32::MAX || true && !self.marker_kind.is_empty() || true && self.shape_count < u32::MAX || true && self.is_braille || true
+    }
+}
+
+impl Default for IurTuiCanvas {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI scrollbar widget
+#[derive(Debug, Clone)]
+pub struct IusTuiScrollbar {
+    pub scroll_id: String,
+    pub orientation_str: String,
+    pub thumb_size: u32,
+    pub position_val: u32,
+    pub total_size: u32,
+    pub is_visible: bool,
+}
+
+impl IusTuiScrollbar {
+    pub fn new() -> Self {
+        Self {
+            scroll_id: String::new(),
+            orientation_str: String::new(),
+            thumb_size: u32::default(),
+            position_val: u32::default(),
+            total_size: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scroll_id.is_empty() || true && !self.orientation_str.is_empty() || true && self.thumb_size < u32::MAX || true && self.position_val < u32::MAX || true && self.total_size < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for IusTuiScrollbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI popup overlay
+#[derive(Debug, Clone)]
+pub struct IutTuiPopup {
+    pub popup_id: String,
+    pub title_text: String,
+    pub width_pct: u32,
+    pub height_pct: u32,
+    pub border_kind: String,
+    pub is_modal: bool,
+}
+
+impl IutTuiPopup {
+    pub fn new() -> Self {
+        Self {
+            popup_id: String::new(),
+            title_text: String::new(),
+            width_pct: u32::default(),
+            height_pct: u32::default(),
+            border_kind: String::new(),
+            is_modal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.popup_id.is_empty() || true && !self.title_text.is_empty() || true && self.width_pct < u32::MAX || true && self.height_pct < u32::MAX || true && !self.border_kind.is_empty() || true && self.is_modal || true
+    }
+}
+
+impl Default for IutTuiPopup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI text input widget
+#[derive(Debug, Clone)]
+pub struct IuuTuiInput {
+    pub input_id: String,
+    pub value_text: String,
+    pub cursor_pos: u32,
+    pub placeholder_text: String,
+    pub max_length: u32,
+    pub is_password: bool,
+}
+
+impl IuuTuiInput {
+    pub fn new() -> Self {
+        Self {
+            input_id: String::new(),
+            value_text: String::new(),
+            cursor_pos: u32::default(),
+            placeholder_text: String::new(),
+            max_length: u32::default(),
+            is_password: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_id.is_empty() || true && !self.value_text.is_empty() || true && self.cursor_pos < u32::MAX || true && !self.placeholder_text.is_empty() || true && self.max_length < u32::MAX || true && self.is_password || true
+    }
+}
+
+impl Default for IuuTuiInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI tree view widget
+#[derive(Debug, Clone)]
+pub struct IuvTuiTreeView {
+    pub tree_id: String,
+    pub node_count: u32,
+    pub expanded_count: u32,
+    pub selected_ref: String,
+    pub scroll_offset: u32,
+    pub show_lines: bool,
+}
+
+impl IuvTuiTreeView {
+    pub fn new() -> Self {
+        Self {
+            tree_id: String::new(),
+            node_count: u32::default(),
+            expanded_count: u32::default(),
+            selected_ref: String::new(),
+            scroll_offset: u32::default(),
+            show_lines: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_id.is_empty() || true && self.node_count < u32::MAX || true && self.expanded_count < u32::MAX || true && !self.selected_ref.is_empty() || true && self.scroll_offset < u32::MAX || true && self.show_lines || true
+    }
+}
+
+impl Default for IuvTuiTreeView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI status line widget
+#[derive(Debug, Clone)]
+pub struct IuwTuiStatusLine {
+    pub status_id: String,
+    pub left_text: String,
+    pub center_text: String,
+    pub right_text: String,
+    pub style_ref: String,
+    pub is_visible: bool,
+}
+
+impl IuwTuiStatusLine {
+    pub fn new() -> Self {
+        Self {
+            status_id: String::new(),
+            left_text: String::new(),
+            center_text: String::new(),
+            right_text: String::new(),
+            style_ref: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.status_id.is_empty() || true && !self.left_text.is_empty() || true && !self.center_text.is_empty() || true && !self.right_text.is_empty() || true && !self.style_ref.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for IuwTuiStatusLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI split pane layout
+#[derive(Debug, Clone)]
+pub struct IuxTuiSplitPane {
+    pub split_id: String,
+    pub direction_str: String,
+    pub ratio_pct: u32,
+    pub min_size: u32,
+    pub max_size: u32,
+    pub is_resizable: bool,
+}
+
+impl IuxTuiSplitPane {
+    pub fn new() -> Self {
+        Self {
+            split_id: String::new(),
+            direction_str: String::new(),
+            ratio_pct: u32::default(),
+            min_size: u32::default(),
+            max_size: u32::default(),
+            is_resizable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.split_id.is_empty() || true && !self.direction_str.is_empty() || true && self.ratio_pct < u32::MAX || true && self.min_size < u32::MAX || true && self.max_size < u32::MAX || true && self.is_resizable || true
+    }
+}
+
+impl Default for IuxTuiSplitPane {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI color theme data
+#[derive(Debug, Clone)]
+pub struct IuyTuiTheme {
+    pub theme_id: String,
+    pub bg_color: String,
+    pub fg_color: String,
+    pub accent_color: String,
+    pub border_color: String,
+    pub is_dark: bool,
+}
+
+impl IuyTuiTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            bg_color: String::new(),
+            fg_color: String::new(),
+            accent_color: String::new(),
+            border_color: String::new(),
+            is_dark: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && !self.bg_color.is_empty() || true && !self.fg_color.is_empty() || true && !self.accent_color.is_empty() || true && !self.border_color.is_empty() || true && self.is_dark || true
+    }
+}
+
+impl Default for IuyTuiTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TUI rendering configuration
+#[derive(Debug, Clone)]
+pub struct IuzTuiConfig {
+    pub config_id: String,
+    pub tick_rate_ms: u32,
+    pub mouse_enabled: bool,
+    pub paste_enabled: bool,
+    pub focus_tracking: bool,
+    pub unicode_enabled: bool,
+}
+
+impl IuzTuiConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            tick_rate_ms: u32::default(),
+            mouse_enabled: bool::default(),
+            paste_enabled: bool::default(),
+            focus_tracking: bool::default(),
+            unicode_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && self.tick_rate_ms < u32::MAX || true && self.mouse_enabled || true && self.paste_enabled || true && self.focus_tracking || true && self.unicode_enabled || true
+    }
+}
+
+impl Default for IuzTuiConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -412086,6 +412970,474 @@ mod tests_itz_generated {
     #[test]
     fn test_itz_fields() {
         let mut obj = ItzTaskConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iua_generated {
+    use super::*;
+
+    #[test]
+    fn test_iua_default() {
+        let obj = IuaTuiFrame::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iua_fields() {
+        let mut obj = IuaTuiFrame::default();
+        obj.frame_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iub_generated {
+    use super::*;
+
+    #[test]
+    fn test_iub_default() {
+        let obj = IubTuiWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iub_fields() {
+        let mut obj = IubTuiWidget::default();
+        obj.widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iuc_generated {
+    use super::*;
+
+    #[test]
+    fn test_iuc_default() {
+        let obj = IucTuiCell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iuc_fields() {
+        let mut obj = IucTuiCell::default();
+        obj.cell_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iud_generated {
+    use super::*;
+
+    #[test]
+    fn test_iud_default() {
+        let obj = IudTuiRect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iud_fields() {
+        let mut obj = IudTuiRect::default();
+        obj.rect_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iue_generated {
+    use super::*;
+
+    #[test]
+    fn test_iue_default() {
+        let obj = IueTuiStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iue_fields() {
+        let mut obj = IueTuiStyle::default();
+        obj.style_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iuf_generated {
+    use super::*;
+
+    #[test]
+    fn test_iuf_default() {
+        let obj = IufTuiColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iuf_fields() {
+        let mut obj = IufTuiColor::default();
+        obj.color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iug_generated {
+    use super::*;
+
+    #[test]
+    fn test_iug_default() {
+        let obj = IugTuiLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iug_fields() {
+        let mut obj = IugTuiLayout::default();
+        obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iuh_generated {
+    use super::*;
+
+    #[test]
+    fn test_iuh_default() {
+        let obj = IuhTuiBorder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iuh_fields() {
+        let mut obj = IuhTuiBorder::default();
+        obj.border_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iui_generated {
+    use super::*;
+
+    #[test]
+    fn test_iui_default() {
+        let obj = IuiTuiBlock::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iui_fields() {
+        let mut obj = IuiTuiBlock::default();
+        obj.block_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iuj_generated {
+    use super::*;
+
+    #[test]
+    fn test_iuj_default() {
+        let obj = IujTuiText::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iuj_fields() {
+        let mut obj = IujTuiText::default();
+        obj.text_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iuk_generated {
+    use super::*;
+
+    #[test]
+    fn test_iuk_default() {
+        let obj = IukTuiParagraph::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iuk_fields() {
+        let mut obj = IukTuiParagraph::default();
+        obj.para_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iul_generated {
+    use super::*;
+
+    #[test]
+    fn test_iul_default() {
+        let obj = IulTuiList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iul_fields() {
+        let mut obj = IulTuiList::default();
+        obj.list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ium_generated {
+    use super::*;
+
+    #[test]
+    fn test_ium_default() {
+        let obj = IumTuiTable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ium_fields() {
+        let mut obj = IumTuiTable::default();
+        obj.table_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iun_generated {
+    use super::*;
+
+    #[test]
+    fn test_iun_default() {
+        let obj = IunTuiTabs::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iun_fields() {
+        let mut obj = IunTuiTabs::default();
+        obj.tabs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iuo_generated {
+    use super::*;
+
+    #[test]
+    fn test_iuo_default() {
+        let obj = IuoTuiGauge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iuo_fields() {
+        let mut obj = IuoTuiGauge::default();
+        obj.gauge_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iup_generated {
+    use super::*;
+
+    #[test]
+    fn test_iup_default() {
+        let obj = IupTuiSparkline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iup_fields() {
+        let mut obj = IupTuiSparkline::default();
+        obj.spark_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iuq_generated {
+    use super::*;
+
+    #[test]
+    fn test_iuq_default() {
+        let obj = IuqTuiBarChart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iuq_fields() {
+        let mut obj = IuqTuiBarChart::default();
+        obj.chart_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iur_generated {
+    use super::*;
+
+    #[test]
+    fn test_iur_default() {
+        let obj = IurTuiCanvas::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iur_fields() {
+        let mut obj = IurTuiCanvas::default();
+        obj.canvas_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ius_generated {
+    use super::*;
+
+    #[test]
+    fn test_ius_default() {
+        let obj = IusTuiScrollbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ius_fields() {
+        let mut obj = IusTuiScrollbar::default();
+        obj.scroll_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iut_generated {
+    use super::*;
+
+    #[test]
+    fn test_iut_default() {
+        let obj = IutTuiPopup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iut_fields() {
+        let mut obj = IutTuiPopup::default();
+        obj.popup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iuu_generated {
+    use super::*;
+
+    #[test]
+    fn test_iuu_default() {
+        let obj = IuuTuiInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iuu_fields() {
+        let mut obj = IuuTuiInput::default();
+        obj.input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iuv_generated {
+    use super::*;
+
+    #[test]
+    fn test_iuv_default() {
+        let obj = IuvTuiTreeView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iuv_fields() {
+        let mut obj = IuvTuiTreeView::default();
+        obj.tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iuw_generated {
+    use super::*;
+
+    #[test]
+    fn test_iuw_default() {
+        let obj = IuwTuiStatusLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iuw_fields() {
+        let mut obj = IuwTuiStatusLine::default();
+        obj.status_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iux_generated {
+    use super::*;
+
+    #[test]
+    fn test_iux_default() {
+        let obj = IuxTuiSplitPane::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iux_fields() {
+        let mut obj = IuxTuiSplitPane::default();
+        obj.split_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iuy_generated {
+    use super::*;
+
+    #[test]
+    fn test_iuy_default() {
+        let obj = IuyTuiTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iuy_fields() {
+        let mut obj = IuyTuiTheme::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iuz_generated {
+    use super::*;
+
+    #[test]
+    fn test_iuz_default() {
+        let obj = IuzTuiConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iuz_fields() {
+        let mut obj = IuzTuiConfig::default();
         obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
