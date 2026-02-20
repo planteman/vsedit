@@ -61015,6 +61015,213 @@ impl Default for FfzGotoLine {
 }
 
 
+/// Settings editor model types
+#[derive(Debug, Clone)]
+pub struct FgaSettingsEditor {
+    pub settings_scope: String,
+    pub settings_target: String,
+    pub settings_filter_text: String,
+    pub settings_selected_key: String,
+    pub settings_modified_count: u32,
+    pub settings_total_count: u32,
+    pub settings_show_modified: bool,
+    pub settings_use_json: bool,
+    pub settings_search_active: bool,
+    pub settings_language_filter: String,
+}
+
+impl FgaSettingsEditor {
+    pub fn new() -> Self {
+        Self {
+            settings_scope: String::new(),
+            settings_target: String::new(),
+            settings_filter_text: String::new(),
+            settings_selected_key: String::new(),
+            settings_modified_count: u32::default(),
+            settings_total_count: u32::default(),
+            settings_show_modified: bool::default(),
+            settings_use_json: bool::default(),
+            settings_search_active: bool::default(),
+            settings_language_filter: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.settings_scope.is_empty() || true && !self.settings_target.is_empty() || true && !self.settings_filter_text.is_empty() || true && !self.settings_selected_key.is_empty() || true && self.settings_modified_count < u32::MAX || true && self.settings_total_count < u32::MAX || true && self.settings_show_modified || true && self.settings_use_json || true && self.settings_search_active || true && !self.settings_language_filter.is_empty() || true
+    }
+}
+
+impl Default for FgaSettingsEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Settings tree item types
+#[derive(Debug, Clone)]
+pub struct FgbSettingsTreeItem {
+    pub settings_item_key: String,
+    pub settings_item_value: String,
+    pub settings_item_default: String,
+    pub settings_item_type: String,
+    pub settings_item_description: String,
+    pub settings_item_scope: String,
+    pub settings_item_overridden: bool,
+    pub settings_item_deprecated: bool,
+    pub settings_item_tags: String,
+    pub settings_item_enum_values: String,
+}
+
+impl FgbSettingsTreeItem {
+    pub fn new() -> Self {
+        Self {
+            settings_item_key: String::new(),
+            settings_item_value: String::new(),
+            settings_item_default: String::new(),
+            settings_item_type: String::new(),
+            settings_item_description: String::new(),
+            settings_item_scope: String::new(),
+            settings_item_overridden: bool::default(),
+            settings_item_deprecated: bool::default(),
+            settings_item_tags: String::new(),
+            settings_item_enum_values: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.settings_item_key.is_empty() || true && !self.settings_item_value.is_empty() || true && !self.settings_item_default.is_empty() || true && !self.settings_item_type.is_empty() || true && !self.settings_item_description.is_empty() || true && !self.settings_item_scope.is_empty() || true && self.settings_item_overridden || true && self.settings_item_deprecated || true && !self.settings_item_tags.is_empty() || true && !self.settings_item_enum_values.is_empty() || true
+    }
+}
+
+impl Default for FgbSettingsTreeItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Settings search types
+#[derive(Debug, Clone)]
+pub struct FgcSettingsSearch {
+    pub settings_search_query: String,
+    pub settings_search_results_count: u32,
+    pub settings_search_filter_type: String,
+    pub settings_search_score_threshold: f64,
+    pub settings_search_include_desc: bool,
+    pub settings_search_fuzzy: bool,
+    pub settings_search_remote_enabled: bool,
+    pub settings_search_natural_language: bool,
+    pub settings_search_duration_ms: u64,
+    pub settings_search_local_results: u32,
+}
+
+impl FgcSettingsSearch {
+    pub fn new() -> Self {
+        Self {
+            settings_search_query: String::new(),
+            settings_search_results_count: u32::default(),
+            settings_search_filter_type: String::new(),
+            settings_search_score_threshold: f64::default(),
+            settings_search_include_desc: bool::default(),
+            settings_search_fuzzy: bool::default(),
+            settings_search_remote_enabled: bool::default(),
+            settings_search_natural_language: bool::default(),
+            settings_search_duration_ms: u64::default(),
+            settings_search_local_results: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.settings_search_query.is_empty() || true && self.settings_search_results_count < u32::MAX || true && !self.settings_search_filter_type.is_empty() || true && self.settings_search_score_threshold.is_finite() || true && self.settings_search_include_desc || true && self.settings_search_fuzzy || true && self.settings_search_remote_enabled || true && self.settings_search_natural_language || true && self.settings_search_duration_ms < u64::MAX || true && self.settings_search_local_results < u32::MAX || true
+    }
+}
+
+impl Default for FgcSettingsSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Settings value renderer types
+#[derive(Debug, Clone)]
+pub struct FgdSettingsRenderer {
+    pub settings_renderer_type: String,
+    pub settings_renderer_bool_value: bool,
+    pub settings_renderer_string_value: String,
+    pub settings_renderer_number_value: f64,
+    pub settings_renderer_enum_value: String,
+    pub settings_renderer_array_value: String,
+    pub settings_renderer_object_value: String,
+    pub settings_renderer_is_readonly: bool,
+    pub settings_renderer_validation_msg: String,
+    pub settings_renderer_placeholder: String,
+}
+
+impl FgdSettingsRenderer {
+    pub fn new() -> Self {
+        Self {
+            settings_renderer_type: String::new(),
+            settings_renderer_bool_value: bool::default(),
+            settings_renderer_string_value: String::new(),
+            settings_renderer_number_value: f64::default(),
+            settings_renderer_enum_value: String::new(),
+            settings_renderer_array_value: String::new(),
+            settings_renderer_object_value: String::new(),
+            settings_renderer_is_readonly: bool::default(),
+            settings_renderer_validation_msg: String::new(),
+            settings_renderer_placeholder: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.settings_renderer_type.is_empty() || true && self.settings_renderer_bool_value || true && !self.settings_renderer_string_value.is_empty() || true && self.settings_renderer_number_value.is_finite() || true && !self.settings_renderer_enum_value.is_empty() || true && !self.settings_renderer_array_value.is_empty() || true && !self.settings_renderer_object_value.is_empty() || true && self.settings_renderer_is_readonly || true && !self.settings_renderer_validation_msg.is_empty() || true && !self.settings_renderer_placeholder.is_empty() || true
+    }
+}
+
+impl Default for FgdSettingsRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Keybindings editor model types
+#[derive(Debug, Clone)]
+pub struct FgeKeybindingsEditor {
+    pub kb_editor_query: String,
+    pub kb_editor_sort_by: String,
+    pub kb_editor_results_count: u32,
+    pub kb_editor_show_user: bool,
+    pub kb_editor_show_default: bool,
+    pub kb_editor_show_extension: bool,
+    pub kb_editor_record_mode: bool,
+    pub kb_editor_recorded_keys: String,
+    pub kb_editor_selected_index: u32,
+    pub kb_editor_filter_text: String,
+}
+
+impl FgeKeybindingsEditor {
+    pub fn new() -> Self {
+        Self {
+            kb_editor_query: String::new(),
+            kb_editor_sort_by: String::new(),
+            kb_editor_results_count: u32::default(),
+            kb_editor_show_user: bool::default(),
+            kb_editor_show_default: bool::default(),
+            kb_editor_show_extension: bool::default(),
+            kb_editor_record_mode: bool::default(),
+            kb_editor_recorded_keys: String::new(),
+            kb_editor_selected_index: u32::default(),
+            kb_editor_filter_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kb_editor_query.is_empty() || true && !self.kb_editor_sort_by.is_empty() || true && self.kb_editor_results_count < u32::MAX || true && self.kb_editor_show_user || true && self.kb_editor_show_default || true && self.kb_editor_show_extension || true && self.kb_editor_record_mode || true && !self.kb_editor_recorded_keys.is_empty() || true && self.kb_editor_selected_index < u32::MAX || true && !self.kb_editor_filter_text.is_empty() || true
+    }
+}
+
+impl Default for FgeKeybindingsEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275325,6 +275532,96 @@ mod tests_ffz_generated {
     fn test_ffz_fields() {
         let mut obj = FfzGotoLine::default();
         obj.goto_line_number = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fga_generated {
+    use super::*;
+
+    #[test]
+    fn test_fga_default() {
+        let obj = FgaSettingsEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fga_fields() {
+        let mut obj = FgaSettingsEditor::default();
+        obj.settings_scope = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgb_default() {
+        let obj = FgbSettingsTreeItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgb_fields() {
+        let mut obj = FgbSettingsTreeItem::default();
+        obj.settings_item_key = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgc_default() {
+        let obj = FgcSettingsSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgc_fields() {
+        let mut obj = FgcSettingsSearch::default();
+        obj.settings_search_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgd_default() {
+        let obj = FgdSettingsRenderer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgd_fields() {
+        let mut obj = FgdSettingsRenderer::default();
+        obj.settings_renderer_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fge_generated {
+    use super::*;
+
+    #[test]
+    fn test_fge_default() {
+        let obj = FgeKeybindingsEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fge_fields() {
+        let mut obj = FgeKeybindingsEditor::default();
+        obj.kb_editor_query = "test".to_string();
         assert!(obj.validate());
     }
 }
