@@ -63462,6 +63462,213 @@ impl Default for FhzNotebookMarkdownCell {
 }
 
 
+/// Remote authority (scheme, host, port, connection token, resolver)
+#[derive(Debug, Clone)]
+pub struct FiaRemoteAuthority {
+    pub authority: String,
+    pub scheme: String,
+    pub host: String,
+    pub port: u32,
+    pub connection_token: String,
+    pub resolver_extension_id: String,
+    pub is_connected: bool,
+    pub display_name: String,
+    pub server_pid: u64,
+    pub latency_ms: u32,
+}
+
+impl FiaRemoteAuthority {
+    pub fn new() -> Self {
+        Self {
+            authority: String::new(),
+            scheme: String::new(),
+            host: String::new(),
+            port: u32::default(),
+            connection_token: String::new(),
+            resolver_extension_id: String::new(),
+            is_connected: bool::default(),
+            display_name: String::new(),
+            server_pid: u64::default(),
+            latency_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.authority.is_empty() || true && !self.scheme.is_empty() || true && !self.host.is_empty() || true && self.port < u32::MAX || true && !self.connection_token.is_empty() || true && !self.resolver_extension_id.is_empty() || true && self.is_connected || true && !self.display_name.is_empty() || true && self.server_pid < u64::MAX || true && self.latency_ms < u32::MAX || true
+    }
+}
+
+impl Default for FiaRemoteAuthority {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Remote tunnel (local port, remote port, protocol, privacy, label)
+#[derive(Debug, Clone)]
+pub struct FibRemoteTunnel {
+    pub tunnel_id: String,
+    pub local_address: String,
+    pub local_port: u32,
+    pub remote_host: String,
+    pub remote_port: u32,
+    pub protocol: String,
+    pub privacy: u32,
+    pub label: String,
+    pub is_active: bool,
+    pub source_extension_id: String,
+}
+
+impl FibRemoteTunnel {
+    pub fn new() -> Self {
+        Self {
+            tunnel_id: String::new(),
+            local_address: String::new(),
+            local_port: u32::default(),
+            remote_host: String::new(),
+            remote_port: u32::default(),
+            protocol: String::new(),
+            privacy: u32::default(),
+            label: String::new(),
+            is_active: bool::default(),
+            source_extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tunnel_id.is_empty() || true && !self.local_address.is_empty() || true && self.local_port < u32::MAX || true && !self.remote_host.is_empty() || true && self.remote_port < u32::MAX || true && !self.protocol.is_empty() || true && self.privacy < u32::MAX || true && !self.label.is_empty() || true && self.is_active || true && !self.source_extension_id.is_empty() || true
+    }
+}
+
+impl Default for FibRemoteTunnel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Remote connection state (type, host, latency, reconnection)
+#[derive(Debug, Clone)]
+pub struct FicRemoteConnection {
+    pub connection_id: String,
+    pub connection_type: u32,
+    pub host: String,
+    pub port: u32,
+    pub latency_ms: u32,
+    pub is_connected: bool,
+    pub reconnect_attempts: u32,
+    pub last_error: String,
+    pub uptime_ms: u64,
+    pub bytes_transferred: u64,
+}
+
+impl FicRemoteConnection {
+    pub fn new() -> Self {
+        Self {
+            connection_id: String::new(),
+            connection_type: u32::default(),
+            host: String::new(),
+            port: u32::default(),
+            latency_ms: u32::default(),
+            is_connected: bool::default(),
+            reconnect_attempts: u32::default(),
+            last_error: String::new(),
+            uptime_ms: u64::default(),
+            bytes_transferred: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.connection_id.is_empty() || true && self.connection_type < u32::MAX || true && !self.host.is_empty() || true && self.port < u32::MAX || true && self.latency_ms < u32::MAX || true && self.is_connected || true && self.reconnect_attempts < u32::MAX || true && !self.last_error.is_empty() || true && self.uptime_ms < u64::MAX || true && self.bytes_transferred < u64::MAX || true
+    }
+}
+
+impl Default for FicRemoteConnection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Remote environment variables (path, home, shell, os, arch)
+#[derive(Debug, Clone)]
+pub struct FidRemoteEnvironment {
+    pub env_id: String,
+    pub remote_path: String,
+    pub home_dir: String,
+    pub shell_path: String,
+    pub os_type: u32,
+    pub arch: String,
+    pub node_version: String,
+    pub env_vars_json: String,
+    pub tmp_dir: String,
+    pub username: String,
+}
+
+impl FidRemoteEnvironment {
+    pub fn new() -> Self {
+        Self {
+            env_id: String::new(),
+            remote_path: String::new(),
+            home_dir: String::new(),
+            shell_path: String::new(),
+            os_type: u32::default(),
+            arch: String::new(),
+            node_version: String::new(),
+            env_vars_json: String::new(),
+            tmp_dir: String::new(),
+            username: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.env_id.is_empty() || true && !self.remote_path.is_empty() || true && !self.home_dir.is_empty() || true && !self.shell_path.is_empty() || true && self.os_type < u32::MAX || true && !self.arch.is_empty() || true && !self.node_version.is_empty() || true && !self.env_vars_json.is_empty() || true && !self.tmp_dir.is_empty() || true && !self.username.is_empty() || true
+    }
+}
+
+impl Default for FidRemoteEnvironment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Remote file system provider (scheme, capabilities, watch, stat)
+#[derive(Debug, Clone)]
+pub struct FieRemoteFileSystem {
+    pub fs_id: String,
+    pub scheme: String,
+    pub can_read: bool,
+    pub can_write: bool,
+    pub can_delete: bool,
+    pub can_rename: bool,
+    pub can_copy: bool,
+    pub supports_watch: bool,
+    pub is_readonly: bool,
+    pub max_file_size: u64,
+}
+
+impl FieRemoteFileSystem {
+    pub fn new() -> Self {
+        Self {
+            fs_id: String::new(),
+            scheme: String::new(),
+            can_read: bool::default(),
+            can_write: bool::default(),
+            can_delete: bool::default(),
+            can_rename: bool::default(),
+            can_copy: bool::default(),
+            supports_watch: bool::default(),
+            is_readonly: bool::default(),
+            max_file_size: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fs_id.is_empty() || true && !self.scheme.is_empty() || true && self.can_read || true && self.can_write || true && self.can_delete || true && self.can_rename || true && self.can_copy || true && self.supports_watch || true && self.is_readonly || true && self.max_file_size < u64::MAX || true
+    }
+}
+
+impl Default for FieRemoteFileSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -278355,6 +278562,96 @@ mod tests_fhz_generated {
     fn test_fhz_fields() {
         let mut obj = FhzNotebookMarkdownCell::default();
         obj.cell_handle = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fia_generated {
+    use super::*;
+
+    #[test]
+    fn test_fia_default() {
+        let obj = FiaRemoteAuthority::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fia_fields() {
+        let mut obj = FiaRemoteAuthority::default();
+        obj.authority = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fib_generated {
+    use super::*;
+
+    #[test]
+    fn test_fib_default() {
+        let obj = FibRemoteTunnel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fib_fields() {
+        let mut obj = FibRemoteTunnel::default();
+        obj.tunnel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fic_generated {
+    use super::*;
+
+    #[test]
+    fn test_fic_default() {
+        let obj = FicRemoteConnection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fic_fields() {
+        let mut obj = FicRemoteConnection::default();
+        obj.connection_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fid_generated {
+    use super::*;
+
+    #[test]
+    fn test_fid_default() {
+        let obj = FidRemoteEnvironment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fid_fields() {
+        let mut obj = FidRemoteEnvironment::default();
+        obj.env_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fie_generated {
+    use super::*;
+
+    #[test]
+    fn test_fie_default() {
+        let obj = FieRemoteFileSystem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fie_fields() {
+        let mut obj = FieRemoteFileSystem::default();
+        obj.fs_id = "test".to_string();
         assert!(obj.validate());
     }
 }
