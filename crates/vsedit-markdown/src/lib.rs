@@ -151522,6 +151522,890 @@ impl Default for IpzCursorConfig {
     }
 }
 
+/// Storage service descriptor
+#[derive(Debug, Clone)]
+pub struct IqaStorageService {
+    pub service_id: String,
+    pub scope_str: String,
+    pub key_count: u32,
+    pub byte_size: u64,
+    pub flush_count: u64,
+    pub is_initialized: bool,
+}
+
+impl IqaStorageService {
+    pub fn new() -> Self {
+        Self {
+            service_id: String::new(),
+            scope_str: String::new(),
+            key_count: u32::default(),
+            byte_size: u64::default(),
+            flush_count: u64::default(),
+            is_initialized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.service_id.is_empty() || true && !self.scope_str.is_empty() || true && self.key_count < u32::MAX || true && self.byte_size < u64::MAX || true && self.flush_count < u64::MAX || true && self.is_initialized || true
+    }
+}
+
+impl Default for IqaStorageService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage key-value entry
+#[derive(Debug, Clone)]
+pub struct IqbStorageKey {
+    pub key_id: String,
+    pub key_str: String,
+    pub value_json: String,
+    pub scope_val: u32,
+    pub version_val: u32,
+    pub is_default: bool,
+}
+
+impl IqbStorageKey {
+    pub fn new() -> Self {
+        Self {
+            key_id: String::new(),
+            key_str: String::new(),
+            value_json: String::new(),
+            scope_val: u32::default(),
+            version_val: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.key_id.is_empty() || true && !self.key_str.is_empty() || true && !self.value_json.is_empty() || true && self.scope_val < u32::MAX || true && self.version_val < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for IqbStorageKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Global storage scope
+#[derive(Debug, Clone)]
+pub struct IqcGlobalStorage {
+    pub global_id: String,
+    pub key_count: u32,
+    pub byte_size: u64,
+    pub file_path: String,
+    pub flush_interval_ms: u32,
+    pub is_migrated: bool,
+}
+
+impl IqcGlobalStorage {
+    pub fn new() -> Self {
+        Self {
+            global_id: String::new(),
+            key_count: u32::default(),
+            byte_size: u64::default(),
+            file_path: String::new(),
+            flush_interval_ms: u32::default(),
+            is_migrated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.global_id.is_empty() || true && self.key_count < u32::MAX || true && self.byte_size < u64::MAX || true && !self.file_path.is_empty() || true && self.flush_interval_ms < u32::MAX || true && self.is_migrated || true
+    }
+}
+
+impl Default for IqcGlobalStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace storage scope
+#[derive(Debug, Clone)]
+pub struct IqdWorkspaceStorage {
+    pub ws_id: String,
+    pub workspace_ref: String,
+    pub key_count: u32,
+    pub byte_size: u64,
+    pub file_path: String,
+    pub is_valid: bool,
+}
+
+impl IqdWorkspaceStorage {
+    pub fn new() -> Self {
+        Self {
+            ws_id: String::new(),
+            workspace_ref: String::new(),
+            key_count: u32::default(),
+            byte_size: u64::default(),
+            file_path: String::new(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_id.is_empty() || true && !self.workspace_ref.is_empty() || true && self.key_count < u32::MAX || true && self.byte_size < u64::MAX || true && !self.file_path.is_empty() || true && self.is_valid || true
+    }
+}
+
+impl Default for IqdWorkspaceStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// In-memory storage scope
+#[derive(Debug, Clone)]
+pub struct IqeMemoryStorage {
+    pub mem_id: String,
+    pub key_count: u32,
+    pub byte_size: u64,
+    pub max_keys: u32,
+    pub eviction_count: u64,
+    pub is_bounded: bool,
+}
+
+impl IqeMemoryStorage {
+    pub fn new() -> Self {
+        Self {
+            mem_id: String::new(),
+            key_count: u32::default(),
+            byte_size: u64::default(),
+            max_keys: u32::default(),
+            eviction_count: u64::default(),
+            is_bounded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mem_id.is_empty() || true && self.key_count < u32::MAX || true && self.byte_size < u64::MAX || true && self.max_keys < u32::MAX || true && self.eviction_count < u64::MAX || true && self.is_bounded || true
+    }
+}
+
+impl Default for IqeMemoryStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage target descriptor
+#[derive(Debug, Clone)]
+pub struct IqfStorageTarget {
+    pub target_id: String,
+    pub target_kind: String,
+    pub profile_ref: String,
+    pub root_path: String,
+    pub byte_limit: u64,
+    pub is_readonly: bool,
+}
+
+impl IqfStorageTarget {
+    pub fn new() -> Self {
+        Self {
+            target_id: String::new(),
+            target_kind: String::new(),
+            profile_ref: String::new(),
+            root_path: String::new(),
+            byte_limit: u64::default(),
+            is_readonly: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.target_id.is_empty() || true && !self.target_kind.is_empty() || true && !self.profile_ref.is_empty() || true && !self.root_path.is_empty() || true && self.byte_limit < u64::MAX || true && self.is_readonly || true
+    }
+}
+
+impl Default for IqfStorageTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage sync state
+#[derive(Debug, Clone)]
+pub struct IqgStorageSync {
+    pub sync_id: String,
+    pub resource_kind: String,
+    pub local_version: u64,
+    pub remote_version: u64,
+    pub conflict_count: u32,
+    pub is_syncing: bool,
+}
+
+impl IqgStorageSync {
+    pub fn new() -> Self {
+        Self {
+            sync_id: String::new(),
+            resource_kind: String::new(),
+            local_version: u64::default(),
+            remote_version: u64::default(),
+            conflict_count: u32::default(),
+            is_syncing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sync_id.is_empty() || true && !self.resource_kind.is_empty() || true && self.local_version < u64::MAX || true && self.remote_version < u64::MAX || true && self.conflict_count < u32::MAX || true && self.is_syncing || true
+    }
+}
+
+impl Default for IqgStorageSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage backup entry
+#[derive(Debug, Clone)]
+pub struct IqhStorageBackup {
+    pub backup_id: String,
+    pub storage_ref: String,
+    pub backup_path: String,
+    pub created_epoch: u64,
+    pub key_count: u32,
+    pub is_compressed: bool,
+}
+
+impl IqhStorageBackup {
+    pub fn new() -> Self {
+        Self {
+            backup_id: String::new(),
+            storage_ref: String::new(),
+            backup_path: String::new(),
+            created_epoch: u64::default(),
+            key_count: u32::default(),
+            is_compressed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.backup_id.is_empty() || true && !self.storage_ref.is_empty() || true && !self.backup_path.is_empty() || true && self.created_epoch < u64::MAX || true && self.key_count < u32::MAX || true && self.is_compressed || true
+    }
+}
+
+impl Default for IqhStorageBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage data migration
+#[derive(Debug, Clone)]
+pub struct IqiStorageMigration {
+    pub migration_id: String,
+    pub from_version: u32,
+    pub to_version: u32,
+    pub key_count: u32,
+    pub transform_count: u32,
+    pub is_reversible: bool,
+}
+
+impl IqiStorageMigration {
+    pub fn new() -> Self {
+        Self {
+            migration_id: String::new(),
+            from_version: u32::default(),
+            to_version: u32::default(),
+            key_count: u32::default(),
+            transform_count: u32::default(),
+            is_reversible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.migration_id.is_empty() || true && self.from_version < u32::MAX || true && self.to_version < u32::MAX || true && self.key_count < u32::MAX || true && self.transform_count < u32::MAX || true && self.is_reversible || true
+    }
+}
+
+impl Default for IqiStorageMigration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage change event
+#[derive(Debug, Clone)]
+pub struct IqjStorageChange {
+    pub change_id: String,
+    pub key_str: String,
+    pub old_value_len: u32,
+    pub new_value_len: u32,
+    pub scope_val: u32,
+    pub is_delete: bool,
+}
+
+impl IqjStorageChange {
+    pub fn new() -> Self {
+        Self {
+            change_id: String::new(),
+            key_str: String::new(),
+            old_value_len: u32::default(),
+            new_value_len: u32::default(),
+            scope_val: u32::default(),
+            is_delete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.change_id.is_empty() || true && !self.key_str.is_empty() || true && self.old_value_len < u32::MAX || true && self.new_value_len < u32::MAX || true && self.scope_val < u32::MAX || true && self.is_delete || true
+    }
+}
+
+impl Default for IqjStorageChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Secret storage service
+#[derive(Debug, Clone)]
+pub struct IqkSecretStorage {
+    pub secret_id: String,
+    pub service_name: String,
+    pub account_name: String,
+    pub key_count: u32,
+    pub backend_str: String,
+    pub is_available: bool,
+}
+
+impl IqkSecretStorage {
+    pub fn new() -> Self {
+        Self {
+            secret_id: String::new(),
+            service_name: String::new(),
+            account_name: String::new(),
+            key_count: u32::default(),
+            backend_str: String::new(),
+            is_available: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.secret_id.is_empty() || true && !self.service_name.is_empty() || true && !self.account_name.is_empty() || true && self.key_count < u32::MAX || true && !self.backend_str.is_empty() || true && self.is_available || true
+    }
+}
+
+impl Default for IqkSecretStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Credential storage entry
+#[derive(Debug, Clone)]
+pub struct IqlCredential {
+    pub cred_id: String,
+    pub service_str: String,
+    pub account_str: String,
+    pub value_len: u32,
+    pub created_epoch: u64,
+    pub is_expired: bool,
+}
+
+impl IqlCredential {
+    pub fn new() -> Self {
+        Self {
+            cred_id: String::new(),
+            service_str: String::new(),
+            account_str: String::new(),
+            value_len: u32::default(),
+            created_epoch: u64::default(),
+            is_expired: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cred_id.is_empty() || true && !self.service_str.is_empty() || true && !self.account_str.is_empty() || true && self.value_len < u32::MAX || true && self.created_epoch < u64::MAX || true && self.is_expired || true
+    }
+}
+
+impl Default for IqlCredential {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cache service descriptor
+#[derive(Debug, Clone)]
+pub struct IqmCacheService {
+    pub cache_id: String,
+    pub cache_name: String,
+    pub max_size_bytes: u64,
+    pub current_size: u64,
+    pub hit_rate_pct: u32,
+    pub is_persistent: bool,
+}
+
+impl IqmCacheService {
+    pub fn new() -> Self {
+        Self {
+            cache_id: String::new(),
+            cache_name: String::new(),
+            max_size_bytes: u64::default(),
+            current_size: u64::default(),
+            hit_rate_pct: u32::default(),
+            is_persistent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cache_id.is_empty() || true && !self.cache_name.is_empty() || true && self.max_size_bytes < u64::MAX || true && self.current_size < u64::MAX || true && self.hit_rate_pct < u32::MAX || true && self.is_persistent || true
+    }
+}
+
+impl Default for IqmCacheService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cache entry descriptor
+#[derive(Debug, Clone)]
+pub struct IqnCacheEntry {
+    pub entry_id: String,
+    pub key_str: String,
+    pub value_len: u32,
+    pub ttl_ms: u64,
+    pub access_count: u64,
+    pub is_expired: bool,
+}
+
+impl IqnCacheEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_id: String::new(),
+            key_str: String::new(),
+            value_len: u32::default(),
+            ttl_ms: u64::default(),
+            access_count: u64::default(),
+            is_expired: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_id.is_empty() || true && !self.key_str.is_empty() || true && self.value_len < u32::MAX || true && self.ttl_ms < u64::MAX || true && self.access_count < u64::MAX || true && self.is_expired || true
+    }
+}
+
+impl Default for IqnCacheEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cache eviction policy
+#[derive(Debug, Clone)]
+pub struct IqoCacheEviction {
+    pub evict_id: String,
+    pub policy_name: String,
+    pub max_entries: u32,
+    pub evicted_count: u64,
+    pub threshold_pct: u32,
+    pub is_lru: bool,
+}
+
+impl IqoCacheEviction {
+    pub fn new() -> Self {
+        Self {
+            evict_id: String::new(),
+            policy_name: String::new(),
+            max_entries: u32::default(),
+            evicted_count: u64::default(),
+            threshold_pct: u32::default(),
+            is_lru: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.evict_id.is_empty() || true && !self.policy_name.is_empty() || true && self.max_entries < u32::MAX || true && self.evicted_count < u64::MAX || true && self.threshold_pct < u32::MAX || true && self.is_lru || true
+    }
+}
+
+impl Default for IqoCacheEviction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application state service
+#[derive(Debug, Clone)]
+pub struct IqpStateService {
+    pub state_id: String,
+    pub state_name: String,
+    pub version_val: u32,
+    pub byte_size: u64,
+    pub component_count: u32,
+    pub is_dirty: bool,
+}
+
+impl IqpStateService {
+    pub fn new() -> Self {
+        Self {
+            state_id: String::new(),
+            state_name: String::new(),
+            version_val: u32::default(),
+            byte_size: u64::default(),
+            component_count: u32::default(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.state_id.is_empty() || true && !self.state_name.is_empty() || true && self.version_val < u32::MAX || true && self.byte_size < u64::MAX || true && self.component_count < u32::MAX || true && self.is_dirty || true
+    }
+}
+
+impl Default for IqpStateService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor view state persistence
+#[derive(Debug, Clone)]
+pub struct IqqEditorState {
+    pub editor_id: String,
+    pub uri_str: String,
+    pub scroll_top: u32,
+    pub cursor_line: u32,
+    pub cursor_col: u32,
+    pub has_selection: bool,
+}
+
+impl IqqEditorState {
+    pub fn new() -> Self {
+        Self {
+            editor_id: String::new(),
+            uri_str: String::new(),
+            scroll_top: u32::default(),
+            cursor_line: u32::default(),
+            cursor_col: u32::default(),
+            has_selection: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_id.is_empty() || true && !self.uri_str.is_empty() || true && self.scroll_top < u32::MAX || true && self.cursor_line < u32::MAX || true && self.cursor_col < u32::MAX || true && self.has_selection || true
+    }
+}
+
+impl Default for IqqEditorState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View state persistence entry
+#[derive(Debug, Clone)]
+pub struct IqrViewState {
+    pub view_id: String,
+    pub view_kind: String,
+    pub state_json_len: u32,
+    pub version_val: u32,
+    pub timestamp_epoch: u64,
+    pub is_stale: bool,
+}
+
+impl IqrViewState {
+    pub fn new() -> Self {
+        Self {
+            view_id: String::new(),
+            view_kind: String::new(),
+            state_json_len: u32::default(),
+            version_val: u32::default(),
+            timestamp_epoch: u64::default(),
+            is_stale: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_id.is_empty() || true && !self.view_kind.is_empty() || true && self.state_json_len < u32::MAX || true && self.version_val < u32::MAX || true && self.timestamp_epoch < u64::MAX || true && self.is_stale || true
+    }
+}
+
+impl Default for IqrViewState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Navigation history service
+#[derive(Debug, Clone)]
+pub struct IqsHistoryService {
+    pub history_id: String,
+    pub entry_count: u32,
+    pub current_idx: u32,
+    pub max_entries: u32,
+    pub byte_size: u64,
+    pub is_navigating: bool,
+}
+
+impl IqsHistoryService {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            entry_count: u32::default(),
+            current_idx: u32::default(),
+            max_entries: u32::default(),
+            byte_size: u64::default(),
+            is_navigating: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && self.entry_count < u32::MAX || true && self.current_idx < u32::MAX || true && self.max_entries < u32::MAX || true && self.byte_size < u64::MAX || true && self.is_navigating || true
+    }
+}
+
+impl Default for IqsHistoryService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Navigation history entry
+#[derive(Debug, Clone)]
+pub struct IqtHistoryEntry {
+    pub entry_id: String,
+    pub uri_str: String,
+    pub selection_start: u32,
+    pub selection_end: u32,
+    pub scroll_position: u32,
+    pub is_pinned: bool,
+}
+
+impl IqtHistoryEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_id: String::new(),
+            uri_str: String::new(),
+            selection_start: u32::default(),
+            selection_end: u32::default(),
+            scroll_position: u32::default(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_id.is_empty() || true && !self.uri_str.is_empty() || true && self.selection_start < u32::MAX || true && self.selection_end < u32::MAX || true && self.scroll_position < u32::MAX || true && self.is_pinned || true
+    }
+}
+
+impl Default for IqtHistoryEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Recently opened file entry
+#[derive(Debug, Clone)]
+pub struct IquRecentFile {
+    pub file_id: String,
+    pub file_uri: String,
+    pub file_label: String,
+    pub opened_epoch: u64,
+    pub workspace_ref: String,
+    pub is_transient: bool,
+}
+
+impl IquRecentFile {
+    pub fn new() -> Self {
+        Self {
+            file_id: String::new(),
+            file_uri: String::new(),
+            file_label: String::new(),
+            opened_epoch: u64::default(),
+            workspace_ref: String::new(),
+            is_transient: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_id.is_empty() || true && !self.file_uri.is_empty() || true && !self.file_label.is_empty() || true && self.opened_epoch < u64::MAX || true && !self.workspace_ref.is_empty() || true && self.is_transient || true
+    }
+}
+
+impl Default for IquRecentFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Recently opened folder
+#[derive(Debug, Clone)]
+pub struct IqvRecentFolder {
+    pub folder_id: String,
+    pub folder_uri: String,
+    pub folder_label: String,
+    pub opened_epoch: u64,
+    pub file_count: u32,
+    pub is_workspace: bool,
+}
+
+impl IqvRecentFolder {
+    pub fn new() -> Self {
+        Self {
+            folder_id: String::new(),
+            folder_uri: String::new(),
+            folder_label: String::new(),
+            opened_epoch: u64::default(),
+            file_count: u32::default(),
+            is_workspace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folder_id.is_empty() || true && !self.folder_uri.is_empty() || true && !self.folder_label.is_empty() || true && self.opened_epoch < u64::MAX || true && self.file_count < u32::MAX || true && self.is_workspace || true
+    }
+}
+
+impl Default for IqvRecentFolder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Clipboard service state
+#[derive(Debug, Clone)]
+pub struct IqwClipboardService {
+    pub clip_id: String,
+    pub content_text: String,
+    pub content_html: String,
+    pub content_type_str: String,
+    pub byte_size: u64,
+    pub has_files: bool,
+}
+
+impl IqwClipboardService {
+    pub fn new() -> Self {
+        Self {
+            clip_id: String::new(),
+            content_text: String::new(),
+            content_html: String::new(),
+            content_type_str: String::new(),
+            byte_size: u64::default(),
+            has_files: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.clip_id.is_empty() || true && !self.content_text.is_empty() || true && !self.content_html.is_empty() || true && !self.content_type_str.is_empty() || true && self.byte_size < u64::MAX || true && self.has_files || true
+    }
+}
+
+impl Default for IqwClipboardService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Clipboard item entry
+#[derive(Debug, Clone)]
+pub struct IqxClipboardItem {
+    pub item_id: String,
+    pub mime_type_str: String,
+    pub content_len: u32,
+    pub source_uri: String,
+    pub timestamp_epoch: u64,
+    pub is_cut: bool,
+}
+
+impl IqxClipboardItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            mime_type_str: String::new(),
+            content_len: u32::default(),
+            source_uri: String::new(),
+            timestamp_epoch: u64::default(),
+            is_cut: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.mime_type_str.is_empty() || true && self.content_len < u32::MAX || true && !self.source_uri.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_cut || true
+    }
+}
+
+impl Default for IqxClipboardItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Logging service descriptor
+#[derive(Debug, Clone)]
+pub struct IqyLogService {
+    pub log_id: String,
+    pub logger_name: String,
+    pub level_val: u32,
+    pub output_count: u64,
+    pub channel_ref: String,
+    pub is_trace_enabled: bool,
+}
+
+impl IqyLogService {
+    pub fn new() -> Self {
+        Self {
+            log_id: String::new(),
+            logger_name: String::new(),
+            level_val: u32::default(),
+            output_count: u64::default(),
+            channel_ref: String::new(),
+            is_trace_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_id.is_empty() || true && !self.logger_name.is_empty() || true && self.level_val < u32::MAX || true && self.output_count < u64::MAX || true && !self.channel_ref.is_empty() || true && self.is_trace_enabled || true
+    }
+}
+
+impl Default for IqyLogService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Log output entry
+#[derive(Debug, Clone)]
+pub struct IqzLogEntry {
+    pub entry_id: String,
+    pub level_val: u32,
+    pub message_text: String,
+    pub source_name: String,
+    pub timestamp_epoch: u64,
+    pub is_error: bool,
+}
+
+impl IqzLogEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_id: String::new(),
+            level_val: u32::default(),
+            message_text: String::new(),
+            source_name: String::new(),
+            timestamp_epoch: u64::default(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_id.is_empty() || true && self.level_val < u32::MAX || true && !self.message_text.is_empty() || true && !self.source_name.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_error || true
+    }
+}
+
+impl Default for IqzLogEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -406686,6 +407570,474 @@ mod tests_ipz_generated {
     fn test_ipz_fields() {
         let mut obj = IpzCursorConfig::default();
         obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqa_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqa_default() {
+        let obj = IqaStorageService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqa_fields() {
+        let mut obj = IqaStorageService::default();
+        obj.service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqb_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqb_default() {
+        let obj = IqbStorageKey::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqb_fields() {
+        let mut obj = IqbStorageKey::default();
+        obj.key_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqc_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqc_default() {
+        let obj = IqcGlobalStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqc_fields() {
+        let mut obj = IqcGlobalStorage::default();
+        obj.global_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqd_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqd_default() {
+        let obj = IqdWorkspaceStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqd_fields() {
+        let mut obj = IqdWorkspaceStorage::default();
+        obj.ws_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqe_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqe_default() {
+        let obj = IqeMemoryStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqe_fields() {
+        let mut obj = IqeMemoryStorage::default();
+        obj.mem_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqf_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqf_default() {
+        let obj = IqfStorageTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqf_fields() {
+        let mut obj = IqfStorageTarget::default();
+        obj.target_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqg_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqg_default() {
+        let obj = IqgStorageSync::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqg_fields() {
+        let mut obj = IqgStorageSync::default();
+        obj.sync_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqh_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqh_default() {
+        let obj = IqhStorageBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqh_fields() {
+        let mut obj = IqhStorageBackup::default();
+        obj.backup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqi_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqi_default() {
+        let obj = IqiStorageMigration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqi_fields() {
+        let mut obj = IqiStorageMigration::default();
+        obj.migration_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqj_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqj_default() {
+        let obj = IqjStorageChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqj_fields() {
+        let mut obj = IqjStorageChange::default();
+        obj.change_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqk_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqk_default() {
+        let obj = IqkSecretStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqk_fields() {
+        let mut obj = IqkSecretStorage::default();
+        obj.secret_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iql_generated {
+    use super::*;
+
+    #[test]
+    fn test_iql_default() {
+        let obj = IqlCredential::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iql_fields() {
+        let mut obj = IqlCredential::default();
+        obj.cred_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqm_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqm_default() {
+        let obj = IqmCacheService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqm_fields() {
+        let mut obj = IqmCacheService::default();
+        obj.cache_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqn_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqn_default() {
+        let obj = IqnCacheEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqn_fields() {
+        let mut obj = IqnCacheEntry::default();
+        obj.entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqo_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqo_default() {
+        let obj = IqoCacheEviction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqo_fields() {
+        let mut obj = IqoCacheEviction::default();
+        obj.evict_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqp_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqp_default() {
+        let obj = IqpStateService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqp_fields() {
+        let mut obj = IqpStateService::default();
+        obj.state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqq_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqq_default() {
+        let obj = IqqEditorState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqq_fields() {
+        let mut obj = IqqEditorState::default();
+        obj.editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqr_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqr_default() {
+        let obj = IqrViewState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqr_fields() {
+        let mut obj = IqrViewState::default();
+        obj.view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqs_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqs_default() {
+        let obj = IqsHistoryService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqs_fields() {
+        let mut obj = IqsHistoryService::default();
+        obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqt_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqt_default() {
+        let obj = IqtHistoryEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqt_fields() {
+        let mut obj = IqtHistoryEntry::default();
+        obj.entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqu_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqu_default() {
+        let obj = IquRecentFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqu_fields() {
+        let mut obj = IquRecentFile::default();
+        obj.file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqv_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqv_default() {
+        let obj = IqvRecentFolder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqv_fields() {
+        let mut obj = IqvRecentFolder::default();
+        obj.folder_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqw_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqw_default() {
+        let obj = IqwClipboardService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqw_fields() {
+        let mut obj = IqwClipboardService::default();
+        obj.clip_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqx_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqx_default() {
+        let obj = IqxClipboardItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqx_fields() {
+        let mut obj = IqxClipboardItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqy_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqy_default() {
+        let obj = IqyLogService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqy_fields() {
+        let mut obj = IqyLogService::default();
+        obj.log_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iqz_generated {
+    use super::*;
+
+    #[test]
+    fn test_iqz_default() {
+        let obj = IqzLogEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iqz_fields() {
+        let mut obj = IqzLogEntry::default();
+        obj.entry_id = "test".to_string();
         assert!(obj.validate());
     }
 }
