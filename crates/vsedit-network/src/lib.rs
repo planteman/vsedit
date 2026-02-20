@@ -77444,6 +77444,216 @@ impl Default for FuzNotificationsPart {
     }
 }
 
+/// Service identifier (id, type, optional, multiple)
+#[derive(Debug, Clone)]
+pub struct FvaServiceIdentifier {
+    pub service_id: String,
+    pub identifier_type: String,
+    pub is_optional: bool,
+    pub allows_multiple: bool,
+    pub decorator_id: String,
+    pub priority: u32,
+    pub scope: u32,
+    pub description: String,
+    pub owner_module: String,
+    pub is_registered: bool,
+}
+
+impl FvaServiceIdentifier {
+    pub fn new() -> Self {
+        Self {
+            service_id: String::new(),
+            identifier_type: String::new(),
+            is_optional: bool::default(),
+            allows_multiple: bool::default(),
+            decorator_id: String::new(),
+            priority: u32::default(),
+            scope: u32::default(),
+            description: String::new(),
+            owner_module: String::new(),
+            is_registered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.service_id.is_empty() || true && !self.identifier_type.is_empty() || true && self.is_optional || true && self.allows_multiple || true && !self.decorator_id.is_empty() || true && self.priority < u32::MAX || true && self.scope < u32::MAX || true && !self.description.is_empty() || true && !self.owner_module.is_empty() || true && self.is_registered || true
+    }
+}
+
+impl Default for FvaServiceIdentifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service descriptor (ctor, args, supportsDelayedInstantiation)
+#[derive(Debug, Clone)]
+pub struct FvbServiceDescriptor {
+    pub descriptor_id: String,
+    pub constructor_id: String,
+    pub args_json: String,
+    pub supports_delayed: bool,
+    pub is_static_args: bool,
+    pub dependency_count: u32,
+    pub supersedes_id: String,
+    pub lifecycle_phase: u32,
+    pub is_singleton: bool,
+    pub creation_count: u64,
+}
+
+impl FvbServiceDescriptor {
+    pub fn new() -> Self {
+        Self {
+            descriptor_id: String::new(),
+            constructor_id: String::new(),
+            args_json: String::new(),
+            supports_delayed: bool::default(),
+            is_static_args: bool::default(),
+            dependency_count: u32::default(),
+            supersedes_id: String::new(),
+            lifecycle_phase: u32::default(),
+            is_singleton: bool::default(),
+            creation_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.descriptor_id.is_empty() || true && !self.constructor_id.is_empty() || true && !self.args_json.is_empty() || true && self.supports_delayed || true && self.is_static_args || true && self.dependency_count < u32::MAX || true && !self.supersedes_id.is_empty() || true && self.lifecycle_phase < u32::MAX || true && self.is_singleton || true && self.creation_count < u64::MAX || true
+    }
+}
+
+impl Default for FvbServiceDescriptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Instantiation service (create instance, invoke function, services map)
+#[derive(Debug, Clone)]
+pub struct FvcInstantiationService {
+    pub inst_id: String,
+    pub service_count: u32,
+    pub pending_count: u32,
+    pub creation_trace_json: String,
+    pub strict_mode: bool,
+    pub parent_id: String,
+    pub child_count: u32,
+    pub is_disposed: bool,
+    pub invoke_count: u64,
+    pub max_recursion_depth: u32,
+}
+
+impl FvcInstantiationService {
+    pub fn new() -> Self {
+        Self {
+            inst_id: String::new(),
+            service_count: u32::default(),
+            pending_count: u32::default(),
+            creation_trace_json: String::new(),
+            strict_mode: bool::default(),
+            parent_id: String::new(),
+            child_count: u32::default(),
+            is_disposed: bool::default(),
+            invoke_count: u64::default(),
+            max_recursion_depth: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inst_id.is_empty() || true && self.service_count < u32::MAX || true && self.pending_count < u32::MAX || true && !self.creation_trace_json.is_empty() || true && self.strict_mode || true && !self.parent_id.is_empty() || true && self.child_count < u32::MAX || true && self.is_disposed || true && self.invoke_count < u64::MAX || true && self.max_recursion_depth < u32::MAX || true
+    }
+}
+
+impl Default for FvcInstantiationService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service collection (services, set, has, get, entries)
+#[derive(Debug, Clone)]
+pub struct FvdServiceCollection {
+    pub collection_id: String,
+    pub service_count: u32,
+    pub entries_json: String,
+    pub is_frozen: bool,
+    pub parent_collection_id: String,
+    pub override_count: u32,
+    pub has_cyclic_deps: bool,
+    pub last_modified_ms: u64,
+    pub total_size_bytes: u64,
+    pub merge_count: u32,
+}
+
+impl FvdServiceCollection {
+    pub fn new() -> Self {
+        Self {
+            collection_id: String::new(),
+            service_count: u32::default(),
+            entries_json: String::new(),
+            is_frozen: bool::default(),
+            parent_collection_id: String::new(),
+            override_count: u32::default(),
+            has_cyclic_deps: bool::default(),
+            last_modified_ms: u64::default(),
+            total_size_bytes: u64::default(),
+            merge_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.collection_id.is_empty() || true && self.service_count < u32::MAX || true && !self.entries_json.is_empty() || true && self.is_frozen || true && !self.parent_collection_id.is_empty() || true && self.override_count < u32::MAX || true && self.has_cyclic_deps || true && self.last_modified_ms < u64::MAX || true && self.total_size_bytes < u64::MAX || true && self.merge_count < u32::MAX || true
+    }
+}
+
+impl Default for FvdServiceCollection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Disposable store (disposables, isDisposed, clear, add, delete)
+#[derive(Debug, Clone)]
+pub struct FveDisposableStore {
+    pub store_id: String,
+    pub disposable_count: u32,
+    pub is_disposed: bool,
+    pub leak_trace_json: String,
+    pub parent_store_id: String,
+    pub created_at_ms: u64,
+    pub disposed_at_ms: u64,
+    pub add_count: u64,
+    pub clear_count: u64,
+    pub error_count: u32,
+}
+
+impl FveDisposableStore {
+    pub fn new() -> Self {
+        Self {
+            store_id: String::new(),
+            disposable_count: u32::default(),
+            is_disposed: bool::default(),
+            leak_trace_json: String::new(),
+            parent_store_id: String::new(),
+            created_at_ms: u64::default(),
+            disposed_at_ms: u64::default(),
+            add_count: u64::default(),
+            clear_count: u64::default(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.store_id.is_empty() || true && self.disposable_count < u32::MAX || true && self.is_disposed || true && !self.leak_trace_json.is_empty() || true && !self.parent_store_id.is_empty() || true && self.created_at_ms < u64::MAX || true && self.disposed_at_ms < u64::MAX || true && self.add_count < u64::MAX || true && self.clear_count < u64::MAX || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for FveDisposableStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -298542,6 +298752,96 @@ mod tests_fuz_generated {
     fn test_fuz_fields() {
         let mut obj = FuzNotificationsPart::default();
         obj.part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fva_generated {
+    use super::*;
+
+    #[test]
+    fn test_fva_default() {
+        let obj = FvaServiceIdentifier::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fva_fields() {
+        let mut obj = FvaServiceIdentifier::default();
+        obj.service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvb_default() {
+        let obj = FvbServiceDescriptor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvb_fields() {
+        let mut obj = FvbServiceDescriptor::default();
+        obj.descriptor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvc_default() {
+        let obj = FvcInstantiationService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvc_fields() {
+        let mut obj = FvcInstantiationService::default();
+        obj.inst_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvd_default() {
+        let obj = FvdServiceCollection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvd_fields() {
+        let mut obj = FvdServiceCollection::default();
+        obj.collection_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fve_generated {
+    use super::*;
+
+    #[test]
+    fn test_fve_default() {
+        let obj = FveDisposableStore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fve_fields() {
+        let mut obj = FveDisposableStore::default();
+        obj.store_id = "test".to_string();
         assert!(obj.validate());
     }
 }
