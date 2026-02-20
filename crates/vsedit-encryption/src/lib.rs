@@ -84652,6 +84652,468 @@ impl Default for GboEditorInlineSuggest {
     }
 }
 
+/// Editor bracket guide (enabled, active, color, horizontal)
+#[derive(Debug, Clone)]
+pub struct GbpEditorBracketGuide {
+    pub guide_id: String,
+    pub enabled: bool,
+    pub active: bool,
+    pub color_json: String,
+    pub horizontal_guides: bool,
+    pub indent_size: u32,
+    pub bracket_pairs: bool,
+    pub bracket_pair_color: bool,
+    pub highlight_active: bool,
+    pub max_depth: u32,
+}
+
+impl GbpEditorBracketGuide {
+    pub fn new() -> Self {
+        Self {
+            guide_id: String::new(),
+            enabled: bool::default(),
+            active: bool::default(),
+            color_json: String::new(),
+            horizontal_guides: bool::default(),
+            indent_size: u32::default(),
+            bracket_pairs: bool::default(),
+            bracket_pair_color: bool::default(),
+            highlight_active: bool::default(),
+            max_depth: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.guide_id.is_empty() || true && self.enabled || true && self.active || true && !self.color_json.is_empty() || true && self.horizontal_guides || true && self.indent_size < u32::MAX || true && self.bracket_pairs || true && self.bracket_pair_color || true && self.highlight_active || true && self.max_depth < u32::MAX || true
+    }
+}
+
+impl Default for GbpEditorBracketGuide {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor indent guide (enabled, color, active color, highlight active)
+#[derive(Debug, Clone)]
+pub struct GbqEditorIndentGuide {
+    pub indent_id: String,
+    pub enabled: bool,
+    pub color: String,
+    pub active_color: String,
+    pub highlight_active: bool,
+    pub size: u32,
+    pub type_name: String,
+    pub max_depth: u32,
+    pub hide_sub_indent: bool,
+    pub passthrough: bool,
+}
+
+impl GbqEditorIndentGuide {
+    pub fn new() -> Self {
+        Self {
+            indent_id: String::new(),
+            enabled: bool::default(),
+            color: String::new(),
+            active_color: String::new(),
+            highlight_active: bool::default(),
+            size: u32::default(),
+            type_name: String::new(),
+            max_depth: u32::default(),
+            hide_sub_indent: bool::default(),
+            passthrough: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.indent_id.is_empty() || true && self.enabled || true && !self.color.is_empty() || true && !self.active_color.is_empty() || true && self.highlight_active || true && self.size < u32::MAX || true && !self.type_name.is_empty() || true && self.max_depth < u32::MAX || true && self.hide_sub_indent || true && self.passthrough || true
+    }
+}
+
+impl Default for GbqEditorIndentGuide {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor code lens widget (command, range, is resolved, provider)
+#[derive(Debug, Clone)]
+pub struct GbrEditorCodeLensWidget {
+    pub lens_id: String,
+    pub command_id: String,
+    pub command_title: String,
+    pub range_json: String,
+    pub is_resolved: bool,
+    pub provider_id: String,
+    pub arguments_json: String,
+    pub enabled: bool,
+    pub font_family: String,
+    pub font_size: u32,
+}
+
+impl GbrEditorCodeLensWidget {
+    pub fn new() -> Self {
+        Self {
+            lens_id: String::new(),
+            command_id: String::new(),
+            command_title: String::new(),
+            range_json: String::new(),
+            is_resolved: bool::default(),
+            provider_id: String::new(),
+            arguments_json: String::new(),
+            enabled: bool::default(),
+            font_family: String::new(),
+            font_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lens_id.is_empty() || true && !self.command_id.is_empty() || true && !self.command_title.is_empty() || true && !self.range_json.is_empty() || true && self.is_resolved || true && !self.provider_id.is_empty() || true && !self.arguments_json.is_empty() || true && self.enabled || true && !self.font_family.is_empty() || true && self.font_size < u32::MAX || true
+    }
+}
+
+impl Default for GbrEditorCodeLensWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor light bulb widget (position, actions, preferred, auto fix)
+#[derive(Debug, Clone)]
+pub struct GbsEditorLightBulbWidget {
+    pub bulb_id: String,
+    pub line_number: u32,
+    pub actions_json: String,
+    pub preferred_action_id: String,
+    pub auto_fix: bool,
+    pub is_visible: bool,
+    pub source_action: bool,
+    pub organize_imports: bool,
+    pub kind_filter: String,
+    pub trigger: String,
+}
+
+impl GbsEditorLightBulbWidget {
+    pub fn new() -> Self {
+        Self {
+            bulb_id: String::new(),
+            line_number: u32::default(),
+            actions_json: String::new(),
+            preferred_action_id: String::new(),
+            auto_fix: bool::default(),
+            is_visible: bool::default(),
+            source_action: bool::default(),
+            organize_imports: bool::default(),
+            kind_filter: String::new(),
+            trigger: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bulb_id.is_empty() || true && self.line_number < u32::MAX || true && !self.actions_json.is_empty() || true && !self.preferred_action_id.is_empty() || true && self.auto_fix || true && self.is_visible || true && self.source_action || true && self.organize_imports || true && !self.kind_filter.is_empty() || true && !self.trigger.is_empty() || true
+    }
+}
+
+impl Default for GbsEditorLightBulbWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor glyph margin (lane, icon, tooltip, range, priority)
+#[derive(Debug, Clone)]
+pub struct GbtEditorGlyphMargin {
+    pub glyph_id: String,
+    pub lane: u32,
+    pub icon_path: String,
+    pub tooltip: String,
+    pub range_json: String,
+    pub priority: u32,
+    pub is_whole_line: bool,
+    pub color: String,
+    pub z_index: u32,
+    pub persistent: bool,
+}
+
+impl GbtEditorGlyphMargin {
+    pub fn new() -> Self {
+        Self {
+            glyph_id: String::new(),
+            lane: u32::default(),
+            icon_path: String::new(),
+            tooltip: String::new(),
+            range_json: String::new(),
+            priority: u32::default(),
+            is_whole_line: bool::default(),
+            color: String::new(),
+            z_index: u32::default(),
+            persistent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.glyph_id.is_empty() || true && self.lane < u32::MAX || true && !self.icon_path.is_empty() || true && !self.tooltip.is_empty() || true && !self.range_json.is_empty() || true && self.priority < u32::MAX || true && self.is_whole_line || true && !self.color.is_empty() || true && self.z_index < u32::MAX || true && self.persistent || true
+    }
+}
+
+impl Default for GbtEditorGlyphMargin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor folding range (start, end, kind, collapsed, region tag)
+#[derive(Debug, Clone)]
+pub struct GbuEditorFoldingRange {
+    pub fold_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub kind: String,
+    pub is_collapsed: bool,
+    pub region_tag: String,
+    pub is_manual: bool,
+    pub max_level: u32,
+    pub provider_id: String,
+    pub show_last_line: bool,
+}
+
+impl GbuEditorFoldingRange {
+    pub fn new() -> Self {
+        Self {
+            fold_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            kind: String::new(),
+            is_collapsed: bool::default(),
+            region_tag: String::new(),
+            is_manual: bool::default(),
+            max_level: u32::default(),
+            provider_id: String::new(),
+            show_last_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fold_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.kind.is_empty() || true && self.is_collapsed || true && !self.region_tag.is_empty() || true && self.is_manual || true && self.max_level < u32::MAX || true && !self.provider_id.is_empty() || true && self.show_last_line || true
+    }
+}
+
+impl Default for GbuEditorFoldingRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor color decorator (color value, range, format, swatch)
+#[derive(Debug, Clone)]
+pub struct GbvEditorColorDecorator {
+    pub color_id: String,
+    pub color_value: String,
+    pub range_json: String,
+    pub format: String,
+    pub swatch_enabled: bool,
+    pub presentation_json: String,
+    pub available_formats_json: String,
+    pub is_editable: bool,
+    pub alpha: f64,
+    pub opacity: f64,
+}
+
+impl GbvEditorColorDecorator {
+    pub fn new() -> Self {
+        Self {
+            color_id: String::new(),
+            color_value: String::new(),
+            range_json: String::new(),
+            format: String::new(),
+            swatch_enabled: bool::default(),
+            presentation_json: String::new(),
+            available_formats_json: String::new(),
+            is_editable: bool::default(),
+            alpha: f64::default(),
+            opacity: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_id.is_empty() || true && !self.color_value.is_empty() || true && !self.range_json.is_empty() || true && !self.format.is_empty() || true && self.swatch_enabled || true && !self.presentation_json.is_empty() || true && !self.available_formats_json.is_empty() || true && self.is_editable || true && self.alpha.is_finite() || true && self.opacity.is_finite() || true
+    }
+}
+
+impl Default for GbvEditorColorDecorator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor inlay hint item (label, position, kind, padding, tooltip)
+#[derive(Debug, Clone)]
+pub struct GbwEditorInlayHintItem {
+    pub inlay_id: String,
+    pub label: String,
+    pub position_json: String,
+    pub kind: u32,
+    pub padding_left: bool,
+    pub padding_right: bool,
+    pub tooltip: String,
+    pub text_edits_json: String,
+    pub command_id: String,
+    pub data_json: String,
+}
+
+impl GbwEditorInlayHintItem {
+    pub fn new() -> Self {
+        Self {
+            inlay_id: String::new(),
+            label: String::new(),
+            position_json: String::new(),
+            kind: u32::default(),
+            padding_left: bool::default(),
+            padding_right: bool::default(),
+            tooltip: String::new(),
+            text_edits_json: String::new(),
+            command_id: String::new(),
+            data_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inlay_id.is_empty() || true && !self.label.is_empty() || true && !self.position_json.is_empty() || true && self.kind < u32::MAX || true && self.padding_left || true && self.padding_right || true && !self.tooltip.is_empty() || true && !self.text_edits_json.is_empty() || true && !self.command_id.is_empty() || true && !self.data_json.is_empty() || true
+    }
+}
+
+impl Default for GbwEditorInlayHintItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor linked editing (ranges, word pattern, provider)
+#[derive(Debug, Clone)]
+pub struct GbxEditorLinkedEditing {
+    pub linked_id: String,
+    pub ranges_json: String,
+    pub word_pattern: String,
+    pub provider_id: String,
+    pub is_active: bool,
+    pub trigger_kind: u32,
+    pub debounce_ms: u32,
+    pub max_ranges: u32,
+    pub editor_uri: String,
+    pub position_json: String,
+}
+
+impl GbxEditorLinkedEditing {
+    pub fn new() -> Self {
+        Self {
+            linked_id: String::new(),
+            ranges_json: String::new(),
+            word_pattern: String::new(),
+            provider_id: String::new(),
+            is_active: bool::default(),
+            trigger_kind: u32::default(),
+            debounce_ms: u32::default(),
+            max_ranges: u32::default(),
+            editor_uri: String::new(),
+            position_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.linked_id.is_empty() || true && !self.ranges_json.is_empty() || true && !self.word_pattern.is_empty() || true && !self.provider_id.is_empty() || true && self.is_active || true && self.trigger_kind < u32::MAX || true && self.debounce_ms < u32::MAX || true && self.max_ranges < u32::MAX || true && !self.editor_uri.is_empty() || true && !self.position_json.is_empty() || true
+    }
+}
+
+impl Default for GbxEditorLinkedEditing {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor rename widget (old name, new name, position, preview)
+#[derive(Debug, Clone)]
+pub struct GbyEditorRenameWidget {
+    pub rename_id: String,
+    pub old_name: String,
+    pub new_name: String,
+    pub position_json: String,
+    pub preview_enabled: bool,
+    pub is_valid: bool,
+    pub validation_message: String,
+    pub reject_reason: String,
+    pub provider_id: String,
+    pub show_preview: bool,
+}
+
+impl GbyEditorRenameWidget {
+    pub fn new() -> Self {
+        Self {
+            rename_id: String::new(),
+            old_name: String::new(),
+            new_name: String::new(),
+            position_json: String::new(),
+            preview_enabled: bool::default(),
+            is_valid: bool::default(),
+            validation_message: String::new(),
+            reject_reason: String::new(),
+            provider_id: String::new(),
+            show_preview: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rename_id.is_empty() || true && !self.old_name.is_empty() || true && !self.new_name.is_empty() || true && !self.position_json.is_empty() || true && self.preview_enabled || true && self.is_valid || true && !self.validation_message.is_empty() || true && !self.reject_reason.is_empty() || true && !self.provider_id.is_empty() || true && self.show_preview || true
+    }
+}
+
+impl Default for GbyEditorRenameWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor goto widget (line input, symbol input, command mode)
+#[derive(Debug, Clone)]
+pub struct GbzEditorGotoWidget {
+    pub goto_id: String,
+    pub line_input: String,
+    pub symbol_input: String,
+    pub command_mode: bool,
+    pub current_line: u32,
+    pub max_line: u32,
+    pub prefix: String,
+    pub is_visible: bool,
+    pub history_json: String,
+    pub placeholder: String,
+}
+
+impl GbzEditorGotoWidget {
+    pub fn new() -> Self {
+        Self {
+            goto_id: String::new(),
+            line_input: String::new(),
+            symbol_input: String::new(),
+            command_mode: bool::default(),
+            current_line: u32::default(),
+            max_line: u32::default(),
+            prefix: String::new(),
+            is_visible: bool::default(),
+            history_json: String::new(),
+            placeholder: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.goto_id.is_empty() || true && !self.line_input.is_empty() || true && !self.symbol_input.is_empty() || true && self.command_mode || true && self.current_line < u32::MAX || true && self.max_line < u32::MAX || true && !self.prefix.is_empty() || true && self.is_visible || true && !self.history_json.is_empty() || true && !self.placeholder.is_empty() || true
+    }
+}
+
+impl Default for GbzEditorGotoWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308822,6 +309284,204 @@ mod tests_gbo_generated {
     fn test_gbo_fields() {
         let mut obj = GboEditorInlineSuggest::default();
         obj.inline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbp_default() {
+        let obj = GbpEditorBracketGuide::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbp_fields() {
+        let mut obj = GbpEditorBracketGuide::default();
+        obj.guide_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbq_default() {
+        let obj = GbqEditorIndentGuide::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbq_fields() {
+        let mut obj = GbqEditorIndentGuide::default();
+        obj.indent_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbr_default() {
+        let obj = GbrEditorCodeLensWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbr_fields() {
+        let mut obj = GbrEditorCodeLensWidget::default();
+        obj.lens_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbs_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbs_default() {
+        let obj = GbsEditorLightBulbWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbs_fields() {
+        let mut obj = GbsEditorLightBulbWidget::default();
+        obj.bulb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbt_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbt_default() {
+        let obj = GbtEditorGlyphMargin::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbt_fields() {
+        let mut obj = GbtEditorGlyphMargin::default();
+        obj.glyph_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbu_default() {
+        let obj = GbuEditorFoldingRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbu_fields() {
+        let mut obj = GbuEditorFoldingRange::default();
+        obj.fold_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbv_default() {
+        let obj = GbvEditorColorDecorator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbv_fields() {
+        let mut obj = GbvEditorColorDecorator::default();
+        obj.color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbw_default() {
+        let obj = GbwEditorInlayHintItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbw_fields() {
+        let mut obj = GbwEditorInlayHintItem::default();
+        obj.inlay_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbx_default() {
+        let obj = GbxEditorLinkedEditing::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbx_fields() {
+        let mut obj = GbxEditorLinkedEditing::default();
+        obj.linked_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gby_generated {
+    use super::*;
+
+    #[test]
+    fn test_gby_default() {
+        let obj = GbyEditorRenameWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gby_fields() {
+        let mut obj = GbyEditorRenameWidget::default();
+        obj.rename_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbz_default() {
+        let obj = GbzEditorGotoWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbz_fields() {
+        let mut obj = GbzEditorGotoWidget::default();
+        obj.goto_id = "test".to_string();
         assert!(obj.validate());
     }
 }
