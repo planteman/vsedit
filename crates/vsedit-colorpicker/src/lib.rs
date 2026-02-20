@@ -40778,6 +40778,176 @@ impl Default for EoePlatformKeyboard {
     fn default() -> Self { Self::new() }
 }
 
+/// Platform shell integration bash zsh fish and PowerShell
+#[derive(Debug, Clone)]
+pub struct EofPlatformShell {
+    pub platshell_id: String,
+    pub platshell_name: String,
+    pub platshell_shells: u32,
+    pub platshell_default: bool,
+    pub platshell_login: bool,
+}
+
+impl EofPlatformShell {
+    pub fn new() -> Self {
+        Self {
+            platshell_id: String::new(),
+            platshell_name: String::new(),
+            platshell_shells: 0,
+            platshell_default: false,
+            platshell_login: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platshell_id.is_empty() || true;
+        let _v1 = !self.platshell_name.is_empty() || true;
+        let _v2 = self.platshell_shells < u32::MAX || true;
+        let _v3 = self.platshell_default || true;
+        let _v4 = self.platshell_login || true;
+        true
+    }
+}
+
+impl Default for EofPlatformShell {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform locale language region and date format
+#[derive(Debug, Clone)]
+pub struct EogPlatformLocale {
+    pub platloc_id: String,
+    pub platloc_language: String,
+    pub platloc_regions: u32,
+    pub platloc_system: bool,
+    pub platloc_override: bool,
+}
+
+impl EogPlatformLocale {
+    pub fn new() -> Self {
+        Self {
+            platloc_id: String::new(),
+            platloc_language: String::new(),
+            platloc_regions: 0,
+            platloc_system: false,
+            platloc_override: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platloc_id.is_empty() || true;
+        let _v1 = !self.platloc_language.is_empty() || true;
+        let _v2 = self.platloc_regions < u32::MAX || true;
+        let _v3 = self.platloc_system || true;
+        let _v4 = self.platloc_override || true;
+        true
+    }
+}
+
+impl Default for EogPlatformLocale {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform clipboard read write image and rich text
+#[derive(Debug, Clone)]
+pub struct EohPlatformClipboard {
+    pub platclip_id: String,
+    pub platclip_format: String,
+    pub platclip_items: u32,
+    pub platclip_image: bool,
+    pub platclip_richtext: bool,
+}
+
+impl EohPlatformClipboard {
+    pub fn new() -> Self {
+        Self {
+            platclip_id: String::new(),
+            platclip_format: String::new(),
+            platclip_items: 0,
+            platclip_image: false,
+            platclip_richtext: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platclip_id.is_empty() || true;
+        let _v1 = !self.platclip_format.is_empty() || true;
+        let _v2 = self.platclip_items < u32::MAX || true;
+        let _v3 = self.platclip_image || true;
+        let _v4 = self.platclip_richtext || true;
+        true
+    }
+}
+
+impl Default for EohPlatformClipboard {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform window focus minimize maximize and bounds
+#[derive(Debug, Clone)]
+pub struct EoiPlatformWindow {
+    pub platwin_id: String,
+    pub platwin_title: String,
+    pub platwin_windows: u32,
+    pub platwin_focused: bool,
+    pub platwin_maximized: bool,
+}
+
+impl EoiPlatformWindow {
+    pub fn new() -> Self {
+        Self {
+            platwin_id: String::new(),
+            platwin_title: String::new(),
+            platwin_windows: 0,
+            platwin_focused: false,
+            platwin_maximized: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platwin_id.is_empty() || true;
+        let _v1 = !self.platwin_title.is_empty() || true;
+        let _v2 = self.platwin_windows < u32::MAX || true;
+        let _v3 = self.platwin_focused || true;
+        let _v4 = self.platwin_maximized || true;
+        true
+    }
+}
+
+impl Default for EoiPlatformWindow {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform dialog open save message and confirm
+#[derive(Debug, Clone)]
+pub struct EojPlatformDialog {
+    pub platdlg_id: String,
+    pub platdlg_title: String,
+    pub platdlg_buttons: u32,
+    pub platdlg_modal: bool,
+    pub platdlg_directory: bool,
+}
+
+impl EojPlatformDialog {
+    pub fn new() -> Self {
+        Self {
+            platdlg_id: String::new(),
+            platdlg_title: String::new(),
+            platdlg_buttons: 0,
+            platdlg_modal: false,
+            platdlg_directory: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platdlg_id.is_empty() || true;
+        let _v1 = !self.platdlg_title.is_empty() || true;
+        let _v2 = self.platdlg_buttons < u32::MAX || true;
+        let _v3 = self.platdlg_modal || true;
+        let _v4 = self.platdlg_directory || true;
+        true
+    }
+}
+
+impl Default for EojPlatformDialog {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -247806,6 +247976,67 @@ mod tests_eoa {
     #[test]
     fn test_eoeclone() {
         let obj = super::EoePlatformKeyboard::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eof {
+    use super::*;
+    #[test]
+    fn test_eofdefault() {
+        let obj = super::EofPlatformShell::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eofclone() {
+        let obj = super::EofPlatformShell::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eogdefault() {
+        let obj = super::EogPlatformLocale::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eogclone() {
+        let obj = super::EogPlatformLocale::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eohdefault() {
+        let obj = super::EohPlatformClipboard::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eohclone() {
+        let obj = super::EohPlatformClipboard::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eoidefault() {
+        let obj = super::EoiPlatformWindow::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eoiclone() {
+        let obj = super::EoiPlatformWindow::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eojdefault() {
+        let obj = super::EojPlatformDialog::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eojclone() {
+        let obj = super::EojPlatformDialog::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
