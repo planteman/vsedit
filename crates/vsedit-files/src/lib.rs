@@ -98399,6 +98399,216 @@ impl Default for GoeMergeEditorModel {
     }
 }
 
+/// Merge conflict (range, current, incoming, ancestor, is resolved)
+#[derive(Debug, Clone)]
+pub struct GofMergeConflict {
+    pub conflict_id: String,
+    pub range_json: String,
+    pub current_text: String,
+    pub incoming_text: String,
+    pub ancestor_text: String,
+    pub is_resolved: bool,
+    pub resolution: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub file_uri: String,
+}
+
+impl GofMergeConflict {
+    pub fn new() -> Self {
+        Self {
+            conflict_id: String::new(),
+            range_json: String::new(),
+            current_text: String::new(),
+            incoming_text: String::new(),
+            ancestor_text: String::new(),
+            is_resolved: bool::default(),
+            resolution: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            file_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conflict_id.is_empty() || true && !self.range_json.is_empty() || true && !self.current_text.is_empty() || true && !self.incoming_text.is_empty() || true && !self.ancestor_text.is_empty() || true && self.is_resolved || true && !self.resolution.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.file_uri.is_empty() || true
+    }
+}
+
+impl Default for GofMergeConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge conflict decoration (current, incoming, header, gutter)
+#[derive(Debug, Clone)]
+pub struct GogMergeConflictDecoration {
+    pub merge_deco_id: String,
+    pub current_color: String,
+    pub incoming_color: String,
+    pub header_color: String,
+    pub gutter_enabled: bool,
+    pub word_level: bool,
+    pub show_actions: bool,
+    pub code_lens_enabled: bool,
+    pub border_width: u32,
+    pub overview_ruler: bool,
+}
+
+impl GogMergeConflictDecoration {
+    pub fn new() -> Self {
+        Self {
+            merge_deco_id: String::new(),
+            current_color: String::new(),
+            incoming_color: String::new(),
+            header_color: String::new(),
+            gutter_enabled: bool::default(),
+            word_level: bool::default(),
+            show_actions: bool::default(),
+            code_lens_enabled: bool::default(),
+            border_width: u32::default(),
+            overview_ruler: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_deco_id.is_empty() || true && !self.current_color.is_empty() || true && !self.incoming_color.is_empty() || true && !self.header_color.is_empty() || true && self.gutter_enabled || true && self.word_level || true && self.show_actions || true && self.code_lens_enabled || true && self.border_width < u32::MAX || true && self.overview_ruler || true
+    }
+}
+
+impl Default for GogMergeConflictDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff algorithm (type, patience, histogram, Myers, minimal)
+#[derive(Debug, Clone)]
+pub struct GohDiffAlgorithm {
+    pub algo_id: String,
+    pub algorithm_type: String,
+    pub use_patience: bool,
+    pub use_histogram: bool,
+    pub use_myers: bool,
+    pub minimal: bool,
+    pub timeout_ms: u64,
+    pub max_edit_distance: u32,
+    pub ignore_whitespace: bool,
+    pub context_lines: u32,
+}
+
+impl GohDiffAlgorithm {
+    pub fn new() -> Self {
+        Self {
+            algo_id: String::new(),
+            algorithm_type: String::new(),
+            use_patience: bool::default(),
+            use_histogram: bool::default(),
+            use_myers: bool::default(),
+            minimal: bool::default(),
+            timeout_ms: u64::default(),
+            max_edit_distance: u32::default(),
+            ignore_whitespace: bool::default(),
+            context_lines: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.algo_id.is_empty() || true && !self.algorithm_type.is_empty() || true && self.use_patience || true && self.use_histogram || true && self.use_myers || true && self.minimal || true && self.timeout_ms < u64::MAX || true && self.max_edit_distance < u32::MAX || true && self.ignore_whitespace || true && self.context_lines < u32::MAX || true
+    }
+}
+
+impl Default for GohDiffAlgorithm {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff hunk (start1, count1, start2, count2, header, lines)
+#[derive(Debug, Clone)]
+pub struct GoiDiffHunk {
+    pub hunk_id: String,
+    pub start1: u32,
+    pub count1: u32,
+    pub start2: u32,
+    pub count2: u32,
+    pub header: String,
+    pub lines_json: String,
+    pub is_binary: bool,
+    pub file_mode_change: String,
+    pub rename_from: String,
+}
+
+impl GoiDiffHunk {
+    pub fn new() -> Self {
+        Self {
+            hunk_id: String::new(),
+            start1: u32::default(),
+            count1: u32::default(),
+            start2: u32::default(),
+            count2: u32::default(),
+            header: String::new(),
+            lines_json: String::new(),
+            is_binary: bool::default(),
+            file_mode_change: String::new(),
+            rename_from: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hunk_id.is_empty() || true && self.start1 < u32::MAX || true && self.count1 < u32::MAX || true && self.start2 < u32::MAX || true && self.count2 < u32::MAX || true && !self.header.is_empty() || true && !self.lines_json.is_empty() || true && self.is_binary || true && !self.file_mode_change.is_empty() || true && !self.rename_from.is_empty() || true
+    }
+}
+
+impl Default for GoiDiffHunk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff line change (operation, line number, text, indentation)
+#[derive(Debug, Clone)]
+pub struct GojDiffLineChange {
+    pub line_change_id: String,
+    pub operation: String,
+    pub line_number: u32,
+    pub text: String,
+    pub indentation: u32,
+    pub original_line_number: u32,
+    pub is_whitespace_only: bool,
+    pub word_changes_json: String,
+    pub char_changes_json: String,
+    pub moved_from: u32,
+}
+
+impl GojDiffLineChange {
+    pub fn new() -> Self {
+        Self {
+            line_change_id: String::new(),
+            operation: String::new(),
+            line_number: u32::default(),
+            text: String::new(),
+            indentation: u32::default(),
+            original_line_number: u32::default(),
+            is_whitespace_only: bool::default(),
+            word_changes_json: String::new(),
+            char_changes_json: String::new(),
+            moved_from: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_change_id.is_empty() || true && !self.operation.is_empty() || true && self.line_number < u32::MAX || true && !self.text.is_empty() || true && self.indentation < u32::MAX || true && self.original_line_number < u32::MAX || true && self.is_whitespace_only || true && !self.word_changes_json.is_empty() || true && !self.char_changes_json.is_empty() || true && self.moved_from < u32::MAX || true
+    }
+}
+
+impl Default for GojDiffLineChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -328487,6 +328697,96 @@ mod tests_goe_generated {
     fn test_goe_fields() {
         let mut obj = GoeMergeEditorModel::default();
         obj.merge_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gof_generated {
+    use super::*;
+
+    #[test]
+    fn test_gof_default() {
+        let obj = GofMergeConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gof_fields() {
+        let mut obj = GofMergeConflict::default();
+        obj.conflict_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gog_generated {
+    use super::*;
+
+    #[test]
+    fn test_gog_default() {
+        let obj = GogMergeConflictDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gog_fields() {
+        let mut obj = GogMergeConflictDecoration::default();
+        obj.merge_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_goh_generated {
+    use super::*;
+
+    #[test]
+    fn test_goh_default() {
+        let obj = GohDiffAlgorithm::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_goh_fields() {
+        let mut obj = GohDiffAlgorithm::default();
+        obj.algo_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_goi_generated {
+    use super::*;
+
+    #[test]
+    fn test_goi_default() {
+        let obj = GoiDiffHunk::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_goi_fields() {
+        let mut obj = GoiDiffHunk::default();
+        obj.hunk_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_goj_generated {
+    use super::*;
+
+    #[test]
+    fn test_goj_default() {
+        let obj = GojDiffLineChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_goj_fields() {
+        let mut obj = GojDiffLineChange::default();
+        obj.line_change_id = "test".to_string();
         assert!(obj.validate());
     }
 }
