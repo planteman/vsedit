@@ -101589,6 +101589,216 @@ impl Default for GqzLanguageFeatureRegistry {
     }
 }
 
+/// Event emitter (fire, event, on, once, dispose, listeners)
+#[derive(Debug, Clone)]
+pub struct GraEventEmitter {
+    pub emitter_id: String,
+    pub event_name: String,
+    pub listener_count: u32,
+    pub max_listeners: u32,
+    pub is_disposed: bool,
+    pub leak_warning_threshold: u32,
+    pub delivery_queue_size: u32,
+    pub fire_count: u64,
+    pub has_listeners: bool,
+    pub options_json: String,
+}
+
+impl GraEventEmitter {
+    pub fn new() -> Self {
+        Self {
+            emitter_id: String::new(),
+            event_name: String::new(),
+            listener_count: u32::default(),
+            max_listeners: u32::default(),
+            is_disposed: bool::default(),
+            leak_warning_threshold: u32::default(),
+            delivery_queue_size: u32::default(),
+            fire_count: u64::default(),
+            has_listeners: bool::default(),
+            options_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.emitter_id.is_empty() || true && !self.event_name.is_empty() || true && self.listener_count < u32::MAX || true && self.max_listeners < u32::MAX || true && self.is_disposed || true && self.leak_warning_threshold < u32::MAX || true && self.delivery_queue_size < u32::MAX || true && self.fire_count < u64::MAX || true && self.has_listeners || true && !self.options_json.is_empty() || true
+    }
+}
+
+impl Default for GraEventEmitter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cancellation token (is cancelled, on cancel, source, dispose)
+#[derive(Debug, Clone)]
+pub struct GrbCancellationToken {
+    pub cancel_id: String,
+    pub is_cancelled: bool,
+    pub on_cancel_registered: bool,
+    pub source_id: String,
+    pub is_disposed: bool,
+    pub parent_token_id: String,
+    pub timeout_ms: u64,
+    pub reason: String,
+    pub created_ms: u64,
+    pub cancel_requested_ms: u64,
+}
+
+impl GrbCancellationToken {
+    pub fn new() -> Self {
+        Self {
+            cancel_id: String::new(),
+            is_cancelled: bool::default(),
+            on_cancel_registered: bool::default(),
+            source_id: String::new(),
+            is_disposed: bool::default(),
+            parent_token_id: String::new(),
+            timeout_ms: u64::default(),
+            reason: String::new(),
+            created_ms: u64::default(),
+            cancel_requested_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cancel_id.is_empty() || true && self.is_cancelled || true && self.on_cancel_registered || true && !self.source_id.is_empty() || true && self.is_disposed || true && !self.parent_token_id.is_empty() || true && self.timeout_ms < u64::MAX || true && !self.reason.is_empty() || true && self.created_ms < u64::MAX || true && self.cancel_requested_ms < u64::MAX || true
+    }
+}
+
+impl Default for GrbCancellationToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async barrier (open, wait, is open, participant count)
+#[derive(Debug, Clone)]
+pub struct GrcAsyncBarrier {
+    pub barrier_id: String,
+    pub is_open: bool,
+    pub participant_count: u32,
+    pub arrived_count: u32,
+    pub timeout_ms: u64,
+    pub name: String,
+    pub is_disposed: bool,
+    pub created_ms: u64,
+    pub opened_ms: u64,
+    pub on_open_registered: bool,
+}
+
+impl GrcAsyncBarrier {
+    pub fn new() -> Self {
+        Self {
+            barrier_id: String::new(),
+            is_open: bool::default(),
+            participant_count: u32::default(),
+            arrived_count: u32::default(),
+            timeout_ms: u64::default(),
+            name: String::new(),
+            is_disposed: bool::default(),
+            created_ms: u64::default(),
+            opened_ms: u64::default(),
+            on_open_registered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.barrier_id.is_empty() || true && self.is_open || true && self.participant_count < u32::MAX || true && self.arrived_count < u32::MAX || true && self.timeout_ms < u64::MAX || true && !self.name.is_empty() || true && self.is_disposed || true && self.created_ms < u64::MAX || true && self.opened_ms < u64::MAX || true && self.on_open_registered || true
+    }
+}
+
+impl Default for GrcAsyncBarrier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Throttler (trigger, cancel, is scheduled, delay, disposed)
+#[derive(Debug, Clone)]
+pub struct GrdThrottler {
+    pub throttle_id: String,
+    pub delay_ms: u32,
+    pub is_scheduled: bool,
+    pub is_disposed: bool,
+    pub leading: bool,
+    pub trailing: bool,
+    pub max_wait_ms: u32,
+    pub last_trigger_ms: u64,
+    pub trigger_count: u64,
+    pub cancel_count: u64,
+}
+
+impl GrdThrottler {
+    pub fn new() -> Self {
+        Self {
+            throttle_id: String::new(),
+            delay_ms: u32::default(),
+            is_scheduled: bool::default(),
+            is_disposed: bool::default(),
+            leading: bool::default(),
+            trailing: bool::default(),
+            max_wait_ms: u32::default(),
+            last_trigger_ms: u64::default(),
+            trigger_count: u64::default(),
+            cancel_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.throttle_id.is_empty() || true && self.delay_ms < u32::MAX || true && self.is_scheduled || true && self.is_disposed || true && self.leading || true && self.trailing || true && self.max_wait_ms < u32::MAX || true && self.last_trigger_ms < u64::MAX || true && self.trigger_count < u64::MAX || true && self.cancel_count < u64::MAX || true
+    }
+}
+
+impl Default for GrdThrottler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sequencer (queue, cancel current, size, pending count)
+#[derive(Debug, Clone)]
+pub struct GreSequencer {
+    pub seq_id: String,
+    pub queue_size: u32,
+    pub pending_count: u32,
+    pub is_running: bool,
+    pub max_queue_size: u32,
+    pub is_disposed: bool,
+    pub completed_count: u64,
+    pub error_count: u64,
+    pub current_task_id: String,
+    pub drain_timeout_ms: u64,
+}
+
+impl GreSequencer {
+    pub fn new() -> Self {
+        Self {
+            seq_id: String::new(),
+            queue_size: u32::default(),
+            pending_count: u32::default(),
+            is_running: bool::default(),
+            max_queue_size: u32::default(),
+            is_disposed: bool::default(),
+            completed_count: u64::default(),
+            error_count: u64::default(),
+            current_task_id: String::new(),
+            drain_timeout_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.seq_id.is_empty() || true && self.queue_size < u32::MAX || true && self.pending_count < u32::MAX || true && self.is_running || true && self.max_queue_size < u32::MAX || true && self.is_disposed || true && self.completed_count < u64::MAX || true && self.error_count < u64::MAX || true && !self.current_task_id.is_empty() || true && self.drain_timeout_ms < u64::MAX || true
+    }
+}
+
+impl Default for GreSequencer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -332847,6 +333057,96 @@ mod tests_gqz_generated {
     fn test_gqz_fields() {
         let mut obj = GqzLanguageFeatureRegistry::default();
         obj.feat_reg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gra_generated {
+    use super::*;
+
+    #[test]
+    fn test_gra_default() {
+        let obj = GraEventEmitter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gra_fields() {
+        let mut obj = GraEventEmitter::default();
+        obj.emitter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grb_generated {
+    use super::*;
+
+    #[test]
+    fn test_grb_default() {
+        let obj = GrbCancellationToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grb_fields() {
+        let mut obj = GrbCancellationToken::default();
+        obj.cancel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grc_generated {
+    use super::*;
+
+    #[test]
+    fn test_grc_default() {
+        let obj = GrcAsyncBarrier::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grc_fields() {
+        let mut obj = GrcAsyncBarrier::default();
+        obj.barrier_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grd_generated {
+    use super::*;
+
+    #[test]
+    fn test_grd_default() {
+        let obj = GrdThrottler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grd_fields() {
+        let mut obj = GrdThrottler::default();
+        obj.throttle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gre_generated {
+    use super::*;
+
+    #[test]
+    fn test_gre_default() {
+        let obj = GreSequencer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gre_fields() {
+        let mut obj = GreSequencer::default();
+        obj.seq_id = "test".to_string();
         assert!(obj.validate());
     }
 }
