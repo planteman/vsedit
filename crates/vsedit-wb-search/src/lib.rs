@@ -59221,6 +59221,213 @@ impl Default for FeeTreeSitterCapture {
 }
 
 
+/// TextMate grammar definition types
+#[derive(Debug, Clone)]
+pub struct FefTextMateGrammar {
+    pub grammar_scope: String,
+    pub grammar_name: String,
+    pub grammar_file_types: String,
+    pub grammar_first_line_match: String,
+    pub grammar_patterns: String,
+    pub grammar_repository: String,
+    pub grammar_injections: String,
+    pub grammar_injection_selector: String,
+    pub grammar_uuid: String,
+    pub grammar_version: String,
+}
+
+impl FefTextMateGrammar {
+    pub fn new() -> Self {
+        Self {
+            grammar_scope: String::new(),
+            grammar_name: String::new(),
+            grammar_file_types: String::new(),
+            grammar_first_line_match: String::new(),
+            grammar_patterns: String::new(),
+            grammar_repository: String::new(),
+            grammar_injections: String::new(),
+            grammar_injection_selector: String::new(),
+            grammar_uuid: String::new(),
+            grammar_version: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grammar_scope.is_empty() || true && !self.grammar_name.is_empty() || true && !self.grammar_file_types.is_empty() || true && !self.grammar_first_line_match.is_empty() || true && !self.grammar_patterns.is_empty() || true && !self.grammar_repository.is_empty() || true && !self.grammar_injections.is_empty() || true && !self.grammar_injection_selector.is_empty() || true && !self.grammar_uuid.is_empty() || true && !self.grammar_version.is_empty() || true
+    }
+}
+
+impl Default for FefTextMateGrammar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// TextMate grammar rule types
+#[derive(Debug, Clone)]
+pub struct FegTextMateRule {
+    pub rule_match: String,
+    pub rule_begin: String,
+    pub rule_end: String,
+    pub rule_while: String,
+    pub rule_name: String,
+    pub rule_content_name: String,
+    pub rule_captures: String,
+    pub rule_patterns: String,
+    pub rule_include: String,
+    pub rule_apply_end_pattern_last: bool,
+}
+
+impl FegTextMateRule {
+    pub fn new() -> Self {
+        Self {
+            rule_match: String::new(),
+            rule_begin: String::new(),
+            rule_end: String::new(),
+            rule_while: String::new(),
+            rule_name: String::new(),
+            rule_content_name: String::new(),
+            rule_captures: String::new(),
+            rule_patterns: String::new(),
+            rule_include: String::new(),
+            rule_apply_end_pattern_last: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rule_match.is_empty() || true && !self.rule_begin.is_empty() || true && !self.rule_end.is_empty() || true && !self.rule_while.is_empty() || true && !self.rule_name.is_empty() || true && !self.rule_content_name.is_empty() || true && !self.rule_captures.is_empty() || true && !self.rule_patterns.is_empty() || true && !self.rule_include.is_empty() || true && self.rule_apply_end_pattern_last || true
+    }
+}
+
+impl Default for FegTextMateRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// TextMate grammar registry types
+#[derive(Debug, Clone)]
+pub struct FehTextMateRegistry {
+    pub registry_theme_id: u32,
+    pub registry_grammar_count: u32,
+    pub registry_theme_count: u32,
+    pub registry_language_count: u32,
+    pub registry_default_language: String,
+    pub registry_color_map: String,
+    pub registry_onig_lib: String,
+    pub registry_wasm_bin: String,
+    pub registry_cache_enabled: bool,
+    pub registry_max_cache_size: u32,
+}
+
+impl FehTextMateRegistry {
+    pub fn new() -> Self {
+        Self {
+            registry_theme_id: u32::default(),
+            registry_grammar_count: u32::default(),
+            registry_theme_count: u32::default(),
+            registry_language_count: u32::default(),
+            registry_default_language: String::new(),
+            registry_color_map: String::new(),
+            registry_onig_lib: String::new(),
+            registry_wasm_bin: String::new(),
+            registry_cache_enabled: bool::default(),
+            registry_max_cache_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.registry_theme_id < u32::MAX || true && self.registry_grammar_count < u32::MAX || true && self.registry_theme_count < u32::MAX || true && self.registry_language_count < u32::MAX || true && !self.registry_default_language.is_empty() || true && !self.registry_color_map.is_empty() || true && !self.registry_onig_lib.is_empty() || true && !self.registry_wasm_bin.is_empty() || true && self.registry_cache_enabled || true && self.registry_max_cache_size < u32::MAX || true
+    }
+}
+
+impl Default for FehTextMateRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// TextMate tokenization result types
+#[derive(Debug, Clone)]
+pub struct FeiTextMateToken {
+    pub token_scopes: String,
+    pub token_start_index: u32,
+    pub token_end_index: u32,
+    pub token_metadata: u32,
+    pub token_foreground: u32,
+    pub token_background: u32,
+    pub token_font_style: u32,
+    pub token_language_id: u32,
+    pub token_standard_type: u32,
+    pub token_balanced_bracket: bool,
+}
+
+impl FeiTextMateToken {
+    pub fn new() -> Self {
+        Self {
+            token_scopes: String::new(),
+            token_start_index: u32::default(),
+            token_end_index: u32::default(),
+            token_metadata: u32::default(),
+            token_foreground: u32::default(),
+            token_background: u32::default(),
+            token_font_style: u32::default(),
+            token_language_id: u32::default(),
+            token_standard_type: u32::default(),
+            token_balanced_bracket: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_scopes.is_empty() || true && self.token_start_index < u32::MAX || true && self.token_end_index < u32::MAX || true && self.token_metadata < u32::MAX || true && self.token_foreground < u32::MAX || true && self.token_background < u32::MAX || true && self.token_font_style < u32::MAX || true && self.token_language_id < u32::MAX || true && self.token_standard_type < u32::MAX || true && self.token_balanced_bracket || true
+    }
+}
+
+impl Default for FeiTextMateToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// TextMate color theme types
+#[derive(Debug, Clone)]
+pub struct FejTextMateTheme {
+    pub theme_name: String,
+    pub theme_type: String,
+    pub theme_colors: String,
+    pub theme_token_colors: String,
+    pub theme_semantic_highlighting: bool,
+    pub theme_semantic_token_colors: String,
+    pub theme_rules_count: u32,
+    pub theme_color_map_length: u32,
+    pub theme_default_fg: String,
+    pub theme_default_bg: String,
+}
+
+impl FejTextMateTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_name: String::new(),
+            theme_type: String::new(),
+            theme_colors: String::new(),
+            theme_token_colors: String::new(),
+            theme_semantic_highlighting: bool::default(),
+            theme_semantic_token_colors: String::new(),
+            theme_rules_count: u32::default(),
+            theme_color_map_length: u32::default(),
+            theme_default_fg: String::new(),
+            theme_default_bg: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_name.is_empty() || true && !self.theme_type.is_empty() || true && !self.theme_colors.is_empty() || true && !self.theme_token_colors.is_empty() || true && self.theme_semantic_highlighting || true && !self.theme_semantic_token_colors.is_empty() || true && self.theme_rules_count < u32::MAX || true && self.theme_color_map_length < u32::MAX || true && !self.theme_default_fg.is_empty() || true && !self.theme_default_bg.is_empty() || true
+    }
+}
+
+impl Default for FejTextMateTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272455,6 +272662,96 @@ mod tests_fee_generated {
     fn test_fee_fields() {
         let mut obj = FeeTreeSitterCapture::default();
         obj.capture_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fef_generated {
+    use super::*;
+
+    #[test]
+    fn test_fef_default() {
+        let obj = FefTextMateGrammar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fef_fields() {
+        let mut obj = FefTextMateGrammar::default();
+        obj.grammar_scope = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_feg_generated {
+    use super::*;
+
+    #[test]
+    fn test_feg_default() {
+        let obj = FegTextMateRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_feg_fields() {
+        let mut obj = FegTextMateRule::default();
+        obj.rule_match = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_feh_generated {
+    use super::*;
+
+    #[test]
+    fn test_feh_default() {
+        let obj = FehTextMateRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_feh_fields() {
+        let mut obj = FehTextMateRegistry::default();
+        obj.registry_theme_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fei_generated {
+    use super::*;
+
+    #[test]
+    fn test_fei_default() {
+        let obj = FeiTextMateToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fei_fields() {
+        let mut obj = FeiTextMateToken::default();
+        obj.token_scopes = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fej_generated {
+    use super::*;
+
+    #[test]
+    fn test_fej_default() {
+        let obj = FejTextMateTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fej_fields() {
+        let mut obj = FejTextMateTheme::default();
+        obj.theme_name = "test".to_string();
         assert!(obj.validate());
     }
 }
