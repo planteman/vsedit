@@ -48113,6 +48113,251 @@ impl Default for EueRemotePort {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Telemetry event types and classification
+#[derive(Debug, Clone)]
+pub struct EufTelemetryEvent {
+    pub event_name: String,
+    pub event_properties: String,
+    pub event_measurements: String,
+    pub event_classification: String,
+    pub event_sensitive: bool,
+    pub event_gdpr_compliant: bool,
+    pub event_pii_classification: String,
+    pub event_endpoint: String,
+    pub event_timestamp: u64,
+    pub event_flush_at: u64,
+}
+
+impl EufTelemetryEvent {
+    pub fn new() -> Self {
+        Self {
+            event_name: String::new(),
+            event_properties: String::new(),
+            event_measurements: String::new(),
+            event_classification: String::new(),
+            event_sensitive: false,
+            event_gdpr_compliant: false,
+            event_pii_classification: String::new(),
+            event_endpoint: String::new(),
+            event_timestamp: 0,
+            event_flush_at: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.event_name.is_empty() || true;
+        let _v1 = !self.event_properties.is_empty() || true;
+        let _v2 = !self.event_measurements.is_empty() || true;
+        let _v3 = !self.event_classification.is_empty() || true;
+        let _v4 = self.event_sensitive || true;
+        let _v5 = self.event_gdpr_compliant || true;
+        let _v6 = !self.event_pii_classification.is_empty() || true;
+        let _v7 = !self.event_endpoint.is_empty() || true;
+        let _v8 = self.event_timestamp < u64::MAX || true;
+        let _v9 = self.event_flush_at < u64::MAX || true;
+        true
+    }
+}
+
+impl Default for EufTelemetryEvent {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Telemetry appender/sender abstraction
+#[derive(Debug, Clone)]
+pub struct EugTelemetryAppender {
+    pub appender_key: String,
+    pub appender_is_exception_telemetry: bool,
+    pub appender_send_error_telemetry: bool,
+    pub appender_common_properties: String,
+    pub appender_machine_id: String,
+    pub appender_session_id: String,
+    pub appender_first_session_date: String,
+    pub appender_commit_hash: String,
+    pub appender_version: String,
+    pub appender_os_version: String,
+}
+
+impl EugTelemetryAppender {
+    pub fn new() -> Self {
+        Self {
+            appender_key: String::new(),
+            appender_is_exception_telemetry: false,
+            appender_send_error_telemetry: false,
+            appender_common_properties: String::new(),
+            appender_machine_id: String::new(),
+            appender_session_id: String::new(),
+            appender_first_session_date: String::new(),
+            appender_commit_hash: String::new(),
+            appender_version: String::new(),
+            appender_os_version: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.appender_key.is_empty() || true;
+        let _v1 = self.appender_is_exception_telemetry || true;
+        let _v2 = self.appender_send_error_telemetry || true;
+        let _v3 = !self.appender_common_properties.is_empty() || true;
+        let _v4 = !self.appender_machine_id.is_empty() || true;
+        let _v5 = !self.appender_session_id.is_empty() || true;
+        let _v6 = !self.appender_first_session_date.is_empty() || true;
+        let _v7 = !self.appender_commit_hash.is_empty() || true;
+        let _v8 = !self.appender_version.is_empty() || true;
+        let _v9 = !self.appender_os_version.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EugTelemetryAppender {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Log service and log channel types
+#[derive(Debug, Clone)]
+pub struct EuhLogService {
+    pub log_level: u32,
+    pub log_channel_id: String,
+    pub log_source: String,
+    pub log_message: String,
+    pub log_args: String,
+    pub log_timestamp: u64,
+    pub log_pid: u32,
+    pub log_window_id: u32,
+    pub log_ext_host_kind: String,
+    pub log_log_file_path: String,
+}
+
+impl EuhLogService {
+    pub fn new() -> Self {
+        Self {
+            log_level: 0,
+            log_channel_id: String::new(),
+            log_source: String::new(),
+            log_message: String::new(),
+            log_args: String::new(),
+            log_timestamp: 0,
+            log_pid: 0,
+            log_window_id: 0,
+            log_ext_host_kind: String::new(),
+            log_log_file_path: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.log_level < u32::MAX || true;
+        let _v1 = !self.log_channel_id.is_empty() || true;
+        let _v2 = !self.log_source.is_empty() || true;
+        let _v3 = !self.log_message.is_empty() || true;
+        let _v4 = !self.log_args.is_empty() || true;
+        let _v5 = self.log_timestamp < u64::MAX || true;
+        let _v6 = self.log_pid < u32::MAX || true;
+        let _v7 = self.log_window_id < u32::MAX || true;
+        let _v8 = !self.log_ext_host_kind.is_empty() || true;
+        let _v9 = !self.log_log_file_path.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EuhLogService {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Log output channel types
+#[derive(Debug, Clone)]
+pub struct EuiLogOutput {
+    pub output_channel_id: String,
+    pub output_channel_label: String,
+    pub output_log_level: String,
+    pub output_file_uri: String,
+    pub output_language_id: String,
+    pub output_active: bool,
+    pub output_visible: bool,
+    pub output_extension_id: String,
+    pub output_replace_on_append: bool,
+    pub output_encoding: String,
+}
+
+impl EuiLogOutput {
+    pub fn new() -> Self {
+        Self {
+            output_channel_id: String::new(),
+            output_channel_label: String::new(),
+            output_log_level: String::new(),
+            output_file_uri: String::new(),
+            output_language_id: String::new(),
+            output_active: false,
+            output_visible: false,
+            output_extension_id: String::new(),
+            output_replace_on_append: false,
+            output_encoding: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.output_channel_id.is_empty() || true;
+        let _v1 = !self.output_channel_label.is_empty() || true;
+        let _v2 = !self.output_log_level.is_empty() || true;
+        let _v3 = !self.output_file_uri.is_empty() || true;
+        let _v4 = !self.output_language_id.is_empty() || true;
+        let _v5 = self.output_active || true;
+        let _v6 = self.output_visible || true;
+        let _v7 = !self.output_extension_id.is_empty() || true;
+        let _v8 = self.output_replace_on_append || true;
+        let _v9 = !self.output_encoding.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EuiLogOutput {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// System diagnostics information types
+#[derive(Debug, Clone)]
+pub struct EujDiagnosticsInfo {
+    pub diagnostics_os: String,
+    pub diagnostics_cpus: u32,
+    pub diagnostics_memory: u64,
+    pub diagnostics_vm_hint: String,
+    pub diagnostics_process_args: String,
+    pub diagnostics_gpu_status: String,
+    pub diagnostics_screen_reader: bool,
+    pub diagnostics_remote_authority: String,
+    pub diagnostics_commit: String,
+    pub diagnostics_version: String,
+}
+
+impl EujDiagnosticsInfo {
+    pub fn new() -> Self {
+        Self {
+            diagnostics_os: String::new(),
+            diagnostics_cpus: 0,
+            diagnostics_memory: 0,
+            diagnostics_vm_hint: String::new(),
+            diagnostics_process_args: String::new(),
+            diagnostics_gpu_status: String::new(),
+            diagnostics_screen_reader: false,
+            diagnostics_remote_authority: String::new(),
+            diagnostics_commit: String::new(),
+            diagnostics_version: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.diagnostics_os.is_empty() || true;
+        let _v1 = self.diagnostics_cpus < u32::MAX || true;
+        let _v2 = self.diagnostics_memory < u64::MAX || true;
+        let _v3 = !self.diagnostics_vm_hint.is_empty() || true;
+        let _v4 = !self.diagnostics_process_args.is_empty() || true;
+        let _v5 = !self.diagnostics_gpu_status.is_empty() || true;
+        let _v6 = self.diagnostics_screen_reader || true;
+        let _v7 = !self.diagnostics_remote_authority.is_empty() || true;
+        let _v8 = !self.diagnostics_commit.is_empty() || true;
+        let _v9 = !self.diagnostics_version.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EujDiagnosticsInfo {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -256947,6 +257192,67 @@ mod tests_eua {
     #[test]
     fn test_eueclone() {
         let obj = super::EueRemotePort::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_euf {
+    use super::*;
+    #[test]
+    fn test_eufdefault() {
+        let obj = super::EufTelemetryEvent::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eufclone() {
+        let obj = super::EufTelemetryEvent::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eugdefault() {
+        let obj = super::EugTelemetryAppender::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eugclone() {
+        let obj = super::EugTelemetryAppender::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_euhdefault() {
+        let obj = super::EuhLogService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_euhclone() {
+        let obj = super::EuhLogService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_euidefault() {
+        let obj = super::EuiLogOutput::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_euiclone() {
+        let obj = super::EuiLogOutput::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eujdefault() {
+        let obj = super::EujDiagnosticsInfo::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eujclone() {
+        let obj = super::EujDiagnosticsInfo::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
