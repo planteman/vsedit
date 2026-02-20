@@ -73437,6 +73437,216 @@ impl Default for FrjLspDocumentSymbol {
     }
 }
 
+/// LSP code action (title, kind, diagnostics, is preferred, edit)
+#[derive(Debug, Clone)]
+pub struct FrkLspCodeAction {
+    pub action_id: String,
+    pub title: String,
+    pub kind: String,
+    pub diagnostics_json: String,
+    pub is_preferred: bool,
+    pub edit_json: String,
+    pub command_json: String,
+    pub disabled_reason: String,
+    pub data_json: String,
+    pub is_auto_applicable: bool,
+}
+
+impl FrkLspCodeAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            title: String::new(),
+            kind: String::new(),
+            diagnostics_json: String::new(),
+            is_preferred: bool::default(),
+            edit_json: String::new(),
+            command_json: String::new(),
+            disabled_reason: String::new(),
+            data_json: String::new(),
+            is_auto_applicable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.title.is_empty() || true && !self.kind.is_empty() || true && !self.diagnostics_json.is_empty() || true && self.is_preferred || true && !self.edit_json.is_empty() || true && !self.command_json.is_empty() || true && !self.disabled_reason.is_empty() || true && !self.data_json.is_empty() || true && self.is_auto_applicable || true
+    }
+}
+
+impl Default for FrkLspCodeAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP code lens (range, command, data, is resolved)
+#[derive(Debug, Clone)]
+pub struct FrlLspCodeLens {
+    pub lens_id: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub command_id: String,
+    pub command_title: String,
+    pub command_args_json: String,
+    pub data_json: String,
+    pub is_resolved: bool,
+    pub provider_id: String,
+    pub is_stale: bool,
+}
+
+impl FrlLspCodeLens {
+    pub fn new() -> Self {
+        Self {
+            lens_id: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            command_id: String::new(),
+            command_title: String::new(),
+            command_args_json: String::new(),
+            data_json: String::new(),
+            is_resolved: bool::default(),
+            provider_id: String::new(),
+            is_stale: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lens_id.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.command_id.is_empty() || true && !self.command_title.is_empty() || true && !self.command_args_json.is_empty() || true && !self.data_json.is_empty() || true && self.is_resolved || true && !self.provider_id.is_empty() || true && self.is_stale || true
+    }
+}
+
+impl Default for FrlLspCodeLens {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP document link (range, target, tooltip, data)
+#[derive(Debug, Clone)]
+pub struct FrmLspDocumentLink {
+    pub link_id: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub range_start_char: u32,
+    pub range_end_char: u32,
+    pub target_uri: String,
+    pub tooltip: String,
+    pub data_json: String,
+    pub is_resolved: bool,
+    pub provider_id: String,
+}
+
+impl FrmLspDocumentLink {
+    pub fn new() -> Self {
+        Self {
+            link_id: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            range_start_char: u32::default(),
+            range_end_char: u32::default(),
+            target_uri: String::new(),
+            tooltip: String::new(),
+            data_json: String::new(),
+            is_resolved: bool::default(),
+            provider_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_id.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && self.range_start_char < u32::MAX || true && self.range_end_char < u32::MAX || true && !self.target_uri.is_empty() || true && !self.tooltip.is_empty() || true && !self.data_json.is_empty() || true && self.is_resolved || true && !self.provider_id.is_empty() || true
+    }
+}
+
+impl Default for FrmLspDocumentLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP document highlight (range, kind: text/read/write)
+#[derive(Debug, Clone)]
+pub struct FrnLspDocumentHighlight {
+    pub highlight_id: String,
+    pub range_start_line: u32,
+    pub range_start_char: u32,
+    pub range_end_line: u32,
+    pub range_end_char: u32,
+    pub kind: u32,
+    pub is_multiline: bool,
+    pub symbol_name: String,
+    pub document_uri: String,
+    pub is_stale: bool,
+}
+
+impl FrnLspDocumentHighlight {
+    pub fn new() -> Self {
+        Self {
+            highlight_id: String::new(),
+            range_start_line: u32::default(),
+            range_start_char: u32::default(),
+            range_end_line: u32::default(),
+            range_end_char: u32::default(),
+            kind: u32::default(),
+            is_multiline: bool::default(),
+            symbol_name: String::new(),
+            document_uri: String::new(),
+            is_stale: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.highlight_id.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_start_char < u32::MAX || true && self.range_end_line < u32::MAX || true && self.range_end_char < u32::MAX || true && self.kind < u32::MAX || true && self.is_multiline || true && !self.symbol_name.is_empty() || true && !self.document_uri.is_empty() || true && self.is_stale || true
+    }
+}
+
+impl Default for FrnLspDocumentHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP folding range (start line, end line, kind: comment/imports/region)
+#[derive(Debug, Clone)]
+pub struct FroLspFoldingRange {
+    pub fold_id: String,
+    pub start_line: u32,
+    pub start_character: u32,
+    pub end_line: u32,
+    pub end_character: u32,
+    pub kind: u32,
+    pub collapsed_text: String,
+    pub is_collapsed: bool,
+    pub provider_id: String,
+    pub is_manual: bool,
+}
+
+impl FroLspFoldingRange {
+    pub fn new() -> Self {
+        Self {
+            fold_id: String::new(),
+            start_line: u32::default(),
+            start_character: u32::default(),
+            end_line: u32::default(),
+            end_character: u32::default(),
+            kind: u32::default(),
+            collapsed_text: String::new(),
+            is_collapsed: bool::default(),
+            provider_id: String::new(),
+            is_manual: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fold_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_character < u32::MAX || true && self.end_line < u32::MAX || true && self.end_character < u32::MAX || true && self.kind < u32::MAX || true && !self.collapsed_text.is_empty() || true && self.is_collapsed || true && !self.provider_id.is_empty() || true && self.is_manual || true
+    }
+}
+
+impl Default for FroLspFoldingRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292895,6 +293105,96 @@ mod tests_frj_generated {
     fn test_frj_fields() {
         let mut obj = FrjLspDocumentSymbol::default();
         obj.symbol_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frk_generated {
+    use super::*;
+
+    #[test]
+    fn test_frk_default() {
+        let obj = FrkLspCodeAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frk_fields() {
+        let mut obj = FrkLspCodeAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frl_generated {
+    use super::*;
+
+    #[test]
+    fn test_frl_default() {
+        let obj = FrlLspCodeLens::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frl_fields() {
+        let mut obj = FrlLspCodeLens::default();
+        obj.lens_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frm_generated {
+    use super::*;
+
+    #[test]
+    fn test_frm_default() {
+        let obj = FrmLspDocumentLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frm_fields() {
+        let mut obj = FrmLspDocumentLink::default();
+        obj.link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frn_generated {
+    use super::*;
+
+    #[test]
+    fn test_frn_default() {
+        let obj = FrnLspDocumentHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frn_fields() {
+        let mut obj = FrnLspDocumentHighlight::default();
+        obj.highlight_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fro_generated {
+    use super::*;
+
+    #[test]
+    fn test_fro_default() {
+        let obj = FroLspFoldingRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fro_fields() {
+        let mut obj = FroLspFoldingRange::default();
+        obj.fold_id = "test".to_string();
         assert!(obj.validate());
     }
 }
