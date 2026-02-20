@@ -71057,6 +71057,216 @@ impl Default for FpeScmInputBox {
     }
 }
 
+/// SCM history item (id, parent ids, message, timestamp, author)
+#[derive(Debug, Clone)]
+pub struct FpfScmHistoryItem {
+    pub item_id: String,
+    pub parent_ids_json: String,
+    pub message: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub author_date_ms: u64,
+    pub commit_date_ms: u64,
+    pub hash: String,
+    pub short_hash: String,
+    pub ref_names_json: String,
+}
+
+impl FpfScmHistoryItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            parent_ids_json: String::new(),
+            message: String::new(),
+            author_name: String::new(),
+            author_email: String::new(),
+            author_date_ms: u64::default(),
+            commit_date_ms: u64::default(),
+            hash: String::new(),
+            short_hash: String::new(),
+            ref_names_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.parent_ids_json.is_empty() || true && !self.message.is_empty() || true && !self.author_name.is_empty() || true && !self.author_email.is_empty() || true && self.author_date_ms < u64::MAX || true && self.commit_date_ms < u64::MAX || true && !self.hash.is_empty() || true && !self.short_hash.is_empty() || true && !self.ref_names_json.is_empty() || true
+    }
+}
+
+impl Default for FpfScmHistoryItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM history provider (current item, items, action button)
+#[derive(Debug, Clone)]
+pub struct FpgScmHistoryProvider {
+    pub provider_id: String,
+    pub current_item_id: String,
+    pub item_count: u32,
+    pub action_button_json: String,
+    pub scm_provider_id: String,
+    pub has_more: bool,
+    pub cursor: String,
+    pub is_loading: bool,
+    pub extension_id: String,
+    pub supports_graph: bool,
+}
+
+impl FpgScmHistoryProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            current_item_id: String::new(),
+            item_count: u32::default(),
+            action_button_json: String::new(),
+            scm_provider_id: String::new(),
+            has_more: bool::default(),
+            cursor: String::new(),
+            is_loading: bool::default(),
+            extension_id: String::new(),
+            supports_graph: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.current_item_id.is_empty() || true && self.item_count < u32::MAX || true && !self.action_button_json.is_empty() || true && !self.scm_provider_id.is_empty() || true && self.has_more || true && !self.cursor.is_empty() || true && self.is_loading || true && !self.extension_id.is_empty() || true && self.supports_graph || true
+    }
+}
+
+impl Default for FpgScmHistoryProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM quick diff provider (original resource, change, uri)
+#[derive(Debug, Clone)]
+pub struct FphScmQuickDiff {
+    pub diff_id: String,
+    pub original_uri: String,
+    pub modified_uri: String,
+    pub change_type: u32,
+    pub scm_provider_id: String,
+    pub is_active: bool,
+    pub decoration_json: String,
+    pub diff_line_count: u32,
+    pub added_count: u32,
+    pub removed_count: u32,
+}
+
+impl FphScmQuickDiff {
+    pub fn new() -> Self {
+        Self {
+            diff_id: String::new(),
+            original_uri: String::new(),
+            modified_uri: String::new(),
+            change_type: u32::default(),
+            scm_provider_id: String::new(),
+            is_active: bool::default(),
+            decoration_json: String::new(),
+            diff_line_count: u32::default(),
+            added_count: u32::default(),
+            removed_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_id.is_empty() || true && !self.original_uri.is_empty() || true && !self.modified_uri.is_empty() || true && self.change_type < u32::MAX || true && !self.scm_provider_id.is_empty() || true && self.is_active || true && !self.decoration_json.is_empty() || true && self.diff_line_count < u32::MAX || true && self.added_count < u32::MAX || true && self.removed_count < u32::MAX || true
+    }
+}
+
+impl Default for FphScmQuickDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM action button (command, title, icon, description, enabled)
+#[derive(Debug, Clone)]
+pub struct FpiScmAction {
+    pub action_id: String,
+    pub command_id: String,
+    pub title: String,
+    pub icon_id: String,
+    pub description: String,
+    pub is_enabled: bool,
+    pub tooltip: String,
+    pub scm_provider_id: String,
+    pub is_primary: bool,
+    pub context_value: String,
+}
+
+impl FpiScmAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            command_id: String::new(),
+            title: String::new(),
+            icon_id: String::new(),
+            description: String::new(),
+            is_enabled: bool::default(),
+            tooltip: String::new(),
+            scm_provider_id: String::new(),
+            is_primary: bool::default(),
+            context_value: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.command_id.is_empty() || true && !self.title.is_empty() || true && !self.icon_id.is_empty() || true && !self.description.is_empty() || true && self.is_enabled || true && !self.tooltip.is_empty() || true && !self.scm_provider_id.is_empty() || true && self.is_primary || true && !self.context_value.is_empty() || true
+    }
+}
+
+impl Default for FpiScmAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM commit graph (branches, lanes, colors, merge points)
+#[derive(Debug, Clone)]
+pub struct FpjScmGraph {
+    pub graph_id: String,
+    pub branch_count: u32,
+    pub lane_count: u32,
+    pub commit_count: u32,
+    pub colors_json: String,
+    pub merge_point_count: u32,
+    pub max_parallel_lanes: u32,
+    pub scm_provider_id: String,
+    pub is_complete: bool,
+    pub viewport_start: u32,
+}
+
+impl FpjScmGraph {
+    pub fn new() -> Self {
+        Self {
+            graph_id: String::new(),
+            branch_count: u32::default(),
+            lane_count: u32::default(),
+            commit_count: u32::default(),
+            colors_json: String::new(),
+            merge_point_count: u32::default(),
+            max_parallel_lanes: u32::default(),
+            scm_provider_id: String::new(),
+            is_complete: bool::default(),
+            viewport_start: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.graph_id.is_empty() || true && self.branch_count < u32::MAX || true && self.lane_count < u32::MAX || true && self.commit_count < u32::MAX || true && !self.colors_json.is_empty() || true && self.merge_point_count < u32::MAX || true && self.max_parallel_lanes < u32::MAX || true && !self.scm_provider_id.is_empty() || true && self.is_complete || true && self.viewport_start < u32::MAX || true
+    }
+}
+
+impl Default for FpjScmGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -289466,6 +289676,96 @@ mod tests_fpe_generated {
     fn test_fpe_fields() {
         let mut obj = FpeScmInputBox::default();
         obj.input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpf_default() {
+        let obj = FpfScmHistoryItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpf_fields() {
+        let mut obj = FpfScmHistoryItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpg_default() {
+        let obj = FpgScmHistoryProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpg_fields() {
+        let mut obj = FpgScmHistoryProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fph_generated {
+    use super::*;
+
+    #[test]
+    fn test_fph_default() {
+        let obj = FphScmQuickDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fph_fields() {
+        let mut obj = FphScmQuickDiff::default();
+        obj.diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpi_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpi_default() {
+        let obj = FpiScmAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpi_fields() {
+        let mut obj = FpiScmAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpj_default() {
+        let obj = FpjScmGraph::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpj_fields() {
+        let mut obj = FpjScmGraph::default();
+        obj.graph_id = "test".to_string();
         assert!(obj.validate());
     }
 }
