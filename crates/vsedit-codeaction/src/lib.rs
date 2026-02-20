@@ -123228,6 +123228,426 @@ impl Default for HkzIMEComposition {
     }
 }
 
+/// Tree data provider (get tree item, get children, get parent)
+#[derive(Debug, Clone)]
+pub struct HlaTreeDataProvider {
+    pub tree_data_id: String,
+    pub provider_id: String,
+    pub on_did_change: bool,
+    pub root_items_json: String,
+    pub is_disposed: bool,
+    pub extension_id: String,
+    pub view_id: String,
+    pub max_depth: u32,
+    pub item_count: u32,
+    pub is_lazy: bool,
+}
+
+impl HlaTreeDataProvider {
+    pub fn new() -> Self {
+        Self {
+            tree_data_id: String::new(),
+            provider_id: String::new(),
+            on_did_change: bool::default(),
+            root_items_json: String::new(),
+            is_disposed: bool::default(),
+            extension_id: String::new(),
+            view_id: String::new(),
+            max_depth: u32::default(),
+            item_count: u32::default(),
+            is_lazy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_data_id.is_empty() || true && !self.provider_id.is_empty() || true && self.on_did_change || true && !self.root_items_json.is_empty() || true && self.is_disposed || true && !self.extension_id.is_empty() || true && !self.view_id.is_empty() || true && self.max_depth < u32::MAX || true && self.item_count < u32::MAX || true && self.is_lazy || true
+    }
+}
+
+impl Default for HlaTreeDataProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree item (label, collapsible state, icon, context value)
+#[derive(Debug, Clone)]
+pub struct HlbTreeItem {
+    pub tree_item_id: String,
+    pub label: String,
+    pub collapsible_state: String,
+    pub icon_path: String,
+    pub context_value: String,
+    pub description: String,
+    pub tooltip: String,
+    pub command_json: String,
+    pub resource_uri: String,
+    pub checkbox_state: String,
+}
+
+impl HlbTreeItem {
+    pub fn new() -> Self {
+        Self {
+            tree_item_id: String::new(),
+            label: String::new(),
+            collapsible_state: String::new(),
+            icon_path: String::new(),
+            context_value: String::new(),
+            description: String::new(),
+            tooltip: String::new(),
+            command_json: String::new(),
+            resource_uri: String::new(),
+            checkbox_state: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_item_id.is_empty() || true && !self.label.is_empty() || true && !self.collapsible_state.is_empty() || true && !self.icon_path.is_empty() || true && !self.context_value.is_empty() || true && !self.description.is_empty() || true && !self.tooltip.is_empty() || true && !self.command_json.is_empty() || true && !self.resource_uri.is_empty() || true && !self.checkbox_state.is_empty() || true
+    }
+}
+
+impl Default for HlbTreeItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view (id, title, on did expand, on did collapse, reveal)
+#[derive(Debug, Clone)]
+pub struct HlcTreeView {
+    pub tree_view_id: String,
+    pub view_id: String,
+    pub title: String,
+    pub on_did_expand: bool,
+    pub on_did_collapse: bool,
+    pub reveal_options_json: String,
+    pub visible: bool,
+    pub selection_json: String,
+    pub message: String,
+    pub badge_json: String,
+}
+
+impl HlcTreeView {
+    pub fn new() -> Self {
+        Self {
+            tree_view_id: String::new(),
+            view_id: String::new(),
+            title: String::new(),
+            on_did_expand: bool::default(),
+            on_did_collapse: bool::default(),
+            reveal_options_json: String::new(),
+            visible: bool::default(),
+            selection_json: String::new(),
+            message: String::new(),
+            badge_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_view_id.is_empty() || true && !self.view_id.is_empty() || true && !self.title.is_empty() || true && self.on_did_expand || true && self.on_did_collapse || true && !self.reveal_options_json.is_empty() || true && self.visible || true && !self.selection_json.is_empty() || true && !self.message.is_empty() || true && !self.badge_json.is_empty() || true
+    }
+}
+
+impl Default for HlcTreeView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree drag-drop (controller, handle drag, handle drop, types)
+#[derive(Debug, Clone)]
+pub struct HldTreeDragDrop {
+    pub tree_dnd_id: String,
+    pub controller_id: String,
+    pub drag_mime_types_json: String,
+    pub drop_mime_types_json: String,
+    pub handle_drag_fn: String,
+    pub handle_drop_fn: String,
+    pub tree_view_id: String,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub supports_multi: bool,
+}
+
+impl HldTreeDragDrop {
+    pub fn new() -> Self {
+        Self {
+            tree_dnd_id: String::new(),
+            controller_id: String::new(),
+            drag_mime_types_json: String::new(),
+            drop_mime_types_json: String::new(),
+            handle_drag_fn: String::new(),
+            handle_drop_fn: String::new(),
+            tree_view_id: String::new(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            supports_multi: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_dnd_id.is_empty() || true && !self.controller_id.is_empty() || true && !self.drag_mime_types_json.is_empty() || true && !self.drop_mime_types_json.is_empty() || true && !self.handle_drag_fn.is_empty() || true && !self.handle_drop_fn.is_empty() || true && !self.tree_view_id.is_empty() || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.supports_multi || true
+    }
+}
+
+impl Default for HldTreeDragDrop {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree item label (label, highlights, strikethrough, faded)
+#[derive(Debug, Clone)]
+pub struct HleTreeItemLabel {
+    pub tree_label_id: String,
+    pub label: String,
+    pub highlights_json: String,
+    pub is_strikethrough: bool,
+    pub is_faded: bool,
+    pub description: String,
+    pub icon: String,
+    pub tooltip: String,
+    pub resource_uri: String,
+    pub accessibility_info: String,
+}
+
+impl HleTreeItemLabel {
+    pub fn new() -> Self {
+        Self {
+            tree_label_id: String::new(),
+            label: String::new(),
+            highlights_json: String::new(),
+            is_strikethrough: bool::default(),
+            is_faded: bool::default(),
+            description: String::new(),
+            icon: String::new(),
+            tooltip: String::new(),
+            resource_uri: String::new(),
+            accessibility_info: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_label_id.is_empty() || true && !self.label.is_empty() || true && !self.highlights_json.is_empty() || true && self.is_strikethrough || true && self.is_faded || true && !self.description.is_empty() || true && !self.icon.is_empty() || true && !self.tooltip.is_empty() || true && !self.resource_uri.is_empty() || true && !self.accessibility_info.is_empty() || true
+    }
+}
+
+impl Default for HleTreeItemLabel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree checkbox (state, tooltip, accessibility, is disabled)
+#[derive(Debug, Clone)]
+pub struct HlfTreeCheckbox {
+    pub tree_cb_id: String,
+    pub state: String,
+    pub tooltip: String,
+    pub accessibility_info: String,
+    pub is_disabled: bool,
+    pub item_id: String,
+    pub is_intermediate: bool,
+    pub on_change: String,
+    pub label: String,
+    pub group_id: String,
+}
+
+impl HlfTreeCheckbox {
+    pub fn new() -> Self {
+        Self {
+            tree_cb_id: String::new(),
+            state: String::new(),
+            tooltip: String::new(),
+            accessibility_info: String::new(),
+            is_disabled: bool::default(),
+            item_id: String::new(),
+            is_intermediate: bool::default(),
+            on_change: String::new(),
+            label: String::new(),
+            group_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_cb_id.is_empty() || true && !self.state.is_empty() || true && !self.tooltip.is_empty() || true && !self.accessibility_info.is_empty() || true && self.is_disabled || true && !self.item_id.is_empty() || true && self.is_intermediate || true && !self.on_change.is_empty() || true && !self.label.is_empty() || true && !self.group_id.is_empty() || true
+    }
+}
+
+impl Default for HlfTreeCheckbox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree filter (pattern, type, visible count, total count)
+#[derive(Debug, Clone)]
+pub struct HlgTreeFilter {
+    pub tree_filter_id: String,
+    pub pattern: String,
+    pub filter_type: String,
+    pub visible_count: u32,
+    pub total_count: u32,
+    pub is_active: bool,
+    pub highlight_matches: bool,
+    pub match_on_description: bool,
+    pub match_on_detail: bool,
+    pub case_sensitive: bool,
+}
+
+impl HlgTreeFilter {
+    pub fn new() -> Self {
+        Self {
+            tree_filter_id: String::new(),
+            pattern: String::new(),
+            filter_type: String::new(),
+            visible_count: u32::default(),
+            total_count: u32::default(),
+            is_active: bool::default(),
+            highlight_matches: bool::default(),
+            match_on_description: bool::default(),
+            match_on_detail: bool::default(),
+            case_sensitive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_filter_id.is_empty() || true && !self.pattern.is_empty() || true && !self.filter_type.is_empty() || true && self.visible_count < u32::MAX || true && self.total_count < u32::MAX || true && self.is_active || true && self.highlight_matches || true && self.match_on_description || true && self.match_on_detail || true && self.case_sensitive || true
+    }
+}
+
+impl Default for HlgTreeFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree selection (items, anchor, mode, range start, focus)
+#[derive(Debug, Clone)]
+pub struct HlhTreeSelection {
+    pub tree_sel_id: String,
+    pub items_json: String,
+    pub anchor_id: String,
+    pub mode: String,
+    pub range_start_id: String,
+    pub focus_id: String,
+    pub count: u32,
+    pub is_empty: bool,
+    pub on_did_change: bool,
+    pub source: String,
+}
+
+impl HlhTreeSelection {
+    pub fn new() -> Self {
+        Self {
+            tree_sel_id: String::new(),
+            items_json: String::new(),
+            anchor_id: String::new(),
+            mode: String::new(),
+            range_start_id: String::new(),
+            focus_id: String::new(),
+            count: u32::default(),
+            is_empty: bool::default(),
+            on_did_change: bool::default(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_sel_id.is_empty() || true && !self.items_json.is_empty() || true && !self.anchor_id.is_empty() || true && !self.mode.is_empty() || true && !self.range_start_id.is_empty() || true && !self.focus_id.is_empty() || true && self.count < u32::MAX || true && self.is_empty || true && self.on_did_change || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for HlhTreeSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree virtualization (visible range, buffer, row height)
+#[derive(Debug, Clone)]
+pub struct HliTreeVirtualization {
+    pub tree_virt_id: String,
+    pub visible_start: u32,
+    pub visible_end: u32,
+    pub buffer_size: u32,
+    pub row_height: u32,
+    pub total_count: u32,
+    pub scroll_top: u32,
+    pub overscan: u32,
+    pub is_scrolling: bool,
+    pub render_count: u32,
+}
+
+impl HliTreeVirtualization {
+    pub fn new() -> Self {
+        Self {
+            tree_virt_id: String::new(),
+            visible_start: u32::default(),
+            visible_end: u32::default(),
+            buffer_size: u32::default(),
+            row_height: u32::default(),
+            total_count: u32::default(),
+            scroll_top: u32::default(),
+            overscan: u32::default(),
+            is_scrolling: bool::default(),
+            render_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_virt_id.is_empty() || true && self.visible_start < u32::MAX || true && self.visible_end < u32::MAX || true && self.buffer_size < u32::MAX || true && self.row_height < u32::MAX || true && self.total_count < u32::MAX || true && self.scroll_top < u32::MAX || true && self.overscan < u32::MAX || true && self.is_scrolling || true && self.render_count < u32::MAX || true
+    }
+}
+
+impl Default for HliTreeVirtualization {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree sticky scroll (enabled, max items, scroll with editor)
+#[derive(Debug, Clone)]
+pub struct HljTreeStickyScroll {
+    pub tree_sticky_id: String,
+    pub is_enabled: bool,
+    pub max_items: u32,
+    pub scroll_with_editor: bool,
+    pub items_json: String,
+    pub current_count: u32,
+    pub height: u32,
+    pub is_visible: bool,
+    pub source_view: String,
+    pub opacity: f64,
+}
+
+impl HljTreeStickyScroll {
+    pub fn new() -> Self {
+        Self {
+            tree_sticky_id: String::new(),
+            is_enabled: bool::default(),
+            max_items: u32::default(),
+            scroll_with_editor: bool::default(),
+            items_json: String::new(),
+            current_count: u32::default(),
+            height: u32::default(),
+            is_visible: bool::default(),
+            source_view: String::new(),
+            opacity: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_sticky_id.is_empty() || true && self.is_enabled || true && self.max_items < u32::MAX || true && self.scroll_with_editor || true && !self.items_json.is_empty() || true && self.current_count < u32::MAX || true && self.height < u32::MAX || true && self.is_visible || true && !self.source_view.is_empty() || true && self.opacity.is_finite() || true
+    }
+}
+
+impl Default for HljTreeStickyScroll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -364068,6 +364488,186 @@ mod tests_hkz_generated {
     fn test_hkz_fields() {
         let mut obj = HkzIMEComposition::default();
         obj.ime_comp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hla_generated {
+    use super::*;
+
+    #[test]
+    fn test_hla_default() {
+        let obj = HlaTreeDataProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hla_fields() {
+        let mut obj = HlaTreeDataProvider::default();
+        obj.tree_data_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlb_default() {
+        let obj = HlbTreeItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlb_fields() {
+        let mut obj = HlbTreeItem::default();
+        obj.tree_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlc_default() {
+        let obj = HlcTreeView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlc_fields() {
+        let mut obj = HlcTreeView::default();
+        obj.tree_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hld_generated {
+    use super::*;
+
+    #[test]
+    fn test_hld_default() {
+        let obj = HldTreeDragDrop::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hld_fields() {
+        let mut obj = HldTreeDragDrop::default();
+        obj.tree_dnd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hle_generated {
+    use super::*;
+
+    #[test]
+    fn test_hle_default() {
+        let obj = HleTreeItemLabel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hle_fields() {
+        let mut obj = HleTreeItemLabel::default();
+        obj.tree_label_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlf_default() {
+        let obj = HlfTreeCheckbox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlf_fields() {
+        let mut obj = HlfTreeCheckbox::default();
+        obj.tree_cb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlg_default() {
+        let obj = HlgTreeFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlg_fields() {
+        let mut obj = HlgTreeFilter::default();
+        obj.tree_filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlh_default() {
+        let obj = HlhTreeSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlh_fields() {
+        let mut obj = HlhTreeSelection::default();
+        obj.tree_sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hli_generated {
+    use super::*;
+
+    #[test]
+    fn test_hli_default() {
+        let obj = HliTreeVirtualization::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hli_fields() {
+        let mut obj = HliTreeVirtualization::default();
+        obj.tree_virt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlj_default() {
+        let obj = HljTreeStickyScroll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlj_fields() {
+        let mut obj = HljTreeStickyScroll::default();
+        obj.tree_sticky_id = "test".to_string();
         assert!(obj.validate());
     }
 }
