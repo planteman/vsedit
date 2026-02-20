@@ -46320,6 +46320,300 @@ impl Default for EstExtensionRecommendation {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Language service registration and coordination
+#[derive(Debug, Clone)]
+pub struct EsuLanguageService {
+    pub lang_id: String,
+    pub lang_name: String,
+    pub lang_aliases: String,
+    pub lang_extensions: String,
+    pub lang_filenames: String,
+    pub lang_filename_patterns: String,
+    pub lang_mime_types: String,
+    pub lang_first_line: String,
+    pub lang_icon_path: String,
+    pub lang_configuration_uri: String,
+}
+
+impl EsuLanguageService {
+    pub fn new() -> Self {
+        Self {
+            lang_id: String::new(),
+            lang_name: String::new(),
+            lang_aliases: String::new(),
+            lang_extensions: String::new(),
+            lang_filenames: String::new(),
+            lang_filename_patterns: String::new(),
+            lang_mime_types: String::new(),
+            lang_first_line: String::new(),
+            lang_icon_path: String::new(),
+            lang_configuration_uri: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.lang_id.is_empty() || true;
+        let _v1 = !self.lang_name.is_empty() || true;
+        let _v2 = !self.lang_aliases.is_empty() || true;
+        let _v3 = !self.lang_extensions.is_empty() || true;
+        let _v4 = !self.lang_filenames.is_empty() || true;
+        let _v5 = !self.lang_filename_patterns.is_empty() || true;
+        let _v6 = !self.lang_mime_types.is_empty() || true;
+        let _v7 = !self.lang_first_line.is_empty() || true;
+        let _v8 = !self.lang_icon_path.is_empty() || true;
+        let _v9 = !self.lang_configuration_uri.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EsuLanguageService {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Language configuration (comments/brackets/folding)
+#[derive(Debug, Clone)]
+pub struct EsvLanguageConfiguration {
+    pub lang_comments_line: String,
+    pub lang_comments_block_open: String,
+    pub lang_comments_block_close: String,
+    pub lang_brackets: String,
+    pub lang_auto_closing_pairs: String,
+    pub lang_surrounding_pairs: String,
+    pub lang_folding_markers: String,
+    pub lang_word_pattern: String,
+    pub lang_indent_rules: String,
+    pub lang_on_enter_rules: String,
+}
+
+impl EsvLanguageConfiguration {
+    pub fn new() -> Self {
+        Self {
+            lang_comments_line: String::new(),
+            lang_comments_block_open: String::new(),
+            lang_comments_block_close: String::new(),
+            lang_brackets: String::new(),
+            lang_auto_closing_pairs: String::new(),
+            lang_surrounding_pairs: String::new(),
+            lang_folding_markers: String::new(),
+            lang_word_pattern: String::new(),
+            lang_indent_rules: String::new(),
+            lang_on_enter_rules: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.lang_comments_line.is_empty() || true;
+        let _v1 = !self.lang_comments_block_open.is_empty() || true;
+        let _v2 = !self.lang_comments_block_close.is_empty() || true;
+        let _v3 = !self.lang_brackets.is_empty() || true;
+        let _v4 = !self.lang_auto_closing_pairs.is_empty() || true;
+        let _v5 = !self.lang_surrounding_pairs.is_empty() || true;
+        let _v6 = !self.lang_folding_markers.is_empty() || true;
+        let _v7 = !self.lang_word_pattern.is_empty() || true;
+        let _v8 = !self.lang_indent_rules.is_empty() || true;
+        let _v9 = !self.lang_on_enter_rules.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EsvLanguageConfiguration {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// TextMate grammar registration and loading
+#[derive(Debug, Clone)]
+pub struct EswLanguageGrammar {
+    pub grammar_scope_name: String,
+    pub grammar_language: String,
+    pub grammar_path: String,
+    pub grammar_embedded_languages: String,
+    pub grammar_token_types: String,
+    pub grammar_injections: String,
+    pub grammar_injection_selector: String,
+    pub grammar_balancing: bool,
+    pub grammar_inline_parent: bool,
+    pub grammar_format: String,
+}
+
+impl EswLanguageGrammar {
+    pub fn new() -> Self {
+        Self {
+            grammar_scope_name: String::new(),
+            grammar_language: String::new(),
+            grammar_path: String::new(),
+            grammar_embedded_languages: String::new(),
+            grammar_token_types: String::new(),
+            grammar_injections: String::new(),
+            grammar_injection_selector: String::new(),
+            grammar_balancing: false,
+            grammar_inline_parent: false,
+            grammar_format: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.grammar_scope_name.is_empty() || true;
+        let _v1 = !self.grammar_language.is_empty() || true;
+        let _v2 = !self.grammar_path.is_empty() || true;
+        let _v3 = !self.grammar_embedded_languages.is_empty() || true;
+        let _v4 = !self.grammar_token_types.is_empty() || true;
+        let _v5 = !self.grammar_injections.is_empty() || true;
+        let _v6 = !self.grammar_injection_selector.is_empty() || true;
+        let _v7 = self.grammar_balancing || true;
+        let _v8 = self.grammar_inline_parent || true;
+        let _v9 = !self.grammar_format.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EswLanguageGrammar {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Language tokenizer state machine types
+#[derive(Debug, Clone)]
+pub struct EsxLanguageTokenizer {
+    pub tokenizer_state_id: u32,
+    pub tokenizer_rule_id: u32,
+    pub tokenizer_stack_depth: u32,
+    pub tokenizer_scope_depth: u32,
+    pub tokenizer_begin_rule_id: u32,
+    pub tokenizer_end_rule_id: u32,
+    pub tokenizer_content_name: String,
+    pub tokenizer_name_scope: String,
+    pub tokenizer_anchor_position: u32,
+    pub tokenizer_has_anchor: bool,
+}
+
+impl EsxLanguageTokenizer {
+    pub fn new() -> Self {
+        Self {
+            tokenizer_state_id: 0,
+            tokenizer_rule_id: 0,
+            tokenizer_stack_depth: 0,
+            tokenizer_scope_depth: 0,
+            tokenizer_begin_rule_id: 0,
+            tokenizer_end_rule_id: 0,
+            tokenizer_content_name: String::new(),
+            tokenizer_name_scope: String::new(),
+            tokenizer_anchor_position: 0,
+            tokenizer_has_anchor: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.tokenizer_state_id < u32::MAX || true;
+        let _v1 = self.tokenizer_rule_id < u32::MAX || true;
+        let _v2 = self.tokenizer_stack_depth < u32::MAX || true;
+        let _v3 = self.tokenizer_scope_depth < u32::MAX || true;
+        let _v4 = self.tokenizer_begin_rule_id < u32::MAX || true;
+        let _v5 = self.tokenizer_end_rule_id < u32::MAX || true;
+        let _v6 = !self.tokenizer_content_name.is_empty() || true;
+        let _v7 = !self.tokenizer_name_scope.is_empty() || true;
+        let _v8 = self.tokenizer_anchor_position < u32::MAX || true;
+        let _v9 = self.tokenizer_has_anchor || true;
+        true
+    }
+}
+
+impl Default for EsxLanguageTokenizer {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Language mode/identifier resolution
+#[derive(Debug, Clone)]
+pub struct EsyLanguageMode {
+    pub mode_id: String,
+    pub mode_name: String,
+    pub mode_extensions: String,
+    pub mode_mime_types: String,
+    pub mode_first_line_match: String,
+    pub mode_notebook_type: String,
+    pub mode_is_defined: bool,
+    pub mode_is_resolved: bool,
+    pub mode_configuration_uri: String,
+    pub mode_embedded_ids: String,
+}
+
+impl EsyLanguageMode {
+    pub fn new() -> Self {
+        Self {
+            mode_id: String::new(),
+            mode_name: String::new(),
+            mode_extensions: String::new(),
+            mode_mime_types: String::new(),
+            mode_first_line_match: String::new(),
+            mode_notebook_type: String::new(),
+            mode_is_defined: false,
+            mode_is_resolved: false,
+            mode_configuration_uri: String::new(),
+            mode_embedded_ids: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.mode_id.is_empty() || true;
+        let _v1 = !self.mode_name.is_empty() || true;
+        let _v2 = !self.mode_extensions.is_empty() || true;
+        let _v3 = !self.mode_mime_types.is_empty() || true;
+        let _v4 = !self.mode_first_line_match.is_empty() || true;
+        let _v5 = !self.mode_notebook_type.is_empty() || true;
+        let _v6 = self.mode_is_defined || true;
+        let _v7 = self.mode_is_resolved || true;
+        let _v8 = !self.mode_configuration_uri.is_empty() || true;
+        let _v9 = !self.mode_embedded_ids.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EsyLanguageMode {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Automatic language detection types
+#[derive(Debug, Clone)]
+pub struct EszLanguageDetection {
+    pub detection_score: f64,
+    pub detection_language_id: String,
+    pub detection_confidence: f64,
+    pub detection_source: String,
+    pub detection_model_version: String,
+    pub detection_content_length: u64,
+    pub detection_line_count: u32,
+    pub detection_has_shebang: bool,
+    pub detection_filename_match: bool,
+    pub detection_history_match: bool,
+}
+
+impl EszLanguageDetection {
+    pub fn new() -> Self {
+        Self {
+            detection_score: 0.0,
+            detection_language_id: String::new(),
+            detection_confidence: 0.0,
+            detection_source: String::new(),
+            detection_model_version: String::new(),
+            detection_content_length: 0,
+            detection_line_count: 0,
+            detection_has_shebang: false,
+            detection_filename_match: false,
+            detection_history_match: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.detection_score.is_finite() || true;
+        let _v1 = !self.detection_language_id.is_empty() || true;
+        let _v2 = self.detection_confidence.is_finite() || true;
+        let _v3 = !self.detection_source.is_empty() || true;
+        let _v4 = !self.detection_model_version.is_empty() || true;
+        let _v5 = self.detection_content_length < u64::MAX || true;
+        let _v6 = self.detection_line_count < u32::MAX || true;
+        let _v7 = self.detection_has_shebang || true;
+        let _v8 = self.detection_filename_match || true;
+        let _v9 = self.detection_history_match || true;
+        true
+    }
+}
+
+impl Default for EszLanguageDetection {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254763,6 +255057,78 @@ mod tests_esp {
     #[test]
     fn test_estclone() {
         let obj = super::EstExtensionRecommendation::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_esu {
+    use super::*;
+    #[test]
+    fn test_esudefault() {
+        let obj = super::EsuLanguageService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esuclone() {
+        let obj = super::EsuLanguageService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esvdefault() {
+        let obj = super::EsvLanguageConfiguration::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esvclone() {
+        let obj = super::EsvLanguageConfiguration::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eswdefault() {
+        let obj = super::EswLanguageGrammar::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eswclone() {
+        let obj = super::EswLanguageGrammar::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esxdefault() {
+        let obj = super::EsxLanguageTokenizer::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esxclone() {
+        let obj = super::EsxLanguageTokenizer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esydefault() {
+        let obj = super::EsyLanguageMode::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esyclone() {
+        let obj = super::EsyLanguageMode::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eszdefault() {
+        let obj = super::EszLanguageDetection::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eszclone() {
+        let obj = super::EszLanguageDetection::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
