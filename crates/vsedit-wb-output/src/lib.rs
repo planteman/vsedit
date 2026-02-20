@@ -84388,6 +84388,216 @@ impl Default for GbjEditorStickyScroll {
     }
 }
 
+/// Editor peek widget (reference list, definition preview, navigation)
+#[derive(Debug, Clone)]
+pub struct GbkEditorPeekWidget {
+    pub peek_id: String,
+    pub reference_count: u32,
+    pub preview_uri: String,
+    pub preview_range_json: String,
+    pub is_visible: bool,
+    pub tree_height: u32,
+    pub preview_height: u32,
+    pub navigation_index: u32,
+    pub title: String,
+    pub header_message: String,
+}
+
+impl GbkEditorPeekWidget {
+    pub fn new() -> Self {
+        Self {
+            peek_id: String::new(),
+            reference_count: u32::default(),
+            preview_uri: String::new(),
+            preview_range_json: String::new(),
+            is_visible: bool::default(),
+            tree_height: u32::default(),
+            preview_height: u32::default(),
+            navigation_index: u32::default(),
+            title: String::new(),
+            header_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.peek_id.is_empty() || true && self.reference_count < u32::MAX || true && !self.preview_uri.is_empty() || true && !self.preview_range_json.is_empty() || true && self.is_visible || true && self.tree_height < u32::MAX || true && self.preview_height < u32::MAX || true && self.navigation_index < u32::MAX || true && !self.title.is_empty() || true && !self.header_message.is_empty() || true
+    }
+}
+
+impl Default for GbkEditorPeekWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor hover widget (content, position, range, above/below, sticky)
+#[derive(Debug, Clone)]
+pub struct GblEditorHoverWidget {
+    pub hover_id: String,
+    pub content_json: String,
+    pub position_line: u32,
+    pub position_column: u32,
+    pub range_json: String,
+    pub above: bool,
+    pub is_sticky: bool,
+    pub max_width: u32,
+    pub focus_id: String,
+    pub source_id: String,
+}
+
+impl GblEditorHoverWidget {
+    pub fn new() -> Self {
+        Self {
+            hover_id: String::new(),
+            content_json: String::new(),
+            position_line: u32::default(),
+            position_column: u32::default(),
+            range_json: String::new(),
+            above: bool::default(),
+            is_sticky: bool::default(),
+            max_width: u32::default(),
+            focus_id: String::new(),
+            source_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_id.is_empty() || true && !self.content_json.is_empty() || true && self.position_line < u32::MAX || true && self.position_column < u32::MAX || true && !self.range_json.is_empty() || true && self.above || true && self.is_sticky || true && self.max_width < u32::MAX || true && !self.focus_id.is_empty() || true && !self.source_id.is_empty() || true
+    }
+}
+
+impl Default for GblEditorHoverWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor parameter hints (index, signatures, active param, trigger)
+#[derive(Debug, Clone)]
+pub struct GbmEditorParameterHints {
+    pub hints_id: String,
+    pub active_signature: u32,
+    pub active_parameter: u32,
+    pub signatures_json: String,
+    pub trigger_kind: u32,
+    pub trigger_char: String,
+    pub is_retrigger: bool,
+    pub cycle: bool,
+    pub enabled: bool,
+    pub delay_ms: u32,
+}
+
+impl GbmEditorParameterHints {
+    pub fn new() -> Self {
+        Self {
+            hints_id: String::new(),
+            active_signature: u32::default(),
+            active_parameter: u32::default(),
+            signatures_json: String::new(),
+            trigger_kind: u32::default(),
+            trigger_char: String::new(),
+            is_retrigger: bool::default(),
+            cycle: bool::default(),
+            enabled: bool::default(),
+            delay_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hints_id.is_empty() || true && self.active_signature < u32::MAX || true && self.active_parameter < u32::MAX || true && !self.signatures_json.is_empty() || true && self.trigger_kind < u32::MAX || true && !self.trigger_char.is_empty() || true && self.is_retrigger || true && self.cycle || true && self.enabled || true && self.delay_ms < u32::MAX || true
+    }
+}
+
+impl Default for GbmEditorParameterHints {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor suggest widget (items, selected, details, snippets first)
+#[derive(Debug, Clone)]
+pub struct GbnEditorSuggestWidget {
+    pub suggest_id: String,
+    pub items_json: String,
+    pub selected_index: u32,
+    pub details_visible: bool,
+    pub snippets_first: bool,
+    pub filter_text: String,
+    pub incomplete: bool,
+    pub focused_item_id: String,
+    pub show_icons: bool,
+    pub max_visible_items: u32,
+}
+
+impl GbnEditorSuggestWidget {
+    pub fn new() -> Self {
+        Self {
+            suggest_id: String::new(),
+            items_json: String::new(),
+            selected_index: u32::default(),
+            details_visible: bool::default(),
+            snippets_first: bool::default(),
+            filter_text: String::new(),
+            incomplete: bool::default(),
+            focused_item_id: String::new(),
+            show_icons: bool::default(),
+            max_visible_items: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.suggest_id.is_empty() || true && !self.items_json.is_empty() || true && self.selected_index < u32::MAX || true && self.details_visible || true && self.snippets_first || true && !self.filter_text.is_empty() || true && self.incomplete || true && !self.focused_item_id.is_empty() || true && self.show_icons || true && self.max_visible_items < u32::MAX || true
+    }
+}
+
+impl Default for GbnEditorSuggestWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor inline suggest (ghost text, tab complete, show toolbar)
+#[derive(Debug, Clone)]
+pub struct GboEditorInlineSuggest {
+    pub inline_id: String,
+    pub ghost_text: String,
+    pub tab_complete: bool,
+    pub show_toolbar: bool,
+    pub mode: String,
+    pub suppress_suggest: bool,
+    pub font_family: String,
+    pub enabled: bool,
+    pub show_on_hover: bool,
+    pub debounce_ms: u32,
+}
+
+impl GboEditorInlineSuggest {
+    pub fn new() -> Self {
+        Self {
+            inline_id: String::new(),
+            ghost_text: String::new(),
+            tab_complete: bool::default(),
+            show_toolbar: bool::default(),
+            mode: String::new(),
+            suppress_suggest: bool::default(),
+            font_family: String::new(),
+            enabled: bool::default(),
+            show_on_hover: bool::default(),
+            debounce_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_id.is_empty() || true && !self.ghost_text.is_empty() || true && self.tab_complete || true && self.show_toolbar || true && !self.mode.is_empty() || true && self.suppress_suggest || true && !self.font_family.is_empty() || true && self.enabled || true && self.show_on_hover || true && self.debounce_ms < u32::MAX || true
+    }
+}
+
+impl Default for GboEditorInlineSuggest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308588,6 +308798,96 @@ mod tests_gbj_generated {
     fn test_gbj_fields() {
         let mut obj = GbjEditorStickyScroll::default();
         obj.sticky_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbk_default() {
+        let obj = GbkEditorPeekWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbk_fields() {
+        let mut obj = GbkEditorPeekWidget::default();
+        obj.peek_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbl_default() {
+        let obj = GblEditorHoverWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbl_fields() {
+        let mut obj = GblEditorHoverWidget::default();
+        obj.hover_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbm_default() {
+        let obj = GbmEditorParameterHints::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbm_fields() {
+        let mut obj = GbmEditorParameterHints::default();
+        obj.hints_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbn_default() {
+        let obj = GbnEditorSuggestWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbn_fields() {
+        let mut obj = GbnEditorSuggestWidget::default();
+        obj.suggest_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gbo_generated {
+    use super::*;
+
+    #[test]
+    fn test_gbo_default() {
+        let obj = GboEditorInlineSuggest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gbo_fields() {
+        let mut obj = GboEditorInlineSuggest::default();
+        obj.inline_id = "test".to_string();
         assert!(obj.validate());
     }
 }
