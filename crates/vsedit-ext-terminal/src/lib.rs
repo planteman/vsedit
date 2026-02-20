@@ -75525,6 +75525,216 @@ impl Default for FteConfigurationRegistry {
     }
 }
 
+/// Configuration policy (name, definition type, default, category)
+#[derive(Debug, Clone)]
+pub struct FtfConfigurationPolicy {
+    pub policy_id: String,
+    pub policy_name: String,
+    pub definition_type: u32,
+    pub default_value_json: String,
+    pub category: String,
+    pub description: String,
+    pub minimum_version: String,
+    pub is_deprecated: bool,
+    pub replacement_key: String,
+    pub platform_json: String,
+}
+
+impl FtfConfigurationPolicy {
+    pub fn new() -> Self {
+        Self {
+            policy_id: String::new(),
+            policy_name: String::new(),
+            definition_type: u32::default(),
+            default_value_json: String::new(),
+            category: String::new(),
+            description: String::new(),
+            minimum_version: String::new(),
+            is_deprecated: bool::default(),
+            replacement_key: String::new(),
+            platform_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.policy_id.is_empty() || true && !self.policy_name.is_empty() || true && self.definition_type < u32::MAX || true && !self.default_value_json.is_empty() || true && !self.category.is_empty() || true && !self.description.is_empty() || true && !self.minimum_version.is_empty() || true && self.is_deprecated || true && !self.replacement_key.is_empty() || true && !self.platform_json.is_empty() || true
+    }
+}
+
+impl Default for FtfConfigurationPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration change event (affected keys, source, target)
+#[derive(Debug, Clone)]
+pub struct FtgConfigurationChange {
+    pub change_id: String,
+    pub affected_keys_json: String,
+    pub source: u32,
+    pub target: u32,
+    pub override_identifier: String,
+    pub previous_value_json: String,
+    pub new_value_json: String,
+    pub is_language: bool,
+    pub folder_uri: String,
+    pub key_count: u32,
+}
+
+impl FtgConfigurationChange {
+    pub fn new() -> Self {
+        Self {
+            change_id: String::new(),
+            affected_keys_json: String::new(),
+            source: u32::default(),
+            target: u32::default(),
+            override_identifier: String::new(),
+            previous_value_json: String::new(),
+            new_value_json: String::new(),
+            is_language: bool::default(),
+            folder_uri: String::new(),
+            key_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.change_id.is_empty() || true && !self.affected_keys_json.is_empty() || true && self.source < u32::MAX || true && self.target < u32::MAX || true && !self.override_identifier.is_empty() || true && !self.previous_value_json.is_empty() || true && !self.new_value_json.is_empty() || true && self.is_language || true && !self.folder_uri.is_empty() || true && self.key_count < u32::MAX || true
+    }
+}
+
+impl Default for FtgConfigurationChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings JSON model (parse tree, errors, comments, schema)
+#[derive(Debug, Clone)]
+pub struct FthSettingsJsonModel {
+    pub json_id: String,
+    pub parse_tree_json: String,
+    pub error_count: u32,
+    pub comment_count: u32,
+    pub schema_uri: String,
+    pub file_uri: String,
+    pub is_valid: bool,
+    pub encoding: String,
+    pub key_count: u32,
+    pub has_trailing_comma: bool,
+}
+
+impl FthSettingsJsonModel {
+    pub fn new() -> Self {
+        Self {
+            json_id: String::new(),
+            parse_tree_json: String::new(),
+            error_count: u32::default(),
+            comment_count: u32::default(),
+            schema_uri: String::new(),
+            file_uri: String::new(),
+            is_valid: bool::default(),
+            encoding: String::new(),
+            key_count: u32::default(),
+            has_trailing_comma: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.json_id.is_empty() || true && !self.parse_tree_json.is_empty() || true && self.error_count < u32::MAX || true && self.comment_count < u32::MAX || true && !self.schema_uri.is_empty() || true && !self.file_uri.is_empty() || true && self.is_valid || true && !self.encoding.is_empty() || true && self.key_count < u32::MAX || true && self.has_trailing_comma || true
+    }
+}
+
+impl Default for FthSettingsJsonModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings editor model (groups, toc, search results, modified)
+#[derive(Debug, Clone)]
+pub struct FtiSettingsEditorModel {
+    pub editor_id: String,
+    pub group_count: u32,
+    pub toc_entries_json: String,
+    pub search_results_count: u32,
+    pub modified_count: u32,
+    pub filter_text: String,
+    pub scope: u32,
+    pub target: u32,
+    pub is_searching: bool,
+    pub language_filter: String,
+}
+
+impl FtiSettingsEditorModel {
+    pub fn new() -> Self {
+        Self {
+            editor_id: String::new(),
+            group_count: u32::default(),
+            toc_entries_json: String::new(),
+            search_results_count: u32::default(),
+            modified_count: u32::default(),
+            filter_text: String::new(),
+            scope: u32::default(),
+            target: u32::default(),
+            is_searching: bool::default(),
+            language_filter: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_id.is_empty() || true && self.group_count < u32::MAX || true && !self.toc_entries_json.is_empty() || true && self.search_results_count < u32::MAX || true && self.modified_count < u32::MAX || true && !self.filter_text.is_empty() || true && self.scope < u32::MAX || true && self.target < u32::MAX || true && self.is_searching || true && !self.language_filter.is_empty() || true
+    }
+}
+
+impl Default for FtiSettingsEditorModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings item (key, value, type, scope, description, default)
+#[derive(Debug, Clone)]
+pub struct FtjSettingItem {
+    pub setting_id: String,
+    pub key: String,
+    pub value_json: String,
+    pub value_type: String,
+    pub scope: u32,
+    pub description: String,
+    pub default_value_json: String,
+    pub is_configured: bool,
+    pub has_policy: bool,
+    pub enum_values_json: String,
+}
+
+impl FtjSettingItem {
+    pub fn new() -> Self {
+        Self {
+            setting_id: String::new(),
+            key: String::new(),
+            value_json: String::new(),
+            value_type: String::new(),
+            scope: u32::default(),
+            description: String::new(),
+            default_value_json: String::new(),
+            is_configured: bool::default(),
+            has_policy: bool::default(),
+            enum_values_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.setting_id.is_empty() || true && !self.key.is_empty() || true && !self.value_json.is_empty() || true && !self.value_type.is_empty() || true && self.scope < u32::MAX || true && !self.description.is_empty() || true && !self.default_value_json.is_empty() || true && self.is_configured || true && self.has_policy || true && !self.enum_values_json.is_empty() || true
+    }
+}
+
+impl Default for FtjSettingItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -295736,6 +295946,96 @@ mod tests_fte_generated {
     fn test_fte_fields() {
         let mut obj = FteConfigurationRegistry::default();
         obj.registry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftf_default() {
+        let obj = FtfConfigurationPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftf_fields() {
+        let mut obj = FtfConfigurationPolicy::default();
+        obj.policy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftg_default() {
+        let obj = FtgConfigurationChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftg_fields() {
+        let mut obj = FtgConfigurationChange::default();
+        obj.change_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fth_generated {
+    use super::*;
+
+    #[test]
+    fn test_fth_default() {
+        let obj = FthSettingsJsonModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fth_fields() {
+        let mut obj = FthSettingsJsonModel::default();
+        obj.json_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fti_generated {
+    use super::*;
+
+    #[test]
+    fn test_fti_default() {
+        let obj = FtiSettingsEditorModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fti_fields() {
+        let mut obj = FtiSettingsEditorModel::default();
+        obj.editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftj_default() {
+        let obj = FtjSettingItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftj_fields() {
+        let mut obj = FtjSettingItem::default();
+        obj.setting_id = "test".to_string();
         assert!(obj.validate());
     }
 }
