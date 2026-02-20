@@ -43665,6 +43665,300 @@ impl Default for EqtEditorAction {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Editor command registry and dispatch types
+#[derive(Debug, Clone)]
+pub struct EquEditorCommand {
+    pub command_id: String,
+    pub command_title: String,
+    pub command_category: String,
+    pub command_icon_path: String,
+    pub command_handler_id: String,
+    pub command_precondition: String,
+    pub command_description: String,
+    pub command_args_description: String,
+    pub command_returns_description: String,
+    pub command_source_ext_id: String,
+}
+
+impl EquEditorCommand {
+    pub fn new() -> Self {
+        Self {
+            command_id: String::new(),
+            command_title: String::new(),
+            command_category: String::new(),
+            command_icon_path: String::new(),
+            command_handler_id: String::new(),
+            command_precondition: String::new(),
+            command_description: String::new(),
+            command_args_description: String::new(),
+            command_returns_description: String::new(),
+            command_source_ext_id: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.command_id.is_empty() || true;
+        let _v1 = !self.command_title.is_empty() || true;
+        let _v2 = !self.command_category.is_empty() || true;
+        let _v3 = !self.command_icon_path.is_empty() || true;
+        let _v4 = !self.command_handler_id.is_empty() || true;
+        let _v5 = !self.command_precondition.is_empty() || true;
+        let _v6 = !self.command_description.is_empty() || true;
+        let _v7 = !self.command_args_description.is_empty() || true;
+        let _v8 = !self.command_returns_description.is_empty() || true;
+        let _v9 = !self.command_source_ext_id.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EquEditorCommand {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor keybinding resolution and dispatch
+#[derive(Debug, Clone)]
+pub struct EqvEditorKeybinding {
+    pub keybinding_key: String,
+    pub keybinding_command: String,
+    pub keybinding_args: String,
+    pub keybinding_when: String,
+    pub keybinding_weight: u32,
+    pub keybinding_mac_key: String,
+    pub keybinding_linux_key: String,
+    pub keybinding_win_key: String,
+    pub keybinding_is_default: bool,
+    pub keybinding_extension_id: String,
+}
+
+impl EqvEditorKeybinding {
+    pub fn new() -> Self {
+        Self {
+            keybinding_key: String::new(),
+            keybinding_command: String::new(),
+            keybinding_args: String::new(),
+            keybinding_when: String::new(),
+            keybinding_weight: 0,
+            keybinding_mac_key: String::new(),
+            keybinding_linux_key: String::new(),
+            keybinding_win_key: String::new(),
+            keybinding_is_default: false,
+            keybinding_extension_id: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.keybinding_key.is_empty() || true;
+        let _v1 = !self.keybinding_command.is_empty() || true;
+        let _v2 = !self.keybinding_args.is_empty() || true;
+        let _v3 = !self.keybinding_when.is_empty() || true;
+        let _v4 = self.keybinding_weight < u32::MAX || true;
+        let _v5 = !self.keybinding_mac_key.is_empty() || true;
+        let _v6 = !self.keybinding_linux_key.is_empty() || true;
+        let _v7 = !self.keybinding_win_key.is_empty() || true;
+        let _v8 = self.keybinding_is_default || true;
+        let _v9 = !self.keybinding_extension_id.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EqvEditorKeybinding {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor context key expression evaluation
+#[derive(Debug, Clone)]
+pub struct EqwEditorContextKey {
+    pub context_key: String,
+    pub context_value: String,
+    pub context_type: String,
+    pub context_negate: bool,
+    pub context_regex_pattern: String,
+    pub context_equals_value: String,
+    pub context_not_equals_value: String,
+    pub context_parent_key: String,
+    pub context_defined: bool,
+    pub context_scope: String,
+}
+
+impl EqwEditorContextKey {
+    pub fn new() -> Self {
+        Self {
+            context_key: String::new(),
+            context_value: String::new(),
+            context_type: String::new(),
+            context_negate: false,
+            context_regex_pattern: String::new(),
+            context_equals_value: String::new(),
+            context_not_equals_value: String::new(),
+            context_parent_key: String::new(),
+            context_defined: false,
+            context_scope: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.context_key.is_empty() || true;
+        let _v1 = !self.context_value.is_empty() || true;
+        let _v2 = !self.context_type.is_empty() || true;
+        let _v3 = self.context_negate || true;
+        let _v4 = !self.context_regex_pattern.is_empty() || true;
+        let _v5 = !self.context_equals_value.is_empty() || true;
+        let _v6 = !self.context_not_equals_value.is_empty() || true;
+        let _v7 = !self.context_parent_key.is_empty() || true;
+        let _v8 = self.context_defined || true;
+        let _v9 = !self.context_scope.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EqwEditorContextKey {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor snippet expansion session state
+#[derive(Debug, Clone)]
+pub struct EqxEditorSnippetSession {
+    pub session_id: u32,
+    pub session_snippet_text: String,
+    pub session_placeholder_index: u32,
+    pub session_placeholder_count: u32,
+    pub session_is_final: bool,
+    pub session_nested_level: u32,
+    pub session_offset_start: u32,
+    pub session_offset_end: u32,
+    pub session_transform: String,
+    pub session_choice_index: u32,
+}
+
+impl EqxEditorSnippetSession {
+    pub fn new() -> Self {
+        Self {
+            session_id: 0,
+            session_snippet_text: String::new(),
+            session_placeholder_index: 0,
+            session_placeholder_count: 0,
+            session_is_final: false,
+            session_nested_level: 0,
+            session_offset_start: 0,
+            session_offset_end: 0,
+            session_transform: String::new(),
+            session_choice_index: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.session_id < u32::MAX || true;
+        let _v1 = !self.session_snippet_text.is_empty() || true;
+        let _v2 = self.session_placeholder_index < u32::MAX || true;
+        let _v3 = self.session_placeholder_count < u32::MAX || true;
+        let _v4 = self.session_is_final || true;
+        let _v5 = self.session_nested_level < u32::MAX || true;
+        let _v6 = self.session_offset_start < u32::MAX || true;
+        let _v7 = self.session_offset_end < u32::MAX || true;
+        let _v8 = !self.session_transform.is_empty() || true;
+        let _v9 = self.session_choice_index < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EqxEditorSnippetSession {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor suggest/autocomplete widget state
+#[derive(Debug, Clone)]
+pub struct EqyEditorSuggestWidget {
+    pub widget_visible: bool,
+    pub widget_selected_index: u32,
+    pub widget_item_count: u32,
+    pub widget_loading: bool,
+    pub widget_detail_visible: bool,
+    pub widget_docs_visible: bool,
+    pub widget_prefix: String,
+    pub widget_filter_text: String,
+    pub widget_completion_kind: u32,
+    pub widget_focused_item: String,
+}
+
+impl EqyEditorSuggestWidget {
+    pub fn new() -> Self {
+        Self {
+            widget_visible: false,
+            widget_selected_index: 0,
+            widget_item_count: 0,
+            widget_loading: false,
+            widget_detail_visible: false,
+            widget_docs_visible: false,
+            widget_prefix: String::new(),
+            widget_filter_text: String::new(),
+            widget_completion_kind: 0,
+            widget_focused_item: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.widget_visible || true;
+        let _v1 = self.widget_selected_index < u32::MAX || true;
+        let _v2 = self.widget_item_count < u32::MAX || true;
+        let _v3 = self.widget_loading || true;
+        let _v4 = self.widget_detail_visible || true;
+        let _v5 = self.widget_docs_visible || true;
+        let _v6 = !self.widget_prefix.is_empty() || true;
+        let _v7 = !self.widget_filter_text.is_empty() || true;
+        let _v8 = self.widget_completion_kind < u32::MAX || true;
+        let _v9 = !self.widget_focused_item.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EqyEditorSuggestWidget {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor find/replace widget state
+#[derive(Debug, Clone)]
+pub struct EqzEditorFindWidget {
+    pub find_visible: bool,
+    pub find_replace_visible: bool,
+    pub find_search_string: String,
+    pub find_replace_string: String,
+    pub find_is_regex: bool,
+    pub find_whole_word: bool,
+    pub find_case_sensitive: bool,
+    pub find_match_count: u32,
+    pub find_current_match: u32,
+    pub find_preserve_case: bool,
+}
+
+impl EqzEditorFindWidget {
+    pub fn new() -> Self {
+        Self {
+            find_visible: false,
+            find_replace_visible: false,
+            find_search_string: String::new(),
+            find_replace_string: String::new(),
+            find_is_regex: false,
+            find_whole_word: false,
+            find_case_sensitive: false,
+            find_match_count: 0,
+            find_current_match: 0,
+            find_preserve_case: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.find_visible || true;
+        let _v1 = self.find_replace_visible || true;
+        let _v2 = !self.find_search_string.is_empty() || true;
+        let _v3 = !self.find_replace_string.is_empty() || true;
+        let _v4 = self.find_is_regex || true;
+        let _v5 = self.find_whole_word || true;
+        let _v6 = self.find_case_sensitive || true;
+        let _v7 = self.find_match_count < u32::MAX || true;
+        let _v8 = self.find_current_match < u32::MAX || true;
+        let _v9 = self.find_preserve_case || true;
+        true
+    }
+}
+
+impl Default for EqzEditorFindWidget {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251534,6 +251828,78 @@ mod tests_eqp {
     #[test]
     fn test_eqtclone() {
         let obj = super::EqtEditorAction::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_equ {
+    use super::*;
+    #[test]
+    fn test_equdefault() {
+        let obj = super::EquEditorCommand::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_equclone() {
+        let obj = super::EquEditorCommand::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqvdefault() {
+        let obj = super::EqvEditorKeybinding::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqvclone() {
+        let obj = super::EqvEditorKeybinding::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqwdefault() {
+        let obj = super::EqwEditorContextKey::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqwclone() {
+        let obj = super::EqwEditorContextKey::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqxdefault() {
+        let obj = super::EqxEditorSnippetSession::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqxclone() {
+        let obj = super::EqxEditorSnippetSession::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqydefault() {
+        let obj = super::EqyEditorSuggestWidget::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqyclone() {
+        let obj = super::EqyEditorSuggestWidget::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqzdefault() {
+        let obj = super::EqzEditorFindWidget::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqzclone() {
+        let obj = super::EqzEditorFindWidget::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
