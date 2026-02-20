@@ -100582,6 +100582,678 @@ impl Default for GqjProductService {
     }
 }
 
+/// Environment service (app root, user home, args, extensions path)
+#[derive(Debug, Clone)]
+pub struct GqkEnvironmentService {
+    pub env_svc_id: String,
+    pub app_root: String,
+    pub user_home: String,
+    pub app_settings_home: String,
+    pub extensions_path: String,
+    pub is_built: bool,
+    pub is_development: bool,
+    pub log_level: String,
+    pub remote_authority: String,
+    pub os_release: String,
+}
+
+impl GqkEnvironmentService {
+    pub fn new() -> Self {
+        Self {
+            env_svc_id: String::new(),
+            app_root: String::new(),
+            user_home: String::new(),
+            app_settings_home: String::new(),
+            extensions_path: String::new(),
+            is_built: bool::default(),
+            is_development: bool::default(),
+            log_level: String::new(),
+            remote_authority: String::new(),
+            os_release: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.env_svc_id.is_empty() || true && !self.app_root.is_empty() || true && !self.user_home.is_empty() || true && !self.app_settings_home.is_empty() || true && !self.extensions_path.is_empty() || true && self.is_built || true && self.is_development || true && !self.log_level.is_empty() || true && !self.remote_authority.is_empty() || true && !self.os_release.is_empty() || true
+    }
+}
+
+impl Default for GqkEnvironmentService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Lifecycle service (phase, on before shutdown, on will shutdown)
+#[derive(Debug, Clone)]
+pub struct GqlLifecycleService {
+    pub lifecycle_svc_id: String,
+    pub phase: String,
+    pub shutdown_reason: String,
+    pub startup_kind: String,
+    pub on_before_shutdown: bool,
+    pub on_will_shutdown: bool,
+    pub shutdown_join_timeout_ms: u64,
+    pub is_shutting_down: bool,
+    pub startup_time_ms: u64,
+    pub phase_order: u32,
+}
+
+impl GqlLifecycleService {
+    pub fn new() -> Self {
+        Self {
+            lifecycle_svc_id: String::new(),
+            phase: String::new(),
+            shutdown_reason: String::new(),
+            startup_kind: String::new(),
+            on_before_shutdown: bool::default(),
+            on_will_shutdown: bool::default(),
+            shutdown_join_timeout_ms: u64::default(),
+            is_shutting_down: bool::default(),
+            startup_time_ms: u64::default(),
+            phase_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lifecycle_svc_id.is_empty() || true && !self.phase.is_empty() || true && !self.shutdown_reason.is_empty() || true && !self.startup_kind.is_empty() || true && self.on_before_shutdown || true && self.on_will_shutdown || true && self.shutdown_join_timeout_ms < u64::MAX || true && self.is_shutting_down || true && self.startup_time_ms < u64::MAX || true && self.phase_order < u32::MAX || true
+    }
+}
+
+impl Default for GqlLifecycleService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Update service (state, check, download, apply, channel)
+#[derive(Debug, Clone)]
+pub struct GqmUpdateService {
+    pub update_svc_id: String,
+    pub state: String,
+    pub check_for_update: bool,
+    pub available_version: String,
+    pub channel: String,
+    pub download_url: String,
+    pub last_check_ms: u64,
+    pub auto_update: bool,
+    pub disable_update: bool,
+    pub product_quality: String,
+}
+
+impl GqmUpdateService {
+    pub fn new() -> Self {
+        Self {
+            update_svc_id: String::new(),
+            state: String::new(),
+            check_for_update: bool::default(),
+            available_version: String::new(),
+            channel: String::new(),
+            download_url: String::new(),
+            last_check_ms: u64::default(),
+            auto_update: bool::default(),
+            disable_update: bool::default(),
+            product_quality: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.update_svc_id.is_empty() || true && !self.state.is_empty() || true && self.check_for_update || true && !self.available_version.is_empty() || true && !self.channel.is_empty() || true && !self.download_url.is_empty() || true && self.last_check_ms < u64::MAX || true && self.auto_update || true && self.disable_update || true && !self.product_quality.is_empty() || true
+    }
+}
+
+impl Default for GqmUpdateService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Clipboard service (read, write, read find text, has resources)
+#[derive(Debug, Clone)]
+pub struct GqnClipboardService {
+    pub clipboard_svc_id: String,
+    pub text: String,
+    pub html: String,
+    pub find_text: String,
+    pub has_resources: bool,
+    pub resource_uris_json: String,
+    pub format: String,
+    pub is_read_only: bool,
+    pub platform_clipboard: bool,
+    pub osc52_enabled: bool,
+}
+
+impl GqnClipboardService {
+    pub fn new() -> Self {
+        Self {
+            clipboard_svc_id: String::new(),
+            text: String::new(),
+            html: String::new(),
+            find_text: String::new(),
+            has_resources: bool::default(),
+            resource_uris_json: String::new(),
+            format: String::new(),
+            is_read_only: bool::default(),
+            platform_clipboard: bool::default(),
+            osc52_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.clipboard_svc_id.is_empty() || true && !self.text.is_empty() || true && !self.html.is_empty() || true && !self.find_text.is_empty() || true && self.has_resources || true && !self.resource_uris_json.is_empty() || true && !self.format.is_empty() || true && self.is_read_only || true && self.platform_clipboard || true && self.osc52_enabled || true
+    }
+}
+
+impl Default for GqnClipboardService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Opener service (open, resolve external, register handler)
+#[derive(Debug, Clone)]
+pub struct GqoOpenerService {
+    pub opener_svc_id: String,
+    pub uri: String,
+    pub options_json: String,
+    pub handler_id: String,
+    pub is_external: bool,
+    pub open_in_new_window: bool,
+    pub allow_tunneling: bool,
+    pub allow_commands: bool,
+    pub from_workspace: bool,
+    pub trust_level: String,
+}
+
+impl GqoOpenerService {
+    pub fn new() -> Self {
+        Self {
+            opener_svc_id: String::new(),
+            uri: String::new(),
+            options_json: String::new(),
+            handler_id: String::new(),
+            is_external: bool::default(),
+            open_in_new_window: bool::default(),
+            allow_tunneling: bool::default(),
+            allow_commands: bool::default(),
+            from_workspace: bool::default(),
+            trust_level: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.opener_svc_id.is_empty() || true && !self.uri.is_empty() || true && !self.options_json.is_empty() || true && !self.handler_id.is_empty() || true && self.is_external || true && self.open_in_new_window || true && self.allow_tunneling || true && self.allow_commands || true && self.from_workspace || true && !self.trust_level.is_empty() || true
+    }
+}
+
+impl Default for GqoOpenerService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dialog service (show, confirm, input, file open, file save)
+#[derive(Debug, Clone)]
+pub struct GqpDialogService {
+    pub dialog_svc_id: String,
+    pub message: String,
+    pub dialog_type: String,
+    pub buttons_json: String,
+    pub detail: String,
+    pub checkbox_label: String,
+    pub default_button: u32,
+    pub cancel_button: u32,
+    pub custom_icon: String,
+    pub is_modal: bool,
+}
+
+impl GqpDialogService {
+    pub fn new() -> Self {
+        Self {
+            dialog_svc_id: String::new(),
+            message: String::new(),
+            dialog_type: String::new(),
+            buttons_json: String::new(),
+            detail: String::new(),
+            checkbox_label: String::new(),
+            default_button: u32::default(),
+            cancel_button: u32::default(),
+            custom_icon: String::new(),
+            is_modal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dialog_svc_id.is_empty() || true && !self.message.is_empty() || true && !self.dialog_type.is_empty() || true && !self.buttons_json.is_empty() || true && !self.detail.is_empty() || true && !self.checkbox_label.is_empty() || true && self.default_button < u32::MAX || true && self.cancel_button < u32::MAX || true && !self.custom_icon.is_empty() || true && self.is_modal || true
+    }
+}
+
+impl Default for GqpDialogService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notification service (info, warn, error, prompt, progress)
+#[derive(Debug, Clone)]
+pub struct GqqNotificationService {
+    pub notif_svc_id: String,
+    pub severity: String,
+    pub message: String,
+    pub source: String,
+    pub actions_json: String,
+    pub is_sticky: bool,
+    pub silent: bool,
+    pub progress_json: String,
+    pub close_after_ms: u32,
+    pub id: String,
+}
+
+impl GqqNotificationService {
+    pub fn new() -> Self {
+        Self {
+            notif_svc_id: String::new(),
+            severity: String::new(),
+            message: String::new(),
+            source: String::new(),
+            actions_json: String::new(),
+            is_sticky: bool::default(),
+            silent: bool::default(),
+            progress_json: String::new(),
+            close_after_ms: u32::default(),
+            id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notif_svc_id.is_empty() || true && !self.severity.is_empty() || true && !self.message.is_empty() || true && !self.source.is_empty() || true && !self.actions_json.is_empty() || true && self.is_sticky || true && self.silent || true && !self.progress_json.is_empty() || true && self.close_after_ms < u32::MAX || true && !self.id.is_empty() || true
+    }
+}
+
+impl Default for GqqNotificationService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Progress service (with progress, location, cancellation)
+#[derive(Debug, Clone)]
+pub struct GqrProgressService {
+    pub progress_svc_id: String,
+    pub location: String,
+    pub title: String,
+    pub is_cancellable: bool,
+    pub total: u32,
+    pub worked: u32,
+    pub message: String,
+    pub delay_ms: u32,
+    pub source: String,
+    pub buttons_json: String,
+}
+
+impl GqrProgressService {
+    pub fn new() -> Self {
+        Self {
+            progress_svc_id: String::new(),
+            location: String::new(),
+            title: String::new(),
+            is_cancellable: bool::default(),
+            total: u32::default(),
+            worked: u32::default(),
+            message: String::new(),
+            delay_ms: u32::default(),
+            source: String::new(),
+            buttons_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.progress_svc_id.is_empty() || true && !self.location.is_empty() || true && !self.title.is_empty() || true && self.is_cancellable || true && self.total < u32::MAX || true && self.worked < u32::MAX || true && !self.message.is_empty() || true && self.delay_ms < u32::MAX || true && !self.source.is_empty() || true && !self.buttons_json.is_empty() || true
+    }
+}
+
+impl Default for GqrProgressService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor service (open, close, create, resolve, save)
+#[derive(Debug, Clone)]
+pub struct GqsEditorService {
+    pub editor_svc_id: String,
+    pub active_editor_uri: String,
+    pub visible_editors_json: String,
+    pub editor_count: u32,
+    pub on_did_active_change: bool,
+    pub on_did_visible_change: bool,
+    pub on_did_close: bool,
+    pub max_editors: u32,
+    pub close_on_file_delete: String,
+    pub open_default_editor: bool,
+}
+
+impl GqsEditorService {
+    pub fn new() -> Self {
+        Self {
+            editor_svc_id: String::new(),
+            active_editor_uri: String::new(),
+            visible_editors_json: String::new(),
+            editor_count: u32::default(),
+            on_did_active_change: bool::default(),
+            on_did_visible_change: bool::default(),
+            on_did_close: bool::default(),
+            max_editors: u32::default(),
+            close_on_file_delete: String::new(),
+            open_default_editor: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_svc_id.is_empty() || true && !self.active_editor_uri.is_empty() || true && !self.visible_editors_json.is_empty() || true && self.editor_count < u32::MAX || true && self.on_did_active_change || true && self.on_did_visible_change || true && self.on_did_close || true && self.max_editors < u32::MAX || true && !self.close_on_file_delete.is_empty() || true && self.open_default_editor || true
+    }
+}
+
+impl Default for GqsEditorService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text file service (read, write, create, encoding, resolve)
+#[derive(Debug, Clone)]
+pub struct GqtTextFileService {
+    pub text_file_svc_id: String,
+    pub uri: String,
+    pub encoding: String,
+    pub auto_detect_encoding: bool,
+    pub default_encoding: String,
+    pub preferred_encoding: String,
+    pub write_bom: bool,
+    pub default_eol: String,
+    pub auto_save_mode: String,
+    pub auto_save_delay_ms: u64,
+}
+
+impl GqtTextFileService {
+    pub fn new() -> Self {
+        Self {
+            text_file_svc_id: String::new(),
+            uri: String::new(),
+            encoding: String::new(),
+            auto_detect_encoding: bool::default(),
+            default_encoding: String::new(),
+            preferred_encoding: String::new(),
+            write_bom: bool::default(),
+            default_eol: String::new(),
+            auto_save_mode: String::new(),
+            auto_save_delay_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.text_file_svc_id.is_empty() || true && !self.uri.is_empty() || true && !self.encoding.is_empty() || true && self.auto_detect_encoding || true && !self.default_encoding.is_empty() || true && !self.preferred_encoding.is_empty() || true && self.write_bom || true && !self.default_eol.is_empty() || true && !self.auto_save_mode.is_empty() || true && self.auto_save_delay_ms < u64::MAX || true
+    }
+}
+
+impl Default for GqtTextFileService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Working copy service (dirty, get, resolve, register, backup)
+#[derive(Debug, Clone)]
+pub struct GquWorkingCopyService {
+    pub working_copy_svc_id: String,
+    pub dirty_count: u32,
+    pub dirty_uris_json: String,
+    pub backup_path: String,
+    pub on_did_change_dirty: bool,
+    pub on_did_register: bool,
+    pub hot_exit_mode: String,
+    pub max_backup_size_bytes: u64,
+    pub backup_delay_ms: u32,
+    pub is_restoring: bool,
+}
+
+impl GquWorkingCopyService {
+    pub fn new() -> Self {
+        Self {
+            working_copy_svc_id: String::new(),
+            dirty_count: u32::default(),
+            dirty_uris_json: String::new(),
+            backup_path: String::new(),
+            on_did_change_dirty: bool::default(),
+            on_did_register: bool::default(),
+            hot_exit_mode: String::new(),
+            max_backup_size_bytes: u64::default(),
+            backup_delay_ms: u32::default(),
+            is_restoring: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.working_copy_svc_id.is_empty() || true && self.dirty_count < u32::MAX || true && !self.dirty_uris_json.is_empty() || true && !self.backup_path.is_empty() || true && self.on_did_change_dirty || true && self.on_did_register || true && !self.hot_exit_mode.is_empty() || true && self.max_backup_size_bytes < u64::MAX || true && self.backup_delay_ms < u32::MAX || true && self.is_restoring || true
+    }
+}
+
+impl Default for GquWorkingCopyService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text editor service (open, resolve, create, diff, merge)
+#[derive(Debug, Clone)]
+pub struct GqvTextEditorService {
+    pub text_editor_svc_id: String,
+    pub uri: String,
+    pub language_id: String,
+    pub editor_type: String,
+    pub options_json: String,
+    pub is_diff: bool,
+    pub is_merge: bool,
+    pub can_split: bool,
+    pub preferred_group: String,
+    pub override_id: String,
+}
+
+impl GqvTextEditorService {
+    pub fn new() -> Self {
+        Self {
+            text_editor_svc_id: String::new(),
+            uri: String::new(),
+            language_id: String::new(),
+            editor_type: String::new(),
+            options_json: String::new(),
+            is_diff: bool::default(),
+            is_merge: bool::default(),
+            can_split: bool::default(),
+            preferred_group: String::new(),
+            override_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.text_editor_svc_id.is_empty() || true && !self.uri.is_empty() || true && !self.language_id.is_empty() || true && !self.editor_type.is_empty() || true && !self.options_json.is_empty() || true && self.is_diff || true && self.is_merge || true && self.can_split || true && !self.preferred_group.is_empty() || true && !self.override_id.is_empty() || true
+    }
+}
+
+impl Default for GqvTextEditorService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bulk edit service (apply, preview, has previewer, undo)
+#[derive(Debug, Clone)]
+pub struct GqwBulkEditService {
+    pub bulk_edit_svc_id: String,
+    pub edits_json: String,
+    pub has_previewer: bool,
+    pub is_preview: bool,
+    pub apply_progress_json: String,
+    pub undo_enabled: bool,
+    pub label: String,
+    pub code_action_kind: String,
+    pub show_preview: bool,
+    pub confirm: bool,
+}
+
+impl GqwBulkEditService {
+    pub fn new() -> Self {
+        Self {
+            bulk_edit_svc_id: String::new(),
+            edits_json: String::new(),
+            has_previewer: bool::default(),
+            is_preview: bool::default(),
+            apply_progress_json: String::new(),
+            undo_enabled: bool::default(),
+            label: String::new(),
+            code_action_kind: String::new(),
+            show_preview: bool::default(),
+            confirm: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bulk_edit_svc_id.is_empty() || true && !self.edits_json.is_empty() || true && self.has_previewer || true && self.is_preview || true && !self.apply_progress_json.is_empty() || true && self.undo_enabled || true && !self.label.is_empty() || true && !self.code_action_kind.is_empty() || true && self.show_preview || true && self.confirm || true
+    }
+}
+
+impl Default for GqwBulkEditService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code editor service (get, list, focus, register, on change)
+#[derive(Debug, Clone)]
+pub struct GqxCodeEditorService {
+    pub code_editor_svc_id: String,
+    pub editors_json: String,
+    pub focused_editor_id: String,
+    pub on_did_change_model: bool,
+    pub on_did_change_configuration: bool,
+    pub max_instances: u32,
+    pub editor_type: String,
+    pub is_diff_editor: bool,
+    pub widget_id: String,
+    pub container_id: String,
+}
+
+impl GqxCodeEditorService {
+    pub fn new() -> Self {
+        Self {
+            code_editor_svc_id: String::new(),
+            editors_json: String::new(),
+            focused_editor_id: String::new(),
+            on_did_change_model: bool::default(),
+            on_did_change_configuration: bool::default(),
+            max_instances: u32::default(),
+            editor_type: String::new(),
+            is_diff_editor: bool::default(),
+            widget_id: String::new(),
+            container_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.code_editor_svc_id.is_empty() || true && !self.editors_json.is_empty() || true && !self.focused_editor_id.is_empty() || true && self.on_did_change_model || true && self.on_did_change_configuration || true && self.max_instances < u32::MAX || true && !self.editor_type.is_empty() || true && self.is_diff_editor || true && !self.widget_id.is_empty() || true && !self.container_id.is_empty() || true
+    }
+}
+
+impl Default for GqxCodeEditorService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language service (register, get, resolve, on did change)
+#[derive(Debug, Clone)]
+pub struct GqyLanguageService {
+    pub lang_svc_id: String,
+    pub language_id: String,
+    pub extensions_json: String,
+    pub filenames_json: String,
+    pub file_patterns_json: String,
+    pub first_line_pattern: String,
+    pub aliases_json: String,
+    pub mime_types_json: String,
+    pub configuration_uri: String,
+    pub icon: String,
+}
+
+impl GqyLanguageService {
+    pub fn new() -> Self {
+        Self {
+            lang_svc_id: String::new(),
+            language_id: String::new(),
+            extensions_json: String::new(),
+            filenames_json: String::new(),
+            file_patterns_json: String::new(),
+            first_line_pattern: String::new(),
+            aliases_json: String::new(),
+            mime_types_json: String::new(),
+            configuration_uri: String::new(),
+            icon: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_svc_id.is_empty() || true && !self.language_id.is_empty() || true && !self.extensions_json.is_empty() || true && !self.filenames_json.is_empty() || true && !self.file_patterns_json.is_empty() || true && !self.first_line_pattern.is_empty() || true && !self.aliases_json.is_empty() || true && !self.mime_types_json.is_empty() || true && !self.configuration_uri.is_empty() || true && !self.icon.is_empty() || true
+    }
+}
+
+impl Default for GqyLanguageService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language feature registry (register, get, ordered, all)
+#[derive(Debug, Clone)]
+pub struct GqzLanguageFeatureRegistry {
+    pub feat_reg_id: String,
+    pub feature_type: String,
+    pub providers_json: String,
+    pub selector_json: String,
+    pub ordered_json: String,
+    pub provider_count: u32,
+    pub on_did_change: bool,
+    pub metadata_json: String,
+    pub language_id: String,
+    pub scheme: String,
+}
+
+impl GqzLanguageFeatureRegistry {
+    pub fn new() -> Self {
+        Self {
+            feat_reg_id: String::new(),
+            feature_type: String::new(),
+            providers_json: String::new(),
+            selector_json: String::new(),
+            ordered_json: String::new(),
+            provider_count: u32::default(),
+            on_did_change: bool::default(),
+            metadata_json: String::new(),
+            language_id: String::new(),
+            scheme: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.feat_reg_id.is_empty() || true && !self.feature_type.is_empty() || true && !self.providers_json.is_empty() || true && !self.selector_json.is_empty() || true && !self.ordered_json.is_empty() || true && self.provider_count < u32::MAX || true && self.on_did_change || true && !self.metadata_json.is_empty() || true && !self.language_id.is_empty() || true && !self.scheme.is_empty() || true
+    }
+}
+
+impl Default for GqzLanguageFeatureRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331887,6 +332559,294 @@ mod tests_gqj_generated {
     fn test_gqj_fields() {
         let mut obj = GqjProductService::default();
         obj.product_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqk_default() {
+        let obj = GqkEnvironmentService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqk_fields() {
+        let mut obj = GqkEnvironmentService::default();
+        obj.env_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gql_generated {
+    use super::*;
+
+    #[test]
+    fn test_gql_default() {
+        let obj = GqlLifecycleService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gql_fields() {
+        let mut obj = GqlLifecycleService::default();
+        obj.lifecycle_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqm_default() {
+        let obj = GqmUpdateService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqm_fields() {
+        let mut obj = GqmUpdateService::default();
+        obj.update_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqn_default() {
+        let obj = GqnClipboardService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqn_fields() {
+        let mut obj = GqnClipboardService::default();
+        obj.clipboard_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqo_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqo_default() {
+        let obj = GqoOpenerService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqo_fields() {
+        let mut obj = GqoOpenerService::default();
+        obj.opener_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqp_default() {
+        let obj = GqpDialogService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqp_fields() {
+        let mut obj = GqpDialogService::default();
+        obj.dialog_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqq_default() {
+        let obj = GqqNotificationService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqq_fields() {
+        let mut obj = GqqNotificationService::default();
+        obj.notif_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqr_default() {
+        let obj = GqrProgressService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqr_fields() {
+        let mut obj = GqrProgressService::default();
+        obj.progress_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqs_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqs_default() {
+        let obj = GqsEditorService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqs_fields() {
+        let mut obj = GqsEditorService::default();
+        obj.editor_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqt_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqt_default() {
+        let obj = GqtTextFileService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqt_fields() {
+        let mut obj = GqtTextFileService::default();
+        obj.text_file_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqu_default() {
+        let obj = GquWorkingCopyService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqu_fields() {
+        let mut obj = GquWorkingCopyService::default();
+        obj.working_copy_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqv_default() {
+        let obj = GqvTextEditorService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqv_fields() {
+        let mut obj = GqvTextEditorService::default();
+        obj.text_editor_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqw_default() {
+        let obj = GqwBulkEditService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqw_fields() {
+        let mut obj = GqwBulkEditService::default();
+        obj.bulk_edit_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqx_default() {
+        let obj = GqxCodeEditorService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqx_fields() {
+        let mut obj = GqxCodeEditorService::default();
+        obj.code_editor_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqy_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqy_default() {
+        let obj = GqyLanguageService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqy_fields() {
+        let mut obj = GqyLanguageService::default();
+        obj.lang_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gqz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gqz_default() {
+        let obj = GqzLanguageFeatureRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gqz_fields() {
+        let mut obj = GqzLanguageFeatureRegistry::default();
+        obj.feat_reg_id = "test".to_string();
         assert!(obj.validate());
     }
 }
