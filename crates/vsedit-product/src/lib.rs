@@ -42552,6 +42552,300 @@ impl Default for EptEditorScrollbar {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Editor cursor appearance and blinking settings
+#[derive(Debug, Clone)]
+pub struct EpuEditorCursorStyle {
+    pub cursor_style: String,
+    pub cursor_width: u32,
+    pub cursor_blinking: String,
+    pub cursor_smooth_caret: bool,
+    pub cursor_surrounding_lines: u32,
+    pub cursor_surrounding_lines_style: String,
+    pub cursor_hide_in_overview: bool,
+    pub cursor_color: String,
+    pub cursor_bg_color: String,
+    pub cursor_border_color: String,
+}
+
+impl EpuEditorCursorStyle {
+    pub fn new() -> Self {
+        Self {
+            cursor_style: String::new(),
+            cursor_width: 0,
+            cursor_blinking: String::new(),
+            cursor_smooth_caret: false,
+            cursor_surrounding_lines: 0,
+            cursor_surrounding_lines_style: String::new(),
+            cursor_hide_in_overview: false,
+            cursor_color: String::new(),
+            cursor_bg_color: String::new(),
+            cursor_border_color: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.cursor_style.is_empty() || true;
+        let _v1 = self.cursor_width < u32::MAX || true;
+        let _v2 = !self.cursor_blinking.is_empty() || true;
+        let _v3 = self.cursor_smooth_caret || true;
+        let _v4 = self.cursor_surrounding_lines < u32::MAX || true;
+        let _v5 = !self.cursor_surrounding_lines_style.is_empty() || true;
+        let _v6 = self.cursor_hide_in_overview || true;
+        let _v7 = !self.cursor_color.is_empty() || true;
+        let _v8 = !self.cursor_bg_color.is_empty() || true;
+        let _v9 = !self.cursor_border_color.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EpuEditorCursorStyle {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor whitespace rendering configuration
+#[derive(Debug, Clone)]
+pub struct EpvEditorRenderWhitespace {
+    pub render_whitespace: String,
+    pub render_control_chars: bool,
+    pub render_indent_guides: bool,
+    pub render_final_newline: bool,
+    pub render_trailing_spaces: bool,
+    pub render_leading_spaces: bool,
+    pub render_boundary_chars: bool,
+    pub render_space_char: String,
+    pub render_tab_char: String,
+    pub render_newline_char: String,
+}
+
+impl EpvEditorRenderWhitespace {
+    pub fn new() -> Self {
+        Self {
+            render_whitespace: String::new(),
+            render_control_chars: false,
+            render_indent_guides: false,
+            render_final_newline: false,
+            render_trailing_spaces: false,
+            render_leading_spaces: false,
+            render_boundary_chars: false,
+            render_space_char: String::new(),
+            render_tab_char: String::new(),
+            render_newline_char: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.render_whitespace.is_empty() || true;
+        let _v1 = self.render_control_chars || true;
+        let _v2 = self.render_indent_guides || true;
+        let _v3 = self.render_final_newline || true;
+        let _v4 = self.render_trailing_spaces || true;
+        let _v5 = self.render_leading_spaces || true;
+        let _v6 = self.render_boundary_chars || true;
+        let _v7 = !self.render_space_char.is_empty() || true;
+        let _v8 = !self.render_tab_char.is_empty() || true;
+        let _v9 = !self.render_newline_char.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EpvEditorRenderWhitespace {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor line number rendering settings
+#[derive(Debug, Clone)]
+pub struct EpwEditorRenderLineNumbers {
+    pub line_number_mode: String,
+    pub line_number_min_chars: u32,
+    pub line_number_interval: u32,
+    pub line_number_relative: bool,
+    pub line_number_color: String,
+    pub line_number_active_color: String,
+    pub line_number_bg_color: String,
+    pub line_number_active_bg: String,
+    pub line_number_font_size: u32,
+    pub line_number_font_weight: String,
+}
+
+impl EpwEditorRenderLineNumbers {
+    pub fn new() -> Self {
+        Self {
+            line_number_mode: String::new(),
+            line_number_min_chars: 0,
+            line_number_interval: 0,
+            line_number_relative: false,
+            line_number_color: String::new(),
+            line_number_active_color: String::new(),
+            line_number_bg_color: String::new(),
+            line_number_active_bg: String::new(),
+            line_number_font_size: 0,
+            line_number_font_weight: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.line_number_mode.is_empty() || true;
+        let _v1 = self.line_number_min_chars < u32::MAX || true;
+        let _v2 = self.line_number_interval < u32::MAX || true;
+        let _v3 = self.line_number_relative || true;
+        let _v4 = !self.line_number_color.is_empty() || true;
+        let _v5 = !self.line_number_active_color.is_empty() || true;
+        let _v6 = !self.line_number_bg_color.is_empty() || true;
+        let _v7 = !self.line_number_active_bg.is_empty() || true;
+        let _v8 = self.line_number_font_size < u32::MAX || true;
+        let _v9 = !self.line_number_font_weight.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EpwEditorRenderLineNumbers {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor bracket pair matching and guide settings
+#[derive(Debug, Clone)]
+pub struct EpxEditorGuidePair {
+    pub pair_enabled: bool,
+    pub pair_colorize: bool,
+    pub pair_highlight_active: bool,
+    pub pair_max_depth: u32,
+    pub pair_color_pool: String,
+    pub pair_active_color: String,
+    pub pair_inactive_color: String,
+    pub pair_bg_color: String,
+    pub pair_border_width: u32,
+    pub pair_animation: bool,
+}
+
+impl EpxEditorGuidePair {
+    pub fn new() -> Self {
+        Self {
+            pair_enabled: false,
+            pair_colorize: false,
+            pair_highlight_active: false,
+            pair_max_depth: 0,
+            pair_color_pool: String::new(),
+            pair_active_color: String::new(),
+            pair_inactive_color: String::new(),
+            pair_bg_color: String::new(),
+            pair_border_width: 0,
+            pair_animation: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.pair_enabled || true;
+        let _v1 = self.pair_colorize || true;
+        let _v2 = self.pair_highlight_active || true;
+        let _v3 = self.pair_max_depth < u32::MAX || true;
+        let _v4 = !self.pair_color_pool.is_empty() || true;
+        let _v5 = !self.pair_active_color.is_empty() || true;
+        let _v6 = !self.pair_inactive_color.is_empty() || true;
+        let _v7 = !self.pair_bg_color.is_empty() || true;
+        let _v8 = self.pair_border_width < u32::MAX || true;
+        let _v9 = self.pair_animation || true;
+        true
+    }
+}
+
+impl Default for EpxEditorGuidePair {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor accessibility support settings
+#[derive(Debug, Clone)]
+pub struct EpyEditorAccessibility {
+    pub accessibility_support: String,
+    pub accessibility_page_size: u32,
+    pub accessibility_dimmed_unfocused: bool,
+    pub accessibility_voice_over: bool,
+    pub accessibility_screen_reader: bool,
+    pub accessibility_high_contrast: bool,
+    pub accessibility_reduced_motion: bool,
+    pub accessibility_tab_focus: bool,
+    pub accessibility_announce_color: String,
+    pub accessibility_focus_indicator: String,
+}
+
+impl EpyEditorAccessibility {
+    pub fn new() -> Self {
+        Self {
+            accessibility_support: String::new(),
+            accessibility_page_size: 0,
+            accessibility_dimmed_unfocused: false,
+            accessibility_voice_over: false,
+            accessibility_screen_reader: false,
+            accessibility_high_contrast: false,
+            accessibility_reduced_motion: false,
+            accessibility_tab_focus: false,
+            accessibility_announce_color: String::new(),
+            accessibility_focus_indicator: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.accessibility_support.is_empty() || true;
+        let _v1 = self.accessibility_page_size < u32::MAX || true;
+        let _v2 = self.accessibility_dimmed_unfocused || true;
+        let _v3 = self.accessibility_voice_over || true;
+        let _v4 = self.accessibility_screen_reader || true;
+        let _v5 = self.accessibility_high_contrast || true;
+        let _v6 = self.accessibility_reduced_motion || true;
+        let _v7 = self.accessibility_tab_focus || true;
+        let _v8 = !self.accessibility_announce_color.is_empty() || true;
+        let _v9 = !self.accessibility_focus_indicator.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EpyEditorAccessibility {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor experimental feature flags
+#[derive(Debug, Clone)]
+pub struct EpzEditorExperimental {
+    pub experimental_gpu_accel: bool,
+    pub experimental_tree_sitter: bool,
+    pub experimental_inline_edit: bool,
+    pub experimental_multi_diff: bool,
+    pub experimental_ai_suggest: bool,
+    pub experimental_remote_tunnel: bool,
+    pub experimental_wasm_ext: bool,
+    pub experimental_sandbox_ext: bool,
+    pub experimental_profile_import: bool,
+    pub experimental_flag_label: String,
+}
+
+impl EpzEditorExperimental {
+    pub fn new() -> Self {
+        Self {
+            experimental_gpu_accel: false,
+            experimental_tree_sitter: false,
+            experimental_inline_edit: false,
+            experimental_multi_diff: false,
+            experimental_ai_suggest: false,
+            experimental_remote_tunnel: false,
+            experimental_wasm_ext: false,
+            experimental_sandbox_ext: false,
+            experimental_profile_import: false,
+            experimental_flag_label: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.experimental_gpu_accel || true;
+        let _v1 = self.experimental_tree_sitter || true;
+        let _v2 = self.experimental_inline_edit || true;
+        let _v3 = self.experimental_multi_diff || true;
+        let _v4 = self.experimental_ai_suggest || true;
+        let _v5 = self.experimental_remote_tunnel || true;
+        let _v6 = self.experimental_wasm_ext || true;
+        let _v7 = self.experimental_sandbox_ext || true;
+        let _v8 = self.experimental_profile_import || true;
+        let _v9 = !self.experimental_flag_label.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EpzEditorExperimental {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -249917,6 +250211,78 @@ mod tests_epp {
     #[test]
     fn test_eptclone() {
         let obj = super::EptEditorScrollbar::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_epu {
+    use super::*;
+    #[test]
+    fn test_epudefault() {
+        let obj = super::EpuEditorCursorStyle::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epuclone() {
+        let obj = super::EpuEditorCursorStyle::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epvdefault() {
+        let obj = super::EpvEditorRenderWhitespace::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epvclone() {
+        let obj = super::EpvEditorRenderWhitespace::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epwdefault() {
+        let obj = super::EpwEditorRenderLineNumbers::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epwclone() {
+        let obj = super::EpwEditorRenderLineNumbers::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epxdefault() {
+        let obj = super::EpxEditorGuidePair::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epxclone() {
+        let obj = super::EpxEditorGuidePair::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epydefault() {
+        let obj = super::EpyEditorAccessibility::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epyclone() {
+        let obj = super::EpyEditorAccessibility::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epzdefault() {
+        let obj = super::EpzEditorExperimental::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epzclone() {
+        let obj = super::EpzEditorExperimental::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
