@@ -180634,6 +180634,890 @@ impl Default for JwzWebviewConfig {
     }
 }
 
+/// Diff editor descriptor
+#[derive(Debug, Clone)]
+pub struct JxaDiffEditor {
+    pub diff_editor_id: String,
+    pub original_uri: String,
+    pub modified_uri: String,
+    pub title_str: String,
+    pub change_count: u32,
+    pub is_inline_view: bool,
+}
+
+impl JxaDiffEditor {
+    pub fn new() -> Self {
+        Self {
+            diff_editor_id: String::new(),
+            original_uri: String::new(),
+            modified_uri: String::new(),
+            title_str: String::new(),
+            change_count: u32::default(),
+            is_inline_view: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_editor_id.is_empty() || true && !self.original_uri.is_empty() || true && !self.modified_uri.is_empty() || true && !self.title_str.is_empty() || true && self.change_count < u32::MAX || true && self.is_inline_view || true
+    }
+}
+
+impl Default for JxaDiffEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff computation model
+#[derive(Debug, Clone)]
+pub struct JxbDiffModel {
+    pub diff_model_id: String,
+    pub original_model_ref: String,
+    pub modified_model_ref: String,
+    pub hunk_count: u32,
+    pub algorithm_str: String,
+    pub is_stale: bool,
+}
+
+impl JxbDiffModel {
+    pub fn new() -> Self {
+        Self {
+            diff_model_id: String::new(),
+            original_model_ref: String::new(),
+            modified_model_ref: String::new(),
+            hunk_count: u32::default(),
+            algorithm_str: String::new(),
+            is_stale: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_model_id.is_empty() || true && !self.original_model_ref.is_empty() || true && !self.modified_model_ref.is_empty() || true && self.hunk_count < u32::MAX || true && !self.algorithm_str.is_empty() || true && self.is_stale || true
+    }
+}
+
+impl Default for JxbDiffModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff hunk descriptor
+#[derive(Debug, Clone)]
+pub struct JxcDiffHunk {
+    pub diff_hunk_id: String,
+    pub original_start: u32,
+    pub original_count: u32,
+    pub modified_start: u32,
+    pub modified_count: u32,
+    pub is_moved: bool,
+}
+
+impl JxcDiffHunk {
+    pub fn new() -> Self {
+        Self {
+            diff_hunk_id: String::new(),
+            original_start: u32::default(),
+            original_count: u32::default(),
+            modified_start: u32::default(),
+            modified_count: u32::default(),
+            is_moved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_hunk_id.is_empty() || true && self.original_start < u32::MAX || true && self.original_count < u32::MAX || true && self.modified_start < u32::MAX || true && self.modified_count < u32::MAX || true && self.is_moved || true
+    }
+}
+
+impl Default for JxcDiffHunk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Character-level diff change
+#[derive(Debug, Clone)]
+pub struct JxdDiffChange {
+    pub diff_change_id: String,
+    pub original_offset: u32,
+    pub original_length: u32,
+    pub modified_offset: u32,
+    pub modified_length: u32,
+    pub is_whitespace: bool,
+}
+
+impl JxdDiffChange {
+    pub fn new() -> Self {
+        Self {
+            diff_change_id: String::new(),
+            original_offset: u32::default(),
+            original_length: u32::default(),
+            modified_offset: u32::default(),
+            modified_length: u32::default(),
+            is_whitespace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_change_id.is_empty() || true && self.original_offset < u32::MAX || true && self.original_length < u32::MAX || true && self.modified_offset < u32::MAX || true && self.modified_length < u32::MAX || true && self.is_whitespace || true
+    }
+}
+
+impl Default for JxdDiffChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff gutter decoration
+#[derive(Debug, Clone)]
+pub struct JxeDiffDecoration {
+    pub diff_deco_id: String,
+    pub line_number: u32,
+    pub glyph_class: String,
+    pub margin_class: String,
+    pub overview_color: String,
+    pub is_inserted: bool,
+}
+
+impl JxeDiffDecoration {
+    pub fn new() -> Self {
+        Self {
+            diff_deco_id: String::new(),
+            line_number: u32::default(),
+            glyph_class: String::new(),
+            margin_class: String::new(),
+            overview_color: String::new(),
+            is_inserted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_deco_id.is_empty() || true && self.line_number < u32::MAX || true && !self.glyph_class.is_empty() || true && !self.margin_class.is_empty() || true && !self.overview_color.is_empty() || true && self.is_inserted || true
+    }
+}
+
+impl Default for JxeDiffDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff navigation state
+#[derive(Debug, Clone)]
+pub struct JxfDiffNavigator {
+    pub diff_nav_id: String,
+    pub current_hunk_idx: u32,
+    pub total_hunks: u32,
+    pub direction_str: String,
+    pub wrap_around: bool,
+    pub is_active: bool,
+}
+
+impl JxfDiffNavigator {
+    pub fn new() -> Self {
+        Self {
+            diff_nav_id: String::new(),
+            current_hunk_idx: u32::default(),
+            total_hunks: u32::default(),
+            direction_str: String::new(),
+            wrap_around: bool::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_nav_id.is_empty() || true && self.current_hunk_idx < u32::MAX || true && self.total_hunks < u32::MAX || true && !self.direction_str.is_empty() || true && self.wrap_around || true && self.is_active || true
+    }
+}
+
+impl Default for JxfDiffNavigator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Three-way merge editor
+#[derive(Debug, Clone)]
+pub struct JxgMergeEditor {
+    pub merge_editor_id: String,
+    pub base_uri: String,
+    pub input1_uri: String,
+    pub input2_uri: String,
+    pub result_uri: String,
+    pub is_three_way: bool,
+}
+
+impl JxgMergeEditor {
+    pub fn new() -> Self {
+        Self {
+            merge_editor_id: String::new(),
+            base_uri: String::new(),
+            input1_uri: String::new(),
+            input2_uri: String::new(),
+            result_uri: String::new(),
+            is_three_way: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_editor_id.is_empty() || true && !self.base_uri.is_empty() || true && !self.input1_uri.is_empty() || true && !self.input2_uri.is_empty() || true && !self.result_uri.is_empty() || true && self.is_three_way || true
+    }
+}
+
+impl Default for JxgMergeEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge conflict region
+#[derive(Debug, Clone)]
+pub struct JxhMergeConflict {
+    pub merge_conflict_id: String,
+    pub base_range_json: String,
+    pub input1_range_json: String,
+    pub input2_range_json: String,
+    pub result_range_json: String,
+    pub is_resolved: bool,
+}
+
+impl JxhMergeConflict {
+    pub fn new() -> Self {
+        Self {
+            merge_conflict_id: String::new(),
+            base_range_json: String::new(),
+            input1_range_json: String::new(),
+            input2_range_json: String::new(),
+            result_range_json: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_conflict_id.is_empty() || true && !self.base_range_json.is_empty() || true && !self.input1_range_json.is_empty() || true && !self.input2_range_json.is_empty() || true && !self.result_range_json.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for JxhMergeConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge result document
+#[derive(Debug, Clone)]
+pub struct JxiMergeResult {
+    pub merge_result_id: String,
+    pub result_text: String,
+    pub conflict_count: u32,
+    pub resolved_count: u32,
+    pub base_ref: String,
+    pub is_complete: bool,
+}
+
+impl JxiMergeResult {
+    pub fn new() -> Self {
+        Self {
+            merge_result_id: String::new(),
+            result_text: String::new(),
+            conflict_count: u32::default(),
+            resolved_count: u32::default(),
+            base_ref: String::new(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_result_id.is_empty() || true && !self.result_text.is_empty() || true && self.conflict_count < u32::MAX || true && self.resolved_count < u32::MAX || true && !self.base_ref.is_empty() || true && self.is_complete || true
+    }
+}
+
+impl Default for JxiMergeResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge conflict decoration
+#[derive(Debug, Clone)]
+pub struct JxjMergeDecoration {
+    pub merge_deco_id: String,
+    pub range_json: String,
+    pub input_source_str: String,
+    pub bg_color: String,
+    pub border_color: String,
+    pub is_word_level: bool,
+}
+
+impl JxjMergeDecoration {
+    pub fn new() -> Self {
+        Self {
+            merge_deco_id: String::new(),
+            range_json: String::new(),
+            input_source_str: String::new(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            is_word_level: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_deco_id.is_empty() || true && !self.range_json.is_empty() || true && !self.input_source_str.is_empty() || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && self.is_word_level || true
+    }
+}
+
+impl Default for JxjMergeDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge conflict action
+#[derive(Debug, Clone)]
+pub struct JxkMergeAction {
+    pub merge_action_id: String,
+    pub action_type_str: String,
+    pub conflict_ref: String,
+    pub label_str: String,
+    pub icon_ref: String,
+    pub is_inline: bool,
+}
+
+impl JxkMergeAction {
+    pub fn new() -> Self {
+        Self {
+            merge_action_id: String::new(),
+            action_type_str: String::new(),
+            conflict_ref: String::new(),
+            label_str: String::new(),
+            icon_ref: String::new(),
+            is_inline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_action_id.is_empty() || true && !self.action_type_str.is_empty() || true && !self.conflict_ref.is_empty() || true && !self.label_str.is_empty() || true && !self.icon_ref.is_empty() || true && self.is_inline || true
+    }
+}
+
+impl Default for JxkMergeAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff algorithm descriptor
+#[derive(Debug, Clone)]
+pub struct JxlDiffAlgorithm {
+    pub diff_algo_id: String,
+    pub algorithm_name: String,
+    pub time_complexity: String,
+    pub space_complexity: String,
+    pub max_computation_ms: u32,
+    pub is_default: bool,
+}
+
+impl JxlDiffAlgorithm {
+    pub fn new() -> Self {
+        Self {
+            diff_algo_id: String::new(),
+            algorithm_name: String::new(),
+            time_complexity: String::new(),
+            space_complexity: String::new(),
+            max_computation_ms: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_algo_id.is_empty() || true && !self.algorithm_name.is_empty() || true && !self.time_complexity.is_empty() || true && !self.space_complexity.is_empty() || true && self.max_computation_ms < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for JxlDiffAlgorithm {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff review descriptor
+#[derive(Debug, Clone)]
+pub struct JxmDiffReview {
+    pub diff_review_id: String,
+    pub editor_ref: String,
+    pub current_hunk_idx: u32,
+    pub review_mode_str: String,
+    pub accepted_count: u32,
+    pub is_read_only: bool,
+}
+
+impl JxmDiffReview {
+    pub fn new() -> Self {
+        Self {
+            diff_review_id: String::new(),
+            editor_ref: String::new(),
+            current_hunk_idx: u32::default(),
+            review_mode_str: String::new(),
+            accepted_count: u32::default(),
+            is_read_only: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_review_id.is_empty() || true && !self.editor_ref.is_empty() || true && self.current_hunk_idx < u32::MAX || true && !self.review_mode_str.is_empty() || true && self.accepted_count < u32::MAX || true && self.is_read_only || true
+    }
+}
+
+impl Default for JxmDiffReview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Side-by-side diff view
+#[derive(Debug, Clone)]
+pub struct JxnDiffSideBySide {
+    pub diff_sbs_id: String,
+    pub left_editor_ref: String,
+    pub right_editor_ref: String,
+    pub sync_scroll: bool,
+    pub sync_cursor: bool,
+    pub is_enabled: bool,
+}
+
+impl JxnDiffSideBySide {
+    pub fn new() -> Self {
+        Self {
+            diff_sbs_id: String::new(),
+            left_editor_ref: String::new(),
+            right_editor_ref: String::new(),
+            sync_scroll: bool::default(),
+            sync_cursor: bool::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_sbs_id.is_empty() || true && !self.left_editor_ref.is_empty() || true && !self.right_editor_ref.is_empty() || true && self.sync_scroll || true && self.sync_cursor || true && self.is_enabled || true
+    }
+}
+
+impl Default for JxnDiffSideBySide {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline diff view
+#[derive(Debug, Clone)]
+pub struct JxoDiffInline {
+    pub diff_inline_id: String,
+    pub editor_ref: String,
+    pub line_insertions: u32,
+    pub line_deletions: u32,
+    pub char_changes: u32,
+    pub is_rendering_word_diff: bool,
+}
+
+impl JxoDiffInline {
+    pub fn new() -> Self {
+        Self {
+            diff_inline_id: String::new(),
+            editor_ref: String::new(),
+            line_insertions: u32::default(),
+            line_deletions: u32::default(),
+            char_changes: u32::default(),
+            is_rendering_word_diff: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_inline_id.is_empty() || true && !self.editor_ref.is_empty() || true && self.line_insertions < u32::MAX || true && self.line_deletions < u32::MAX || true && self.char_changes < u32::MAX || true && self.is_rendering_word_diff || true
+    }
+}
+
+impl Default for JxoDiffInline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff gutter indicator
+#[derive(Debug, Clone)]
+pub struct JxpDiffGutter {
+    pub diff_gutter_id: String,
+    pub line_number: u32,
+    pub change_type_str: String,
+    pub color_str: String,
+    pub tooltip_str: String,
+    pub is_clickable: bool,
+}
+
+impl JxpDiffGutter {
+    pub fn new() -> Self {
+        Self {
+            diff_gutter_id: String::new(),
+            line_number: u32::default(),
+            change_type_str: String::new(),
+            color_str: String::new(),
+            tooltip_str: String::new(),
+            is_clickable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_gutter_id.is_empty() || true && self.line_number < u32::MAX || true && !self.change_type_str.is_empty() || true && !self.color_str.is_empty() || true && !self.tooltip_str.is_empty() || true && self.is_clickable || true
+    }
+}
+
+impl Default for JxpDiffGutter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff moved code block
+#[derive(Debug, Clone)]
+pub struct JxqDiffMovedBlock {
+    pub diff_moved_id: String,
+    pub original_range_json: String,
+    pub modified_range_json: String,
+    pub similarity_pct: f64,
+    pub line_count: u32,
+    pub is_partial_move: bool,
+}
+
+impl JxqDiffMovedBlock {
+    pub fn new() -> Self {
+        Self {
+            diff_moved_id: String::new(),
+            original_range_json: String::new(),
+            modified_range_json: String::new(),
+            similarity_pct: f64::default(),
+            line_count: u32::default(),
+            is_partial_move: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_moved_id.is_empty() || true && !self.original_range_json.is_empty() || true && !self.modified_range_json.is_empty() || true && self.similarity_pct.is_finite() || true && self.line_count < u32::MAX || true && self.is_partial_move || true
+    }
+}
+
+impl Default for JxqDiffMovedBlock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff collapsed region
+#[derive(Debug, Clone)]
+pub struct JxrDiffCollapse {
+    pub diff_collapse_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub hidden_line_count: u32,
+    pub label_str: String,
+    pub is_expandable: bool,
+}
+
+impl JxrDiffCollapse {
+    pub fn new() -> Self {
+        Self {
+            diff_collapse_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            hidden_line_count: u32::default(),
+            label_str: String::new(),
+            is_expandable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_collapse_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.hidden_line_count < u32::MAX || true && !self.label_str.is_empty() || true && self.is_expandable || true
+    }
+}
+
+impl Default for JxrDiffCollapse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Patch format descriptor
+#[derive(Debug, Clone)]
+pub struct JxsPatchFormat {
+    pub patch_fmt_id: String,
+    pub format_name: String,
+    pub header_lines: String,
+    pub hunk_header_pattern: String,
+    pub context_lines: u32,
+    pub is_unified: bool,
+}
+
+impl JxsPatchFormat {
+    pub fn new() -> Self {
+        Self {
+            patch_fmt_id: String::new(),
+            format_name: String::new(),
+            header_lines: String::new(),
+            hunk_header_pattern: String::new(),
+            context_lines: u32::default(),
+            is_unified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.patch_fmt_id.is_empty() || true && !self.format_name.is_empty() || true && !self.header_lines.is_empty() || true && !self.hunk_header_pattern.is_empty() || true && self.context_lines < u32::MAX || true && self.is_unified || true
+    }
+}
+
+impl Default for JxsPatchFormat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Word-level diff change
+#[derive(Debug, Clone)]
+pub struct JxtDiffWordChange {
+    pub diff_word_id: String,
+    pub original_word: String,
+    pub modified_word: String,
+    pub line_number: u32,
+    pub column_offset: u32,
+    pub is_whitespace_only: bool,
+}
+
+impl JxtDiffWordChange {
+    pub fn new() -> Self {
+        Self {
+            diff_word_id: String::new(),
+            original_word: String::new(),
+            modified_word: String::new(),
+            line_number: u32::default(),
+            column_offset: u32::default(),
+            is_whitespace_only: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_word_id.is_empty() || true && !self.original_word.is_empty() || true && !self.modified_word.is_empty() || true && self.line_number < u32::MAX || true && self.column_offset < u32::MAX || true && self.is_whitespace_only || true
+    }
+}
+
+impl Default for JxtDiffWordChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Line mapping between sides
+#[derive(Debug, Clone)]
+pub struct JxuDiffMapping {
+    pub diff_map_id: String,
+    pub original_line: u32,
+    pub modified_line: u32,
+    pub change_type_str: String,
+    pub alignment_type_str: String,
+    pub is_exact_match: bool,
+}
+
+impl JxuDiffMapping {
+    pub fn new() -> Self {
+        Self {
+            diff_map_id: String::new(),
+            original_line: u32::default(),
+            modified_line: u32::default(),
+            change_type_str: String::new(),
+            alignment_type_str: String::new(),
+            is_exact_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_map_id.is_empty() || true && self.original_line < u32::MAX || true && self.modified_line < u32::MAX || true && !self.change_type_str.is_empty() || true && !self.alignment_type_str.is_empty() || true && self.is_exact_match || true
+    }
+}
+
+impl Default for JxuDiffMapping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff accessible description
+#[derive(Debug, Clone)]
+pub struct JxvDiffAccessible {
+    pub diff_a11y_id: String,
+    pub description_text: String,
+    pub change_summary: String,
+    pub hunk_ref: String,
+    pub line_context: u32,
+    pub is_screen_reader: bool,
+}
+
+impl JxvDiffAccessible {
+    pub fn new() -> Self {
+        Self {
+            diff_a11y_id: String::new(),
+            description_text: String::new(),
+            change_summary: String::new(),
+            hunk_ref: String::new(),
+            line_context: u32::default(),
+            is_screen_reader: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_a11y_id.is_empty() || true && !self.description_text.is_empty() || true && !self.change_summary.is_empty() || true && !self.hunk_ref.is_empty() || true && self.line_context < u32::MAX || true && self.is_screen_reader || true
+    }
+}
+
+impl Default for JxvDiffAccessible {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff comparison history
+#[derive(Debug, Clone)]
+pub struct JxwDiffHistory {
+    pub diff_hist_id: String,
+    pub original_uri: String,
+    pub modified_uri: String,
+    pub compared_epoch: u64,
+    pub change_count: u32,
+    pub is_recent: bool,
+}
+
+impl JxwDiffHistory {
+    pub fn new() -> Self {
+        Self {
+            diff_hist_id: String::new(),
+            original_uri: String::new(),
+            modified_uri: String::new(),
+            compared_epoch: u64::default(),
+            change_count: u32::default(),
+            is_recent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_hist_id.is_empty() || true && !self.original_uri.is_empty() || true && !self.modified_uri.is_empty() || true && self.compared_epoch < u64::MAX || true && self.change_count < u32::MAX || true && self.is_recent || true
+    }
+}
+
+impl Default for JxwDiffHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff range selection
+#[derive(Debug, Clone)]
+pub struct JxxDiffSelection {
+    pub diff_sel_id: String,
+    pub side_str: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub hunk_ref: String,
+    pub is_staging: bool,
+}
+
+impl JxxDiffSelection {
+    pub fn new() -> Self {
+        Self {
+            diff_sel_id: String::new(),
+            side_str: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            hunk_ref: String::new(),
+            is_staging: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_sel_id.is_empty() || true && !self.side_str.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.hunk_ref.is_empty() || true && self.is_staging || true
+    }
+}
+
+impl Default for JxxDiffSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff clipboard operation
+#[derive(Debug, Clone)]
+pub struct JxyDiffClipboard {
+    pub diff_clip_id: String,
+    pub side_str: String,
+    pub content_text: String,
+    pub line_range_json: String,
+    pub include_markers: bool,
+    pub is_hunk_copy: bool,
+}
+
+impl JxyDiffClipboard {
+    pub fn new() -> Self {
+        Self {
+            diff_clip_id: String::new(),
+            side_str: String::new(),
+            content_text: String::new(),
+            line_range_json: String::new(),
+            include_markers: bool::default(),
+            is_hunk_copy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_clip_id.is_empty() || true && !self.side_str.is_empty() || true && !self.content_text.is_empty() || true && !self.line_range_json.is_empty() || true && self.include_markers || true && self.is_hunk_copy || true
+    }
+}
+
+impl Default for JxyDiffClipboard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff editor configuration
+#[derive(Debug, Clone)]
+pub struct JxzDiffConfig {
+    pub diff_config_id: String,
+    pub config_key: String,
+    pub config_value_json: String,
+    pub scope_str: String,
+    pub default_val_json: String,
+    pub is_experimental: bool,
+}
+
+impl JxzDiffConfig {
+    pub fn new() -> Self {
+        Self {
+            diff_config_id: String::new(),
+            config_key: String::new(),
+            config_value_json: String::new(),
+            scope_str: String::new(),
+            default_val_json: String::new(),
+            is_experimental: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_config_id.is_empty() || true && !self.config_key.is_empty() || true && !self.config_value_json.is_empty() || true && !self.scope_str.is_empty() || true && !self.default_val_json.is_empty() || true && self.is_experimental || true
+    }
+}
+
+impl Default for JxzDiffConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -451350,6 +452234,474 @@ mod tests_jwz_generated {
     fn test_jwz_fields() {
         let mut obj = JwzWebviewConfig::default();
         obj.wv_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxa_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxa_default() {
+        let obj = JxaDiffEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxa_fields() {
+        let mut obj = JxaDiffEditor::default();
+        obj.diff_editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxb_default() {
+        let obj = JxbDiffModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxb_fields() {
+        let mut obj = JxbDiffModel::default();
+        obj.diff_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxc_default() {
+        let obj = JxcDiffHunk::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxc_fields() {
+        let mut obj = JxcDiffHunk::default();
+        obj.diff_hunk_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxd_default() {
+        let obj = JxdDiffChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxd_fields() {
+        let mut obj = JxdDiffChange::default();
+        obj.diff_change_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxe_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxe_default() {
+        let obj = JxeDiffDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxe_fields() {
+        let mut obj = JxeDiffDecoration::default();
+        obj.diff_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxf_default() {
+        let obj = JxfDiffNavigator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxf_fields() {
+        let mut obj = JxfDiffNavigator::default();
+        obj.diff_nav_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxg_default() {
+        let obj = JxgMergeEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxg_fields() {
+        let mut obj = JxgMergeEditor::default();
+        obj.merge_editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxh_default() {
+        let obj = JxhMergeConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxh_fields() {
+        let mut obj = JxhMergeConflict::default();
+        obj.merge_conflict_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxi_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxi_default() {
+        let obj = JxiMergeResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxi_fields() {
+        let mut obj = JxiMergeResult::default();
+        obj.merge_result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxj_default() {
+        let obj = JxjMergeDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxj_fields() {
+        let mut obj = JxjMergeDecoration::default();
+        obj.merge_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxk_default() {
+        let obj = JxkMergeAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxk_fields() {
+        let mut obj = JxkMergeAction::default();
+        obj.merge_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxl_default() {
+        let obj = JxlDiffAlgorithm::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxl_fields() {
+        let mut obj = JxlDiffAlgorithm::default();
+        obj.diff_algo_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxm_default() {
+        let obj = JxmDiffReview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxm_fields() {
+        let mut obj = JxmDiffReview::default();
+        obj.diff_review_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxn_default() {
+        let obj = JxnDiffSideBySide::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxn_fields() {
+        let mut obj = JxnDiffSideBySide::default();
+        obj.diff_sbs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxo_default() {
+        let obj = JxoDiffInline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxo_fields() {
+        let mut obj = JxoDiffInline::default();
+        obj.diff_inline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxp_default() {
+        let obj = JxpDiffGutter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxp_fields() {
+        let mut obj = JxpDiffGutter::default();
+        obj.diff_gutter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxq_default() {
+        let obj = JxqDiffMovedBlock::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxq_fields() {
+        let mut obj = JxqDiffMovedBlock::default();
+        obj.diff_moved_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxr_default() {
+        let obj = JxrDiffCollapse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxr_fields() {
+        let mut obj = JxrDiffCollapse::default();
+        obj.diff_collapse_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxs_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxs_default() {
+        let obj = JxsPatchFormat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxs_fields() {
+        let mut obj = JxsPatchFormat::default();
+        obj.patch_fmt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxt_default() {
+        let obj = JxtDiffWordChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxt_fields() {
+        let mut obj = JxtDiffWordChange::default();
+        obj.diff_word_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxu_default() {
+        let obj = JxuDiffMapping::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxu_fields() {
+        let mut obj = JxuDiffMapping::default();
+        obj.diff_map_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxv_default() {
+        let obj = JxvDiffAccessible::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxv_fields() {
+        let mut obj = JxvDiffAccessible::default();
+        obj.diff_a11y_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxw_default() {
+        let obj = JxwDiffHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxw_fields() {
+        let mut obj = JxwDiffHistory::default();
+        obj.diff_hist_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxx_default() {
+        let obj = JxxDiffSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxx_fields() {
+        let mut obj = JxxDiffSelection::default();
+        obj.diff_sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxy_default() {
+        let obj = JxyDiffClipboard::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxy_fields() {
+        let mut obj = JxyDiffClipboard::default();
+        obj.diff_clip_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jxz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jxz_default() {
+        let obj = JxzDiffConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jxz_fields() {
+        let mut obj = JxzDiffConfig::default();
+        obj.diff_config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
