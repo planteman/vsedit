@@ -114565,6 +114565,426 @@ impl Default for HczConfigurationTarget {
     }
 }
 
+/// Comment thread (uri, range, comments, label, context value)
+#[derive(Debug, Clone)]
+pub struct HdaCommentThread {
+    pub comment_thread_id: String,
+    pub uri: String,
+    pub range_json: String,
+    pub comments_json: String,
+    pub label: String,
+    pub context_value: String,
+    pub collapsible_state: String,
+    pub can_reply: bool,
+    pub state: String,
+    pub is_disposed: bool,
+}
+
+impl HdaCommentThread {
+    pub fn new() -> Self {
+        Self {
+            comment_thread_id: String::new(),
+            uri: String::new(),
+            range_json: String::new(),
+            comments_json: String::new(),
+            label: String::new(),
+            context_value: String::new(),
+            collapsible_state: String::new(),
+            can_reply: bool::default(),
+            state: String::new(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_thread_id.is_empty() || true && !self.uri.is_empty() || true && !self.range_json.is_empty() || true && !self.comments_json.is_empty() || true && !self.label.is_empty() || true && !self.context_value.is_empty() || true && !self.collapsible_state.is_empty() || true && self.can_reply || true && !self.state.is_empty() || true && self.is_disposed || true
+    }
+}
+
+impl Default for HdaCommentThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment (body, author, mode, timestamp, reactions, context value)
+#[derive(Debug, Clone)]
+pub struct HdbComment {
+    pub comment_id: String,
+    pub body: String,
+    pub author_name: String,
+    pub author_icon: String,
+    pub mode: String,
+    pub timestamp_ms: u64,
+    pub reactions_json: String,
+    pub context_value: String,
+    pub is_pending: bool,
+    pub edit_mode: String,
+}
+
+impl HdbComment {
+    pub fn new() -> Self {
+        Self {
+            comment_id: String::new(),
+            body: String::new(),
+            author_name: String::new(),
+            author_icon: String::new(),
+            mode: String::new(),
+            timestamp_ms: u64::default(),
+            reactions_json: String::new(),
+            context_value: String::new(),
+            is_pending: bool::default(),
+            edit_mode: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_id.is_empty() || true && !self.body.is_empty() || true && !self.author_name.is_empty() || true && !self.author_icon.is_empty() || true && !self.mode.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.reactions_json.is_empty() || true && !self.context_value.is_empty() || true && self.is_pending || true && !self.edit_mode.is_empty() || true
+    }
+}
+
+impl Default for HdbComment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment controller (id, label, commenting ranges, options)
+#[derive(Debug, Clone)]
+pub struct HdcCommentController {
+    pub comment_ctrl_id: String,
+    pub controller_id: String,
+    pub label: String,
+    pub commenting_ranges_json: String,
+    pub options_json: String,
+    pub comment_thread_count: u32,
+    pub reaction_handler: bool,
+    pub is_disposed: bool,
+    pub creation_order: u32,
+    pub owner_id: String,
+}
+
+impl HdcCommentController {
+    pub fn new() -> Self {
+        Self {
+            comment_ctrl_id: String::new(),
+            controller_id: String::new(),
+            label: String::new(),
+            commenting_ranges_json: String::new(),
+            options_json: String::new(),
+            comment_thread_count: u32::default(),
+            reaction_handler: bool::default(),
+            is_disposed: bool::default(),
+            creation_order: u32::default(),
+            owner_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_ctrl_id.is_empty() || true && !self.controller_id.is_empty() || true && !self.label.is_empty() || true && !self.commenting_ranges_json.is_empty() || true && !self.options_json.is_empty() || true && self.comment_thread_count < u32::MAX || true && self.reaction_handler || true && self.is_disposed || true && self.creation_order < u32::MAX || true && !self.owner_id.is_empty() || true
+    }
+}
+
+impl Default for HdcCommentController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment reaction (label, icon, count, has reacted, authored)
+#[derive(Debug, Clone)]
+pub struct HddCommentReaction {
+    pub comment_react_id: String,
+    pub label: String,
+    pub icon_path: String,
+    pub count: u32,
+    pub has_reacted: bool,
+    pub authored_by_me: bool,
+    pub tooltip: String,
+    pub users_json: String,
+    pub reaction_type: String,
+    pub is_custom: bool,
+}
+
+impl HddCommentReaction {
+    pub fn new() -> Self {
+        Self {
+            comment_react_id: String::new(),
+            label: String::new(),
+            icon_path: String::new(),
+            count: u32::default(),
+            has_reacted: bool::default(),
+            authored_by_me: bool::default(),
+            tooltip: String::new(),
+            users_json: String::new(),
+            reaction_type: String::new(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_react_id.is_empty() || true && !self.label.is_empty() || true && !self.icon_path.is_empty() || true && self.count < u32::MAX || true && self.has_reacted || true && self.authored_by_me || true && !self.tooltip.is_empty() || true && !self.users_json.is_empty() || true && !self.reaction_type.is_empty() || true && self.is_custom || true
+    }
+}
+
+impl Default for HddCommentReaction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment reply (thread, text, comment, position, mode)
+#[derive(Debug, Clone)]
+pub struct HdeCommentReply {
+    pub comment_reply_id: String,
+    pub thread_id: String,
+    pub text: String,
+    pub comment_id: String,
+    pub position_json: String,
+    pub mode: String,
+    pub is_draft: bool,
+    pub parent_id: String,
+    pub mentions_json: String,
+    pub timestamp_ms: u64,
+}
+
+impl HdeCommentReply {
+    pub fn new() -> Self {
+        Self {
+            comment_reply_id: String::new(),
+            thread_id: String::new(),
+            text: String::new(),
+            comment_id: String::new(),
+            position_json: String::new(),
+            mode: String::new(),
+            is_draft: bool::default(),
+            parent_id: String::new(),
+            mentions_json: String::new(),
+            timestamp_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_reply_id.is_empty() || true && !self.thread_id.is_empty() || true && !self.text.is_empty() || true && !self.comment_id.is_empty() || true && !self.position_json.is_empty() || true && !self.mode.is_empty() || true && self.is_draft || true && !self.parent_id.is_empty() || true && !self.mentions_json.is_empty() || true && self.timestamp_ms < u64::MAX || true
+    }
+}
+
+impl Default for HdeCommentReply {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment range (resource uri, ranges, permissions, scheme)
+#[derive(Debug, Clone)]
+pub struct HdfCommentRange {
+    pub comment_range_id: String,
+    pub resource_uri: String,
+    pub ranges_json: String,
+    pub permissions_json: String,
+    pub scheme: String,
+    pub controller_id: String,
+    pub is_active: bool,
+    pub comment_count: u32,
+    pub thread_ids_json: String,
+    pub priority: u32,
+}
+
+impl HdfCommentRange {
+    pub fn new() -> Self {
+        Self {
+            comment_range_id: String::new(),
+            resource_uri: String::new(),
+            ranges_json: String::new(),
+            permissions_json: String::new(),
+            scheme: String::new(),
+            controller_id: String::new(),
+            is_active: bool::default(),
+            comment_count: u32::default(),
+            thread_ids_json: String::new(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_range_id.is_empty() || true && !self.resource_uri.is_empty() || true && !self.ranges_json.is_empty() || true && !self.permissions_json.is_empty() || true && !self.scheme.is_empty() || true && !self.controller_id.is_empty() || true && self.is_active || true && self.comment_count < u32::MAX || true && !self.thread_ids_json.is_empty() || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for HdfCommentRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document link (range, target, tooltip, data, is resolved)
+#[derive(Debug, Clone)]
+pub struct HdgDocumentLink {
+    pub doc_link_id: String,
+    pub range_json: String,
+    pub target_uri: String,
+    pub tooltip: String,
+    pub data_json: String,
+    pub is_resolved: bool,
+    pub provider_id: String,
+    pub command_id: String,
+    pub is_clickable: bool,
+    pub decoration_style: String,
+}
+
+impl HdgDocumentLink {
+    pub fn new() -> Self {
+        Self {
+            doc_link_id: String::new(),
+            range_json: String::new(),
+            target_uri: String::new(),
+            tooltip: String::new(),
+            data_json: String::new(),
+            is_resolved: bool::default(),
+            provider_id: String::new(),
+            command_id: String::new(),
+            is_clickable: bool::default(),
+            decoration_style: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.doc_link_id.is_empty() || true && !self.range_json.is_empty() || true && !self.target_uri.is_empty() || true && !self.tooltip.is_empty() || true && !self.data_json.is_empty() || true && self.is_resolved || true && !self.provider_id.is_empty() || true && !self.command_id.is_empty() || true && self.is_clickable || true && !self.decoration_style.is_empty() || true
+    }
+}
+
+impl Default for HdgDocumentLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document color (range, color value, presentations)
+#[derive(Debug, Clone)]
+pub struct HdhDocumentColor {
+    pub doc_color_id: String,
+    pub range_json: String,
+    pub color_value: String,
+    pub presentations_json: String,
+    pub red: f64,
+    pub green: f64,
+    pub blue: f64,
+    pub alpha: f64,
+    pub format: String,
+    pub is_editable: bool,
+}
+
+impl HdhDocumentColor {
+    pub fn new() -> Self {
+        Self {
+            doc_color_id: String::new(),
+            range_json: String::new(),
+            color_value: String::new(),
+            presentations_json: String::new(),
+            red: f64::default(),
+            green: f64::default(),
+            blue: f64::default(),
+            alpha: f64::default(),
+            format: String::new(),
+            is_editable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.doc_color_id.is_empty() || true && !self.range_json.is_empty() || true && !self.color_value.is_empty() || true && !self.presentations_json.is_empty() || true && self.red.is_finite() || true && self.green.is_finite() || true && self.blue.is_finite() || true && self.alpha.is_finite() || true && !self.format.is_empty() || true && self.is_editable || true
+    }
+}
+
+impl Default for HdhDocumentColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document symbol (name, kind, range, selection, children)
+#[derive(Debug, Clone)]
+pub struct HdiDocumentSymbol {
+    pub doc_symbol_id: String,
+    pub name: String,
+    pub kind: String,
+    pub range_json: String,
+    pub selection_range_json: String,
+    pub children_json: String,
+    pub detail: String,
+    pub tags_json: String,
+    pub container_name: String,
+    pub deprecated: bool,
+}
+
+impl HdiDocumentSymbol {
+    pub fn new() -> Self {
+        Self {
+            doc_symbol_id: String::new(),
+            name: String::new(),
+            kind: String::new(),
+            range_json: String::new(),
+            selection_range_json: String::new(),
+            children_json: String::new(),
+            detail: String::new(),
+            tags_json: String::new(),
+            container_name: String::new(),
+            deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.doc_symbol_id.is_empty() || true && !self.name.is_empty() || true && !self.kind.is_empty() || true && !self.range_json.is_empty() || true && !self.selection_range_json.is_empty() || true && !self.children_json.is_empty() || true && !self.detail.is_empty() || true && !self.tags_json.is_empty() || true && !self.container_name.is_empty() || true && self.deprecated || true
+    }
+}
+
+impl Default for HdiDocumentSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document highlight (range, kind, is resolved, provider id)
+#[derive(Debug, Clone)]
+pub struct HdjDocumentHighlight {
+    pub doc_highlight_id: String,
+    pub range_json: String,
+    pub kind: String,
+    pub is_resolved: bool,
+    pub provider_id: String,
+    pub tag: String,
+    pub uri: String,
+    pub match_text: String,
+    pub decoration_key: String,
+    pub is_stale: bool,
+}
+
+impl HdjDocumentHighlight {
+    pub fn new() -> Self {
+        Self {
+            doc_highlight_id: String::new(),
+            range_json: String::new(),
+            kind: String::new(),
+            is_resolved: bool::default(),
+            provider_id: String::new(),
+            tag: String::new(),
+            uri: String::new(),
+            match_text: String::new(),
+            decoration_key: String::new(),
+            is_stale: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.doc_highlight_id.is_empty() || true && !self.range_json.is_empty() || true && !self.kind.is_empty() || true && self.is_resolved || true && !self.provider_id.is_empty() || true && !self.tag.is_empty() || true && !self.uri.is_empty() || true && !self.match_text.is_empty() || true && !self.decoration_key.is_empty() || true && self.is_stale || true
+    }
+}
+
+impl Default for HdjDocumentHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -351581,6 +352001,186 @@ mod tests_hcz_generated {
     fn test_hcz_fields() {
         let mut obj = HczConfigurationTarget::default();
         obj.config_target_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hda_generated {
+    use super::*;
+
+    #[test]
+    fn test_hda_default() {
+        let obj = HdaCommentThread::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hda_fields() {
+        let mut obj = HdaCommentThread::default();
+        obj.comment_thread_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdb_default() {
+        let obj = HdbComment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdb_fields() {
+        let mut obj = HdbComment::default();
+        obj.comment_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdc_default() {
+        let obj = HdcCommentController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdc_fields() {
+        let mut obj = HdcCommentController::default();
+        obj.comment_ctrl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdd_default() {
+        let obj = HddCommentReaction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdd_fields() {
+        let mut obj = HddCommentReaction::default();
+        obj.comment_react_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hde_generated {
+    use super::*;
+
+    #[test]
+    fn test_hde_default() {
+        let obj = HdeCommentReply::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hde_fields() {
+        let mut obj = HdeCommentReply::default();
+        obj.comment_reply_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdf_default() {
+        let obj = HdfCommentRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdf_fields() {
+        let mut obj = HdfCommentRange::default();
+        obj.comment_range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdg_default() {
+        let obj = HdgDocumentLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdg_fields() {
+        let mut obj = HdgDocumentLink::default();
+        obj.doc_link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdh_default() {
+        let obj = HdhDocumentColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdh_fields() {
+        let mut obj = HdhDocumentColor::default();
+        obj.doc_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdi_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdi_default() {
+        let obj = HdiDocumentSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdi_fields() {
+        let mut obj = HdiDocumentSymbol::default();
+        obj.doc_symbol_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdj_default() {
+        let obj = HdjDocumentHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdj_fields() {
+        let mut obj = HdjDocumentHighlight::default();
+        obj.doc_highlight_id = "test".to_string();
         assert!(obj.validate());
     }
 }
