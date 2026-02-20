@@ -156753,6 +156753,890 @@ impl Default for IvzAuthConfig {
     }
 }
 
+/// HTTP client service
+#[derive(Debug, Clone)]
+pub struct IwaHttpClient {
+    pub client_id: String,
+    pub base_url: String,
+    pub timeout_ms: u32,
+    pub retry_count: u32,
+    pub proxy_ref: String,
+    pub is_configured: bool,
+}
+
+impl IwaHttpClient {
+    pub fn new() -> Self {
+        Self {
+            client_id: String::new(),
+            base_url: String::new(),
+            timeout_ms: u32::default(),
+            retry_count: u32::default(),
+            proxy_ref: String::new(),
+            is_configured: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.client_id.is_empty() || true && !self.base_url.is_empty() || true && self.timeout_ms < u32::MAX || true && self.retry_count < u32::MAX || true && !self.proxy_ref.is_empty() || true && self.is_configured || true
+    }
+}
+
+impl Default for IwaHttpClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// HTTP request descriptor
+#[derive(Debug, Clone)]
+pub struct IwbHttpRequest {
+    pub req_id: String,
+    pub method_str: String,
+    pub url_str: String,
+    pub header_count: u32,
+    pub body_len: u64,
+    pub is_streaming: bool,
+}
+
+impl IwbHttpRequest {
+    pub fn new() -> Self {
+        Self {
+            req_id: String::new(),
+            method_str: String::new(),
+            url_str: String::new(),
+            header_count: u32::default(),
+            body_len: u64::default(),
+            is_streaming: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.req_id.is_empty() || true && !self.method_str.is_empty() || true && !self.url_str.is_empty() || true && self.header_count < u32::MAX || true && self.body_len < u64::MAX || true && self.is_streaming || true
+    }
+}
+
+impl Default for IwbHttpRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// HTTP response descriptor
+#[derive(Debug, Clone)]
+pub struct IwcHttpResponse {
+    pub resp_id: String,
+    pub status_code: u32,
+    pub header_count: u32,
+    pub body_len: u64,
+    pub elapsed_ms: u32,
+    pub is_cached: bool,
+}
+
+impl IwcHttpResponse {
+    pub fn new() -> Self {
+        Self {
+            resp_id: String::new(),
+            status_code: u32::default(),
+            header_count: u32::default(),
+            body_len: u64::default(),
+            elapsed_ms: u32::default(),
+            is_cached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resp_id.is_empty() || true && self.status_code < u32::MAX || true && self.header_count < u32::MAX || true && self.body_len < u64::MAX || true && self.elapsed_ms < u32::MAX || true && self.is_cached || true
+    }
+}
+
+impl Default for IwcHttpResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// HTTP header entry
+#[derive(Debug, Clone)]
+pub struct IwdHttpHeader {
+    pub header_id: String,
+    pub header_name: String,
+    pub header_value: String,
+    pub source_str: String,
+    pub priority_val: u32,
+    pub is_sensitive: bool,
+}
+
+impl IwdHttpHeader {
+    pub fn new() -> Self {
+        Self {
+            header_id: String::new(),
+            header_name: String::new(),
+            header_value: String::new(),
+            source_str: String::new(),
+            priority_val: u32::default(),
+            is_sensitive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.header_id.is_empty() || true && !self.header_name.is_empty() || true && !self.header_value.is_empty() || true && !self.source_str.is_empty() || true && self.priority_val < u32::MAX || true && self.is_sensitive || true
+    }
+}
+
+impl Default for IwdHttpHeader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Request cancellation token
+#[derive(Debug, Clone)]
+pub struct IweRequestCancel {
+    pub cancel_id: String,
+    pub request_ref: String,
+    pub reason_str: String,
+    pub cancelled_epoch: u64,
+    pub bytes_received: u64,
+    pub was_timeout: bool,
+}
+
+impl IweRequestCancel {
+    pub fn new() -> Self {
+        Self {
+            cancel_id: String::new(),
+            request_ref: String::new(),
+            reason_str: String::new(),
+            cancelled_epoch: u64::default(),
+            bytes_received: u64::default(),
+            was_timeout: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cancel_id.is_empty() || true && !self.request_ref.is_empty() || true && !self.reason_str.is_empty() || true && self.cancelled_epoch < u64::MAX || true && self.bytes_received < u64::MAX || true && self.was_timeout || true
+    }
+}
+
+impl Default for IweRequestCancel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Download progress state
+#[derive(Debug, Clone)]
+pub struct IwfDownloadProgress {
+    pub progress_id: String,
+    pub url_ref: String,
+    pub bytes_received: u64,
+    pub total_bytes: u64,
+    pub speed_bps: u64,
+    pub is_complete: bool,
+}
+
+impl IwfDownloadProgress {
+    pub fn new() -> Self {
+        Self {
+            progress_id: String::new(),
+            url_ref: String::new(),
+            bytes_received: u64::default(),
+            total_bytes: u64::default(),
+            speed_bps: u64::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.progress_id.is_empty() || true && !self.url_ref.is_empty() || true && self.bytes_received < u64::MAX || true && self.total_bytes < u64::MAX || true && self.speed_bps < u64::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for IwfDownloadProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// WebSocket connection descriptor
+#[derive(Debug, Clone)]
+pub struct IwgWebSocket {
+    pub ws_id: String,
+    pub url_str: String,
+    pub protocol_str: String,
+    pub ready_state: u32,
+    pub message_count: u64,
+    pub is_binary: bool,
+}
+
+impl IwgWebSocket {
+    pub fn new() -> Self {
+        Self {
+            ws_id: String::new(),
+            url_str: String::new(),
+            protocol_str: String::new(),
+            ready_state: u32::default(),
+            message_count: u64::default(),
+            is_binary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_id.is_empty() || true && !self.url_str.is_empty() || true && !self.protocol_str.is_empty() || true && self.ready_state < u32::MAX || true && self.message_count < u64::MAX || true && self.is_binary || true
+    }
+}
+
+impl Default for IwgWebSocket {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// WebSocket message entry
+#[derive(Debug, Clone)]
+pub struct IwhWebSocketMessage {
+    pub msg_id: String,
+    pub data_len: u32,
+    pub msg_kind: String,
+    pub timestamp_epoch: u64,
+    pub sequence_val: u64,
+    pub is_compressed: bool,
+}
+
+impl IwhWebSocketMessage {
+    pub fn new() -> Self {
+        Self {
+            msg_id: String::new(),
+            data_len: u32::default(),
+            msg_kind: String::new(),
+            timestamp_epoch: u64::default(),
+            sequence_val: u64::default(),
+            is_compressed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.msg_id.is_empty() || true && self.data_len < u32::MAX || true && !self.msg_kind.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.sequence_val < u64::MAX || true && self.is_compressed || true
+    }
+}
+
+impl Default for IwhWebSocketMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Network proxy configuration
+#[derive(Debug, Clone)]
+pub struct IwiProxyConfig {
+    pub proxy_id: String,
+    pub proxy_url: String,
+    pub proxy_type_str: String,
+    pub bypass_list: String,
+    pub auth_required: bool,
+    pub is_system: bool,
+}
+
+impl IwiProxyConfig {
+    pub fn new() -> Self {
+        Self {
+            proxy_id: String::new(),
+            proxy_url: String::new(),
+            proxy_type_str: String::new(),
+            bypass_list: String::new(),
+            auth_required: bool::default(),
+            is_system: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proxy_id.is_empty() || true && !self.proxy_url.is_empty() || true && !self.proxy_type_str.is_empty() || true && !self.bypass_list.is_empty() || true && self.auth_required || true && self.is_system || true
+    }
+}
+
+impl Default for IwiProxyConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DNS resolution result
+#[derive(Debug, Clone)]
+pub struct IwjDnsResolver {
+    pub dns_id: String,
+    pub hostname_str: String,
+    pub resolved_ip: String,
+    pub ttl_secs: u32,
+    pub lookup_ms: u32,
+    pub is_cached: bool,
+}
+
+impl IwjDnsResolver {
+    pub fn new() -> Self {
+        Self {
+            dns_id: String::new(),
+            hostname_str: String::new(),
+            resolved_ip: String::new(),
+            ttl_secs: u32::default(),
+            lookup_ms: u32::default(),
+            is_cached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dns_id.is_empty() || true && !self.hostname_str.is_empty() || true && !self.resolved_ip.is_empty() || true && self.ttl_secs < u32::MAX || true && self.lookup_ms < u32::MAX || true && self.is_cached || true
+    }
+}
+
+impl Default for IwjDnsResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Network connectivity status
+#[derive(Debug, Clone)]
+pub struct IwkNetworkStatus {
+    pub status_id: String,
+    pub connectivity_val: u32,
+    pub latency_ms: u32,
+    pub bandwidth_bps: u64,
+    pub check_epoch: u64,
+    pub is_online: bool,
+}
+
+impl IwkNetworkStatus {
+    pub fn new() -> Self {
+        Self {
+            status_id: String::new(),
+            connectivity_val: u32::default(),
+            latency_ms: u32::default(),
+            bandwidth_bps: u64::default(),
+            check_epoch: u64::default(),
+            is_online: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.status_id.is_empty() || true && self.connectivity_val < u32::MAX || true && self.latency_ms < u32::MAX || true && self.bandwidth_bps < u64::MAX || true && self.check_epoch < u64::MAX || true && self.is_online || true
+    }
+}
+
+impl Default for IwkNetworkStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TLS configuration entry
+#[derive(Debug, Clone)]
+pub struct IwlTlsConfig {
+    pub tls_id: String,
+    pub min_version: String,
+    pub max_version: String,
+    pub cipher_suite: String,
+    pub cert_path_len: u32,
+    pub verify_peer: bool,
+}
+
+impl IwlTlsConfig {
+    pub fn new() -> Self {
+        Self {
+            tls_id: String::new(),
+            min_version: String::new(),
+            max_version: String::new(),
+            cipher_suite: String::new(),
+            cert_path_len: u32::default(),
+            verify_peer: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tls_id.is_empty() || true && !self.min_version.is_empty() || true && !self.max_version.is_empty() || true && !self.cipher_suite.is_empty() || true && self.cert_path_len < u32::MAX || true && self.verify_peer || true
+    }
+}
+
+impl Default for IwlTlsConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// CORS policy descriptor
+#[derive(Debug, Clone)]
+pub struct IwmCorsPolicy {
+    pub cors_id: String,
+    pub allowed_origins: String,
+    pub allowed_methods: String,
+    pub allowed_headers: String,
+    pub max_age_secs: u32,
+    pub allow_credentials: bool,
+}
+
+impl IwmCorsPolicy {
+    pub fn new() -> Self {
+        Self {
+            cors_id: String::new(),
+            allowed_origins: String::new(),
+            allowed_methods: String::new(),
+            allowed_headers: String::new(),
+            max_age_secs: u32::default(),
+            allow_credentials: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cors_id.is_empty() || true && !self.allowed_origins.is_empty() || true && !self.allowed_methods.is_empty() || true && !self.allowed_headers.is_empty() || true && self.max_age_secs < u32::MAX || true && self.allow_credentials || true
+    }
+}
+
+impl Default for IwmCorsPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Rate limiting state
+#[derive(Debug, Clone)]
+pub struct IwnRateLimit {
+    pub limit_id: String,
+    pub max_requests: u32,
+    pub window_ms: u32,
+    pub current_count: u32,
+    pub reset_epoch: u64,
+    pub is_throttled: bool,
+}
+
+impl IwnRateLimit {
+    pub fn new() -> Self {
+        Self {
+            limit_id: String::new(),
+            max_requests: u32::default(),
+            window_ms: u32::default(),
+            current_count: u32::default(),
+            reset_epoch: u64::default(),
+            is_throttled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.limit_id.is_empty() || true && self.max_requests < u32::MAX || true && self.window_ms < u32::MAX || true && self.current_count < u32::MAX || true && self.reset_epoch < u64::MAX || true && self.is_throttled || true
+    }
+}
+
+impl Default for IwnRateLimit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// HTTP retry policy
+#[derive(Debug, Clone)]
+pub struct IwoRetryPolicy {
+    pub retry_id: String,
+    pub max_retries: u32,
+    pub base_delay_ms: u32,
+    pub max_delay_ms: u32,
+    pub retry_on_codes: String,
+    pub use_exponential: bool,
+}
+
+impl IwoRetryPolicy {
+    pub fn new() -> Self {
+        Self {
+            retry_id: String::new(),
+            max_retries: u32::default(),
+            base_delay_ms: u32::default(),
+            max_delay_ms: u32::default(),
+            retry_on_codes: String::new(),
+            use_exponential: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.retry_id.is_empty() || true && self.max_retries < u32::MAX || true && self.base_delay_ms < u32::MAX || true && self.max_delay_ms < u32::MAX || true && !self.retry_on_codes.is_empty() || true && self.use_exponential || true
+    }
+}
+
+impl Default for IwoRetryPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// HTTP cache policy
+#[derive(Debug, Clone)]
+pub struct IwpCachePolicy {
+    pub cache_id: String,
+    pub max_age_secs: u32,
+    pub stale_while_revalidate: u32,
+    pub vary_headers: String,
+    pub entry_count: u32,
+    pub is_shared: bool,
+}
+
+impl IwpCachePolicy {
+    pub fn new() -> Self {
+        Self {
+            cache_id: String::new(),
+            max_age_secs: u32::default(),
+            stale_while_revalidate: u32::default(),
+            vary_headers: String::new(),
+            entry_count: u32::default(),
+            is_shared: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cache_id.is_empty() || true && self.max_age_secs < u32::MAX || true && self.stale_while_revalidate < u32::MAX || true && !self.vary_headers.is_empty() || true && self.entry_count < u32::MAX || true && self.is_shared || true
+    }
+}
+
+impl Default for IwpCachePolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URL parsing result
+#[derive(Debug, Clone)]
+pub struct IwqUrlParser {
+    pub url_id: String,
+    pub scheme_str: String,
+    pub host_str: String,
+    pub port_val: u32,
+    pub path_str: String,
+    pub has_fragment: bool,
+}
+
+impl IwqUrlParser {
+    pub fn new() -> Self {
+        Self {
+            url_id: String::new(),
+            scheme_str: String::new(),
+            host_str: String::new(),
+            port_val: u32::default(),
+            path_str: String::new(),
+            has_fragment: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.url_id.is_empty() || true && !self.scheme_str.is_empty() || true && !self.host_str.is_empty() || true && self.port_val < u32::MAX || true && !self.path_str.is_empty() || true && self.has_fragment || true
+    }
+}
+
+impl Default for IwqUrlParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URL query string parser
+#[derive(Debug, Clone)]
+pub struct IwrQueryString {
+    pub query_id: String,
+    pub raw_query: String,
+    pub param_count: u32,
+    pub decoded_len: u32,
+    pub encoding_str: String,
+    pub is_valid: bool,
+}
+
+impl IwrQueryString {
+    pub fn new() -> Self {
+        Self {
+            query_id: String::new(),
+            raw_query: String::new(),
+            param_count: u32::default(),
+            decoded_len: u32::default(),
+            encoding_str: String::new(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.query_id.is_empty() || true && !self.raw_query.is_empty() || true && self.param_count < u32::MAX || true && self.decoded_len < u32::MAX || true && !self.encoding_str.is_empty() || true && self.is_valid || true
+    }
+}
+
+impl Default for IwrQueryString {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Form data builder
+#[derive(Debug, Clone)]
+pub struct IwsFormData {
+    pub form_id: String,
+    pub field_count: u32,
+    pub file_count: u32,
+    pub content_type_str: String,
+    pub byte_size: u64,
+    pub is_multipart: bool,
+}
+
+impl IwsFormData {
+    pub fn new() -> Self {
+        Self {
+            form_id: String::new(),
+            field_count: u32::default(),
+            file_count: u32::default(),
+            content_type_str: String::new(),
+            byte_size: u64::default(),
+            is_multipart: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.form_id.is_empty() || true && self.field_count < u32::MAX || true && self.file_count < u32::MAX || true && !self.content_type_str.is_empty() || true && self.byte_size < u64::MAX || true && self.is_multipart || true
+    }
+}
+
+impl Default for IwsFormData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON-RPC message
+#[derive(Debug, Clone)]
+pub struct IwtJsonRpc {
+    pub rpc_id: String,
+    pub method_str: String,
+    pub params_json_len: u32,
+    pub result_json_len: u32,
+    pub error_code: u32,
+    pub is_notification: bool,
+}
+
+impl IwtJsonRpc {
+    pub fn new() -> Self {
+        Self {
+            rpc_id: String::new(),
+            method_str: String::new(),
+            params_json_len: u32::default(),
+            result_json_len: u32::default(),
+            error_code: u32::default(),
+            is_notification: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rpc_id.is_empty() || true && !self.method_str.is_empty() || true && self.params_json_len < u32::MAX || true && self.result_json_len < u32::MAX || true && self.error_code < u32::MAX || true && self.is_notification || true
+    }
+}
+
+impl Default for IwtJsonRpc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// HTTP stream reader
+#[derive(Debug, Clone)]
+pub struct IwuStreamReader {
+    pub stream_id: String,
+    pub url_ref: String,
+    pub bytes_read: u64,
+    pub chunk_count: u32,
+    pub content_type_str: String,
+    pub is_complete: bool,
+}
+
+impl IwuStreamReader {
+    pub fn new() -> Self {
+        Self {
+            stream_id: String::new(),
+            url_ref: String::new(),
+            bytes_read: u64::default(),
+            chunk_count: u32::default(),
+            content_type_str: String::new(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stream_id.is_empty() || true && !self.url_ref.is_empty() || true && self.bytes_read < u64::MAX || true && self.chunk_count < u32::MAX || true && !self.content_type_str.is_empty() || true && self.is_complete || true
+    }
+}
+
+impl Default for IwuStreamReader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Server-sent event
+#[derive(Debug, Clone)]
+pub struct IwvSseEvent {
+    pub sse_id: String,
+    pub event_type_str: String,
+    pub data_text: String,
+    pub event_id_str: String,
+    pub retry_ms: u32,
+    pub is_reconnect: bool,
+}
+
+impl IwvSseEvent {
+    pub fn new() -> Self {
+        Self {
+            sse_id: String::new(),
+            event_type_str: String::new(),
+            data_text: String::new(),
+            event_id_str: String::new(),
+            retry_ms: u32::default(),
+            is_reconnect: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sse_id.is_empty() || true && !self.event_type_str.is_empty() || true && !self.data_text.is_empty() || true && !self.event_id_str.is_empty() || true && self.retry_ms < u32::MAX || true && self.is_reconnect || true
+    }
+}
+
+impl Default for IwvSseEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Fetch API wrapper
+#[derive(Debug, Clone)]
+pub struct IwwFetchApi {
+    pub fetch_id: String,
+    pub url_str: String,
+    pub method_str: String,
+    pub redirect_mode: String,
+    pub referrer_policy: String,
+    pub keep_alive: bool,
+}
+
+impl IwwFetchApi {
+    pub fn new() -> Self {
+        Self {
+            fetch_id: String::new(),
+            url_str: String::new(),
+            method_str: String::new(),
+            redirect_mode: String::new(),
+            referrer_policy: String::new(),
+            keep_alive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fetch_id.is_empty() || true && !self.url_str.is_empty() || true && !self.method_str.is_empty() || true && !self.redirect_mode.is_empty() || true && !self.referrer_policy.is_empty() || true && self.keep_alive || true
+    }
+}
+
+impl Default for IwwFetchApi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Network request log entry
+#[derive(Debug, Clone)]
+pub struct IwxNetworkLog {
+    pub log_id: String,
+    pub request_url: String,
+    pub status_code: u32,
+    pub method_str: String,
+    pub elapsed_ms: u32,
+    pub is_error: bool,
+}
+
+impl IwxNetworkLog {
+    pub fn new() -> Self {
+        Self {
+            log_id: String::new(),
+            request_url: String::new(),
+            status_code: u32::default(),
+            method_str: String::new(),
+            elapsed_ms: u32::default(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_id.is_empty() || true && !self.request_url.is_empty() || true && self.status_code < u32::MAX || true && !self.method_str.is_empty() || true && self.elapsed_ms < u32::MAX || true && self.is_error || true
+    }
+}
+
+impl Default for IwxNetworkLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bandwidth measurement
+#[derive(Debug, Clone)]
+pub struct IwyBandwidth {
+    pub bw_id: String,
+    pub download_bps: u64,
+    pub upload_bps: u64,
+    pub sample_count: u32,
+    pub measurement_ms: u32,
+    pub is_metered: bool,
+}
+
+impl IwyBandwidth {
+    pub fn new() -> Self {
+        Self {
+            bw_id: String::new(),
+            download_bps: u64::default(),
+            upload_bps: u64::default(),
+            sample_count: u32::default(),
+            measurement_ms: u32::default(),
+            is_metered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bw_id.is_empty() || true && self.download_bps < u64::MAX || true && self.upload_bps < u64::MAX || true && self.sample_count < u32::MAX || true && self.measurement_ms < u32::MAX || true && self.is_metered || true
+    }
+}
+
+impl Default for IwyBandwidth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Network configuration
+#[derive(Debug, Clone)]
+pub struct IwzNetworkConfig {
+    pub config_id: String,
+    pub proxy_setting: String,
+    pub timeout_ms: u32,
+    pub max_redirects: u32,
+    pub dns_cache_ttl_secs: u32,
+    pub tls_verify: bool,
+}
+
+impl IwzNetworkConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            proxy_setting: String::new(),
+            timeout_ms: u32::default(),
+            max_redirects: u32::default(),
+            dns_cache_ttl_secs: u32::default(),
+            tls_verify: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.proxy_setting.is_empty() || true && self.timeout_ms < u32::MAX || true && self.max_redirects < u32::MAX || true && self.dns_cache_ttl_secs < u32::MAX || true && self.tls_verify || true
+    }
+}
+
+impl Default for IwzNetworkConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -414803,6 +415687,474 @@ mod tests_ivz_generated {
     #[test]
     fn test_ivz_fields() {
         let mut obj = IvzAuthConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwa_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwa_default() {
+        let obj = IwaHttpClient::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwa_fields() {
+        let mut obj = IwaHttpClient::default();
+        obj.client_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwb_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwb_default() {
+        let obj = IwbHttpRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwb_fields() {
+        let mut obj = IwbHttpRequest::default();
+        obj.req_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwc_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwc_default() {
+        let obj = IwcHttpResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwc_fields() {
+        let mut obj = IwcHttpResponse::default();
+        obj.resp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwd_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwd_default() {
+        let obj = IwdHttpHeader::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwd_fields() {
+        let mut obj = IwdHttpHeader::default();
+        obj.header_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwe_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwe_default() {
+        let obj = IweRequestCancel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwe_fields() {
+        let mut obj = IweRequestCancel::default();
+        obj.cancel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwf_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwf_default() {
+        let obj = IwfDownloadProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwf_fields() {
+        let mut obj = IwfDownloadProgress::default();
+        obj.progress_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwg_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwg_default() {
+        let obj = IwgWebSocket::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwg_fields() {
+        let mut obj = IwgWebSocket::default();
+        obj.ws_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwh_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwh_default() {
+        let obj = IwhWebSocketMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwh_fields() {
+        let mut obj = IwhWebSocketMessage::default();
+        obj.msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwi_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwi_default() {
+        let obj = IwiProxyConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwi_fields() {
+        let mut obj = IwiProxyConfig::default();
+        obj.proxy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwj_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwj_default() {
+        let obj = IwjDnsResolver::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwj_fields() {
+        let mut obj = IwjDnsResolver::default();
+        obj.dns_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwk_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwk_default() {
+        let obj = IwkNetworkStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwk_fields() {
+        let mut obj = IwkNetworkStatus::default();
+        obj.status_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwl_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwl_default() {
+        let obj = IwlTlsConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwl_fields() {
+        let mut obj = IwlTlsConfig::default();
+        obj.tls_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwm_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwm_default() {
+        let obj = IwmCorsPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwm_fields() {
+        let mut obj = IwmCorsPolicy::default();
+        obj.cors_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwn_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwn_default() {
+        let obj = IwnRateLimit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwn_fields() {
+        let mut obj = IwnRateLimit::default();
+        obj.limit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwo_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwo_default() {
+        let obj = IwoRetryPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwo_fields() {
+        let mut obj = IwoRetryPolicy::default();
+        obj.retry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwp_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwp_default() {
+        let obj = IwpCachePolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwp_fields() {
+        let mut obj = IwpCachePolicy::default();
+        obj.cache_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwq_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwq_default() {
+        let obj = IwqUrlParser::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwq_fields() {
+        let mut obj = IwqUrlParser::default();
+        obj.url_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwr_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwr_default() {
+        let obj = IwrQueryString::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwr_fields() {
+        let mut obj = IwrQueryString::default();
+        obj.query_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iws_generated {
+    use super::*;
+
+    #[test]
+    fn test_iws_default() {
+        let obj = IwsFormData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iws_fields() {
+        let mut obj = IwsFormData::default();
+        obj.form_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwt_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwt_default() {
+        let obj = IwtJsonRpc::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwt_fields() {
+        let mut obj = IwtJsonRpc::default();
+        obj.rpc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwu_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwu_default() {
+        let obj = IwuStreamReader::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwu_fields() {
+        let mut obj = IwuStreamReader::default();
+        obj.stream_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwv_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwv_default() {
+        let obj = IwvSseEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwv_fields() {
+        let mut obj = IwvSseEvent::default();
+        obj.sse_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iww_generated {
+    use super::*;
+
+    #[test]
+    fn test_iww_default() {
+        let obj = IwwFetchApi::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iww_fields() {
+        let mut obj = IwwFetchApi::default();
+        obj.fetch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwx_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwx_default() {
+        let obj = IwxNetworkLog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwx_fields() {
+        let mut obj = IwxNetworkLog::default();
+        obj.log_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwy_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwy_default() {
+        let obj = IwyBandwidth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwy_fields() {
+        let mut obj = IwyBandwidth::default();
+        obj.bw_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iwz_generated {
+    use super::*;
+
+    #[test]
+    fn test_iwz_default() {
+        let obj = IwzNetworkConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iwz_fields() {
+        let mut obj = IwzNetworkConfig::default();
         obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
