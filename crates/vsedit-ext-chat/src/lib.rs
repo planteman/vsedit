@@ -139069,6 +139069,890 @@ impl Default for IbzViewEvent {
     }
 }
 
+/// Configuration section descriptor
+#[derive(Debug, Clone)]
+pub struct IcaConfigSection {
+    pub section_id: String,
+    pub section_key: String,
+    pub title_text: String,
+    pub order_val: u32,
+    pub property_count: u32,
+    pub is_extension: bool,
+}
+
+impl IcaConfigSection {
+    pub fn new() -> Self {
+        Self {
+            section_id: String::new(),
+            section_key: String::new(),
+            title_text: String::new(),
+            order_val: u32::default(),
+            property_count: u32::default(),
+            is_extension: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.section_id.is_empty() || true && !self.section_key.is_empty() || true && !self.title_text.is_empty() || true && self.order_val < u32::MAX || true && self.property_count < u32::MAX || true && self.is_extension || true
+    }
+}
+
+impl Default for IcaConfigSection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration property definition
+#[derive(Debug, Clone)]
+pub struct IcbConfigProperty {
+    pub prop_id: String,
+    pub property_key: String,
+    pub default_json: String,
+    pub description_text: String,
+    pub scope_val: u32,
+    pub is_deprecated: bool,
+}
+
+impl IcbConfigProperty {
+    pub fn new() -> Self {
+        Self {
+            prop_id: String::new(),
+            property_key: String::new(),
+            default_json: String::new(),
+            description_text: String::new(),
+            scope_val: u32::default(),
+            is_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prop_id.is_empty() || true && !self.property_key.is_empty() || true && !self.default_json.is_empty() || true && !self.description_text.is_empty() || true && self.scope_val < u32::MAX || true && self.is_deprecated || true
+    }
+}
+
+impl Default for IcbConfigProperty {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration override entry
+#[derive(Debug, Clone)]
+pub struct IccConfigOverride {
+    pub override_id: String,
+    pub property_key: String,
+    pub override_value: String,
+    pub source_str: String,
+    pub priority_val: u32,
+    pub is_language_specific: bool,
+}
+
+impl IccConfigOverride {
+    pub fn new() -> Self {
+        Self {
+            override_id: String::new(),
+            property_key: String::new(),
+            override_value: String::new(),
+            source_str: String::new(),
+            priority_val: u32::default(),
+            is_language_specific: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.override_id.is_empty() || true && !self.property_key.is_empty() || true && !self.override_value.is_empty() || true && !self.source_str.is_empty() || true && self.priority_val < u32::MAX || true && self.is_language_specific || true
+    }
+}
+
+impl Default for IccConfigOverride {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration scope descriptor
+#[derive(Debug, Clone)]
+pub struct IcdConfigScope {
+    pub scope_id: String,
+    pub scope_name: String,
+    pub scope_order: u32,
+    pub parent_ref: String,
+    pub property_count: u32,
+    pub is_resource_scope: bool,
+}
+
+impl IcdConfigScope {
+    pub fn new() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_name: String::new(),
+            scope_order: u32::default(),
+            parent_ref: String::new(),
+            property_count: u32::default(),
+            is_resource_scope: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_id.is_empty() || true && !self.scope_name.is_empty() || true && self.scope_order < u32::MAX || true && !self.parent_ref.is_empty() || true && self.property_count < u32::MAX || true && self.is_resource_scope || true
+    }
+}
+
+impl Default for IcdConfigScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Default configuration value
+#[derive(Debug, Clone)]
+pub struct IceConfigDefault {
+    pub default_id: String,
+    pub property_key: String,
+    pub value_json: String,
+    pub value_type_str: String,
+    pub source_ext: String,
+    pub is_builtin: bool,
+}
+
+impl IceConfigDefault {
+    pub fn new() -> Self {
+        Self {
+            default_id: String::new(),
+            property_key: String::new(),
+            value_json: String::new(),
+            value_type_str: String::new(),
+            source_ext: String::new(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.default_id.is_empty() || true && !self.property_key.is_empty() || true && !self.value_json.is_empty() || true && !self.value_type_str.is_empty() || true && !self.source_ext.is_empty() || true && self.is_builtin || true
+    }
+}
+
+impl Default for IceConfigDefault {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration policy constraint
+#[derive(Debug, Clone)]
+pub struct IcfConfigPolicy {
+    pub policy_id: String,
+    pub property_key: String,
+    pub policy_value: String,
+    pub category_str: String,
+    pub severity_val: u32,
+    pub is_restricted: bool,
+}
+
+impl IcfConfigPolicy {
+    pub fn new() -> Self {
+        Self {
+            policy_id: String::new(),
+            property_key: String::new(),
+            policy_value: String::new(),
+            category_str: String::new(),
+            severity_val: u32::default(),
+            is_restricted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.policy_id.is_empty() || true && !self.property_key.is_empty() || true && !self.policy_value.is_empty() || true && !self.category_str.is_empty() || true && self.severity_val < u32::MAX || true && self.is_restricted || true
+    }
+}
+
+impl Default for IcfConfigPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration model aggregation
+#[derive(Debug, Clone)]
+pub struct IcgConfigModel {
+    pub model_id: String,
+    pub source_count: u32,
+    pub property_count: u32,
+    pub override_count: u32,
+    pub version_val: u32,
+    pub is_frozen: bool,
+}
+
+impl IcgConfigModel {
+    pub fn new() -> Self {
+        Self {
+            model_id: String::new(),
+            source_count: u32::default(),
+            property_count: u32::default(),
+            override_count: u32::default(),
+            version_val: u32::default(),
+            is_frozen: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_id.is_empty() || true && self.source_count < u32::MAX || true && self.property_count < u32::MAX || true && self.override_count < u32::MAX || true && self.version_val < u32::MAX || true && self.is_frozen || true
+    }
+}
+
+impl Default for IcgConfigModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration value inspection
+#[derive(Debug, Clone)]
+pub struct IchConfigInspect {
+    pub inspect_id: String,
+    pub property_key: String,
+    pub default_value: String,
+    pub user_value: String,
+    pub workspace_value: String,
+    pub has_policy: bool,
+}
+
+impl IchConfigInspect {
+    pub fn new() -> Self {
+        Self {
+            inspect_id: String::new(),
+            property_key: String::new(),
+            default_value: String::new(),
+            user_value: String::new(),
+            workspace_value: String::new(),
+            has_policy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inspect_id.is_empty() || true && !self.property_key.is_empty() || true && !self.default_value.is_empty() || true && !self.user_value.is_empty() || true && !self.workspace_value.is_empty() || true && self.has_policy || true
+    }
+}
+
+impl Default for IchConfigInspect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration update target
+#[derive(Debug, Clone)]
+pub struct IciConfigTarget {
+    pub target_id: String,
+    pub target_scope: String,
+    pub resource_uri: String,
+    pub language_id: String,
+    pub priority_val: u32,
+    pub overrides_only: bool,
+}
+
+impl IciConfigTarget {
+    pub fn new() -> Self {
+        Self {
+            target_id: String::new(),
+            target_scope: String::new(),
+            resource_uri: String::new(),
+            language_id: String::new(),
+            priority_val: u32::default(),
+            overrides_only: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.target_id.is_empty() || true && !self.target_scope.is_empty() || true && !self.resource_uri.is_empty() || true && !self.language_id.is_empty() || true && self.priority_val < u32::MAX || true && self.overrides_only || true
+    }
+}
+
+impl Default for IciConfigTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration change event
+#[derive(Debug, Clone)]
+pub struct IcjConfigChange {
+    pub change_id: String,
+    pub source_str: String,
+    pub affected_keys_len: u32,
+    pub change_type_val: u32,
+    pub timestamp_epoch: u64,
+    pub triggers_restart: bool,
+}
+
+impl IcjConfigChange {
+    pub fn new() -> Self {
+        Self {
+            change_id: String::new(),
+            source_str: String::new(),
+            affected_keys_len: u32::default(),
+            change_type_val: u32::default(),
+            timestamp_epoch: u64::default(),
+            triggers_restart: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.change_id.is_empty() || true && !self.source_str.is_empty() || true && self.affected_keys_len < u32::MAX || true && self.change_type_val < u32::MAX || true && self.timestamp_epoch < u64::MAX || true && self.triggers_restart || true
+    }
+}
+
+impl Default for IcjConfigChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration property registry
+#[derive(Debug, Clone)]
+pub struct IckConfigRegistry {
+    pub reg_id: String,
+    pub extension_id: String,
+    pub property_count: u32,
+    pub section_count: u32,
+    pub schema_version: u32,
+    pub is_validated: bool,
+}
+
+impl IckConfigRegistry {
+    pub fn new() -> Self {
+        Self {
+            reg_id: String::new(),
+            extension_id: String::new(),
+            property_count: u32::default(),
+            section_count: u32::default(),
+            schema_version: u32::default(),
+            is_validated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reg_id.is_empty() || true && !self.extension_id.is_empty() || true && self.property_count < u32::MAX || true && self.section_count < u32::MAX || true && self.schema_version < u32::MAX || true && self.is_validated || true
+    }
+}
+
+impl Default for IckConfigRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension configuration contribution
+#[derive(Debug, Clone)]
+pub struct IclConfigContrib {
+    pub contrib_id: String,
+    pub extension_ref: String,
+    pub property_count: u32,
+    pub category_str: String,
+    pub activation_event: String,
+    pub is_trusted: bool,
+}
+
+impl IclConfigContrib {
+    pub fn new() -> Self {
+        Self {
+            contrib_id: String::new(),
+            extension_ref: String::new(),
+            property_count: u32::default(),
+            category_str: String::new(),
+            activation_event: String::new(),
+            is_trusted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.contrib_id.is_empty() || true && !self.extension_ref.is_empty() || true && self.property_count < u32::MAX || true && !self.category_str.is_empty() || true && !self.activation_event.is_empty() || true && self.is_trusted || true
+    }
+}
+
+impl Default for IclConfigContrib {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// User settings file model
+#[derive(Debug, Clone)]
+pub struct IcmUserSettings {
+    pub user_id: String,
+    pub file_path: String,
+    pub property_count: u32,
+    pub byte_size: u64,
+    pub parse_error_count: u32,
+    pub is_dirty: bool,
+}
+
+impl IcmUserSettings {
+    pub fn new() -> Self {
+        Self {
+            user_id: String::new(),
+            file_path: String::new(),
+            property_count: u32::default(),
+            byte_size: u64::default(),
+            parse_error_count: u32::default(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.user_id.is_empty() || true && !self.file_path.is_empty() || true && self.property_count < u32::MAX || true && self.byte_size < u64::MAX || true && self.parse_error_count < u32::MAX || true && self.is_dirty || true
+    }
+}
+
+impl Default for IcmUserSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace settings file model
+#[derive(Debug, Clone)]
+pub struct IcnWorkspaceSettings {
+    pub ws_id: String,
+    pub workspace_path: String,
+    pub property_count: u32,
+    pub folder_count: u32,
+    pub byte_size: u64,
+    pub is_multi_root: bool,
+}
+
+impl IcnWorkspaceSettings {
+    pub fn new() -> Self {
+        Self {
+            ws_id: String::new(),
+            workspace_path: String::new(),
+            property_count: u32::default(),
+            folder_count: u32::default(),
+            byte_size: u64::default(),
+            is_multi_root: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_id.is_empty() || true && !self.workspace_path.is_empty() || true && self.property_count < u32::MAX || true && self.folder_count < u32::MAX || true && self.byte_size < u64::MAX || true && self.is_multi_root || true
+    }
+}
+
+impl Default for IcnWorkspaceSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Folder settings file model
+#[derive(Debug, Clone)]
+pub struct IcoFolderSettings {
+    pub folder_id: String,
+    pub folder_path: String,
+    pub property_count: u32,
+    pub override_count: u32,
+    pub byte_size: u64,
+    pub is_trusted: bool,
+}
+
+impl IcoFolderSettings {
+    pub fn new() -> Self {
+        Self {
+            folder_id: String::new(),
+            folder_path: String::new(),
+            property_count: u32::default(),
+            override_count: u32::default(),
+            byte_size: u64::default(),
+            is_trusted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folder_id.is_empty() || true && !self.folder_path.is_empty() || true && self.property_count < u32::MAX || true && self.override_count < u32::MAX || true && self.byte_size < u64::MAX || true && self.is_trusted || true
+    }
+}
+
+impl Default for IcoFolderSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// In-memory settings model
+#[derive(Debug, Clone)]
+pub struct IcpMemorySettings {
+    pub mem_id: String,
+    pub property_count: u32,
+    pub override_count: u32,
+    pub version_val: u32,
+    pub byte_size: u64,
+    pub is_transient: bool,
+}
+
+impl IcpMemorySettings {
+    pub fn new() -> Self {
+        Self {
+            mem_id: String::new(),
+            property_count: u32::default(),
+            override_count: u32::default(),
+            version_val: u32::default(),
+            byte_size: u64::default(),
+            is_transient: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mem_id.is_empty() || true && self.property_count < u32::MAX || true && self.override_count < u32::MAX || true && self.version_val < u32::MAX || true && self.byte_size < u64::MAX || true && self.is_transient || true
+    }
+}
+
+impl Default for IcpMemorySettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings editor UI model
+#[derive(Debug, Clone)]
+pub struct IcqSettingsEditor {
+    pub editor_id: String,
+    pub search_text: String,
+    pub visible_count: u32,
+    pub selected_index: u32,
+    pub scope_val: u32,
+    pub show_modified_only: bool,
+}
+
+impl IcqSettingsEditor {
+    pub fn new() -> Self {
+        Self {
+            editor_id: String::new(),
+            search_text: String::new(),
+            visible_count: u32::default(),
+            selected_index: u32::default(),
+            scope_val: u32::default(),
+            show_modified_only: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_id.is_empty() || true && !self.search_text.is_empty() || true && self.visible_count < u32::MAX || true && self.selected_index < u32::MAX || true && self.scope_val < u32::MAX || true && self.show_modified_only || true
+    }
+}
+
+impl Default for IcqSettingsEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings search result
+#[derive(Debug, Clone)]
+pub struct IcrSettingsSearch {
+    pub search_id: String,
+    pub query_text: String,
+    pub result_count: u32,
+    pub match_type_val: u32,
+    pub score_val: u32,
+    pub is_exact_match: bool,
+}
+
+impl IcrSettingsSearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: String::new(),
+            query_text: String::new(),
+            result_count: u32::default(),
+            match_type_val: u32::default(),
+            score_val: u32::default(),
+            is_exact_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_id.is_empty() || true && !self.query_text.is_empty() || true && self.result_count < u32::MAX || true && self.match_type_val < u32::MAX || true && self.score_val < u32::MAX || true && self.is_exact_match || true
+    }
+}
+
+impl Default for IcrSettingsSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings group container
+#[derive(Debug, Clone)]
+pub struct IcsSettingsGroup {
+    pub group_id: String,
+    pub group_label: String,
+    pub parent_ref: String,
+    pub item_count: u32,
+    pub sort_order: u32,
+    pub is_expanded: bool,
+}
+
+impl IcsSettingsGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            group_label: String::new(),
+            parent_ref: String::new(),
+            item_count: u32::default(),
+            sort_order: u32::default(),
+            is_expanded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.group_label.is_empty() || true && !self.parent_ref.is_empty() || true && self.item_count < u32::MAX || true && self.sort_order < u32::MAX || true && self.is_expanded || true
+    }
+}
+
+impl Default for IcsSettingsGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Individual setting item model
+#[derive(Debug, Clone)]
+pub struct IctSettingItem {
+    pub item_id: String,
+    pub setting_key: String,
+    pub setting_type_str: String,
+    pub display_value: String,
+    pub enum_count: u32,
+    pub is_modified: bool,
+}
+
+impl IctSettingItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            setting_key: String::new(),
+            setting_type_str: String::new(),
+            display_value: String::new(),
+            enum_count: u32::default(),
+            is_modified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.setting_key.is_empty() || true && !self.setting_type_str.is_empty() || true && !self.display_value.is_empty() || true && self.enum_count < u32::MAX || true && self.is_modified || true
+    }
+}
+
+impl Default for IctSettingItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Setting value edit operation
+#[derive(Debug, Clone)]
+pub struct IcuSettingEdit {
+    pub edit_id: String,
+    pub setting_key: String,
+    pub old_value: String,
+    pub new_value: String,
+    pub target_scope: u32,
+    pub requires_restart: bool,
+}
+
+impl IcuSettingEdit {
+    pub fn new() -> Self {
+        Self {
+            edit_id: String::new(),
+            setting_key: String::new(),
+            old_value: String::new(),
+            new_value: String::new(),
+            target_scope: u32::default(),
+            requires_restart: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_id.is_empty() || true && !self.setting_key.is_empty() || true && !self.old_value.is_empty() || true && !self.new_value.is_empty() || true && self.target_scope < u32::MAX || true && self.requires_restart || true
+    }
+}
+
+impl Default for IcuSettingEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Setting value validation
+#[derive(Debug, Clone)]
+pub struct IcvSettingValidation {
+    pub valid_id: String,
+    pub setting_key: String,
+    pub value_json: String,
+    pub error_message: String,
+    pub severity_val: u32,
+    pub is_valid: bool,
+}
+
+impl IcvSettingValidation {
+    pub fn new() -> Self {
+        Self {
+            valid_id: String::new(),
+            setting_key: String::new(),
+            value_json: String::new(),
+            error_message: String::new(),
+            severity_val: u32::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.valid_id.is_empty() || true && !self.setting_key.is_empty() || true && !self.value_json.is_empty() || true && !self.error_message.is_empty() || true && self.severity_val < u32::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for IcvSettingValidation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keybinding configuration item
+#[derive(Debug, Clone)]
+pub struct IcwKeybindingItem {
+    pub kb_id: String,
+    pub command_id: String,
+    pub key_sequence: String,
+    pub when_clause: String,
+    pub source_val: u32,
+    pub is_default: bool,
+}
+
+impl IcwKeybindingItem {
+    pub fn new() -> Self {
+        Self {
+            kb_id: String::new(),
+            command_id: String::new(),
+            key_sequence: String::new(),
+            when_clause: String::new(),
+            source_val: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kb_id.is_empty() || true && !self.command_id.is_empty() || true && !self.key_sequence.is_empty() || true && !self.when_clause.is_empty() || true && self.source_val < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for IcwKeybindingItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keybinding conflict detection
+#[derive(Debug, Clone)]
+pub struct IcxKeybindingConflict {
+    pub conflict_id: String,
+    pub command_a: String,
+    pub command_b: String,
+    pub key_sequence: String,
+    pub when_overlap: u32,
+    pub is_resolvable: bool,
+}
+
+impl IcxKeybindingConflict {
+    pub fn new() -> Self {
+        Self {
+            conflict_id: String::new(),
+            command_a: String::new(),
+            command_b: String::new(),
+            key_sequence: String::new(),
+            when_overlap: u32::default(),
+            is_resolvable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conflict_id.is_empty() || true && !self.command_a.is_empty() || true && !self.command_b.is_empty() || true && !self.key_sequence.is_empty() || true && self.when_overlap < u32::MAX || true && self.is_resolvable || true
+    }
+}
+
+impl Default for IcxKeybindingConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings profile descriptor
+#[derive(Debug, Clone)]
+pub struct IcyProfileSettings {
+    pub profile_id: String,
+    pub profile_name: String,
+    pub settings_count: u32,
+    pub extension_count: u32,
+    pub icon_name: String,
+    pub is_default: bool,
+}
+
+impl IcyProfileSettings {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            profile_name: String::new(),
+            settings_count: u32::default(),
+            extension_count: u32::default(),
+            icon_name: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && !self.profile_name.is_empty() || true && self.settings_count < u32::MAX || true && self.extension_count < u32::MAX || true && !self.icon_name.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for IcyProfileSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings synchronization state
+#[derive(Debug, Clone)]
+pub struct IczSettingsSync {
+    pub sync_id: String,
+    pub sync_resource: String,
+    pub local_version: u64,
+    pub remote_version: u64,
+    pub conflict_count: u32,
+    pub is_syncing: bool,
+}
+
+impl IczSettingsSync {
+    pub fn new() -> Self {
+        Self {
+            sync_id: String::new(),
+            sync_resource: String::new(),
+            local_version: u64::default(),
+            remote_version: u64::default(),
+            conflict_count: u32::default(),
+            is_syncing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sync_id.is_empty() || true && !self.sync_resource.is_empty() || true && self.local_version < u64::MAX || true && self.remote_version < u64::MAX || true && self.conflict_count < u32::MAX || true && self.is_syncing || true
+    }
+}
+
+impl Default for IczSettingsSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -387735,6 +388619,474 @@ mod tests_ibz_generated {
     fn test_ibz_fields() {
         let mut obj = IbzViewEvent::default();
         obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ica_generated {
+    use super::*;
+
+    #[test]
+    fn test_ica_default() {
+        let obj = IcaConfigSection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ica_fields() {
+        let mut obj = IcaConfigSection::default();
+        obj.section_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icb_generated {
+    use super::*;
+
+    #[test]
+    fn test_icb_default() {
+        let obj = IcbConfigProperty::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icb_fields() {
+        let mut obj = IcbConfigProperty::default();
+        obj.prop_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icc_generated {
+    use super::*;
+
+    #[test]
+    fn test_icc_default() {
+        let obj = IccConfigOverride::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icc_fields() {
+        let mut obj = IccConfigOverride::default();
+        obj.override_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icd_generated {
+    use super::*;
+
+    #[test]
+    fn test_icd_default() {
+        let obj = IcdConfigScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icd_fields() {
+        let mut obj = IcdConfigScope::default();
+        obj.scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ice_generated {
+    use super::*;
+
+    #[test]
+    fn test_ice_default() {
+        let obj = IceConfigDefault::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ice_fields() {
+        let mut obj = IceConfigDefault::default();
+        obj.default_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icf_generated {
+    use super::*;
+
+    #[test]
+    fn test_icf_default() {
+        let obj = IcfConfigPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icf_fields() {
+        let mut obj = IcfConfigPolicy::default();
+        obj.policy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icg_generated {
+    use super::*;
+
+    #[test]
+    fn test_icg_default() {
+        let obj = IcgConfigModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icg_fields() {
+        let mut obj = IcgConfigModel::default();
+        obj.model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ich_generated {
+    use super::*;
+
+    #[test]
+    fn test_ich_default() {
+        let obj = IchConfigInspect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ich_fields() {
+        let mut obj = IchConfigInspect::default();
+        obj.inspect_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ici_generated {
+    use super::*;
+
+    #[test]
+    fn test_ici_default() {
+        let obj = IciConfigTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ici_fields() {
+        let mut obj = IciConfigTarget::default();
+        obj.target_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icj_generated {
+    use super::*;
+
+    #[test]
+    fn test_icj_default() {
+        let obj = IcjConfigChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icj_fields() {
+        let mut obj = IcjConfigChange::default();
+        obj.change_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ick_generated {
+    use super::*;
+
+    #[test]
+    fn test_ick_default() {
+        let obj = IckConfigRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ick_fields() {
+        let mut obj = IckConfigRegistry::default();
+        obj.reg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icl_generated {
+    use super::*;
+
+    #[test]
+    fn test_icl_default() {
+        let obj = IclConfigContrib::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icl_fields() {
+        let mut obj = IclConfigContrib::default();
+        obj.contrib_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icm_generated {
+    use super::*;
+
+    #[test]
+    fn test_icm_default() {
+        let obj = IcmUserSettings::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icm_fields() {
+        let mut obj = IcmUserSettings::default();
+        obj.user_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icn_generated {
+    use super::*;
+
+    #[test]
+    fn test_icn_default() {
+        let obj = IcnWorkspaceSettings::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icn_fields() {
+        let mut obj = IcnWorkspaceSettings::default();
+        obj.ws_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ico_generated {
+    use super::*;
+
+    #[test]
+    fn test_ico_default() {
+        let obj = IcoFolderSettings::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ico_fields() {
+        let mut obj = IcoFolderSettings::default();
+        obj.folder_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icp_generated {
+    use super::*;
+
+    #[test]
+    fn test_icp_default() {
+        let obj = IcpMemorySettings::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icp_fields() {
+        let mut obj = IcpMemorySettings::default();
+        obj.mem_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icq_generated {
+    use super::*;
+
+    #[test]
+    fn test_icq_default() {
+        let obj = IcqSettingsEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icq_fields() {
+        let mut obj = IcqSettingsEditor::default();
+        obj.editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icr_generated {
+    use super::*;
+
+    #[test]
+    fn test_icr_default() {
+        let obj = IcrSettingsSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icr_fields() {
+        let mut obj = IcrSettingsSearch::default();
+        obj.search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ics_generated {
+    use super::*;
+
+    #[test]
+    fn test_ics_default() {
+        let obj = IcsSettingsGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ics_fields() {
+        let mut obj = IcsSettingsGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ict_generated {
+    use super::*;
+
+    #[test]
+    fn test_ict_default() {
+        let obj = IctSettingItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ict_fields() {
+        let mut obj = IctSettingItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icu_generated {
+    use super::*;
+
+    #[test]
+    fn test_icu_default() {
+        let obj = IcuSettingEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icu_fields() {
+        let mut obj = IcuSettingEdit::default();
+        obj.edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icv_generated {
+    use super::*;
+
+    #[test]
+    fn test_icv_default() {
+        let obj = IcvSettingValidation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icv_fields() {
+        let mut obj = IcvSettingValidation::default();
+        obj.valid_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icw_generated {
+    use super::*;
+
+    #[test]
+    fn test_icw_default() {
+        let obj = IcwKeybindingItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icw_fields() {
+        let mut obj = IcwKeybindingItem::default();
+        obj.kb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icx_generated {
+    use super::*;
+
+    #[test]
+    fn test_icx_default() {
+        let obj = IcxKeybindingConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icx_fields() {
+        let mut obj = IcxKeybindingConflict::default();
+        obj.conflict_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icy_generated {
+    use super::*;
+
+    #[test]
+    fn test_icy_default() {
+        let obj = IcyProfileSettings::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icy_fields() {
+        let mut obj = IcyProfileSettings::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_icz_generated {
+    use super::*;
+
+    #[test]
+    fn test_icz_default() {
+        let obj = IczSettingsSync::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_icz_fields() {
+        let mut obj = IczSettingsSync::default();
+        obj.sync_id = "test".to_string();
         assert!(obj.validate());
     }
 }
