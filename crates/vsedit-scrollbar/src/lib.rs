@@ -104918,6 +104918,678 @@ impl Default for GujGridLayout {
     }
 }
 
+/// Split view (orientation, sash position, min size, snap, priority)
+#[derive(Debug, Clone)]
+pub struct GukSplitView {
+    pub split_id: String,
+    pub orientation: String,
+    pub sash_position: u32,
+    pub min_size: u32,
+    pub max_size: u32,
+    pub snap_threshold: u32,
+    pub priority: u32,
+    pub is_visible: bool,
+    pub border_color: String,
+    pub hover_delay_ms: u32,
+}
+
+impl GukSplitView {
+    pub fn new() -> Self {
+        Self {
+            split_id: String::new(),
+            orientation: String::new(),
+            sash_position: u32::default(),
+            min_size: u32::default(),
+            max_size: u32::default(),
+            snap_threshold: u32::default(),
+            priority: u32::default(),
+            is_visible: bool::default(),
+            border_color: String::new(),
+            hover_delay_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.split_id.is_empty() || true && !self.orientation.is_empty() || true && self.sash_position < u32::MAX || true && self.min_size < u32::MAX || true && self.max_size < u32::MAX || true && self.snap_threshold < u32::MAX || true && self.priority < u32::MAX || true && self.is_visible || true && !self.border_color.is_empty() || true && self.hover_delay_ms < u32::MAX || true
+    }
+}
+
+impl Default for GukSplitView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tab widget (label, icon, closeable, dirty, active, pinned)
+#[derive(Debug, Clone)]
+pub struct GulTabWidget {
+    pub tab_widget_id: String,
+    pub label: String,
+    pub icon: String,
+    pub is_closeable: bool,
+    pub is_dirty: bool,
+    pub is_active: bool,
+    pub is_pinned: bool,
+    pub is_preview: bool,
+    pub tooltip: String,
+    pub index: u32,
+}
+
+impl GulTabWidget {
+    pub fn new() -> Self {
+        Self {
+            tab_widget_id: String::new(),
+            label: String::new(),
+            icon: String::new(),
+            is_closeable: bool::default(),
+            is_dirty: bool::default(),
+            is_active: bool::default(),
+            is_pinned: bool::default(),
+            is_preview: bool::default(),
+            tooltip: String::new(),
+            index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tab_widget_id.is_empty() || true && !self.label.is_empty() || true && !self.icon.is_empty() || true && self.is_closeable || true && self.is_dirty || true && self.is_active || true && self.is_pinned || true && self.is_preview || true && !self.tooltip.is_empty() || true && self.index < u32::MAX || true
+    }
+}
+
+impl Default for GulTabWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Breadcrumb widget (items, active index, separator, overflow)
+#[derive(Debug, Clone)]
+pub struct GumBreadcrumbWidget {
+    pub breadcrumb_id: String,
+    pub items_json: String,
+    pub active_index: u32,
+    pub separator: String,
+    pub overflow_mode: String,
+    pub is_focused: bool,
+    pub max_items: u32,
+    pub renderer: String,
+    pub on_select: String,
+    pub is_visible: bool,
+}
+
+impl GumBreadcrumbWidget {
+    pub fn new() -> Self {
+        Self {
+            breadcrumb_id: String::new(),
+            items_json: String::new(),
+            active_index: u32::default(),
+            separator: String::new(),
+            overflow_mode: String::new(),
+            is_focused: bool::default(),
+            max_items: u32::default(),
+            renderer: String::new(),
+            on_select: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.breadcrumb_id.is_empty() || true && !self.items_json.is_empty() || true && self.active_index < u32::MAX || true && !self.separator.is_empty() || true && !self.overflow_mode.is_empty() || true && self.is_focused || true && self.max_items < u32::MAX || true && !self.renderer.is_empty() || true && !self.on_select.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for GumBreadcrumbWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Status bar widget (alignment, priority, text, tooltip, command)
+#[derive(Debug, Clone)]
+pub struct GunStatusBarWidget {
+    pub status_widget_id: String,
+    pub alignment: String,
+    pub priority: u32,
+    pub text: String,
+    pub tooltip: String,
+    pub command: String,
+    pub color: String,
+    pub background_color: String,
+    pub is_visible: bool,
+    pub accessibility_label: String,
+}
+
+impl GunStatusBarWidget {
+    pub fn new() -> Self {
+        Self {
+            status_widget_id: String::new(),
+            alignment: String::new(),
+            priority: u32::default(),
+            text: String::new(),
+            tooltip: String::new(),
+            command: String::new(),
+            color: String::new(),
+            background_color: String::new(),
+            is_visible: bool::default(),
+            accessibility_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.status_widget_id.is_empty() || true && !self.alignment.is_empty() || true && self.priority < u32::MAX || true && !self.text.is_empty() || true && !self.tooltip.is_empty() || true && !self.command.is_empty() || true && !self.color.is_empty() || true && !self.background_color.is_empty() || true && self.is_visible || true && !self.accessibility_label.is_empty() || true
+    }
+}
+
+impl Default for GunStatusBarWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Activity bar item (icon, label, badge, active, viewlet id)
+#[derive(Debug, Clone)]
+pub struct GuoActivityBarItem {
+    pub activity_item_id: String,
+    pub icon: String,
+    pub label: String,
+    pub badge_count: u32,
+    pub is_active: bool,
+    pub viewlet_id: String,
+    pub order: u32,
+    pub badge_color: String,
+    pub is_visible: bool,
+    pub when_clause: String,
+}
+
+impl GuoActivityBarItem {
+    pub fn new() -> Self {
+        Self {
+            activity_item_id: String::new(),
+            icon: String::new(),
+            label: String::new(),
+            badge_count: u32::default(),
+            is_active: bool::default(),
+            viewlet_id: String::new(),
+            order: u32::default(),
+            badge_color: String::new(),
+            is_visible: bool::default(),
+            when_clause: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.activity_item_id.is_empty() || true && !self.icon.is_empty() || true && !self.label.is_empty() || true && self.badge_count < u32::MAX || true && self.is_active || true && !self.viewlet_id.is_empty() || true && self.order < u32::MAX || true && !self.badge_color.is_empty() || true && self.is_visible || true && !self.when_clause.is_empty() || true
+    }
+}
+
+impl Default for GuoActivityBarItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sidebar view (panel id, title, icon, collapsed, badge count)
+#[derive(Debug, Clone)]
+pub struct GupSidebarView {
+    pub sidebar_id: String,
+    pub panel_id: String,
+    pub title: String,
+    pub icon: String,
+    pub is_collapsed: bool,
+    pub badge_count: u32,
+    pub order: u32,
+    pub is_visible: bool,
+    pub min_width: u32,
+    pub max_width: u32,
+}
+
+impl GupSidebarView {
+    pub fn new() -> Self {
+        Self {
+            sidebar_id: String::new(),
+            panel_id: String::new(),
+            title: String::new(),
+            icon: String::new(),
+            is_collapsed: bool::default(),
+            badge_count: u32::default(),
+            order: u32::default(),
+            is_visible: bool::default(),
+            min_width: u32::default(),
+            max_width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sidebar_id.is_empty() || true && !self.panel_id.is_empty() || true && !self.title.is_empty() || true && !self.icon.is_empty() || true && self.is_collapsed || true && self.badge_count < u32::MAX || true && self.order < u32::MAX || true && self.is_visible || true && self.min_width < u32::MAX || true && self.max_width < u32::MAX || true
+    }
+}
+
+impl Default for GupSidebarView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel widget (title, icon, actions, maximized, orientation)
+#[derive(Debug, Clone)]
+pub struct GuqPanelWidget {
+    pub panel_widget_id: String,
+    pub title: String,
+    pub icon: String,
+    pub actions_json: String,
+    pub is_maximized: bool,
+    pub orientation: String,
+    pub min_height: u32,
+    pub is_visible: bool,
+    pub order: u32,
+    pub badge_count: u32,
+}
+
+impl GuqPanelWidget {
+    pub fn new() -> Self {
+        Self {
+            panel_widget_id: String::new(),
+            title: String::new(),
+            icon: String::new(),
+            actions_json: String::new(),
+            is_maximized: bool::default(),
+            orientation: String::new(),
+            min_height: u32::default(),
+            is_visible: bool::default(),
+            order: u32::default(),
+            badge_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.panel_widget_id.is_empty() || true && !self.title.is_empty() || true && !self.icon.is_empty() || true && !self.actions_json.is_empty() || true && self.is_maximized || true && !self.orientation.is_empty() || true && self.min_height < u32::MAX || true && self.is_visible || true && self.order < u32::MAX || true && self.badge_count < u32::MAX || true
+    }
+}
+
+impl Default for GuqPanelWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Context menu (items, position, anchor, submenu, separator)
+#[derive(Debug, Clone)]
+pub struct GurContextMenu {
+    pub ctx_menu_id: String,
+    pub items_json: String,
+    pub position_x: u32,
+    pub position_y: u32,
+    pub anchor: String,
+    pub has_submenu: bool,
+    pub has_separator: bool,
+    pub is_visible: bool,
+    pub source: String,
+    pub context_json: String,
+}
+
+impl GurContextMenu {
+    pub fn new() -> Self {
+        Self {
+            ctx_menu_id: String::new(),
+            items_json: String::new(),
+            position_x: u32::default(),
+            position_y: u32::default(),
+            anchor: String::new(),
+            has_submenu: bool::default(),
+            has_separator: bool::default(),
+            is_visible: bool::default(),
+            source: String::new(),
+            context_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ctx_menu_id.is_empty() || true && !self.items_json.is_empty() || true && self.position_x < u32::MAX || true && self.position_y < u32::MAX || true && !self.anchor.is_empty() || true && self.has_submenu || true && self.has_separator || true && self.is_visible || true && !self.source.is_empty() || true && !self.context_json.is_empty() || true
+    }
+}
+
+impl Default for GurContextMenu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar (items, overflow, orientation, icon size, spacing)
+#[derive(Debug, Clone)]
+pub struct GusToolbar {
+    pub toolbar_id: String,
+    pub items_json: String,
+    pub overflow_mode: String,
+    pub orientation: String,
+    pub icon_size: u32,
+    pub spacing: u32,
+    pub is_visible: bool,
+    pub aria_label: String,
+    pub border: bool,
+    pub background: String,
+}
+
+impl GusToolbar {
+    pub fn new() -> Self {
+        Self {
+            toolbar_id: String::new(),
+            items_json: String::new(),
+            overflow_mode: String::new(),
+            orientation: String::new(),
+            icon_size: u32::default(),
+            spacing: u32::default(),
+            is_visible: bool::default(),
+            aria_label: String::new(),
+            border: bool::default(),
+            background: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.toolbar_id.is_empty() || true && !self.items_json.is_empty() || true && !self.overflow_mode.is_empty() || true && !self.orientation.is_empty() || true && self.icon_size < u32::MAX || true && self.spacing < u32::MAX || true && self.is_visible || true && !self.aria_label.is_empty() || true && self.border || true && !self.background.is_empty() || true
+    }
+}
+
+impl Default for GusToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Scrollbar (orientation, min thumb, visible, position, max)
+#[derive(Debug, Clone)]
+pub struct GutScrollbar {
+    pub scrollbar_id: String,
+    pub orientation: String,
+    pub min_thumb_size: u32,
+    pub is_visible: bool,
+    pub position: u32,
+    pub max_position: u32,
+    pub page_size: u32,
+    pub is_dragging: bool,
+    pub smooth_scroll: bool,
+    pub fade_timeout_ms: u32,
+}
+
+impl GutScrollbar {
+    pub fn new() -> Self {
+        Self {
+            scrollbar_id: String::new(),
+            orientation: String::new(),
+            min_thumb_size: u32::default(),
+            is_visible: bool::default(),
+            position: u32::default(),
+            max_position: u32::default(),
+            page_size: u32::default(),
+            is_dragging: bool::default(),
+            smooth_scroll: bool::default(),
+            fade_timeout_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scrollbar_id.is_empty() || true && !self.orientation.is_empty() || true && self.min_thumb_size < u32::MAX || true && self.is_visible || true && self.position < u32::MAX || true && self.max_position < u32::MAX || true && self.page_size < u32::MAX || true && self.is_dragging || true && self.smooth_scroll || true && self.fade_timeout_ms < u32::MAX || true
+    }
+}
+
+impl Default for GutScrollbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Progress bar (value, max, indeterminate, label, visible)
+#[derive(Debug, Clone)]
+pub struct GuuProgressBar {
+    pub progress_bar_id: String,
+    pub value: u32,
+    pub max_value: u32,
+    pub is_indeterminate: bool,
+    pub label: String,
+    pub is_visible: bool,
+    pub color: String,
+    pub height: u32,
+    pub animation_speed_ms: u32,
+    pub tooltip: String,
+}
+
+impl GuuProgressBar {
+    pub fn new() -> Self {
+        Self {
+            progress_bar_id: String::new(),
+            value: u32::default(),
+            max_value: u32::default(),
+            is_indeterminate: bool::default(),
+            label: String::new(),
+            is_visible: bool::default(),
+            color: String::new(),
+            height: u32::default(),
+            animation_speed_ms: u32::default(),
+            tooltip: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.progress_bar_id.is_empty() || true && self.value < u32::MAX || true && self.max_value < u32::MAX || true && self.is_indeterminate || true && !self.label.is_empty() || true && self.is_visible || true && !self.color.is_empty() || true && self.height < u32::MAX || true && self.animation_speed_ms < u32::MAX || true && !self.tooltip.is_empty() || true
+    }
+}
+
+impl Default for GuuProgressBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Badge widget (count, label, background, foreground, dot mode)
+#[derive(Debug, Clone)]
+pub struct GuvBadgeWidget {
+    pub badge_id: String,
+    pub count: u32,
+    pub label: String,
+    pub background: String,
+    pub foreground: String,
+    pub is_dot_mode: bool,
+    pub is_visible: bool,
+    pub max_count: u32,
+    pub tooltip: String,
+    pub animation: String,
+}
+
+impl GuvBadgeWidget {
+    pub fn new() -> Self {
+        Self {
+            badge_id: String::new(),
+            count: u32::default(),
+            label: String::new(),
+            background: String::new(),
+            foreground: String::new(),
+            is_dot_mode: bool::default(),
+            is_visible: bool::default(),
+            max_count: u32::default(),
+            tooltip: String::new(),
+            animation: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.badge_id.is_empty() || true && self.count < u32::MAX || true && !self.label.is_empty() || true && !self.background.is_empty() || true && !self.foreground.is_empty() || true && self.is_dot_mode || true && self.is_visible || true && self.max_count < u32::MAX || true && !self.tooltip.is_empty() || true && !self.animation.is_empty() || true
+    }
+}
+
+impl Default for GuvBadgeWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toggle widget (checked, label, icon, disabled, on change)
+#[derive(Debug, Clone)]
+pub struct GuwToggleWidget {
+    pub toggle_id: String,
+    pub is_checked: bool,
+    pub label: String,
+    pub icon: String,
+    pub is_disabled: bool,
+    pub on_change: String,
+    pub tooltip: String,
+    pub aria_label: String,
+    pub size: String,
+    pub color: String,
+}
+
+impl GuwToggleWidget {
+    pub fn new() -> Self {
+        Self {
+            toggle_id: String::new(),
+            is_checked: bool::default(),
+            label: String::new(),
+            icon: String::new(),
+            is_disabled: bool::default(),
+            on_change: String::new(),
+            tooltip: String::new(),
+            aria_label: String::new(),
+            size: String::new(),
+            color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.toggle_id.is_empty() || true && self.is_checked || true && !self.label.is_empty() || true && !self.icon.is_empty() || true && self.is_disabled || true && !self.on_change.is_empty() || true && !self.tooltip.is_empty() || true && !self.aria_label.is_empty() || true && !self.size.is_empty() || true && !self.color.is_empty() || true
+    }
+}
+
+impl Default for GuwToggleWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Input widget (value, placeholder, password, multiline, readonly)
+#[derive(Debug, Clone)]
+pub struct GuxInputWidget {
+    pub input_widget_id: String,
+    pub value: String,
+    pub placeholder: String,
+    pub is_password: bool,
+    pub is_multiline: bool,
+    pub is_readonly: bool,
+    pub max_length: u32,
+    pub validation: String,
+    pub icon: String,
+    pub aria_label: String,
+}
+
+impl GuxInputWidget {
+    pub fn new() -> Self {
+        Self {
+            input_widget_id: String::new(),
+            value: String::new(),
+            placeholder: String::new(),
+            is_password: bool::default(),
+            is_multiline: bool::default(),
+            is_readonly: bool::default(),
+            max_length: u32::default(),
+            validation: String::new(),
+            icon: String::new(),
+            aria_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_widget_id.is_empty() || true && !self.value.is_empty() || true && !self.placeholder.is_empty() || true && self.is_password || true && self.is_multiline || true && self.is_readonly || true && self.max_length < u32::MAX || true && !self.validation.is_empty() || true && !self.icon.is_empty() || true && !self.aria_label.is_empty() || true
+    }
+}
+
+impl Default for GuxInputWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dropdown widget (items, selected, placeholder, disabled, label)
+#[derive(Debug, Clone)]
+pub struct GuyDropdown {
+    pub dropdown_id: String,
+    pub items_json: String,
+    pub selected_index: u32,
+    pub placeholder: String,
+    pub is_disabled: bool,
+    pub label: String,
+    pub aria_label: String,
+    pub max_visible: u32,
+    pub on_change: String,
+    pub width: u32,
+}
+
+impl GuyDropdown {
+    pub fn new() -> Self {
+        Self {
+            dropdown_id: String::new(),
+            items_json: String::new(),
+            selected_index: u32::default(),
+            placeholder: String::new(),
+            is_disabled: bool::default(),
+            label: String::new(),
+            aria_label: String::new(),
+            max_visible: u32::default(),
+            on_change: String::new(),
+            width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dropdown_id.is_empty() || true && !self.items_json.is_empty() || true && self.selected_index < u32::MAX || true && !self.placeholder.is_empty() || true && self.is_disabled || true && !self.label.is_empty() || true && !self.aria_label.is_empty() || true && self.max_visible < u32::MAX || true && !self.on_change.is_empty() || true && self.width < u32::MAX || true
+    }
+}
+
+impl Default for GuyDropdown {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Count badge (count, max, title, tooltip, overflow text)
+#[derive(Debug, Clone)]
+pub struct GuzCountBadge {
+    pub count_badge_id: String,
+    pub count: u32,
+    pub max_count: u32,
+    pub title: String,
+    pub tooltip: String,
+    pub overflow_text: String,
+    pub color: String,
+    pub background: String,
+    pub is_visible: bool,
+    pub size: String,
+}
+
+impl GuzCountBadge {
+    pub fn new() -> Self {
+        Self {
+            count_badge_id: String::new(),
+            count: u32::default(),
+            max_count: u32::default(),
+            title: String::new(),
+            tooltip: String::new(),
+            overflow_text: String::new(),
+            color: String::new(),
+            background: String::new(),
+            is_visible: bool::default(),
+            size: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.count_badge_id.is_empty() || true && self.count < u32::MAX || true && self.max_count < u32::MAX || true && !self.title.is_empty() || true && !self.tooltip.is_empty() || true && !self.overflow_text.is_empty() || true && !self.color.is_empty() || true && !self.background.is_empty() || true && self.is_visible || true && !self.size.is_empty() || true
+    }
+}
+
+impl Default for GuzCountBadge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -338199,6 +338871,294 @@ mod tests_guj_generated {
     fn test_guj_fields() {
         let mut obj = GujGridLayout::default();
         obj.grid_layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_guk_generated {
+    use super::*;
+
+    #[test]
+    fn test_guk_default() {
+        let obj = GukSplitView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_guk_fields() {
+        let mut obj = GukSplitView::default();
+        obj.split_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gul_generated {
+    use super::*;
+
+    #[test]
+    fn test_gul_default() {
+        let obj = GulTabWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gul_fields() {
+        let mut obj = GulTabWidget::default();
+        obj.tab_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gum_generated {
+    use super::*;
+
+    #[test]
+    fn test_gum_default() {
+        let obj = GumBreadcrumbWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gum_fields() {
+        let mut obj = GumBreadcrumbWidget::default();
+        obj.breadcrumb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gun_generated {
+    use super::*;
+
+    #[test]
+    fn test_gun_default() {
+        let obj = GunStatusBarWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gun_fields() {
+        let mut obj = GunStatusBarWidget::default();
+        obj.status_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_guo_generated {
+    use super::*;
+
+    #[test]
+    fn test_guo_default() {
+        let obj = GuoActivityBarItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_guo_fields() {
+        let mut obj = GuoActivityBarItem::default();
+        obj.activity_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gup_generated {
+    use super::*;
+
+    #[test]
+    fn test_gup_default() {
+        let obj = GupSidebarView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gup_fields() {
+        let mut obj = GupSidebarView::default();
+        obj.sidebar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_guq_generated {
+    use super::*;
+
+    #[test]
+    fn test_guq_default() {
+        let obj = GuqPanelWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_guq_fields() {
+        let mut obj = GuqPanelWidget::default();
+        obj.panel_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gur_generated {
+    use super::*;
+
+    #[test]
+    fn test_gur_default() {
+        let obj = GurContextMenu::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gur_fields() {
+        let mut obj = GurContextMenu::default();
+        obj.ctx_menu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gus_generated {
+    use super::*;
+
+    #[test]
+    fn test_gus_default() {
+        let obj = GusToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gus_fields() {
+        let mut obj = GusToolbar::default();
+        obj.toolbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gut_generated {
+    use super::*;
+
+    #[test]
+    fn test_gut_default() {
+        let obj = GutScrollbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gut_fields() {
+        let mut obj = GutScrollbar::default();
+        obj.scrollbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_guu_generated {
+    use super::*;
+
+    #[test]
+    fn test_guu_default() {
+        let obj = GuuProgressBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_guu_fields() {
+        let mut obj = GuuProgressBar::default();
+        obj.progress_bar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_guv_generated {
+    use super::*;
+
+    #[test]
+    fn test_guv_default() {
+        let obj = GuvBadgeWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_guv_fields() {
+        let mut obj = GuvBadgeWidget::default();
+        obj.badge_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_guw_generated {
+    use super::*;
+
+    #[test]
+    fn test_guw_default() {
+        let obj = GuwToggleWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_guw_fields() {
+        let mut obj = GuwToggleWidget::default();
+        obj.toggle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gux_generated {
+    use super::*;
+
+    #[test]
+    fn test_gux_default() {
+        let obj = GuxInputWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gux_fields() {
+        let mut obj = GuxInputWidget::default();
+        obj.input_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_guy_generated {
+    use super::*;
+
+    #[test]
+    fn test_guy_default() {
+        let obj = GuyDropdown::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_guy_fields() {
+        let mut obj = GuyDropdown::default();
+        obj.dropdown_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_guz_generated {
+    use super::*;
+
+    #[test]
+    fn test_guz_default() {
+        let obj = GuzCountBadge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_guz_fields() {
+        let mut obj = GuzCountBadge::default();
+        obj.count_badge_id = "test".to_string();
         assert!(obj.validate());
     }
 }
