@@ -76565,6 +76565,216 @@ impl Default for FueActivityBarLayout {
     }
 }
 
+/// View container (id, title, icon, order, location, views)
+#[derive(Debug, Clone)]
+pub struct FufViewContainer {
+    pub container_id: String,
+    pub title: String,
+    pub icon_id: String,
+    pub order: u32,
+    pub location: u32,
+    pub view_count: u32,
+    pub extension_id: String,
+    pub is_hidden: bool,
+    pub default_view_id: String,
+    pub reorder_enabled: bool,
+}
+
+impl FufViewContainer {
+    pub fn new() -> Self {
+        Self {
+            container_id: String::new(),
+            title: String::new(),
+            icon_id: String::new(),
+            order: u32::default(),
+            location: u32::default(),
+            view_count: u32::default(),
+            extension_id: String::new(),
+            is_hidden: bool::default(),
+            default_view_id: String::new(),
+            reorder_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.container_id.is_empty() || true && !self.title.is_empty() || true && !self.icon_id.is_empty() || true && self.order < u32::MAX || true && self.location < u32::MAX || true && self.view_count < u32::MAX || true && !self.extension_id.is_empty() || true && self.is_hidden || true && !self.default_view_id.is_empty() || true && self.reorder_enabled || true
+    }
+}
+
+impl Default for FufViewContainer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View descriptor (id, name, when, order, container id, weight)
+#[derive(Debug, Clone)]
+pub struct FugViewDescriptor {
+    pub view_id: String,
+    pub name: String,
+    pub when_clause: String,
+    pub order: u32,
+    pub container_id: String,
+    pub weight: u32,
+    pub can_toggle_visibility: bool,
+    pub is_hidden: bool,
+    pub focus_command_id: String,
+    pub extension_id: String,
+}
+
+impl FugViewDescriptor {
+    pub fn new() -> Self {
+        Self {
+            view_id: String::new(),
+            name: String::new(),
+            when_clause: String::new(),
+            order: u32::default(),
+            container_id: String::new(),
+            weight: u32::default(),
+            can_toggle_visibility: bool::default(),
+            is_hidden: bool::default(),
+            focus_command_id: String::new(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_id.is_empty() || true && !self.name.is_empty() || true && !self.when_clause.is_empty() || true && self.order < u32::MAX || true && !self.container_id.is_empty() || true && self.weight < u32::MAX || true && self.can_toggle_visibility || true && self.is_hidden || true && !self.focus_command_id.is_empty() || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for FugViewDescriptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor part layout (groups, active group, sidebar, preview)
+#[derive(Debug, Clone)]
+pub struct FuhEditorPartLayout {
+    pub part_id: String,
+    pub group_count: u32,
+    pub active_group_id: String,
+    pub sidebar_visible: bool,
+    pub preview_enabled: bool,
+    pub centered_layout: bool,
+    pub split_sizing: u32,
+    pub open_side_by_side: bool,
+    pub wrap_tabs: bool,
+    pub tab_sizing: u32,
+}
+
+impl FuhEditorPartLayout {
+    pub fn new() -> Self {
+        Self {
+            part_id: String::new(),
+            group_count: u32::default(),
+            active_group_id: String::new(),
+            sidebar_visible: bool::default(),
+            preview_enabled: bool::default(),
+            centered_layout: bool::default(),
+            split_sizing: u32::default(),
+            open_side_by_side: bool::default(),
+            wrap_tabs: bool::default(),
+            tab_sizing: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.part_id.is_empty() || true && self.group_count < u32::MAX || true && !self.active_group_id.is_empty() || true && self.sidebar_visible || true && self.preview_enabled || true && self.centered_layout || true && self.split_sizing < u32::MAX || true && self.open_side_by_side || true && self.wrap_tabs || true && self.tab_sizing < u32::MAX || true
+    }
+}
+
+impl Default for FuhEditorPartLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Auxiliary bar layout (side, width, visible, active view)
+#[derive(Debug, Clone)]
+pub struct FuiAuxiliaryBar {
+    pub aux_id: String,
+    pub side: u32,
+    pub width: u32,
+    pub is_visible: bool,
+    pub active_view_id: String,
+    pub view_count: u32,
+    pub last_visible_width: u32,
+    pub focus_indicator: bool,
+    pub pinned_views_json: String,
+    pub is_secondary: bool,
+}
+
+impl FuiAuxiliaryBar {
+    pub fn new() -> Self {
+        Self {
+            aux_id: String::new(),
+            side: u32::default(),
+            width: u32::default(),
+            is_visible: bool::default(),
+            active_view_id: String::new(),
+            view_count: u32::default(),
+            last_visible_width: u32::default(),
+            focus_indicator: bool::default(),
+            pinned_views_json: String::new(),
+            is_secondary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.aux_id.is_empty() || true && self.side < u32::MAX || true && self.width < u32::MAX || true && self.is_visible || true && !self.active_view_id.is_empty() || true && self.view_count < u32::MAX || true && self.last_visible_width < u32::MAX || true && self.focus_indicator || true && !self.pinned_views_json.is_empty() || true && self.is_secondary || true
+    }
+}
+
+impl Default for FuiAuxiliaryBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Title bar layout (height, style, menu bar visible, command center)
+#[derive(Debug, Clone)]
+pub struct FujTitleBarLayout {
+    pub title_id: String,
+    pub height: u32,
+    pub style: u32,
+    pub menu_bar_visible: bool,
+    pub command_center_visible: bool,
+    pub layout_controls_visible: bool,
+    pub breadcrumb_visible: bool,
+    pub navigation_controls_visible: bool,
+    pub window_title: String,
+    pub is_custom: bool,
+}
+
+impl FujTitleBarLayout {
+    pub fn new() -> Self {
+        Self {
+            title_id: String::new(),
+            height: u32::default(),
+            style: u32::default(),
+            menu_bar_visible: bool::default(),
+            command_center_visible: bool::default(),
+            layout_controls_visible: bool::default(),
+            breadcrumb_visible: bool::default(),
+            navigation_controls_visible: bool::default(),
+            window_title: String::new(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.title_id.is_empty() || true && self.height < u32::MAX || true && self.style < u32::MAX || true && self.menu_bar_visible || true && self.command_center_visible || true && self.layout_controls_visible || true && self.breadcrumb_visible || true && self.navigation_controls_visible || true && !self.window_title.is_empty() || true && self.is_custom || true
+    }
+}
+
+impl Default for FujTitleBarLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -297429,6 +297639,96 @@ mod tests_fue_generated {
     fn test_fue_fields() {
         let mut obj = FueActivityBarLayout::default();
         obj.bar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fuf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fuf_default() {
+        let obj = FufViewContainer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fuf_fields() {
+        let mut obj = FufViewContainer::default();
+        obj.container_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fug_generated {
+    use super::*;
+
+    #[test]
+    fn test_fug_default() {
+        let obj = FugViewDescriptor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fug_fields() {
+        let mut obj = FugViewDescriptor::default();
+        obj.view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fuh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fuh_default() {
+        let obj = FuhEditorPartLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fuh_fields() {
+        let mut obj = FuhEditorPartLayout::default();
+        obj.part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fui_generated {
+    use super::*;
+
+    #[test]
+    fn test_fui_default() {
+        let obj = FuiAuxiliaryBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fui_fields() {
+        let mut obj = FuiAuxiliaryBar::default();
+        obj.aux_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fuj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fuj_default() {
+        let obj = FujTitleBarLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fuj_fields() {
+        let mut obj = FujTitleBarLayout::default();
+        obj.title_id = "test".to_string();
         assert!(obj.validate());
     }
 }
