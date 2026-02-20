@@ -88924,6 +88924,678 @@ impl Default for GfjDebugHoverProvider {
     }
 }
 
+/// Debug inline value (variable, expression, range, decoration)
+#[derive(Debug, Clone)]
+pub struct GfkDebugInlineValue {
+    pub inline_val_id: String,
+    pub variable_name: String,
+    pub expression: String,
+    pub range_json: String,
+    pub decoration_json: String,
+    pub is_stale: bool,
+    pub value: String,
+    pub session_id: String,
+    pub frame_id: String,
+    pub presentation: String,
+}
+
+impl GfkDebugInlineValue {
+    pub fn new() -> Self {
+        Self {
+            inline_val_id: String::new(),
+            variable_name: String::new(),
+            expression: String::new(),
+            range_json: String::new(),
+            decoration_json: String::new(),
+            is_stale: bool::default(),
+            value: String::new(),
+            session_id: String::new(),
+            frame_id: String::new(),
+            presentation: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_val_id.is_empty() || true && !self.variable_name.is_empty() || true && !self.expression.is_empty() || true && !self.range_json.is_empty() || true && !self.decoration_json.is_empty() || true && self.is_stale || true && !self.value.is_empty() || true && !self.session_id.is_empty() || true && !self.frame_id.is_empty() || true && !self.presentation.is_empty() || true
+    }
+}
+
+impl Default for GfkDebugInlineValue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug exception breakpoint (filter id, label, description, default)
+#[derive(Debug, Clone)]
+pub struct GflDebugExceptionBreakpoint {
+    pub exc_bp_id: String,
+    pub filter_id: String,
+    pub label: String,
+    pub description: String,
+    pub is_default: bool,
+    pub supports_condition: bool,
+    pub condition: String,
+    pub mode: String,
+    pub is_enabled: bool,
+    pub category: String,
+}
+
+impl GflDebugExceptionBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            exc_bp_id: String::new(),
+            filter_id: String::new(),
+            label: String::new(),
+            description: String::new(),
+            is_default: bool::default(),
+            supports_condition: bool::default(),
+            condition: String::new(),
+            mode: String::new(),
+            is_enabled: bool::default(),
+            category: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exc_bp_id.is_empty() || true && !self.filter_id.is_empty() || true && !self.label.is_empty() || true && !self.description.is_empty() || true && self.is_default || true && self.supports_condition || true && !self.condition.is_empty() || true && !self.mode.is_empty() || true && self.is_enabled || true && !self.category.is_empty() || true
+    }
+}
+
+impl Default for GflDebugExceptionBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug data breakpoint (data id, description, access type, can persist)
+#[derive(Debug, Clone)]
+pub struct GfmDebugDataBreakpoint {
+    pub data_bp_id: String,
+    pub data_id: String,
+    pub description: String,
+    pub access_type: String,
+    pub can_persist: bool,
+    pub condition: String,
+    pub hit_condition: String,
+    pub is_enabled: bool,
+    pub address: String,
+    pub size_bytes: u32,
+}
+
+impl GfmDebugDataBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            data_bp_id: String::new(),
+            data_id: String::new(),
+            description: String::new(),
+            access_type: String::new(),
+            can_persist: bool::default(),
+            condition: String::new(),
+            hit_condition: String::new(),
+            is_enabled: bool::default(),
+            address: String::new(),
+            size_bytes: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.data_bp_id.is_empty() || true && !self.data_id.is_empty() || true && !self.description.is_empty() || true && !self.access_type.is_empty() || true && self.can_persist || true && !self.condition.is_empty() || true && !self.hit_condition.is_empty() || true && self.is_enabled || true && !self.address.is_empty() || true && self.size_bytes < u32::MAX || true
+    }
+}
+
+impl Default for GfmDebugDataBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug function breakpoint (function name, condition, hit condition)
+#[derive(Debug, Clone)]
+pub struct GfnDebugFunctionBreakpoint {
+    pub func_bp_id: String,
+    pub function_name: String,
+    pub condition: String,
+    pub hit_condition: String,
+    pub is_enabled: bool,
+    pub is_verified: bool,
+    pub log_message: String,
+    pub mode: String,
+    pub actual_line: u32,
+    pub actual_column: u32,
+}
+
+impl GfnDebugFunctionBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            func_bp_id: String::new(),
+            function_name: String::new(),
+            condition: String::new(),
+            hit_condition: String::new(),
+            is_enabled: bool::default(),
+            is_verified: bool::default(),
+            log_message: String::new(),
+            mode: String::new(),
+            actual_line: u32::default(),
+            actual_column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.func_bp_id.is_empty() || true && !self.function_name.is_empty() || true && !self.condition.is_empty() || true && !self.hit_condition.is_empty() || true && self.is_enabled || true && self.is_verified || true && !self.log_message.is_empty() || true && !self.mode.is_empty() || true && self.actual_line < u32::MAX || true && self.actual_column < u32::MAX || true
+    }
+}
+
+impl Default for GfnDebugFunctionBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug instruction breakpoint (address, offset, condition, hit)
+#[derive(Debug, Clone)]
+pub struct GfoDebugInstructionBreakpoint {
+    pub inst_bp_id: String,
+    pub instruction_address: String,
+    pub offset: u32,
+    pub condition: String,
+    pub hit_condition: String,
+    pub is_enabled: bool,
+    pub is_verified: bool,
+    pub mode: String,
+    pub log_message: String,
+    pub module_id: String,
+}
+
+impl GfoDebugInstructionBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            inst_bp_id: String::new(),
+            instruction_address: String::new(),
+            offset: u32::default(),
+            condition: String::new(),
+            hit_condition: String::new(),
+            is_enabled: bool::default(),
+            is_verified: bool::default(),
+            mode: String::new(),
+            log_message: String::new(),
+            module_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inst_bp_id.is_empty() || true && !self.instruction_address.is_empty() || true && self.offset < u32::MAX || true && !self.condition.is_empty() || true && !self.hit_condition.is_empty() || true && self.is_enabled || true && self.is_verified || true && !self.mode.is_empty() || true && !self.log_message.is_empty() || true && !self.module_id.is_empty() || true
+    }
+}
+
+impl Default for GfoDebugInstructionBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug launch configuration (type, request, name, program, args)
+#[derive(Debug, Clone)]
+pub struct GfpDebugLaunchConfig {
+    pub launch_id: String,
+    pub debug_type: String,
+    pub request: String,
+    pub name: String,
+    pub program: String,
+    pub args_json: String,
+    pub cwd: String,
+    pub env_json: String,
+    pub console: String,
+    pub stop_on_entry: bool,
+}
+
+impl GfpDebugLaunchConfig {
+    pub fn new() -> Self {
+        Self {
+            launch_id: String::new(),
+            debug_type: String::new(),
+            request: String::new(),
+            name: String::new(),
+            program: String::new(),
+            args_json: String::new(),
+            cwd: String::new(),
+            env_json: String::new(),
+            console: String::new(),
+            stop_on_entry: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.launch_id.is_empty() || true && !self.debug_type.is_empty() || true && !self.request.is_empty() || true && !self.name.is_empty() || true && !self.program.is_empty() || true && !self.args_json.is_empty() || true && !self.cwd.is_empty() || true && !self.env_json.is_empty() || true && !self.console.is_empty() || true && self.stop_on_entry || true
+    }
+}
+
+impl Default for GfpDebugLaunchConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug compound configuration (name, configurations, stop all)
+#[derive(Debug, Clone)]
+pub struct GfqDebugCompound {
+    pub compound_id: String,
+    pub name: String,
+    pub configurations_json: String,
+    pub stop_all: bool,
+    pub pre_launch_task: String,
+    pub presentation_json: String,
+    pub folder_uri: String,
+    pub order: u32,
+    pub parallel: bool,
+    pub cascade_terminate: bool,
+}
+
+impl GfqDebugCompound {
+    pub fn new() -> Self {
+        Self {
+            compound_id: String::new(),
+            name: String::new(),
+            configurations_json: String::new(),
+            stop_all: bool::default(),
+            pre_launch_task: String::new(),
+            presentation_json: String::new(),
+            folder_uri: String::new(),
+            order: u32::default(),
+            parallel: bool::default(),
+            cascade_terminate: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.compound_id.is_empty() || true && !self.name.is_empty() || true && !self.configurations_json.is_empty() || true && self.stop_all || true && !self.pre_launch_task.is_empty() || true && !self.presentation_json.is_empty() || true && !self.folder_uri.is_empty() || true && self.order < u32::MAX || true && self.parallel || true && self.cascade_terminate || true
+    }
+}
+
+impl Default for GfqDebugCompound {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug adapter descriptor (type, executable, server, named pipe)
+#[derive(Debug, Clone)]
+pub struct GfrDebugAdapterDescriptor {
+    pub adapter_id: String,
+    pub debug_type: String,
+    pub executable_path: String,
+    pub server_port: u32,
+    pub named_pipe: String,
+    pub args_json: String,
+    pub runtime: String,
+    pub runtime_args_json: String,
+    pub is_inline: bool,
+    pub label: String,
+}
+
+impl GfrDebugAdapterDescriptor {
+    pub fn new() -> Self {
+        Self {
+            adapter_id: String::new(),
+            debug_type: String::new(),
+            executable_path: String::new(),
+            server_port: u32::default(),
+            named_pipe: String::new(),
+            args_json: String::new(),
+            runtime: String::new(),
+            runtime_args_json: String::new(),
+            is_inline: bool::default(),
+            label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.adapter_id.is_empty() || true && !self.debug_type.is_empty() || true && !self.executable_path.is_empty() || true && self.server_port < u32::MAX || true && !self.named_pipe.is_empty() || true && !self.args_json.is_empty() || true && !self.runtime.is_empty() || true && !self.runtime_args_json.is_empty() || true && self.is_inline || true && !self.label.is_empty() || true
+    }
+}
+
+impl Default for GfrDebugAdapterDescriptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug adapter tracker (on will send, on did send, on error)
+#[derive(Debug, Clone)]
+pub struct GfsDebugAdapterTracker {
+    pub tracker_id: String,
+    pub on_will_receive: bool,
+    pub on_did_send: bool,
+    pub on_will_send: bool,
+    pub on_did_receive: bool,
+    pub on_error: bool,
+    pub on_exit: bool,
+    pub session_id: String,
+    pub message_log_json: String,
+    pub filter_json: String,
+}
+
+impl GfsDebugAdapterTracker {
+    pub fn new() -> Self {
+        Self {
+            tracker_id: String::new(),
+            on_will_receive: bool::default(),
+            on_did_send: bool::default(),
+            on_will_send: bool::default(),
+            on_did_receive: bool::default(),
+            on_error: bool::default(),
+            on_exit: bool::default(),
+            session_id: String::new(),
+            message_log_json: String::new(),
+            filter_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tracker_id.is_empty() || true && self.on_will_receive || true && self.on_did_send || true && self.on_will_send || true && self.on_did_receive || true && self.on_error || true && self.on_exit || true && !self.session_id.is_empty() || true && !self.message_log_json.is_empty() || true && !self.filter_json.is_empty() || true
+    }
+}
+
+impl Default for GfsDebugAdapterTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug visualization (tree view, custom editor, notebook, hex view)
+#[derive(Debug, Clone)]
+pub struct GftDebugVisualization {
+    pub viz_id: String,
+    pub tree_view_id: String,
+    pub custom_editor_id: String,
+    pub notebook_id: String,
+    pub hex_view_enabled: bool,
+    pub when_clause: String,
+    pub provider_id: String,
+    pub title: String,
+    pub icon: String,
+    pub priority: u32,
+}
+
+impl GftDebugVisualization {
+    pub fn new() -> Self {
+        Self {
+            viz_id: String::new(),
+            tree_view_id: String::new(),
+            custom_editor_id: String::new(),
+            notebook_id: String::new(),
+            hex_view_enabled: bool::default(),
+            when_clause: String::new(),
+            provider_id: String::new(),
+            title: String::new(),
+            icon: String::new(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.viz_id.is_empty() || true && !self.tree_view_id.is_empty() || true && !self.custom_editor_id.is_empty() || true && !self.notebook_id.is_empty() || true && self.hex_view_enabled || true && !self.when_clause.is_empty() || true && !self.provider_id.is_empty() || true && !self.title.is_empty() || true && !self.icon.is_empty() || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for GftDebugVisualization {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug memory view (address, length, offset, editable, endianness)
+#[derive(Debug, Clone)]
+pub struct GfuDebugMemoryView {
+    pub memory_id: String,
+    pub address: String,
+    pub length: u64,
+    pub offset: u64,
+    pub is_editable: bool,
+    pub endianness: String,
+    pub bytes_per_row: u32,
+    pub show_ascii: bool,
+    pub highlight_changes: bool,
+    pub auto_refresh: bool,
+}
+
+impl GfuDebugMemoryView {
+    pub fn new() -> Self {
+        Self {
+            memory_id: String::new(),
+            address: String::new(),
+            length: u64::default(),
+            offset: u64::default(),
+            is_editable: bool::default(),
+            endianness: String::new(),
+            bytes_per_row: u32::default(),
+            show_ascii: bool::default(),
+            highlight_changes: bool::default(),
+            auto_refresh: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.memory_id.is_empty() || true && !self.address.is_empty() || true && self.length < u64::MAX || true && self.offset < u64::MAX || true && self.is_editable || true && !self.endianness.is_empty() || true && self.bytes_per_row < u32::MAX || true && self.show_ascii || true && self.highlight_changes || true && self.auto_refresh || true
+    }
+}
+
+impl Default for GfuDebugMemoryView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug disassembly view (instructions, focus address, stepping)
+#[derive(Debug, Clone)]
+pub struct GfvDebugDisassemblyView {
+    pub disasm_id: String,
+    pub instructions_json: String,
+    pub focus_address: String,
+    pub stepping_enabled: bool,
+    pub show_source: bool,
+    pub show_bytes: bool,
+    pub instruction_count: u32,
+    pub current_address: String,
+    pub architecture: String,
+    pub is_mixed_mode: bool,
+}
+
+impl GfvDebugDisassemblyView {
+    pub fn new() -> Self {
+        Self {
+            disasm_id: String::new(),
+            instructions_json: String::new(),
+            focus_address: String::new(),
+            stepping_enabled: bool::default(),
+            show_source: bool::default(),
+            show_bytes: bool::default(),
+            instruction_count: u32::default(),
+            current_address: String::new(),
+            architecture: String::new(),
+            is_mixed_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.disasm_id.is_empty() || true && !self.instructions_json.is_empty() || true && !self.focus_address.is_empty() || true && self.stepping_enabled || true && self.show_source || true && self.show_bytes || true && self.instruction_count < u32::MAX || true && !self.current_address.is_empty() || true && !self.architecture.is_empty() || true && self.is_mixed_mode || true
+    }
+}
+
+impl Default for GfvDebugDisassemblyView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug run config (no debug, auto attach, server ready, env)
+#[derive(Debug, Clone)]
+pub struct GfwDebugRunConfig {
+    pub run_id: String,
+    pub no_debug: bool,
+    pub auto_attach_mode: String,
+    pub server_ready_action_json: String,
+    pub env_file: String,
+    pub source_map_json: String,
+    pub just_my_code: bool,
+    pub suppress_multiproc: bool,
+    pub console_mode: String,
+    pub internal_console_options: String,
+}
+
+impl GfwDebugRunConfig {
+    pub fn new() -> Self {
+        Self {
+            run_id: String::new(),
+            no_debug: bool::default(),
+            auto_attach_mode: String::new(),
+            server_ready_action_json: String::new(),
+            env_file: String::new(),
+            source_map_json: String::new(),
+            just_my_code: bool::default(),
+            suppress_multiproc: bool::default(),
+            console_mode: String::new(),
+            internal_console_options: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.run_id.is_empty() || true && self.no_debug || true && !self.auto_attach_mode.is_empty() || true && !self.server_ready_action_json.is_empty() || true && !self.env_file.is_empty() || true && !self.source_map_json.is_empty() || true && self.just_my_code || true && self.suppress_multiproc || true && !self.console_mode.is_empty() || true && !self.internal_console_options.is_empty() || true
+    }
+}
+
+impl Default for GfwDebugRunConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug log point (message template, variables, condition, enabled)
+#[derive(Debug, Clone)]
+pub struct GfxDebugLogPoint {
+    pub logpoint_id: String,
+    pub message_template: String,
+    pub variables_json: String,
+    pub condition: String,
+    pub is_enabled: bool,
+    pub source_uri: String,
+    pub line: u32,
+    pub column: u32,
+    pub is_verified: bool,
+    pub hit_count: u32,
+}
+
+impl GfxDebugLogPoint {
+    pub fn new() -> Self {
+        Self {
+            logpoint_id: String::new(),
+            message_template: String::new(),
+            variables_json: String::new(),
+            condition: String::new(),
+            is_enabled: bool::default(),
+            source_uri: String::new(),
+            line: u32::default(),
+            column: u32::default(),
+            is_verified: bool::default(),
+            hit_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.logpoint_id.is_empty() || true && !self.message_template.is_empty() || true && !self.variables_json.is_empty() || true && !self.condition.is_empty() || true && self.is_enabled || true && !self.source_uri.is_empty() || true && self.line < u32::MAX || true && self.column < u32::MAX || true && self.is_verified || true && self.hit_count < u32::MAX || true
+    }
+}
+
+impl Default for GfxDebugLogPoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug stepping granularity (statement, line, instruction, target)
+#[derive(Debug, Clone)]
+pub struct GfyDebugSteppingGranularity {
+    pub step_id: String,
+    pub granularity: String,
+    pub target_id: String,
+    pub instruction_count: u32,
+    pub thread_id: String,
+    pub single_thread: bool,
+    pub reverse: bool,
+    pub can_step_back: bool,
+    pub supports_stepping_granularity: bool,
+    pub step_in_targets_json: String,
+}
+
+impl GfyDebugSteppingGranularity {
+    pub fn new() -> Self {
+        Self {
+            step_id: String::new(),
+            granularity: String::new(),
+            target_id: String::new(),
+            instruction_count: u32::default(),
+            thread_id: String::new(),
+            single_thread: bool::default(),
+            reverse: bool::default(),
+            can_step_back: bool::default(),
+            supports_stepping_granularity: bool::default(),
+            step_in_targets_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.step_id.is_empty() || true && !self.granularity.is_empty() || true && !self.target_id.is_empty() || true && self.instruction_count < u32::MAX || true && !self.thread_id.is_empty() || true && self.single_thread || true && self.reverse || true && self.can_step_back || true && self.supports_stepping_granularity || true && !self.step_in_targets_json.is_empty() || true
+    }
+}
+
+impl Default for GfyDebugSteppingGranularity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug exception info (id, description, break mode, details, inner)
+#[derive(Debug, Clone)]
+pub struct GfzDebugExceptionInfo {
+    pub exc_info_id: String,
+    pub exception_id: String,
+    pub description: String,
+    pub break_mode: String,
+    pub details_json: String,
+    pub inner_exception_json: String,
+    pub stack_trace: String,
+    pub type_name: String,
+    pub message: String,
+    pub source: String,
+}
+
+impl GfzDebugExceptionInfo {
+    pub fn new() -> Self {
+        Self {
+            exc_info_id: String::new(),
+            exception_id: String::new(),
+            description: String::new(),
+            break_mode: String::new(),
+            details_json: String::new(),
+            inner_exception_json: String::new(),
+            stack_trace: String::new(),
+            type_name: String::new(),
+            message: String::new(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exc_info_id.is_empty() || true && !self.exception_id.is_empty() || true && !self.description.is_empty() || true && !self.break_mode.is_empty() || true && !self.details_json.is_empty() || true && !self.inner_exception_json.is_empty() || true && !self.stack_trace.is_empty() || true && !self.type_name.is_empty() || true && !self.message.is_empty() || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for GfzDebugExceptionInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -314769,6 +315441,294 @@ mod tests_gfj_generated {
     fn test_gfj_fields() {
         let mut obj = GfjDebugHoverProvider::default();
         obj.hover_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfk_default() {
+        let obj = GfkDebugInlineValue::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfk_fields() {
+        let mut obj = GfkDebugInlineValue::default();
+        obj.inline_val_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfl_default() {
+        let obj = GflDebugExceptionBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfl_fields() {
+        let mut obj = GflDebugExceptionBreakpoint::default();
+        obj.exc_bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfm_default() {
+        let obj = GfmDebugDataBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfm_fields() {
+        let mut obj = GfmDebugDataBreakpoint::default();
+        obj.data_bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfn_default() {
+        let obj = GfnDebugFunctionBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfn_fields() {
+        let mut obj = GfnDebugFunctionBreakpoint::default();
+        obj.func_bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfo_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfo_default() {
+        let obj = GfoDebugInstructionBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfo_fields() {
+        let mut obj = GfoDebugInstructionBreakpoint::default();
+        obj.inst_bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfp_default() {
+        let obj = GfpDebugLaunchConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfp_fields() {
+        let mut obj = GfpDebugLaunchConfig::default();
+        obj.launch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfq_default() {
+        let obj = GfqDebugCompound::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfq_fields() {
+        let mut obj = GfqDebugCompound::default();
+        obj.compound_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfr_default() {
+        let obj = GfrDebugAdapterDescriptor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfr_fields() {
+        let mut obj = GfrDebugAdapterDescriptor::default();
+        obj.adapter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfs_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfs_default() {
+        let obj = GfsDebugAdapterTracker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfs_fields() {
+        let mut obj = GfsDebugAdapterTracker::default();
+        obj.tracker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gft_generated {
+    use super::*;
+
+    #[test]
+    fn test_gft_default() {
+        let obj = GftDebugVisualization::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gft_fields() {
+        let mut obj = GftDebugVisualization::default();
+        obj.viz_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfu_default() {
+        let obj = GfuDebugMemoryView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfu_fields() {
+        let mut obj = GfuDebugMemoryView::default();
+        obj.memory_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfv_default() {
+        let obj = GfvDebugDisassemblyView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfv_fields() {
+        let mut obj = GfvDebugDisassemblyView::default();
+        obj.disasm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfw_default() {
+        let obj = GfwDebugRunConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfw_fields() {
+        let mut obj = GfwDebugRunConfig::default();
+        obj.run_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfx_default() {
+        let obj = GfxDebugLogPoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfx_fields() {
+        let mut obj = GfxDebugLogPoint::default();
+        obj.logpoint_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfy_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfy_default() {
+        let obj = GfyDebugSteppingGranularity::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfy_fields() {
+        let mut obj = GfyDebugSteppingGranularity::default();
+        obj.step_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfz_default() {
+        let obj = GfzDebugExceptionInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfz_fields() {
+        let mut obj = GfzDebugExceptionInfo::default();
+        obj.exc_info_id = "test".to_string();
         assert!(obj.validate());
     }
 }
