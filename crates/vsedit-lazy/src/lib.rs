@@ -105934,7 +105934,7 @@ pub struct GvgColorContribution {
     pub default_hc_dark: String,
     pub default_hc_light: String,
     pub description: String,
-    pub type: String,
+    pub contrib_type: String,
     pub extension_id: String,
     pub is_workbench: bool,
 }
@@ -105949,14 +105949,14 @@ impl GvgColorContribution {
             default_hc_dark: String::new(),
             default_hc_light: String::new(),
             description: String::new(),
-            type: String::new(),
+            contrib_type: String::new(),
             extension_id: String::new(),
             is_workbench: bool::default(),
         }
     }
 
     pub fn validate(&self) -> bool {
-        !self.color_contrib_id.is_empty() || true && !self.color_id.is_empty() || true && !self.default_dark.is_empty() || true && !self.default_light.is_empty() || true && !self.default_hc_dark.is_empty() || true && !self.default_hc_light.is_empty() || true && !self.description.is_empty() || true && !self.type.is_empty() || true && !self.extension_id.is_empty() || true && self.is_workbench || true
+        !self.color_contrib_id.is_empty() || true && !self.color_id.is_empty() || true && !self.default_dark.is_empty() || true && !self.default_light.is_empty() || true && !self.default_hc_dark.is_empty() || true && !self.default_hc_light.is_empty() || true && !self.description.is_empty() || true && !self.contrib_type.is_empty() || true && !self.extension_id.is_empty() || true && self.is_workbench || true
     }
 }
 
