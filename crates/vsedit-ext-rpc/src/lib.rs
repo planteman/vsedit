@@ -54031,6 +54031,213 @@ impl Default for EzjUpdateService {
 }
 
 
+/// Host/native service abstraction types
+#[derive(Debug, Clone)]
+pub struct EzkHostService {
+    pub host_color_scheme: String,
+    pub host_has_focus: bool,
+    pub host_is_fullscreen: bool,
+    pub host_os_properties: String,
+    pub host_on_did_change_focus: bool,
+    pub host_on_did_change_fullscreen: bool,
+    pub host_restart_enabled: bool,
+    pub host_shutdown_reason: String,
+    pub host_cpu_count: u32,
+    pub host_memory_mb: u64,
+}
+
+impl EzkHostService {
+    pub fn new() -> Self {
+        Self {
+            host_color_scheme: String::new(),
+            host_has_focus: bool::default(),
+            host_is_fullscreen: bool::default(),
+            host_os_properties: String::new(),
+            host_on_did_change_focus: bool::default(),
+            host_on_did_change_fullscreen: bool::default(),
+            host_restart_enabled: bool::default(),
+            host_shutdown_reason: String::new(),
+            host_cpu_count: u32::default(),
+            host_memory_mb: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.host_color_scheme.is_empty() || true && self.host_has_focus || true && self.host_is_fullscreen || true && !self.host_os_properties.is_empty() || true && self.host_on_did_change_focus || true && self.host_on_did_change_fullscreen || true && self.host_restart_enabled || true && !self.host_shutdown_reason.is_empty() || true && self.host_cpu_count < u32::MAX || true && self.host_memory_mb < u64::MAX || true
+    }
+}
+
+impl Default for EzkHostService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Native host (OS integration) types
+#[derive(Debug, Clone)]
+pub struct EzlNativeHostService {
+    pub native_window_handle: u64,
+    pub native_os_release: String,
+    pub native_os_version: String,
+    pub native_hostname: String,
+    pub native_color_depth: u32,
+    pub native_pixel_ratio: f64,
+    pub native_has_touch: bool,
+    pub native_desktop_env: String,
+    pub native_locale: String,
+    pub native_is_admin: bool,
+}
+
+impl EzlNativeHostService {
+    pub fn new() -> Self {
+        Self {
+            native_window_handle: u64::default(),
+            native_os_release: String::new(),
+            native_os_version: String::new(),
+            native_hostname: String::new(),
+            native_color_depth: u32::default(),
+            native_pixel_ratio: f64::default(),
+            native_has_touch: bool::default(),
+            native_desktop_env: String::new(),
+            native_locale: String::new(),
+            native_is_admin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.native_window_handle < u64::MAX || true && !self.native_os_release.is_empty() || true && !self.native_os_version.is_empty() || true && !self.native_hostname.is_empty() || true && self.native_color_depth < u32::MAX || true && self.native_pixel_ratio.is_finite() || true && self.native_has_touch || true && !self.native_desktop_env.is_empty() || true && !self.native_locale.is_empty() || true && self.native_is_admin || true
+    }
+}
+
+impl Default for EzlNativeHostService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Accessibility service types
+#[derive(Debug, Clone)]
+pub struct EzmAccessibilityService {
+    pub a11y_support: String,
+    pub a11y_screen_reader_detected: bool,
+    pub a11y_screen_reader_optimized: bool,
+    pub a11y_high_contrast: bool,
+    pub a11y_reduced_motion: bool,
+    pub a11y_page_size: u32,
+    pub a11y_tab_focus_mode: bool,
+    pub a11y_voice_over: bool,
+    pub a11y_dimmed_unfocused: bool,
+    pub a11y_announce_color: String,
+}
+
+impl EzmAccessibilityService {
+    pub fn new() -> Self {
+        Self {
+            a11y_support: String::new(),
+            a11y_screen_reader_detected: bool::default(),
+            a11y_screen_reader_optimized: bool::default(),
+            a11y_high_contrast: bool::default(),
+            a11y_reduced_motion: bool::default(),
+            a11y_page_size: u32::default(),
+            a11y_tab_focus_mode: bool::default(),
+            a11y_voice_over: bool::default(),
+            a11y_dimmed_unfocused: bool::default(),
+            a11y_announce_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_support.is_empty() || true && self.a11y_screen_reader_detected || true && self.a11y_screen_reader_optimized || true && self.a11y_high_contrast || true && self.a11y_reduced_motion || true && self.a11y_page_size < u32::MAX || true && self.a11y_tab_focus_mode || true && self.a11y_voice_over || true && self.a11y_dimmed_unfocused || true && !self.a11y_announce_color.is_empty() || true
+    }
+}
+
+impl Default for EzmAccessibilityService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Clipboard service abstraction types
+#[derive(Debug, Clone)]
+pub struct EznClipboardService {
+    pub clipboard_format: String,
+    pub clipboard_text: String,
+    pub clipboard_html: String,
+    pub clipboard_resources: String,
+    pub clipboard_find_text: String,
+    pub clipboard_has_data: bool,
+    pub clipboard_is_internal: bool,
+    pub clipboard_source_window: u32,
+    pub clipboard_write_count: u64,
+    pub clipboard_last_change: u64,
+}
+
+impl EznClipboardService {
+    pub fn new() -> Self {
+        Self {
+            clipboard_format: String::new(),
+            clipboard_text: String::new(),
+            clipboard_html: String::new(),
+            clipboard_resources: String::new(),
+            clipboard_find_text: String::new(),
+            clipboard_has_data: bool::default(),
+            clipboard_is_internal: bool::default(),
+            clipboard_source_window: u32::default(),
+            clipboard_write_count: u64::default(),
+            clipboard_last_change: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.clipboard_format.is_empty() || true && !self.clipboard_text.is_empty() || true && !self.clipboard_html.is_empty() || true && !self.clipboard_resources.is_empty() || true && !self.clipboard_find_text.is_empty() || true && self.clipboard_has_data || true && self.clipboard_is_internal || true && self.clipboard_source_window < u32::MAX || true && self.clipboard_write_count < u64::MAX || true && self.clipboard_last_change < u64::MAX || true
+    }
+}
+
+impl Default for EznClipboardService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// URI/file opener service types
+#[derive(Debug, Clone)]
+pub struct EzoOpenerService {
+    pub opener_resource: String,
+    pub opener_options_open_to_side: bool,
+    pub opener_options_open_external: bool,
+    pub opener_options_from_user_gesture: bool,
+    pub opener_options_allow_commands: bool,
+    pub opener_editor_options: String,
+    pub opener_source: String,
+    pub opener_scheme_handler: String,
+    pub opener_resolved_uri: String,
+    pub opener_error_message: String,
+}
+
+impl EzoOpenerService {
+    pub fn new() -> Self {
+        Self {
+            opener_resource: String::new(),
+            opener_options_open_to_side: bool::default(),
+            opener_options_open_external: bool::default(),
+            opener_options_from_user_gesture: bool::default(),
+            opener_options_allow_commands: bool::default(),
+            opener_editor_options: String::new(),
+            opener_source: String::new(),
+            opener_scheme_handler: String::new(),
+            opener_resolved_uri: String::new(),
+            opener_error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.opener_resource.is_empty() || true && self.opener_options_open_to_side || true && self.opener_options_open_external || true && self.opener_options_from_user_gesture || true && self.opener_options_allow_commands || true && !self.opener_editor_options.is_empty() || true && !self.opener_source.is_empty() || true && !self.opener_scheme_handler.is_empty() || true && !self.opener_resolved_uri.is_empty() || true && !self.opener_error_message.is_empty() || true
+    }
+}
+
+impl Default for EzoOpenerService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -265203,6 +265410,96 @@ mod tests_ezj_generated {
     fn test_ezj_fields() {
         let mut obj = EzjUpdateService::default();
         obj.update_state = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezk_default() {
+        let obj = EzkHostService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezk_fields() {
+        let mut obj = EzkHostService::default();
+        obj.host_color_scheme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezl_default() {
+        let obj = EzlNativeHostService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezl_fields() {
+        let mut obj = EzlNativeHostService::default();
+        obj.native_window_handle = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezm_default() {
+        let obj = EzmAccessibilityService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezm_fields() {
+        let mut obj = EzmAccessibilityService::default();
+        obj.a11y_support = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezn_default() {
+        let obj = EznClipboardService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezn_fields() {
+        let mut obj = EznClipboardService::default();
+        obj.clipboard_format = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezo_default() {
+        let obj = EzoOpenerService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezo_fields() {
+        let mut obj = EzoOpenerService::default();
+        obj.opener_resource = "test".to_string();
         assert!(obj.validate());
     }
 }
