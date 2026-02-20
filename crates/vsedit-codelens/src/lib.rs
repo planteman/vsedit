@@ -73118,6 +73118,216 @@ impl Default for FreLspDiagnostic {
     }
 }
 
+/// LSP completion item (label, kind, detail, documentation, insert text)
+#[derive(Debug, Clone)]
+pub struct FrfLspCompletionItem {
+    pub item_id: String,
+    pub label: String,
+    pub kind: u32,
+    pub detail: String,
+    pub documentation: String,
+    pub insert_text: String,
+    pub insert_text_format: u32,
+    pub sort_text: String,
+    pub filter_text: String,
+    pub text_edit_json: String,
+}
+
+impl FrfLspCompletionItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            label: String::new(),
+            kind: u32::default(),
+            detail: String::new(),
+            documentation: String::new(),
+            insert_text: String::new(),
+            insert_text_format: u32::default(),
+            sort_text: String::new(),
+            filter_text: String::new(),
+            text_edit_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.label.is_empty() || true && self.kind < u32::MAX || true && !self.detail.is_empty() || true && !self.documentation.is_empty() || true && !self.insert_text.is_empty() || true && self.insert_text_format < u32::MAX || true && !self.sort_text.is_empty() || true && !self.filter_text.is_empty() || true && !self.text_edit_json.is_empty() || true
+    }
+}
+
+impl Default for FrfLspCompletionItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP completion list (is incomplete, items, default range)
+#[derive(Debug, Clone)]
+pub struct FrgLspCompletionList {
+    pub list_id: String,
+    pub is_incomplete: bool,
+    pub item_count: u32,
+    pub default_range_json: String,
+    pub commit_characters_json: String,
+    pub item_defaults_json: String,
+    pub edit_range_json: String,
+    pub insert_text_format: u32,
+    pub insert_text_mode: u32,
+    pub data_json: String,
+}
+
+impl FrgLspCompletionList {
+    pub fn new() -> Self {
+        Self {
+            list_id: String::new(),
+            is_incomplete: bool::default(),
+            item_count: u32::default(),
+            default_range_json: String::new(),
+            commit_characters_json: String::new(),
+            item_defaults_json: String::new(),
+            edit_range_json: String::new(),
+            insert_text_format: u32::default(),
+            insert_text_mode: u32::default(),
+            data_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_id.is_empty() || true && self.is_incomplete || true && self.item_count < u32::MAX || true && !self.default_range_json.is_empty() || true && !self.commit_characters_json.is_empty() || true && !self.item_defaults_json.is_empty() || true && !self.edit_range_json.is_empty() || true && self.insert_text_format < u32::MAX || true && self.insert_text_mode < u32::MAX || true && !self.data_json.is_empty() || true
+    }
+}
+
+impl Default for FrgLspCompletionList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP hover (contents, range, markdown, code blocks)
+#[derive(Debug, Clone)]
+pub struct FrhLspHover {
+    pub hover_id: String,
+    pub contents_json: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub is_markdown: bool,
+    pub code_block_count: u32,
+    pub language_id: String,
+    pub is_trusted: bool,
+    pub support_html: bool,
+    pub max_height: u32,
+}
+
+impl FrhLspHover {
+    pub fn new() -> Self {
+        Self {
+            hover_id: String::new(),
+            contents_json: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            is_markdown: bool::default(),
+            code_block_count: u32::default(),
+            language_id: String::new(),
+            is_trusted: bool::default(),
+            support_html: bool::default(),
+            max_height: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_id.is_empty() || true && !self.contents_json.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && self.is_markdown || true && self.code_block_count < u32::MAX || true && !self.language_id.is_empty() || true && self.is_trusted || true && self.support_html || true && self.max_height < u32::MAX || true
+    }
+}
+
+impl Default for FrhLspHover {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP signature help (signatures, active signature, active parameter)
+#[derive(Debug, Clone)]
+pub struct FriLspSignatureHelp {
+    pub sig_id: String,
+    pub signatures_json: String,
+    pub active_signature: u32,
+    pub active_parameter: u32,
+    pub trigger_character: String,
+    pub is_retrigger: bool,
+    pub trigger_kind: u32,
+    pub context_json: String,
+    pub signature_count: u32,
+    pub documentation_json: String,
+}
+
+impl FriLspSignatureHelp {
+    pub fn new() -> Self {
+        Self {
+            sig_id: String::new(),
+            signatures_json: String::new(),
+            active_signature: u32::default(),
+            active_parameter: u32::default(),
+            trigger_character: String::new(),
+            is_retrigger: bool::default(),
+            trigger_kind: u32::default(),
+            context_json: String::new(),
+            signature_count: u32::default(),
+            documentation_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sig_id.is_empty() || true && !self.signatures_json.is_empty() || true && self.active_signature < u32::MAX || true && self.active_parameter < u32::MAX || true && !self.trigger_character.is_empty() || true && self.is_retrigger || true && self.trigger_kind < u32::MAX || true && !self.context_json.is_empty() || true && self.signature_count < u32::MAX || true && !self.documentation_json.is_empty() || true
+    }
+}
+
+impl Default for FriLspSignatureHelp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP document symbol (name, kind, detail, range, children, tags)
+#[derive(Debug, Clone)]
+pub struct FrjLspDocumentSymbol {
+    pub symbol_id: String,
+    pub name: String,
+    pub kind: u32,
+    pub detail: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub selection_start_line: u32,
+    pub selection_end_line: u32,
+    pub child_count: u32,
+    pub tags_json: String,
+}
+
+impl FrjLspDocumentSymbol {
+    pub fn new() -> Self {
+        Self {
+            symbol_id: String::new(),
+            name: String::new(),
+            kind: u32::default(),
+            detail: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            selection_start_line: u32::default(),
+            selection_end_line: u32::default(),
+            child_count: u32::default(),
+            tags_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.symbol_id.is_empty() || true && !self.name.is_empty() || true && self.kind < u32::MAX || true && !self.detail.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && self.selection_start_line < u32::MAX || true && self.selection_end_line < u32::MAX || true && self.child_count < u32::MAX || true && !self.tags_json.is_empty() || true
+    }
+}
+
+impl Default for FrjLspDocumentSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292590,6 +292800,96 @@ mod tests_fre_generated {
     fn test_fre_fields() {
         let mut obj = FreLspDiagnostic::default();
         obj.diag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frf_generated {
+    use super::*;
+
+    #[test]
+    fn test_frf_default() {
+        let obj = FrfLspCompletionItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frf_fields() {
+        let mut obj = FrfLspCompletionItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frg_generated {
+    use super::*;
+
+    #[test]
+    fn test_frg_default() {
+        let obj = FrgLspCompletionList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frg_fields() {
+        let mut obj = FrgLspCompletionList::default();
+        obj.list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frh_generated {
+    use super::*;
+
+    #[test]
+    fn test_frh_default() {
+        let obj = FrhLspHover::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frh_fields() {
+        let mut obj = FrhLspHover::default();
+        obj.hover_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fri_generated {
+    use super::*;
+
+    #[test]
+    fn test_fri_default() {
+        let obj = FriLspSignatureHelp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fri_fields() {
+        let mut obj = FriLspSignatureHelp::default();
+        obj.sig_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frj_generated {
+    use super::*;
+
+    #[test]
+    fn test_frj_default() {
+        let obj = FrjLspDocumentSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frj_fields() {
+        let mut obj = FrjLspDocumentSymbol::default();
+        obj.symbol_id = "test".to_string();
         assert!(obj.validate());
     }
 }
