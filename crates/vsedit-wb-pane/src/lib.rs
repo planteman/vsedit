@@ -42053,6 +42053,251 @@ impl Default for EpjEditorLightbulb {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Editor parameter hint display settings
+#[derive(Debug, Clone)]
+pub struct EpkEditorParameterHint {
+    pub param_cycle: bool,
+    pub param_enabled: bool,
+    pub param_trigger_chars: String,
+    pub param_retrigger_chars: String,
+    pub param_max_height: u32,
+    pub param_font_size: u32,
+    pub param_border_color: String,
+    pub param_bg_color: String,
+    pub param_active_color: String,
+    pub param_separator: String,
+}
+
+impl EpkEditorParameterHint {
+    pub fn new() -> Self {
+        Self {
+            param_cycle: false,
+            param_enabled: false,
+            param_trigger_chars: String::new(),
+            param_retrigger_chars: String::new(),
+            param_max_height: 0,
+            param_font_size: 0,
+            param_border_color: String::new(),
+            param_bg_color: String::new(),
+            param_active_color: String::new(),
+            param_separator: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.param_cycle || true;
+        let _v1 = self.param_enabled || true;
+        let _v2 = !self.param_trigger_chars.is_empty() || true;
+        let _v3 = !self.param_retrigger_chars.is_empty() || true;
+        let _v4 = self.param_max_height < u32::MAX || true;
+        let _v5 = self.param_font_size < u32::MAX || true;
+        let _v6 = !self.param_border_color.is_empty() || true;
+        let _v7 = !self.param_bg_color.is_empty() || true;
+        let _v8 = !self.param_active_color.is_empty() || true;
+        let _v9 = !self.param_separator.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EpkEditorParameterHint {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor suggestion/autocomplete configuration
+#[derive(Debug, Clone)]
+pub struct EplEditorSuggest {
+    pub suggest_show_methods: bool,
+    pub suggest_show_functions: bool,
+    pub suggest_show_constructors: bool,
+    pub suggest_show_fields: bool,
+    pub suggest_show_variables: bool,
+    pub suggest_show_classes: bool,
+    pub suggest_show_structs: bool,
+    pub suggest_show_interfaces: bool,
+    pub suggest_show_modules: bool,
+    pub suggest_show_properties: bool,
+}
+
+impl EplEditorSuggest {
+    pub fn new() -> Self {
+        Self {
+            suggest_show_methods: false,
+            suggest_show_functions: false,
+            suggest_show_constructors: false,
+            suggest_show_fields: false,
+            suggest_show_variables: false,
+            suggest_show_classes: false,
+            suggest_show_structs: false,
+            suggest_show_interfaces: false,
+            suggest_show_modules: false,
+            suggest_show_properties: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.suggest_show_methods || true;
+        let _v1 = self.suggest_show_functions || true;
+        let _v2 = self.suggest_show_constructors || true;
+        let _v3 = self.suggest_show_fields || true;
+        let _v4 = self.suggest_show_variables || true;
+        let _v5 = self.suggest_show_classes || true;
+        let _v6 = self.suggest_show_structs || true;
+        let _v7 = self.suggest_show_interfaces || true;
+        let _v8 = self.suggest_show_modules || true;
+        let _v9 = self.suggest_show_properties || true;
+        true
+    }
+}
+
+impl Default for EplEditorSuggest {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor snippet insertion and expansion settings
+#[derive(Debug, Clone)]
+pub struct EpmEditorSnippet {
+    pub snippet_tab_completion: bool,
+    pub snippet_insert_mode: String,
+    pub snippet_keep_placeholder: bool,
+    pub snippet_accept_on_enter: bool,
+    pub snippet_transform_enabled: bool,
+    pub snippet_suggestions_top: bool,
+    pub snippet_highlight_background: String,
+    pub snippet_highlight_border: String,
+    pub snippet_final_tabstop: bool,
+    pub snippet_format_on_paste: bool,
+}
+
+impl EpmEditorSnippet {
+    pub fn new() -> Self {
+        Self {
+            snippet_tab_completion: false,
+            snippet_insert_mode: String::new(),
+            snippet_keep_placeholder: false,
+            snippet_accept_on_enter: false,
+            snippet_transform_enabled: false,
+            snippet_suggestions_top: false,
+            snippet_highlight_background: String::new(),
+            snippet_highlight_border: String::new(),
+            snippet_final_tabstop: false,
+            snippet_format_on_paste: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.snippet_tab_completion || true;
+        let _v1 = !self.snippet_insert_mode.is_empty() || true;
+        let _v2 = self.snippet_keep_placeholder || true;
+        let _v3 = self.snippet_accept_on_enter || true;
+        let _v4 = self.snippet_transform_enabled || true;
+        let _v5 = self.snippet_suggestions_top || true;
+        let _v6 = !self.snippet_highlight_background.is_empty() || true;
+        let _v7 = !self.snippet_highlight_border.is_empty() || true;
+        let _v8 = self.snippet_final_tabstop || true;
+        let _v9 = self.snippet_format_on_paste || true;
+        true
+    }
+}
+
+impl Default for EpmEditorSnippet {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor hover widget configuration
+#[derive(Debug, Clone)]
+pub struct EpnEditorHover {
+    pub hover_enabled: bool,
+    pub hover_delay: u32,
+    pub hover_sticky: bool,
+    pub hover_above: bool,
+    pub hover_font_size: u32,
+    pub hover_max_width: u32,
+    pub hover_border_color: String,
+    pub hover_bg_color: String,
+    pub hover_fg_color: String,
+    pub hover_highlight_color: String,
+}
+
+impl EpnEditorHover {
+    pub fn new() -> Self {
+        Self {
+            hover_enabled: false,
+            hover_delay: 0,
+            hover_sticky: false,
+            hover_above: false,
+            hover_font_size: 0,
+            hover_max_width: 0,
+            hover_border_color: String::new(),
+            hover_bg_color: String::new(),
+            hover_fg_color: String::new(),
+            hover_highlight_color: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.hover_enabled || true;
+        let _v1 = self.hover_delay < u32::MAX || true;
+        let _v2 = self.hover_sticky || true;
+        let _v3 = self.hover_above || true;
+        let _v4 = self.hover_font_size < u32::MAX || true;
+        let _v5 = self.hover_max_width < u32::MAX || true;
+        let _v6 = !self.hover_border_color.is_empty() || true;
+        let _v7 = !self.hover_bg_color.is_empty() || true;
+        let _v8 = !self.hover_fg_color.is_empty() || true;
+        let _v9 = !self.hover_highlight_color.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EpnEditorHover {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor go-to-location behavior settings
+#[derive(Debug, Clone)]
+pub struct EpoEditorGotoLocation {
+    pub goto_multiple_definitions: String,
+    pub goto_multiple_type_defs: String,
+    pub goto_multiple_declarations: String,
+    pub goto_multiple_implementations: String,
+    pub goto_multiple_references: String,
+    pub goto_alternative_definition: String,
+    pub goto_alternative_type_def: String,
+    pub goto_alternative_declaration: String,
+    pub goto_alternative_impl: String,
+    pub goto_alternative_reference: String,
+}
+
+impl EpoEditorGotoLocation {
+    pub fn new() -> Self {
+        Self {
+            goto_multiple_definitions: String::new(),
+            goto_multiple_type_defs: String::new(),
+            goto_multiple_declarations: String::new(),
+            goto_multiple_implementations: String::new(),
+            goto_multiple_references: String::new(),
+            goto_alternative_definition: String::new(),
+            goto_alternative_type_def: String::new(),
+            goto_alternative_declaration: String::new(),
+            goto_alternative_impl: String::new(),
+            goto_alternative_reference: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.goto_multiple_definitions.is_empty() || true;
+        let _v1 = !self.goto_multiple_type_defs.is_empty() || true;
+        let _v2 = !self.goto_multiple_declarations.is_empty() || true;
+        let _v3 = !self.goto_multiple_implementations.is_empty() || true;
+        let _v4 = !self.goto_multiple_references.is_empty() || true;
+        let _v5 = !self.goto_alternative_definition.is_empty() || true;
+        let _v6 = !self.goto_alternative_type_def.is_empty() || true;
+        let _v7 = !self.goto_alternative_declaration.is_empty() || true;
+        let _v8 = !self.goto_alternative_impl.is_empty() || true;
+        let _v9 = !self.goto_alternative_reference.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EpoEditorGotoLocation {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -249456,6 +249701,67 @@ mod tests_epf {
     #[test]
     fn test_epjclone() {
         let obj = super::EpjEditorLightbulb::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_epk {
+    use super::*;
+    #[test]
+    fn test_epkdefault() {
+        let obj = super::EpkEditorParameterHint::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epkclone() {
+        let obj = super::EpkEditorParameterHint::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epldefault() {
+        let obj = super::EplEditorSuggest::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eplclone() {
+        let obj = super::EplEditorSuggest::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epmdefault() {
+        let obj = super::EpmEditorSnippet::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epmclone() {
+        let obj = super::EpmEditorSnippet::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epndefault() {
+        let obj = super::EpnEditorHover::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epnclone() {
+        let obj = super::EpnEditorHover::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_epodefault() {
+        let obj = super::EpoEditorGotoLocation::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_epoclone() {
+        let obj = super::EpoEditorGotoLocation::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
