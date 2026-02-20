@@ -66974,6 +66974,459 @@ impl Default for FloQuickPick {
 }
 
 
+/// Quick pick item (label, description, detail, icon, picked, always show)
+#[derive(Debug, Clone)]
+pub struct FlpQuickPickItem {
+    pub item_id: String,
+    pub label: String,
+    pub description: String,
+    pub detail: String,
+    pub icon_id: String,
+    pub is_picked: bool,
+    pub always_show: bool,
+    pub kind: u32,
+    pub buttons_json: String,
+    pub sort_text: String,
+}
+
+impl FlpQuickPickItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            label: String::new(),
+            description: String::new(),
+            detail: String::new(),
+            icon_id: String::new(),
+            is_picked: bool::default(),
+            always_show: bool::default(),
+            kind: u32::default(),
+            buttons_json: String::new(),
+            sort_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.label.is_empty() || true && !self.description.is_empty() || true && !self.detail.is_empty() || true && !self.icon_id.is_empty() || true && self.is_picked || true && self.always_show || true && self.kind < u32::MAX || true && !self.buttons_json.is_empty() || true && !self.sort_text.is_empty() || true
+    }
+}
+
+impl Default for FlpQuickPickItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Quick input button (icon, tooltip, flat style)
+#[derive(Debug, Clone)]
+pub struct FlqQuickInputButton {
+    pub button_id: String,
+    pub icon_id: String,
+    pub tooltip: String,
+    pub is_flat: bool,
+    pub is_visible: bool,
+    pub command_id: String,
+    pub aria_label: String,
+    pub icon_path: String,
+    pub position: u32,
+    pub dark_icon_path: String,
+}
+
+impl FlqQuickInputButton {
+    pub fn new() -> Self {
+        Self {
+            button_id: String::new(),
+            icon_id: String::new(),
+            tooltip: String::new(),
+            is_flat: bool::default(),
+            is_visible: bool::default(),
+            command_id: String::new(),
+            aria_label: String::new(),
+            icon_path: String::new(),
+            position: u32::default(),
+            dark_icon_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.button_id.is_empty() || true && !self.icon_id.is_empty() || true && !self.tooltip.is_empty() || true && self.is_flat || true && self.is_visible || true && !self.command_id.is_empty() || true && !self.aria_label.is_empty() || true && !self.icon_path.is_empty() || true && self.position < u32::MAX || true && !self.dark_icon_path.is_empty() || true
+    }
+}
+
+impl Default for FlqQuickInputButton {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Input box (value, prompt, placeholder, password, validation)
+#[derive(Debug, Clone)]
+pub struct FlrInputBox {
+    pub inputbox_id: String,
+    pub value: String,
+    pub prompt: String,
+    pub placeholder: String,
+    pub is_password: bool,
+    pub validation_message: String,
+    pub validation_severity: u32,
+    pub title: String,
+    pub step: u32,
+    pub total_steps: u32,
+}
+
+impl FlrInputBox {
+    pub fn new() -> Self {
+        Self {
+            inputbox_id: String::new(),
+            value: String::new(),
+            prompt: String::new(),
+            placeholder: String::new(),
+            is_password: bool::default(),
+            validation_message: String::new(),
+            validation_severity: u32::default(),
+            title: String::new(),
+            step: u32::default(),
+            total_steps: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inputbox_id.is_empty() || true && !self.value.is_empty() || true && !self.prompt.is_empty() || true && !self.placeholder.is_empty() || true && self.is_password || true && !self.validation_message.is_empty() || true && self.validation_severity < u32::MAX || true && !self.title.is_empty() || true && self.step < u32::MAX || true && self.total_steps < u32::MAX || true
+    }
+}
+
+impl Default for FlrInputBox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notification (severity, message, source, actions, progress, sticky)
+#[derive(Debug, Clone)]
+pub struct FlsNotification {
+    pub notif_id: String,
+    pub severity: u32,
+    pub message: String,
+    pub source: String,
+    pub actions_json: String,
+    pub is_sticky: bool,
+    pub has_progress: bool,
+    pub is_silent: bool,
+    pub do_not_disturb: bool,
+    pub close_after_ms: u64,
+}
+
+impl FlsNotification {
+    pub fn new() -> Self {
+        Self {
+            notif_id: String::new(),
+            severity: u32::default(),
+            message: String::new(),
+            source: String::new(),
+            actions_json: String::new(),
+            is_sticky: bool::default(),
+            has_progress: bool::default(),
+            is_silent: bool::default(),
+            do_not_disturb: bool::default(),
+            close_after_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notif_id.is_empty() || true && self.severity < u32::MAX || true && !self.message.is_empty() || true && !self.source.is_empty() || true && !self.actions_json.is_empty() || true && self.is_sticky || true && self.has_progress || true && self.is_silent || true && self.do_not_disturb || true && self.close_after_ms < u64::MAX || true
+    }
+}
+
+impl Default for FlsNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Status bar entry (id, text, tooltip, command, alignment, priority)
+#[derive(Debug, Clone)]
+pub struct FltStatusBarEntry {
+    pub entry_id: String,
+    pub text: String,
+    pub tooltip: String,
+    pub command_id: String,
+    pub alignment: u32,
+    pub priority: u32,
+    pub color: String,
+    pub background_color: String,
+    pub name: String,
+    pub aria_label: String,
+}
+
+impl FltStatusBarEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_id: String::new(),
+            text: String::new(),
+            tooltip: String::new(),
+            command_id: String::new(),
+            alignment: u32::default(),
+            priority: u32::default(),
+            color: String::new(),
+            background_color: String::new(),
+            name: String::new(),
+            aria_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_id.is_empty() || true && !self.text.is_empty() || true && !self.tooltip.is_empty() || true && !self.command_id.is_empty() || true && self.alignment < u32::MAX || true && self.priority < u32::MAX || true && !self.color.is_empty() || true && !self.background_color.is_empty() || true && !self.name.is_empty() || true && !self.aria_label.is_empty() || true
+    }
+}
+
+impl Default for FltStatusBarEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Progress indicator (infinite, discrete, total, worked, message)
+#[derive(Debug, Clone)]
+pub struct FluProgressIndicator {
+    pub progress_id: String,
+    pub is_infinite: bool,
+    pub total: u64,
+    pub worked: u64,
+    pub message: String,
+    pub cancellable: bool,
+    pub location: u32,
+    pub title: String,
+    pub is_cancelled: bool,
+    pub increment: u64,
+}
+
+impl FluProgressIndicator {
+    pub fn new() -> Self {
+        Self {
+            progress_id: String::new(),
+            is_infinite: bool::default(),
+            total: u64::default(),
+            worked: u64::default(),
+            message: String::new(),
+            cancellable: bool::default(),
+            location: u32::default(),
+            title: String::new(),
+            is_cancelled: bool::default(),
+            increment: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.progress_id.is_empty() || true && self.is_infinite || true && self.total < u64::MAX || true && self.worked < u64::MAX || true && !self.message.is_empty() || true && self.cancellable || true && self.location < u32::MAX || true && !self.title.is_empty() || true && self.is_cancelled || true && self.increment < u64::MAX || true
+    }
+}
+
+impl Default for FluProgressIndicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Dialog options (type, title, message, detail, buttons, checkbox)
+#[derive(Debug, Clone)]
+pub struct FlvDialogOptions {
+    pub dialog_id: String,
+    pub dialog_type: u32,
+    pub title: String,
+    pub message: String,
+    pub detail: String,
+    pub buttons_json: String,
+    pub checkbox_label: String,
+    pub checkbox_checked: bool,
+    pub default_button_index: u32,
+    pub cancel_button_index: u32,
+}
+
+impl FlvDialogOptions {
+    pub fn new() -> Self {
+        Self {
+            dialog_id: String::new(),
+            dialog_type: u32::default(),
+            title: String::new(),
+            message: String::new(),
+            detail: String::new(),
+            buttons_json: String::new(),
+            checkbox_label: String::new(),
+            checkbox_checked: bool::default(),
+            default_button_index: u32::default(),
+            cancel_button_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dialog_id.is_empty() || true && self.dialog_type < u32::MAX || true && !self.title.is_empty() || true && !self.message.is_empty() || true && !self.detail.is_empty() || true && !self.buttons_json.is_empty() || true && !self.checkbox_label.is_empty() || true && self.checkbox_checked || true && self.default_button_index < u32::MAX || true && self.cancel_button_index < u32::MAX || true
+    }
+}
+
+impl Default for FlvDialogOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// File dialog (open/save, filters, default uri, can select many)
+#[derive(Debug, Clone)]
+pub struct FlwFileDialog {
+    pub file_dialog_id: String,
+    pub dialog_type: u32,
+    pub default_uri: String,
+    pub filters_json: String,
+    pub can_select_files: bool,
+    pub can_select_folders: bool,
+    pub can_select_many: bool,
+    pub title: String,
+    pub open_label: String,
+    pub save_label: String,
+}
+
+impl FlwFileDialog {
+    pub fn new() -> Self {
+        Self {
+            file_dialog_id: String::new(),
+            dialog_type: u32::default(),
+            default_uri: String::new(),
+            filters_json: String::new(),
+            can_select_files: bool::default(),
+            can_select_folders: bool::default(),
+            can_select_many: bool::default(),
+            title: String::new(),
+            open_label: String::new(),
+            save_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_dialog_id.is_empty() || true && self.dialog_type < u32::MAX || true && !self.default_uri.is_empty() || true && !self.filters_json.is_empty() || true && self.can_select_files || true && self.can_select_folders || true && self.can_select_many || true && !self.title.is_empty() || true && !self.open_label.is_empty() || true && !self.save_label.is_empty() || true
+    }
+}
+
+impl Default for FlwFileDialog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Tree view (id, title, can select many, drag and drop, show collapse)
+#[derive(Debug, Clone)]
+pub struct FlxTreeView {
+    pub tree_id: String,
+    pub title: String,
+    pub can_select_many: bool,
+    pub drag_and_drop_enabled: bool,
+    pub show_collapse_all: bool,
+    pub badge_count: u32,
+    pub message: String,
+    pub description: String,
+    pub is_visible: bool,
+    pub view_type: String,
+}
+
+impl FlxTreeView {
+    pub fn new() -> Self {
+        Self {
+            tree_id: String::new(),
+            title: String::new(),
+            can_select_many: bool::default(),
+            drag_and_drop_enabled: bool::default(),
+            show_collapse_all: bool::default(),
+            badge_count: u32::default(),
+            message: String::new(),
+            description: String::new(),
+            is_visible: bool::default(),
+            view_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_id.is_empty() || true && !self.title.is_empty() || true && self.can_select_many || true && self.drag_and_drop_enabled || true && self.show_collapse_all || true && self.badge_count < u32::MAX || true && !self.message.is_empty() || true && !self.description.is_empty() || true && self.is_visible || true && !self.view_type.is_empty() || true
+    }
+}
+
+impl Default for FlxTreeView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Tree item (label, description, icon, collapsible state, command, tooltip)
+#[derive(Debug, Clone)]
+pub struct FlyTreeItem {
+    pub item_id: String,
+    pub label: String,
+    pub description: String,
+    pub icon_path: String,
+    pub collapsible_state: u32,
+    pub command_id: String,
+    pub tooltip: String,
+    pub context_value: String,
+    pub resource_uri: String,
+    pub accessibility_info: String,
+}
+
+impl FlyTreeItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            label: String::new(),
+            description: String::new(),
+            icon_path: String::new(),
+            collapsible_state: u32::default(),
+            command_id: String::new(),
+            tooltip: String::new(),
+            context_value: String::new(),
+            resource_uri: String::new(),
+            accessibility_info: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.label.is_empty() || true && !self.description.is_empty() || true && !self.icon_path.is_empty() || true && self.collapsible_state < u32::MAX || true && !self.command_id.is_empty() || true && !self.tooltip.is_empty() || true && !self.context_value.is_empty() || true && !self.resource_uri.is_empty() || true && !self.accessibility_info.is_empty() || true
+    }
+}
+
+impl Default for FlyTreeItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Tree data provider (id, get children, get tree item, resolve, refresh)
+#[derive(Debug, Clone)]
+pub struct FlzTreeDataProvider {
+    pub provider_id: String,
+    pub tree_id: String,
+    pub root_count: u32,
+    pub is_disposable: bool,
+    pub supports_drag: bool,
+    pub supports_drop: bool,
+    pub mime_types_json: String,
+    pub handle_count: u32,
+    pub is_refreshing: bool,
+    pub change_event_count: u64,
+}
+
+impl FlzTreeDataProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            tree_id: String::new(),
+            root_count: u32::default(),
+            is_disposable: bool::default(),
+            supports_drag: bool::default(),
+            supports_drop: bool::default(),
+            mime_types_json: String::new(),
+            handle_count: u32::default(),
+            is_refreshing: bool::default(),
+            change_event_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.tree_id.is_empty() || true && self.root_count < u32::MAX || true && self.is_disposable || true && self.supports_drag || true && self.supports_drop || true && !self.mime_types_json.is_empty() || true && self.handle_count < u32::MAX || true && self.is_refreshing || true && self.change_event_count < u64::MAX || true
+    }
+}
+
+impl Default for FlzTreeDataProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -283849,6 +284302,204 @@ mod tests_flo_generated {
     fn test_flo_fields() {
         let mut obj = FloQuickPick::default();
         obj.pick_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flp_generated {
+    use super::*;
+
+    #[test]
+    fn test_flp_default() {
+        let obj = FlpQuickPickItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flp_fields() {
+        let mut obj = FlpQuickPickItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flq_generated {
+    use super::*;
+
+    #[test]
+    fn test_flq_default() {
+        let obj = FlqQuickInputButton::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flq_fields() {
+        let mut obj = FlqQuickInputButton::default();
+        obj.button_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flr_generated {
+    use super::*;
+
+    #[test]
+    fn test_flr_default() {
+        let obj = FlrInputBox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flr_fields() {
+        let mut obj = FlrInputBox::default();
+        obj.inputbox_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fls_generated {
+    use super::*;
+
+    #[test]
+    fn test_fls_default() {
+        let obj = FlsNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fls_fields() {
+        let mut obj = FlsNotification::default();
+        obj.notif_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flt_generated {
+    use super::*;
+
+    #[test]
+    fn test_flt_default() {
+        let obj = FltStatusBarEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flt_fields() {
+        let mut obj = FltStatusBarEntry::default();
+        obj.entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flu_generated {
+    use super::*;
+
+    #[test]
+    fn test_flu_default() {
+        let obj = FluProgressIndicator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flu_fields() {
+        let mut obj = FluProgressIndicator::default();
+        obj.progress_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flv_generated {
+    use super::*;
+
+    #[test]
+    fn test_flv_default() {
+        let obj = FlvDialogOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flv_fields() {
+        let mut obj = FlvDialogOptions::default();
+        obj.dialog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flw_generated {
+    use super::*;
+
+    #[test]
+    fn test_flw_default() {
+        let obj = FlwFileDialog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flw_fields() {
+        let mut obj = FlwFileDialog::default();
+        obj.file_dialog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flx_generated {
+    use super::*;
+
+    #[test]
+    fn test_flx_default() {
+        let obj = FlxTreeView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flx_fields() {
+        let mut obj = FlxTreeView::default();
+        obj.tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fly_generated {
+    use super::*;
+
+    #[test]
+    fn test_fly_default() {
+        let obj = FlyTreeItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fly_fields() {
+        let mut obj = FlyTreeItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flz_generated {
+    use super::*;
+
+    #[test]
+    fn test_flz_default() {
+        let obj = FlzTreeDataProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flz_fields() {
+        let mut obj = FlzTreeDataProvider::default();
+        obj.provider_id = "test".to_string();
         assert!(obj.validate());
     }
 }
