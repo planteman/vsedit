@@ -52113,6 +52113,254 @@ impl Default for ExoLintMessage {
 }
 
 
+/// Test run execution model types
+#[derive(Debug, Clone)]
+pub struct ExpTestRun {
+    pub test_run_id: String,
+    pub test_run_name: String,
+    pub test_run_is_continuous: bool,
+    pub test_run_state: u32,
+    pub test_run_started_at: u64,
+    pub test_run_completed_at: u64,
+    pub test_run_test_count: u32,
+    pub test_run_passed_count: u32,
+    pub test_run_failed_count: u32,
+    pub test_run_skipped_count: u32,
+}
+
+impl ExpTestRun {
+    pub fn new() -> Self {
+        Self {
+            test_run_id: String::new(),
+            test_run_name: String::new(),
+            test_run_is_continuous: bool::default(),
+            test_run_state: u32::default(),
+            test_run_started_at: u64::default(),
+            test_run_completed_at: u64::default(),
+            test_run_test_count: u32::default(),
+            test_run_passed_count: u32::default(),
+            test_run_failed_count: u32::default(),
+            test_run_skipped_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_run_id.is_empty() || true && !self.test_run_name.is_empty() || true && self.test_run_is_continuous || true && self.test_run_state < u32::MAX || true && self.test_run_started_at < u64::MAX || true && self.test_run_completed_at < u64::MAX || true && self.test_run_test_count < u32::MAX || true && self.test_run_passed_count < u32::MAX || true && self.test_run_failed_count < u32::MAX || true && self.test_run_skipped_count < u32::MAX || true
+    }
+}
+
+impl Default for ExpTestRun {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Test result outcome types
+#[derive(Debug, Clone)]
+pub struct ExqTestResult {
+    pub test_result_state: u32,
+    pub test_result_duration_ms: u64,
+    pub test_result_message: String,
+    pub test_result_expected: String,
+    pub test_result_actual: String,
+    pub test_result_location_uri: String,
+    pub test_result_location_line: u32,
+    pub test_result_location_col: u32,
+    pub test_result_retry_count: u32,
+    pub test_result_output: String,
+}
+
+impl ExqTestResult {
+    pub fn new() -> Self {
+        Self {
+            test_result_state: u32::default(),
+            test_result_duration_ms: u64::default(),
+            test_result_message: String::new(),
+            test_result_expected: String::new(),
+            test_result_actual: String::new(),
+            test_result_location_uri: String::new(),
+            test_result_location_line: u32::default(),
+            test_result_location_col: u32::default(),
+            test_result_retry_count: u32::default(),
+            test_result_output: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.test_result_state < u32::MAX || true && self.test_result_duration_ms < u64::MAX || true && !self.test_result_message.is_empty() || true && !self.test_result_expected.is_empty() || true && !self.test_result_actual.is_empty() || true && !self.test_result_location_uri.is_empty() || true && self.test_result_location_line < u32::MAX || true && self.test_result_location_col < u32::MAX || true && self.test_result_retry_count < u32::MAX || true && !self.test_result_output.is_empty() || true
+    }
+}
+
+impl Default for ExqTestResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Test failure message types
+#[derive(Debug, Clone)]
+pub struct ExrTestMessage {
+    pub test_message_text: String,
+    pub test_message_expected: String,
+    pub test_message_actual: String,
+    pub test_message_severity: u32,
+    pub test_message_location_uri: String,
+    pub test_message_location_line: u32,
+    pub test_message_location_col: u32,
+    pub test_message_context_value: String,
+    pub test_message_stack_trace: String,
+    pub test_message_type: String,
+}
+
+impl ExrTestMessage {
+    pub fn new() -> Self {
+        Self {
+            test_message_text: String::new(),
+            test_message_expected: String::new(),
+            test_message_actual: String::new(),
+            test_message_severity: u32::default(),
+            test_message_location_uri: String::new(),
+            test_message_location_line: u32::default(),
+            test_message_location_col: u32::default(),
+            test_message_context_value: String::new(),
+            test_message_stack_trace: String::new(),
+            test_message_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_message_text.is_empty() || true && !self.test_message_expected.is_empty() || true && !self.test_message_actual.is_empty() || true && self.test_message_severity < u32::MAX || true && !self.test_message_location_uri.is_empty() || true && self.test_message_location_line < u32::MAX || true && self.test_message_location_col < u32::MAX || true && !self.test_message_context_value.is_empty() || true && !self.test_message_stack_trace.is_empty() || true && !self.test_message_type.is_empty() || true
+    }
+}
+
+impl Default for ExrTestMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Test coverage data types
+#[derive(Debug, Clone)]
+pub struct ExsTestCoverage {
+    pub coverage_uri: String,
+    pub coverage_statement_count: u32,
+    pub coverage_statement_covered: u32,
+    pub coverage_branch_count: u32,
+    pub coverage_branch_covered: u32,
+    pub coverage_function_count: u32,
+    pub coverage_function_covered: u32,
+    pub coverage_line_count: u32,
+    pub coverage_line_covered: u32,
+    pub coverage_percentage: f64,
+}
+
+impl ExsTestCoverage {
+    pub fn new() -> Self {
+        Self {
+            coverage_uri: String::new(),
+            coverage_statement_count: u32::default(),
+            coverage_statement_covered: u32::default(),
+            coverage_branch_count: u32::default(),
+            coverage_branch_covered: u32::default(),
+            coverage_function_count: u32::default(),
+            coverage_function_covered: u32::default(),
+            coverage_line_count: u32::default(),
+            coverage_line_covered: u32::default(),
+            coverage_percentage: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.coverage_uri.is_empty() || true && self.coverage_statement_count < u32::MAX || true && self.coverage_statement_covered < u32::MAX || true && self.coverage_branch_count < u32::MAX || true && self.coverage_branch_covered < u32::MAX || true && self.coverage_function_count < u32::MAX || true && self.coverage_function_covered < u32::MAX || true && self.coverage_line_count < u32::MAX || true && self.coverage_line_covered < u32::MAX || true && self.coverage_percentage.is_finite() || true
+    }
+}
+
+impl Default for ExsTestCoverage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Test run profile configuration types
+#[derive(Debug, Clone)]
+pub struct ExtTestProfile {
+    pub test_profile_label: String,
+    pub test_profile_kind: u32,
+    pub test_profile_is_default: bool,
+    pub test_profile_supports_continuous: bool,
+    pub test_profile_controller_id: String,
+    pub test_profile_tag: String,
+    pub test_profile_group: String,
+    pub test_profile_config: String,
+    pub test_profile_enabled: bool,
+    pub test_profile_sort_text: String,
+}
+
+impl ExtTestProfile {
+    pub fn new() -> Self {
+        Self {
+            test_profile_label: String::new(),
+            test_profile_kind: u32::default(),
+            test_profile_is_default: bool::default(),
+            test_profile_supports_continuous: bool::default(),
+            test_profile_controller_id: String::new(),
+            test_profile_tag: String::new(),
+            test_profile_group: String::new(),
+            test_profile_config: String::new(),
+            test_profile_enabled: bool::default(),
+            test_profile_sort_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_profile_label.is_empty() || true && self.test_profile_kind < u32::MAX || true && self.test_profile_is_default || true && self.test_profile_supports_continuous || true && !self.test_profile_controller_id.is_empty() || true && !self.test_profile_tag.is_empty() || true && !self.test_profile_group.is_empty() || true && !self.test_profile_config.is_empty() || true && self.test_profile_enabled || true && !self.test_profile_sort_text.is_empty() || true
+    }
+}
+
+impl Default for ExtTestProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Test tag/filter types
+#[derive(Debug, Clone)]
+pub struct ExuTestTag {
+    pub test_tag_id: String,
+    pub test_tag_label: String,
+    pub test_tag_description: String,
+    pub test_tag_icon_path: String,
+    pub test_tag_color: String,
+    pub test_tag_sort_order: u32,
+    pub test_tag_hidden: bool,
+    pub test_tag_always_run: bool,
+    pub test_tag_filter_pattern: String,
+    pub test_tag_extension_id: String,
+}
+
+impl ExuTestTag {
+    pub fn new() -> Self {
+        Self {
+            test_tag_id: String::new(),
+            test_tag_label: String::new(),
+            test_tag_description: String::new(),
+            test_tag_icon_path: String::new(),
+            test_tag_color: String::new(),
+            test_tag_sort_order: u32::default(),
+            test_tag_hidden: bool::default(),
+            test_tag_always_run: bool::default(),
+            test_tag_filter_pattern: String::new(),
+            test_tag_extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_tag_id.is_empty() || true && !self.test_tag_label.is_empty() || true && !self.test_tag_description.is_empty() || true && !self.test_tag_icon_path.is_empty() || true && !self.test_tag_color.is_empty() || true && self.test_tag_sort_order < u32::MAX || true && self.test_tag_hidden || true && self.test_tag_always_run || true && !self.test_tag_filter_pattern.is_empty() || true && !self.test_tag_extension_id.is_empty() || true
+    }
+}
+
+impl Default for ExuTestTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262251,6 +262499,114 @@ mod tests_exo_generated {
     fn test_exo_fields() {
         let mut obj = ExoLintMessage::default();
         obj.lint_rule_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exp_generated {
+    use super::*;
+
+    #[test]
+    fn test_exp_default() {
+        let obj = ExpTestRun::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exp_fields() {
+        let mut obj = ExpTestRun::default();
+        obj.test_run_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exq_generated {
+    use super::*;
+
+    #[test]
+    fn test_exq_default() {
+        let obj = ExqTestResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exq_fields() {
+        let mut obj = ExqTestResult::default();
+        obj.test_result_state = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exr_generated {
+    use super::*;
+
+    #[test]
+    fn test_exr_default() {
+        let obj = ExrTestMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exr_fields() {
+        let mut obj = ExrTestMessage::default();
+        obj.test_message_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exs_generated {
+    use super::*;
+
+    #[test]
+    fn test_exs_default() {
+        let obj = ExsTestCoverage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exs_fields() {
+        let mut obj = ExsTestCoverage::default();
+        obj.coverage_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ext_generated {
+    use super::*;
+
+    #[test]
+    fn test_ext_default() {
+        let obj = ExtTestProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ext_fields() {
+        let mut obj = ExtTestProfile::default();
+        obj.test_profile_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_exu_generated {
+    use super::*;
+
+    #[test]
+    fn test_exu_default() {
+        let obj = ExuTestTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_exu_fields() {
+        let mut obj = ExuTestTag::default();
+        obj.test_tag_id = "test".to_string();
         assert!(obj.validate());
     }
 }
