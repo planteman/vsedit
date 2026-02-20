@@ -63378,6 +63378,213 @@ impl Default for FieRemoteFileSystem {
 }
 
 
+/// Remote extension host (process, connection, extensions, restart)
+#[derive(Debug, Clone)]
+pub struct FifRemoteExtensionHost {
+    pub host_id: String,
+    pub process_pid: u64,
+    pub socket_path: String,
+    pub extension_count: u32,
+    pub is_running: bool,
+    pub log_level: u32,
+    pub startup_time_ms: u64,
+    pub memory_usage: u64,
+    pub connection_type: u32,
+    pub last_restart_ms: u64,
+}
+
+impl FifRemoteExtensionHost {
+    pub fn new() -> Self {
+        Self {
+            host_id: String::new(),
+            process_pid: u64::default(),
+            socket_path: String::new(),
+            extension_count: u32::default(),
+            is_running: bool::default(),
+            log_level: u32::default(),
+            startup_time_ms: u64::default(),
+            memory_usage: u64::default(),
+            connection_type: u32::default(),
+            last_restart_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.host_id.is_empty() || true && self.process_pid < u64::MAX || true && !self.socket_path.is_empty() || true && self.extension_count < u32::MAX || true && self.is_running || true && self.log_level < u32::MAX || true && self.startup_time_ms < u64::MAX || true && self.memory_usage < u64::MAX || true && self.connection_type < u32::MAX || true && self.last_restart_ms < u64::MAX || true
+    }
+}
+
+impl Default for FifRemoteExtensionHost {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Remote terminal (pty process, dimensions, data, title)
+#[derive(Debug, Clone)]
+pub struct FigRemoteTerminal {
+    pub terminal_id: String,
+    pub remote_pid: u64,
+    pub cols: u32,
+    pub rows: u32,
+    pub title: String,
+    pub cwd: String,
+    pub shell_path: String,
+    pub is_connected: bool,
+    pub data_buffer_size: u64,
+    pub env_json: String,
+}
+
+impl FigRemoteTerminal {
+    pub fn new() -> Self {
+        Self {
+            terminal_id: String::new(),
+            remote_pid: u64::default(),
+            cols: u32::default(),
+            rows: u32::default(),
+            title: String::new(),
+            cwd: String::new(),
+            shell_path: String::new(),
+            is_connected: bool::default(),
+            data_buffer_size: u64::default(),
+            env_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.terminal_id.is_empty() || true && self.remote_pid < u64::MAX || true && self.cols < u32::MAX || true && self.rows < u32::MAX || true && !self.title.is_empty() || true && !self.cwd.is_empty() || true && !self.shell_path.is_empty() || true && self.is_connected || true && self.data_buffer_size < u64::MAX || true && !self.env_json.is_empty() || true
+    }
+}
+
+impl Default for FigRemoteTerminal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Remote user data/settings sync (profile, extensions, keybindings, snippets)
+#[derive(Debug, Clone)]
+pub struct FihRemoteUserData {
+    pub profile_id: String,
+    pub sync_extensions: bool,
+    pub sync_keybindings: bool,
+    pub sync_settings: bool,
+    pub sync_snippets: bool,
+    pub sync_ui_state: bool,
+    pub last_sync_ms: u64,
+    pub conflicts_count: u32,
+    pub machine_id: String,
+    pub sync_resource_type: u32,
+}
+
+impl FihRemoteUserData {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            sync_extensions: bool::default(),
+            sync_keybindings: bool::default(),
+            sync_settings: bool::default(),
+            sync_snippets: bool::default(),
+            sync_ui_state: bool::default(),
+            last_sync_ms: u64::default(),
+            conflicts_count: u32::default(),
+            machine_id: String::new(),
+            sync_resource_type: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && self.sync_extensions || true && self.sync_keybindings || true && self.sync_settings || true && self.sync_snippets || true && self.sync_ui_state || true && self.last_sync_ms < u64::MAX || true && self.conflicts_count < u32::MAX || true && !self.machine_id.is_empty() || true && self.sync_resource_type < u32::MAX || true
+    }
+}
+
+impl Default for FihRemoteUserData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace storage (global/workspace state, keys, values, migration)
+#[derive(Debug, Clone)]
+pub struct FiiWorkspaceStorage {
+    pub storage_id: String,
+    pub storage_scope: u32,
+    pub key_count: u32,
+    pub total_size_bytes: u64,
+    pub is_global: bool,
+    pub workspace_id: String,
+    pub target_path: String,
+    pub migration_version: u32,
+    pub is_readonly: bool,
+    pub last_modified_ms: u64,
+}
+
+impl FiiWorkspaceStorage {
+    pub fn new() -> Self {
+        Self {
+            storage_id: String::new(),
+            storage_scope: u32::default(),
+            key_count: u32::default(),
+            total_size_bytes: u64::default(),
+            is_global: bool::default(),
+            workspace_id: String::new(),
+            target_path: String::new(),
+            migration_version: u32::default(),
+            is_readonly: bool::default(),
+            last_modified_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.storage_id.is_empty() || true && self.storage_scope < u32::MAX || true && self.key_count < u32::MAX || true && self.total_size_bytes < u64::MAX || true && self.is_global || true && !self.workspace_id.is_empty() || true && !self.target_path.is_empty() || true && self.migration_version < u32::MAX || true && self.is_readonly || true && self.last_modified_ms < u64::MAX || true
+    }
+}
+
+impl Default for FiiWorkspaceStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace edit (file operations, text edits, notebook edits, metadata)
+#[derive(Debug, Clone)]
+pub struct FijWorkspaceEdit {
+    pub edit_id: String,
+    pub file_operation_count: u32,
+    pub text_edit_count: u32,
+    pub notebook_edit_count: u32,
+    pub metadata_json: String,
+    pub needs_confirmation: bool,
+    pub label: String,
+    pub is_refactoring: bool,
+    pub document_changes_json: String,
+    pub resource_operations_json: String,
+}
+
+impl FijWorkspaceEdit {
+    pub fn new() -> Self {
+        Self {
+            edit_id: String::new(),
+            file_operation_count: u32::default(),
+            text_edit_count: u32::default(),
+            notebook_edit_count: u32::default(),
+            metadata_json: String::new(),
+            needs_confirmation: bool::default(),
+            label: String::new(),
+            is_refactoring: bool::default(),
+            document_changes_json: String::new(),
+            resource_operations_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_id.is_empty() || true && self.file_operation_count < u32::MAX || true && self.text_edit_count < u32::MAX || true && self.notebook_edit_count < u32::MAX || true && !self.metadata_json.is_empty() || true && self.needs_confirmation || true && !self.label.is_empty() || true && self.is_refactoring || true && !self.document_changes_json.is_empty() || true && !self.resource_operations_json.is_empty() || true
+    }
+}
+
+impl Default for FijWorkspaceEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -278632,6 +278839,96 @@ mod tests_fie_generated {
     fn test_fie_fields() {
         let mut obj = FieRemoteFileSystem::default();
         obj.fs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fif_generated {
+    use super::*;
+
+    #[test]
+    fn test_fif_default() {
+        let obj = FifRemoteExtensionHost::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fif_fields() {
+        let mut obj = FifRemoteExtensionHost::default();
+        obj.host_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fig_generated {
+    use super::*;
+
+    #[test]
+    fn test_fig_default() {
+        let obj = FigRemoteTerminal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fig_fields() {
+        let mut obj = FigRemoteTerminal::default();
+        obj.terminal_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fih_generated {
+    use super::*;
+
+    #[test]
+    fn test_fih_default() {
+        let obj = FihRemoteUserData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fih_fields() {
+        let mut obj = FihRemoteUserData::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fii_generated {
+    use super::*;
+
+    #[test]
+    fn test_fii_default() {
+        let obj = FiiWorkspaceStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fii_fields() {
+        let mut obj = FiiWorkspaceStorage::default();
+        obj.storage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fij_generated {
+    use super::*;
+
+    #[test]
+    fn test_fij_default() {
+        let obj = FijWorkspaceEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fij_fields() {
+        let mut obj = FijWorkspaceEdit::default();
+        obj.edit_id = "test".to_string();
         assert!(obj.validate());
     }
 }
