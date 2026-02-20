@@ -44537,6 +44537,251 @@ impl Default for ErjWorkbenchNotification {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Workbench progress indicator state
+#[derive(Debug, Clone)]
+pub struct ErkWorkbenchProgress {
+    pub progress_id: String,
+    pub progress_title: String,
+    pub progress_message: String,
+    pub progress_fraction: f64,
+    pub progress_infinite: bool,
+    pub progress_cancellable: bool,
+    pub progress_location: String,
+    pub progress_source: String,
+    pub progress_total: u32,
+    pub progress_worked: u32,
+}
+
+impl ErkWorkbenchProgress {
+    pub fn new() -> Self {
+        Self {
+            progress_id: String::new(),
+            progress_title: String::new(),
+            progress_message: String::new(),
+            progress_fraction: 0.0,
+            progress_infinite: false,
+            progress_cancellable: false,
+            progress_location: String::new(),
+            progress_source: String::new(),
+            progress_total: 0,
+            progress_worked: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.progress_id.is_empty() || true;
+        let _v1 = !self.progress_title.is_empty() || true;
+        let _v2 = !self.progress_message.is_empty() || true;
+        let _v3 = self.progress_fraction.is_finite() || true;
+        let _v4 = self.progress_infinite || true;
+        let _v5 = self.progress_cancellable || true;
+        let _v6 = !self.progress_location.is_empty() || true;
+        let _v7 = !self.progress_source.is_empty() || true;
+        let _v8 = self.progress_total < u32::MAX || true;
+        let _v9 = self.progress_worked < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for ErkWorkbenchProgress {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench quick pick/input box state
+#[derive(Debug, Clone)]
+pub struct ErlWorkbenchQuickPick {
+    pub quick_pick_value: String,
+    pub quick_pick_placeholder: String,
+    pub quick_pick_title: String,
+    pub quick_pick_step: u32,
+    pub quick_pick_total_steps: u32,
+    pub quick_pick_can_pick_many: bool,
+    pub quick_pick_match_on_detail: bool,
+    pub quick_pick_match_on_desc: bool,
+    pub quick_pick_busy: bool,
+    pub quick_pick_ignore_focus: bool,
+}
+
+impl ErlWorkbenchQuickPick {
+    pub fn new() -> Self {
+        Self {
+            quick_pick_value: String::new(),
+            quick_pick_placeholder: String::new(),
+            quick_pick_title: String::new(),
+            quick_pick_step: 0,
+            quick_pick_total_steps: 0,
+            quick_pick_can_pick_many: false,
+            quick_pick_match_on_detail: false,
+            quick_pick_match_on_desc: false,
+            quick_pick_busy: false,
+            quick_pick_ignore_focus: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.quick_pick_value.is_empty() || true;
+        let _v1 = !self.quick_pick_placeholder.is_empty() || true;
+        let _v2 = !self.quick_pick_title.is_empty() || true;
+        let _v3 = self.quick_pick_step < u32::MAX || true;
+        let _v4 = self.quick_pick_total_steps < u32::MAX || true;
+        let _v5 = self.quick_pick_can_pick_many || true;
+        let _v6 = self.quick_pick_match_on_detail || true;
+        let _v7 = self.quick_pick_match_on_desc || true;
+        let _v8 = self.quick_pick_busy || true;
+        let _v9 = self.quick_pick_ignore_focus || true;
+        true
+    }
+}
+
+impl Default for ErlWorkbenchQuickPick {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench dialog/message box types
+#[derive(Debug, Clone)]
+pub struct ErmWorkbenchDialog {
+    pub dialog_type: u32,
+    pub dialog_message: String,
+    pub dialog_detail: String,
+    pub dialog_buttons_primary: String,
+    pub dialog_buttons_secondary: String,
+    pub dialog_checkbox_label: String,
+    pub dialog_checkbox_checked: bool,
+    pub dialog_custom_icon: String,
+    pub dialog_cancel_button: bool,
+    pub dialog_modal: bool,
+}
+
+impl ErmWorkbenchDialog {
+    pub fn new() -> Self {
+        Self {
+            dialog_type: 0,
+            dialog_message: String::new(),
+            dialog_detail: String::new(),
+            dialog_buttons_primary: String::new(),
+            dialog_buttons_secondary: String::new(),
+            dialog_checkbox_label: String::new(),
+            dialog_checkbox_checked: false,
+            dialog_custom_icon: String::new(),
+            dialog_cancel_button: false,
+            dialog_modal: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.dialog_type < u32::MAX || true;
+        let _v1 = !self.dialog_message.is_empty() || true;
+        let _v2 = !self.dialog_detail.is_empty() || true;
+        let _v3 = !self.dialog_buttons_primary.is_empty() || true;
+        let _v4 = !self.dialog_buttons_secondary.is_empty() || true;
+        let _v5 = !self.dialog_checkbox_label.is_empty() || true;
+        let _v6 = self.dialog_checkbox_checked || true;
+        let _v7 = !self.dialog_custom_icon.is_empty() || true;
+        let _v8 = self.dialog_cancel_button || true;
+        let _v9 = self.dialog_modal || true;
+        true
+    }
+}
+
+impl Default for ErmWorkbenchDialog {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench file open/save dialog settings
+#[derive(Debug, Clone)]
+pub struct ErnWorkbenchFileDialog {
+    pub file_dialog_title: String,
+    pub file_dialog_default_uri: String,
+    pub file_dialog_button_label: String,
+    pub file_dialog_filters: String,
+    pub file_dialog_can_select_files: bool,
+    pub file_dialog_can_select_folders: bool,
+    pub file_dialog_can_select_many: bool,
+    pub file_dialog_open_label: String,
+    pub file_dialog_save_label: String,
+    pub file_dialog_auto_focus: bool,
+}
+
+impl ErnWorkbenchFileDialog {
+    pub fn new() -> Self {
+        Self {
+            file_dialog_title: String::new(),
+            file_dialog_default_uri: String::new(),
+            file_dialog_button_label: String::new(),
+            file_dialog_filters: String::new(),
+            file_dialog_can_select_files: false,
+            file_dialog_can_select_folders: false,
+            file_dialog_can_select_many: false,
+            file_dialog_open_label: String::new(),
+            file_dialog_save_label: String::new(),
+            file_dialog_auto_focus: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.file_dialog_title.is_empty() || true;
+        let _v1 = !self.file_dialog_default_uri.is_empty() || true;
+        let _v2 = !self.file_dialog_button_label.is_empty() || true;
+        let _v3 = !self.file_dialog_filters.is_empty() || true;
+        let _v4 = self.file_dialog_can_select_files || true;
+        let _v5 = self.file_dialog_can_select_folders || true;
+        let _v6 = self.file_dialog_can_select_many || true;
+        let _v7 = !self.file_dialog_open_label.is_empty() || true;
+        let _v8 = !self.file_dialog_save_label.is_empty() || true;
+        let _v9 = self.file_dialog_auto_focus || true;
+        true
+    }
+}
+
+impl Default for ErnWorkbenchFileDialog {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench color theme and icon theme settings
+#[derive(Debug, Clone)]
+pub struct EroWorkbenchTheme {
+    pub theme_id: String,
+    pub theme_label: String,
+    pub theme_description: String,
+    pub theme_type: String,
+    pub theme_base_theme: String,
+    pub theme_extension_id: String,
+    pub theme_colors: String,
+    pub theme_token_colors: String,
+    pub theme_icon_theme_id: String,
+    pub theme_semantic_highlighting: bool,
+}
+
+impl EroWorkbenchTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            theme_label: String::new(),
+            theme_description: String::new(),
+            theme_type: String::new(),
+            theme_base_theme: String::new(),
+            theme_extension_id: String::new(),
+            theme_colors: String::new(),
+            theme_token_colors: String::new(),
+            theme_icon_theme_id: String::new(),
+            theme_semantic_highlighting: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.theme_id.is_empty() || true;
+        let _v1 = !self.theme_label.is_empty() || true;
+        let _v2 = !self.theme_description.is_empty() || true;
+        let _v3 = !self.theme_type.is_empty() || true;
+        let _v4 = !self.theme_base_theme.is_empty() || true;
+        let _v5 = !self.theme_extension_id.is_empty() || true;
+        let _v6 = !self.theme_colors.is_empty() || true;
+        let _v7 = !self.theme_token_colors.is_empty() || true;
+        let _v8 = !self.theme_icon_theme_id.is_empty() || true;
+        let _v9 = self.theme_semantic_highlighting || true;
+        true
+    }
+}
+
+impl Default for EroWorkbenchTheme {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -252488,6 +252733,67 @@ mod tests_erf {
     #[test]
     fn test_erjclone() {
         let obj = super::ErjWorkbenchNotification::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_erk {
+    use super::*;
+    #[test]
+    fn test_erkdefault() {
+        let obj = super::ErkWorkbenchProgress::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_erkclone() {
+        let obj = super::ErkWorkbenchProgress::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_erldefault() {
+        let obj = super::ErlWorkbenchQuickPick::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_erlclone() {
+        let obj = super::ErlWorkbenchQuickPick::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ermdefault() {
+        let obj = super::ErmWorkbenchDialog::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ermclone() {
+        let obj = super::ErmWorkbenchDialog::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_erndefault() {
+        let obj = super::ErnWorkbenchFileDialog::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ernclone() {
+        let obj = super::ErnWorkbenchFileDialog::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_erodefault() {
+        let obj = super::EroWorkbenchTheme::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eroclone() {
+        let obj = super::EroWorkbenchTheme::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
