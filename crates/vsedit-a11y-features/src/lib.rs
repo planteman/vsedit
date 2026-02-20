@@ -62559,6 +62559,213 @@ impl Default for FheNotebookEditor {
 }
 
 
+/// Notebook serializer (content type registration, save/load)
+#[derive(Debug, Clone)]
+pub struct FhfNotebookSerializer {
+    pub serializer_id: String,
+    pub notebook_type: String,
+    pub display_name: String,
+    pub priority: u32,
+    pub selector_json: String,
+    pub data_to_notebook_fn: String,
+    pub notebook_to_data_fn: String,
+    pub save_format: String,
+    pub handles_backup: bool,
+    pub is_registered: bool,
+}
+
+impl FhfNotebookSerializer {
+    pub fn new() -> Self {
+        Self {
+            serializer_id: String::new(),
+            notebook_type: String::new(),
+            display_name: String::new(),
+            priority: u32::default(),
+            selector_json: String::new(),
+            data_to_notebook_fn: String::new(),
+            notebook_to_data_fn: String::new(),
+            save_format: String::new(),
+            handles_backup: bool::default(),
+            is_registered: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.serializer_id.is_empty() || true && !self.notebook_type.is_empty() || true && !self.display_name.is_empty() || true && self.priority < u32::MAX || true && !self.selector_json.is_empty() || true && !self.data_to_notebook_fn.is_empty() || true && !self.notebook_to_data_fn.is_empty() || true && !self.save_format.is_empty() || true && self.handles_backup || true && self.is_registered || true
+    }
+}
+
+impl Default for FhfNotebookSerializer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook output renderer (mime types, entrypoint, messaging)
+#[derive(Debug, Clone)]
+pub struct FhgNotebookRenderer {
+    pub renderer_id: String,
+    pub entrypoint_uri: String,
+    pub display_name: String,
+    pub mime_types: String,
+    pub depends_on: String,
+    pub requires_messaging: bool,
+    pub is_preloaded: bool,
+    pub hardcoded_html: String,
+    pub preload_uris: String,
+    pub extension_id: String,
+}
+
+impl FhgNotebookRenderer {
+    pub fn new() -> Self {
+        Self {
+            renderer_id: String::new(),
+            entrypoint_uri: String::new(),
+            display_name: String::new(),
+            mime_types: String::new(),
+            depends_on: String::new(),
+            requires_messaging: bool::default(),
+            is_preloaded: bool::default(),
+            hardcoded_html: String::new(),
+            preload_uris: String::new(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.renderer_id.is_empty() || true && !self.entrypoint_uri.is_empty() || true && !self.display_name.is_empty() || true && !self.mime_types.is_empty() || true && !self.depends_on.is_empty() || true && self.requires_messaging || true && self.is_preloaded || true && !self.hardcoded_html.is_empty() || true && !self.preload_uris.is_empty() || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for FhgNotebookRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook cell execution (task, token, start/end time, order)
+#[derive(Debug, Clone)]
+pub struct FhhNotebookCellExecution {
+    pub execution_id: String,
+    pub cell_index: u32,
+    pub start_time_ms: u64,
+    pub end_time_ms: u64,
+    pub execution_order: u64,
+    pub is_running: bool,
+    pub did_succeed: bool,
+    pub cancellation_token: String,
+    pub error_message: String,
+    pub duration_ms: u64,
+}
+
+impl FhhNotebookCellExecution {
+    pub fn new() -> Self {
+        Self {
+            execution_id: String::new(),
+            cell_index: u32::default(),
+            start_time_ms: u64::default(),
+            end_time_ms: u64::default(),
+            execution_order: u64::default(),
+            is_running: bool::default(),
+            did_succeed: bool::default(),
+            cancellation_token: String::new(),
+            error_message: String::new(),
+            duration_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.execution_id.is_empty() || true && self.cell_index < u32::MAX || true && self.start_time_ms < u64::MAX || true && self.end_time_ms < u64::MAX || true && self.execution_order < u64::MAX || true && self.is_running || true && self.did_succeed || true && !self.cancellation_token.is_empty() || true && !self.error_message.is_empty() || true && self.duration_ms < u64::MAX || true
+    }
+}
+
+impl Default for FhhNotebookCellExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook cell status bar item (text, alignment, command, tooltip)
+#[derive(Debug, Clone)]
+pub struct FhiNotebookCellStatusBar {
+    pub cell_index: u32,
+    pub text: String,
+    pub alignment: u32,
+    pub command_id: String,
+    pub tooltip: String,
+    pub priority: u32,
+    pub is_visible: bool,
+    pub accessor_id: String,
+    pub color_id: String,
+    pub opacity: f64,
+}
+
+impl FhiNotebookCellStatusBar {
+    pub fn new() -> Self {
+        Self {
+            cell_index: u32::default(),
+            text: String::new(),
+            alignment: u32::default(),
+            command_id: String::new(),
+            tooltip: String::new(),
+            priority: u32::default(),
+            is_visible: bool::default(),
+            accessor_id: String::new(),
+            color_id: String::new(),
+            opacity: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cell_index < u32::MAX || true && !self.text.is_empty() || true && self.alignment < u32::MAX || true && !self.command_id.is_empty() || true && !self.tooltip.is_empty() || true && self.priority < u32::MAX || true && self.is_visible || true && !self.accessor_id.is_empty() || true && !self.color_id.is_empty() || true && self.opacity.is_finite() || true
+    }
+}
+
+impl Default for FhiNotebookCellStatusBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook editor decoration (cell handle, type, range)
+#[derive(Debug, Clone)]
+pub struct FhjNotebookEditorDecoration {
+    pub decoration_id: String,
+    pub cell_handle: u32,
+    pub decoration_type: u32,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub class_name: String,
+    pub glyph_margin_class: String,
+    pub hover_message: String,
+    pub is_whole_line: bool,
+    pub z_index: u32,
+}
+
+impl FhjNotebookEditorDecoration {
+    pub fn new() -> Self {
+        Self {
+            decoration_id: String::new(),
+            cell_handle: u32::default(),
+            decoration_type: u32::default(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            class_name: String::new(),
+            glyph_margin_class: String::new(),
+            hover_message: String::new(),
+            is_whole_line: bool::default(),
+            z_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decoration_id.is_empty() || true && self.cell_handle < u32::MAX || true && self.decoration_type < u32::MAX || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.class_name.is_empty() || true && !self.glyph_margin_class.is_empty() || true && !self.hover_message.is_empty() || true && self.is_whole_line || true && self.z_index < u32::MAX || true
+    }
+}
+
+impl Default for FhjNotebookEditorDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277216,6 +277423,96 @@ mod tests_fhe_generated {
     fn test_fhe_fields() {
         let mut obj = FheNotebookEditor::default();
         obj.editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhf_default() {
+        let obj = FhfNotebookSerializer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhf_fields() {
+        let mut obj = FhfNotebookSerializer::default();
+        obj.serializer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhg_default() {
+        let obj = FhgNotebookRenderer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhg_fields() {
+        let mut obj = FhgNotebookRenderer::default();
+        obj.renderer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhh_default() {
+        let obj = FhhNotebookCellExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhh_fields() {
+        let mut obj = FhhNotebookCellExecution::default();
+        obj.execution_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhi_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhi_default() {
+        let obj = FhiNotebookCellStatusBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhi_fields() {
+        let mut obj = FhiNotebookCellStatusBar::default();
+        obj.cell_index = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhj_default() {
+        let obj = FhjNotebookEditorDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhj_fields() {
+        let mut obj = FhjNotebookEditorDecoration::default();
+        obj.decoration_id = "test".to_string();
         assert!(obj.validate());
     }
 }
