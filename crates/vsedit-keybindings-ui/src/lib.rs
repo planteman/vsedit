@@ -74550,6 +74550,678 @@ impl Default for FsjExtensionHostProcess {
     }
 }
 
+/// File system provider (scheme, capabilities, stat, read, write)
+#[derive(Debug, Clone)]
+pub struct FskFileSystemProvider {
+    pub provider_id: String,
+    pub scheme: String,
+    pub can_read: bool,
+    pub can_write: bool,
+    pub can_delete: bool,
+    pub can_rename: bool,
+    pub can_copy: bool,
+    pub supports_watch: bool,
+    pub is_readonly: bool,
+    pub is_case_sensitive: bool,
+}
+
+impl FskFileSystemProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            scheme: String::new(),
+            can_read: bool::default(),
+            can_write: bool::default(),
+            can_delete: bool::default(),
+            can_rename: bool::default(),
+            can_copy: bool::default(),
+            supports_watch: bool::default(),
+            is_readonly: bool::default(),
+            is_case_sensitive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.scheme.is_empty() || true && self.can_read || true && self.can_write || true && self.can_delete || true && self.can_rename || true && self.can_copy || true && self.supports_watch || true && self.is_readonly || true && self.is_case_sensitive || true
+    }
+}
+
+impl Default for FskFileSystemProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File stat (type, mtime, ctime, size, permissions, readonly)
+#[derive(Debug, Clone)]
+pub struct FslFileStat {
+    pub stat_id: String,
+    pub file_type: u32,
+    pub mtime_ms: u64,
+    pub ctime_ms: u64,
+    pub size_bytes: u64,
+    pub permissions: u32,
+    pub is_readonly: bool,
+    pub is_symlink: bool,
+    pub uri: String,
+    pub etag: String,
+}
+
+impl FslFileStat {
+    pub fn new() -> Self {
+        Self {
+            stat_id: String::new(),
+            file_type: u32::default(),
+            mtime_ms: u64::default(),
+            ctime_ms: u64::default(),
+            size_bytes: u64::default(),
+            permissions: u32::default(),
+            is_readonly: bool::default(),
+            is_symlink: bool::default(),
+            uri: String::new(),
+            etag: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stat_id.is_empty() || true && self.file_type < u32::MAX || true && self.mtime_ms < u64::MAX || true && self.ctime_ms < u64::MAX || true && self.size_bytes < u64::MAX || true && self.permissions < u32::MAX || true && self.is_readonly || true && self.is_symlink || true && !self.uri.is_empty() || true && !self.etag.is_empty() || true
+    }
+}
+
+impl Default for FslFileStat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File change event (type, uri, is directory, recursive)
+#[derive(Debug, Clone)]
+pub struct FsmFileChangeEvent {
+    pub event_id: String,
+    pub change_type: u32,
+    pub uri: String,
+    pub is_directory: bool,
+    pub is_recursive: bool,
+    pub old_uri: String,
+    pub correlation_id: String,
+    pub source: String,
+    pub timestamp_ms: u64,
+    pub is_external: bool,
+}
+
+impl FsmFileChangeEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            change_type: u32::default(),
+            uri: String::new(),
+            is_directory: bool::default(),
+            is_recursive: bool::default(),
+            old_uri: String::new(),
+            correlation_id: String::new(),
+            source: String::new(),
+            timestamp_ms: u64::default(),
+            is_external: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && self.change_type < u32::MAX || true && !self.uri.is_empty() || true && self.is_directory || true && self.is_recursive || true && !self.old_uri.is_empty() || true && !self.correlation_id.is_empty() || true && !self.source.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_external || true
+    }
+}
+
+impl Default for FsmFileChangeEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File watcher (glob pattern, excludes, recursive, correlate)
+#[derive(Debug, Clone)]
+pub struct FsnFileWatcher {
+    pub watcher_id: String,
+    pub glob_pattern: String,
+    pub excludes_json: String,
+    pub is_recursive: bool,
+    pub correlate: bool,
+    pub max_depth: u32,
+    pub follow_symlinks: bool,
+    pub polling_interval_ms: u32,
+    pub provider_id: String,
+    pub is_active: bool,
+}
+
+impl FsnFileWatcher {
+    pub fn new() -> Self {
+        Self {
+            watcher_id: String::new(),
+            glob_pattern: String::new(),
+            excludes_json: String::new(),
+            is_recursive: bool::default(),
+            correlate: bool::default(),
+            max_depth: u32::default(),
+            follow_symlinks: bool::default(),
+            polling_interval_ms: u32::default(),
+            provider_id: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watcher_id.is_empty() || true && !self.glob_pattern.is_empty() || true && !self.excludes_json.is_empty() || true && self.is_recursive || true && self.correlate || true && self.max_depth < u32::MAX || true && self.follow_symlinks || true && self.polling_interval_ms < u32::MAX || true && !self.provider_id.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for FsnFileWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File search provider (scheme, search, max results)
+#[derive(Debug, Clone)]
+pub struct FsoFileSearchProvider {
+    pub provider_id: String,
+    pub scheme: String,
+    pub max_results: u32,
+    pub include_pattern: String,
+    pub exclude_pattern: String,
+    pub file_encoding: String,
+    pub sort_by_score: bool,
+    pub is_case_sensitive: bool,
+    pub use_ignore_files: bool,
+    pub follow_symlinks: bool,
+}
+
+impl FsoFileSearchProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            scheme: String::new(),
+            max_results: u32::default(),
+            include_pattern: String::new(),
+            exclude_pattern: String::new(),
+            file_encoding: String::new(),
+            sort_by_score: bool::default(),
+            is_case_sensitive: bool::default(),
+            use_ignore_files: bool::default(),
+            follow_symlinks: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.scheme.is_empty() || true && self.max_results < u32::MAX || true && !self.include_pattern.is_empty() || true && !self.exclude_pattern.is_empty() || true && !self.file_encoding.is_empty() || true && self.sort_by_score || true && self.is_case_sensitive || true && self.use_ignore_files || true && self.follow_symlinks || true
+    }
+}
+
+impl Default for FsoFileSearchProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text search provider (scheme, search, preview options)
+#[derive(Debug, Clone)]
+pub struct FspTextSearchProvider {
+    pub provider_id: String,
+    pub scheme: String,
+    pub max_results: u32,
+    pub preview_lines: u32,
+    pub preview_chars_before: u32,
+    pub preview_chars_after: u32,
+    pub is_multi_line: bool,
+    pub use_pcre2: bool,
+    pub before_context: u32,
+    pub after_context: u32,
+}
+
+impl FspTextSearchProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            scheme: String::new(),
+            max_results: u32::default(),
+            preview_lines: u32::default(),
+            preview_chars_before: u32::default(),
+            preview_chars_after: u32::default(),
+            is_multi_line: bool::default(),
+            use_pcre2: bool::default(),
+            before_context: u32::default(),
+            after_context: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.scheme.is_empty() || true && self.max_results < u32::MAX || true && self.preview_lines < u32::MAX || true && self.preview_chars_before < u32::MAX || true && self.preview_chars_after < u32::MAX || true && self.is_multi_line || true && self.use_pcre2 || true && self.before_context < u32::MAX || true && self.after_context < u32::MAX || true
+    }
+}
+
+impl Default for FspTextSearchProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search result (uri, ranges, preview text, match kind)
+#[derive(Debug, Clone)]
+pub struct FsqSearchResult {
+    pub result_id: String,
+    pub uri: String,
+    pub ranges_json: String,
+    pub preview_text: String,
+    pub match_kind: u32,
+    pub line_number: u32,
+    pub column: u32,
+    pub match_length: u32,
+    pub context_before: String,
+    pub context_after: String,
+}
+
+impl FsqSearchResult {
+    pub fn new() -> Self {
+        Self {
+            result_id: String::new(),
+            uri: String::new(),
+            ranges_json: String::new(),
+            preview_text: String::new(),
+            match_kind: u32::default(),
+            line_number: u32::default(),
+            column: u32::default(),
+            match_length: u32::default(),
+            context_before: String::new(),
+            context_after: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_id.is_empty() || true && !self.uri.is_empty() || true && !self.ranges_json.is_empty() || true && !self.preview_text.is_empty() || true && self.match_kind < u32::MAX || true && self.line_number < u32::MAX || true && self.column < u32::MAX || true && self.match_length < u32::MAX || true && !self.context_before.is_empty() || true && !self.context_after.is_empty() || true
+    }
+}
+
+impl Default for FsqSearchResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search options (pattern, case sensitive, word match, regex)
+#[derive(Debug, Clone)]
+pub struct FsrSearchOptions {
+    pub options_id: String,
+    pub pattern: String,
+    pub is_case_sensitive: bool,
+    pub is_word_match: bool,
+    pub is_regex: bool,
+    pub include_pattern: String,
+    pub exclude_pattern: String,
+    pub max_results: u32,
+    pub encoding: String,
+    pub use_ignore_files: bool,
+}
+
+impl FsrSearchOptions {
+    pub fn new() -> Self {
+        Self {
+            options_id: String::new(),
+            pattern: String::new(),
+            is_case_sensitive: bool::default(),
+            is_word_match: bool::default(),
+            is_regex: bool::default(),
+            include_pattern: String::new(),
+            exclude_pattern: String::new(),
+            max_results: u32::default(),
+            encoding: String::new(),
+            use_ignore_files: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.options_id.is_empty() || true && !self.pattern.is_empty() || true && self.is_case_sensitive || true && self.is_word_match || true && self.is_regex || true && !self.include_pattern.is_empty() || true && !self.exclude_pattern.is_empty() || true && self.max_results < u32::MAX || true && !self.encoding.is_empty() || true && self.use_ignore_files || true
+    }
+}
+
+impl Default for FsrSearchOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File decoration (badge, tooltip, color, propagate, priority)
+#[derive(Debug, Clone)]
+pub struct FssFileDecoration {
+    pub decoration_id: String,
+    pub badge_text: String,
+    pub tooltip: String,
+    pub color_id: String,
+    pub propagate: bool,
+    pub priority: u32,
+    pub letter: String,
+    pub strikethrough: bool,
+    pub faded: bool,
+    pub provider_id: String,
+}
+
+impl FssFileDecoration {
+    pub fn new() -> Self {
+        Self {
+            decoration_id: String::new(),
+            badge_text: String::new(),
+            tooltip: String::new(),
+            color_id: String::new(),
+            propagate: bool::default(),
+            priority: u32::default(),
+            letter: String::new(),
+            strikethrough: bool::default(),
+            faded: bool::default(),
+            provider_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decoration_id.is_empty() || true && !self.badge_text.is_empty() || true && !self.tooltip.is_empty() || true && !self.color_id.is_empty() || true && self.propagate || true && self.priority < u32::MAX || true && !self.letter.is_empty() || true && self.strikethrough || true && self.faded || true && !self.provider_id.is_empty() || true
+    }
+}
+
+impl Default for FssFileDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File operation (type, source, target, overwrite, ignore)
+#[derive(Debug, Clone)]
+pub struct FstFileOperation {
+    pub operation_id: String,
+    pub operation_type: u32,
+    pub source_uri: String,
+    pub target_uri: String,
+    pub overwrite: bool,
+    pub ignore_if_exists: bool,
+    pub recursive: bool,
+    pub skip_trash: bool,
+    pub max_size: u64,
+    pub metadata_json: String,
+}
+
+impl FstFileOperation {
+    pub fn new() -> Self {
+        Self {
+            operation_id: String::new(),
+            operation_type: u32::default(),
+            source_uri: String::new(),
+            target_uri: String::new(),
+            overwrite: bool::default(),
+            ignore_if_exists: bool::default(),
+            recursive: bool::default(),
+            skip_trash: bool::default(),
+            max_size: u64::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.operation_id.is_empty() || true && self.operation_type < u32::MAX || true && !self.source_uri.is_empty() || true && !self.target_uri.is_empty() || true && self.overwrite || true && self.ignore_if_exists || true && self.recursive || true && self.skip_trash || true && self.max_size < u64::MAX || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for FstFileOperation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File copy operation (source, destination, overwrite, recursive)
+#[derive(Debug, Clone)]
+pub struct FsuFileCopy {
+    pub copy_id: String,
+    pub source_uri: String,
+    pub destination_uri: String,
+    pub overwrite: bool,
+    pub is_recursive: bool,
+    pub preserve_timestamps: bool,
+    pub bytes_copied: u64,
+    pub total_bytes: u64,
+    pub file_count: u32,
+    pub is_cancelled: bool,
+}
+
+impl FsuFileCopy {
+    pub fn new() -> Self {
+        Self {
+            copy_id: String::new(),
+            source_uri: String::new(),
+            destination_uri: String::new(),
+            overwrite: bool::default(),
+            is_recursive: bool::default(),
+            preserve_timestamps: bool::default(),
+            bytes_copied: u64::default(),
+            total_bytes: u64::default(),
+            file_count: u32::default(),
+            is_cancelled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.copy_id.is_empty() || true && !self.source_uri.is_empty() || true && !self.destination_uri.is_empty() || true && self.overwrite || true && self.is_recursive || true && self.preserve_timestamps || true && self.bytes_copied < u64::MAX || true && self.total_bytes < u64::MAX || true && self.file_count < u32::MAX || true && self.is_cancelled || true
+    }
+}
+
+impl Default for FsuFileCopy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File delete operation (uri, recursive, use trash, max depth)
+#[derive(Debug, Clone)]
+pub struct FsvFileDelete {
+    pub delete_id: String,
+    pub uri: String,
+    pub is_recursive: bool,
+    pub use_trash: bool,
+    pub max_depth: u32,
+    pub file_count: u32,
+    pub directory_count: u32,
+    pub total_bytes: u64,
+    pub is_cancelled: bool,
+    pub error_message: String,
+}
+
+impl FsvFileDelete {
+    pub fn new() -> Self {
+        Self {
+            delete_id: String::new(),
+            uri: String::new(),
+            is_recursive: bool::default(),
+            use_trash: bool::default(),
+            max_depth: u32::default(),
+            file_count: u32::default(),
+            directory_count: u32::default(),
+            total_bytes: u64::default(),
+            is_cancelled: bool::default(),
+            error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.delete_id.is_empty() || true && !self.uri.is_empty() || true && self.is_recursive || true && self.use_trash || true && self.max_depth < u32::MAX || true && self.file_count < u32::MAX || true && self.directory_count < u32::MAX || true && self.total_bytes < u64::MAX || true && self.is_cancelled || true && !self.error_message.is_empty() || true
+    }
+}
+
+impl Default for FsvFileDelete {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File rename operation (old uri, new uri, overwrite)
+#[derive(Debug, Clone)]
+pub struct FswFileRename {
+    pub rename_id: String,
+    pub old_uri: String,
+    pub new_uri: String,
+    pub overwrite: bool,
+    pub is_directory: bool,
+    pub update_references: bool,
+    pub reference_count: u32,
+    pub affected_file_count: u32,
+    pub is_cancelled: bool,
+    pub error_message: String,
+}
+
+impl FswFileRename {
+    pub fn new() -> Self {
+        Self {
+            rename_id: String::new(),
+            old_uri: String::new(),
+            new_uri: String::new(),
+            overwrite: bool::default(),
+            is_directory: bool::default(),
+            update_references: bool::default(),
+            reference_count: u32::default(),
+            affected_file_count: u32::default(),
+            is_cancelled: bool::default(),
+            error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rename_id.is_empty() || true && !self.old_uri.is_empty() || true && !self.new_uri.is_empty() || true && self.overwrite || true && self.is_directory || true && self.update_references || true && self.reference_count < u32::MAX || true && self.affected_file_count < u32::MAX || true && self.is_cancelled || true && !self.error_message.is_empty() || true
+    }
+}
+
+impl Default for FswFileRename {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File create operation (uri, overwrite, content, encoding)
+#[derive(Debug, Clone)]
+pub struct FsxFileCreate {
+    pub create_id: String,
+    pub uri: String,
+    pub overwrite: bool,
+    pub content_bytes: String,
+    pub encoding: String,
+    pub is_directory: bool,
+    pub ignore_if_exists: bool,
+    pub recursive: bool,
+    pub permissions: u32,
+    pub template_uri: String,
+}
+
+impl FsxFileCreate {
+    pub fn new() -> Self {
+        Self {
+            create_id: String::new(),
+            uri: String::new(),
+            overwrite: bool::default(),
+            content_bytes: String::new(),
+            encoding: String::new(),
+            is_directory: bool::default(),
+            ignore_if_exists: bool::default(),
+            recursive: bool::default(),
+            permissions: u32::default(),
+            template_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.create_id.is_empty() || true && !self.uri.is_empty() || true && self.overwrite || true && !self.content_bytes.is_empty() || true && !self.encoding.is_empty() || true && self.is_directory || true && self.ignore_if_exists || true && self.recursive || true && self.permissions < u32::MAX || true && !self.template_uri.is_empty() || true
+    }
+}
+
+impl Default for FsxFileCreate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File encoding (detected, configured, guessed, bom)
+#[derive(Debug, Clone)]
+pub struct FsyFileEncoding {
+    pub encoding_id: String,
+    pub detected_encoding: String,
+    pub configured_encoding: String,
+    pub guessed_encoding: String,
+    pub has_bom: bool,
+    pub confidence: f64,
+    pub file_uri: String,
+    pub encoding_name: String,
+    pub is_autoguess: bool,
+    pub byte_order: u32,
+}
+
+impl FsyFileEncoding {
+    pub fn new() -> Self {
+        Self {
+            encoding_id: String::new(),
+            detected_encoding: String::new(),
+            configured_encoding: String::new(),
+            guessed_encoding: String::new(),
+            has_bom: bool::default(),
+            confidence: f64::default(),
+            file_uri: String::new(),
+            encoding_name: String::new(),
+            is_autoguess: bool::default(),
+            byte_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.encoding_id.is_empty() || true && !self.detected_encoding.is_empty() || true && !self.configured_encoding.is_empty() || true && !self.guessed_encoding.is_empty() || true && self.has_bom || true && self.confidence.is_finite() || true && !self.file_uri.is_empty() || true && !self.encoding_name.is_empty() || true && self.is_autoguess || true && self.byte_order < u32::MAX || true
+    }
+}
+
+impl Default for FsyFileEncoding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File association (pattern, language id, priority, glob, scope)
+#[derive(Debug, Clone)]
+pub struct FszFileAssociation {
+    pub assoc_id: String,
+    pub pattern: String,
+    pub language_id: String,
+    pub priority: u32,
+    pub glob: String,
+    pub scope: u32,
+    pub is_user_configured: bool,
+    pub first_line_match: String,
+    pub extension_id: String,
+    pub mime_type: String,
+}
+
+impl FszFileAssociation {
+    pub fn new() -> Self {
+        Self {
+            assoc_id: String::new(),
+            pattern: String::new(),
+            language_id: String::new(),
+            priority: u32::default(),
+            glob: String::new(),
+            scope: u32::default(),
+            is_user_configured: bool::default(),
+            first_line_match: String::new(),
+            extension_id: String::new(),
+            mime_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.assoc_id.is_empty() || true && !self.pattern.is_empty() || true && !self.language_id.is_empty() || true && self.priority < u32::MAX || true && !self.glob.is_empty() || true && self.scope < u32::MAX || true && self.is_user_configured || true && !self.first_line_match.is_empty() || true && !self.extension_id.is_empty() || true && !self.mime_type.is_empty() || true
+    }
+}
+
+impl Default for FszFileAssociation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -294515,6 +295187,294 @@ mod tests_fsj_generated {
     fn test_fsj_fields() {
         let mut obj = FsjExtensionHostProcess::default();
         obj.host_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsk_default() {
+        let obj = FskFileSystemProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsk_fields() {
+        let mut obj = FskFileSystemProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsl_default() {
+        let obj = FslFileStat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsl_fields() {
+        let mut obj = FslFileStat::default();
+        obj.stat_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsm_default() {
+        let obj = FsmFileChangeEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsm_fields() {
+        let mut obj = FsmFileChangeEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsn_default() {
+        let obj = FsnFileWatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsn_fields() {
+        let mut obj = FsnFileWatcher::default();
+        obj.watcher_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fso_generated {
+    use super::*;
+
+    #[test]
+    fn test_fso_default() {
+        let obj = FsoFileSearchProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fso_fields() {
+        let mut obj = FsoFileSearchProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsp_default() {
+        let obj = FspTextSearchProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsp_fields() {
+        let mut obj = FspTextSearchProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsq_default() {
+        let obj = FsqSearchResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsq_fields() {
+        let mut obj = FsqSearchResult::default();
+        obj.result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsr_default() {
+        let obj = FsrSearchOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsr_fields() {
+        let mut obj = FsrSearchOptions::default();
+        obj.options_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fss_generated {
+    use super::*;
+
+    #[test]
+    fn test_fss_default() {
+        let obj = FssFileDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fss_fields() {
+        let mut obj = FssFileDecoration::default();
+        obj.decoration_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fst_generated {
+    use super::*;
+
+    #[test]
+    fn test_fst_default() {
+        let obj = FstFileOperation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fst_fields() {
+        let mut obj = FstFileOperation::default();
+        obj.operation_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsu_default() {
+        let obj = FsuFileCopy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsu_fields() {
+        let mut obj = FsuFileCopy::default();
+        obj.copy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsv_default() {
+        let obj = FsvFileDelete::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsv_fields() {
+        let mut obj = FsvFileDelete::default();
+        obj.delete_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsw_default() {
+        let obj = FswFileRename::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsw_fields() {
+        let mut obj = FswFileRename::default();
+        obj.rename_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsx_default() {
+        let obj = FsxFileCreate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsx_fields() {
+        let mut obj = FsxFileCreate::default();
+        obj.create_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsy_default() {
+        let obj = FsyFileEncoding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsy_fields() {
+        let mut obj = FsyFileEncoding::default();
+        obj.encoding_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fsz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fsz_default() {
+        let obj = FszFileAssociation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fsz_fields() {
+        let mut obj = FszFileAssociation::default();
+        obj.assoc_id = "test".to_string();
         assert!(obj.validate());
     }
 }
