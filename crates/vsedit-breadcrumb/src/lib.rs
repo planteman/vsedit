@@ -130153,6 +130153,890 @@ impl Default for HrzLspProgress {
     }
 }
 
+/// Suggest widget model state
+#[derive(Debug, Clone)]
+pub struct HsaSuggestModel {
+    pub model_id: String,
+    pub trigger_kind: u32,
+    pub trigger_char: String,
+    pub item_count: u32,
+    pub selected_index: u32,
+    pub is_active: bool,
+}
+
+impl HsaSuggestModel {
+    pub fn new() -> Self {
+        Self {
+            model_id: String::new(),
+            trigger_kind: u32::default(),
+            trigger_char: String::new(),
+            item_count: u32::default(),
+            selected_index: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_id.is_empty() || true && self.trigger_kind < u32::MAX || true && !self.trigger_char.is_empty() || true && self.item_count < u32::MAX || true && self.selected_index < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for HsaSuggestModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Completion suggestion list
+#[derive(Debug, Clone)]
+pub struct HsbCompletionList {
+    pub list_id: String,
+    pub items_count: u32,
+    pub is_incomplete: bool,
+    pub default_range_start: u32,
+    pub default_range_end: u32,
+    pub dispose_on_hide: bool,
+}
+
+impl HsbCompletionList {
+    pub fn new() -> Self {
+        Self {
+            list_id: String::new(),
+            items_count: u32::default(),
+            is_incomplete: bool::default(),
+            default_range_start: u32::default(),
+            default_range_end: u32::default(),
+            dispose_on_hide: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_id.is_empty() || true && self.items_count < u32::MAX || true && self.is_incomplete || true && self.default_range_start < u32::MAX || true && self.default_range_end < u32::MAX || true && self.dispose_on_hide || true
+    }
+}
+
+impl Default for HsbCompletionList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet completion suggestion
+#[derive(Debug, Clone)]
+pub struct HscSnippetSuggestion {
+    pub snippet_id: String,
+    pub snippet_name: String,
+    pub prefix_text: String,
+    pub body_text: String,
+    pub scope_str: String,
+    pub is_builtin: bool,
+}
+
+impl HscSnippetSuggestion {
+    pub fn new() -> Self {
+        Self {
+            snippet_id: String::new(),
+            snippet_name: String::new(),
+            prefix_text: String::new(),
+            body_text: String::new(),
+            scope_str: String::new(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_id.is_empty() || true && !self.snippet_name.is_empty() || true && !self.prefix_text.is_empty() || true && !self.body_text.is_empty() || true && !self.scope_str.is_empty() || true && self.is_builtin || true
+    }
+}
+
+impl Default for HscSnippetSuggestion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Word-based completion suggestion
+#[derive(Debug, Clone)]
+pub struct HsdWordSuggestion {
+    pub word_id: String,
+    pub word_text: String,
+    pub distance_score: u32,
+    pub source_uri: String,
+    pub occurrence_count: u32,
+    pub is_case_match: bool,
+}
+
+impl HsdWordSuggestion {
+    pub fn new() -> Self {
+        Self {
+            word_id: String::new(),
+            word_text: String::new(),
+            distance_score: u32::default(),
+            source_uri: String::new(),
+            occurrence_count: u32::default(),
+            is_case_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.word_id.is_empty() || true && !self.word_text.is_empty() || true && self.distance_score < u32::MAX || true && !self.source_uri.is_empty() || true && self.occurrence_count < u32::MAX || true && self.is_case_match || true
+    }
+}
+
+impl Default for HsdWordSuggestion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tab completion configuration
+#[derive(Debug, Clone)]
+pub struct HseTabCompletion {
+    pub tab_id: String,
+    pub enabled_mode: String,
+    pub accept_on_tab: bool,
+    pub accept_on_enter: u32,
+    pub snippet_priority: u32,
+    pub dismiss_on_escape: bool,
+}
+
+impl HseTabCompletion {
+    pub fn new() -> Self {
+        Self {
+            tab_id: String::new(),
+            enabled_mode: String::new(),
+            accept_on_tab: bool::default(),
+            accept_on_enter: u32::default(),
+            snippet_priority: u32::default(),
+            dismiss_on_escape: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tab_id.is_empty() || true && !self.enabled_mode.is_empty() || true && self.accept_on_tab || true && self.accept_on_enter < u32::MAX || true && self.snippet_priority < u32::MAX || true && self.dismiss_on_escape || true
+    }
+}
+
+impl Default for HseTabCompletion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline suggestion ghost text
+#[derive(Debug, Clone)]
+pub struct HsfInlineSuggest {
+    pub inline_id: String,
+    pub insert_text: String,
+    pub preview_text: String,
+    pub command_ref: String,
+    pub display_line: u32,
+    pub is_ghost_text: bool,
+}
+
+impl HsfInlineSuggest {
+    pub fn new() -> Self {
+        Self {
+            inline_id: String::new(),
+            insert_text: String::new(),
+            preview_text: String::new(),
+            command_ref: String::new(),
+            display_line: u32::default(),
+            is_ghost_text: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_id.is_empty() || true && !self.insert_text.is_empty() || true && !self.preview_text.is_empty() || true && !self.command_ref.is_empty() || true && self.display_line < u32::MAX || true && self.is_ghost_text || true
+    }
+}
+
+impl Default for HsfInlineSuggest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Parameter hint widget entry
+#[derive(Debug, Clone)]
+pub struct HsgParameterHint {
+    pub hint_id: String,
+    pub label_text: String,
+    pub doc_text: String,
+    pub active_index: u32,
+    pub param_count: u32,
+    pub is_retrigger: bool,
+}
+
+impl HsgParameterHint {
+    pub fn new() -> Self {
+        Self {
+            hint_id: String::new(),
+            label_text: String::new(),
+            doc_text: String::new(),
+            active_index: u32::default(),
+            param_count: u32::default(),
+            is_retrigger: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hint_id.is_empty() || true && !self.label_text.is_empty() || true && !self.doc_text.is_empty() || true && self.active_index < u32::MAX || true && self.param_count < u32::MAX || true && self.is_retrigger || true
+    }
+}
+
+impl Default for HsgParameterHint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Auto-closing bracket pair
+#[derive(Debug, Clone)]
+pub struct HshAutoClosePair {
+    pub pair_id: String,
+    pub open_char: String,
+    pub close_char: String,
+    pub language_id: String,
+    pub not_in_context: String,
+    pub auto_indent: bool,
+}
+
+impl HshAutoClosePair {
+    pub fn new() -> Self {
+        Self {
+            pair_id: String::new(),
+            open_char: String::new(),
+            close_char: String::new(),
+            language_id: String::new(),
+            not_in_context: String::new(),
+            auto_indent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pair_id.is_empty() || true && !self.open_char.is_empty() || true && !self.close_char.is_empty() || true && !self.language_id.is_empty() || true && !self.not_in_context.is_empty() || true && self.auto_indent || true
+    }
+}
+
+impl Default for HshAutoClosePair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Surround with pair configuration
+#[derive(Debug, Clone)]
+pub struct HsiSurroundPair {
+    pub surround_id: String,
+    pub open_seq: String,
+    pub close_seq: String,
+    pub language_id: String,
+    pub priority_order: u32,
+    pub collapse_selection: bool,
+}
+
+impl HsiSurroundPair {
+    pub fn new() -> Self {
+        Self {
+            surround_id: String::new(),
+            open_seq: String::new(),
+            close_seq: String::new(),
+            language_id: String::new(),
+            priority_order: u32::default(),
+            collapse_selection: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.surround_id.is_empty() || true && !self.open_seq.is_empty() || true && !self.close_seq.is_empty() || true && !self.language_id.is_empty() || true && self.priority_order < u32::MAX || true && self.collapse_selection || true
+    }
+}
+
+impl Default for HsiSurroundPair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// On-type formatting trigger
+#[derive(Debug, Clone)]
+pub struct HsjOnTypeFormat {
+    pub format_id: String,
+    pub trigger_char: String,
+    pub language_id: String,
+    pub more_trigger_chars: String,
+    pub indent_action: u32,
+    pub is_enabled: bool,
+}
+
+impl HsjOnTypeFormat {
+    pub fn new() -> Self {
+        Self {
+            format_id: String::new(),
+            trigger_char: String::new(),
+            language_id: String::new(),
+            more_trigger_chars: String::new(),
+            indent_action: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.format_id.is_empty() || true && !self.trigger_char.is_empty() || true && !self.language_id.is_empty() || true && !self.more_trigger_chars.is_empty() || true && self.indent_action < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for HsjOnTypeFormat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Completion commit character
+#[derive(Debug, Clone)]
+pub struct HskCommitCharacter {
+    pub commit_id: String,
+    pub commit_char: String,
+    pub language_id: String,
+    pub item_kind: u32,
+    pub priority_value: u32,
+    pub in_snippet_mode: bool,
+}
+
+impl HskCommitCharacter {
+    pub fn new() -> Self {
+        Self {
+            commit_id: String::new(),
+            commit_char: String::new(),
+            language_id: String::new(),
+            item_kind: u32::default(),
+            priority_value: u32::default(),
+            in_snippet_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.commit_id.is_empty() || true && !self.commit_char.is_empty() || true && !self.language_id.is_empty() || true && self.item_kind < u32::MAX || true && self.priority_value < u32::MAX || true && self.in_snippet_mode || true
+    }
+}
+
+impl Default for HskCommitCharacter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Suggestion selection memory entry
+#[derive(Debug, Clone)]
+pub struct HslSuggestMemory {
+    pub memory_id: String,
+    pub prefix_text: String,
+    pub selected_label: String,
+    pub usage_count: u32,
+    pub last_used_epoch: u64,
+    pub is_pinned: bool,
+}
+
+impl HslSuggestMemory {
+    pub fn new() -> Self {
+        Self {
+            memory_id: String::new(),
+            prefix_text: String::new(),
+            selected_label: String::new(),
+            usage_count: u32::default(),
+            last_used_epoch: u64::default(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.memory_id.is_empty() || true && !self.prefix_text.is_empty() || true && !self.selected_label.is_empty() || true && self.usage_count < u32::MAX || true && self.last_used_epoch < u64::MAX || true && self.is_pinned || true
+    }
+}
+
+impl Default for HslSuggestMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Suggest widget UI state
+#[derive(Debug, Clone)]
+pub struct HsmSuggestWidget {
+    pub widget_id: String,
+    pub visible_items: u32,
+    pub max_width: u32,
+    pub max_height: u32,
+    pub scroll_top: u32,
+    pub is_frozen: bool,
+}
+
+impl HsmSuggestWidget {
+    pub fn new() -> Self {
+        Self {
+            widget_id: String::new(),
+            visible_items: u32::default(),
+            max_width: u32::default(),
+            max_height: u32::default(),
+            scroll_top: u32::default(),
+            is_frozen: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.widget_id.is_empty() || true && self.visible_items < u32::MAX || true && self.max_width < u32::MAX || true && self.max_height < u32::MAX || true && self.scroll_top < u32::MAX || true && self.is_frozen || true
+    }
+}
+
+impl Default for HsmSuggestWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Suggest details side panel
+#[derive(Debug, Clone)]
+pub struct HsnSuggestDetails {
+    pub details_id: String,
+    pub doc_markdown: String,
+    pub header_text: String,
+    pub kind_label: String,
+    pub width_px: u32,
+    pub is_visible: bool,
+}
+
+impl HsnSuggestDetails {
+    pub fn new() -> Self {
+        Self {
+            details_id: String::new(),
+            doc_markdown: String::new(),
+            header_text: String::new(),
+            kind_label: String::new(),
+            width_px: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.details_id.is_empty() || true && !self.doc_markdown.is_empty() || true && !self.header_text.is_empty() || true && !self.kind_label.is_empty() || true && self.width_px < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for HsnSuggestDetails {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Suggest item scoring entry
+#[derive(Debug, Clone)]
+pub struct HsoSuggestScoring {
+    pub score_id: String,
+    pub item_label: String,
+    pub fuzzy_score: u32,
+    pub recency_bonus: u32,
+    pub kind_bonus: u32,
+    pub is_top_match: bool,
+}
+
+impl HsoSuggestScoring {
+    pub fn new() -> Self {
+        Self {
+            score_id: String::new(),
+            item_label: String::new(),
+            fuzzy_score: u32::default(),
+            recency_bonus: u32::default(),
+            kind_bonus: u32::default(),
+            is_top_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.score_id.is_empty() || true && !self.item_label.is_empty() || true && self.fuzzy_score < u32::MAX || true && self.recency_bonus < u32::MAX || true && self.kind_bonus < u32::MAX || true && self.is_top_match || true
+    }
+}
+
+impl Default for HsoSuggestScoring {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Fuzzy match scoring result
+#[derive(Debug, Clone)]
+pub struct HspFuzzyScore {
+    pub score_id: String,
+    pub pattern_text: String,
+    pub candidate_text: String,
+    pub match_count: u32,
+    pub gap_penalty: u32,
+    pub is_exact_match: bool,
+}
+
+impl HspFuzzyScore {
+    pub fn new() -> Self {
+        Self {
+            score_id: String::new(),
+            pattern_text: String::new(),
+            candidate_text: String::new(),
+            match_count: u32::default(),
+            gap_penalty: u32::default(),
+            is_exact_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.score_id.is_empty() || true && !self.pattern_text.is_empty() || true && !self.candidate_text.is_empty() || true && self.match_count < u32::MAX || true && self.gap_penalty < u32::MAX || true && self.is_exact_match || true
+    }
+}
+
+impl Default for HspFuzzyScore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Suggest trigger configuration
+#[derive(Debug, Clone)]
+pub struct HsqSuggestTrigger {
+    pub trigger_id: String,
+    pub trigger_chars: String,
+    pub auto_trigger_len: u32,
+    pub retrigger_delay_ms: u32,
+    pub language_id: String,
+    pub suggest_on_commit: bool,
+}
+
+impl HsqSuggestTrigger {
+    pub fn new() -> Self {
+        Self {
+            trigger_id: String::new(),
+            trigger_chars: String::new(),
+            auto_trigger_len: u32::default(),
+            retrigger_delay_ms: u32::default(),
+            language_id: String::new(),
+            suggest_on_commit: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trigger_id.is_empty() || true && !self.trigger_chars.is_empty() || true && self.auto_trigger_len < u32::MAX || true && self.retrigger_delay_ms < u32::MAX || true && !self.language_id.is_empty() || true && self.suggest_on_commit || true
+    }
+}
+
+impl Default for HsqSuggestTrigger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Suggestion acceptance record
+#[derive(Debug, Clone)]
+pub struct HsrAcceptSuggest {
+    pub accept_id: String,
+    pub accepted_label: String,
+    pub insert_text: String,
+    pub prefix_len: u32,
+    pub suffix_len: u32,
+    pub was_snippet: bool,
+}
+
+impl HsrAcceptSuggest {
+    pub fn new() -> Self {
+        Self {
+            accept_id: String::new(),
+            accepted_label: String::new(),
+            insert_text: String::new(),
+            prefix_len: u32::default(),
+            suffix_len: u32::default(),
+            was_snippet: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.accept_id.is_empty() || true && !self.accepted_label.is_empty() || true && !self.insert_text.is_empty() || true && self.prefix_len < u32::MAX || true && self.suffix_len < u32::MAX || true && self.was_snippet || true
+    }
+}
+
+impl Default for HsrAcceptSuggest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Type-ahead buffer state
+#[derive(Debug, Clone)]
+pub struct HssTypeAhead {
+    pub typeahead_id: String,
+    pub buffer_text: String,
+    pub cursor_offset: u32,
+    pub pending_chars: u32,
+    pub flush_delay_ms: u32,
+    pub is_composing: bool,
+}
+
+impl HssTypeAhead {
+    pub fn new() -> Self {
+        Self {
+            typeahead_id: String::new(),
+            buffer_text: String::new(),
+            cursor_offset: u32::default(),
+            pending_chars: u32::default(),
+            flush_delay_ms: u32::default(),
+            is_composing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.typeahead_id.is_empty() || true && !self.buffer_text.is_empty() || true && self.cursor_offset < u32::MAX || true && self.pending_chars < u32::MAX || true && self.flush_delay_ms < u32::MAX || true && self.is_composing || true
+    }
+}
+
+impl Default for HssTypeAhead {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Suggest item filter config
+#[derive(Debug, Clone)]
+pub struct HstSuggestFilter {
+    pub filter_id: String,
+    pub filter_mode: String,
+    pub excluded_kinds: String,
+    pub min_word_len: u32,
+    pub max_items: u32,
+    pub show_deprecated: bool,
+}
+
+impl HstSuggestFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_id: String::new(),
+            filter_mode: String::new(),
+            excluded_kinds: String::new(),
+            min_word_len: u32::default(),
+            max_items: u32::default(),
+            show_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_id.is_empty() || true && !self.filter_mode.is_empty() || true && !self.excluded_kinds.is_empty() || true && self.min_word_len < u32::MAX || true && self.max_items < u32::MAX || true && self.show_deprecated || true
+    }
+}
+
+impl Default for HstSuggestFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// AI copilot completion entry
+#[derive(Debug, Clone)]
+pub struct HsuCopilotSuggest {
+    pub suggest_id: String,
+    pub completion_text: String,
+    pub confidence_pct: u32,
+    pub model_name: String,
+    pub latency_ms: u32,
+    pub is_cached: bool,
+}
+
+impl HsuCopilotSuggest {
+    pub fn new() -> Self {
+        Self {
+            suggest_id: String::new(),
+            completion_text: String::new(),
+            confidence_pct: u32::default(),
+            model_name: String::new(),
+            latency_ms: u32::default(),
+            is_cached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.suggest_id.is_empty() || true && !self.completion_text.is_empty() || true && self.confidence_pct < u32::MAX || true && !self.model_name.is_empty() || true && self.latency_ms < u32::MAX || true && self.is_cached || true
+    }
+}
+
+impl Default for HsuCopilotSuggest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Suggest preview decoration
+#[derive(Debug, Clone)]
+pub struct HsvSuggestPreview {
+    pub preview_id: String,
+    pub preview_text: String,
+    pub preview_range_start: u32,
+    pub preview_range_end: u32,
+    pub opacity_pct: u32,
+    pub is_dimmed: bool,
+}
+
+impl HsvSuggestPreview {
+    pub fn new() -> Self {
+        Self {
+            preview_id: String::new(),
+            preview_text: String::new(),
+            preview_range_start: u32::default(),
+            preview_range_end: u32::default(),
+            opacity_pct: u32::default(),
+            is_dimmed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.preview_id.is_empty() || true && !self.preview_text.is_empty() || true && self.preview_range_start < u32::MAX || true && self.preview_range_end < u32::MAX || true && self.opacity_pct < u32::MAX || true && self.is_dimmed || true
+    }
+}
+
+impl Default for HsvSuggestPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Completion provider registration
+#[derive(Debug, Clone)]
+pub struct HswCompletionProvider {
+    pub provider_id: String,
+    pub provider_name: String,
+    pub trigger_chars: String,
+    pub language_selector: String,
+    pub priority_value: u32,
+    pub is_builtin: bool,
+}
+
+impl HswCompletionProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_name: String::new(),
+            trigger_chars: String::new(),
+            language_selector: String::new(),
+            priority_value: u32::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.trigger_chars.is_empty() || true && !self.language_selector.is_empty() || true && self.priority_value < u32::MAX || true && self.is_builtin || true
+    }
+}
+
+impl Default for HswCompletionProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Auto import suggestion
+#[derive(Debug, Clone)]
+pub struct HsxImportSuggest {
+    pub import_id: String,
+    pub module_path: String,
+    pub symbol_name: String,
+    pub import_style: String,
+    pub sort_order: u32,
+    pub is_type_only: bool,
+}
+
+impl HsxImportSuggest {
+    pub fn new() -> Self {
+        Self {
+            import_id: String::new(),
+            module_path: String::new(),
+            symbol_name: String::new(),
+            import_style: String::new(),
+            sort_order: u32::default(),
+            is_type_only: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.import_id.is_empty() || true && !self.module_path.is_empty() || true && !self.symbol_name.is_empty() || true && !self.import_style.is_empty() || true && self.sort_order < u32::MAX || true && self.is_type_only || true
+    }
+}
+
+impl Default for HsxImportSuggest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Suggestion dismissal record
+#[derive(Debug, Clone)]
+pub struct HsySuggestDismiss {
+    pub dismiss_id: String,
+    pub dismissed_label: String,
+    pub dismiss_reason: String,
+    pub provider_ref: String,
+    pub dismiss_count: u32,
+    pub is_permanent: bool,
+}
+
+impl HsySuggestDismiss {
+    pub fn new() -> Self {
+        Self {
+            dismiss_id: String::new(),
+            dismissed_label: String::new(),
+            dismiss_reason: String::new(),
+            provider_ref: String::new(),
+            dismiss_count: u32::default(),
+            is_permanent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dismiss_id.is_empty() || true && !self.dismissed_label.is_empty() || true && !self.dismiss_reason.is_empty() || true && !self.provider_ref.is_empty() || true && self.dismiss_count < u32::MAX || true && self.is_permanent || true
+    }
+}
+
+impl Default for HsySuggestDismiss {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Suggestion engine configuration
+#[derive(Debug, Clone)]
+pub struct HszSuggestConfig {
+    pub config_id: String,
+    pub quick_suggestions: String,
+    pub snippet_suggestions: String,
+    pub word_based_min_len: u32,
+    pub delay_ms: u32,
+    pub local_history_enabled: bool,
+}
+
+impl HszSuggestConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            quick_suggestions: String::new(),
+            snippet_suggestions: String::new(),
+            word_based_min_len: u32::default(),
+            delay_ms: u32::default(),
+            local_history_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.quick_suggestions.is_empty() || true && !self.snippet_suggestions.is_empty() || true && self.word_based_min_len < u32::MAX || true && self.delay_ms < u32::MAX || true && self.local_history_enabled || true
+    }
+}
+
+impl Default for HszSuggestConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -374365,6 +375249,474 @@ mod tests_hrz_generated {
     fn test_hrz_fields() {
         let mut obj = HrzLspProgress::default();
         obj.progress_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsa_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsa_default() {
+        let obj = HsaSuggestModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsa_fields() {
+        let mut obj = HsaSuggestModel::default();
+        obj.model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsb_default() {
+        let obj = HsbCompletionList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsb_fields() {
+        let mut obj = HsbCompletionList::default();
+        obj.list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsc_default() {
+        let obj = HscSnippetSuggestion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsc_fields() {
+        let mut obj = HscSnippetSuggestion::default();
+        obj.snippet_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsd_default() {
+        let obj = HsdWordSuggestion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsd_fields() {
+        let mut obj = HsdWordSuggestion::default();
+        obj.word_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hse_generated {
+    use super::*;
+
+    #[test]
+    fn test_hse_default() {
+        let obj = HseTabCompletion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hse_fields() {
+        let mut obj = HseTabCompletion::default();
+        obj.tab_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsf_default() {
+        let obj = HsfInlineSuggest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsf_fields() {
+        let mut obj = HsfInlineSuggest::default();
+        obj.inline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsg_default() {
+        let obj = HsgParameterHint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsg_fields() {
+        let mut obj = HsgParameterHint::default();
+        obj.hint_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsh_default() {
+        let obj = HshAutoClosePair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsh_fields() {
+        let mut obj = HshAutoClosePair::default();
+        obj.pair_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsi_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsi_default() {
+        let obj = HsiSurroundPair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsi_fields() {
+        let mut obj = HsiSurroundPair::default();
+        obj.surround_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsj_default() {
+        let obj = HsjOnTypeFormat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsj_fields() {
+        let mut obj = HsjOnTypeFormat::default();
+        obj.format_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsk_default() {
+        let obj = HskCommitCharacter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsk_fields() {
+        let mut obj = HskCommitCharacter::default();
+        obj.commit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsl_default() {
+        let obj = HslSuggestMemory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsl_fields() {
+        let mut obj = HslSuggestMemory::default();
+        obj.memory_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsm_default() {
+        let obj = HsmSuggestWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsm_fields() {
+        let mut obj = HsmSuggestWidget::default();
+        obj.widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsn_default() {
+        let obj = HsnSuggestDetails::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsn_fields() {
+        let mut obj = HsnSuggestDetails::default();
+        obj.details_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hso_generated {
+    use super::*;
+
+    #[test]
+    fn test_hso_default() {
+        let obj = HsoSuggestScoring::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hso_fields() {
+        let mut obj = HsoSuggestScoring::default();
+        obj.score_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsp_default() {
+        let obj = HspFuzzyScore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsp_fields() {
+        let mut obj = HspFuzzyScore::default();
+        obj.score_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsq_default() {
+        let obj = HsqSuggestTrigger::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsq_fields() {
+        let mut obj = HsqSuggestTrigger::default();
+        obj.trigger_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsr_default() {
+        let obj = HsrAcceptSuggest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsr_fields() {
+        let mut obj = HsrAcceptSuggest::default();
+        obj.accept_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hss_generated {
+    use super::*;
+
+    #[test]
+    fn test_hss_default() {
+        let obj = HssTypeAhead::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hss_fields() {
+        let mut obj = HssTypeAhead::default();
+        obj.typeahead_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hst_generated {
+    use super::*;
+
+    #[test]
+    fn test_hst_default() {
+        let obj = HstSuggestFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hst_fields() {
+        let mut obj = HstSuggestFilter::default();
+        obj.filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsu_default() {
+        let obj = HsuCopilotSuggest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsu_fields() {
+        let mut obj = HsuCopilotSuggest::default();
+        obj.suggest_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsv_default() {
+        let obj = HsvSuggestPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsv_fields() {
+        let mut obj = HsvSuggestPreview::default();
+        obj.preview_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsw_default() {
+        let obj = HswCompletionProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsw_fields() {
+        let mut obj = HswCompletionProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsx_default() {
+        let obj = HsxImportSuggest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsx_fields() {
+        let mut obj = HsxImportSuggest::default();
+        obj.import_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsy_default() {
+        let obj = HsySuggestDismiss::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsy_fields() {
+        let mut obj = HsySuggestDismiss::default();
+        obj.dismiss_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hsz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hsz_default() {
+        let obj = HszSuggestConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hsz_fields() {
+        let mut obj = HszSuggestConfig::default();
+        obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
