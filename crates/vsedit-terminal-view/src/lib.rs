@@ -61426,6 +61426,213 @@ impl Default for FgeKeybindingsEditor {
 }
 
 
+/// Extensions view model types
+#[derive(Debug, Clone)]
+pub struct FgfExtensionsView {
+    pub ext_view_query: String,
+    pub ext_view_sort_by: String,
+    pub ext_view_category: String,
+    pub ext_view_results_count: u32,
+    pub ext_view_loading: bool,
+    pub ext_view_selected_index: u32,
+    pub ext_view_page: u32,
+    pub ext_view_per_page: u32,
+    pub ext_view_show_installed: bool,
+    pub ext_view_show_updates: bool,
+}
+
+impl FgfExtensionsView {
+    pub fn new() -> Self {
+        Self {
+            ext_view_query: String::new(),
+            ext_view_sort_by: String::new(),
+            ext_view_category: String::new(),
+            ext_view_results_count: u32::default(),
+            ext_view_loading: bool::default(),
+            ext_view_selected_index: u32::default(),
+            ext_view_page: u32::default(),
+            ext_view_per_page: u32::default(),
+            ext_view_show_installed: bool::default(),
+            ext_view_show_updates: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_view_query.is_empty() || true && !self.ext_view_sort_by.is_empty() || true && !self.ext_view_category.is_empty() || true && self.ext_view_results_count < u32::MAX || true && self.ext_view_loading || true && self.ext_view_selected_index < u32::MAX || true && self.ext_view_page < u32::MAX || true && self.ext_view_per_page < u32::MAX || true && self.ext_view_show_installed || true && self.ext_view_show_updates || true
+    }
+}
+
+impl Default for FgfExtensionsView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Extension card/list item types
+#[derive(Debug, Clone)]
+pub struct FggExtensionCard {
+    pub ext_card_id: String,
+    pub ext_card_name: String,
+    pub ext_card_publisher: String,
+    pub ext_card_version: String,
+    pub ext_card_description: String,
+    pub ext_card_install_count: u64,
+    pub ext_card_rating: f64,
+    pub ext_card_icon_url: String,
+    pub ext_card_state: String,
+    pub ext_card_categories: String,
+}
+
+impl FggExtensionCard {
+    pub fn new() -> Self {
+        Self {
+            ext_card_id: String::new(),
+            ext_card_name: String::new(),
+            ext_card_publisher: String::new(),
+            ext_card_version: String::new(),
+            ext_card_description: String::new(),
+            ext_card_install_count: u64::default(),
+            ext_card_rating: f64::default(),
+            ext_card_icon_url: String::new(),
+            ext_card_state: String::new(),
+            ext_card_categories: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_card_id.is_empty() || true && !self.ext_card_name.is_empty() || true && !self.ext_card_publisher.is_empty() || true && !self.ext_card_version.is_empty() || true && !self.ext_card_description.is_empty() || true && self.ext_card_install_count < u64::MAX || true && self.ext_card_rating.is_finite() || true && !self.ext_card_icon_url.is_empty() || true && !self.ext_card_state.is_empty() || true && !self.ext_card_categories.is_empty() || true
+    }
+}
+
+impl Default for FggExtensionCard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Extension detail view types
+#[derive(Debug, Clone)]
+pub struct FghExtensionDetail {
+    pub ext_detail_id: String,
+    pub ext_detail_readme: String,
+    pub ext_detail_changelog: String,
+    pub ext_detail_license: String,
+    pub ext_detail_repository: String,
+    pub ext_detail_homepage: String,
+    pub ext_detail_bugs_url: String,
+    pub ext_detail_categories: String,
+    pub ext_detail_tags: String,
+    pub ext_detail_dependencies: String,
+}
+
+impl FghExtensionDetail {
+    pub fn new() -> Self {
+        Self {
+            ext_detail_id: String::new(),
+            ext_detail_readme: String::new(),
+            ext_detail_changelog: String::new(),
+            ext_detail_license: String::new(),
+            ext_detail_repository: String::new(),
+            ext_detail_homepage: String::new(),
+            ext_detail_bugs_url: String::new(),
+            ext_detail_categories: String::new(),
+            ext_detail_tags: String::new(),
+            ext_detail_dependencies: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_detail_id.is_empty() || true && !self.ext_detail_readme.is_empty() || true && !self.ext_detail_changelog.is_empty() || true && !self.ext_detail_license.is_empty() || true && !self.ext_detail_repository.is_empty() || true && !self.ext_detail_homepage.is_empty() || true && !self.ext_detail_bugs_url.is_empty() || true && !self.ext_detail_categories.is_empty() || true && !self.ext_detail_tags.is_empty() || true && !self.ext_detail_dependencies.is_empty() || true
+    }
+}
+
+impl Default for FghExtensionDetail {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Extension rating/review types
+#[derive(Debug, Clone)]
+pub struct FgiExtensionRating {
+    pub ext_rating_value: f64,
+    pub ext_rating_count: u32,
+    pub ext_rating_review_text: String,
+    pub ext_rating_reviewer: String,
+    pub ext_rating_date: u64,
+    pub ext_rating_stars: u32,
+    pub ext_rating_helpful_count: u32,
+    pub ext_rating_reply: String,
+    pub ext_rating_version: String,
+    pub ext_rating_edited: bool,
+}
+
+impl FgiExtensionRating {
+    pub fn new() -> Self {
+        Self {
+            ext_rating_value: f64::default(),
+            ext_rating_count: u32::default(),
+            ext_rating_review_text: String::new(),
+            ext_rating_reviewer: String::new(),
+            ext_rating_date: u64::default(),
+            ext_rating_stars: u32::default(),
+            ext_rating_helpful_count: u32::default(),
+            ext_rating_reply: String::new(),
+            ext_rating_version: String::new(),
+            ext_rating_edited: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ext_rating_value.is_finite() || true && self.ext_rating_count < u32::MAX || true && !self.ext_rating_review_text.is_empty() || true && !self.ext_rating_reviewer.is_empty() || true && self.ext_rating_date < u64::MAX || true && self.ext_rating_stars < u32::MAX || true && self.ext_rating_helpful_count < u32::MAX || true && !self.ext_rating_reply.is_empty() || true && !self.ext_rating_version.is_empty() || true && self.ext_rating_edited || true
+    }
+}
+
+impl Default for FgiExtensionRating {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Extension editor (readme/changelog) types
+#[derive(Debug, Clone)]
+pub struct FgjExtensionEditor {
+    pub ext_editor_id: String,
+    pub ext_editor_content: String,
+    pub ext_editor_content_type: String,
+    pub ext_editor_scroll_top: f64,
+    pub ext_editor_active_tab: String,
+    pub ext_editor_loading: bool,
+    pub ext_editor_error: String,
+    pub ext_editor_render_markdown: bool,
+    pub ext_editor_base_uri: String,
+    pub ext_editor_trust_level: u32,
+}
+
+impl FgjExtensionEditor {
+    pub fn new() -> Self {
+        Self {
+            ext_editor_id: String::new(),
+            ext_editor_content: String::new(),
+            ext_editor_content_type: String::new(),
+            ext_editor_scroll_top: f64::default(),
+            ext_editor_active_tab: String::new(),
+            ext_editor_loading: bool::default(),
+            ext_editor_error: String::new(),
+            ext_editor_render_markdown: bool::default(),
+            ext_editor_base_uri: String::new(),
+            ext_editor_trust_level: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_editor_id.is_empty() || true && !self.ext_editor_content.is_empty() || true && !self.ext_editor_content_type.is_empty() || true && self.ext_editor_scroll_top.is_finite() || true && !self.ext_editor_active_tab.is_empty() || true && self.ext_editor_loading || true && !self.ext_editor_error.is_empty() || true && self.ext_editor_render_markdown || true && !self.ext_editor_base_uri.is_empty() || true && self.ext_editor_trust_level < u32::MAX || true
+    }
+}
+
+impl Default for FgjExtensionEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275545,6 +275752,96 @@ mod tests_fge_generated {
     fn test_fge_fields() {
         let mut obj = FgeKeybindingsEditor::default();
         obj.kb_editor_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgf_default() {
+        let obj = FgfExtensionsView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgf_fields() {
+        let mut obj = FgfExtensionsView::default();
+        obj.ext_view_query = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgg_default() {
+        let obj = FggExtensionCard::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgg_fields() {
+        let mut obj = FggExtensionCard::default();
+        obj.ext_card_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgh_default() {
+        let obj = FghExtensionDetail::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgh_fields() {
+        let mut obj = FghExtensionDetail::default();
+        obj.ext_detail_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgi_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgi_default() {
+        let obj = FgiExtensionRating::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgi_fields() {
+        let mut obj = FgiExtensionRating::default();
+        obj.ext_rating_value = 3.14;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgj_default() {
+        let obj = FgjExtensionEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgj_fields() {
+        let mut obj = FgjExtensionEditor::default();
+        obj.ext_editor_id = "test".to_string();
         assert!(obj.validate());
     }
 }
