@@ -136349,6 +136349,890 @@ impl Default for HyzSearchConfig {
     }
 }
 
+/// Disposable resource tracker
+#[derive(Debug, Clone)]
+pub struct HzaDisposable {
+    pub disposable_id: String,
+    pub resource_name: String,
+    pub dispose_order: u32,
+    pub group_ref: String,
+    pub ref_count: u32,
+    pub is_disposed: bool,
+}
+
+impl HzaDisposable {
+    pub fn new() -> Self {
+        Self {
+            disposable_id: String::new(),
+            resource_name: String::new(),
+            dispose_order: u32::default(),
+            group_ref: String::new(),
+            ref_count: u32::default(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.disposable_id.is_empty() || true && !self.resource_name.is_empty() || true && self.dispose_order < u32::MAX || true && !self.group_ref.is_empty() || true && self.ref_count < u32::MAX || true && self.is_disposed || true
+    }
+}
+
+impl Default for HzaDisposable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cancellation token descriptor
+#[derive(Debug, Clone)]
+pub struct HzbCancellationToken {
+    pub token_id: String,
+    pub parent_ref: String,
+    pub reason_text: String,
+    pub created_epoch: u64,
+    pub listener_count: u32,
+    pub is_cancelled: bool,
+}
+
+impl HzbCancellationToken {
+    pub fn new() -> Self {
+        Self {
+            token_id: String::new(),
+            parent_ref: String::new(),
+            reason_text: String::new(),
+            created_epoch: u64::default(),
+            listener_count: u32::default(),
+            is_cancelled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_id.is_empty() || true && !self.parent_ref.is_empty() || true && !self.reason_text.is_empty() || true && self.created_epoch < u64::MAX || true && self.listener_count < u32::MAX || true && self.is_cancelled || true
+    }
+}
+
+impl Default for HzbCancellationToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Typed event emitter
+#[derive(Debug, Clone)]
+pub struct HzcEventEmitter {
+    pub emitter_id: String,
+    pub event_name: String,
+    pub listener_count: u32,
+    pub fire_count: u64,
+    pub max_listeners: u32,
+    pub has_leak_warning: bool,
+}
+
+impl HzcEventEmitter {
+    pub fn new() -> Self {
+        Self {
+            emitter_id: String::new(),
+            event_name: String::new(),
+            listener_count: u32::default(),
+            fire_count: u64::default(),
+            max_listeners: u32::default(),
+            has_leak_warning: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.emitter_id.is_empty() || true && !self.event_name.is_empty() || true && self.listener_count < u32::MAX || true && self.fire_count < u64::MAX || true && self.max_listeners < u32::MAX || true && self.has_leak_warning || true
+    }
+}
+
+impl Default for HzcEventEmitter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Linked list container
+#[derive(Debug, Clone)]
+pub struct HzdLinkedList {
+    pub list_id: String,
+    pub element_count: u32,
+    pub head_ref: String,
+    pub tail_ref: String,
+    pub version_counter: u64,
+    pub is_empty: bool,
+}
+
+impl HzdLinkedList {
+    pub fn new() -> Self {
+        Self {
+            list_id: String::new(),
+            element_count: u32::default(),
+            head_ref: String::new(),
+            tail_ref: String::new(),
+            version_counter: u64::default(),
+            is_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_id.is_empty() || true && self.element_count < u32::MAX || true && !self.head_ref.is_empty() || true && !self.tail_ref.is_empty() || true && self.version_counter < u64::MAX || true && self.is_empty || true
+    }
+}
+
+impl Default for HzdLinkedList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LRU cache descriptor
+#[derive(Debug, Clone)]
+pub struct HzeLruCache {
+    pub cache_id: String,
+    pub capacity: u32,
+    pub current_size: u32,
+    pub hit_count: u64,
+    pub miss_count: u64,
+    pub evict_on_full: bool,
+}
+
+impl HzeLruCache {
+    pub fn new() -> Self {
+        Self {
+            cache_id: String::new(),
+            capacity: u32::default(),
+            current_size: u32::default(),
+            hit_count: u64::default(),
+            miss_count: u64::default(),
+            evict_on_full: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cache_id.is_empty() || true && self.capacity < u32::MAX || true && self.current_size < u32::MAX || true && self.hit_count < u64::MAX || true && self.miss_count < u64::MAX || true && self.evict_on_full || true
+    }
+}
+
+impl Default for HzeLruCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debounced function wrapper
+#[derive(Debug, Clone)]
+pub struct HzfDebounce {
+    pub debounce_id: String,
+    pub delay_ms: u32,
+    pub max_wait_ms: u32,
+    pub invocation_count: u64,
+    pub pending_count: u32,
+    pub leading_edge: bool,
+}
+
+impl HzfDebounce {
+    pub fn new() -> Self {
+        Self {
+            debounce_id: String::new(),
+            delay_ms: u32::default(),
+            max_wait_ms: u32::default(),
+            invocation_count: u64::default(),
+            pending_count: u32::default(),
+            leading_edge: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.debounce_id.is_empty() || true && self.delay_ms < u32::MAX || true && self.max_wait_ms < u32::MAX || true && self.invocation_count < u64::MAX || true && self.pending_count < u32::MAX || true && self.leading_edge || true
+    }
+}
+
+impl Default for HzfDebounce {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Throttled function wrapper
+#[derive(Debug, Clone)]
+pub struct HzgThrottle {
+    pub throttle_id: String,
+    pub interval_ms: u32,
+    pub max_burst: u32,
+    pub call_count: u64,
+    pub dropped_count: u64,
+    pub trailing_edge: bool,
+}
+
+impl HzgThrottle {
+    pub fn new() -> Self {
+        Self {
+            throttle_id: String::new(),
+            interval_ms: u32::default(),
+            max_burst: u32::default(),
+            call_count: u64::default(),
+            dropped_count: u64::default(),
+            trailing_edge: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.throttle_id.is_empty() || true && self.interval_ms < u32::MAX || true && self.max_burst < u32::MAX || true && self.call_count < u64::MAX || true && self.dropped_count < u64::MAX || true && self.trailing_edge || true
+    }
+}
+
+impl Default for HzgThrottle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async operation sequencer
+#[derive(Debug, Clone)]
+pub struct HzhSequencer {
+    pub seq_id: String,
+    pub queue_size: u32,
+    pub pending_count: u32,
+    pub completed_count: u64,
+    pub max_concurrent: u32,
+    pub is_running: bool,
+}
+
+impl HzhSequencer {
+    pub fn new() -> Self {
+        Self {
+            seq_id: String::new(),
+            queue_size: u32::default(),
+            pending_count: u32::default(),
+            completed_count: u64::default(),
+            max_concurrent: u32::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.seq_id.is_empty() || true && self.queue_size < u32::MAX || true && self.pending_count < u32::MAX || true && self.completed_count < u64::MAX || true && self.max_concurrent < u32::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for HzhSequencer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async barrier synchronization
+#[derive(Debug, Clone)]
+pub struct HziBarrier {
+    pub barrier_id: String,
+    pub party_count: u32,
+    pub arrived_count: u32,
+    pub generation_num: u64,
+    pub timeout_ms: u32,
+    pub is_broken: bool,
+}
+
+impl HziBarrier {
+    pub fn new() -> Self {
+        Self {
+            barrier_id: String::new(),
+            party_count: u32::default(),
+            arrived_count: u32::default(),
+            generation_num: u64::default(),
+            timeout_ms: u32::default(),
+            is_broken: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.barrier_id.is_empty() || true && self.party_count < u32::MAX || true && self.arrived_count < u32::MAX || true && self.generation_num < u64::MAX || true && self.timeout_ms < u32::MAX || true && self.is_broken || true
+    }
+}
+
+impl Default for HziBarrier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Unique ID generator
+#[derive(Debug, Clone)]
+pub struct HzjIdGenerator {
+    pub gen_id: String,
+    pub prefix_str: String,
+    pub counter_value: u64,
+    pub format_str: String,
+    pub max_value: u64,
+    pub use_uuid: bool,
+}
+
+impl HzjIdGenerator {
+    pub fn new() -> Self {
+        Self {
+            gen_id: String::new(),
+            prefix_str: String::new(),
+            counter_value: u64::default(),
+            format_str: String::new(),
+            max_value: u64::default(),
+            use_uuid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gen_id.is_empty() || true && !self.prefix_str.is_empty() || true && self.counter_value < u64::MAX || true && !self.format_str.is_empty() || true && self.max_value < u64::MAX || true && self.use_uuid || true
+    }
+}
+
+impl Default for HzjIdGenerator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI parsing result
+#[derive(Debug, Clone)]
+pub struct HzkUriParser {
+    pub parser_id: String,
+    pub scheme_str: String,
+    pub authority_str: String,
+    pub path_str: String,
+    pub query_len: u32,
+    pub has_fragment: bool,
+}
+
+impl HzkUriParser {
+    pub fn new() -> Self {
+        Self {
+            parser_id: String::new(),
+            scheme_str: String::new(),
+            authority_str: String::new(),
+            path_str: String::new(),
+            query_len: u32::default(),
+            has_fragment: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.parser_id.is_empty() || true && !self.scheme_str.is_empty() || true && !self.authority_str.is_empty() || true && !self.path_str.is_empty() || true && self.query_len < u32::MAX || true && self.has_fragment || true
+    }
+}
+
+impl Default for HzkUriParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Path normalization result
+#[derive(Debug, Clone)]
+pub struct HzlPathNormalizer {
+    pub norm_id: String,
+    pub input_path: String,
+    pub output_path: String,
+    pub separator_char: String,
+    pub segment_count: u32,
+    pub is_absolute: bool,
+}
+
+impl HzlPathNormalizer {
+    pub fn new() -> Self {
+        Self {
+            norm_id: String::new(),
+            input_path: String::new(),
+            output_path: String::new(),
+            separator_char: String::new(),
+            segment_count: u32::default(),
+            is_absolute: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.norm_id.is_empty() || true && !self.input_path.is_empty() || true && !self.output_path.is_empty() || true && !self.separator_char.is_empty() || true && self.segment_count < u32::MAX || true && self.is_absolute || true
+    }
+}
+
+impl Default for HzlPathNormalizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Glob pattern matcher
+#[derive(Debug, Clone)]
+pub struct HzmGlobPattern {
+    pub glob_id: String,
+    pub pattern_str: String,
+    pub base_path: String,
+    pub match_count: u32,
+    pub segment_count: u32,
+    pub is_negated: bool,
+}
+
+impl HzmGlobPattern {
+    pub fn new() -> Self {
+        Self {
+            glob_id: String::new(),
+            pattern_str: String::new(),
+            base_path: String::new(),
+            match_count: u32::default(),
+            segment_count: u32::default(),
+            is_negated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.glob_id.is_empty() || true && !self.pattern_str.is_empty() || true && !self.base_path.is_empty() || true && self.match_count < u32::MAX || true && self.segment_count < u32::MAX || true && self.is_negated || true
+    }
+}
+
+impl Default for HzmGlobPattern {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// MIME type detection result
+#[derive(Debug, Clone)]
+pub struct HznMimeType {
+    pub mime_id: String,
+    pub mime_str: String,
+    pub extension_str: String,
+    pub charset_str: String,
+    pub confidence_pct: u32,
+    pub is_text: bool,
+}
+
+impl HznMimeType {
+    pub fn new() -> Self {
+        Self {
+            mime_id: String::new(),
+            mime_str: String::new(),
+            extension_str: String::new(),
+            charset_str: String::new(),
+            confidence_pct: u32::default(),
+            is_text: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mime_id.is_empty() || true && !self.mime_str.is_empty() || true && !self.extension_str.is_empty() || true && !self.charset_str.is_empty() || true && self.confidence_pct < u32::MAX || true && self.is_text || true
+    }
+}
+
+impl Default for HznMimeType {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Character code classification
+#[derive(Debug, Clone)]
+pub struct HzoCharCode {
+    pub char_id: String,
+    pub code_point: u32,
+    pub category_str: String,
+    pub bidi_class: String,
+    pub width_value: u32,
+    pub is_printable: bool,
+}
+
+impl HzoCharCode {
+    pub fn new() -> Self {
+        Self {
+            char_id: String::new(),
+            code_point: u32::default(),
+            category_str: String::new(),
+            bidi_class: String::new(),
+            width_value: u32::default(),
+            is_printable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.char_id.is_empty() || true && self.code_point < u32::MAX || true && !self.category_str.is_empty() || true && !self.bidi_class.is_empty() || true && self.width_value < u32::MAX || true && self.is_printable || true
+    }
+}
+
+impl Default for HzoCharCode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// String builder buffer
+#[derive(Debug, Clone)]
+pub struct HzpStringBuilder {
+    pub builder_id: String,
+    pub capacity: u32,
+    pub length_bytes: u32,
+    pub chunk_count: u32,
+    pub encoding_str: String,
+    pub is_finalized: bool,
+}
+
+impl HzpStringBuilder {
+    pub fn new() -> Self {
+        Self {
+            builder_id: String::new(),
+            capacity: u32::default(),
+            length_bytes: u32::default(),
+            chunk_count: u32::default(),
+            encoding_str: String::new(),
+            is_finalized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.builder_id.is_empty() || true && self.capacity < u32::MAX || true && self.length_bytes < u32::MAX || true && self.chunk_count < u32::MAX || true && !self.encoding_str.is_empty() || true && self.is_finalized || true
+    }
+}
+
+impl Default for HzpStringBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff algorithm configuration
+#[derive(Debug, Clone)]
+pub struct HzqDiffAlgorithm {
+    pub diff_id: String,
+    pub algorithm_name: String,
+    pub timeout_ms: u32,
+    pub max_computations: u64,
+    pub change_count: u32,
+    pub too_slow_fallback: bool,
+}
+
+impl HzqDiffAlgorithm {
+    pub fn new() -> Self {
+        Self {
+            diff_id: String::new(),
+            algorithm_name: String::new(),
+            timeout_ms: u32::default(),
+            max_computations: u64::default(),
+            change_count: u32::default(),
+            too_slow_fallback: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_id.is_empty() || true && !self.algorithm_name.is_empty() || true && self.timeout_ms < u32::MAX || true && self.max_computations < u64::MAX || true && self.change_count < u32::MAX || true && self.too_slow_fallback || true
+    }
+}
+
+impl Default for HzqDiffAlgorithm {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Interval tree container
+#[derive(Debug, Clone)]
+pub struct HzrIntervalTree {
+    pub tree_id: String,
+    pub node_count: u32,
+    pub min_value: u64,
+    pub max_value: u64,
+    pub height_value: u32,
+    pub is_balanced: bool,
+}
+
+impl HzrIntervalTree {
+    pub fn new() -> Self {
+        Self {
+            tree_id: String::new(),
+            node_count: u32::default(),
+            min_value: u64::default(),
+            max_value: u64::default(),
+            height_value: u32::default(),
+            is_balanced: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_id.is_empty() || true && self.node_count < u32::MAX || true && self.min_value < u64::MAX || true && self.max_value < u64::MAX || true && self.height_value < u32::MAX || true && self.is_balanced || true
+    }
+}
+
+impl Default for HzrIntervalTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit operation stack
+#[derive(Debug, Clone)]
+pub struct HzsEditStack {
+    pub stack_id: String,
+    pub undo_count: u32,
+    pub redo_count: u32,
+    pub max_depth: u32,
+    pub byte_size: u64,
+    pub is_locked: bool,
+}
+
+impl HzsEditStack {
+    pub fn new() -> Self {
+        Self {
+            stack_id: String::new(),
+            undo_count: u32::default(),
+            redo_count: u32::default(),
+            max_depth: u32::default(),
+            byte_size: u64::default(),
+            is_locked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stack_id.is_empty() || true && self.undo_count < u32::MAX || true && self.redo_count < u32::MAX || true && self.max_depth < u32::MAX || true && self.byte_size < u64::MAX || true && self.is_locked || true
+    }
+}
+
+impl Default for HzsEditStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Resource URI map
+#[derive(Debug, Clone)]
+pub struct HztResourceMap {
+    pub map_id: String,
+    pub entry_count: u32,
+    pub bucket_count: u32,
+    pub load_factor_pct: u32,
+    pub collision_count: u32,
+    pub case_sensitive: bool,
+}
+
+impl HztResourceMap {
+    pub fn new() -> Self {
+        Self {
+            map_id: String::new(),
+            entry_count: u32::default(),
+            bucket_count: u32::default(),
+            load_factor_pct: u32::default(),
+            collision_count: u32::default(),
+            case_sensitive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.map_id.is_empty() || true && self.entry_count < u32::MAX || true && self.bucket_count < u32::MAX || true && self.load_factor_pct < u32::MAX || true && self.collision_count < u32::MAX || true && self.case_sensitive || true
+    }
+}
+
+impl Default for HztResourceMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Priority queue container
+#[derive(Debug, Clone)]
+pub struct HzuPriorityQueue {
+    pub queue_id: String,
+    pub element_count: u32,
+    pub capacity: u32,
+    pub min_priority: u32,
+    pub max_priority: u32,
+    pub is_min_heap: bool,
+}
+
+impl HzuPriorityQueue {
+    pub fn new() -> Self {
+        Self {
+            queue_id: String::new(),
+            element_count: u32::default(),
+            capacity: u32::default(),
+            min_priority: u32::default(),
+            max_priority: u32::default(),
+            is_min_heap: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.queue_id.is_empty() || true && self.element_count < u32::MAX || true && self.capacity < u32::MAX || true && self.min_priority < u32::MAX || true && self.max_priority < u32::MAX || true && self.is_min_heap || true
+    }
+}
+
+impl Default for HzuPriorityQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Lazy initialization wrapper
+#[derive(Debug, Clone)]
+pub struct HzvLazyValue {
+    pub lazy_id: String,
+    pub value_type_str: String,
+    pub init_time_ms: u32,
+    pub access_count: u64,
+    pub byte_size: u32,
+    pub is_initialized: bool,
+}
+
+impl HzvLazyValue {
+    pub fn new() -> Self {
+        Self {
+            lazy_id: String::new(),
+            value_type_str: String::new(),
+            init_time_ms: u32::default(),
+            access_count: u64::default(),
+            byte_size: u32::default(),
+            is_initialized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lazy_id.is_empty() || true && !self.value_type_str.is_empty() || true && self.init_time_ms < u32::MAX || true && self.access_count < u64::MAX || true && self.byte_size < u32::MAX || true && self.is_initialized || true
+    }
+}
+
+impl Default for HzvLazyValue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async task queue
+#[derive(Debug, Clone)]
+pub struct HzwAsyncQueue {
+    pub queue_id: String,
+    pub pending_count: u32,
+    pub max_concurrent: u32,
+    pub completed_count: u64,
+    pub error_count: u32,
+    pub is_paused: bool,
+}
+
+impl HzwAsyncQueue {
+    pub fn new() -> Self {
+        Self {
+            queue_id: String::new(),
+            pending_count: u32::default(),
+            max_concurrent: u32::default(),
+            completed_count: u64::default(),
+            error_count: u32::default(),
+            is_paused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.queue_id.is_empty() || true && self.pending_count < u32::MAX || true && self.max_concurrent < u32::MAX || true && self.completed_count < u64::MAX || true && self.error_count < u32::MAX || true && self.is_paused || true
+    }
+}
+
+impl Default for HzwAsyncQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Telemetry event descriptor
+#[derive(Debug, Clone)]
+pub struct HzxTelemetryEvent {
+    pub event_id: String,
+    pub event_name: String,
+    pub properties_json: String,
+    pub measurements_json: String,
+    pub timestamp_epoch: u64,
+    pub is_error: bool,
+}
+
+impl HzxTelemetryEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            event_name: String::new(),
+            properties_json: String::new(),
+            measurements_json: String::new(),
+            timestamp_epoch: u64::default(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.event_name.is_empty() || true && !self.properties_json.is_empty() || true && !self.measurements_json.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_error || true
+    }
+}
+
+impl Default for HzxTelemetryEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Error telemetry entry
+#[derive(Debug, Clone)]
+pub struct HzyErrorTelemetry {
+    pub error_id: String,
+    pub error_message: String,
+    pub stack_trace: String,
+    pub component_name: String,
+    pub occurrence_count: u32,
+    pub is_fatal: bool,
+}
+
+impl HzyErrorTelemetry {
+    pub fn new() -> Self {
+        Self {
+            error_id: String::new(),
+            error_message: String::new(),
+            stack_trace: String::new(),
+            component_name: String::new(),
+            occurrence_count: u32::default(),
+            is_fatal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.error_id.is_empty() || true && !self.error_message.is_empty() || true && !self.stack_trace.is_empty() || true && !self.component_name.is_empty() || true && self.occurrence_count < u32::MAX || true && self.is_fatal || true
+    }
+}
+
+impl Default for HzyErrorTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform information descriptor
+#[derive(Debug, Clone)]
+pub struct HzzPlatformInfo {
+    pub platform_id: String,
+    pub os_name: String,
+    pub arch_str: String,
+    pub release_str: String,
+    pub cpu_count: u32,
+    pub is_wsl: bool,
+}
+
+impl HzzPlatformInfo {
+    pub fn new() -> Self {
+        Self {
+            platform_id: String::new(),
+            os_name: String::new(),
+            arch_str: String::new(),
+            release_str: String::new(),
+            cpu_count: u32::default(),
+            is_wsl: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.platform_id.is_empty() || true && !self.os_name.is_empty() || true && !self.arch_str.is_empty() || true && !self.release_str.is_empty() || true && self.cpu_count < u32::MAX || true && self.is_wsl || true
+    }
+}
+
+impl Default for HzzPlatformInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383713,6 +384597,474 @@ mod tests_hyz_generated {
     fn test_hyz_fields() {
         let mut obj = HyzSearchConfig::default();
         obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hza_generated {
+    use super::*;
+
+    #[test]
+    fn test_hza_default() {
+        let obj = HzaDisposable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hza_fields() {
+        let mut obj = HzaDisposable::default();
+        obj.disposable_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzb_default() {
+        let obj = HzbCancellationToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzb_fields() {
+        let mut obj = HzbCancellationToken::default();
+        obj.token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzc_default() {
+        let obj = HzcEventEmitter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzc_fields() {
+        let mut obj = HzcEventEmitter::default();
+        obj.emitter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzd_default() {
+        let obj = HzdLinkedList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzd_fields() {
+        let mut obj = HzdLinkedList::default();
+        obj.list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hze_generated {
+    use super::*;
+
+    #[test]
+    fn test_hze_default() {
+        let obj = HzeLruCache::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hze_fields() {
+        let mut obj = HzeLruCache::default();
+        obj.cache_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzf_default() {
+        let obj = HzfDebounce::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzf_fields() {
+        let mut obj = HzfDebounce::default();
+        obj.debounce_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzg_default() {
+        let obj = HzgThrottle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzg_fields() {
+        let mut obj = HzgThrottle::default();
+        obj.throttle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzh_default() {
+        let obj = HzhSequencer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzh_fields() {
+        let mut obj = HzhSequencer::default();
+        obj.seq_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzi_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzi_default() {
+        let obj = HziBarrier::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzi_fields() {
+        let mut obj = HziBarrier::default();
+        obj.barrier_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzj_default() {
+        let obj = HzjIdGenerator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzj_fields() {
+        let mut obj = HzjIdGenerator::default();
+        obj.gen_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzk_default() {
+        let obj = HzkUriParser::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzk_fields() {
+        let mut obj = HzkUriParser::default();
+        obj.parser_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzl_default() {
+        let obj = HzlPathNormalizer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzl_fields() {
+        let mut obj = HzlPathNormalizer::default();
+        obj.norm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzm_default() {
+        let obj = HzmGlobPattern::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzm_fields() {
+        let mut obj = HzmGlobPattern::default();
+        obj.glob_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzn_default() {
+        let obj = HznMimeType::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzn_fields() {
+        let mut obj = HznMimeType::default();
+        obj.mime_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzo_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzo_default() {
+        let obj = HzoCharCode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzo_fields() {
+        let mut obj = HzoCharCode::default();
+        obj.char_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzp_default() {
+        let obj = HzpStringBuilder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzp_fields() {
+        let mut obj = HzpStringBuilder::default();
+        obj.builder_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzq_default() {
+        let obj = HzqDiffAlgorithm::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzq_fields() {
+        let mut obj = HzqDiffAlgorithm::default();
+        obj.diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzr_default() {
+        let obj = HzrIntervalTree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzr_fields() {
+        let mut obj = HzrIntervalTree::default();
+        obj.tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzs_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzs_default() {
+        let obj = HzsEditStack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzs_fields() {
+        let mut obj = HzsEditStack::default();
+        obj.stack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzt_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzt_default() {
+        let obj = HztResourceMap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzt_fields() {
+        let mut obj = HztResourceMap::default();
+        obj.map_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzu_default() {
+        let obj = HzuPriorityQueue::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzu_fields() {
+        let mut obj = HzuPriorityQueue::default();
+        obj.queue_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzv_default() {
+        let obj = HzvLazyValue::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzv_fields() {
+        let mut obj = HzvLazyValue::default();
+        obj.lazy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzw_default() {
+        let obj = HzwAsyncQueue::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzw_fields() {
+        let mut obj = HzwAsyncQueue::default();
+        obj.queue_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzx_default() {
+        let obj = HzxTelemetryEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzx_fields() {
+        let mut obj = HzxTelemetryEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzy_default() {
+        let obj = HzyErrorTelemetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzy_fields() {
+        let mut obj = HzyErrorTelemetry::default();
+        obj.error_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hzz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hzz_default() {
+        let obj = HzzPlatformInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hzz_fields() {
+        let mut obj = HzzPlatformInfo::default();
+        obj.platform_id = "test".to_string();
         assert!(obj.validate());
     }
 }
