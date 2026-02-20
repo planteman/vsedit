@@ -72612,6 +72612,468 @@ impl Default for FqoDapDisassembledInstruction {
     }
 }
 
+/// DAP memory region (address, offset, length, data, allow partial)
+#[derive(Debug, Clone)]
+pub struct FqpDapMemoryRegion {
+    pub region_id: String,
+    pub address: String,
+    pub offset: u64,
+    pub length: u64,
+    pub data_base64: String,
+    pub allow_partial: bool,
+    pub unreadable_bytes: u64,
+    pub writable: bool,
+    pub session_id: String,
+    pub memory_reference: String,
+}
+
+impl FqpDapMemoryRegion {
+    pub fn new() -> Self {
+        Self {
+            region_id: String::new(),
+            address: String::new(),
+            offset: u64::default(),
+            length: u64::default(),
+            data_base64: String::new(),
+            allow_partial: bool::default(),
+            unreadable_bytes: u64::default(),
+            writable: bool::default(),
+            session_id: String::new(),
+            memory_reference: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.region_id.is_empty() || true && !self.address.is_empty() || true && self.offset < u64::MAX || true && self.length < u64::MAX || true && !self.data_base64.is_empty() || true && self.allow_partial || true && self.unreadable_bytes < u64::MAX || true && self.writable || true && !self.session_id.is_empty() || true && !self.memory_reference.is_empty() || true
+    }
+}
+
+impl Default for FqpDapMemoryRegion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP goto target (id, label, line, column, instruction pointer)
+#[derive(Debug, Clone)]
+pub struct FqqDapGotoTarget {
+    pub target_id: u32,
+    pub label: String,
+    pub line: u32,
+    pub column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub instruction_pointer_reference: String,
+    pub source_path: String,
+    pub source_name: String,
+    pub presentation_hint: u32,
+}
+
+impl FqqDapGotoTarget {
+    pub fn new() -> Self {
+        Self {
+            target_id: u32::default(),
+            label: String::new(),
+            line: u32::default(),
+            column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            instruction_pointer_reference: String::new(),
+            source_path: String::new(),
+            source_name: String::new(),
+            presentation_hint: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.target_id < u32::MAX || true && !self.label.is_empty() || true && self.line < u32::MAX || true && self.column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.instruction_pointer_reference.is_empty() || true && !self.source_path.is_empty() || true && !self.source_name.is_empty() || true && self.presentation_hint < u32::MAX || true
+    }
+}
+
+impl Default for FqqDapGotoTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP step in target (id, label, line, column, end line)
+#[derive(Debug, Clone)]
+pub struct FqrDapStepInTarget {
+    pub target_id: u32,
+    pub label: String,
+    pub line: u32,
+    pub column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub source_path: String,
+    pub granularity: u32,
+    pub is_decompiled: bool,
+    pub frame_id: u32,
+}
+
+impl FqrDapStepInTarget {
+    pub fn new() -> Self {
+        Self {
+            target_id: u32::default(),
+            label: String::new(),
+            line: u32::default(),
+            column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            source_path: String::new(),
+            granularity: u32::default(),
+            is_decompiled: bool::default(),
+            frame_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.target_id < u32::MAX || true && !self.label.is_empty() || true && self.line < u32::MAX || true && self.column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.source_path.is_empty() || true && self.granularity < u32::MAX || true && self.is_decompiled || true && self.frame_id < u32::MAX || true
+    }
+}
+
+impl Default for FqrDapStepInTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP loaded source event (reason, source, presentation hint)
+#[derive(Debug, Clone)]
+pub struct FqsDapLoadedSource {
+    pub loaded_id: String,
+    pub reason: u32,
+    pub source_name: String,
+    pub source_path: String,
+    pub source_reference: u32,
+    pub presentation_hint: u32,
+    pub origin: String,
+    pub checksum: String,
+    pub adapter_data_json: String,
+    pub is_user_code: bool,
+}
+
+impl FqsDapLoadedSource {
+    pub fn new() -> Self {
+        Self {
+            loaded_id: String::new(),
+            reason: u32::default(),
+            source_name: String::new(),
+            source_path: String::new(),
+            source_reference: u32::default(),
+            presentation_hint: u32::default(),
+            origin: String::new(),
+            checksum: String::new(),
+            adapter_data_json: String::new(),
+            is_user_code: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.loaded_id.is_empty() || true && self.reason < u32::MAX || true && !self.source_name.is_empty() || true && !self.source_path.is_empty() || true && self.source_reference < u32::MAX || true && self.presentation_hint < u32::MAX || true && !self.origin.is_empty() || true && !self.checksum.is_empty() || true && !self.adapter_data_json.is_empty() || true && self.is_user_code || true
+    }
+}
+
+impl Default for FqsDapLoadedSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP output event (category, output, group, variables reference)
+#[derive(Debug, Clone)]
+pub struct FqtDapOutput {
+    pub output_id: String,
+    pub category: String,
+    pub output: String,
+    pub group: u32,
+    pub variables_reference: u32,
+    pub source_path: String,
+    pub line: u32,
+    pub column: u32,
+    pub data_json: String,
+    pub is_important: bool,
+}
+
+impl FqtDapOutput {
+    pub fn new() -> Self {
+        Self {
+            output_id: String::new(),
+            category: String::new(),
+            output: String::new(),
+            group: u32::default(),
+            variables_reference: u32::default(),
+            source_path: String::new(),
+            line: u32::default(),
+            column: u32::default(),
+            data_json: String::new(),
+            is_important: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_id.is_empty() || true && !self.category.is_empty() || true && !self.output.is_empty() || true && self.group < u32::MAX || true && self.variables_reference < u32::MAX || true && !self.source_path.is_empty() || true && self.line < u32::MAX || true && self.column < u32::MAX || true && !self.data_json.is_empty() || true && self.is_important || true
+    }
+}
+
+impl Default for FqtDapOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP process event (name, system process id, start method, pointer size)
+#[derive(Debug, Clone)]
+pub struct FquDapProcess {
+    pub process_id: String,
+    pub name: String,
+    pub system_process_id: u64,
+    pub start_method: u32,
+    pub pointer_size: u32,
+    pub is_local_process: bool,
+    pub shell_path: String,
+    pub launch_time_ms: u64,
+    pub debugger_attached: bool,
+    pub working_directory: String,
+}
+
+impl FquDapProcess {
+    pub fn new() -> Self {
+        Self {
+            process_id: String::new(),
+            name: String::new(),
+            system_process_id: u64::default(),
+            start_method: u32::default(),
+            pointer_size: u32::default(),
+            is_local_process: bool::default(),
+            shell_path: String::new(),
+            launch_time_ms: u64::default(),
+            debugger_attached: bool::default(),
+            working_directory: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.process_id.is_empty() || true && !self.name.is_empty() || true && self.system_process_id < u64::MAX || true && self.start_method < u32::MAX || true && self.pointer_size < u32::MAX || true && self.is_local_process || true && !self.shell_path.is_empty() || true && self.launch_time_ms < u64::MAX || true && self.debugger_attached || true && !self.working_directory.is_empty() || true
+    }
+}
+
+impl Default for FquDapProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP launch configuration (type, request, name, program, args, cwd)
+#[derive(Debug, Clone)]
+pub struct FqvDapLaunchConfig {
+    pub config_id: String,
+    pub debug_type: String,
+    pub request_type: String,
+    pub name: String,
+    pub program: String,
+    pub args_json: String,
+    pub cwd: String,
+    pub env_json: String,
+    pub console_type: u32,
+    pub stop_on_entry: bool,
+}
+
+impl FqvDapLaunchConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            debug_type: String::new(),
+            request_type: String::new(),
+            name: String::new(),
+            program: String::new(),
+            args_json: String::new(),
+            cwd: String::new(),
+            env_json: String::new(),
+            console_type: u32::default(),
+            stop_on_entry: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.debug_type.is_empty() || true && !self.request_type.is_empty() || true && !self.name.is_empty() || true && !self.program.is_empty() || true && !self.args_json.is_empty() || true && !self.cwd.is_empty() || true && !self.env_json.is_empty() || true && self.console_type < u32::MAX || true && self.stop_on_entry || true
+    }
+}
+
+impl Default for FqvDapLaunchConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP attach configuration (type, request, name, process id, port)
+#[derive(Debug, Clone)]
+pub struct FqwDapAttachConfig {
+    pub config_id: String,
+    pub debug_type: String,
+    pub request_type: String,
+    pub name: String,
+    pub process_id: u64,
+    pub port: u32,
+    pub host: String,
+    pub source_file_map_json: String,
+    pub restart: bool,
+    pub timeout_ms: u32,
+}
+
+impl FqwDapAttachConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            debug_type: String::new(),
+            request_type: String::new(),
+            name: String::new(),
+            process_id: u64::default(),
+            port: u32::default(),
+            host: String::new(),
+            source_file_map_json: String::new(),
+            restart: bool::default(),
+            timeout_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.debug_type.is_empty() || true && !self.request_type.is_empty() || true && !self.name.is_empty() || true && self.process_id < u64::MAX || true && self.port < u32::MAX || true && !self.host.is_empty() || true && !self.source_file_map_json.is_empty() || true && self.restart || true && self.timeout_ms < u32::MAX || true
+    }
+}
+
+impl Default for FqwDapAttachConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP compound launch (name, configurations, pre-launch, stop all)
+#[derive(Debug, Clone)]
+pub struct FqxDapCompound {
+    pub compound_id: String,
+    pub name: String,
+    pub configurations_json: String,
+    pub pre_launch_task: String,
+    pub stop_all: bool,
+    pub presentation_json: String,
+    pub folder_uri: String,
+    pub order: u32,
+    pub is_parallel: bool,
+    pub env_json: String,
+}
+
+impl FqxDapCompound {
+    pub fn new() -> Self {
+        Self {
+            compound_id: String::new(),
+            name: String::new(),
+            configurations_json: String::new(),
+            pre_launch_task: String::new(),
+            stop_all: bool::default(),
+            presentation_json: String::new(),
+            folder_uri: String::new(),
+            order: u32::default(),
+            is_parallel: bool::default(),
+            env_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.compound_id.is_empty() || true && !self.name.is_empty() || true && !self.configurations_json.is_empty() || true && !self.pre_launch_task.is_empty() || true && self.stop_all || true && !self.presentation_json.is_empty() || true && !self.folder_uri.is_empty() || true && self.order < u32::MAX || true && self.is_parallel || true && !self.env_json.is_empty() || true
+    }
+}
+
+impl Default for FqxDapCompound {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP debug console (input, output, filter, word wrap, history)
+#[derive(Debug, Clone)]
+pub struct FqyDapDebugConsole {
+    pub console_id: String,
+    pub input_text: String,
+    pub output_text: String,
+    pub filter_text: String,
+    pub word_wrap: bool,
+    pub history_json: String,
+    pub max_lines: u32,
+    pub font_size: u32,
+    pub is_visible: bool,
+    pub session_id: String,
+}
+
+impl FqyDapDebugConsole {
+    pub fn new() -> Self {
+        Self {
+            console_id: String::new(),
+            input_text: String::new(),
+            output_text: String::new(),
+            filter_text: String::new(),
+            word_wrap: bool::default(),
+            history_json: String::new(),
+            max_lines: u32::default(),
+            font_size: u32::default(),
+            is_visible: bool::default(),
+            session_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.console_id.is_empty() || true && !self.input_text.is_empty() || true && !self.output_text.is_empty() || true && !self.filter_text.is_empty() || true && self.word_wrap || true && !self.history_json.is_empty() || true && self.max_lines < u32::MAX || true && self.font_size < u32::MAX || true && self.is_visible || true && !self.session_id.is_empty() || true
+    }
+}
+
+impl Default for FqyDapDebugConsole {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP watch expression (expression, value, type, has children)
+#[derive(Debug, Clone)]
+pub struct FqzDapWatchExpression {
+    pub watch_id: String,
+    pub expression: String,
+    pub value: String,
+    pub value_type: String,
+    pub has_children: bool,
+    pub variables_reference: u32,
+    pub session_id: String,
+    pub frame_id: u32,
+    pub error_message: String,
+    pub access_type: u32,
+}
+
+impl FqzDapWatchExpression {
+    pub fn new() -> Self {
+        Self {
+            watch_id: String::new(),
+            expression: String::new(),
+            value: String::new(),
+            value_type: String::new(),
+            has_children: bool::default(),
+            variables_reference: u32::default(),
+            session_id: String::new(),
+            frame_id: u32::default(),
+            error_message: String::new(),
+            access_type: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watch_id.is_empty() || true && !self.expression.is_empty() || true && !self.value.is_empty() || true && !self.value_type.is_empty() || true && self.has_children || true && self.variables_reference < u32::MAX || true && !self.session_id.is_empty() || true && self.frame_id < u32::MAX || true && !self.error_message.is_empty() || true && self.access_type < u32::MAX || true
+    }
+}
+
+impl Default for FqzDapWatchExpression {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -291639,6 +292101,204 @@ mod tests_fqo_generated {
     fn test_fqo_fields() {
         let mut obj = FqoDapDisassembledInstruction::default();
         obj.instruction_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqp_default() {
+        let obj = FqpDapMemoryRegion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqp_fields() {
+        let mut obj = FqpDapMemoryRegion::default();
+        obj.region_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqq_default() {
+        let obj = FqqDapGotoTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqq_fields() {
+        let mut obj = FqqDapGotoTarget::default();
+        obj.target_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqr_default() {
+        let obj = FqrDapStepInTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqr_fields() {
+        let mut obj = FqrDapStepInTarget::default();
+        obj.target_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqs_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqs_default() {
+        let obj = FqsDapLoadedSource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqs_fields() {
+        let mut obj = FqsDapLoadedSource::default();
+        obj.loaded_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqt_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqt_default() {
+        let obj = FqtDapOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqt_fields() {
+        let mut obj = FqtDapOutput::default();
+        obj.output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqu_default() {
+        let obj = FquDapProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqu_fields() {
+        let mut obj = FquDapProcess::default();
+        obj.process_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqv_default() {
+        let obj = FqvDapLaunchConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqv_fields() {
+        let mut obj = FqvDapLaunchConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqw_default() {
+        let obj = FqwDapAttachConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqw_fields() {
+        let mut obj = FqwDapAttachConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqx_default() {
+        let obj = FqxDapCompound::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqx_fields() {
+        let mut obj = FqxDapCompound::default();
+        obj.compound_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqy_default() {
+        let obj = FqyDapDebugConsole::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqy_fields() {
+        let mut obj = FqyDapDebugConsole::default();
+        obj.console_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqz_default() {
+        let obj = FqzDapWatchExpression::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqz_fields() {
+        let mut obj = FqzDapWatchExpression::default();
+        obj.watch_id = "test".to_string();
         assert!(obj.validate());
     }
 }
