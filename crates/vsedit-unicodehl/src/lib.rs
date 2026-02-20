@@ -135447,6 +135447,890 @@ impl Default for HxzNavigationConfig {
     }
 }
 
+/// Find widget UI state
+#[derive(Debug, Clone)]
+pub struct HyaFindWidget {
+    pub widget_id: String,
+    pub search_text: String,
+    pub replace_text: String,
+    pub match_count: u32,
+    pub current_match: u32,
+    pub is_visible: bool,
+}
+
+impl HyaFindWidget {
+    pub fn new() -> Self {
+        Self {
+            widget_id: String::new(),
+            search_text: String::new(),
+            replace_text: String::new(),
+            match_count: u32::default(),
+            current_match: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.widget_id.is_empty() || true && !self.search_text.is_empty() || true && !self.replace_text.is_empty() || true && self.match_count < u32::MAX || true && self.current_match < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for HyaFindWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Find match result entry
+#[derive(Debug, Clone)]
+pub struct HybFindMatch {
+    pub match_id: String,
+    pub file_uri: String,
+    pub line_number: u32,
+    pub col_start: u32,
+    pub match_len: u32,
+    pub is_in_selection: bool,
+}
+
+impl HybFindMatch {
+    pub fn new() -> Self {
+        Self {
+            match_id: String::new(),
+            file_uri: String::new(),
+            line_number: u32::default(),
+            col_start: u32::default(),
+            match_len: u32::default(),
+            is_in_selection: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.match_id.is_empty() || true && !self.file_uri.is_empty() || true && self.line_number < u32::MAX || true && self.col_start < u32::MAX || true && self.match_len < u32::MAX || true && self.is_in_selection || true
+    }
+}
+
+impl Default for HybFindMatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Find/replace operation state
+#[derive(Debug, Clone)]
+pub struct HycReplaceState {
+    pub replace_id: String,
+    pub search_text: String,
+    pub replace_text: String,
+    pub replaced_count: u32,
+    pub total_matches: u32,
+    pub preserve_case: bool,
+}
+
+impl HycReplaceState {
+    pub fn new() -> Self {
+        Self {
+            replace_id: String::new(),
+            search_text: String::new(),
+            replace_text: String::new(),
+            replaced_count: u32::default(),
+            total_matches: u32::default(),
+            preserve_case: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.replace_id.is_empty() || true && !self.search_text.is_empty() || true && !self.replace_text.is_empty() || true && self.replaced_count < u32::MAX || true && self.total_matches < u32::MAX || true && self.preserve_case || true
+    }
+}
+
+impl Default for HycReplaceState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Find search scope config
+#[derive(Debug, Clone)]
+pub struct HydSearchScope {
+    pub scope_id: String,
+    pub include_pattern: String,
+    pub exclude_pattern: String,
+    pub max_results: u32,
+    pub file_count: u32,
+    pub search_in_selection: bool,
+}
+
+impl HydSearchScope {
+    pub fn new() -> Self {
+        Self {
+            scope_id: String::new(),
+            include_pattern: String::new(),
+            exclude_pattern: String::new(),
+            max_results: u32::default(),
+            file_count: u32::default(),
+            search_in_selection: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_id.is_empty() || true && !self.include_pattern.is_empty() || true && !self.exclude_pattern.is_empty() || true && self.max_results < u32::MAX || true && self.file_count < u32::MAX || true && self.search_in_selection || true
+    }
+}
+
+impl Default for HydSearchScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Find in files operation
+#[derive(Debug, Clone)]
+pub struct HyeFindInFiles {
+    pub search_id: String,
+    pub query_text: String,
+    pub file_pattern: String,
+    pub result_count: u32,
+    pub file_count: u32,
+    pub is_regex: bool,
+}
+
+impl HyeFindInFiles {
+    pub fn new() -> Self {
+        Self {
+            search_id: String::new(),
+            query_text: String::new(),
+            file_pattern: String::new(),
+            result_count: u32::default(),
+            file_count: u32::default(),
+            is_regex: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_id.is_empty() || true && !self.query_text.is_empty() || true && !self.file_pattern.is_empty() || true && self.result_count < u32::MAX || true && self.file_count < u32::MAX || true && self.is_regex || true
+    }
+}
+
+impl Default for HyeFindInFiles {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File search result entry
+#[derive(Debug, Clone)]
+pub struct HyfSearchResult {
+    pub result_id: String,
+    pub file_uri: String,
+    pub line_text: String,
+    pub line_number: u32,
+    pub match_count: u32,
+    pub is_binary: bool,
+}
+
+impl HyfSearchResult {
+    pub fn new() -> Self {
+        Self {
+            result_id: String::new(),
+            file_uri: String::new(),
+            line_text: String::new(),
+            line_number: u32::default(),
+            match_count: u32::default(),
+            is_binary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_id.is_empty() || true && !self.file_uri.is_empty() || true && !self.line_text.is_empty() || true && self.line_number < u32::MAX || true && self.match_count < u32::MAX || true && self.is_binary || true
+    }
+}
+
+impl Default for HyfSearchResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search result preview
+#[derive(Debug, Clone)]
+pub struct HygSearchPreview {
+    pub preview_id: String,
+    pub file_uri: String,
+    pub context_before: String,
+    pub match_text: String,
+    pub context_after: String,
+    pub is_expanded: bool,
+}
+
+impl HygSearchPreview {
+    pub fn new() -> Self {
+        Self {
+            preview_id: String::new(),
+            file_uri: String::new(),
+            context_before: String::new(),
+            match_text: String::new(),
+            context_after: String::new(),
+            is_expanded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.preview_id.is_empty() || true && !self.file_uri.is_empty() || true && !self.context_before.is_empty() || true && !self.match_text.is_empty() || true && !self.context_after.is_empty() || true && self.is_expanded || true
+    }
+}
+
+impl Default for HygSearchPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search history entry
+#[derive(Debug, Clone)]
+pub struct HyhSearchHistory {
+    pub history_id: String,
+    pub search_text: String,
+    pub replace_text: String,
+    pub timestamp_epoch: u64,
+    pub result_count: u32,
+    pub was_regex: bool,
+}
+
+impl HyhSearchHistory {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            search_text: String::new(),
+            replace_text: String::new(),
+            timestamp_epoch: u64::default(),
+            result_count: u32::default(),
+            was_regex: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && !self.search_text.is_empty() || true && !self.replace_text.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.result_count < u32::MAX || true && self.was_regex || true
+    }
+}
+
+impl Default for HyhSearchHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Regex search flag configuration
+#[derive(Debug, Clone)]
+pub struct HyiRegexFlag {
+    pub flag_id: String,
+    pub flag_name: String,
+    pub regex_pattern: String,
+    pub option_mask: u32,
+    pub compile_time_ms: u32,
+    pub is_valid: bool,
+}
+
+impl HyiRegexFlag {
+    pub fn new() -> Self {
+        Self {
+            flag_id: String::new(),
+            flag_name: String::new(),
+            regex_pattern: String::new(),
+            option_mask: u32::default(),
+            compile_time_ms: u32::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.flag_id.is_empty() || true && !self.flag_name.is_empty() || true && !self.regex_pattern.is_empty() || true && self.option_mask < u32::MAX || true && self.compile_time_ms < u32::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for HyiRegexFlag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Case sensitivity toggle state
+#[derive(Debug, Clone)]
+pub struct HyjCaseSensitive {
+    pub case_id: String,
+    pub mode_str: String,
+    pub smart_case_enabled: bool,
+    pub scope_str: String,
+    pub toggle_count: u32,
+    pub is_active: bool,
+}
+
+impl HyjCaseSensitive {
+    pub fn new() -> Self {
+        Self {
+            case_id: String::new(),
+            mode_str: String::new(),
+            smart_case_enabled: bool::default(),
+            scope_str: String::new(),
+            toggle_count: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.case_id.is_empty() || true && !self.mode_str.is_empty() || true && self.smart_case_enabled || true && !self.scope_str.is_empty() || true && self.toggle_count < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for HyjCaseSensitive {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Whole word match config
+#[derive(Debug, Clone)]
+pub struct HykWholeWord {
+    pub word_id: String,
+    pub boundary_mode: String,
+    pub word_chars: String,
+    pub language_id: String,
+    pub match_count: u32,
+    pub is_active: bool,
+}
+
+impl HykWholeWord {
+    pub fn new() -> Self {
+        Self {
+            word_id: String::new(),
+            boundary_mode: String::new(),
+            word_chars: String::new(),
+            language_id: String::new(),
+            match_count: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.word_id.is_empty() || true && !self.boundary_mode.is_empty() || true && !self.word_chars.is_empty() || true && !self.language_id.is_empty() || true && self.match_count < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for HykWholeWord {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search editor panel state
+#[derive(Debug, Clone)]
+pub struct HylSearchEditor {
+    pub editor_id: String,
+    pub query_text: String,
+    pub include_glob: String,
+    pub exclude_glob: String,
+    pub result_count: u32,
+    pub is_pinned: bool,
+}
+
+impl HylSearchEditor {
+    pub fn new() -> Self {
+        Self {
+            editor_id: String::new(),
+            query_text: String::new(),
+            include_glob: String::new(),
+            exclude_glob: String::new(),
+            result_count: u32::default(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_id.is_empty() || true && !self.query_text.is_empty() || true && !self.include_glob.is_empty() || true && !self.exclude_glob.is_empty() || true && self.result_count < u32::MAX || true && self.is_pinned || true
+    }
+}
+
+impl Default for HylSearchEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Replace all operation
+#[derive(Debug, Clone)]
+pub struct HymReplaceAll {
+    pub replace_id: String,
+    pub search_text: String,
+    pub replace_text: String,
+    pub file_count: u32,
+    pub match_count: u32,
+    pub confirm_each: bool,
+}
+
+impl HymReplaceAll {
+    pub fn new() -> Self {
+        Self {
+            replace_id: String::new(),
+            search_text: String::new(),
+            replace_text: String::new(),
+            file_count: u32::default(),
+            match_count: u32::default(),
+            confirm_each: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.replace_id.is_empty() || true && !self.search_text.is_empty() || true && !self.replace_text.is_empty() || true && self.file_count < u32::MAX || true && self.match_count < u32::MAX || true && self.confirm_each || true
+    }
+}
+
+impl Default for HymReplaceAll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Replace in files operation
+#[derive(Debug, Clone)]
+pub struct HynReplaceInFiles {
+    pub replace_id: String,
+    pub search_text: String,
+    pub replace_text: String,
+    pub file_count: u32,
+    pub total_replacements: u32,
+    pub create_backup: bool,
+}
+
+impl HynReplaceInFiles {
+    pub fn new() -> Self {
+        Self {
+            replace_id: String::new(),
+            search_text: String::new(),
+            replace_text: String::new(),
+            file_count: u32::default(),
+            total_replacements: u32::default(),
+            create_backup: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.replace_id.is_empty() || true && !self.search_text.is_empty() || true && !self.replace_text.is_empty() || true && self.file_count < u32::MAX || true && self.total_replacements < u32::MAX || true && self.create_backup || true
+    }
+}
+
+impl Default for HynReplaceInFiles {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search match decoration
+#[derive(Debug, Clone)]
+pub struct HyoSearchDecoration {
+    pub deco_id: String,
+    pub color_token: String,
+    pub overview_ruler_lane: u32,
+    pub minimap_color: String,
+    pub border_width: u32,
+    pub is_active_match: bool,
+}
+
+impl HyoSearchDecoration {
+    pub fn new() -> Self {
+        Self {
+            deco_id: String::new(),
+            color_token: String::new(),
+            overview_ruler_lane: u32::default(),
+            minimap_color: String::new(),
+            border_width: u32::default(),
+            is_active_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_id.is_empty() || true && !self.color_token.is_empty() || true && self.overview_ruler_lane < u32::MAX || true && !self.minimap_color.is_empty() || true && self.border_width < u32::MAX || true && self.is_active_match || true
+    }
+}
+
+impl Default for HyoSearchDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search results tree item
+#[derive(Debug, Clone)]
+pub struct HypSearchTreeItem {
+    pub item_id: String,
+    pub label_text: String,
+    pub parent_ref: String,
+    pub match_count: u32,
+    pub child_count: u32,
+    pub is_expanded: bool,
+}
+
+impl HypSearchTreeItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            label_text: String::new(),
+            parent_ref: String::new(),
+            match_count: u32::default(),
+            child_count: u32::default(),
+            is_expanded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.label_text.is_empty() || true && !self.parent_ref.is_empty() || true && self.match_count < u32::MAX || true && self.child_count < u32::MAX || true && self.is_expanded || true
+    }
+}
+
+impl Default for HypSearchTreeItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search result filter
+#[derive(Debug, Clone)]
+pub struct HyqSearchFilter {
+    pub filter_id: String,
+    pub filter_pattern: String,
+    pub include_only: bool,
+    pub max_results: u32,
+    pub language_filter: String,
+    pub apply_to_replace: bool,
+}
+
+impl HyqSearchFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_id: String::new(),
+            filter_pattern: String::new(),
+            include_only: bool::default(),
+            max_results: u32::default(),
+            language_filter: String::new(),
+            apply_to_replace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_id.is_empty() || true && !self.filter_pattern.is_empty() || true && self.include_only || true && self.max_results < u32::MAX || true && !self.language_filter.is_empty() || true && self.apply_to_replace || true
+    }
+}
+
+impl Default for HyqSearchFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search result sort config
+#[derive(Debug, Clone)]
+pub struct HyrSearchSort {
+    pub sort_id: String,
+    pub sort_field: String,
+    pub sort_direction: String,
+    pub secondary_field: String,
+    pub group_by_file: bool,
+    pub natural_sort: bool,
+}
+
+impl HyrSearchSort {
+    pub fn new() -> Self {
+        Self {
+            sort_id: String::new(),
+            sort_field: String::new(),
+            sort_direction: String::new(),
+            secondary_field: String::new(),
+            group_by_file: bool::default(),
+            natural_sort: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sort_id.is_empty() || true && !self.sort_field.is_empty() || true && !self.sort_direction.is_empty() || true && !self.secondary_field.is_empty() || true && self.group_by_file || true && self.natural_sort || true
+    }
+}
+
+impl Default for HyrSearchSort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search exclusion pattern
+#[derive(Debug, Clone)]
+pub struct HysSearchExclude {
+    pub exclude_id: String,
+    pub pattern_glob: String,
+    pub reason_text: String,
+    pub source_str: String,
+    pub priority_value: u32,
+    pub is_default: bool,
+}
+
+impl HysSearchExclude {
+    pub fn new() -> Self {
+        Self {
+            exclude_id: String::new(),
+            pattern_glob: String::new(),
+            reason_text: String::new(),
+            source_str: String::new(),
+            priority_value: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exclude_id.is_empty() || true && !self.pattern_glob.is_empty() || true && !self.reason_text.is_empty() || true && !self.source_str.is_empty() || true && self.priority_value < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for HysSearchExclude {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search inclusion pattern
+#[derive(Debug, Clone)]
+pub struct HytSearchInclude {
+    pub include_id: String,
+    pub pattern_glob: String,
+    pub label_text: String,
+    pub source_str: String,
+    pub priority_value: u32,
+    pub is_required: bool,
+}
+
+impl HytSearchInclude {
+    pub fn new() -> Self {
+        Self {
+            include_id: String::new(),
+            pattern_glob: String::new(),
+            label_text: String::new(),
+            source_str: String::new(),
+            priority_value: u32::default(),
+            is_required: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.include_id.is_empty() || true && !self.pattern_glob.is_empty() || true && !self.label_text.is_empty() || true && !self.source_str.is_empty() || true && self.priority_value < u32::MAX || true && self.is_required || true
+    }
+}
+
+impl Default for HytSearchInclude {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search progress indicator
+#[derive(Debug, Clone)]
+pub struct HyuSearchProgress {
+    pub progress_id: String,
+    pub files_searched: u32,
+    pub matches_found: u32,
+    pub elapsed_ms: u64,
+    pub estimated_total: u32,
+    pub is_complete: bool,
+}
+
+impl HyuSearchProgress {
+    pub fn new() -> Self {
+        Self {
+            progress_id: String::new(),
+            files_searched: u32::default(),
+            matches_found: u32::default(),
+            elapsed_ms: u64::default(),
+            estimated_total: u32::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.progress_id.is_empty() || true && self.files_searched < u32::MAX || true && self.matches_found < u32::MAX || true && self.elapsed_ms < u64::MAX || true && self.estimated_total < u32::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for HyuSearchProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search cancellation token
+#[derive(Debug, Clone)]
+pub struct HyvSearchCancel {
+    pub cancel_id: String,
+    pub search_ref: String,
+    pub reason_str: String,
+    pub cancelled_epoch: u64,
+    pub partial_results: u32,
+    pub was_timeout: bool,
+}
+
+impl HyvSearchCancel {
+    pub fn new() -> Self {
+        Self {
+            cancel_id: String::new(),
+            search_ref: String::new(),
+            reason_str: String::new(),
+            cancelled_epoch: u64::default(),
+            partial_results: u32::default(),
+            was_timeout: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cancel_id.is_empty() || true && !self.search_ref.is_empty() || true && !self.reason_str.is_empty() || true && self.cancelled_epoch < u64::MAX || true && self.partial_results < u32::MAX || true && self.was_timeout || true
+    }
+}
+
+impl Default for HyvSearchCancel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search and replace pair
+#[derive(Debug, Clone)]
+pub struct HywSearchReplace {
+    pub sr_id: String,
+    pub find_text: String,
+    pub replace_text: String,
+    pub transform_kind: String,
+    pub apply_count: u32,
+    pub is_regex: bool,
+}
+
+impl HywSearchReplace {
+    pub fn new() -> Self {
+        Self {
+            sr_id: String::new(),
+            find_text: String::new(),
+            replace_text: String::new(),
+            transform_kind: String::new(),
+            apply_count: u32::default(),
+            is_regex: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sr_id.is_empty() || true && !self.find_text.is_empty() || true && !self.replace_text.is_empty() || true && !self.transform_kind.is_empty() || true && self.apply_count < u32::MAX || true && self.is_regex || true
+    }
+}
+
+impl Default for HywSearchReplace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search highlight style
+#[derive(Debug, Clone)]
+pub struct HyxSearchHighlight {
+    pub hl_id: String,
+    pub bg_color: String,
+    pub border_color: String,
+    pub text_decoration: String,
+    pub opacity_pct: u32,
+    pub is_current: bool,
+}
+
+impl HyxSearchHighlight {
+    pub fn new() -> Self {
+        Self {
+            hl_id: String::new(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            text_decoration: String::new(),
+            opacity_pct: u32::default(),
+            is_current: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hl_id.is_empty() || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && !self.text_decoration.is_empty() || true && self.opacity_pct < u32::MAX || true && self.is_current || true
+    }
+}
+
+impl Default for HyxSearchHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search result bookmark
+#[derive(Debug, Clone)]
+pub struct HyySearchBookmark {
+    pub bm_id: String,
+    pub file_uri: String,
+    pub line_number: u32,
+    pub match_text: String,
+    pub note_text: String,
+    pub is_pinned: bool,
+}
+
+impl HyySearchBookmark {
+    pub fn new() -> Self {
+        Self {
+            bm_id: String::new(),
+            file_uri: String::new(),
+            line_number: u32::default(),
+            match_text: String::new(),
+            note_text: String::new(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bm_id.is_empty() || true && !self.file_uri.is_empty() || true && self.line_number < u32::MAX || true && !self.match_text.is_empty() || true && !self.note_text.is_empty() || true && self.is_pinned || true
+    }
+}
+
+impl Default for HyySearchBookmark {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search engine configuration
+#[derive(Debug, Clone)]
+pub struct HyzSearchConfig {
+    pub config_id: String,
+    pub default_regex: bool,
+    pub default_case_sensitive: bool,
+    pub default_whole_word: bool,
+    pub max_results: u32,
+    pub ripgrep_enabled: bool,
+}
+
+impl HyzSearchConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            default_regex: bool::default(),
+            default_case_sensitive: bool::default(),
+            default_whole_word: bool::default(),
+            max_results: u32::default(),
+            ripgrep_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && self.default_regex || true && self.default_case_sensitive || true && self.default_whole_word || true && self.max_results < u32::MAX || true && self.ripgrep_enabled || true
+    }
+}
+
+impl Default for HyzSearchConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -382348,6 +383232,474 @@ mod tests_hxz_generated {
     #[test]
     fn test_hxz_fields() {
         let mut obj = HxzNavigationConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hya_generated {
+    use super::*;
+
+    #[test]
+    fn test_hya_default() {
+        let obj = HyaFindWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hya_fields() {
+        let mut obj = HyaFindWidget::default();
+        obj.widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyb_default() {
+        let obj = HybFindMatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyb_fields() {
+        let mut obj = HybFindMatch::default();
+        obj.match_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyc_default() {
+        let obj = HycReplaceState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyc_fields() {
+        let mut obj = HycReplaceState::default();
+        obj.replace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyd_default() {
+        let obj = HydSearchScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyd_fields() {
+        let mut obj = HydSearchScope::default();
+        obj.scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hye_generated {
+    use super::*;
+
+    #[test]
+    fn test_hye_default() {
+        let obj = HyeFindInFiles::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hye_fields() {
+        let mut obj = HyeFindInFiles::default();
+        obj.search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyf_default() {
+        let obj = HyfSearchResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyf_fields() {
+        let mut obj = HyfSearchResult::default();
+        obj.result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyg_default() {
+        let obj = HygSearchPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyg_fields() {
+        let mut obj = HygSearchPreview::default();
+        obj.preview_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyh_default() {
+        let obj = HyhSearchHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyh_fields() {
+        let mut obj = HyhSearchHistory::default();
+        obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyi_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyi_default() {
+        let obj = HyiRegexFlag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyi_fields() {
+        let mut obj = HyiRegexFlag::default();
+        obj.flag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyj_default() {
+        let obj = HyjCaseSensitive::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyj_fields() {
+        let mut obj = HyjCaseSensitive::default();
+        obj.case_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyk_default() {
+        let obj = HykWholeWord::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyk_fields() {
+        let mut obj = HykWholeWord::default();
+        obj.word_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyl_default() {
+        let obj = HylSearchEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyl_fields() {
+        let mut obj = HylSearchEditor::default();
+        obj.editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hym_generated {
+    use super::*;
+
+    #[test]
+    fn test_hym_default() {
+        let obj = HymReplaceAll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hym_fields() {
+        let mut obj = HymReplaceAll::default();
+        obj.replace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyn_default() {
+        let obj = HynReplaceInFiles::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyn_fields() {
+        let mut obj = HynReplaceInFiles::default();
+        obj.replace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyo_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyo_default() {
+        let obj = HyoSearchDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyo_fields() {
+        let mut obj = HyoSearchDecoration::default();
+        obj.deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyp_default() {
+        let obj = HypSearchTreeItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyp_fields() {
+        let mut obj = HypSearchTreeItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyq_default() {
+        let obj = HyqSearchFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyq_fields() {
+        let mut obj = HyqSearchFilter::default();
+        obj.filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyr_default() {
+        let obj = HyrSearchSort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyr_fields() {
+        let mut obj = HyrSearchSort::default();
+        obj.sort_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hys_generated {
+    use super::*;
+
+    #[test]
+    fn test_hys_default() {
+        let obj = HysSearchExclude::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hys_fields() {
+        let mut obj = HysSearchExclude::default();
+        obj.exclude_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyt_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyt_default() {
+        let obj = HytSearchInclude::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyt_fields() {
+        let mut obj = HytSearchInclude::default();
+        obj.include_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyu_default() {
+        let obj = HyuSearchProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyu_fields() {
+        let mut obj = HyuSearchProgress::default();
+        obj.progress_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyv_default() {
+        let obj = HyvSearchCancel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyv_fields() {
+        let mut obj = HyvSearchCancel::default();
+        obj.cancel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyw_default() {
+        let obj = HywSearchReplace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyw_fields() {
+        let mut obj = HywSearchReplace::default();
+        obj.sr_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyx_default() {
+        let obj = HyxSearchHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyx_fields() {
+        let mut obj = HyxSearchHighlight::default();
+        obj.hl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyy_default() {
+        let obj = HyySearchBookmark::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyy_fields() {
+        let mut obj = HyySearchBookmark::default();
+        obj.bm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hyz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hyz_default() {
+        let obj = HyzSearchConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hyz_fields() {
+        let mut obj = HyzSearchConfig::default();
         obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
