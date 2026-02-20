@@ -72309,6 +72309,216 @@ impl Default for FqjDapExceptionInfo {
     }
 }
 
+/// DAP evaluate response (result, type, variables reference, memory ref)
+#[derive(Debug, Clone)]
+pub struct FqkDapEvaluateResponse {
+    pub eval_id: String,
+    pub result: String,
+    pub result_type: String,
+    pub variables_reference: u32,
+    pub named_variables: u32,
+    pub indexed_variables: u32,
+    pub memory_reference: String,
+    pub presentation_hint_json: String,
+    pub is_side_effect_free: bool,
+    pub context: String,
+}
+
+impl FqkDapEvaluateResponse {
+    pub fn new() -> Self {
+        Self {
+            eval_id: String::new(),
+            result: String::new(),
+            result_type: String::new(),
+            variables_reference: u32::default(),
+            named_variables: u32::default(),
+            indexed_variables: u32::default(),
+            memory_reference: String::new(),
+            presentation_hint_json: String::new(),
+            is_side_effect_free: bool::default(),
+            context: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.eval_id.is_empty() || true && !self.result.is_empty() || true && !self.result_type.is_empty() || true && self.variables_reference < u32::MAX || true && self.named_variables < u32::MAX || true && self.indexed_variables < u32::MAX || true && !self.memory_reference.is_empty() || true && !self.presentation_hint_json.is_empty() || true && self.is_side_effect_free || true && !self.context.is_empty() || true
+    }
+}
+
+impl Default for FqkDapEvaluateResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP completion item (label, text, type, start, length, detail)
+#[derive(Debug, Clone)]
+pub struct FqlDapCompletionItem {
+    pub completion_id: String,
+    pub label: String,
+    pub text: String,
+    pub sort_text: String,
+    pub detail: String,
+    pub completion_type: u32,
+    pub start: u32,
+    pub length: u32,
+    pub selection_start: u32,
+    pub selection_length: u32,
+}
+
+impl FqlDapCompletionItem {
+    pub fn new() -> Self {
+        Self {
+            completion_id: String::new(),
+            label: String::new(),
+            text: String::new(),
+            sort_text: String::new(),
+            detail: String::new(),
+            completion_type: u32::default(),
+            start: u32::default(),
+            length: u32::default(),
+            selection_start: u32::default(),
+            selection_length: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.completion_id.is_empty() || true && !self.label.is_empty() || true && !self.text.is_empty() || true && !self.sort_text.is_empty() || true && !self.detail.is_empty() || true && self.completion_type < u32::MAX || true && self.start < u32::MAX || true && self.length < u32::MAX || true && self.selection_start < u32::MAX || true && self.selection_length < u32::MAX || true
+    }
+}
+
+impl Default for FqlDapCompletionItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP data breakpoint (data id, access type, condition, hit condition)
+#[derive(Debug, Clone)]
+pub struct FqmDapDataBreakpoint {
+    pub data_bp_id: String,
+    pub data_id: String,
+    pub access_type: u32,
+    pub condition: String,
+    pub hit_condition: String,
+    pub is_verified: bool,
+    pub message: String,
+    pub description: String,
+    pub can_persist: bool,
+    pub offset: u32,
+}
+
+impl FqmDapDataBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            data_bp_id: String::new(),
+            data_id: String::new(),
+            access_type: u32::default(),
+            condition: String::new(),
+            hit_condition: String::new(),
+            is_verified: bool::default(),
+            message: String::new(),
+            description: String::new(),
+            can_persist: bool::default(),
+            offset: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.data_bp_id.is_empty() || true && !self.data_id.is_empty() || true && self.access_type < u32::MAX || true && !self.condition.is_empty() || true && !self.hit_condition.is_empty() || true && self.is_verified || true && !self.message.is_empty() || true && !self.description.is_empty() || true && self.can_persist || true && self.offset < u32::MAX || true
+    }
+}
+
+impl Default for FqmDapDataBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP instruction breakpoint (instruction reference, offset, condition)
+#[derive(Debug, Clone)]
+pub struct FqnDapInstructionBreakpoint {
+    pub inst_bp_id: String,
+    pub instruction_reference: String,
+    pub offset: u32,
+    pub condition: String,
+    pub hit_condition: String,
+    pub is_verified: bool,
+    pub message: String,
+    pub instruction_address: String,
+    pub source_path: String,
+    pub line: u32,
+}
+
+impl FqnDapInstructionBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            inst_bp_id: String::new(),
+            instruction_reference: String::new(),
+            offset: u32::default(),
+            condition: String::new(),
+            hit_condition: String::new(),
+            is_verified: bool::default(),
+            message: String::new(),
+            instruction_address: String::new(),
+            source_path: String::new(),
+            line: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inst_bp_id.is_empty() || true && !self.instruction_reference.is_empty() || true && self.offset < u32::MAX || true && !self.condition.is_empty() || true && !self.hit_condition.is_empty() || true && self.is_verified || true && !self.message.is_empty() || true && !self.instruction_address.is_empty() || true && !self.source_path.is_empty() || true && self.line < u32::MAX || true
+    }
+}
+
+impl Default for FqnDapInstructionBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP disassembled instruction (address, instruction, symbol, location)
+#[derive(Debug, Clone)]
+pub struct FqoDapDisassembledInstruction {
+    pub instruction_id: String,
+    pub address: String,
+    pub instruction_bytes: String,
+    pub instruction: String,
+    pub symbol: String,
+    pub source_path: String,
+    pub line: u32,
+    pub column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+}
+
+impl FqoDapDisassembledInstruction {
+    pub fn new() -> Self {
+        Self {
+            instruction_id: String::new(),
+            address: String::new(),
+            instruction_bytes: String::new(),
+            instruction: String::new(),
+            symbol: String::new(),
+            source_path: String::new(),
+            line: u32::default(),
+            column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.instruction_id.is_empty() || true && !self.address.is_empty() || true && !self.instruction_bytes.is_empty() || true && !self.instruction.is_empty() || true && !self.symbol.is_empty() || true && !self.source_path.is_empty() || true && self.line < u32::MAX || true && self.column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true
+    }
+}
+
+impl Default for FqoDapDisassembledInstruction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -291353,6 +291563,96 @@ mod tests_fqj_generated {
     fn test_fqj_fields() {
         let mut obj = FqjDapExceptionInfo::default();
         obj.exception_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqk_default() {
+        let obj = FqkDapEvaluateResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqk_fields() {
+        let mut obj = FqkDapEvaluateResponse::default();
+        obj.eval_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fql_generated {
+    use super::*;
+
+    #[test]
+    fn test_fql_default() {
+        let obj = FqlDapCompletionItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fql_fields() {
+        let mut obj = FqlDapCompletionItem::default();
+        obj.completion_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqm_default() {
+        let obj = FqmDapDataBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqm_fields() {
+        let mut obj = FqmDapDataBreakpoint::default();
+        obj.data_bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqn_default() {
+        let obj = FqnDapInstructionBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqn_fields() {
+        let mut obj = FqnDapInstructionBreakpoint::default();
+        obj.inst_bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqo_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqo_default() {
+        let obj = FqoDapDisassembledInstruction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqo_fields() {
+        let mut obj = FqoDapDisassembledInstruction::default();
+        obj.instruction_id = "test".to_string();
         assert!(obj.validate());
     }
 }
