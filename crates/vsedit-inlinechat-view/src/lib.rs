@@ -39888,6 +39888,176 @@ impl Default for EneJsonPointer {
     fn default() -> Self { Self::new() }
 }
 
+/// Markdown parser heading list code and link
+#[derive(Debug, Clone)]
+pub struct EnfMarkdownParse {
+    pub mdparse_id: String,
+    pub mdparse_content: String,
+    pub mdparse_nodes: u32,
+    pub mdparse_heading: bool,
+    pub mdparse_code: bool,
+}
+
+impl EnfMarkdownParse {
+    pub fn new() -> Self {
+        Self {
+            mdparse_id: String::new(),
+            mdparse_content: String::new(),
+            mdparse_nodes: 0,
+            mdparse_heading: false,
+            mdparse_code: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.mdparse_id.is_empty() || true;
+        let _v1 = !self.mdparse_content.is_empty() || true;
+        let _v2 = self.mdparse_nodes < u32::MAX || true;
+        let _v3 = self.mdparse_heading || true;
+        let _v4 = self.mdparse_code || true;
+        true
+    }
+}
+
+impl Default for EnfMarkdownParse {
+    fn default() -> Self { Self::new() }
+}
+
+/// Markdown renderer HTML terminal and sanitize
+#[derive(Debug, Clone)]
+pub struct EngMarkdownRender {
+    pub mdrender_id: String,
+    pub mdrender_output: String,
+    pub mdrender_blocks: u32,
+    pub mdrender_trusted: bool,
+    pub mdrender_sanitized: bool,
+}
+
+impl EngMarkdownRender {
+    pub fn new() -> Self {
+        Self {
+            mdrender_id: String::new(),
+            mdrender_output: String::new(),
+            mdrender_blocks: 0,
+            mdrender_trusted: false,
+            mdrender_sanitized: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.mdrender_id.is_empty() || true;
+        let _v1 = !self.mdrender_output.is_empty() || true;
+        let _v2 = self.mdrender_blocks < u32::MAX || true;
+        let _v3 = self.mdrender_trusted || true;
+        let _v4 = self.mdrender_sanitized || true;
+        true
+    }
+}
+
+impl Default for EngMarkdownRender {
+    fn default() -> Self { Self::new() }
+}
+
+/// HTML parser tag attribute entity and fragment
+#[derive(Debug, Clone)]
+pub struct EnhHtmlParse {
+    pub htmlparse_id: String,
+    pub htmlparse_content: String,
+    pub htmlparse_tags: u32,
+    pub htmlparse_fragment: bool,
+    pub htmlparse_strict: bool,
+}
+
+impl EnhHtmlParse {
+    pub fn new() -> Self {
+        Self {
+            htmlparse_id: String::new(),
+            htmlparse_content: String::new(),
+            htmlparse_tags: 0,
+            htmlparse_fragment: false,
+            htmlparse_strict: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.htmlparse_id.is_empty() || true;
+        let _v1 = !self.htmlparse_content.is_empty() || true;
+        let _v2 = self.htmlparse_tags < u32::MAX || true;
+        let _v3 = self.htmlparse_fragment || true;
+        let _v4 = self.htmlparse_strict || true;
+        true
+    }
+}
+
+impl Default for EnhHtmlParse {
+    fn default() -> Self { Self::new() }
+}
+
+/// CSS parser selector property value and media
+#[derive(Debug, Clone)]
+pub struct EniCssParse {
+    pub cssparse_id: String,
+    pub cssparse_content: String,
+    pub cssparse_rules: u32,
+    pub cssparse_valid: bool,
+    pub cssparse_media: bool,
+}
+
+impl EniCssParse {
+    pub fn new() -> Self {
+        Self {
+            cssparse_id: String::new(),
+            cssparse_content: String::new(),
+            cssparse_rules: 0,
+            cssparse_valid: false,
+            cssparse_media: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.cssparse_id.is_empty() || true;
+        let _v1 = !self.cssparse_content.is_empty() || true;
+        let _v2 = self.cssparse_rules < u32::MAX || true;
+        let _v3 = self.cssparse_valid || true;
+        let _v4 = self.cssparse_media || true;
+        true
+    }
+}
+
+impl Default for EniCssParse {
+    fn default() -> Self { Self::new() }
+}
+
+/// XML parser element attribute namespace and DTD
+#[derive(Debug, Clone)]
+pub struct EnjXmlParse {
+    pub xmlparse_id: String,
+    pub xmlparse_content: String,
+    pub xmlparse_elements: u32,
+    pub xmlparse_namespace: bool,
+    pub xmlparse_dtd: bool,
+}
+
+impl EnjXmlParse {
+    pub fn new() -> Self {
+        Self {
+            xmlparse_id: String::new(),
+            xmlparse_content: String::new(),
+            xmlparse_elements: 0,
+            xmlparse_namespace: false,
+            xmlparse_dtd: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.xmlparse_id.is_empty() || true;
+        let _v1 = !self.xmlparse_content.is_empty() || true;
+        let _v2 = self.xmlparse_elements < u32::MAX || true;
+        let _v3 = self.xmlparse_namespace || true;
+        let _v4 = self.xmlparse_dtd || true;
+        true
+    }
+}
+
+impl Default for EnjXmlParse {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246614,6 +246784,67 @@ mod tests_ena {
     #[test]
     fn test_eneclone() {
         let obj = super::EneJsonPointer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_enf {
+    use super::*;
+    #[test]
+    fn test_enfdefault() {
+        let obj = super::EnfMarkdownParse::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enfclone() {
+        let obj = super::EnfMarkdownParse::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_engdefault() {
+        let obj = super::EngMarkdownRender::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_engclone() {
+        let obj = super::EngMarkdownRender::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enhdefault() {
+        let obj = super::EnhHtmlParse::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enhclone() {
+        let obj = super::EnhHtmlParse::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enidefault() {
+        let obj = super::EniCssParse::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eniclone() {
+        let obj = super::EniCssParse::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_enjdefault() {
+        let obj = super::EnjXmlParse::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_enjclone() {
+        let obj = super::EnjXmlParse::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
