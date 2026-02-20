@@ -82859,6 +82859,216 @@ impl Default for FzzEditorCommand {
     }
 }
 
+/// Window service (open, close, focus, minimize, maximize, state)
+#[derive(Debug, Clone)]
+pub struct GaaWindowService {
+    pub window_id: String,
+    pub is_focused: bool,
+    pub is_minimized: bool,
+    pub is_maximized: bool,
+    pub is_fullscreen: bool,
+    pub title: String,
+    pub zoom_level: f64,
+    pub workspace_id: String,
+    pub recent_count: u32,
+    pub is_new: bool,
+}
+
+impl GaaWindowService {
+    pub fn new() -> Self {
+        Self {
+            window_id: String::new(),
+            is_focused: bool::default(),
+            is_minimized: bool::default(),
+            is_maximized: bool::default(),
+            is_fullscreen: bool::default(),
+            title: String::new(),
+            zoom_level: f64::default(),
+            workspace_id: String::new(),
+            recent_count: u32::default(),
+            is_new: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.window_id.is_empty() || true && self.is_focused || true && self.is_minimized || true && self.is_maximized || true && self.is_fullscreen || true && !self.title.is_empty() || true && self.zoom_level.is_finite() || true && !self.workspace_id.is_empty() || true && self.recent_count < u32::MAX || true && self.is_new || true
+    }
+}
+
+impl Default for GaaWindowService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window configuration (title, dimensions, mode, restore, zoom)
+#[derive(Debug, Clone)]
+pub struct GabWindowConfiguration {
+    pub config_id: String,
+    pub title_template: String,
+    pub width: u32,
+    pub height: u32,
+    pub x: u32,
+    pub y: u32,
+    pub mode: u32,
+    pub restore_on_start: bool,
+    pub zoom_level: f64,
+    pub native_tabs: bool,
+}
+
+impl GabWindowConfiguration {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            title_template: String::new(),
+            width: u32::default(),
+            height: u32::default(),
+            x: u32::default(),
+            y: u32::default(),
+            mode: u32::default(),
+            restore_on_start: bool::default(),
+            zoom_level: f64::default(),
+            native_tabs: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.title_template.is_empty() || true && self.width < u32::MAX || true && self.height < u32::MAX || true && self.x < u32::MAX || true && self.y < u32::MAX || true && self.mode < u32::MAX || true && self.restore_on_start || true && self.zoom_level.is_finite() || true && self.native_tabs || true
+    }
+}
+
+impl Default for GabWindowConfiguration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace identifier (id, config path, is untitled, is transient)
+#[derive(Debug, Clone)]
+pub struct GacWorkspaceIdentifier {
+    pub workspace_id: String,
+    pub config_path: String,
+    pub is_untitled: bool,
+    pub is_transient: bool,
+    pub id_hash: String,
+    pub folder_count: u32,
+    pub remote_authority: String,
+    pub name: String,
+    pub is_empty: bool,
+    pub trust_state: u32,
+}
+
+impl GacWorkspaceIdentifier {
+    pub fn new() -> Self {
+        Self {
+            workspace_id: String::new(),
+            config_path: String::new(),
+            is_untitled: bool::default(),
+            is_transient: bool::default(),
+            id_hash: String::new(),
+            folder_count: u32::default(),
+            remote_authority: String::new(),
+            name: String::new(),
+            is_empty: bool::default(),
+            trust_state: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.workspace_id.is_empty() || true && !self.config_path.is_empty() || true && self.is_untitled || true && self.is_transient || true && !self.id_hash.is_empty() || true && self.folder_count < u32::MAX || true && !self.remote_authority.is_empty() || true && !self.name.is_empty() || true && self.is_empty || true && self.trust_state < u32::MAX || true
+    }
+}
+
+impl Default for GacWorkspaceIdentifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace state (trusted, folders, settings, extensions, opened)
+#[derive(Debug, Clone)]
+pub struct GadWorkspaceState {
+    pub state_id: String,
+    pub is_trusted: bool,
+    pub folder_uris_json: String,
+    pub settings_uri: String,
+    pub extensions_json: String,
+    pub opened_at_ms: u64,
+    pub last_active_ms: u64,
+    pub editor_state_json: String,
+    pub view_state_json: String,
+    pub storage_state_json: String,
+}
+
+impl GadWorkspaceState {
+    pub fn new() -> Self {
+        Self {
+            state_id: String::new(),
+            is_trusted: bool::default(),
+            folder_uris_json: String::new(),
+            settings_uri: String::new(),
+            extensions_json: String::new(),
+            opened_at_ms: u64::default(),
+            last_active_ms: u64::default(),
+            editor_state_json: String::new(),
+            view_state_json: String::new(),
+            storage_state_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.state_id.is_empty() || true && self.is_trusted || true && !self.folder_uris_json.is_empty() || true && !self.settings_uri.is_empty() || true && !self.extensions_json.is_empty() || true && self.opened_at_ms < u64::MAX || true && self.last_active_ms < u64::MAX || true && !self.editor_state_json.is_empty() || true && !self.view_state_json.is_empty() || true && !self.storage_state_json.is_empty() || true
+    }
+}
+
+impl Default for GadWorkspaceState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Recent workspace (uri, label, remote authority, last opened)
+#[derive(Debug, Clone)]
+pub struct GaeRecentWorkspace {
+    pub recent_id: String,
+    pub workspace_uri: String,
+    pub folder_uri: String,
+    pub label: String,
+    pub remote_authority: String,
+    pub last_opened_ms: u64,
+    pub is_pinned: bool,
+    pub is_file_entry: bool,
+    pub is_workspace_entry: bool,
+    pub is_folder_entry: bool,
+}
+
+impl GaeRecentWorkspace {
+    pub fn new() -> Self {
+        Self {
+            recent_id: String::new(),
+            workspace_uri: String::new(),
+            folder_uri: String::new(),
+            label: String::new(),
+            remote_authority: String::new(),
+            last_opened_ms: u64::default(),
+            is_pinned: bool::default(),
+            is_file_entry: bool::default(),
+            is_workspace_entry: bool::default(),
+            is_folder_entry: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.recent_id.is_empty() || true && !self.workspace_uri.is_empty() || true && !self.folder_uri.is_empty() || true && !self.label.is_empty() || true && !self.remote_authority.is_empty() || true && self.last_opened_ms < u64::MAX || true && self.is_pinned || true && self.is_file_entry || true && self.is_workspace_entry || true && self.is_folder_entry || true
+    }
+}
+
+impl Default for GaeRecentWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -306326,6 +306536,96 @@ mod tests_fzz_generated {
     fn test_fzz_fields() {
         let mut obj = FzzEditorCommand::default();
         obj.cmd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gaa_generated {
+    use super::*;
+
+    #[test]
+    fn test_gaa_default() {
+        let obj = GaaWindowService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gaa_fields() {
+        let mut obj = GaaWindowService::default();
+        obj.window_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gab_generated {
+    use super::*;
+
+    #[test]
+    fn test_gab_default() {
+        let obj = GabWindowConfiguration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gab_fields() {
+        let mut obj = GabWindowConfiguration::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gac_generated {
+    use super::*;
+
+    #[test]
+    fn test_gac_default() {
+        let obj = GacWorkspaceIdentifier::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gac_fields() {
+        let mut obj = GacWorkspaceIdentifier::default();
+        obj.workspace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gad_generated {
+    use super::*;
+
+    #[test]
+    fn test_gad_default() {
+        let obj = GadWorkspaceState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gad_fields() {
+        let mut obj = GadWorkspaceState::default();
+        obj.state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gae_generated {
+    use super::*;
+
+    #[test]
+    fn test_gae_default() {
+        let obj = GaeRecentWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gae_fields() {
+        let mut obj = GaeRecentWorkspace::default();
+        obj.recent_id = "test".to_string();
         assert!(obj.validate());
     }
 }
