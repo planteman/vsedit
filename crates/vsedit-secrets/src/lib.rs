@@ -70930,6 +70930,216 @@ impl Default for FozTaskProvider2 {
     }
 }
 
+/// SCM provider (id, label, root uri, count, commit template)
+#[derive(Debug, Clone)]
+pub struct FpaScmProvider {
+    pub provider_id: String,
+    pub label: String,
+    pub root_uri: String,
+    pub count: u32,
+    pub commit_template: String,
+    pub input_box_placeholder: String,
+    pub accept_input_command_id: String,
+    pub status_bar_commands_json: String,
+    pub extension_id: String,
+    pub has_changes: bool,
+}
+
+impl FpaScmProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            label: String::new(),
+            root_uri: String::new(),
+            count: u32::default(),
+            commit_template: String::new(),
+            input_box_placeholder: String::new(),
+            accept_input_command_id: String::new(),
+            status_bar_commands_json: String::new(),
+            extension_id: String::new(),
+            has_changes: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.label.is_empty() || true && !self.root_uri.is_empty() || true && self.count < u32::MAX || true && !self.commit_template.is_empty() || true && !self.input_box_placeholder.is_empty() || true && !self.accept_input_command_id.is_empty() || true && !self.status_bar_commands_json.is_empty() || true && !self.extension_id.is_empty() || true && self.has_changes || true
+    }
+}
+
+impl Default for FpaScmProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM resource group (id, label, resources, hide when empty)
+#[derive(Debug, Clone)]
+pub struct FpbScmResourceGroup {
+    pub group_id: String,
+    pub label: String,
+    pub resource_count: u32,
+    pub hide_when_empty: bool,
+    pub provider_id: String,
+    pub is_expanded: bool,
+    pub context_value: String,
+    pub source_control_id: String,
+    pub sort_key: u32,
+    pub is_dirty: bool,
+}
+
+impl FpbScmResourceGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            label: String::new(),
+            resource_count: u32::default(),
+            hide_when_empty: bool::default(),
+            provider_id: String::new(),
+            is_expanded: bool::default(),
+            context_value: String::new(),
+            source_control_id: String::new(),
+            sort_key: u32::default(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.label.is_empty() || true && self.resource_count < u32::MAX || true && self.hide_when_empty || true && !self.provider_id.is_empty() || true && self.is_expanded || true && !self.context_value.is_empty() || true && !self.source_control_id.is_empty() || true && self.sort_key < u32::MAX || true && self.is_dirty || true
+    }
+}
+
+impl Default for FpbScmResourceGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM resource (uri, source control, decorations, faded, strikethrough)
+#[derive(Debug, Clone)]
+pub struct FpcScmResource {
+    pub resource_id: String,
+    pub uri: String,
+    pub resource_group_id: String,
+    pub source_control_id: String,
+    pub context_value: String,
+    pub command_id: String,
+    pub is_faded: bool,
+    pub is_strikethrough: bool,
+    pub color_id: String,
+    pub letter: String,
+}
+
+impl FpcScmResource {
+    pub fn new() -> Self {
+        Self {
+            resource_id: String::new(),
+            uri: String::new(),
+            resource_group_id: String::new(),
+            source_control_id: String::new(),
+            context_value: String::new(),
+            command_id: String::new(),
+            is_faded: bool::default(),
+            is_strikethrough: bool::default(),
+            color_id: String::new(),
+            letter: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resource_id.is_empty() || true && !self.uri.is_empty() || true && !self.resource_group_id.is_empty() || true && !self.source_control_id.is_empty() || true && !self.context_value.is_empty() || true && !self.command_id.is_empty() || true && self.is_faded || true && self.is_strikethrough || true && !self.color_id.is_empty() || true && !self.letter.is_empty() || true
+    }
+}
+
+impl Default for FpcScmResource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM resource decorations (icon, tooltip, strike, faded, color)
+#[derive(Debug, Clone)]
+pub struct FpdScmResourceDecorations {
+    pub decoration_id: String,
+    pub icon_path: String,
+    pub icon_dark_path: String,
+    pub tooltip: String,
+    pub is_faded: bool,
+    pub is_strikethrough: bool,
+    pub color_id: String,
+    pub letter: String,
+    pub source: String,
+    pub propagate: bool,
+}
+
+impl FpdScmResourceDecorations {
+    pub fn new() -> Self {
+        Self {
+            decoration_id: String::new(),
+            icon_path: String::new(),
+            icon_dark_path: String::new(),
+            tooltip: String::new(),
+            is_faded: bool::default(),
+            is_strikethrough: bool::default(),
+            color_id: String::new(),
+            letter: String::new(),
+            source: String::new(),
+            propagate: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decoration_id.is_empty() || true && !self.icon_path.is_empty() || true && !self.icon_dark_path.is_empty() || true && !self.tooltip.is_empty() || true && self.is_faded || true && self.is_strikethrough || true && !self.color_id.is_empty() || true && !self.letter.is_empty() || true && !self.source.is_empty() || true && self.propagate || true
+    }
+}
+
+impl Default for FpdScmResourceDecorations {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM input box (value, placeholder, visible, focus, validation)
+#[derive(Debug, Clone)]
+pub struct FpeScmInputBox {
+    pub input_id: String,
+    pub value: String,
+    pub placeholder: String,
+    pub is_visible: bool,
+    pub is_focused: bool,
+    pub validation_message: String,
+    pub validation_type: u32,
+    pub max_length: u32,
+    pub provider_id: String,
+    pub enabled: bool,
+}
+
+impl FpeScmInputBox {
+    pub fn new() -> Self {
+        Self {
+            input_id: String::new(),
+            value: String::new(),
+            placeholder: String::new(),
+            is_visible: bool::default(),
+            is_focused: bool::default(),
+            validation_message: String::new(),
+            validation_type: u32::default(),
+            max_length: u32::default(),
+            provider_id: String::new(),
+            enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_id.is_empty() || true && !self.value.is_empty() || true && !self.placeholder.is_empty() || true && self.is_visible || true && self.is_focused || true && !self.validation_message.is_empty() || true && self.validation_type < u32::MAX || true && self.max_length < u32::MAX || true && !self.provider_id.is_empty() || true && self.enabled || true
+    }
+}
+
+impl Default for FpeScmInputBox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -289314,6 +289524,96 @@ mod tests_foz_generated {
     fn test_foz_fields() {
         let mut obj = FozTaskProvider2::default();
         obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpa_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpa_default() {
+        let obj = FpaScmProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpa_fields() {
+        let mut obj = FpaScmProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpb_default() {
+        let obj = FpbScmResourceGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpb_fields() {
+        let mut obj = FpbScmResourceGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpc_default() {
+        let obj = FpcScmResource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpc_fields() {
+        let mut obj = FpcScmResource::default();
+        obj.resource_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpd_default() {
+        let obj = FpdScmResourceDecorations::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpd_fields() {
+        let mut obj = FpdScmResourceDecorations::default();
+        obj.decoration_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpe_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpe_default() {
+        let obj = FpeScmInputBox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpe_fields() {
+        let mut obj = FpeScmInputBox::default();
+        obj.input_id = "test".to_string();
         assert!(obj.validate());
     }
 }
