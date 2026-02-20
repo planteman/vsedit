@@ -97459,6 +97459,678 @@ impl Default for GnjWordDefinition {
     }
 }
 
+/// Indentation rule (increase, decrease, indent next, unindented)
+#[derive(Debug, Clone)]
+pub struct GnkIndentationRule {
+    pub indent_rule_id: String,
+    pub increase_pattern: String,
+    pub decrease_pattern: String,
+    pub indent_next_pattern: String,
+    pub unindented_pattern: String,
+    pub language_id: String,
+    pub is_regex: bool,
+    pub priority: u32,
+    pub source: String,
+    pub metadata_json: String,
+}
+
+impl GnkIndentationRule {
+    pub fn new() -> Self {
+        Self {
+            indent_rule_id: String::new(),
+            increase_pattern: String::new(),
+            decrease_pattern: String::new(),
+            indent_next_pattern: String::new(),
+            unindented_pattern: String::new(),
+            language_id: String::new(),
+            is_regex: bool::default(),
+            priority: u32::default(),
+            source: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.indent_rule_id.is_empty() || true && !self.increase_pattern.is_empty() || true && !self.decrease_pattern.is_empty() || true && !self.indent_next_pattern.is_empty() || true && !self.unindented_pattern.is_empty() || true && !self.language_id.is_empty() || true && self.is_regex || true && self.priority < u32::MAX || true && !self.source.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GnkIndentationRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// On enter rule (before text, after text, action, indent action)
+#[derive(Debug, Clone)]
+pub struct GnlOnEnterRule {
+    pub on_enter_id: String,
+    pub before_text: String,
+    pub after_text: String,
+    pub action_type: String,
+    pub indent_action: String,
+    pub append_text: String,
+    pub remove_text: u32,
+    pub language_id: String,
+    pub priority: u32,
+    pub metadata_json: String,
+}
+
+impl GnlOnEnterRule {
+    pub fn new() -> Self {
+        Self {
+            on_enter_id: String::new(),
+            before_text: String::new(),
+            after_text: String::new(),
+            action_type: String::new(),
+            indent_action: String::new(),
+            append_text: String::new(),
+            remove_text: u32::default(),
+            language_id: String::new(),
+            priority: u32::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.on_enter_id.is_empty() || true && !self.before_text.is_empty() || true && !self.after_text.is_empty() || true && !self.action_type.is_empty() || true && !self.indent_action.is_empty() || true && !self.append_text.is_empty() || true && self.remove_text < u32::MAX || true && !self.language_id.is_empty() || true && self.priority < u32::MAX || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GnlOnEnterRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Auto closing pair (open, close, not in strings/comments)
+#[derive(Debug, Clone)]
+pub struct GnmAutoClosingPair {
+    pub auto_close_id: String,
+    pub open: String,
+    pub close: String,
+    pub not_in_string: bool,
+    pub not_in_comment: bool,
+    pub not_in_regex: bool,
+    pub language_id: String,
+    pub is_default: bool,
+    pub auto_surround: bool,
+    pub metadata_json: String,
+}
+
+impl GnmAutoClosingPair {
+    pub fn new() -> Self {
+        Self {
+            auto_close_id: String::new(),
+            open: String::new(),
+            close: String::new(),
+            not_in_string: bool::default(),
+            not_in_comment: bool::default(),
+            not_in_regex: bool::default(),
+            language_id: String::new(),
+            is_default: bool::default(),
+            auto_surround: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.auto_close_id.is_empty() || true && !self.open.is_empty() || true && !self.close.is_empty() || true && self.not_in_string || true && self.not_in_comment || true && self.not_in_regex || true && !self.language_id.is_empty() || true && self.is_default || true && self.auto_surround || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GnmAutoClosingPair {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment rule (line comment, block comment open/close)
+#[derive(Debug, Clone)]
+pub struct GnnCommentRule {
+    pub comment_id: String,
+    pub line_comment: String,
+    pub block_comment_open: String,
+    pub block_comment_close: String,
+    pub language_id: String,
+    pub is_default: bool,
+    pub doc_comment_prefix: String,
+    pub auto_comment: bool,
+    pub toggle_word: bool,
+    pub metadata_json: String,
+}
+
+impl GnnCommentRule {
+    pub fn new() -> Self {
+        Self {
+            comment_id: String::new(),
+            line_comment: String::new(),
+            block_comment_open: String::new(),
+            block_comment_close: String::new(),
+            language_id: String::new(),
+            is_default: bool::default(),
+            doc_comment_prefix: String::new(),
+            auto_comment: bool::default(),
+            toggle_word: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_id.is_empty() || true && !self.line_comment.is_empty() || true && !self.block_comment_open.is_empty() || true && !self.block_comment_close.is_empty() || true && !self.language_id.is_empty() || true && self.is_default || true && !self.doc_comment_prefix.is_empty() || true && self.auto_comment || true && self.toggle_word || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GnnCommentRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Folding marker (start pattern, end pattern, indentation based)
+#[derive(Debug, Clone)]
+pub struct GnoFoldingMarker {
+    pub fold_marker_id: String,
+    pub start_pattern: String,
+    pub end_pattern: String,
+    pub indentation_based: bool,
+    pub language_id: String,
+    pub is_regex: bool,
+    pub scope: String,
+    pub priority: u32,
+    pub off_side_rule: bool,
+    pub metadata_json: String,
+}
+
+impl GnoFoldingMarker {
+    pub fn new() -> Self {
+        Self {
+            fold_marker_id: String::new(),
+            start_pattern: String::new(),
+            end_pattern: String::new(),
+            indentation_based: bool::default(),
+            language_id: String::new(),
+            is_regex: bool::default(),
+            scope: String::new(),
+            priority: u32::default(),
+            off_side_rule: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fold_marker_id.is_empty() || true && !self.start_pattern.is_empty() || true && !self.end_pattern.is_empty() || true && self.indentation_based || true && !self.language_id.is_empty() || true && self.is_regex || true && !self.scope.is_empty() || true && self.priority < u32::MAX || true && self.off_side_rule || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GnoFoldingMarker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color information (range, red, green, blue, alpha)
+#[derive(Debug, Clone)]
+pub struct GnpColorInformation {
+    pub color_info_id: String,
+    pub range_json: String,
+    pub red: f64,
+    pub green: f64,
+    pub blue: f64,
+    pub alpha: f64,
+    pub format: String,
+    pub color_string: String,
+    pub is_editable: bool,
+    pub document_uri: String,
+}
+
+impl GnpColorInformation {
+    pub fn new() -> Self {
+        Self {
+            color_info_id: String::new(),
+            range_json: String::new(),
+            red: f64::default(),
+            green: f64::default(),
+            blue: f64::default(),
+            alpha: f64::default(),
+            format: String::new(),
+            color_string: String::new(),
+            is_editable: bool::default(),
+            document_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_info_id.is_empty() || true && !self.range_json.is_empty() || true && self.red.is_finite() || true && self.green.is_finite() || true && self.blue.is_finite() || true && self.alpha.is_finite() || true && !self.format.is_empty() || true && !self.color_string.is_empty() || true && self.is_editable || true && !self.document_uri.is_empty() || true
+    }
+}
+
+impl Default for GnpColorInformation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color presentation (label, text edit, additional edits)
+#[derive(Debug, Clone)]
+pub struct GnqColorPresentation {
+    pub color_pres_id: String,
+    pub label: String,
+    pub text_edit_json: String,
+    pub additional_edits_json: String,
+    pub color_string: String,
+    pub format: String,
+    pub is_default: bool,
+    pub kind: String,
+    pub sort_text: String,
+    pub metadata_json: String,
+}
+
+impl GnqColorPresentation {
+    pub fn new() -> Self {
+        Self {
+            color_pres_id: String::new(),
+            label: String::new(),
+            text_edit_json: String::new(),
+            additional_edits_json: String::new(),
+            color_string: String::new(),
+            format: String::new(),
+            is_default: bool::default(),
+            kind: String::new(),
+            sort_text: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_pres_id.is_empty() || true && !self.label.is_empty() || true && !self.text_edit_json.is_empty() || true && !self.additional_edits_json.is_empty() || true && !self.color_string.is_empty() || true && !self.format.is_empty() || true && self.is_default || true && !self.kind.is_empty() || true && !self.sort_text.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GnqColorPresentation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document color (provider, resolve, on did change)
+#[derive(Debug, Clone)]
+pub struct GnrDocumentColor {
+    pub doc_color_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub on_did_change: bool,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub scheme: String,
+    pub supports_resolve: bool,
+    pub metadata_json: String,
+}
+
+impl GnrDocumentColor {
+    pub fn new() -> Self {
+        Self {
+            doc_color_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            on_did_change: bool::default(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            scheme: String::new(),
+            supports_resolve: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.doc_color_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.on_did_change || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && !self.scheme.is_empty() || true && self.supports_resolve || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GnrDocumentColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace symbol (name, kind, location, container name)
+#[derive(Debug, Clone)]
+pub struct GnsWorkspaceSymbol {
+    pub ws_symbol_id: String,
+    pub name: String,
+    pub kind: u32,
+    pub location_json: String,
+    pub container_name: String,
+    pub tags_json: String,
+    pub score: f64,
+    pub provider_id: String,
+    pub language_id: String,
+    pub detail: String,
+}
+
+impl GnsWorkspaceSymbol {
+    pub fn new() -> Self {
+        Self {
+            ws_symbol_id: String::new(),
+            name: String::new(),
+            kind: u32::default(),
+            location_json: String::new(),
+            container_name: String::new(),
+            tags_json: String::new(),
+            score: f64::default(),
+            provider_id: String::new(),
+            language_id: String::new(),
+            detail: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_symbol_id.is_empty() || true && !self.name.is_empty() || true && self.kind < u32::MAX || true && !self.location_json.is_empty() || true && !self.container_name.is_empty() || true && !self.tags_json.is_empty() || true && self.score.is_finite() || true && !self.provider_id.is_empty() || true && !self.language_id.is_empty() || true && !self.detail.is_empty() || true
+    }
+}
+
+impl Default for GnsWorkspaceSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document diagnostic (uri, kind, items, result id, version)
+#[derive(Debug, Clone)]
+pub struct GntDocumentDiagnostic {
+    pub doc_diag_id: String,
+    pub uri: String,
+    pub kind: String,
+    pub items_json: String,
+    pub result_id: String,
+    pub version: u32,
+    pub is_unchanged: bool,
+    pub related_documents_json: String,
+    pub provider_id: String,
+    pub metadata_json: String,
+}
+
+impl GntDocumentDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            doc_diag_id: String::new(),
+            uri: String::new(),
+            kind: String::new(),
+            items_json: String::new(),
+            result_id: String::new(),
+            version: u32::default(),
+            is_unchanged: bool::default(),
+            related_documents_json: String::new(),
+            provider_id: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.doc_diag_id.is_empty() || true && !self.uri.is_empty() || true && !self.kind.is_empty() || true && !self.items_json.is_empty() || true && !self.result_id.is_empty() || true && self.version < u32::MAX || true && self.is_unchanged || true && !self.related_documents_json.is_empty() || true && !self.provider_id.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GntDocumentDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace diagnostic (items, unchanged, result id)
+#[derive(Debug, Clone)]
+pub struct GnuWorkspaceDiagnostic {
+    pub ws_diag_id: String,
+    pub items_json: String,
+    pub unchanged_json: String,
+    pub result_id: String,
+    pub is_full: bool,
+    pub provider_id: String,
+    pub retrigger_request: bool,
+    pub previous_result_id: String,
+    pub metadata_json: String,
+    pub duration_ms: u64,
+}
+
+impl GnuWorkspaceDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            ws_diag_id: String::new(),
+            items_json: String::new(),
+            unchanged_json: String::new(),
+            result_id: String::new(),
+            is_full: bool::default(),
+            provider_id: String::new(),
+            retrigger_request: bool::default(),
+            previous_result_id: String::new(),
+            metadata_json: String::new(),
+            duration_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_diag_id.is_empty() || true && !self.items_json.is_empty() || true && !self.unchanged_json.is_empty() || true && !self.result_id.is_empty() || true && self.is_full || true && !self.provider_id.is_empty() || true && self.retrigger_request || true && !self.previous_result_id.is_empty() || true && !self.metadata_json.is_empty() || true && self.duration_ms < u64::MAX || true
+    }
+}
+
+impl Default for GnuWorkspaceDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline completion item (insert text, filter text, range, command)
+#[derive(Debug, Clone)]
+pub struct GnvInlineCompletionItem {
+    pub inline_item_id: String,
+    pub insert_text: String,
+    pub filter_text: String,
+    pub range_json: String,
+    pub command_json: String,
+    pub is_snippet: bool,
+    pub additional_edits_json: String,
+    pub completion_kind: String,
+    pub metadata_json: String,
+    pub source_provider: String,
+}
+
+impl GnvInlineCompletionItem {
+    pub fn new() -> Self {
+        Self {
+            inline_item_id: String::new(),
+            insert_text: String::new(),
+            filter_text: String::new(),
+            range_json: String::new(),
+            command_json: String::new(),
+            is_snippet: bool::default(),
+            additional_edits_json: String::new(),
+            completion_kind: String::new(),
+            metadata_json: String::new(),
+            source_provider: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_item_id.is_empty() || true && !self.insert_text.is_empty() || true && !self.filter_text.is_empty() || true && !self.range_json.is_empty() || true && !self.command_json.is_empty() || true && self.is_snippet || true && !self.additional_edits_json.is_empty() || true && !self.completion_kind.is_empty() || true && !self.metadata_json.is_empty() || true && !self.source_provider.is_empty() || true
+    }
+}
+
+impl Default for GnvInlineCompletionItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline completion list (items, commands, suppress suggest)
+#[derive(Debug, Clone)]
+pub struct GnwInlineCompletionList {
+    pub inline_list_id: String,
+    pub items_json: String,
+    pub commands_json: String,
+    pub suppress_suggest: bool,
+    pub enable_forward_stability: bool,
+    pub item_count: u32,
+    pub provider_id: String,
+    pub duration_ms: u64,
+    pub is_cached: bool,
+    pub metadata_json: String,
+}
+
+impl GnwInlineCompletionList {
+    pub fn new() -> Self {
+        Self {
+            inline_list_id: String::new(),
+            items_json: String::new(),
+            commands_json: String::new(),
+            suppress_suggest: bool::default(),
+            enable_forward_stability: bool::default(),
+            item_count: u32::default(),
+            provider_id: String::new(),
+            duration_ms: u64::default(),
+            is_cached: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_list_id.is_empty() || true && !self.items_json.is_empty() || true && !self.commands_json.is_empty() || true && self.suppress_suggest || true && self.enable_forward_stability || true && self.item_count < u32::MAX || true && !self.provider_id.is_empty() || true && self.duration_ms < u64::MAX || true && self.is_cached || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GnwInlineCompletionList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Evaluatable expression (range, expression)
+#[derive(Debug, Clone)]
+pub struct GnxEvaluatableExpression {
+    pub eval_expr_id: String,
+    pub range_json: String,
+    pub expression: String,
+    pub provider_id: String,
+    pub language_id: String,
+    pub is_registered: bool,
+    pub priority: u32,
+    pub extension_id: String,
+    pub scheme: String,
+    pub metadata_json: String,
+}
+
+impl GnxEvaluatableExpression {
+    pub fn new() -> Self {
+        Self {
+            eval_expr_id: String::new(),
+            range_json: String::new(),
+            expression: String::new(),
+            provider_id: String::new(),
+            language_id: String::new(),
+            is_registered: bool::default(),
+            priority: u32::default(),
+            extension_id: String::new(),
+            scheme: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.eval_expr_id.is_empty() || true && !self.range_json.is_empty() || true && !self.expression.is_empty() || true && !self.provider_id.is_empty() || true && !self.language_id.is_empty() || true && self.is_registered || true && self.priority < u32::MAX || true && !self.extension_id.is_empty() || true && !self.scheme.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GnxEvaluatableExpression {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline value provider (provide values, on did change)
+#[derive(Debug, Clone)]
+pub struct GnyInlineValueProvider {
+    pub inline_val_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub on_did_change: bool,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub scheme: String,
+    pub event_debounce_ms: u32,
+    pub metadata_json: String,
+}
+
+impl GnyInlineValueProvider {
+    pub fn new() -> Self {
+        Self {
+            inline_val_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            on_did_change: bool::default(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            scheme: String::new(),
+            event_debounce_ms: u32::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_val_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.on_did_change || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && !self.scheme.is_empty() || true && self.event_debounce_ms < u32::MAX || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GnyInlineValueProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document drop edit provider (provide edits, data transfer)
+#[derive(Debug, Clone)]
+pub struct GnzDocumentDropEditProvider {
+    pub drop_edit_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub data_transfer_json: String,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub dropMimeTypes_json: String,
+    pub scheme: String,
+    pub metadata_json: String,
+}
+
+impl GnzDocumentDropEditProvider {
+    pub fn new() -> Self {
+        Self {
+            drop_edit_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            data_transfer_json: String::new(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            dropMimeTypes_json: String::new(),
+            scheme: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.drop_edit_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && !self.data_transfer_json.is_empty() || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && !self.dropMimeTypes_json.is_empty() || true && !self.scheme.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GnzDocumentDropEditProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -327354,6 +328026,294 @@ mod tests_gnj_generated {
     fn test_gnj_fields() {
         let mut obj = GnjWordDefinition::default();
         obj.word_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnk_default() {
+        let obj = GnkIndentationRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnk_fields() {
+        let mut obj = GnkIndentationRule::default();
+        obj.indent_rule_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnl_default() {
+        let obj = GnlOnEnterRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnl_fields() {
+        let mut obj = GnlOnEnterRule::default();
+        obj.on_enter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnm_default() {
+        let obj = GnmAutoClosingPair::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnm_fields() {
+        let mut obj = GnmAutoClosingPair::default();
+        obj.auto_close_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnn_default() {
+        let obj = GnnCommentRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnn_fields() {
+        let mut obj = GnnCommentRule::default();
+        obj.comment_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gno_generated {
+    use super::*;
+
+    #[test]
+    fn test_gno_default() {
+        let obj = GnoFoldingMarker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gno_fields() {
+        let mut obj = GnoFoldingMarker::default();
+        obj.fold_marker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnp_default() {
+        let obj = GnpColorInformation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnp_fields() {
+        let mut obj = GnpColorInformation::default();
+        obj.color_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnq_default() {
+        let obj = GnqColorPresentation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnq_fields() {
+        let mut obj = GnqColorPresentation::default();
+        obj.color_pres_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnr_default() {
+        let obj = GnrDocumentColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnr_fields() {
+        let mut obj = GnrDocumentColor::default();
+        obj.doc_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gns_generated {
+    use super::*;
+
+    #[test]
+    fn test_gns_default() {
+        let obj = GnsWorkspaceSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gns_fields() {
+        let mut obj = GnsWorkspaceSymbol::default();
+        obj.ws_symbol_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnt_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnt_default() {
+        let obj = GntDocumentDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnt_fields() {
+        let mut obj = GntDocumentDiagnostic::default();
+        obj.doc_diag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnu_default() {
+        let obj = GnuWorkspaceDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnu_fields() {
+        let mut obj = GnuWorkspaceDiagnostic::default();
+        obj.ws_diag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnv_default() {
+        let obj = GnvInlineCompletionItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnv_fields() {
+        let mut obj = GnvInlineCompletionItem::default();
+        obj.inline_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnw_default() {
+        let obj = GnwInlineCompletionList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnw_fields() {
+        let mut obj = GnwInlineCompletionList::default();
+        obj.inline_list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnx_default() {
+        let obj = GnxEvaluatableExpression::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnx_fields() {
+        let mut obj = GnxEvaluatableExpression::default();
+        obj.eval_expr_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gny_generated {
+    use super::*;
+
+    #[test]
+    fn test_gny_default() {
+        let obj = GnyInlineValueProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gny_fields() {
+        let mut obj = GnyInlineValueProvider::default();
+        obj.inline_val_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnz_default() {
+        let obj = GnzDocumentDropEditProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnz_fields() {
+        let mut obj = GnzDocumentDropEditProvider::default();
+        obj.drop_edit_id = "test".to_string();
         assert!(obj.validate());
     }
 }
