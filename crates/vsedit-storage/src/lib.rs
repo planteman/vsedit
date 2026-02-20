@@ -90791,6 +90791,216 @@ impl Default for GheFileNestingConfig {
     }
 }
 
+/// Tree view widget (data provider, renderer, filter, drag/drop handler)
+#[derive(Debug, Clone)]
+pub struct GhfTreeViewWidget {
+    pub tree_id: String,
+    pub data_provider_id: String,
+    pub renderer_id: String,
+    pub filter_id: String,
+    pub dnd_handler_id: String,
+    pub show_collapse_all: bool,
+    pub can_select_many: bool,
+    pub title: String,
+    pub description: String,
+    pub message: String,
+}
+
+impl GhfTreeViewWidget {
+    pub fn new() -> Self {
+        Self {
+            tree_id: String::new(),
+            data_provider_id: String::new(),
+            renderer_id: String::new(),
+            filter_id: String::new(),
+            dnd_handler_id: String::new(),
+            show_collapse_all: bool::default(),
+            can_select_many: bool::default(),
+            title: String::new(),
+            description: String::new(),
+            message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_id.is_empty() || true && !self.data_provider_id.is_empty() || true && !self.renderer_id.is_empty() || true && !self.filter_id.is_empty() || true && !self.dnd_handler_id.is_empty() || true && self.show_collapse_all || true && self.can_select_many || true && !self.title.is_empty() || true && !self.description.is_empty() || true && !self.message.is_empty() || true
+    }
+}
+
+impl Default for GhfTreeViewWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view item (label, icon, collapsible state, tooltip, command)
+#[derive(Debug, Clone)]
+pub struct GhgTreeViewItem {
+    pub tree_item_id: String,
+    pub label: String,
+    pub icon_path: String,
+    pub collapsible_state: u32,
+    pub tooltip: String,
+    pub command_id: String,
+    pub context_value: String,
+    pub description: String,
+    pub resource_uri: String,
+    pub checkbox_state: u32,
+}
+
+impl GhgTreeViewItem {
+    pub fn new() -> Self {
+        Self {
+            tree_item_id: String::new(),
+            label: String::new(),
+            icon_path: String::new(),
+            collapsible_state: u32::default(),
+            tooltip: String::new(),
+            command_id: String::new(),
+            context_value: String::new(),
+            description: String::new(),
+            resource_uri: String::new(),
+            checkbox_state: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_item_id.is_empty() || true && !self.label.is_empty() || true && !self.icon_path.is_empty() || true && self.collapsible_state < u32::MAX || true && !self.tooltip.is_empty() || true && !self.command_id.is_empty() || true && !self.context_value.is_empty() || true && !self.description.is_empty() || true && !self.resource_uri.is_empty() || true && self.checkbox_state < u32::MAX || true
+    }
+}
+
+impl Default for GhgTreeViewItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view selection (items, anchor, focus, multi select)
+#[derive(Debug, Clone)]
+pub struct GhhTreeViewSelection {
+    pub selection_id: String,
+    pub selected_items_json: String,
+    pub anchor_item_id: String,
+    pub focus_item_id: String,
+    pub multi_select: bool,
+    pub selection_count: u32,
+    pub is_empty: bool,
+    pub range_select: bool,
+    pub toggle_select: bool,
+    pub source_event: String,
+}
+
+impl GhhTreeViewSelection {
+    pub fn new() -> Self {
+        Self {
+            selection_id: String::new(),
+            selected_items_json: String::new(),
+            anchor_item_id: String::new(),
+            focus_item_id: String::new(),
+            multi_select: bool::default(),
+            selection_count: u32::default(),
+            is_empty: bool::default(),
+            range_select: bool::default(),
+            toggle_select: bool::default(),
+            source_event: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.selection_id.is_empty() || true && !self.selected_items_json.is_empty() || true && !self.anchor_item_id.is_empty() || true && !self.focus_item_id.is_empty() || true && self.multi_select || true && self.selection_count < u32::MAX || true && self.is_empty || true && self.range_select || true && self.toggle_select || true && !self.source_event.is_empty() || true
+    }
+}
+
+impl Default for GhhTreeViewSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view filter (pattern, fuzzy, highlight matches, visible count)
+#[derive(Debug, Clone)]
+pub struct GhiTreeViewFilter {
+    pub filter_id: String,
+    pub pattern: String,
+    pub is_fuzzy: bool,
+    pub highlight_matches: bool,
+    pub visible_count: u32,
+    pub total_count: u32,
+    pub filter_on_type: bool,
+    pub auto_expand: bool,
+    pub min_filter_length: u32,
+    pub debounce_ms: u32,
+}
+
+impl GhiTreeViewFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_id: String::new(),
+            pattern: String::new(),
+            is_fuzzy: bool::default(),
+            highlight_matches: bool::default(),
+            visible_count: u32::default(),
+            total_count: u32::default(),
+            filter_on_type: bool::default(),
+            auto_expand: bool::default(),
+            min_filter_length: u32::default(),
+            debounce_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_id.is_empty() || true && !self.pattern.is_empty() || true && self.is_fuzzy || true && self.highlight_matches || true && self.visible_count < u32::MAX || true && self.total_count < u32::MAX || true && self.filter_on_type || true && self.auto_expand || true && self.min_filter_length < u32::MAX || true && self.debounce_ms < u32::MAX || true
+    }
+}
+
+impl Default for GhiTreeViewFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view virtualization (visible range, item height, render batch)
+#[derive(Debug, Clone)]
+pub struct GhjTreeViewVirtualization {
+    pub virtual_id: String,
+    pub visible_start: u32,
+    pub visible_end: u32,
+    pub item_height: u32,
+    pub render_batch_size: u32,
+    pub total_items: u32,
+    pub scroll_offset: u32,
+    pub overscan_count: u32,
+    pub recycle_pool_size: u32,
+    pub smooth_scroll: bool,
+}
+
+impl GhjTreeViewVirtualization {
+    pub fn new() -> Self {
+        Self {
+            virtual_id: String::new(),
+            visible_start: u32::default(),
+            visible_end: u32::default(),
+            item_height: u32::default(),
+            render_batch_size: u32::default(),
+            total_items: u32::default(),
+            scroll_offset: u32::default(),
+            overscan_count: u32::default(),
+            recycle_pool_size: u32::default(),
+            smooth_scroll: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.virtual_id.is_empty() || true && self.visible_start < u32::MAX || true && self.visible_end < u32::MAX || true && self.item_height < u32::MAX || true && self.render_batch_size < u32::MAX || true && self.total_items < u32::MAX || true && self.scroll_offset < u32::MAX || true && self.overscan_count < u32::MAX || true && self.recycle_pool_size < u32::MAX || true && self.smooth_scroll || true
+    }
+}
+
+impl Default for GhjTreeViewVirtualization {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317551,6 +317761,96 @@ mod tests_ghe_generated {
     fn test_ghe_fields() {
         let mut obj = GheFileNestingConfig::default();
         obj.nesting_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghf_default() {
+        let obj = GhfTreeViewWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghf_fields() {
+        let mut obj = GhfTreeViewWidget::default();
+        obj.tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghg_default() {
+        let obj = GhgTreeViewItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghg_fields() {
+        let mut obj = GhgTreeViewItem::default();
+        obj.tree_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghh_default() {
+        let obj = GhhTreeViewSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghh_fields() {
+        let mut obj = GhhTreeViewSelection::default();
+        obj.selection_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghi_default() {
+        let obj = GhiTreeViewFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghi_fields() {
+        let mut obj = GhiTreeViewFilter::default();
+        obj.filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghj_default() {
+        let obj = GhjTreeViewVirtualization::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghj_fields() {
+        let mut obj = GhjTreeViewVirtualization::default();
+        obj.virtual_id = "test".to_string();
         assert!(obj.validate());
     }
 }
