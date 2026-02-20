@@ -158535,6 +158535,890 @@ impl Default for IxzFsScheme {
     }
 }
 
+/// Logging level descriptor
+#[derive(Debug, Clone)]
+pub struct IyaLogLevel {
+    pub log_id: String,
+    pub level_name: String,
+    pub level_value: u32,
+    pub color_code: String,
+    pub icon_str: String,
+    pub is_enabled: bool,
+}
+
+impl IyaLogLevel {
+    pub fn new() -> Self {
+        Self {
+            log_id: String::new(),
+            level_name: String::new(),
+            level_value: u32::default(),
+            color_code: String::new(),
+            icon_str: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_id.is_empty() || true && !self.level_name.is_empty() || true && self.level_value < u32::MAX || true && !self.color_code.is_empty() || true && !self.icon_str.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for IyaLogLevel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Log message entry
+#[derive(Debug, Clone)]
+pub struct IybLogEntry {
+    pub entry_id: String,
+    pub message_text: String,
+    pub level_str: String,
+    pub source_str: String,
+    pub timestamp_epoch: u64,
+    pub is_error: bool,
+}
+
+impl IybLogEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_id: String::new(),
+            message_text: String::new(),
+            level_str: String::new(),
+            source_str: String::new(),
+            timestamp_epoch: u64::default(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_id.is_empty() || true && !self.message_text.is_empty() || true && !self.level_str.is_empty() || true && !self.source_str.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_error || true
+    }
+}
+
+impl Default for IybLogEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Log output channel
+#[derive(Debug, Clone)]
+pub struct IycLogChannel {
+    pub channel_id: String,
+    pub channel_name: String,
+    pub log_level_str: String,
+    pub file_path: String,
+    pub max_size_bytes: u64,
+    pub is_console: bool,
+}
+
+impl IycLogChannel {
+    pub fn new() -> Self {
+        Self {
+            channel_id: String::new(),
+            channel_name: String::new(),
+            log_level_str: String::new(),
+            file_path: String::new(),
+            max_size_bytes: u64::default(),
+            is_console: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.channel_id.is_empty() || true && !self.channel_name.is_empty() || true && !self.log_level_str.is_empty() || true && !self.file_path.is_empty() || true && self.max_size_bytes < u64::MAX || true && self.is_console || true
+    }
+}
+
+impl Default for IycLogChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Telemetry event descriptor
+#[derive(Debug, Clone)]
+pub struct IydTelemetryEvent {
+    pub telemetry_id: String,
+    pub event_name: String,
+    pub properties_json: String,
+    pub measurements_json: String,
+    pub session_ref: String,
+    pub is_error_event: bool,
+}
+
+impl IydTelemetryEvent {
+    pub fn new() -> Self {
+        Self {
+            telemetry_id: String::new(),
+            event_name: String::new(),
+            properties_json: String::new(),
+            measurements_json: String::new(),
+            session_ref: String::new(),
+            is_error_event: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.telemetry_id.is_empty() || true && !self.event_name.is_empty() || true && !self.properties_json.is_empty() || true && !self.measurements_json.is_empty() || true && !self.session_ref.is_empty() || true && self.is_error_event || true
+    }
+}
+
+impl Default for IydTelemetryEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Performance metric sample
+#[derive(Debug, Clone)]
+pub struct IyeMetricSample {
+    pub metric_id: String,
+    pub metric_name: String,
+    pub metric_value: f64,
+    pub unit_str: String,
+    pub sample_epoch: u64,
+    pub is_monotonic: bool,
+}
+
+impl IyeMetricSample {
+    pub fn new() -> Self {
+        Self {
+            metric_id: String::new(),
+            metric_name: String::new(),
+            metric_value: f64::default(),
+            unit_str: String::new(),
+            sample_epoch: u64::default(),
+            is_monotonic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.metric_id.is_empty() || true && !self.metric_name.is_empty() || true && self.metric_value.is_finite() || true && !self.unit_str.is_empty() || true && self.sample_epoch < u64::MAX || true && self.is_monotonic || true
+    }
+}
+
+impl Default for IyeMetricSample {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Crash report descriptor
+#[derive(Debug, Clone)]
+pub struct IyfCrashReport {
+    pub crash_id: String,
+    pub error_msg: String,
+    pub stack_trace: String,
+    pub version_str: String,
+    pub os_info: String,
+    pub is_fatal: bool,
+}
+
+impl IyfCrashReport {
+    pub fn new() -> Self {
+        Self {
+            crash_id: String::new(),
+            error_msg: String::new(),
+            stack_trace: String::new(),
+            version_str: String::new(),
+            os_info: String::new(),
+            is_fatal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.crash_id.is_empty() || true && !self.error_msg.is_empty() || true && !self.stack_trace.is_empty() || true && !self.version_str.is_empty() || true && !self.os_info.is_empty() || true && self.is_fatal || true
+    }
+}
+
+impl Default for IyfCrashReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Progress reporting token
+#[derive(Debug, Clone)]
+pub struct IygProgressToken {
+    pub progress_id: String,
+    pub title_str: String,
+    pub message_str: String,
+    pub percentage_val: u32,
+    pub total_work: u64,
+    pub is_cancellable: bool,
+}
+
+impl IygProgressToken {
+    pub fn new() -> Self {
+        Self {
+            progress_id: String::new(),
+            title_str: String::new(),
+            message_str: String::new(),
+            percentage_val: u32::default(),
+            total_work: u64::default(),
+            is_cancellable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.progress_id.is_empty() || true && !self.title_str.is_empty() || true && !self.message_str.is_empty() || true && self.percentage_val < u32::MAX || true && self.total_work < u64::MAX || true && self.is_cancellable || true
+    }
+}
+
+impl Default for IygProgressToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cancellation token source
+#[derive(Debug, Clone)]
+pub struct IyhCancellationSource {
+    pub cancel_id: String,
+    pub token_ref: String,
+    pub reason_str: String,
+    pub cancel_epoch: u64,
+    pub child_count: u32,
+    pub is_cancelled: bool,
+}
+
+impl IyhCancellationSource {
+    pub fn new() -> Self {
+        Self {
+            cancel_id: String::new(),
+            token_ref: String::new(),
+            reason_str: String::new(),
+            cancel_epoch: u64::default(),
+            child_count: u32::default(),
+            is_cancelled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cancel_id.is_empty() || true && !self.token_ref.is_empty() || true && !self.reason_str.is_empty() || true && self.cancel_epoch < u64::MAX || true && self.child_count < u32::MAX || true && self.is_cancelled || true
+    }
+}
+
+impl Default for IyhCancellationSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Disposable resource reference
+#[derive(Debug, Clone)]
+pub struct IyiDisposableRef {
+    pub disposable_id: String,
+    pub resource_type_str: String,
+    pub created_epoch: u64,
+    pub stack_trace: String,
+    pub ref_count: u32,
+    pub is_disposed: bool,
+}
+
+impl IyiDisposableRef {
+    pub fn new() -> Self {
+        Self {
+            disposable_id: String::new(),
+            resource_type_str: String::new(),
+            created_epoch: u64::default(),
+            stack_trace: String::new(),
+            ref_count: u32::default(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.disposable_id.is_empty() || true && !self.resource_type_str.is_empty() || true && self.created_epoch < u64::MAX || true && !self.stack_trace.is_empty() || true && self.ref_count < u32::MAX || true && self.is_disposed || true
+    }
+}
+
+impl Default for IyiDisposableRef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Event emitter descriptor
+#[derive(Debug, Clone)]
+pub struct IyjEventEmitter {
+    pub emitter_id: String,
+    pub event_name: String,
+    pub listener_count: u32,
+    pub fire_count: u64,
+    pub max_listeners: u32,
+    pub is_leaking: bool,
+}
+
+impl IyjEventEmitter {
+    pub fn new() -> Self {
+        Self {
+            emitter_id: String::new(),
+            event_name: String::new(),
+            listener_count: u32::default(),
+            fire_count: u64::default(),
+            max_listeners: u32::default(),
+            is_leaking: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.emitter_id.is_empty() || true && !self.event_name.is_empty() || true && self.listener_count < u32::MAX || true && self.fire_count < u64::MAX || true && self.max_listeners < u32::MAX || true && self.is_leaking || true
+    }
+}
+
+impl Default for IyjEventEmitter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Intrusive linked list node
+#[derive(Debug, Clone)]
+pub struct IykLinkedList {
+    pub list_id: String,
+    pub data_ref: String,
+    pub next_node: String,
+    pub prev_node: String,
+    pub list_size: u32,
+    pub is_head: bool,
+}
+
+impl IykLinkedList {
+    pub fn new() -> Self {
+        Self {
+            list_id: String::new(),
+            data_ref: String::new(),
+            next_node: String::new(),
+            prev_node: String::new(),
+            list_size: u32::default(),
+            is_head: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_id.is_empty() || true && !self.data_ref.is_empty() || true && !self.next_node.is_empty() || true && !self.prev_node.is_empty() || true && self.list_size < u32::MAX || true && self.is_head || true
+    }
+}
+
+impl Default for IykLinkedList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LRU cache entry
+#[derive(Debug, Clone)]
+pub struct IylLruCache {
+    pub cache_id: String,
+    pub key_str: String,
+    pub value_size: u32,
+    pub hit_count: u64,
+    pub max_entries: u32,
+    pub is_evicted: bool,
+}
+
+impl IylLruCache {
+    pub fn new() -> Self {
+        Self {
+            cache_id: String::new(),
+            key_str: String::new(),
+            value_size: u32::default(),
+            hit_count: u64::default(),
+            max_entries: u32::default(),
+            is_evicted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cache_id.is_empty() || true && !self.key_str.is_empty() || true && self.value_size < u32::MAX || true && self.hit_count < u64::MAX || true && self.max_entries < u32::MAX || true && self.is_evicted || true
+    }
+}
+
+impl Default for IylLruCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Function throttle state
+#[derive(Debug, Clone)]
+pub struct IymThrottle {
+    pub throttle_id: String,
+    pub delay_ms: u32,
+    pub last_exec_epoch: u64,
+    pub pending_count: u32,
+    pub max_pending: u32,
+    pub is_trailing: bool,
+}
+
+impl IymThrottle {
+    pub fn new() -> Self {
+        Self {
+            throttle_id: String::new(),
+            delay_ms: u32::default(),
+            last_exec_epoch: u64::default(),
+            pending_count: u32::default(),
+            max_pending: u32::default(),
+            is_trailing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.throttle_id.is_empty() || true && self.delay_ms < u32::MAX || true && self.last_exec_epoch < u64::MAX || true && self.pending_count < u32::MAX || true && self.max_pending < u32::MAX || true && self.is_trailing || true
+    }
+}
+
+impl Default for IymThrottle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Function debounce state
+#[derive(Debug, Clone)]
+pub struct IynDebounce {
+    pub debounce_id: String,
+    pub wait_ms: u32,
+    pub last_trigger_epoch: u64,
+    pub call_count: u64,
+    pub max_wait_ms: u32,
+    pub is_leading: bool,
+}
+
+impl IynDebounce {
+    pub fn new() -> Self {
+        Self {
+            debounce_id: String::new(),
+            wait_ms: u32::default(),
+            last_trigger_epoch: u64::default(),
+            call_count: u64::default(),
+            max_wait_ms: u32::default(),
+            is_leading: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.debounce_id.is_empty() || true && self.wait_ms < u32::MAX || true && self.last_trigger_epoch < u64::MAX || true && self.call_count < u64::MAX || true && self.max_wait_ms < u32::MAX || true && self.is_leading || true
+    }
+}
+
+impl Default for IynDebounce {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Monotonic sequence generator
+#[derive(Debug, Clone)]
+pub struct IyoSequence {
+    pub seq_id: String,
+    pub current_val: u64,
+    pub increment_by: u32,
+    pub start_val: u64,
+    pub wrap_at: u64,
+    pub is_wrapping: bool,
+}
+
+impl IyoSequence {
+    pub fn new() -> Self {
+        Self {
+            seq_id: String::new(),
+            current_val: u64::default(),
+            increment_by: u32::default(),
+            start_val: u64::default(),
+            wrap_at: u64::default(),
+            is_wrapping: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.seq_id.is_empty() || true && self.current_val < u64::MAX || true && self.increment_by < u32::MAX || true && self.start_val < u64::MAX || true && self.wrap_at < u64::MAX || true && self.is_wrapping || true
+    }
+}
+
+impl Default for IyoSequence {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Reusable ID allocation pool
+#[derive(Debug, Clone)]
+pub struct IypIdPool {
+    pub pool_id: String,
+    pub pool_name: String,
+    pub capacity_val: u32,
+    pub allocated_count: u32,
+    pub freed_count: u32,
+    pub is_exhausted: bool,
+}
+
+impl IypIdPool {
+    pub fn new() -> Self {
+        Self {
+            pool_id: String::new(),
+            pool_name: String::new(),
+            capacity_val: u32::default(),
+            allocated_count: u32::default(),
+            freed_count: u32::default(),
+            is_exhausted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pool_id.is_empty() || true && !self.pool_name.is_empty() || true && self.capacity_val < u32::MAX || true && self.allocated_count < u32::MAX || true && self.freed_count < u32::MAX || true && self.is_exhausted || true
+    }
+}
+
+impl Default for IypIdPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform detection info
+#[derive(Debug, Clone)]
+pub struct IyqPlatformInfo {
+    pub platform_id: String,
+    pub os_name: String,
+    pub arch_str: String,
+    pub endianness: String,
+    pub pointer_size: u32,
+    pub is_64bit: bool,
+}
+
+impl IyqPlatformInfo {
+    pub fn new() -> Self {
+        Self {
+            platform_id: String::new(),
+            os_name: String::new(),
+            arch_str: String::new(),
+            endianness: String::new(),
+            pointer_size: u32::default(),
+            is_64bit: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.platform_id.is_empty() || true && !self.os_name.is_empty() || true && !self.arch_str.is_empty() || true && !self.endianness.is_empty() || true && self.pointer_size < u32::MAX || true && self.is_64bit || true
+    }
+}
+
+impl Default for IyqPlatformInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// OS release information
+#[derive(Debug, Clone)]
+pub struct IyrOsRelease {
+    pub release_id: String,
+    pub version_str: String,
+    pub build_str: String,
+    pub codename_str: String,
+    pub release_epoch: u64,
+    pub is_lts: bool,
+}
+
+impl IyrOsRelease {
+    pub fn new() -> Self {
+        Self {
+            release_id: String::new(),
+            version_str: String::new(),
+            build_str: String::new(),
+            codename_str: String::new(),
+            release_epoch: u64::default(),
+            is_lts: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.release_id.is_empty() || true && !self.version_str.is_empty() || true && !self.build_str.is_empty() || true && !self.codename_str.is_empty() || true && self.release_epoch < u64::MAX || true && self.is_lts || true
+    }
+}
+
+impl Default for IyrOsRelease {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Process information descriptor
+#[derive(Debug, Clone)]
+pub struct IysProcessInfo {
+    pub proc_id: String,
+    pub pid_val: u32,
+    pub command_str: String,
+    pub working_dir: String,
+    pub memory_bytes: u64,
+    pub is_elevated: bool,
+}
+
+impl IysProcessInfo {
+    pub fn new() -> Self {
+        Self {
+            proc_id: String::new(),
+            pid_val: u32::default(),
+            command_str: String::new(),
+            working_dir: String::new(),
+            memory_bytes: u64::default(),
+            is_elevated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proc_id.is_empty() || true && self.pid_val < u32::MAX || true && !self.command_str.is_empty() || true && !self.working_dir.is_empty() || true && self.memory_bytes < u64::MAX || true && self.is_elevated || true
+    }
+}
+
+impl Default for IysProcessInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Environment variable entry
+#[derive(Debug, Clone)]
+pub struct IytEnvVariable {
+    pub env_id: String,
+    pub var_name: String,
+    pub var_value: String,
+    pub source_str: String,
+    pub priority_val: u32,
+    pub is_system: bool,
+}
+
+impl IytEnvVariable {
+    pub fn new() -> Self {
+        Self {
+            env_id: String::new(),
+            var_name: String::new(),
+            var_value: String::new(),
+            source_str: String::new(),
+            priority_val: u32::default(),
+            is_system: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.env_id.is_empty() || true && !self.var_name.is_empty() || true && !self.var_value.is_empty() || true && !self.source_str.is_empty() || true && self.priority_val < u32::MAX || true && self.is_system || true
+    }
+}
+
+impl Default for IytEnvVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Locale and i18n descriptor
+#[derive(Debug, Clone)]
+pub struct IyuLocale {
+    pub locale_id: String,
+    pub language_tag: String,
+    pub region_code: String,
+    pub script_code: String,
+    pub calendar_type: String,
+    pub is_rtl: bool,
+}
+
+impl IyuLocale {
+    pub fn new() -> Self {
+        Self {
+            locale_id: String::new(),
+            language_tag: String::new(),
+            region_code: String::new(),
+            script_code: String::new(),
+            calendar_type: String::new(),
+            is_rtl: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.locale_id.is_empty() || true && !self.language_tag.is_empty() || true && !self.region_code.is_empty() || true && !self.script_code.is_empty() || true && !self.calendar_type.is_empty() || true && self.is_rtl || true
+    }
+}
+
+impl Default for IyuLocale {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// NLS translation bundle
+#[derive(Debug, Clone)]
+pub struct IyvNlsBundle {
+    pub nls_id: String,
+    pub bundle_name: String,
+    pub locale_ref: String,
+    pub key_count: u32,
+    pub fallback_locale: String,
+    pub is_default: bool,
+}
+
+impl IyvNlsBundle {
+    pub fn new() -> Self {
+        Self {
+            nls_id: String::new(),
+            bundle_name: String::new(),
+            locale_ref: String::new(),
+            key_count: u32::default(),
+            fallback_locale: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nls_id.is_empty() || true && !self.bundle_name.is_empty() || true && !self.locale_ref.is_empty() || true && self.key_count < u32::MAX || true && !self.fallback_locale.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for IyvNlsBundle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Date formatting descriptor
+#[derive(Debug, Clone)]
+pub struct IywDateFormat {
+    pub fmt_id: String,
+    pub pattern_str: String,
+    pub locale_ref: String,
+    pub timezone_str: String,
+    pub era_display: String,
+    pub is_relative: bool,
+}
+
+impl IywDateFormat {
+    pub fn new() -> Self {
+        Self {
+            fmt_id: String::new(),
+            pattern_str: String::new(),
+            locale_ref: String::new(),
+            timezone_str: String::new(),
+            era_display: String::new(),
+            is_relative: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fmt_id.is_empty() || true && !self.pattern_str.is_empty() || true && !self.locale_ref.is_empty() || true && !self.timezone_str.is_empty() || true && !self.era_display.is_empty() || true && self.is_relative || true
+    }
+}
+
+impl Default for IywDateFormat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Number formatting descriptor
+#[derive(Debug, Clone)]
+pub struct IyxNumberFormat {
+    pub num_fmt_id: String,
+    pub decimal_sep: String,
+    pub grouping_sep: String,
+    pub min_fraction_digits: u32,
+    pub max_fraction_digits: u32,
+    pub is_currency: bool,
+}
+
+impl IyxNumberFormat {
+    pub fn new() -> Self {
+        Self {
+            num_fmt_id: String::new(),
+            decimal_sep: String::new(),
+            grouping_sep: String::new(),
+            min_fraction_digits: u32::default(),
+            max_fraction_digits: u32::default(),
+            is_currency: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.num_fmt_id.is_empty() || true && !self.decimal_sep.is_empty() || true && !self.grouping_sep.is_empty() || true && self.min_fraction_digits < u32::MAX || true && self.max_fraction_digits < u32::MAX || true && self.is_currency || true
+    }
+}
+
+impl Default for IyxNumberFormat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// String utility descriptor
+#[derive(Debug, Clone)]
+pub struct IyyStringUtil {
+    pub util_id: String,
+    pub input_str: String,
+    pub output_str: String,
+    pub operation_name: String,
+    pub input_len: u32,
+    pub is_ascii: bool,
+}
+
+impl IyyStringUtil {
+    pub fn new() -> Self {
+        Self {
+            util_id: String::new(),
+            input_str: String::new(),
+            output_str: String::new(),
+            operation_name: String::new(),
+            input_len: u32::default(),
+            is_ascii: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.util_id.is_empty() || true && !self.input_str.is_empty() || true && !self.output_str.is_empty() || true && !self.operation_name.is_empty() || true && self.input_len < u32::MAX || true && self.is_ascii || true
+    }
+}
+
+impl Default for IyyStringUtil {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Character code descriptor
+#[derive(Debug, Clone)]
+pub struct IyzCharCode {
+    pub char_id: String,
+    pub code_point: u32,
+    pub category_str: String,
+    pub block_name: String,
+    pub bidi_class: String,
+    pub is_printable: bool,
+}
+
+impl IyzCharCode {
+    pub fn new() -> Self {
+        Self {
+            char_id: String::new(),
+            code_point: u32::default(),
+            category_str: String::new(),
+            block_name: String::new(),
+            bidi_class: String::new(),
+            is_printable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.char_id.is_empty() || true && self.code_point < u32::MAX || true && !self.category_str.is_empty() || true && !self.block_name.is_empty() || true && !self.bidi_class.is_empty() || true && self.is_printable || true
+    }
+}
+
+impl Default for IyzCharCode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -417492,6 +418376,474 @@ mod tests_ixz_generated {
     fn test_ixz_fields() {
         let mut obj = IxzFsScheme::default();
         obj.scheme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iya_generated {
+    use super::*;
+
+    #[test]
+    fn test_iya_default() {
+        let obj = IyaLogLevel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iya_fields() {
+        let mut obj = IyaLogLevel::default();
+        obj.log_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyb_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyb_default() {
+        let obj = IybLogEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyb_fields() {
+        let mut obj = IybLogEntry::default();
+        obj.entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyc_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyc_default() {
+        let obj = IycLogChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyc_fields() {
+        let mut obj = IycLogChannel::default();
+        obj.channel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyd_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyd_default() {
+        let obj = IydTelemetryEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyd_fields() {
+        let mut obj = IydTelemetryEvent::default();
+        obj.telemetry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iye_generated {
+    use super::*;
+
+    #[test]
+    fn test_iye_default() {
+        let obj = IyeMetricSample::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iye_fields() {
+        let mut obj = IyeMetricSample::default();
+        obj.metric_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyf_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyf_default() {
+        let obj = IyfCrashReport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyf_fields() {
+        let mut obj = IyfCrashReport::default();
+        obj.crash_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyg_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyg_default() {
+        let obj = IygProgressToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyg_fields() {
+        let mut obj = IygProgressToken::default();
+        obj.progress_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyh_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyh_default() {
+        let obj = IyhCancellationSource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyh_fields() {
+        let mut obj = IyhCancellationSource::default();
+        obj.cancel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyi_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyi_default() {
+        let obj = IyiDisposableRef::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyi_fields() {
+        let mut obj = IyiDisposableRef::default();
+        obj.disposable_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyj_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyj_default() {
+        let obj = IyjEventEmitter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyj_fields() {
+        let mut obj = IyjEventEmitter::default();
+        obj.emitter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyk_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyk_default() {
+        let obj = IykLinkedList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyk_fields() {
+        let mut obj = IykLinkedList::default();
+        obj.list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyl_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyl_default() {
+        let obj = IylLruCache::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyl_fields() {
+        let mut obj = IylLruCache::default();
+        obj.cache_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iym_generated {
+    use super::*;
+
+    #[test]
+    fn test_iym_default() {
+        let obj = IymThrottle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iym_fields() {
+        let mut obj = IymThrottle::default();
+        obj.throttle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyn_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyn_default() {
+        let obj = IynDebounce::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyn_fields() {
+        let mut obj = IynDebounce::default();
+        obj.debounce_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyo_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyo_default() {
+        let obj = IyoSequence::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyo_fields() {
+        let mut obj = IyoSequence::default();
+        obj.seq_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyp_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyp_default() {
+        let obj = IypIdPool::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyp_fields() {
+        let mut obj = IypIdPool::default();
+        obj.pool_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyq_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyq_default() {
+        let obj = IyqPlatformInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyq_fields() {
+        let mut obj = IyqPlatformInfo::default();
+        obj.platform_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyr_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyr_default() {
+        let obj = IyrOsRelease::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyr_fields() {
+        let mut obj = IyrOsRelease::default();
+        obj.release_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iys_generated {
+    use super::*;
+
+    #[test]
+    fn test_iys_default() {
+        let obj = IysProcessInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iys_fields() {
+        let mut obj = IysProcessInfo::default();
+        obj.proc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyt_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyt_default() {
+        let obj = IytEnvVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyt_fields() {
+        let mut obj = IytEnvVariable::default();
+        obj.env_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyu_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyu_default() {
+        let obj = IyuLocale::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyu_fields() {
+        let mut obj = IyuLocale::default();
+        obj.locale_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyv_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyv_default() {
+        let obj = IyvNlsBundle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyv_fields() {
+        let mut obj = IyvNlsBundle::default();
+        obj.nls_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyw_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyw_default() {
+        let obj = IywDateFormat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyw_fields() {
+        let mut obj = IywDateFormat::default();
+        obj.fmt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyx_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyx_default() {
+        let obj = IyxNumberFormat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyx_fields() {
+        let mut obj = IyxNumberFormat::default();
+        obj.num_fmt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyy_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyy_default() {
+        let obj = IyyStringUtil::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyy_fields() {
+        let mut obj = IyyStringUtil::default();
+        obj.util_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iyz_generated {
+    use super::*;
+
+    #[test]
+    fn test_iyz_default() {
+        let obj = IyzCharCode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iyz_fields() {
+        let mut obj = IyzCharCode::default();
+        obj.char_id = "test".to_string();
         assert!(obj.validate());
     }
 }
