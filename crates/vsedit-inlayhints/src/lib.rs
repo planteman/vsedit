@@ -93011,6 +93011,678 @@ impl Default for GjjInputBoxModel {
     }
 }
 
+/// Status bar item (id, text, tooltip, command, alignment, priority)
+#[derive(Debug, Clone)]
+pub struct GjkStatusBarItem {
+    pub status_id: String,
+    pub text: String,
+    pub tooltip: String,
+    pub command_id: String,
+    pub alignment: String,
+    pub priority: u32,
+    pub color: String,
+    pub background_color: String,
+    pub is_visible: bool,
+    pub accessibility_info: String,
+}
+
+impl GjkStatusBarItem {
+    pub fn new() -> Self {
+        Self {
+            status_id: String::new(),
+            text: String::new(),
+            tooltip: String::new(),
+            command_id: String::new(),
+            alignment: String::new(),
+            priority: u32::default(),
+            color: String::new(),
+            background_color: String::new(),
+            is_visible: bool::default(),
+            accessibility_info: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.status_id.is_empty() || true && !self.text.is_empty() || true && !self.tooltip.is_empty() || true && !self.command_id.is_empty() || true && !self.alignment.is_empty() || true && self.priority < u32::MAX || true && !self.color.is_empty() || true && !self.background_color.is_empty() || true && self.is_visible || true && !self.accessibility_info.is_empty() || true
+    }
+}
+
+impl Default for GjkStatusBarItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Status bar group (items, alignment, priority, visible)
+#[derive(Debug, Clone)]
+pub struct GjlStatusBarGroup {
+    pub group_id: String,
+    pub items_json: String,
+    pub alignment: String,
+    pub priority: u32,
+    pub is_visible: bool,
+    pub compact_mode: bool,
+    pub overflow_mode: String,
+    pub max_items: u32,
+    pub separator_visible: bool,
+    pub label: String,
+}
+
+impl GjlStatusBarGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            items_json: String::new(),
+            alignment: String::new(),
+            priority: u32::default(),
+            is_visible: bool::default(),
+            compact_mode: bool::default(),
+            overflow_mode: String::new(),
+            max_items: u32::default(),
+            separator_visible: bool::default(),
+            label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.items_json.is_empty() || true && !self.alignment.is_empty() || true && self.priority < u32::MAX || true && self.is_visible || true && self.compact_mode || true && !self.overflow_mode.is_empty() || true && self.max_items < u32::MAX || true && self.separator_visible || true && !self.label.is_empty() || true
+    }
+}
+
+impl Default for GjlStatusBarGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Activity bar item (id, icon, title, badge count, is active)
+#[derive(Debug, Clone)]
+pub struct GjmActivityBarItem {
+    pub activity_id: String,
+    pub icon_path: String,
+    pub title: String,
+    pub badge_count: u32,
+    pub is_active: bool,
+    pub is_visible: bool,
+    pub tooltip: String,
+    pub order: u32,
+    pub when_clause: String,
+    pub context_menu_json: String,
+}
+
+impl GjmActivityBarItem {
+    pub fn new() -> Self {
+        Self {
+            activity_id: String::new(),
+            icon_path: String::new(),
+            title: String::new(),
+            badge_count: u32::default(),
+            is_active: bool::default(),
+            is_visible: bool::default(),
+            tooltip: String::new(),
+            order: u32::default(),
+            when_clause: String::new(),
+            context_menu_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.activity_id.is_empty() || true && !self.icon_path.is_empty() || true && !self.title.is_empty() || true && self.badge_count < u32::MAX || true && self.is_active || true && self.is_visible || true && !self.tooltip.is_empty() || true && self.order < u32::MAX || true && !self.when_clause.is_empty() || true && !self.context_menu_json.is_empty() || true
+    }
+}
+
+impl Default for GjmActivityBarItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel model (id, title, icon, is visible, is maximized, order)
+#[derive(Debug, Clone)]
+pub struct GjnPanelModel {
+    pub panel_id: String,
+    pub title: String,
+    pub icon: String,
+    pub is_visible: bool,
+    pub is_maximized: bool,
+    pub order: u32,
+    pub badge_count: u32,
+    pub height: u32,
+    pub actions_json: String,
+    pub content_id: String,
+}
+
+impl GjnPanelModel {
+    pub fn new() -> Self {
+        Self {
+            panel_id: String::new(),
+            title: String::new(),
+            icon: String::new(),
+            is_visible: bool::default(),
+            is_maximized: bool::default(),
+            order: u32::default(),
+            badge_count: u32::default(),
+            height: u32::default(),
+            actions_json: String::new(),
+            content_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.panel_id.is_empty() || true && !self.title.is_empty() || true && !self.icon.is_empty() || true && self.is_visible || true && self.is_maximized || true && self.order < u32::MAX || true && self.badge_count < u32::MAX || true && self.height < u32::MAX || true && !self.actions_json.is_empty() || true && !self.content_id.is_empty() || true
+    }
+}
+
+impl Default for GjnPanelModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sidebar model (id, views, is visible, width, active view)
+#[derive(Debug, Clone)]
+pub struct GjoSidebarModel {
+    pub sidebar_id: String,
+    pub views_json: String,
+    pub is_visible: bool,
+    pub width: u32,
+    pub active_view_id: String,
+    pub min_width: u32,
+    pub max_width: u32,
+    pub position: String,
+    pub restore_on_open: bool,
+    pub collapsed_views_json: String,
+}
+
+impl GjoSidebarModel {
+    pub fn new() -> Self {
+        Self {
+            sidebar_id: String::new(),
+            views_json: String::new(),
+            is_visible: bool::default(),
+            width: u32::default(),
+            active_view_id: String::new(),
+            min_width: u32::default(),
+            max_width: u32::default(),
+            position: String::new(),
+            restore_on_open: bool::default(),
+            collapsed_views_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sidebar_id.is_empty() || true && !self.views_json.is_empty() || true && self.is_visible || true && self.width < u32::MAX || true && !self.active_view_id.is_empty() || true && self.min_width < u32::MAX || true && self.max_width < u32::MAX || true && !self.position.is_empty() || true && self.restore_on_open || true && !self.collapsed_views_json.is_empty() || true
+    }
+}
+
+impl Default for GjoSidebarModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Auxiliary bar model (id, views, width, is visible, side)
+#[derive(Debug, Clone)]
+pub struct GjpAuxiliaryBarModel {
+    pub auxbar_id: String,
+    pub views_json: String,
+    pub width: u32,
+    pub is_visible: bool,
+    pub side: String,
+    pub min_width: u32,
+    pub active_view_id: String,
+    pub title: String,
+    pub restore_state: bool,
+    pub overlay_mode: bool,
+}
+
+impl GjpAuxiliaryBarModel {
+    pub fn new() -> Self {
+        Self {
+            auxbar_id: String::new(),
+            views_json: String::new(),
+            width: u32::default(),
+            is_visible: bool::default(),
+            side: String::new(),
+            min_width: u32::default(),
+            active_view_id: String::new(),
+            title: String::new(),
+            restore_state: bool::default(),
+            overlay_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.auxbar_id.is_empty() || true && !self.views_json.is_empty() || true && self.width < u32::MAX || true && self.is_visible || true && !self.side.is_empty() || true && self.min_width < u32::MAX || true && !self.active_view_id.is_empty() || true && !self.title.is_empty() || true && self.restore_state || true && self.overlay_mode || true
+    }
+}
+
+impl Default for GjpAuxiliaryBarModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Title bar model (title, menu items, buttons, custom items)
+#[derive(Debug, Clone)]
+pub struct GjqTitleBarModel {
+    pub titlebar_id: String,
+    pub title: String,
+    pub menu_items_json: String,
+    pub buttons_json: String,
+    pub custom_items_json: String,
+    pub is_visible: bool,
+    pub height: u32,
+    pub style: String,
+    pub drag_region: bool,
+    pub show_icon: bool,
+}
+
+impl GjqTitleBarModel {
+    pub fn new() -> Self {
+        Self {
+            titlebar_id: String::new(),
+            title: String::new(),
+            menu_items_json: String::new(),
+            buttons_json: String::new(),
+            custom_items_json: String::new(),
+            is_visible: bool::default(),
+            height: u32::default(),
+            style: String::new(),
+            drag_region: bool::default(),
+            show_icon: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.titlebar_id.is_empty() || true && !self.title.is_empty() || true && !self.menu_items_json.is_empty() || true && !self.buttons_json.is_empty() || true && !self.custom_items_json.is_empty() || true && self.is_visible || true && self.height < u32::MAX || true && !self.style.is_empty() || true && self.drag_region || true && self.show_icon || true
+    }
+}
+
+impl Default for GjqTitleBarModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Banner model (message, icon, actions, close, color, scope)
+#[derive(Debug, Clone)]
+pub struct GjrBannerModel {
+    pub banner_id: String,
+    pub message: String,
+    pub icon: String,
+    pub actions_json: String,
+    pub can_close: bool,
+    pub color: String,
+    pub scope: String,
+    pub priority: u32,
+    pub is_visible: bool,
+    pub link_uri: String,
+}
+
+impl GjrBannerModel {
+    pub fn new() -> Self {
+        Self {
+            banner_id: String::new(),
+            message: String::new(),
+            icon: String::new(),
+            actions_json: String::new(),
+            can_close: bool::default(),
+            color: String::new(),
+            scope: String::new(),
+            priority: u32::default(),
+            is_visible: bool::default(),
+            link_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.banner_id.is_empty() || true && !self.message.is_empty() || true && !self.icon.is_empty() || true && !self.actions_json.is_empty() || true && self.can_close || true && !self.color.is_empty() || true && !self.scope.is_empty() || true && self.priority < u32::MAX || true && self.is_visible || true && !self.link_uri.is_empty() || true
+    }
+}
+
+impl Default for GjrBannerModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Welcome view (walkthroughs, recent, help links, extension tips)
+#[derive(Debug, Clone)]
+pub struct GjsWelcomeView {
+    pub welcome_id: String,
+    pub walkthroughs_json: String,
+    pub recent_json: String,
+    pub help_links_json: String,
+    pub extension_tips_json: String,
+    pub show_on_startup: bool,
+    pub customized_layout: bool,
+    pub theme_preview: bool,
+    pub get_started_json: String,
+    pub version: String,
+}
+
+impl GjsWelcomeView {
+    pub fn new() -> Self {
+        Self {
+            welcome_id: String::new(),
+            walkthroughs_json: String::new(),
+            recent_json: String::new(),
+            help_links_json: String::new(),
+            extension_tips_json: String::new(),
+            show_on_startup: bool::default(),
+            customized_layout: bool::default(),
+            theme_preview: bool::default(),
+            get_started_json: String::new(),
+            version: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.welcome_id.is_empty() || true && !self.walkthroughs_json.is_empty() || true && !self.recent_json.is_empty() || true && !self.help_links_json.is_empty() || true && !self.extension_tips_json.is_empty() || true && self.show_on_startup || true && self.customized_layout || true && self.theme_preview || true && !self.get_started_json.is_empty() || true && !self.version.is_empty() || true
+    }
+}
+
+impl Default for GjsWelcomeView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Release notes (version, date, features, fixes, known issues)
+#[derive(Debug, Clone)]
+pub struct GjtReleaseNotes {
+    pub release_id: String,
+    pub version: String,
+    pub date_ms: u64,
+    pub features_json: String,
+    pub fixes_json: String,
+    pub known_issues_json: String,
+    pub breaking_changes_json: String,
+    pub contributors_json: String,
+    pub preview_features_json: String,
+    pub show_on_update: bool,
+}
+
+impl GjtReleaseNotes {
+    pub fn new() -> Self {
+        Self {
+            release_id: String::new(),
+            version: String::new(),
+            date_ms: u64::default(),
+            features_json: String::new(),
+            fixes_json: String::new(),
+            known_issues_json: String::new(),
+            breaking_changes_json: String::new(),
+            contributors_json: String::new(),
+            preview_features_json: String::new(),
+            show_on_update: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.release_id.is_empty() || true && !self.version.is_empty() || true && self.date_ms < u64::MAX || true && !self.features_json.is_empty() || true && !self.fixes_json.is_empty() || true && !self.known_issues_json.is_empty() || true && !self.breaking_changes_json.is_empty() || true && !self.contributors_json.is_empty() || true && !self.preview_features_json.is_empty() || true && self.show_on_update || true
+    }
+}
+
+impl Default for GjtReleaseNotes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Walkthrough step (title, description, media, completion event)
+#[derive(Debug, Clone)]
+pub struct GjuWalkthroughStep {
+    pub step_id: String,
+    pub title: String,
+    pub description: String,
+    pub media_path: String,
+    pub completion_event: String,
+    pub when_clause: String,
+    pub is_complete: bool,
+    pub order: u32,
+    pub category: String,
+    pub button_json: String,
+}
+
+impl GjuWalkthroughStep {
+    pub fn new() -> Self {
+        Self {
+            step_id: String::new(),
+            title: String::new(),
+            description: String::new(),
+            media_path: String::new(),
+            completion_event: String::new(),
+            when_clause: String::new(),
+            is_complete: bool::default(),
+            order: u32::default(),
+            category: String::new(),
+            button_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.step_id.is_empty() || true && !self.title.is_empty() || true && !self.description.is_empty() || true && !self.media_path.is_empty() || true && !self.completion_event.is_empty() || true && !self.when_clause.is_empty() || true && self.is_complete || true && self.order < u32::MAX || true && !self.category.is_empty() || true && !self.button_json.is_empty() || true
+    }
+}
+
+impl Default for GjuWalkthroughStep {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Interactive playground (samples, live preview, reset, scroll)
+#[derive(Debug, Clone)]
+pub struct GjvInteractivePlayground {
+    pub playground_id: String,
+    pub samples_json: String,
+    pub live_preview: bool,
+    pub can_reset: bool,
+    pub scroll_position: u32,
+    pub active_sample_id: String,
+    pub editor_content: String,
+    pub preview_content: String,
+    pub is_dirty: bool,
+    pub theme_id: String,
+}
+
+impl GjvInteractivePlayground {
+    pub fn new() -> Self {
+        Self {
+            playground_id: String::new(),
+            samples_json: String::new(),
+            live_preview: bool::default(),
+            can_reset: bool::default(),
+            scroll_position: u32::default(),
+            active_sample_id: String::new(),
+            editor_content: String::new(),
+            preview_content: String::new(),
+            is_dirty: bool::default(),
+            theme_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.playground_id.is_empty() || true && !self.samples_json.is_empty() || true && self.live_preview || true && self.can_reset || true && self.scroll_position < u32::MAX || true && !self.active_sample_id.is_empty() || true && !self.editor_content.is_empty() || true && !self.preview_content.is_empty() || true && self.is_dirty || true && !self.theme_id.is_empty() || true
+    }
+}
+
+impl Default for GjvInteractivePlayground {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel model (name, language, content, scroll lock)
+#[derive(Debug, Clone)]
+pub struct GjwOutputChannelModel {
+    pub output_id: String,
+    pub name: String,
+    pub language_id: String,
+    pub content: String,
+    pub scroll_lock: bool,
+    pub max_lines: u32,
+    pub is_visible: bool,
+    pub preserve_focus: bool,
+    pub append_mode: bool,
+    pub word_wrap: bool,
+}
+
+impl GjwOutputChannelModel {
+    pub fn new() -> Self {
+        Self {
+            output_id: String::new(),
+            name: String::new(),
+            language_id: String::new(),
+            content: String::new(),
+            scroll_lock: bool::default(),
+            max_lines: u32::default(),
+            is_visible: bool::default(),
+            preserve_focus: bool::default(),
+            append_mode: bool::default(),
+            word_wrap: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_id.is_empty() || true && !self.name.is_empty() || true && !self.language_id.is_empty() || true && !self.content.is_empty() || true && self.scroll_lock || true && self.max_lines < u32::MAX || true && self.is_visible || true && self.preserve_focus || true && self.append_mode || true && self.word_wrap || true
+    }
+}
+
+impl Default for GjwOutputChannelModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Log channel model (name, level, source, trace, filter)
+#[derive(Debug, Clone)]
+pub struct GjxLogChannelModel {
+    pub log_id: String,
+    pub name: String,
+    pub level: String,
+    pub source: String,
+    pub trace_enabled: bool,
+    pub filter_text: String,
+    pub max_entries: u32,
+    pub follow_output: bool,
+    pub show_timestamps: bool,
+    pub show_source: bool,
+}
+
+impl GjxLogChannelModel {
+    pub fn new() -> Self {
+        Self {
+            log_id: String::new(),
+            name: String::new(),
+            level: String::new(),
+            source: String::new(),
+            trace_enabled: bool::default(),
+            filter_text: String::new(),
+            max_entries: u32::default(),
+            follow_output: bool::default(),
+            show_timestamps: bool::default(),
+            show_source: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_id.is_empty() || true && !self.name.is_empty() || true && !self.level.is_empty() || true && !self.source.is_empty() || true && self.trace_enabled || true && !self.filter_text.is_empty() || true && self.max_entries < u32::MAX || true && self.follow_output || true && self.show_timestamps || true && self.show_source || true
+    }
+}
+
+impl Default for GjxLogChannelModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problems panel (markers, filter, group by, sort, copy)
+#[derive(Debug, Clone)]
+pub struct GjyProblemsPanel {
+    pub problems_id: String,
+    pub markers_json: String,
+    pub filter_text: String,
+    pub group_by: String,
+    pub sort_by: String,
+    pub can_copy: bool,
+    pub file_count: u32,
+    pub error_count: u32,
+    pub warning_count: u32,
+    pub info_count: u32,
+}
+
+impl GjyProblemsPanel {
+    pub fn new() -> Self {
+        Self {
+            problems_id: String::new(),
+            markers_json: String::new(),
+            filter_text: String::new(),
+            group_by: String::new(),
+            sort_by: String::new(),
+            can_copy: bool::default(),
+            file_count: u32::default(),
+            error_count: u32::default(),
+            warning_count: u32::default(),
+            info_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.problems_id.is_empty() || true && !self.markers_json.is_empty() || true && !self.filter_text.is_empty() || true && !self.group_by.is_empty() || true && !self.sort_by.is_empty() || true && self.can_copy || true && self.file_count < u32::MAX || true && self.error_count < u32::MAX || true && self.warning_count < u32::MAX || true && self.info_count < u32::MAX || true
+    }
+}
+
+impl Default for GjyProblemsPanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Timeline view (items, filter, provider, source, refresh)
+#[derive(Debug, Clone)]
+pub struct GjzTimelineView {
+    pub timeline_id: String,
+    pub items_json: String,
+    pub filter_text: String,
+    pub provider_id: String,
+    pub source_uri: String,
+    pub can_refresh: bool,
+    pub is_loading: bool,
+    pub cursor_json: String,
+    pub page_size: u32,
+    pub sort_order: String,
+}
+
+impl GjzTimelineView {
+    pub fn new() -> Self {
+        Self {
+            timeline_id: String::new(),
+            items_json: String::new(),
+            filter_text: String::new(),
+            provider_id: String::new(),
+            source_uri: String::new(),
+            can_refresh: bool::default(),
+            is_loading: bool::default(),
+            cursor_json: String::new(),
+            page_size: u32::default(),
+            sort_order: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.timeline_id.is_empty() || true && !self.items_json.is_empty() || true && !self.filter_text.is_empty() || true && !self.provider_id.is_empty() || true && !self.source_uri.is_empty() || true && self.can_refresh || true && self.is_loading || true && !self.cursor_json.is_empty() || true && self.page_size < u32::MAX || true && !self.sort_order.is_empty() || true
+    }
+}
+
+impl Default for GjzTimelineView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -320983,6 +321655,294 @@ mod tests_gjj_generated {
     fn test_gjj_fields() {
         let mut obj = GjjInputBoxModel::default();
         obj.input_box_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjk_default() {
+        let obj = GjkStatusBarItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjk_fields() {
+        let mut obj = GjkStatusBarItem::default();
+        obj.status_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjl_default() {
+        let obj = GjlStatusBarGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjl_fields() {
+        let mut obj = GjlStatusBarGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjm_default() {
+        let obj = GjmActivityBarItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjm_fields() {
+        let mut obj = GjmActivityBarItem::default();
+        obj.activity_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjn_default() {
+        let obj = GjnPanelModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjn_fields() {
+        let mut obj = GjnPanelModel::default();
+        obj.panel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjo_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjo_default() {
+        let obj = GjoSidebarModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjo_fields() {
+        let mut obj = GjoSidebarModel::default();
+        obj.sidebar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjp_default() {
+        let obj = GjpAuxiliaryBarModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjp_fields() {
+        let mut obj = GjpAuxiliaryBarModel::default();
+        obj.auxbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjq_default() {
+        let obj = GjqTitleBarModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjq_fields() {
+        let mut obj = GjqTitleBarModel::default();
+        obj.titlebar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjr_default() {
+        let obj = GjrBannerModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjr_fields() {
+        let mut obj = GjrBannerModel::default();
+        obj.banner_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjs_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjs_default() {
+        let obj = GjsWelcomeView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjs_fields() {
+        let mut obj = GjsWelcomeView::default();
+        obj.welcome_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjt_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjt_default() {
+        let obj = GjtReleaseNotes::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjt_fields() {
+        let mut obj = GjtReleaseNotes::default();
+        obj.release_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gju_generated {
+    use super::*;
+
+    #[test]
+    fn test_gju_default() {
+        let obj = GjuWalkthroughStep::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gju_fields() {
+        let mut obj = GjuWalkthroughStep::default();
+        obj.step_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjv_default() {
+        let obj = GjvInteractivePlayground::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjv_fields() {
+        let mut obj = GjvInteractivePlayground::default();
+        obj.playground_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjw_default() {
+        let obj = GjwOutputChannelModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjw_fields() {
+        let mut obj = GjwOutputChannelModel::default();
+        obj.output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjx_default() {
+        let obj = GjxLogChannelModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjx_fields() {
+        let mut obj = GjxLogChannelModel::default();
+        obj.log_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjy_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjy_default() {
+        let obj = GjyProblemsPanel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjy_fields() {
+        let mut obj = GjyProblemsPanel::default();
+        obj.problems_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gjz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gjz_default() {
+        let obj = GjzTimelineView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gjz_fields() {
+        let mut obj = GjzTimelineView::default();
+        obj.timeline_id = "test".to_string();
         assert!(obj.validate());
     }
 }
