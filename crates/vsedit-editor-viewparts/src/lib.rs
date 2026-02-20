@@ -60282,6 +60282,213 @@ impl Default for FfjEditorViewContent {
 }
 
 
+/// Cursor movement and positioning controller types
+#[derive(Debug, Clone)]
+pub struct FfkCursorController {
+    pub cursor_position_line: u32,
+    pub cursor_position_col: u32,
+    pub cursor_desired_col: u32,
+    pub cursor_selection_start_line: u32,
+    pub cursor_selection_start_col: u32,
+    pub cursor_is_multi: bool,
+    pub cursor_count: u32,
+    pub cursor_primary_index: u32,
+    pub cursor_reveal_type: String,
+    pub cursor_reveal_horizontal: bool,
+}
+
+impl FfkCursorController {
+    pub fn new() -> Self {
+        Self {
+            cursor_position_line: u32::default(),
+            cursor_position_col: u32::default(),
+            cursor_desired_col: u32::default(),
+            cursor_selection_start_line: u32::default(),
+            cursor_selection_start_col: u32::default(),
+            cursor_is_multi: bool::default(),
+            cursor_count: u32::default(),
+            cursor_primary_index: u32::default(),
+            cursor_reveal_type: String::new(),
+            cursor_reveal_horizontal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cursor_position_line < u32::MAX || true && self.cursor_position_col < u32::MAX || true && self.cursor_desired_col < u32::MAX || true && self.cursor_selection_start_line < u32::MAX || true && self.cursor_selection_start_col < u32::MAX || true && self.cursor_is_multi || true && self.cursor_count < u32::MAX || true && self.cursor_primary_index < u32::MAX || true && !self.cursor_reveal_type.is_empty() || true && self.cursor_reveal_horizontal || true
+    }
+}
+
+impl Default for FfkCursorController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Selection management controller types
+#[derive(Debug, Clone)]
+pub struct FflSelectionController {
+    pub selection_anchor_line: u32,
+    pub selection_anchor_col: u32,
+    pub selection_active_line: u32,
+    pub selection_active_col: u32,
+    pub selection_is_reversed: bool,
+    pub selection_is_empty: bool,
+    pub selection_has_multi: bool,
+    pub selection_mode: String,
+    pub selection_start_of_line: bool,
+    pub selection_end_of_line: bool,
+}
+
+impl FflSelectionController {
+    pub fn new() -> Self {
+        Self {
+            selection_anchor_line: u32::default(),
+            selection_anchor_col: u32::default(),
+            selection_active_line: u32::default(),
+            selection_active_col: u32::default(),
+            selection_is_reversed: bool::default(),
+            selection_is_empty: bool::default(),
+            selection_has_multi: bool::default(),
+            selection_mode: String::new(),
+            selection_start_of_line: bool::default(),
+            selection_end_of_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.selection_anchor_line < u32::MAX || true && self.selection_anchor_col < u32::MAX || true && self.selection_active_line < u32::MAX || true && self.selection_active_col < u32::MAX || true && self.selection_is_reversed || true && self.selection_is_empty || true && self.selection_has_multi || true && !self.selection_mode.is_empty() || true && self.selection_start_of_line || true && self.selection_end_of_line || true
+    }
+}
+
+impl Default for FflSelectionController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Scroll position and smooth scroll controller types
+#[derive(Debug, Clone)]
+pub struct FfmScrollController {
+    pub scroll_target_line: u32,
+    pub scroll_target_col: u32,
+    pub scroll_smooth_duration: u32,
+    pub scroll_is_smooth: bool,
+    pub scroll_direction: String,
+    pub scroll_velocity: f64,
+    pub scroll_reveal_range_start: u32,
+    pub scroll_reveal_range_end: u32,
+    pub scroll_always_consume: bool,
+    pub scroll_top_padding: u32,
+}
+
+impl FfmScrollController {
+    pub fn new() -> Self {
+        Self {
+            scroll_target_line: u32::default(),
+            scroll_target_col: u32::default(),
+            scroll_smooth_duration: u32::default(),
+            scroll_is_smooth: bool::default(),
+            scroll_direction: String::new(),
+            scroll_velocity: f64::default(),
+            scroll_reveal_range_start: u32::default(),
+            scroll_reveal_range_end: u32::default(),
+            scroll_always_consume: bool::default(),
+            scroll_top_padding: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.scroll_target_line < u32::MAX || true && self.scroll_target_col < u32::MAX || true && self.scroll_smooth_duration < u32::MAX || true && self.scroll_is_smooth || true && !self.scroll_direction.is_empty() || true && self.scroll_velocity.is_finite() || true && self.scroll_reveal_range_start < u32::MAX || true && self.scroll_reveal_range_end < u32::MAX || true && self.scroll_always_consume || true && self.scroll_top_padding < u32::MAX || true
+    }
+}
+
+impl Default for FfmScrollController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Typing/auto-closing/auto-indent controller types
+#[derive(Debug, Clone)]
+pub struct FfnTypingController {
+    pub typing_auto_close: bool,
+    pub typing_auto_surround: bool,
+    pub typing_auto_indent: bool,
+    pub typing_auto_format_on_type: bool,
+    pub typing_format_on_paste: bool,
+    pub typing_linked_editing: bool,
+    pub typing_tab_completion: String,
+    pub typing_accept_on_enter: String,
+    pub typing_compose_state: String,
+    pub typing_ime_active: bool,
+}
+
+impl FfnTypingController {
+    pub fn new() -> Self {
+        Self {
+            typing_auto_close: bool::default(),
+            typing_auto_surround: bool::default(),
+            typing_auto_indent: bool::default(),
+            typing_auto_format_on_type: bool::default(),
+            typing_format_on_paste: bool::default(),
+            typing_linked_editing: bool::default(),
+            typing_tab_completion: String::new(),
+            typing_accept_on_enter: String::new(),
+            typing_compose_state: String::new(),
+            typing_ime_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.typing_auto_close || true && self.typing_auto_surround || true && self.typing_auto_indent || true && self.typing_auto_format_on_type || true && self.typing_format_on_paste || true && self.typing_linked_editing || true && !self.typing_tab_completion.is_empty() || true && !self.typing_accept_on_enter.is_empty() || true && !self.typing_compose_state.is_empty() || true && self.typing_ime_active || true
+    }
+}
+
+impl Default for FfnTypingController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Cut/copy/paste controller types
+#[derive(Debug, Clone)]
+pub struct FfoClipboardController {
+    pub clipboard_action: String,
+    pub clipboard_text: String,
+    pub clipboard_is_whole_line: bool,
+    pub clipboard_selections_count: u32,
+    pub clipboard_source_mode: String,
+    pub clipboard_format_on_paste: bool,
+    pub clipboard_multi_paste_mode: String,
+    pub clipboard_auto_indent: bool,
+    pub clipboard_trim_trailing: bool,
+    pub clipboard_final_newline: bool,
+}
+
+impl FfoClipboardController {
+    pub fn new() -> Self {
+        Self {
+            clipboard_action: String::new(),
+            clipboard_text: String::new(),
+            clipboard_is_whole_line: bool::default(),
+            clipboard_selections_count: u32::default(),
+            clipboard_source_mode: String::new(),
+            clipboard_format_on_paste: bool::default(),
+            clipboard_multi_paste_mode: String::new(),
+            clipboard_auto_indent: bool::default(),
+            clipboard_trim_trailing: bool::default(),
+            clipboard_final_newline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.clipboard_action.is_empty() || true && !self.clipboard_text.is_empty() || true && self.clipboard_is_whole_line || true && self.clipboard_selections_count < u32::MAX || true && !self.clipboard_source_mode.is_empty() || true && self.clipboard_format_on_paste || true && !self.clipboard_multi_paste_mode.is_empty() || true && self.clipboard_auto_indent || true && self.clipboard_trim_trailing || true && self.clipboard_final_newline || true
+    }
+}
+
+impl Default for FfoClipboardController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274314,6 +274521,96 @@ mod tests_ffj_generated {
     fn test_ffj_fields() {
         let mut obj = FfjEditorViewContent::default();
         obj.content_left = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffk_default() {
+        let obj = FfkCursorController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffk_fields() {
+        let mut obj = FfkCursorController::default();
+        obj.cursor_position_line = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffl_default() {
+        let obj = FflSelectionController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffl_fields() {
+        let mut obj = FflSelectionController::default();
+        obj.selection_anchor_line = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffm_default() {
+        let obj = FfmScrollController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffm_fields() {
+        let mut obj = FfmScrollController::default();
+        obj.scroll_target_line = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffn_default() {
+        let obj = FfnTypingController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffn_fields() {
+        let mut obj = FfnTypingController::default();
+        obj.typing_auto_close = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffo_default() {
+        let obj = FfoClipboardController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffo_fields() {
+        let mut obj = FfoClipboardController::default();
+        obj.clipboard_action = "test".to_string();
         assert!(obj.validate());
     }
 }
