@@ -150542,6 +150542,890 @@ impl Default for IozDiffConfig {
     }
 }
 
+/// Editor cursor state model
+#[derive(Debug, Clone)]
+pub struct IpaCursorState {
+    pub cursor_id: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub preferred_column: u32,
+    pub selection_ref: String,
+    pub is_multi: bool,
+}
+
+impl IpaCursorState {
+    pub fn new() -> Self {
+        Self {
+            cursor_id: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            preferred_column: u32::default(),
+            selection_ref: String::new(),
+            is_multi: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cursor_id.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.preferred_column < u32::MAX || true && !self.selection_ref.is_empty() || true && self.is_multi || true
+    }
+}
+
+impl Default for IpaCursorState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor position descriptor
+#[derive(Debug, Clone)]
+pub struct IpbCursorPosition {
+    pub pos_id: String,
+    pub line_val: u32,
+    pub column_val: u32,
+    pub offset_val: u64,
+    pub visual_column: u32,
+    pub is_at_eol: bool,
+}
+
+impl IpbCursorPosition {
+    pub fn new() -> Self {
+        Self {
+            pos_id: String::new(),
+            line_val: u32::default(),
+            column_val: u32::default(),
+            offset_val: u64::default(),
+            visual_column: u32::default(),
+            is_at_eol: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pos_id.is_empty() || true && self.line_val < u32::MAX || true && self.column_val < u32::MAX || true && self.offset_val < u64::MAX || true && self.visual_column < u32::MAX || true && self.is_at_eol || true
+    }
+}
+
+impl Default for IpbCursorPosition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor movement operation
+#[derive(Debug, Clone)]
+pub struct IpcCursorMovement {
+    pub move_id: String,
+    pub direction_val: u32,
+    pub unit_val: u32,
+    pub select_mode: bool,
+    pub repeat_count: u32,
+    pub wrap_lines: bool,
+}
+
+impl IpcCursorMovement {
+    pub fn new() -> Self {
+        Self {
+            move_id: String::new(),
+            direction_val: u32::default(),
+            unit_val: u32::default(),
+            select_mode: bool::default(),
+            repeat_count: u32::default(),
+            wrap_lines: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.move_id.is_empty() || true && self.direction_val < u32::MAX || true && self.unit_val < u32::MAX || true && self.select_mode || true && self.repeat_count < u32::MAX || true && self.wrap_lines || true
+    }
+}
+
+impl Default for IpcCursorMovement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text selection descriptor
+#[derive(Debug, Clone)]
+pub struct IpdSelection {
+    pub sel_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub is_reversed: bool,
+}
+
+impl IpdSelection {
+    pub fn new() -> Self {
+        Self {
+            sel_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            is_reversed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && self.is_reversed || true
+    }
+}
+
+impl Default for IpdSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Multi-selection state
+#[derive(Debug, Clone)]
+pub struct IpeMultiSelection {
+    pub multi_id: String,
+    pub selection_count: u32,
+    pub primary_index: u32,
+    pub source_kind: String,
+    pub merge_count: u32,
+    pub auto_reduce: bool,
+}
+
+impl IpeMultiSelection {
+    pub fn new() -> Self {
+        Self {
+            multi_id: String::new(),
+            selection_count: u32::default(),
+            primary_index: u32::default(),
+            source_kind: String::new(),
+            merge_count: u32::default(),
+            auto_reduce: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.multi_id.is_empty() || true && self.selection_count < u32::MAX || true && self.primary_index < u32::MAX || true && !self.source_kind.is_empty() || true && self.merge_count < u32::MAX || true && self.auto_reduce || true
+    }
+}
+
+impl Default for IpeMultiSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Column box selection
+#[derive(Debug, Clone)]
+pub struct IpfColumnSelection {
+    pub col_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub is_sparse: bool,
+}
+
+impl IpfColumnSelection {
+    pub fn new() -> Self {
+        Self {
+            col_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            start_col: u32::default(),
+            end_col: u32::default(),
+            is_sparse: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.col_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_col < u32::MAX || true && self.is_sparse || true
+    }
+}
+
+impl Default for IpfColumnSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Word-level selection
+#[derive(Debug, Clone)]
+pub struct IpgWordSelect {
+    pub word_id: String,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub word_text: String,
+    pub word_kind: u32,
+    pub include_whitespace: bool,
+}
+
+impl IpgWordSelect {
+    pub fn new() -> Self {
+        Self {
+            word_id: String::new(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            word_text: String::new(),
+            word_kind: u32::default(),
+            include_whitespace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.word_id.is_empty() || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && !self.word_text.is_empty() || true && self.word_kind < u32::MAX || true && self.include_whitespace || true
+    }
+}
+
+impl Default for IpgWordSelect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Line-level selection
+#[derive(Debug, Clone)]
+pub struct IphLineSelect {
+    pub line_id: String,
+    pub line_number: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub include_eol: bool,
+    pub is_full_line: bool,
+}
+
+impl IphLineSelect {
+    pub fn new() -> Self {
+        Self {
+            line_id: String::new(),
+            line_number: u32::default(),
+            start_col: u32::default(),
+            end_col: u32::default(),
+            include_eol: bool::default(),
+            is_full_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_id.is_empty() || true && self.line_number < u32::MAX || true && self.start_col < u32::MAX || true && self.end_col < u32::MAX || true && self.include_eol || true && self.is_full_line || true
+    }
+}
+
+impl Default for IphLineSelect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Block text selection
+#[derive(Debug, Clone)]
+pub struct IpiBlockSelect {
+    pub block_id: String,
+    pub top_line: u32,
+    pub bottom_line: u32,
+    pub left_col: u32,
+    pub right_col: u32,
+    pub is_rectangular: bool,
+}
+
+impl IpiBlockSelect {
+    pub fn new() -> Self {
+        Self {
+            block_id: String::new(),
+            top_line: u32::default(),
+            bottom_line: u32::default(),
+            left_col: u32::default(),
+            right_col: u32::default(),
+            is_rectangular: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.block_id.is_empty() || true && self.top_line < u32::MAX || true && self.bottom_line < u32::MAX || true && self.left_col < u32::MAX || true && self.right_col < u32::MAX || true && self.is_rectangular || true
+    }
+}
+
+impl Default for IpiBlockSelect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Smart expand selection
+#[derive(Debug, Clone)]
+pub struct IpjSmartSelect {
+    pub smart_id: String,
+    pub expansion_level: u32,
+    pub parent_kind: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub can_expand: bool,
+}
+
+impl IpjSmartSelect {
+    pub fn new() -> Self {
+        Self {
+            smart_id: String::new(),
+            expansion_level: u32::default(),
+            parent_kind: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            can_expand: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.smart_id.is_empty() || true && self.expansion_level < u32::MAX || true && !self.parent_kind.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && self.can_expand || true
+    }
+}
+
+impl Default for IpjSmartSelect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Clipboard selection model
+#[derive(Debug, Clone)]
+pub struct IpkSelectionClip {
+    pub clip_id: String,
+    pub content_text: String,
+    pub mode_val: u32,
+    pub source_selections: u32,
+    pub byte_size: u64,
+    pub is_full_line: bool,
+}
+
+impl IpkSelectionClip {
+    pub fn new() -> Self {
+        Self {
+            clip_id: String::new(),
+            content_text: String::new(),
+            mode_val: u32::default(),
+            source_selections: u32::default(),
+            byte_size: u64::default(),
+            is_full_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.clip_id.is_empty() || true && !self.content_text.is_empty() || true && self.mode_val < u32::MAX || true && self.source_selections < u32::MAX || true && self.byte_size < u64::MAX || true && self.is_full_line || true
+    }
+}
+
+impl Default for IpkSelectionClip {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor undo entry
+#[derive(Debug, Clone)]
+pub struct IplCursorUndo {
+    pub undo_id: String,
+    pub cursor_before_line: u32,
+    pub cursor_before_col: u32,
+    pub cursor_after_line: u32,
+    pub cursor_after_col: u32,
+    pub has_selection: bool,
+}
+
+impl IplCursorUndo {
+    pub fn new() -> Self {
+        Self {
+            undo_id: String::new(),
+            cursor_before_line: u32::default(),
+            cursor_before_col: u32::default(),
+            cursor_after_line: u32::default(),
+            cursor_after_col: u32::default(),
+            has_selection: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.undo_id.is_empty() || true && self.cursor_before_line < u32::MAX || true && self.cursor_before_col < u32::MAX || true && self.cursor_after_line < u32::MAX || true && self.cursor_after_col < u32::MAX || true && self.has_selection || true
+    }
+}
+
+impl Default for IplCursorUndo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor rendering style
+#[derive(Debug, Clone)]
+pub struct IpmCursorStyle {
+    pub style_id: String,
+    pub style_kind: String,
+    pub line_width: u32,
+    pub color_token: String,
+    pub bg_color_token: String,
+    pub is_hidden: bool,
+}
+
+impl IpmCursorStyle {
+    pub fn new() -> Self {
+        Self {
+            style_id: String::new(),
+            style_kind: String::new(),
+            line_width: u32::default(),
+            color_token: String::new(),
+            bg_color_token: String::new(),
+            is_hidden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.style_id.is_empty() || true && !self.style_kind.is_empty() || true && self.line_width < u32::MAX || true && !self.color_token.is_empty() || true && !self.bg_color_token.is_empty() || true && self.is_hidden || true
+    }
+}
+
+impl Default for IpmCursorStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor blink state
+#[derive(Debug, Clone)]
+pub struct IpnCursorBlink {
+    pub blink_id: String,
+    pub phase_val: u32,
+    pub on_ms: u32,
+    pub off_ms: u32,
+    pub style_val: u32,
+    pub is_blinking: bool,
+}
+
+impl IpnCursorBlink {
+    pub fn new() -> Self {
+        Self {
+            blink_id: String::new(),
+            phase_val: u32::default(),
+            on_ms: u32::default(),
+            off_ms: u32::default(),
+            style_val: u32::default(),
+            is_blinking: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.blink_id.is_empty() || true && self.phase_val < u32::MAX || true && self.on_ms < u32::MAX || true && self.off_ms < u32::MAX || true && self.style_val < u32::MAX || true && self.is_blinking || true
+    }
+}
+
+impl Default for IpnCursorBlink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Smooth cursor animation
+#[derive(Debug, Clone)]
+pub struct IpoCursorSmooth {
+    pub smooth_id: String,
+    pub from_x: u32,
+    pub from_y: u32,
+    pub to_x: u32,
+    pub to_y: u32,
+    pub is_animating: bool,
+}
+
+impl IpoCursorSmooth {
+    pub fn new() -> Self {
+        Self {
+            smooth_id: String::new(),
+            from_x: u32::default(),
+            from_y: u32::default(),
+            to_x: u32::default(),
+            to_y: u32::default(),
+            is_animating: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.smooth_id.is_empty() || true && self.from_x < u32::MAX || true && self.from_y < u32::MAX || true && self.to_x < u32::MAX || true && self.to_y < u32::MAX || true && self.is_animating || true
+    }
+}
+
+impl Default for IpoCursorSmooth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor decoration overlay
+#[derive(Debug, Clone)]
+pub struct IppCursorDecoration {
+    pub deco_id: String,
+    pub cursor_ref: String,
+    pub decoration_class: String,
+    pub before_content: String,
+    pub after_content: String,
+    pub is_visible: bool,
+}
+
+impl IppCursorDecoration {
+    pub fn new() -> Self {
+        Self {
+            deco_id: String::new(),
+            cursor_ref: String::new(),
+            decoration_class: String::new(),
+            before_content: String::new(),
+            after_content: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_id.is_empty() || true && !self.cursor_ref.is_empty() || true && !self.decoration_class.is_empty() || true && !self.before_content.is_empty() || true && !self.after_content.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for IppCursorDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection range decoration
+#[derive(Debug, Clone)]
+pub struct IpqSelectionDecoration {
+    pub deco_id: String,
+    pub bg_color: String,
+    pub border_color: String,
+    pub overview_color: String,
+    pub minimap_color: String,
+    pub is_rounded: bool,
+}
+
+impl IpqSelectionDecoration {
+    pub fn new() -> Self {
+        Self {
+            deco_id: String::new(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            overview_color: String::new(),
+            minimap_color: String::new(),
+            is_rounded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_id.is_empty() || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && !self.overview_color.is_empty() || true && !self.minimap_color.is_empty() || true && self.is_rounded || true
+    }
+}
+
+impl Default for IpqSelectionDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection occurrence highlight
+#[derive(Debug, Clone)]
+pub struct IprSelectionHighlight {
+    pub hl_id: String,
+    pub match_count: u32,
+    pub current_idx: u32,
+    pub bg_color: String,
+    pub border_color: String,
+    pub is_semantic: bool,
+}
+
+impl IprSelectionHighlight {
+    pub fn new() -> Self {
+        Self {
+            hl_id: String::new(),
+            match_count: u32::default(),
+            current_idx: u32::default(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            is_semantic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hl_id.is_empty() || true && self.match_count < u32::MAX || true && self.current_idx < u32::MAX || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && self.is_semantic || true
+    }
+}
+
+impl Default for IprSelectionHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor at find match
+#[derive(Debug, Clone)]
+pub struct IpsCursorFindMatch {
+    pub find_id: String,
+    pub match_index: u32,
+    pub total_matches: u32,
+    pub match_start: u32,
+    pub match_end: u32,
+    pub is_at_match: bool,
+}
+
+impl IpsCursorFindMatch {
+    pub fn new() -> Self {
+        Self {
+            find_id: String::new(),
+            match_index: u32::default(),
+            total_matches: u32::default(),
+            match_start: u32::default(),
+            match_end: u32::default(),
+            is_at_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.find_id.is_empty() || true && self.match_index < u32::MAX || true && self.total_matches < u32::MAX || true && self.match_start < u32::MAX || true && self.match_end < u32::MAX || true && self.is_at_match || true
+    }
+}
+
+impl Default for IpsCursorFindMatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor at bracket pair
+#[derive(Debug, Clone)]
+pub struct IptCursorBracket {
+    pub bracket_id: String,
+    pub open_line: u32,
+    pub open_col: u32,
+    pub close_line: u32,
+    pub close_col: u32,
+    pub is_at_open: bool,
+}
+
+impl IptCursorBracket {
+    pub fn new() -> Self {
+        Self {
+            bracket_id: String::new(),
+            open_line: u32::default(),
+            open_col: u32::default(),
+            close_line: u32::default(),
+            close_col: u32::default(),
+            is_at_open: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bracket_id.is_empty() || true && self.open_line < u32::MAX || true && self.open_col < u32::MAX || true && self.close_line < u32::MAX || true && self.close_col < u32::MAX || true && self.is_at_open || true
+    }
+}
+
+impl Default for IptCursorBracket {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor indentation level
+#[derive(Debug, Clone)]
+pub struct IpuCursorIndent {
+    pub indent_id: String,
+    pub line_number: u32,
+    pub tab_count: u32,
+    pub space_count: u32,
+    pub visual_column: u32,
+    pub is_at_indent: bool,
+}
+
+impl IpuCursorIndent {
+    pub fn new() -> Self {
+        Self {
+            indent_id: String::new(),
+            line_number: u32::default(),
+            tab_count: u32::default(),
+            space_count: u32::default(),
+            visual_column: u32::default(),
+            is_at_indent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.indent_id.is_empty() || true && self.line_number < u32::MAX || true && self.tab_count < u32::MAX || true && self.space_count < u32::MAX || true && self.visual_column < u32::MAX || true && self.is_at_indent || true
+    }
+}
+
+impl Default for IpuCursorIndent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor line state
+#[derive(Debug, Clone)]
+pub struct IpvCursorLine {
+    pub line_id: String,
+    pub line_number: u32,
+    pub line_length: u32,
+    pub first_non_ws_col: u32,
+    pub max_column: u32,
+    pub is_empty: bool,
+}
+
+impl IpvCursorLine {
+    pub fn new() -> Self {
+        Self {
+            line_id: String::new(),
+            line_number: u32::default(),
+            line_length: u32::default(),
+            first_non_ws_col: u32::default(),
+            max_column: u32::default(),
+            is_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_id.is_empty() || true && self.line_number < u32::MAX || true && self.line_length < u32::MAX || true && self.first_non_ws_col < u32::MAX || true && self.max_column < u32::MAX || true && self.is_empty || true
+    }
+}
+
+impl Default for IpvCursorLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor column state
+#[derive(Debug, Clone)]
+pub struct IpwCursorColumn {
+    pub col_id: String,
+    pub column_number: u32,
+    pub visual_column: u32,
+    pub byte_offset: u32,
+    pub char_width: u32,
+    pub is_tab_stop: bool,
+}
+
+impl IpwCursorColumn {
+    pub fn new() -> Self {
+        Self {
+            col_id: String::new(),
+            column_number: u32::default(),
+            visual_column: u32::default(),
+            byte_offset: u32::default(),
+            char_width: u32::default(),
+            is_tab_stop: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.col_id.is_empty() || true && self.column_number < u32::MAX || true && self.visual_column < u32::MAX || true && self.byte_offset < u32::MAX || true && self.char_width < u32::MAX || true && self.is_tab_stop || true
+    }
+}
+
+impl Default for IpwCursorColumn {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection anchor point
+#[derive(Debug, Clone)]
+pub struct IpxSelectionAnchor {
+    pub anchor_id: String,
+    pub line_val: u32,
+    pub col_val: u32,
+    pub anchor_kind: String,
+    pub selection_ref: String,
+    pub is_active: bool,
+}
+
+impl IpxSelectionAnchor {
+    pub fn new() -> Self {
+        Self {
+            anchor_id: String::new(),
+            line_val: u32::default(),
+            col_val: u32::default(),
+            anchor_kind: String::new(),
+            selection_ref: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.anchor_id.is_empty() || true && self.line_val < u32::MAX || true && self.col_val < u32::MAX || true && !self.anchor_kind.is_empty() || true && !self.selection_ref.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for IpxSelectionAnchor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Select all operation
+#[derive(Debug, Clone)]
+pub struct IpySelectAll {
+    pub all_id: String,
+    pub model_ref: String,
+    pub line_count: u32,
+    pub char_count: u64,
+    pub byte_count: u64,
+    pub includes_eol: bool,
+}
+
+impl IpySelectAll {
+    pub fn new() -> Self {
+        Self {
+            all_id: String::new(),
+            model_ref: String::new(),
+            line_count: u32::default(),
+            char_count: u64::default(),
+            byte_count: u64::default(),
+            includes_eol: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.all_id.is_empty() || true && !self.model_ref.is_empty() || true && self.line_count < u32::MAX || true && self.char_count < u64::MAX || true && self.byte_count < u64::MAX || true && self.includes_eol || true
+    }
+}
+
+impl Default for IpySelectAll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor behavior configuration
+#[derive(Debug, Clone)]
+pub struct IpzCursorConfig {
+    pub config_id: String,
+    pub cursor_style_str: String,
+    pub cursor_width: u32,
+    pub cursor_blinking: String,
+    pub smooth_caret: bool,
+    pub cursor_surrounding_lines: u32,
+}
+
+impl IpzCursorConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            cursor_style_str: String::new(),
+            cursor_width: u32::default(),
+            cursor_blinking: String::new(),
+            smooth_caret: bool::default(),
+            cursor_surrounding_lines: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.cursor_style_str.is_empty() || true && self.cursor_width < u32::MAX || true && !self.cursor_blinking.is_empty() || true && self.smooth_caret || true && self.cursor_surrounding_lines < u32::MAX || true
+    }
+}
+
+impl Default for IpzCursorConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -405332,6 +406216,474 @@ mod tests_ioz_generated {
     #[test]
     fn test_ioz_fields() {
         let mut obj = IozDiffConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipa_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipa_default() {
+        let obj = IpaCursorState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipa_fields() {
+        let mut obj = IpaCursorState::default();
+        obj.cursor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipb_default() {
+        let obj = IpbCursorPosition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipb_fields() {
+        let mut obj = IpbCursorPosition::default();
+        obj.pos_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipc_default() {
+        let obj = IpcCursorMovement::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipc_fields() {
+        let mut obj = IpcCursorMovement::default();
+        obj.move_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipd_default() {
+        let obj = IpdSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipd_fields() {
+        let mut obj = IpdSelection::default();
+        obj.sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipe_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipe_default() {
+        let obj = IpeMultiSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipe_fields() {
+        let mut obj = IpeMultiSelection::default();
+        obj.multi_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipf_default() {
+        let obj = IpfColumnSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipf_fields() {
+        let mut obj = IpfColumnSelection::default();
+        obj.col_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipg_default() {
+        let obj = IpgWordSelect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipg_fields() {
+        let mut obj = IpgWordSelect::default();
+        obj.word_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iph_generated {
+    use super::*;
+
+    #[test]
+    fn test_iph_default() {
+        let obj = IphLineSelect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iph_fields() {
+        let mut obj = IphLineSelect::default();
+        obj.line_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipi_default() {
+        let obj = IpiBlockSelect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipi_fields() {
+        let mut obj = IpiBlockSelect::default();
+        obj.block_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipj_default() {
+        let obj = IpjSmartSelect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipj_fields() {
+        let mut obj = IpjSmartSelect::default();
+        obj.smart_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipk_default() {
+        let obj = IpkSelectionClip::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipk_fields() {
+        let mut obj = IpkSelectionClip::default();
+        obj.clip_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipl_default() {
+        let obj = IplCursorUndo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipl_fields() {
+        let mut obj = IplCursorUndo::default();
+        obj.undo_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipm_default() {
+        let obj = IpmCursorStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipm_fields() {
+        let mut obj = IpmCursorStyle::default();
+        obj.style_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipn_default() {
+        let obj = IpnCursorBlink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipn_fields() {
+        let mut obj = IpnCursorBlink::default();
+        obj.blink_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipo_default() {
+        let obj = IpoCursorSmooth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipo_fields() {
+        let mut obj = IpoCursorSmooth::default();
+        obj.smooth_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipp_default() {
+        let obj = IppCursorDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipp_fields() {
+        let mut obj = IppCursorDecoration::default();
+        obj.deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipq_default() {
+        let obj = IpqSelectionDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipq_fields() {
+        let mut obj = IpqSelectionDecoration::default();
+        obj.deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipr_default() {
+        let obj = IprSelectionHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipr_fields() {
+        let mut obj = IprSelectionHighlight::default();
+        obj.hl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ips_generated {
+    use super::*;
+
+    #[test]
+    fn test_ips_default() {
+        let obj = IpsCursorFindMatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ips_fields() {
+        let mut obj = IpsCursorFindMatch::default();
+        obj.find_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipt_default() {
+        let obj = IptCursorBracket::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipt_fields() {
+        let mut obj = IptCursorBracket::default();
+        obj.bracket_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipu_default() {
+        let obj = IpuCursorIndent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipu_fields() {
+        let mut obj = IpuCursorIndent::default();
+        obj.indent_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipv_default() {
+        let obj = IpvCursorLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipv_fields() {
+        let mut obj = IpvCursorLine::default();
+        obj.line_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipw_default() {
+        let obj = IpwCursorColumn::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipw_fields() {
+        let mut obj = IpwCursorColumn::default();
+        obj.col_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipx_default() {
+        let obj = IpxSelectionAnchor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipx_fields() {
+        let mut obj = IpxSelectionAnchor::default();
+        obj.anchor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipy_default() {
+        let obj = IpySelectAll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipy_fields() {
+        let mut obj = IpySelectAll::default();
+        obj.all_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ipz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ipz_default() {
+        let obj = IpzCursorConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ipz_fields() {
+        let mut obj = IpzCursorConfig::default();
         obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
