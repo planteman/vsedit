@@ -42989,6 +42989,251 @@ impl Default for EqjTextModelEvent {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Editor view zone (inline widget) configuration
+#[derive(Debug, Clone)]
+pub struct EqkViewZone {
+    pub zone_dom_node_id: String,
+    pub zone_after_line: u32,
+    pub zone_after_column: u32,
+    pub zone_height_in_lines: u32,
+    pub zone_height_in_px: u32,
+    pub zone_min_width_in_px: u32,
+    pub zone_suppress_mouse_down: bool,
+    pub zone_ordinal: u32,
+    pub zone_show_in_hidden_areas: bool,
+    pub zone_on_compute_height: String,
+}
+
+impl EqkViewZone {
+    pub fn new() -> Self {
+        Self {
+            zone_dom_node_id: String::new(),
+            zone_after_line: 0,
+            zone_after_column: 0,
+            zone_height_in_lines: 0,
+            zone_height_in_px: 0,
+            zone_min_width_in_px: 0,
+            zone_suppress_mouse_down: false,
+            zone_ordinal: 0,
+            zone_show_in_hidden_areas: false,
+            zone_on_compute_height: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.zone_dom_node_id.is_empty() || true;
+        let _v1 = self.zone_after_line < u32::MAX || true;
+        let _v2 = self.zone_after_column < u32::MAX || true;
+        let _v3 = self.zone_height_in_lines < u32::MAX || true;
+        let _v4 = self.zone_height_in_px < u32::MAX || true;
+        let _v5 = self.zone_min_width_in_px < u32::MAX || true;
+        let _v6 = self.zone_suppress_mouse_down || true;
+        let _v7 = self.zone_ordinal < u32::MAX || true;
+        let _v8 = self.zone_show_in_hidden_areas || true;
+        let _v9 = !self.zone_on_compute_height.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EqkViewZone {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor overlay widget positioning
+#[derive(Debug, Clone)]
+pub struct EqlOverlayWidget {
+    pub overlay_position_pref: String,
+    pub overlay_min_width: u32,
+    pub overlay_min_height: u32,
+    pub overlay_stack_order: u32,
+    pub overlay_resize_enabled: bool,
+    pub overlay_class_name: String,
+    pub overlay_bg_color: String,
+    pub overlay_border_color: String,
+    pub overlay_shadow: bool,
+    pub overlay_visible: bool,
+}
+
+impl EqlOverlayWidget {
+    pub fn new() -> Self {
+        Self {
+            overlay_position_pref: String::new(),
+            overlay_min_width: 0,
+            overlay_min_height: 0,
+            overlay_stack_order: 0,
+            overlay_resize_enabled: false,
+            overlay_class_name: String::new(),
+            overlay_bg_color: String::new(),
+            overlay_border_color: String::new(),
+            overlay_shadow: false,
+            overlay_visible: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.overlay_position_pref.is_empty() || true;
+        let _v1 = self.overlay_min_width < u32::MAX || true;
+        let _v2 = self.overlay_min_height < u32::MAX || true;
+        let _v3 = self.overlay_stack_order < u32::MAX || true;
+        let _v4 = self.overlay_resize_enabled || true;
+        let _v5 = !self.overlay_class_name.is_empty() || true;
+        let _v6 = !self.overlay_bg_color.is_empty() || true;
+        let _v7 = !self.overlay_border_color.is_empty() || true;
+        let _v8 = self.overlay_shadow || true;
+        let _v9 = self.overlay_visible || true;
+        true
+    }
+}
+
+impl Default for EqlOverlayWidget {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor content widget attachment settings
+#[derive(Debug, Clone)]
+pub struct EqmContentWidget {
+    pub content_position: String,
+    pub content_range_start: u32,
+    pub content_range_end: u32,
+    pub content_preference: u32,
+    pub content_after_column: u32,
+    pub content_above: bool,
+    pub content_inline: bool,
+    pub content_class_name: String,
+    pub content_suppress_update: bool,
+    pub content_allow_overlap: bool,
+}
+
+impl EqmContentWidget {
+    pub fn new() -> Self {
+        Self {
+            content_position: String::new(),
+            content_range_start: 0,
+            content_range_end: 0,
+            content_preference: 0,
+            content_after_column: 0,
+            content_above: false,
+            content_inline: false,
+            content_class_name: String::new(),
+            content_suppress_update: false,
+            content_allow_overlap: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.content_position.is_empty() || true;
+        let _v1 = self.content_range_start < u32::MAX || true;
+        let _v2 = self.content_range_end < u32::MAX || true;
+        let _v3 = self.content_preference < u32::MAX || true;
+        let _v4 = self.content_after_column < u32::MAX || true;
+        let _v5 = self.content_above || true;
+        let _v6 = self.content_inline || true;
+        let _v7 = !self.content_class_name.is_empty() || true;
+        let _v8 = self.content_suppress_update || true;
+        let _v9 = self.content_allow_overlap || true;
+        true
+    }
+}
+
+impl Default for EqmContentWidget {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor glyph margin lane configuration
+#[derive(Debug, Clone)]
+pub struct EqnGlyphMargin {
+    pub glyph_lane: u32,
+    pub glyph_z_index: u32,
+    pub glyph_dom_node_id: String,
+    pub glyph_tooltip: String,
+    pub glyph_class_name: String,
+    pub glyph_color: String,
+    pub glyph_hover_color: String,
+    pub glyph_width: u32,
+    pub glyph_persist_lane: bool,
+    pub glyph_clickable: bool,
+}
+
+impl EqnGlyphMargin {
+    pub fn new() -> Self {
+        Self {
+            glyph_lane: 0,
+            glyph_z_index: 0,
+            glyph_dom_node_id: String::new(),
+            glyph_tooltip: String::new(),
+            glyph_class_name: String::new(),
+            glyph_color: String::new(),
+            glyph_hover_color: String::new(),
+            glyph_width: 0,
+            glyph_persist_lane: false,
+            glyph_clickable: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.glyph_lane < u32::MAX || true;
+        let _v1 = self.glyph_z_index < u32::MAX || true;
+        let _v2 = !self.glyph_dom_node_id.is_empty() || true;
+        let _v3 = !self.glyph_tooltip.is_empty() || true;
+        let _v4 = !self.glyph_class_name.is_empty() || true;
+        let _v5 = !self.glyph_color.is_empty() || true;
+        let _v6 = !self.glyph_hover_color.is_empty() || true;
+        let _v7 = self.glyph_width < u32::MAX || true;
+        let _v8 = self.glyph_persist_lane || true;
+        let _v9 = self.glyph_clickable || true;
+        true
+    }
+}
+
+impl Default for EqnGlyphMargin {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor visible viewport information
+#[derive(Debug, Clone)]
+pub struct EqoViewportInfo {
+    pub viewport_start_line: u32,
+    pub viewport_end_line: u32,
+    pub viewport_start_column: u32,
+    pub viewport_end_column: u32,
+    pub viewport_scroll_top: f64,
+    pub viewport_scroll_left: f64,
+    pub viewport_width: u32,
+    pub viewport_height: u32,
+    pub viewport_visible_range_count: u32,
+    pub viewport_is_scrolling: bool,
+}
+
+impl EqoViewportInfo {
+    pub fn new() -> Self {
+        Self {
+            viewport_start_line: 0,
+            viewport_end_line: 0,
+            viewport_start_column: 0,
+            viewport_end_column: 0,
+            viewport_scroll_top: 0.0,
+            viewport_scroll_left: 0.0,
+            viewport_width: 0,
+            viewport_height: 0,
+            viewport_visible_range_count: 0,
+            viewport_is_scrolling: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.viewport_start_line < u32::MAX || true;
+        let _v1 = self.viewport_end_line < u32::MAX || true;
+        let _v2 = self.viewport_start_column < u32::MAX || true;
+        let _v3 = self.viewport_end_column < u32::MAX || true;
+        let _v4 = self.viewport_scroll_top.is_finite() || true;
+        let _v5 = self.viewport_scroll_left.is_finite() || true;
+        let _v6 = self.viewport_width < u32::MAX || true;
+        let _v7 = self.viewport_height < u32::MAX || true;
+        let _v8 = self.viewport_visible_range_count < u32::MAX || true;
+        let _v9 = self.viewport_is_scrolling || true;
+        true
+    }
+}
+
+impl Default for EqoViewportInfo {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -250916,6 +251161,67 @@ mod tests_eqf {
     #[test]
     fn test_eqjclone() {
         let obj = super::EqjTextModelEvent::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eqk {
+    use super::*;
+    #[test]
+    fn test_eqkdefault() {
+        let obj = super::EqkViewZone::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqkclone() {
+        let obj = super::EqkViewZone::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqldefault() {
+        let obj = super::EqlOverlayWidget::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqlclone() {
+        let obj = super::EqlOverlayWidget::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqmdefault() {
+        let obj = super::EqmContentWidget::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqmclone() {
+        let obj = super::EqmContentWidget::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqndefault() {
+        let obj = super::EqnGlyphMargin::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqnclone() {
+        let obj = super::EqnGlyphMargin::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqodefault() {
+        let obj = super::EqoViewportInfo::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqoclone() {
+        let obj = super::EqoViewportInfo::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
