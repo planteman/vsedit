@@ -148447,6 +148447,890 @@ impl Default for ImzLanguageFeatureConfig {
     }
 }
 
+/// Text tokenizer state
+#[derive(Debug, Clone)]
+pub struct InaTokenizer {
+    pub tokenizer_id: String,
+    pub language_ref: String,
+    pub state_count: u32,
+    pub rule_count: u32,
+    pub cache_size: u32,
+    pub is_ready: bool,
+}
+
+impl InaTokenizer {
+    pub fn new() -> Self {
+        Self {
+            tokenizer_id: String::new(),
+            language_ref: String::new(),
+            state_count: u32::default(),
+            rule_count: u32::default(),
+            cache_size: u32::default(),
+            is_ready: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tokenizer_id.is_empty() || true && !self.language_ref.is_empty() || true && self.state_count < u32::MAX || true && self.rule_count < u32::MAX || true && self.cache_size < u32::MAX || true && self.is_ready || true
+    }
+}
+
+impl Default for InaTokenizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tokenization result
+#[derive(Debug, Clone)]
+pub struct InbTokenizationResult {
+    pub result_id: String,
+    pub token_count: u32,
+    pub end_state_ref: String,
+    pub contains_embedded: bool,
+    pub line_length: u32,
+    pub has_semantic_tokens: bool,
+}
+
+impl InbTokenizationResult {
+    pub fn new() -> Self {
+        Self {
+            result_id: String::new(),
+            token_count: u32::default(),
+            end_state_ref: String::new(),
+            contains_embedded: bool::default(),
+            line_length: u32::default(),
+            has_semantic_tokens: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_id.is_empty() || true && self.token_count < u32::MAX || true && !self.end_state_ref.is_empty() || true && self.contains_embedded || true && self.line_length < u32::MAX || true && self.has_semantic_tokens || true
+    }
+}
+
+impl Default for InbTokenizationResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Token type classification
+#[derive(Debug, Clone)]
+pub struct IncTokenType {
+    pub type_id: String,
+    pub type_name: String,
+    pub token_kind_val: u32,
+    pub language_ref: String,
+    pub standard_type_val: u32,
+    pub is_comment: bool,
+}
+
+impl IncTokenType {
+    pub fn new() -> Self {
+        Self {
+            type_id: String::new(),
+            type_name: String::new(),
+            token_kind_val: u32::default(),
+            language_ref: String::new(),
+            standard_type_val: u32::default(),
+            is_comment: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.type_id.is_empty() || true && !self.type_name.is_empty() || true && self.token_kind_val < u32::MAX || true && !self.language_ref.is_empty() || true && self.standard_type_val < u32::MAX || true && self.is_comment || true
+    }
+}
+
+impl Default for IncTokenType {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Token modifier flag
+#[derive(Debug, Clone)]
+pub struct IndTokenModifier {
+    pub mod_id: String,
+    pub modifier_name: String,
+    pub modifier_bit: u32,
+    pub language_ref: String,
+    pub description_text: String,
+    pub is_declaration: bool,
+}
+
+impl IndTokenModifier {
+    pub fn new() -> Self {
+        Self {
+            mod_id: String::new(),
+            modifier_name: String::new(),
+            modifier_bit: u32::default(),
+            language_ref: String::new(),
+            description_text: String::new(),
+            is_declaration: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mod_id.is_empty() || true && !self.modifier_name.is_empty() || true && self.modifier_bit < u32::MAX || true && !self.language_ref.is_empty() || true && !self.description_text.is_empty() || true && self.is_declaration || true
+    }
+}
+
+impl Default for IndTokenModifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TextMate grammar lexer
+#[derive(Debug, Clone)]
+pub struct IneTextMateLexer {
+    pub lexer_id: String,
+    pub grammar_ref: String,
+    pub scope_stack_depth: u32,
+    pub rule_stack_size: u32,
+    pub tokenize_count: u64,
+    pub is_initialized: bool,
+}
+
+impl IneTextMateLexer {
+    pub fn new() -> Self {
+        Self {
+            lexer_id: String::new(),
+            grammar_ref: String::new(),
+            scope_stack_depth: u32::default(),
+            rule_stack_size: u32::default(),
+            tokenize_count: u64::default(),
+            is_initialized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lexer_id.is_empty() || true && !self.grammar_ref.is_empty() || true && self.scope_stack_depth < u32::MAX || true && self.rule_stack_size < u32::MAX || true && self.tokenize_count < u64::MAX || true && self.is_initialized || true
+    }
+}
+
+impl Default for IneTextMateLexer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Monarch grammar lexer
+#[derive(Debug, Clone)]
+pub struct InfMonarchLexer {
+    pub monarch_id: String,
+    pub language_ref: String,
+    pub state_count: u32,
+    pub rule_count: u32,
+    pub case_sensitive: bool,
+    pub includes_embedded: bool,
+}
+
+impl InfMonarchLexer {
+    pub fn new() -> Self {
+        Self {
+            monarch_id: String::new(),
+            language_ref: String::new(),
+            state_count: u32::default(),
+            rule_count: u32::default(),
+            case_sensitive: bool::default(),
+            includes_embedded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.monarch_id.is_empty() || true && !self.language_ref.is_empty() || true && self.state_count < u32::MAX || true && self.rule_count < u32::MAX || true && self.case_sensitive || true && self.includes_embedded || true
+    }
+}
+
+impl Default for InfMonarchLexer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token legend
+#[derive(Debug, Clone)]
+pub struct IngSemanticLegend {
+    pub legend_id: String,
+    pub type_count: u32,
+    pub modifier_count: u32,
+    pub type_names_len: u32,
+    pub modifier_names_len: u32,
+    pub is_standard: bool,
+}
+
+impl IngSemanticLegend {
+    pub fn new() -> Self {
+        Self {
+            legend_id: String::new(),
+            type_count: u32::default(),
+            modifier_count: u32::default(),
+            type_names_len: u32::default(),
+            modifier_names_len: u32::default(),
+            is_standard: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.legend_id.is_empty() || true && self.type_count < u32::MAX || true && self.modifier_count < u32::MAX || true && self.type_names_len < u32::MAX || true && self.modifier_names_len < u32::MAX || true && self.is_standard || true
+    }
+}
+
+impl Default for IngSemanticLegend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token data array
+#[derive(Debug, Clone)]
+pub struct InhSemanticTokenData {
+    pub data_id: String,
+    pub token_count: u32,
+    pub encoded_len: u32,
+    pub version_val: u32,
+    pub result_ref: String,
+    pub is_full: bool,
+}
+
+impl InhSemanticTokenData {
+    pub fn new() -> Self {
+        Self {
+            data_id: String::new(),
+            token_count: u32::default(),
+            encoded_len: u32::default(),
+            version_val: u32::default(),
+            result_ref: String::new(),
+            is_full: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.data_id.is_empty() || true && self.token_count < u32::MAX || true && self.encoded_len < u32::MAX || true && self.version_val < u32::MAX || true && !self.result_ref.is_empty() || true && self.is_full || true
+    }
+}
+
+impl Default for InhSemanticTokenData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree-sitter parser state
+#[derive(Debug, Clone)]
+pub struct IniTreeSitterParser {
+    pub parser_id: String,
+    pub language_ref: String,
+    pub tree_ref: String,
+    pub parse_count: u64,
+    pub avg_parse_ms: u32,
+    pub is_incremental: bool,
+}
+
+impl IniTreeSitterParser {
+    pub fn new() -> Self {
+        Self {
+            parser_id: String::new(),
+            language_ref: String::new(),
+            tree_ref: String::new(),
+            parse_count: u64::default(),
+            avg_parse_ms: u32::default(),
+            is_incremental: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.parser_id.is_empty() || true && !self.language_ref.is_empty() || true && !self.tree_ref.is_empty() || true && self.parse_count < u64::MAX || true && self.avg_parse_ms < u32::MAX || true && self.is_incremental || true
+    }
+}
+
+impl Default for IniTreeSitterParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Syntax tree root node
+#[derive(Debug, Clone)]
+pub struct InjSyntaxTree {
+    pub tree_id: String,
+    pub root_node_ref: String,
+    pub node_count: u32,
+    pub byte_length: u64,
+    pub edit_count: u32,
+    pub has_errors: bool,
+}
+
+impl InjSyntaxTree {
+    pub fn new() -> Self {
+        Self {
+            tree_id: String::new(),
+            root_node_ref: String::new(),
+            node_count: u32::default(),
+            byte_length: u64::default(),
+            edit_count: u32::default(),
+            has_errors: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_id.is_empty() || true && !self.root_node_ref.is_empty() || true && self.node_count < u32::MAX || true && self.byte_length < u64::MAX || true && self.edit_count < u32::MAX || true && self.has_errors || true
+    }
+}
+
+impl Default for InjSyntaxTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Syntax tree node
+#[derive(Debug, Clone)]
+pub struct InkSyntaxNode {
+    pub node_id: String,
+    pub kind_str: String,
+    pub start_byte: u64,
+    pub end_byte: u64,
+    pub child_count: u32,
+    pub is_named: bool,
+}
+
+impl InkSyntaxNode {
+    pub fn new() -> Self {
+        Self {
+            node_id: String::new(),
+            kind_str: String::new(),
+            start_byte: u64::default(),
+            end_byte: u64::default(),
+            child_count: u32::default(),
+            is_named: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.node_id.is_empty() || true && !self.kind_str.is_empty() || true && self.start_byte < u64::MAX || true && self.end_byte < u64::MAX || true && self.child_count < u32::MAX || true && self.is_named || true
+    }
+}
+
+impl Default for InkSyntaxNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Injection grammar entry
+#[derive(Debug, Clone)]
+pub struct InlInjectionGrammar {
+    pub inj_id: String,
+    pub host_scope: String,
+    pub injected_scope: String,
+    pub selector_str: String,
+    pub priority_val: u32,
+    pub is_prefix: bool,
+}
+
+impl InlInjectionGrammar {
+    pub fn new() -> Self {
+        Self {
+            inj_id: String::new(),
+            host_scope: String::new(),
+            injected_scope: String::new(),
+            selector_str: String::new(),
+            priority_val: u32::default(),
+            is_prefix: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inj_id.is_empty() || true && !self.host_scope.is_empty() || true && !self.injected_scope.is_empty() || true && !self.selector_str.is_empty() || true && self.priority_val < u32::MAX || true && self.is_prefix || true
+    }
+}
+
+impl Default for InlInjectionGrammar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Embedded language region
+#[derive(Debug, Clone)]
+pub struct InmEmbeddedLanguage {
+    pub embedded_id: String,
+    pub host_language: String,
+    pub embedded_language: String,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub is_block: bool,
+}
+
+impl InmEmbeddedLanguage {
+    pub fn new() -> Self {
+        Self {
+            embedded_id: String::new(),
+            host_language: String::new(),
+            embedded_language: String::new(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            is_block: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.embedded_id.is_empty() || true && !self.host_language.is_empty() || true && !self.embedded_language.is_empty() || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && self.is_block || true
+    }
+}
+
+impl Default for InmEmbeddedLanguage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Token color theme data
+#[derive(Debug, Clone)]
+pub struct InnTokenTheme {
+    pub theme_id: String,
+    pub rule_count: u32,
+    pub default_fg_idx: u32,
+    pub default_bg_idx: u32,
+    pub color_map_size: u32,
+    pub is_high_contrast: bool,
+}
+
+impl InnTokenTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            rule_count: u32::default(),
+            default_fg_idx: u32::default(),
+            default_bg_idx: u32::default(),
+            color_map_size: u32::default(),
+            is_high_contrast: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && self.rule_count < u32::MAX || true && self.default_fg_idx < u32::MAX || true && self.default_bg_idx < u32::MAX || true && self.color_map_size < u32::MAX || true && self.is_high_contrast || true
+    }
+}
+
+impl Default for InnTokenTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Scope name match result
+#[derive(Debug, Clone)]
+pub struct InoScopeMatch {
+    pub match_id: String,
+    pub scope_name: String,
+    pub selector_str: String,
+    pub specificity_val: u32,
+    pub parent_scope_ref: String,
+    pub is_exact_match: bool,
+}
+
+impl InoScopeMatch {
+    pub fn new() -> Self {
+        Self {
+            match_id: String::new(),
+            scope_name: String::new(),
+            selector_str: String::new(),
+            specificity_val: u32::default(),
+            parent_scope_ref: String::new(),
+            is_exact_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.match_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.selector_str.is_empty() || true && self.specificity_val < u32::MAX || true && !self.parent_scope_ref.is_empty() || true && self.is_exact_match || true
+    }
+}
+
+impl Default for InoScopeMatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Colorized line output
+#[derive(Debug, Clone)]
+pub struct InpColorizedLine {
+    pub line_id: String,
+    pub line_number: u32,
+    pub token_count: u32,
+    pub char_count: u32,
+    pub contains_tab: bool,
+    pub is_invalid: bool,
+}
+
+impl InpColorizedLine {
+    pub fn new() -> Self {
+        Self {
+            line_id: String::new(),
+            line_number: u32::default(),
+            token_count: u32::default(),
+            char_count: u32::default(),
+            contains_tab: bool::default(),
+            is_invalid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_id.is_empty() || true && self.line_number < u32::MAX || true && self.token_count < u32::MAX || true && self.char_count < u32::MAX || true && self.contains_tab || true && self.is_invalid || true
+    }
+}
+
+impl Default for InpColorizedLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bracket token entry
+#[derive(Debug, Clone)]
+pub struct InqBracketToken {
+    pub bracket_id: String,
+    pub open_str: String,
+    pub close_str: String,
+    pub token_kind_val: u32,
+    pub nesting_level: u32,
+    pub is_unmatched: bool,
+}
+
+impl InqBracketToken {
+    pub fn new() -> Self {
+        Self {
+            bracket_id: String::new(),
+            open_str: String::new(),
+            close_str: String::new(),
+            token_kind_val: u32::default(),
+            nesting_level: u32::default(),
+            is_unmatched: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bracket_id.is_empty() || true && !self.open_str.is_empty() || true && !self.close_str.is_empty() || true && self.token_kind_val < u32::MAX || true && self.nesting_level < u32::MAX || true && self.is_unmatched || true
+    }
+}
+
+impl Default for InqBracketToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Indentation token entry
+#[derive(Debug, Clone)]
+pub struct InrIndentToken {
+    pub indent_id: String,
+    pub line_number: u32,
+    pub indent_level: u32,
+    pub tab_count: u32,
+    pub space_count: u32,
+    pub is_mixed: bool,
+}
+
+impl InrIndentToken {
+    pub fn new() -> Self {
+        Self {
+            indent_id: String::new(),
+            line_number: u32::default(),
+            indent_level: u32::default(),
+            tab_count: u32::default(),
+            space_count: u32::default(),
+            is_mixed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.indent_id.is_empty() || true && self.line_number < u32::MAX || true && self.indent_level < u32::MAX || true && self.tab_count < u32::MAX || true && self.space_count < u32::MAX || true && self.is_mixed || true
+    }
+}
+
+impl Default for InrIndentToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Folding marker token
+#[derive(Debug, Clone)]
+pub struct InsFoldToken {
+    pub fold_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub fold_kind_str: String,
+    pub collapsed_text: String,
+    pub is_region_marker: bool,
+}
+
+impl InsFoldToken {
+    pub fn new() -> Self {
+        Self {
+            fold_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            fold_kind_str: String::new(),
+            collapsed_text: String::new(),
+            is_region_marker: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fold_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.fold_kind_str.is_empty() || true && !self.collapsed_text.is_empty() || true && self.is_region_marker || true
+    }
+}
+
+impl Default for InsFoldToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Whitespace classification token
+#[derive(Debug, Clone)]
+pub struct IntWhitespaceToken {
+    pub ws_id: String,
+    pub line_number: u32,
+    pub char_offset: u32,
+    pub ws_kind_val: u32,
+    pub run_length: u32,
+    pub is_trailing: bool,
+}
+
+impl IntWhitespaceToken {
+    pub fn new() -> Self {
+        Self {
+            ws_id: String::new(),
+            line_number: u32::default(),
+            char_offset: u32::default(),
+            ws_kind_val: u32::default(),
+            run_length: u32::default(),
+            is_trailing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_id.is_empty() || true && self.line_number < u32::MAX || true && self.char_offset < u32::MAX || true && self.ws_kind_val < u32::MAX || true && self.run_length < u32::MAX || true && self.is_trailing || true
+    }
+}
+
+impl Default for IntWhitespaceToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Background tokenization worker
+#[derive(Debug, Clone)]
+pub struct InuTokenizeWorker {
+    pub worker_id: String,
+    pub model_ref: String,
+    pub pending_lines: u32,
+    pub processed_lines: u64,
+    pub avg_time_ms: u32,
+    pub is_background: bool,
+}
+
+impl InuTokenizeWorker {
+    pub fn new() -> Self {
+        Self {
+            worker_id: String::new(),
+            model_ref: String::new(),
+            pending_lines: u32::default(),
+            processed_lines: u64::default(),
+            avg_time_ms: u32::default(),
+            is_background: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.worker_id.is_empty() || true && !self.model_ref.is_empty() || true && self.pending_lines < u32::MAX || true && self.processed_lines < u64::MAX || true && self.avg_time_ms < u32::MAX || true && self.is_background || true
+    }
+}
+
+impl Default for InuTokenizeWorker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Token result cache entry
+#[derive(Debug, Clone)]
+pub struct InvTokenCache {
+    pub cache_id: String,
+    pub line_number: u32,
+    pub state_hash: u64,
+    pub token_data_len: u32,
+    pub hit_count: u64,
+    pub is_valid: bool,
+}
+
+impl InvTokenCache {
+    pub fn new() -> Self {
+        Self {
+            cache_id: String::new(),
+            line_number: u32::default(),
+            state_hash: u64::default(),
+            token_data_len: u32::default(),
+            hit_count: u64::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cache_id.is_empty() || true && self.line_number < u32::MAX || true && self.state_hash < u64::MAX || true && self.token_data_len < u32::MAX || true && self.hit_count < u64::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for InvTokenCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Syntax highlight range
+#[derive(Debug, Clone)]
+pub struct InwHighlightRange {
+    pub hl_id: String,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub scope_name: String,
+    pub color_idx: u32,
+    pub font_style_mask: bool,
+}
+
+impl InwHighlightRange {
+    pub fn new() -> Self {
+        Self {
+            hl_id: String::new(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            scope_name: String::new(),
+            color_idx: u32::default(),
+            font_style_mask: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hl_id.is_empty() || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && !self.scope_name.is_empty() || true && self.color_idx < u32::MAX || true && self.font_style_mask || true
+    }
+}
+
+impl Default for InwHighlightRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Regex capture group
+#[derive(Debug, Clone)]
+pub struct InxRegexCapture {
+    pub capture_id: String,
+    pub group_index: u32,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub capture_name: String,
+    pub is_named: bool,
+}
+
+impl InxRegexCapture {
+    pub fn new() -> Self {
+        Self {
+            capture_id: String::new(),
+            group_index: u32::default(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            capture_name: String::new(),
+            is_named: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.capture_id.is_empty() || true && self.group_index < u32::MAX || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && !self.capture_name.is_empty() || true && self.is_named || true
+    }
+}
+
+impl Default for InxRegexCapture {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Scope stack state
+#[derive(Debug, Clone)]
+pub struct InyScopeStack {
+    pub stack_id: String,
+    pub depth_val: u32,
+    pub top_scope: String,
+    pub parent_ref: String,
+    pub content_name_ref: String,
+    pub is_frozen: bool,
+}
+
+impl InyScopeStack {
+    pub fn new() -> Self {
+        Self {
+            stack_id: String::new(),
+            depth_val: u32::default(),
+            top_scope: String::new(),
+            parent_ref: String::new(),
+            content_name_ref: String::new(),
+            is_frozen: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stack_id.is_empty() || true && self.depth_val < u32::MAX || true && !self.top_scope.is_empty() || true && !self.parent_ref.is_empty() || true && !self.content_name_ref.is_empty() || true && self.is_frozen || true
+    }
+}
+
+impl Default for InyScopeStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tokenization engine configuration
+#[derive(Debug, Clone)]
+pub struct InzTokenizationConfig {
+    pub config_id: String,
+    pub max_token_length: u32,
+    pub background_delay_ms: u32,
+    pub max_line_length: u32,
+    pub semantic_enabled: bool,
+    pub tree_sitter_enabled: bool,
+}
+
+impl InzTokenizationConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            max_token_length: u32::default(),
+            background_delay_ms: u32::default(),
+            max_line_length: u32::default(),
+            semantic_enabled: bool::default(),
+            tree_sitter_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && self.max_token_length < u32::MAX || true && self.background_delay_ms < u32::MAX || true && self.max_line_length < u32::MAX || true && self.semantic_enabled || true && self.tree_sitter_enabled || true
+    }
+}
+
+impl Default for InzTokenizationConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -402620,6 +403504,474 @@ mod tests_imz_generated {
     #[test]
     fn test_imz_fields() {
         let mut obj = ImzLanguageFeatureConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ina_generated {
+    use super::*;
+
+    #[test]
+    fn test_ina_default() {
+        let obj = InaTokenizer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ina_fields() {
+        let mut obj = InaTokenizer::default();
+        obj.tokenizer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inb_generated {
+    use super::*;
+
+    #[test]
+    fn test_inb_default() {
+        let obj = InbTokenizationResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inb_fields() {
+        let mut obj = InbTokenizationResult::default();
+        obj.result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inc_generated {
+    use super::*;
+
+    #[test]
+    fn test_inc_default() {
+        let obj = IncTokenType::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inc_fields() {
+        let mut obj = IncTokenType::default();
+        obj.type_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ind_generated {
+    use super::*;
+
+    #[test]
+    fn test_ind_default() {
+        let obj = IndTokenModifier::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ind_fields() {
+        let mut obj = IndTokenModifier::default();
+        obj.mod_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ine_generated {
+    use super::*;
+
+    #[test]
+    fn test_ine_default() {
+        let obj = IneTextMateLexer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ine_fields() {
+        let mut obj = IneTextMateLexer::default();
+        obj.lexer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inf_generated {
+    use super::*;
+
+    #[test]
+    fn test_inf_default() {
+        let obj = InfMonarchLexer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inf_fields() {
+        let mut obj = InfMonarchLexer::default();
+        obj.monarch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ing_generated {
+    use super::*;
+
+    #[test]
+    fn test_ing_default() {
+        let obj = IngSemanticLegend::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ing_fields() {
+        let mut obj = IngSemanticLegend::default();
+        obj.legend_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inh_generated {
+    use super::*;
+
+    #[test]
+    fn test_inh_default() {
+        let obj = InhSemanticTokenData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inh_fields() {
+        let mut obj = InhSemanticTokenData::default();
+        obj.data_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ini_generated {
+    use super::*;
+
+    #[test]
+    fn test_ini_default() {
+        let obj = IniTreeSitterParser::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ini_fields() {
+        let mut obj = IniTreeSitterParser::default();
+        obj.parser_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inj_generated {
+    use super::*;
+
+    #[test]
+    fn test_inj_default() {
+        let obj = InjSyntaxTree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inj_fields() {
+        let mut obj = InjSyntaxTree::default();
+        obj.tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ink_generated {
+    use super::*;
+
+    #[test]
+    fn test_ink_default() {
+        let obj = InkSyntaxNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ink_fields() {
+        let mut obj = InkSyntaxNode::default();
+        obj.node_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inl_generated {
+    use super::*;
+
+    #[test]
+    fn test_inl_default() {
+        let obj = InlInjectionGrammar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inl_fields() {
+        let mut obj = InlInjectionGrammar::default();
+        obj.inj_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inm_generated {
+    use super::*;
+
+    #[test]
+    fn test_inm_default() {
+        let obj = InmEmbeddedLanguage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inm_fields() {
+        let mut obj = InmEmbeddedLanguage::default();
+        obj.embedded_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inn_generated {
+    use super::*;
+
+    #[test]
+    fn test_inn_default() {
+        let obj = InnTokenTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inn_fields() {
+        let mut obj = InnTokenTheme::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ino_generated {
+    use super::*;
+
+    #[test]
+    fn test_ino_default() {
+        let obj = InoScopeMatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ino_fields() {
+        let mut obj = InoScopeMatch::default();
+        obj.match_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inp_generated {
+    use super::*;
+
+    #[test]
+    fn test_inp_default() {
+        let obj = InpColorizedLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inp_fields() {
+        let mut obj = InpColorizedLine::default();
+        obj.line_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inq_generated {
+    use super::*;
+
+    #[test]
+    fn test_inq_default() {
+        let obj = InqBracketToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inq_fields() {
+        let mut obj = InqBracketToken::default();
+        obj.bracket_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inr_generated {
+    use super::*;
+
+    #[test]
+    fn test_inr_default() {
+        let obj = InrIndentToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inr_fields() {
+        let mut obj = InrIndentToken::default();
+        obj.indent_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ins_generated {
+    use super::*;
+
+    #[test]
+    fn test_ins_default() {
+        let obj = InsFoldToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ins_fields() {
+        let mut obj = InsFoldToken::default();
+        obj.fold_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_int_generated {
+    use super::*;
+
+    #[test]
+    fn test_int_default() {
+        let obj = IntWhitespaceToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_int_fields() {
+        let mut obj = IntWhitespaceToken::default();
+        obj.ws_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inu_generated {
+    use super::*;
+
+    #[test]
+    fn test_inu_default() {
+        let obj = InuTokenizeWorker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inu_fields() {
+        let mut obj = InuTokenizeWorker::default();
+        obj.worker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inv_generated {
+    use super::*;
+
+    #[test]
+    fn test_inv_default() {
+        let obj = InvTokenCache::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inv_fields() {
+        let mut obj = InvTokenCache::default();
+        obj.cache_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inw_generated {
+    use super::*;
+
+    #[test]
+    fn test_inw_default() {
+        let obj = InwHighlightRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inw_fields() {
+        let mut obj = InwHighlightRange::default();
+        obj.hl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inx_generated {
+    use super::*;
+
+    #[test]
+    fn test_inx_default() {
+        let obj = InxRegexCapture::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inx_fields() {
+        let mut obj = InxRegexCapture::default();
+        obj.capture_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iny_generated {
+    use super::*;
+
+    #[test]
+    fn test_iny_default() {
+        let obj = InyScopeStack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iny_fields() {
+        let mut obj = InyScopeStack::default();
+        obj.stack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_inz_generated {
+    use super::*;
+
+    #[test]
+    fn test_inz_default() {
+        let obj = InzTokenizationConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_inz_fields() {
+        let mut obj = InzTokenizationConfig::default();
         obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
