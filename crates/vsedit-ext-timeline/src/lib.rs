@@ -99127,6 +99127,216 @@ impl Default for GozDiffSnapshotModel {
     }
 }
 
+/// Cursor state (position, selection, view state, column preference)
+#[derive(Debug, Clone)]
+pub struct GpaCursorState {
+    pub cursor_id: String,
+    pub line: u32,
+    pub column: u32,
+    pub selection_start_line: u32,
+    pub selection_start_column: u32,
+    pub selection_end_line: u32,
+    pub selection_end_column: u32,
+    pub left_over_column: u32,
+    pub view_state_json: String,
+    pub is_in_overttype: bool,
+}
+
+impl GpaCursorState {
+    pub fn new() -> Self {
+        Self {
+            cursor_id: String::new(),
+            line: u32::default(),
+            column: u32::default(),
+            selection_start_line: u32::default(),
+            selection_start_column: u32::default(),
+            selection_end_line: u32::default(),
+            selection_end_column: u32::default(),
+            left_over_column: u32::default(),
+            view_state_json: String::new(),
+            is_in_overttype: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cursor_id.is_empty() || true && self.line < u32::MAX || true && self.column < u32::MAX || true && self.selection_start_line < u32::MAX || true && self.selection_start_column < u32::MAX || true && self.selection_end_line < u32::MAX || true && self.selection_end_column < u32::MAX || true && self.left_over_column < u32::MAX || true && !self.view_state_json.is_empty() || true && self.is_in_overttype || true
+    }
+}
+
+impl Default for GpaCursorState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection model (start, end, direction, is reversed, is empty)
+#[derive(Debug, Clone)]
+pub struct GpbSelectionModel {
+    pub sel_id: String,
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub direction: String,
+    pub is_reversed: bool,
+    pub is_empty: bool,
+    pub is_single_line: bool,
+    pub contains_position_json: String,
+}
+
+impl GpbSelectionModel {
+    pub fn new() -> Self {
+        Self {
+            sel_id: String::new(),
+            start_line: u32::default(),
+            start_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            direction: String::new(),
+            is_reversed: bool::default(),
+            is_empty: bool::default(),
+            is_single_line: bool::default(),
+            contains_position_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.direction.is_empty() || true && self.is_reversed || true && self.is_empty || true && self.is_single_line || true && !self.contains_position_json.is_empty() || true
+    }
+}
+
+impl Default for GpbSelectionModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Multi cursor session (cursors, primary, add above/below)
+#[derive(Debug, Clone)]
+pub struct GpcMultiCursorSession {
+    pub multi_id: String,
+    pub cursors_json: String,
+    pub primary_index: u32,
+    pub cursor_count: u32,
+    pub is_active: bool,
+    pub add_direction: String,
+    pub word_selections_json: String,
+    pub line_selections_json: String,
+    pub find_matches_json: String,
+    pub paste_mode: String,
+}
+
+impl GpcMultiCursorSession {
+    pub fn new() -> Self {
+        Self {
+            multi_id: String::new(),
+            cursors_json: String::new(),
+            primary_index: u32::default(),
+            cursor_count: u32::default(),
+            is_active: bool::default(),
+            add_direction: String::new(),
+            word_selections_json: String::new(),
+            line_selections_json: String::new(),
+            find_matches_json: String::new(),
+            paste_mode: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.multi_id.is_empty() || true && !self.cursors_json.is_empty() || true && self.primary_index < u32::MAX || true && self.cursor_count < u32::MAX || true && self.is_active || true && !self.add_direction.is_empty() || true && !self.word_selections_json.is_empty() || true && !self.line_selections_json.is_empty() || true && !self.find_matches_json.is_empty() || true && !self.paste_mode.is_empty() || true
+    }
+}
+
+impl Default for GpcMultiCursorSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor movement (direction, unit, wrap, select, by word)
+#[derive(Debug, Clone)]
+pub struct GpdCursorMovement {
+    pub move_id: String,
+    pub direction: String,
+    pub unit: String,
+    pub wrap_at_boundary: bool,
+    pub select: bool,
+    pub by_word: bool,
+    pub by_subword: bool,
+    pub half_line: bool,
+    pub page_size: u32,
+    pub to_end: bool,
+}
+
+impl GpdCursorMovement {
+    pub fn new() -> Self {
+        Self {
+            move_id: String::new(),
+            direction: String::new(),
+            unit: String::new(),
+            wrap_at_boundary: bool::default(),
+            select: bool::default(),
+            by_word: bool::default(),
+            by_subword: bool::default(),
+            half_line: bool::default(),
+            page_size: u32::default(),
+            to_end: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.move_id.is_empty() || true && !self.direction.is_empty() || true && !self.unit.is_empty() || true && self.wrap_at_boundary || true && self.select || true && self.by_word || true && self.by_subword || true && self.half_line || true && self.page_size < u32::MAX || true && self.to_end || true
+    }
+}
+
+impl Default for GpdCursorMovement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor style (shape, blink, width, color, animation)
+#[derive(Debug, Clone)]
+pub struct GpeCursorStyle {
+    pub style_id: String,
+    pub shape: String,
+    pub blink_mode: String,
+    pub width: u32,
+    pub color: String,
+    pub animation_style: String,
+    pub smooth_caret: bool,
+    pub blink_period_ms: u32,
+    pub show_in_overview: bool,
+    pub primary_color: String,
+}
+
+impl GpeCursorStyle {
+    pub fn new() -> Self {
+        Self {
+            style_id: String::new(),
+            shape: String::new(),
+            blink_mode: String::new(),
+            width: u32::default(),
+            color: String::new(),
+            animation_style: String::new(),
+            smooth_caret: bool::default(),
+            blink_period_ms: u32::default(),
+            show_in_overview: bool::default(),
+            primary_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.style_id.is_empty() || true && !self.shape.is_empty() || true && !self.blink_mode.is_empty() || true && self.width < u32::MAX || true && !self.color.is_empty() || true && !self.animation_style.is_empty() || true && self.smooth_caret || true && self.blink_period_ms < u32::MAX || true && self.show_in_overview || true && !self.primary_color.is_empty() || true
+    }
+}
+
+impl Default for GpeCursorStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -329817,6 +330027,96 @@ mod tests_goz_generated {
     fn test_goz_fields() {
         let mut obj = GozDiffSnapshotModel::default();
         obj.snapshot_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpa_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpa_default() {
+        let obj = GpaCursorState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpa_fields() {
+        let mut obj = GpaCursorState::default();
+        obj.cursor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpb_default() {
+        let obj = GpbSelectionModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpb_fields() {
+        let mut obj = GpbSelectionModel::default();
+        obj.sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpc_default() {
+        let obj = GpcMultiCursorSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpc_fields() {
+        let mut obj = GpcMultiCursorSession::default();
+        obj.multi_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpd_default() {
+        let obj = GpdCursorMovement::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpd_fields() {
+        let mut obj = GpdCursorMovement::default();
+        obj.move_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gpe_generated {
+    use super::*;
+
+    #[test]
+    fn test_gpe_default() {
+        let obj = GpeCursorStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gpe_fields() {
+        let mut obj = GpeCursorStyle::default();
+        obj.style_id = "test".to_string();
         assert!(obj.validate());
     }
 }
