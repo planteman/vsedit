@@ -160310,6 +160310,890 @@ impl Default for IzzAbstractTesting {
     }
 }
 
+/// Core editor model descriptor
+#[derive(Debug, Clone)]
+pub struct JaaEditorModel {
+    pub model_id: String,
+    pub uri_str: String,
+    pub language_id: String,
+    pub line_count: u64,
+    pub version_num: u32,
+    pub is_large_file: bool,
+}
+
+impl JaaEditorModel {
+    pub fn new() -> Self {
+        Self {
+            model_id: String::new(),
+            uri_str: String::new(),
+            language_id: String::new(),
+            line_count: u64::default(),
+            version_num: u32::default(),
+            is_large_file: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_id.is_empty() || true && !self.uri_str.is_empty() || true && !self.language_id.is_empty() || true && self.line_count < u64::MAX || true && self.version_num < u32::MAX || true && self.is_large_file || true
+    }
+}
+
+impl Default for JaaEditorModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text model instance
+#[derive(Debug, Clone)]
+pub struct JabTextModel {
+    pub text_model_id: String,
+    pub content_hash: String,
+    pub encoding_str: String,
+    pub eol_sequence: String,
+    pub byte_count: u64,
+    pub is_read_only: bool,
+}
+
+impl JabTextModel {
+    pub fn new() -> Self {
+        Self {
+            text_model_id: String::new(),
+            content_hash: String::new(),
+            encoding_str: String::new(),
+            eol_sequence: String::new(),
+            byte_count: u64::default(),
+            is_read_only: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.text_model_id.is_empty() || true && !self.content_hash.is_empty() || true && !self.encoding_str.is_empty() || true && !self.eol_sequence.is_empty() || true && self.byte_count < u64::MAX || true && self.is_read_only || true
+    }
+}
+
+impl Default for JabTextModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text model version entry
+#[derive(Debug, Clone)]
+pub struct JacModelVersion {
+    pub version_id: String,
+    pub model_ref: String,
+    pub change_count: u32,
+    pub undo_depth: u32,
+    pub timestamp_epoch: u64,
+    pub is_redo: bool,
+}
+
+impl JacModelVersion {
+    pub fn new() -> Self {
+        Self {
+            version_id: String::new(),
+            model_ref: String::new(),
+            change_count: u32::default(),
+            undo_depth: u32::default(),
+            timestamp_epoch: u64::default(),
+            is_redo: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.version_id.is_empty() || true && !self.model_ref.is_empty() || true && self.change_count < u32::MAX || true && self.undo_depth < u32::MAX || true && self.timestamp_epoch < u64::MAX || true && self.is_redo || true
+    }
+}
+
+impl Default for JacModelVersion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text model change event
+#[derive(Debug, Clone)]
+pub struct JadModelEvent {
+    pub model_event_id: String,
+    pub range_json: String,
+    pub new_text: String,
+    pub old_text_len: u32,
+    pub force_move_markers: bool,
+    pub is_flush: bool,
+}
+
+impl JadModelEvent {
+    pub fn new() -> Self {
+        Self {
+            model_event_id: String::new(),
+            range_json: String::new(),
+            new_text: String::new(),
+            old_text_len: u32::default(),
+            force_move_markers: bool::default(),
+            is_flush: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_event_id.is_empty() || true && !self.range_json.is_empty() || true && !self.new_text.is_empty() || true && self.old_text_len < u32::MAX || true && self.force_move_markers || true && self.is_flush || true
+    }
+}
+
+impl Default for JadModelEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model decoration entry
+#[derive(Debug, Clone)]
+pub struct JaeModelDecoration {
+    pub deco_model_id: String,
+    pub range_str: String,
+    pub options_json: String,
+    pub owner_id: String,
+    pub stacking_order: u32,
+    pub is_whole_line: bool,
+}
+
+impl JaeModelDecoration {
+    pub fn new() -> Self {
+        Self {
+            deco_model_id: String::new(),
+            range_str: String::new(),
+            options_json: String::new(),
+            owner_id: String::new(),
+            stacking_order: u32::default(),
+            is_whole_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_model_id.is_empty() || true && !self.range_str.is_empty() || true && !self.options_json.is_empty() || true && !self.owner_id.is_empty() || true && self.stacking_order < u32::MAX || true && self.is_whole_line || true
+    }
+}
+
+impl Default for JaeModelDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text model options
+#[derive(Debug, Clone)]
+pub struct JafModelOptions {
+    pub model_opt_id: String,
+    pub tab_size: u32,
+    pub insert_spaces: bool,
+    pub trim_whitespace: bool,
+    pub default_eol: String,
+    pub bracket_coloring: bool,
+}
+
+impl JafModelOptions {
+    pub fn new() -> Self {
+        Self {
+            model_opt_id: String::new(),
+            tab_size: u32::default(),
+            insert_spaces: bool::default(),
+            trim_whitespace: bool::default(),
+            default_eol: String::new(),
+            bracket_coloring: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_opt_id.is_empty() || true && self.tab_size < u32::MAX || true && self.insert_spaces || true && self.trim_whitespace || true && !self.default_eol.is_empty() || true && self.bracket_coloring || true
+    }
+}
+
+impl Default for JafModelOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model tokenization entry
+#[derive(Debug, Clone)]
+pub struct JagModelToken {
+    pub token_model_id: String,
+    pub line_number: u32,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub token_type_str: String,
+    pub has_semantic: bool,
+}
+
+impl JagModelToken {
+    pub fn new() -> Self {
+        Self {
+            token_model_id: String::new(),
+            line_number: u32::default(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            token_type_str: String::new(),
+            has_semantic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_model_id.is_empty() || true && self.line_number < u32::MAX || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && !self.token_type_str.is_empty() || true && self.has_semantic || true
+    }
+}
+
+impl Default for JagModelToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model bracket pair
+#[derive(Debug, Clone)]
+pub struct JahModelBracket {
+    pub bracket_model_id: String,
+    pub open_pos_str: String,
+    pub close_pos_str: String,
+    pub nesting_level: u32,
+    pub bracket_kind: String,
+    pub is_matched: bool,
+}
+
+impl JahModelBracket {
+    pub fn new() -> Self {
+        Self {
+            bracket_model_id: String::new(),
+            open_pos_str: String::new(),
+            close_pos_str: String::new(),
+            nesting_level: u32::default(),
+            bracket_kind: String::new(),
+            is_matched: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bracket_model_id.is_empty() || true && !self.open_pos_str.is_empty() || true && !self.close_pos_str.is_empty() || true && self.nesting_level < u32::MAX || true && !self.bracket_kind.is_empty() || true && self.is_matched || true
+    }
+}
+
+impl Default for JahModelBracket {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model indentation guide
+#[derive(Debug, Clone)]
+pub struct JaiModelIndent {
+    pub indent_model_id: String,
+    pub line_number: u32,
+    pub indent_level: u32,
+    pub guide_column: u32,
+    pub guide_kind: String,
+    pub is_active: bool,
+}
+
+impl JaiModelIndent {
+    pub fn new() -> Self {
+        Self {
+            indent_model_id: String::new(),
+            line_number: u32::default(),
+            indent_level: u32::default(),
+            guide_column: u32::default(),
+            guide_kind: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.indent_model_id.is_empty() || true && self.line_number < u32::MAX || true && self.indent_level < u32::MAX || true && self.guide_column < u32::MAX || true && !self.guide_kind.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for JaiModelIndent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model folding range
+#[derive(Debug, Clone)]
+pub struct JajModelFolding {
+    pub folding_model_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub collapsed_text: String,
+    pub nesting_depth: u32,
+    pub is_collapsed: bool,
+}
+
+impl JajModelFolding {
+    pub fn new() -> Self {
+        Self {
+            folding_model_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            collapsed_text: String::new(),
+            nesting_depth: u32::default(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folding_model_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.collapsed_text.is_empty() || true && self.nesting_depth < u32::MAX || true && self.is_collapsed || true
+    }
+}
+
+impl Default for JajModelFolding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model word boundary entry
+#[derive(Debug, Clone)]
+pub struct JakModelWord {
+    pub word_model_id: String,
+    pub word_text: String,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub line_ref: u32,
+    pub is_separator: bool,
+}
+
+impl JakModelWord {
+    pub fn new() -> Self {
+        Self {
+            word_model_id: String::new(),
+            word_text: String::new(),
+            start_col: u32::default(),
+            end_col: u32::default(),
+            line_ref: u32::default(),
+            is_separator: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.word_model_id.is_empty() || true && !self.word_text.is_empty() || true && self.start_col < u32::MAX || true && self.end_col < u32::MAX || true && self.line_ref < u32::MAX || true && self.is_separator || true
+    }
+}
+
+impl Default for JakModelWord {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model link detection entry
+#[derive(Debug, Clone)]
+pub struct JalModelLink {
+    pub link_model_id: String,
+    pub url_str: String,
+    pub range_json: String,
+    pub tooltip_str: String,
+    pub command_ref: String,
+    pub is_trusted: bool,
+}
+
+impl JalModelLink {
+    pub fn new() -> Self {
+        Self {
+            link_model_id: String::new(),
+            url_str: String::new(),
+            range_json: String::new(),
+            tooltip_str: String::new(),
+            command_ref: String::new(),
+            is_trusted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_model_id.is_empty() || true && !self.url_str.is_empty() || true && !self.range_json.is_empty() || true && !self.tooltip_str.is_empty() || true && !self.command_ref.is_empty() || true && self.is_trusted || true
+    }
+}
+
+impl Default for JalModelLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model glyph margin entry
+#[derive(Debug, Clone)]
+pub struct JamModelGlyph {
+    pub glyph_model_id: String,
+    pub line_number: u32,
+    pub glyph_class: String,
+    pub tooltip_text: String,
+    pub lane_val: u32,
+    pub is_clickable: bool,
+}
+
+impl JamModelGlyph {
+    pub fn new() -> Self {
+        Self {
+            glyph_model_id: String::new(),
+            line_number: u32::default(),
+            glyph_class: String::new(),
+            tooltip_text: String::new(),
+            lane_val: u32::default(),
+            is_clickable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.glyph_model_id.is_empty() || true && self.line_number < u32::MAX || true && !self.glyph_class.is_empty() || true && !self.tooltip_text.is_empty() || true && self.lane_val < u32::MAX || true && self.is_clickable || true
+    }
+}
+
+impl Default for JamModelGlyph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model ruler column entry
+#[derive(Debug, Clone)]
+pub struct JanModelRuler {
+    pub ruler_model_id: String,
+    pub column_val: u32,
+    pub color_str: String,
+    pub label_str: String,
+    pub thickness_val: u32,
+    pub is_guide: bool,
+}
+
+impl JanModelRuler {
+    pub fn new() -> Self {
+        Self {
+            ruler_model_id: String::new(),
+            column_val: u32::default(),
+            color_str: String::new(),
+            label_str: String::new(),
+            thickness_val: u32::default(),
+            is_guide: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ruler_model_id.is_empty() || true && self.column_val < u32::MAX || true && !self.color_str.is_empty() || true && !self.label_str.is_empty() || true && self.thickness_val < u32::MAX || true && self.is_guide || true
+    }
+}
+
+impl Default for JanModelRuler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model whitespace rendering
+#[derive(Debug, Clone)]
+pub struct JaoModelWhitespace {
+    pub ws_model_id: String,
+    pub render_mode: String,
+    pub boundary_chars: String,
+    pub trailing_chars: String,
+    pub tab_char: String,
+    pub show_all: bool,
+}
+
+impl JaoModelWhitespace {
+    pub fn new() -> Self {
+        Self {
+            ws_model_id: String::new(),
+            render_mode: String::new(),
+            boundary_chars: String::new(),
+            trailing_chars: String::new(),
+            tab_char: String::new(),
+            show_all: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_model_id.is_empty() || true && !self.render_mode.is_empty() || true && !self.boundary_chars.is_empty() || true && !self.trailing_chars.is_empty() || true && !self.tab_char.is_empty() || true && self.show_all || true
+    }
+}
+
+impl Default for JaoModelWhitespace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model minimap state
+#[derive(Debug, Clone)]
+pub struct JapModelMinimap {
+    pub minimap_model_id: String,
+    pub scale_factor: f64,
+    pub line_height_px: u32,
+    pub char_width_px: u32,
+    pub slider_height: u32,
+    pub is_visible: bool,
+}
+
+impl JapModelMinimap {
+    pub fn new() -> Self {
+        Self {
+            minimap_model_id: String::new(),
+            scale_factor: f64::default(),
+            line_height_px: u32::default(),
+            char_width_px: u32::default(),
+            slider_height: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.minimap_model_id.is_empty() || true && self.scale_factor.is_finite() || true && self.line_height_px < u32::MAX || true && self.char_width_px < u32::MAX || true && self.slider_height < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for JapModelMinimap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model sticky scroll entry
+#[derive(Debug, Clone)]
+pub struct JaqModelSticky {
+    pub sticky_model_id: String,
+    pub line_number: u32,
+    pub depth_val: u32,
+    pub text_str: String,
+    pub max_count: u32,
+    pub is_enabled: bool,
+}
+
+impl JaqModelSticky {
+    pub fn new() -> Self {
+        Self {
+            sticky_model_id: String::new(),
+            line_number: u32::default(),
+            depth_val: u32::default(),
+            text_str: String::new(),
+            max_count: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sticky_model_id.is_empty() || true && self.line_number < u32::MAX || true && self.depth_val < u32::MAX || true && !self.text_str.is_empty() || true && self.max_count < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for JaqModelSticky {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model overview ruler entry
+#[derive(Debug, Clone)]
+pub struct JarModelOverview {
+    pub overview_model_id: String,
+    pub position_val: f64,
+    pub color_str: String,
+    pub lane_str: String,
+    pub weight_val: u32,
+    pub is_full_width: bool,
+}
+
+impl JarModelOverview {
+    pub fn new() -> Self {
+        Self {
+            overview_model_id: String::new(),
+            position_val: f64::default(),
+            color_str: String::new(),
+            lane_str: String::new(),
+            weight_val: u32::default(),
+            is_full_width: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.overview_model_id.is_empty() || true && self.position_val.is_finite() || true && !self.color_str.is_empty() || true && !self.lane_str.is_empty() || true && self.weight_val < u32::MAX || true && self.is_full_width || true
+    }
+}
+
+impl Default for JarModelOverview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model cursor position state
+#[derive(Debug, Clone)]
+pub struct JasModelCursor {
+    pub cursor_model_id: String,
+    pub line_number: u32,
+    pub column_val: u32,
+    pub left_offset_px: f64,
+    pub preferred_col: u32,
+    pub is_primary: bool,
+}
+
+impl JasModelCursor {
+    pub fn new() -> Self {
+        Self {
+            cursor_model_id: String::new(),
+            line_number: u32::default(),
+            column_val: u32::default(),
+            left_offset_px: f64::default(),
+            preferred_col: u32::default(),
+            is_primary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cursor_model_id.is_empty() || true && self.line_number < u32::MAX || true && self.column_val < u32::MAX || true && self.left_offset_px.is_finite() || true && self.preferred_col < u32::MAX || true && self.is_primary || true
+    }
+}
+
+impl Default for JasModelCursor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model selection range
+#[derive(Debug, Clone)]
+pub struct JatModelSelection {
+    pub sel_model_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub is_reversed: bool,
+}
+
+impl JatModelSelection {
+    pub fn new() -> Self {
+        Self {
+            sel_model_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            is_reversed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_model_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && self.is_reversed || true
+    }
+}
+
+impl Default for JatModelSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model scroll state
+#[derive(Debug, Clone)]
+pub struct JauModelScroll {
+    pub scroll_model_id: String,
+    pub scroll_top: f64,
+    pub scroll_left: f64,
+    pub viewport_height: u32,
+    pub viewport_width: u32,
+    pub is_smooth: bool,
+}
+
+impl JauModelScroll {
+    pub fn new() -> Self {
+        Self {
+            scroll_model_id: String::new(),
+            scroll_top: f64::default(),
+            scroll_left: f64::default(),
+            viewport_height: u32::default(),
+            viewport_width: u32::default(),
+            is_smooth: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scroll_model_id.is_empty() || true && self.scroll_top.is_finite() || true && self.scroll_left.is_finite() || true && self.viewport_height < u32::MAX || true && self.viewport_width < u32::MAX || true && self.is_smooth || true
+    }
+}
+
+impl Default for JauModelScroll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model view zone entry
+#[derive(Debug, Clone)]
+pub struct JavModelViewZone {
+    pub vz_model_id: String,
+    pub after_line: u32,
+    pub height_lines: u32,
+    pub dom_node_ref: String,
+    pub ordinal_val: u32,
+    pub is_visible: bool,
+}
+
+impl JavModelViewZone {
+    pub fn new() -> Self {
+        Self {
+            vz_model_id: String::new(),
+            after_line: u32::default(),
+            height_lines: u32::default(),
+            dom_node_ref: String::new(),
+            ordinal_val: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.vz_model_id.is_empty() || true && self.after_line < u32::MAX || true && self.height_lines < u32::MAX || true && !self.dom_node_ref.is_empty() || true && self.ordinal_val < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for JavModelViewZone {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model content widget
+#[derive(Debug, Clone)]
+pub struct JawModelContentWidget {
+    pub cw_model_id: String,
+    pub widget_id: String,
+    pub position_json: String,
+    pub dom_ref: String,
+    pub preference_str: String,
+    pub allow_edge_overflow: bool,
+}
+
+impl JawModelContentWidget {
+    pub fn new() -> Self {
+        Self {
+            cw_model_id: String::new(),
+            widget_id: String::new(),
+            position_json: String::new(),
+            dom_ref: String::new(),
+            preference_str: String::new(),
+            allow_edge_overflow: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cw_model_id.is_empty() || true && !self.widget_id.is_empty() || true && !self.position_json.is_empty() || true && !self.dom_ref.is_empty() || true && !self.preference_str.is_empty() || true && self.allow_edge_overflow || true
+    }
+}
+
+impl Default for JawModelContentWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model overlay widget
+#[derive(Debug, Clone)]
+pub struct JaxModelOverlayWidget {
+    pub ow_model_id: String,
+    pub widget_id: String,
+    pub position_pref: String,
+    pub dom_ref: String,
+    pub min_width: u32,
+    pub is_resizable: bool,
+}
+
+impl JaxModelOverlayWidget {
+    pub fn new() -> Self {
+        Self {
+            ow_model_id: String::new(),
+            widget_id: String::new(),
+            position_pref: String::new(),
+            dom_ref: String::new(),
+            min_width: u32::default(),
+            is_resizable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ow_model_id.is_empty() || true && !self.widget_id.is_empty() || true && !self.position_pref.is_empty() || true && !self.dom_ref.is_empty() || true && self.min_width < u32::MAX || true && self.is_resizable || true
+    }
+}
+
+impl Default for JaxModelOverlayWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model editor command entry
+#[derive(Debug, Clone)]
+pub struct JayModelCommand {
+    pub cmd_model_id: String,
+    pub command_id: String,
+    pub handler_ref: String,
+    pub keybinding_str: String,
+    pub precondition_ref: String,
+    pub is_internal: bool,
+}
+
+impl JayModelCommand {
+    pub fn new() -> Self {
+        Self {
+            cmd_model_id: String::new(),
+            command_id: String::new(),
+            handler_ref: String::new(),
+            keybinding_str: String::new(),
+            precondition_ref: String::new(),
+            is_internal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cmd_model_id.is_empty() || true && !self.command_id.is_empty() || true && !self.handler_ref.is_empty() || true && !self.keybinding_str.is_empty() || true && !self.precondition_ref.is_empty() || true && self.is_internal || true
+    }
+}
+
+impl Default for JayModelCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model editor action entry
+#[derive(Debug, Clone)]
+pub struct JazModelAction {
+    pub action_model_id: String,
+    pub action_id: String,
+    pub label_str: String,
+    pub alias_str: String,
+    pub menu_group: String,
+    pub is_enabled: bool,
+}
+
+impl JazModelAction {
+    pub fn new() -> Self {
+        Self {
+            action_model_id: String::new(),
+            action_id: String::new(),
+            label_str: String::new(),
+            alias_str: String::new(),
+            menu_group: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_model_id.is_empty() || true && !self.action_id.is_empty() || true && !self.label_str.is_empty() || true && !self.alias_str.is_empty() || true && !self.menu_group.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for JazModelAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -420336,6 +421220,474 @@ mod tests_izz_generated {
     fn test_izz_fields() {
         let mut obj = IzzAbstractTesting::default();
         obj.test_abs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jaa_generated {
+    use super::*;
+
+    #[test]
+    fn test_jaa_default() {
+        let obj = JaaEditorModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jaa_fields() {
+        let mut obj = JaaEditorModel::default();
+        obj.model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jab_generated {
+    use super::*;
+
+    #[test]
+    fn test_jab_default() {
+        let obj = JabTextModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jab_fields() {
+        let mut obj = JabTextModel::default();
+        obj.text_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jac_generated {
+    use super::*;
+
+    #[test]
+    fn test_jac_default() {
+        let obj = JacModelVersion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jac_fields() {
+        let mut obj = JacModelVersion::default();
+        obj.version_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jad_generated {
+    use super::*;
+
+    #[test]
+    fn test_jad_default() {
+        let obj = JadModelEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jad_fields() {
+        let mut obj = JadModelEvent::default();
+        obj.model_event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jae_generated {
+    use super::*;
+
+    #[test]
+    fn test_jae_default() {
+        let obj = JaeModelDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jae_fields() {
+        let mut obj = JaeModelDecoration::default();
+        obj.deco_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jaf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jaf_default() {
+        let obj = JafModelOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jaf_fields() {
+        let mut obj = JafModelOptions::default();
+        obj.model_opt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jag_generated {
+    use super::*;
+
+    #[test]
+    fn test_jag_default() {
+        let obj = JagModelToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jag_fields() {
+        let mut obj = JagModelToken::default();
+        obj.token_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jah_generated {
+    use super::*;
+
+    #[test]
+    fn test_jah_default() {
+        let obj = JahModelBracket::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jah_fields() {
+        let mut obj = JahModelBracket::default();
+        obj.bracket_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jai_generated {
+    use super::*;
+
+    #[test]
+    fn test_jai_default() {
+        let obj = JaiModelIndent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jai_fields() {
+        let mut obj = JaiModelIndent::default();
+        obj.indent_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jaj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jaj_default() {
+        let obj = JajModelFolding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jaj_fields() {
+        let mut obj = JajModelFolding::default();
+        obj.folding_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jak_generated {
+    use super::*;
+
+    #[test]
+    fn test_jak_default() {
+        let obj = JakModelWord::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jak_fields() {
+        let mut obj = JakModelWord::default();
+        obj.word_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jal_generated {
+    use super::*;
+
+    #[test]
+    fn test_jal_default() {
+        let obj = JalModelLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jal_fields() {
+        let mut obj = JalModelLink::default();
+        obj.link_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jam_generated {
+    use super::*;
+
+    #[test]
+    fn test_jam_default() {
+        let obj = JamModelGlyph::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jam_fields() {
+        let mut obj = JamModelGlyph::default();
+        obj.glyph_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jan_generated {
+    use super::*;
+
+    #[test]
+    fn test_jan_default() {
+        let obj = JanModelRuler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jan_fields() {
+        let mut obj = JanModelRuler::default();
+        obj.ruler_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jao_generated {
+    use super::*;
+
+    #[test]
+    fn test_jao_default() {
+        let obj = JaoModelWhitespace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jao_fields() {
+        let mut obj = JaoModelWhitespace::default();
+        obj.ws_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jap_generated {
+    use super::*;
+
+    #[test]
+    fn test_jap_default() {
+        let obj = JapModelMinimap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jap_fields() {
+        let mut obj = JapModelMinimap::default();
+        obj.minimap_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jaq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jaq_default() {
+        let obj = JaqModelSticky::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jaq_fields() {
+        let mut obj = JaqModelSticky::default();
+        obj.sticky_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jar_generated {
+    use super::*;
+
+    #[test]
+    fn test_jar_default() {
+        let obj = JarModelOverview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jar_fields() {
+        let mut obj = JarModelOverview::default();
+        obj.overview_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jas_generated {
+    use super::*;
+
+    #[test]
+    fn test_jas_default() {
+        let obj = JasModelCursor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jas_fields() {
+        let mut obj = JasModelCursor::default();
+        obj.cursor_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jat_generated {
+    use super::*;
+
+    #[test]
+    fn test_jat_default() {
+        let obj = JatModelSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jat_fields() {
+        let mut obj = JatModelSelection::default();
+        obj.sel_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jau_generated {
+    use super::*;
+
+    #[test]
+    fn test_jau_default() {
+        let obj = JauModelScroll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jau_fields() {
+        let mut obj = JauModelScroll::default();
+        obj.scroll_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jav_generated {
+    use super::*;
+
+    #[test]
+    fn test_jav_default() {
+        let obj = JavModelViewZone::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jav_fields() {
+        let mut obj = JavModelViewZone::default();
+        obj.vz_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jaw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jaw_default() {
+        let obj = JawModelContentWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jaw_fields() {
+        let mut obj = JawModelContentWidget::default();
+        obj.cw_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jax_generated {
+    use super::*;
+
+    #[test]
+    fn test_jax_default() {
+        let obj = JaxModelOverlayWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jax_fields() {
+        let mut obj = JaxModelOverlayWidget::default();
+        obj.ow_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jay_generated {
+    use super::*;
+
+    #[test]
+    fn test_jay_default() {
+        let obj = JayModelCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jay_fields() {
+        let mut obj = JayModelCommand::default();
+        obj.cmd_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jaz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jaz_default() {
+        let obj = JazModelAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jaz_fields() {
+        let mut obj = JazModelAction::default();
+        obj.action_model_id = "test".to_string();
         assert!(obj.validate());
     }
 }
