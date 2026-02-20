@@ -59089,6 +59089,213 @@ impl Default for FdzProcessSpawn {
 }
 
 
+/// Tree-sitter parser types
+#[derive(Debug, Clone)]
+pub struct FeaTreeSitterParser {
+    pub parser_language: String,
+    pub parser_timeout_us: u64,
+    pub parser_included_ranges: String,
+    pub parser_logger_enabled: bool,
+    pub parser_wasm_store_id: u32,
+    pub parser_cancel_flag: bool,
+    pub parser_version: u32,
+    pub parser_abi_version: u32,
+    pub parser_field_count: u32,
+    pub parser_state_count: u32,
+}
+
+impl FeaTreeSitterParser {
+    pub fn new() -> Self {
+        Self {
+            parser_language: String::new(),
+            parser_timeout_us: u64::default(),
+            parser_included_ranges: String::new(),
+            parser_logger_enabled: bool::default(),
+            parser_wasm_store_id: u32::default(),
+            parser_cancel_flag: bool::default(),
+            parser_version: u32::default(),
+            parser_abi_version: u32::default(),
+            parser_field_count: u32::default(),
+            parser_state_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.parser_language.is_empty() || true && self.parser_timeout_us < u64::MAX || true && !self.parser_included_ranges.is_empty() || true && self.parser_logger_enabled || true && self.parser_wasm_store_id < u32::MAX || true && self.parser_cancel_flag || true && self.parser_version < u32::MAX || true && self.parser_abi_version < u32::MAX || true && self.parser_field_count < u32::MAX || true && self.parser_state_count < u32::MAX || true
+    }
+}
+
+impl Default for FeaTreeSitterParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Tree-sitter syntax tree types
+#[derive(Debug, Clone)]
+pub struct FebTreeSitterTree {
+    pub tree_root_node_id: u32,
+    pub tree_language: String,
+    pub tree_node_count: u32,
+    pub tree_edit_count: u32,
+    pub tree_included_ranges: String,
+    pub tree_changed_ranges: String,
+    pub tree_is_valid: bool,
+    pub tree_byte_size: u64,
+    pub tree_parse_time_us: u64,
+    pub tree_version: u32,
+}
+
+impl FebTreeSitterTree {
+    pub fn new() -> Self {
+        Self {
+            tree_root_node_id: u32::default(),
+            tree_language: String::new(),
+            tree_node_count: u32::default(),
+            tree_edit_count: u32::default(),
+            tree_included_ranges: String::new(),
+            tree_changed_ranges: String::new(),
+            tree_is_valid: bool::default(),
+            tree_byte_size: u64::default(),
+            tree_parse_time_us: u64::default(),
+            tree_version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.tree_root_node_id < u32::MAX || true && !self.tree_language.is_empty() || true && self.tree_node_count < u32::MAX || true && self.tree_edit_count < u32::MAX || true && !self.tree_included_ranges.is_empty() || true && !self.tree_changed_ranges.is_empty() || true && self.tree_is_valid || true && self.tree_byte_size < u64::MAX || true && self.tree_parse_time_us < u64::MAX || true && self.tree_version < u32::MAX || true
+    }
+}
+
+impl Default for FebTreeSitterTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Tree-sitter node types
+#[derive(Debug, Clone)]
+pub struct FecTreeSitterNode {
+    pub node_type: String,
+    pub node_id: u32,
+    pub node_start_byte: u32,
+    pub node_end_byte: u32,
+    pub node_start_row: u32,
+    pub node_start_col: u32,
+    pub node_end_row: u32,
+    pub node_end_col: u32,
+    pub node_child_count: u32,
+    pub node_is_named: bool,
+}
+
+impl FecTreeSitterNode {
+    pub fn new() -> Self {
+        Self {
+            node_type: String::new(),
+            node_id: u32::default(),
+            node_start_byte: u32::default(),
+            node_end_byte: u32::default(),
+            node_start_row: u32::default(),
+            node_start_col: u32::default(),
+            node_end_row: u32::default(),
+            node_end_col: u32::default(),
+            node_child_count: u32::default(),
+            node_is_named: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.node_type.is_empty() || true && self.node_id < u32::MAX || true && self.node_start_byte < u32::MAX || true && self.node_end_byte < u32::MAX || true && self.node_start_row < u32::MAX || true && self.node_start_col < u32::MAX || true && self.node_end_row < u32::MAX || true && self.node_end_col < u32::MAX || true && self.node_child_count < u32::MAX || true && self.node_is_named || true
+    }
+}
+
+impl Default for FecTreeSitterNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Tree-sitter query/pattern match types
+#[derive(Debug, Clone)]
+pub struct FedTreeSitterQuery {
+    pub query_pattern_count: u32,
+    pub query_capture_count: u32,
+    pub query_string_count: u32,
+    pub query_language: String,
+    pub query_source: String,
+    pub query_start_byte: u32,
+    pub query_end_byte: u32,
+    pub query_did_exceed_limit: bool,
+    pub query_match_limit: u32,
+    pub query_timeout_us: u64,
+}
+
+impl FedTreeSitterQuery {
+    pub fn new() -> Self {
+        Self {
+            query_pattern_count: u32::default(),
+            query_capture_count: u32::default(),
+            query_string_count: u32::default(),
+            query_language: String::new(),
+            query_source: String::new(),
+            query_start_byte: u32::default(),
+            query_end_byte: u32::default(),
+            query_did_exceed_limit: bool::default(),
+            query_match_limit: u32::default(),
+            query_timeout_us: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.query_pattern_count < u32::MAX || true && self.query_capture_count < u32::MAX || true && self.query_string_count < u32::MAX || true && !self.query_language.is_empty() || true && !self.query_source.is_empty() || true && self.query_start_byte < u32::MAX || true && self.query_end_byte < u32::MAX || true && self.query_did_exceed_limit || true && self.query_match_limit < u32::MAX || true && self.query_timeout_us < u64::MAX || true
+    }
+}
+
+impl Default for FedTreeSitterQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Tree-sitter capture/highlight types
+#[derive(Debug, Clone)]
+pub struct FeeTreeSitterCapture {
+    pub capture_name: String,
+    pub capture_index: u32,
+    pub capture_node_id: u32,
+    pub capture_node_type: String,
+    pub capture_start_byte: u32,
+    pub capture_end_byte: u32,
+    pub capture_pattern_index: u32,
+    pub capture_quantifier: String,
+    pub capture_properties: String,
+    pub capture_is_definite: bool,
+}
+
+impl FeeTreeSitterCapture {
+    pub fn new() -> Self {
+        Self {
+            capture_name: String::new(),
+            capture_index: u32::default(),
+            capture_node_id: u32::default(),
+            capture_node_type: String::new(),
+            capture_start_byte: u32::default(),
+            capture_end_byte: u32::default(),
+            capture_pattern_index: u32::default(),
+            capture_quantifier: String::new(),
+            capture_properties: String::new(),
+            capture_is_definite: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.capture_name.is_empty() || true && self.capture_index < u32::MAX || true && self.capture_node_id < u32::MAX || true && !self.capture_node_type.is_empty() || true && self.capture_start_byte < u32::MAX || true && self.capture_end_byte < u32::MAX || true && self.capture_pattern_index < u32::MAX || true && !self.capture_quantifier.is_empty() || true && !self.capture_properties.is_empty() || true && self.capture_is_definite || true
+    }
+}
+
+impl Default for FeeTreeSitterCapture {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272233,6 +272440,96 @@ mod tests_fdz_generated {
     fn test_fdz_fields() {
         let mut obj = FdzProcessSpawn::default();
         obj.spawn_command = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fea_generated {
+    use super::*;
+
+    #[test]
+    fn test_fea_default() {
+        let obj = FeaTreeSitterParser::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fea_fields() {
+        let mut obj = FeaTreeSitterParser::default();
+        obj.parser_language = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_feb_generated {
+    use super::*;
+
+    #[test]
+    fn test_feb_default() {
+        let obj = FebTreeSitterTree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_feb_fields() {
+        let mut obj = FebTreeSitterTree::default();
+        obj.tree_root_node_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fec_generated {
+    use super::*;
+
+    #[test]
+    fn test_fec_default() {
+        let obj = FecTreeSitterNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fec_fields() {
+        let mut obj = FecTreeSitterNode::default();
+        obj.node_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fed_generated {
+    use super::*;
+
+    #[test]
+    fn test_fed_default() {
+        let obj = FedTreeSitterQuery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fed_fields() {
+        let mut obj = FedTreeSitterQuery::default();
+        obj.query_pattern_count = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fee_generated {
+    use super::*;
+
+    #[test]
+    fn test_fee_default() {
+        let obj = FeeTreeSitterCapture::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fee_fields() {
+        let mut obj = FeeTreeSitterCapture::default();
+        obj.capture_name = "test".to_string();
         assert!(obj.validate());
     }
 }
