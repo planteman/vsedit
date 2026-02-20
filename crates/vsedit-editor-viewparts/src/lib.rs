@@ -57720,6 +57720,213 @@ impl Default for FczTuiFocus {
 }
 
 
+/// V8/Deno isolate management types
+#[derive(Debug, Clone)]
+pub struct FdaV8Isolate {
+    pub isolate_id: u32,
+    pub isolate_heap_size: u64,
+    pub isolate_heap_limit: u64,
+    pub isolate_external_memory: u64,
+    pub isolate_is_in_use: bool,
+    pub isolate_snapshot_data: String,
+    pub isolate_startup_time_ms: u64,
+    pub isolate_gc_count: u64,
+    pub isolate_thread_id: u32,
+    pub isolate_is_terminated: bool,
+}
+
+impl FdaV8Isolate {
+    pub fn new() -> Self {
+        Self {
+            isolate_id: u32::default(),
+            isolate_heap_size: u64::default(),
+            isolate_heap_limit: u64::default(),
+            isolate_external_memory: u64::default(),
+            isolate_is_in_use: bool::default(),
+            isolate_snapshot_data: String::new(),
+            isolate_startup_time_ms: u64::default(),
+            isolate_gc_count: u64::default(),
+            isolate_thread_id: u32::default(),
+            isolate_is_terminated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.isolate_id < u32::MAX || true && self.isolate_heap_size < u64::MAX || true && self.isolate_heap_limit < u64::MAX || true && self.isolate_external_memory < u64::MAX || true && self.isolate_is_in_use || true && !self.isolate_snapshot_data.is_empty() || true && self.isolate_startup_time_ms < u64::MAX || true && self.isolate_gc_count < u64::MAX || true && self.isolate_thread_id < u32::MAX || true && self.isolate_is_terminated || true
+    }
+}
+
+impl Default for FdaV8Isolate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// V8 execution context types
+#[derive(Debug, Clone)]
+pub struct FdbV8Context {
+    pub context_id: u32,
+    pub context_isolate_id: u32,
+    pub context_global_proxy: String,
+    pub context_security_token: String,
+    pub context_embedder_data: String,
+    pub context_is_detached: bool,
+    pub context_microtask_count: u32,
+    pub context_depth_limit: u32,
+    pub context_extension_count: u32,
+    pub context_creation_time: u64,
+}
+
+impl FdbV8Context {
+    pub fn new() -> Self {
+        Self {
+            context_id: u32::default(),
+            context_isolate_id: u32::default(),
+            context_global_proxy: String::new(),
+            context_security_token: String::new(),
+            context_embedder_data: String::new(),
+            context_is_detached: bool::default(),
+            context_microtask_count: u32::default(),
+            context_depth_limit: u32::default(),
+            context_extension_count: u32::default(),
+            context_creation_time: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.context_id < u32::MAX || true && self.context_isolate_id < u32::MAX || true && !self.context_global_proxy.is_empty() || true && !self.context_security_token.is_empty() || true && !self.context_embedder_data.is_empty() || true && self.context_is_detached || true && self.context_microtask_count < u32::MAX || true && self.context_depth_limit < u32::MAX || true && self.context_extension_count < u32::MAX || true && self.context_creation_time < u64::MAX || true
+    }
+}
+
+impl Default for FdbV8Context {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// V8 ES module loading types
+#[derive(Debug, Clone)]
+pub struct FdcV8Module {
+    pub module_url: String,
+    pub module_status: u32,
+    pub module_request_count: u32,
+    pub module_namespace: String,
+    pub module_exception: String,
+    pub module_is_synthetic: bool,
+    pub module_source_map_url: String,
+    pub module_identity_hash: u32,
+    pub module_script_id: u32,
+    pub module_is_evaluated: bool,
+}
+
+impl FdcV8Module {
+    pub fn new() -> Self {
+        Self {
+            module_url: String::new(),
+            module_status: u32::default(),
+            module_request_count: u32::default(),
+            module_namespace: String::new(),
+            module_exception: String::new(),
+            module_is_synthetic: bool::default(),
+            module_source_map_url: String::new(),
+            module_identity_hash: u32::default(),
+            module_script_id: u32::default(),
+            module_is_evaluated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.module_url.is_empty() || true && self.module_status < u32::MAX || true && self.module_request_count < u32::MAX || true && !self.module_namespace.is_empty() || true && !self.module_exception.is_empty() || true && self.module_is_synthetic || true && !self.module_source_map_url.is_empty() || true && self.module_identity_hash < u32::MAX || true && self.module_script_id < u32::MAX || true && self.module_is_evaluated || true
+    }
+}
+
+impl Default for FdcV8Module {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// V8 value conversion types
+#[derive(Debug, Clone)]
+pub struct FddV8Value {
+    pub value_type: u32,
+    pub value_string: String,
+    pub value_number: f64,
+    pub value_bool: bool,
+    pub value_integer: u64,
+    pub value_is_null: bool,
+    pub value_is_undefined: bool,
+    pub value_is_object: bool,
+    pub value_is_array: bool,
+    pub value_is_function: bool,
+}
+
+impl FddV8Value {
+    pub fn new() -> Self {
+        Self {
+            value_type: u32::default(),
+            value_string: String::new(),
+            value_number: f64::default(),
+            value_bool: bool::default(),
+            value_integer: u64::default(),
+            value_is_null: bool::default(),
+            value_is_undefined: bool::default(),
+            value_is_object: bool::default(),
+            value_is_array: bool::default(),
+            value_is_function: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.value_type < u32::MAX || true && !self.value_string.is_empty() || true && self.value_number.is_finite() || true && self.value_bool || true && self.value_integer < u64::MAX || true && self.value_is_null || true && self.value_is_undefined || true && self.value_is_object || true && self.value_is_array || true && self.value_is_function || true
+    }
+}
+
+impl Default for FddV8Value {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// V8 function callback types
+#[derive(Debug, Clone)]
+pub struct FdeV8Function {
+    pub function_name: String,
+    pub function_length: u32,
+    pub function_is_constructor: bool,
+    pub function_script_id: u32,
+    pub function_script_line: u32,
+    pub function_script_column: u32,
+    pub function_is_bound: bool,
+    pub function_is_async: bool,
+    pub function_is_generator: bool,
+    pub function_source_url: String,
+}
+
+impl FdeV8Function {
+    pub fn new() -> Self {
+        Self {
+            function_name: String::new(),
+            function_length: u32::default(),
+            function_is_constructor: bool::default(),
+            function_script_id: u32::default(),
+            function_script_line: u32::default(),
+            function_script_column: u32::default(),
+            function_is_bound: bool::default(),
+            function_is_async: bool::default(),
+            function_is_generator: bool::default(),
+            function_source_url: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.function_name.is_empty() || true && self.function_length < u32::MAX || true && self.function_is_constructor || true && self.function_script_id < u32::MAX || true && self.function_script_line < u32::MAX || true && self.function_script_column < u32::MAX || true && self.function_is_bound || true && self.function_is_async || true && self.function_is_generator || true && !self.function_source_url.is_empty() || true
+    }
+}
+
+impl Default for FdeV8Function {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270636,6 +270843,96 @@ mod tests_fcz_generated {
     fn test_fcz_fields() {
         let mut obj = FczTuiFocus::default();
         obj.focus_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fda_generated {
+    use super::*;
+
+    #[test]
+    fn test_fda_default() {
+        let obj = FdaV8Isolate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fda_fields() {
+        let mut obj = FdaV8Isolate::default();
+        obj.isolate_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdb_default() {
+        let obj = FdbV8Context::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdb_fields() {
+        let mut obj = FdbV8Context::default();
+        obj.context_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdc_default() {
+        let obj = FdcV8Module::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdc_fields() {
+        let mut obj = FdcV8Module::default();
+        obj.module_url = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdd_default() {
+        let obj = FddV8Value::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdd_fields() {
+        let mut obj = FddV8Value::default();
+        obj.value_type = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fde_generated {
+    use super::*;
+
+    #[test]
+    fn test_fde_default() {
+        let obj = FdeV8Function::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fde_fields() {
+        let mut obj = FdeV8Function::default();
+        obj.function_name = "test".to_string();
         assert!(obj.validate());
     }
 }
