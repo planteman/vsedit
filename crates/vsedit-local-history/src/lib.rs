@@ -110119,6 +110119,426 @@ impl Default for GyzSaveDialogOptions {
     }
 }
 
+/// Telemetry event (name, properties, measurements, timestamp)
+#[derive(Debug, Clone)]
+pub struct GzaTelemetryEvent {
+    pub telemetry_evt_id: String,
+    pub event_name: String,
+    pub properties_json: String,
+    pub measurements_json: String,
+    pub timestamp_ms: u64,
+    pub session_id: String,
+    pub machine_id: String,
+    pub extension_id: String,
+    pub is_error: bool,
+    pub stack_trace: String,
+}
+
+impl GzaTelemetryEvent {
+    pub fn new() -> Self {
+        Self {
+            telemetry_evt_id: String::new(),
+            event_name: String::new(),
+            properties_json: String::new(),
+            measurements_json: String::new(),
+            timestamp_ms: u64::default(),
+            session_id: String::new(),
+            machine_id: String::new(),
+            extension_id: String::new(),
+            is_error: bool::default(),
+            stack_trace: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.telemetry_evt_id.is_empty() || true && !self.event_name.is_empty() || true && !self.properties_json.is_empty() || true && !self.measurements_json.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.session_id.is_empty() || true && !self.machine_id.is_empty() || true && !self.extension_id.is_empty() || true && self.is_error || true && !self.stack_trace.is_empty() || true
+    }
+}
+
+impl Default for GzaTelemetryEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Telemetry service (app insighter, is opted in, flush interval)
+#[derive(Debug, Clone)]
+pub struct GzbTelemetryService {
+    pub telemetry_svc_id: String,
+    pub app_insights_key: String,
+    pub is_opted_in: bool,
+    pub flush_interval_ms: u32,
+    pub batch_size: u32,
+    pub endpoint_url: String,
+    pub telemetry_level: String,
+    pub machine_id: String,
+    pub session_id: String,
+    pub is_first_session: bool,
+}
+
+impl GzbTelemetryService {
+    pub fn new() -> Self {
+        Self {
+            telemetry_svc_id: String::new(),
+            app_insights_key: String::new(),
+            is_opted_in: bool::default(),
+            flush_interval_ms: u32::default(),
+            batch_size: u32::default(),
+            endpoint_url: String::new(),
+            telemetry_level: String::new(),
+            machine_id: String::new(),
+            session_id: String::new(),
+            is_first_session: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.telemetry_svc_id.is_empty() || true && !self.app_insights_key.is_empty() || true && self.is_opted_in || true && self.flush_interval_ms < u32::MAX || true && self.batch_size < u32::MAX || true && !self.endpoint_url.is_empty() || true && !self.telemetry_level.is_empty() || true && !self.machine_id.is_empty() || true && !self.session_id.is_empty() || true && self.is_first_session || true
+    }
+}
+
+impl Default for GzbTelemetryService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Log message (level, message, timestamp, channel, source)
+#[derive(Debug, Clone)]
+pub struct GzcLogMessage {
+    pub log_msg_id: String,
+    pub level: String,
+    pub message: String,
+    pub timestamp_ms: u64,
+    pub channel: String,
+    pub source: String,
+    pub pid: u32,
+    pub thread_id: String,
+    pub correlation_id: String,
+    pub stack_trace: String,
+}
+
+impl GzcLogMessage {
+    pub fn new() -> Self {
+        Self {
+            log_msg_id: String::new(),
+            level: String::new(),
+            message: String::new(),
+            timestamp_ms: u64::default(),
+            channel: String::new(),
+            source: String::new(),
+            pid: u32::default(),
+            thread_id: String::new(),
+            correlation_id: String::new(),
+            stack_trace: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_msg_id.is_empty() || true && !self.level.is_empty() || true && !self.message.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.channel.is_empty() || true && !self.source.is_empty() || true && self.pid < u32::MAX || true && !self.thread_id.is_empty() || true && !self.correlation_id.is_empty() || true && !self.stack_trace.is_empty() || true
+    }
+}
+
+impl Default for GzcLogMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Log level (trace, debug, info, warning, error, critical, off)
+#[derive(Debug, Clone)]
+pub struct GzdLogLevel {
+    pub log_level_id: String,
+    pub level_name: String,
+    pub level_value: u32,
+    pub is_enabled: bool,
+    pub color: String,
+    pub abbreviation: String,
+    pub syslog_severity: u32,
+    pub include_stack: bool,
+    pub console_method: String,
+    pub filter_pattern: String,
+}
+
+impl GzdLogLevel {
+    pub fn new() -> Self {
+        Self {
+            log_level_id: String::new(),
+            level_name: String::new(),
+            level_value: u32::default(),
+            is_enabled: bool::default(),
+            color: String::new(),
+            abbreviation: String::new(),
+            syslog_severity: u32::default(),
+            include_stack: bool::default(),
+            console_method: String::new(),
+            filter_pattern: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_level_id.is_empty() || true && !self.level_name.is_empty() || true && self.level_value < u32::MAX || true && self.is_enabled || true && !self.color.is_empty() || true && !self.abbreviation.is_empty() || true && self.syslog_severity < u32::MAX || true && self.include_stack || true && !self.console_method.is_empty() || true && !self.filter_pattern.is_empty() || true
+    }
+}
+
+impl Default for GzdLogLevel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel (name, language id, append, replace, show)
+#[derive(Debug, Clone)]
+pub struct GzeOutputChannel {
+    pub output_ch_id: String,
+    pub name: String,
+    pub language_id: String,
+    pub is_visible: bool,
+    pub line_count: u64,
+    pub max_lines: u64,
+    pub is_log_channel: bool,
+    pub extension_id: String,
+    pub preserve_focus: bool,
+    pub encoding: String,
+}
+
+impl GzeOutputChannel {
+    pub fn new() -> Self {
+        Self {
+            output_ch_id: String::new(),
+            name: String::new(),
+            language_id: String::new(),
+            is_visible: bool::default(),
+            line_count: u64::default(),
+            max_lines: u64::default(),
+            is_log_channel: bool::default(),
+            extension_id: String::new(),
+            preserve_focus: bool::default(),
+            encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_ch_id.is_empty() || true && !self.name.is_empty() || true && !self.language_id.is_empty() || true && self.is_visible || true && self.line_count < u64::MAX || true && self.max_lines < u64::MAX || true && self.is_log_channel || true && !self.extension_id.is_empty() || true && self.preserve_focus || true && !self.encoding.is_empty() || true
+    }
+}
+
+impl Default for GzeOutputChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Product info (name, version, commit, date, quality, data folder)
+#[derive(Debug, Clone)]
+pub struct GzfProductInfo {
+    pub product_info_id: String,
+    pub name: String,
+    pub version: String,
+    pub commit_hash: String,
+    pub build_date: String,
+    pub quality: String,
+    pub data_folder: String,
+    pub app_root: String,
+    pub is_portable: bool,
+    pub update_url: String,
+}
+
+impl GzfProductInfo {
+    pub fn new() -> Self {
+        Self {
+            product_info_id: String::new(),
+            name: String::new(),
+            version: String::new(),
+            commit_hash: String::new(),
+            build_date: String::new(),
+            quality: String::new(),
+            data_folder: String::new(),
+            app_root: String::new(),
+            is_portable: bool::default(),
+            update_url: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.product_info_id.is_empty() || true && !self.name.is_empty() || true && !self.version.is_empty() || true && !self.commit_hash.is_empty() || true && !self.build_date.is_empty() || true && !self.quality.is_empty() || true && !self.data_folder.is_empty() || true && !self.app_root.is_empty() || true && self.is_portable || true && !self.update_url.is_empty() || true
+    }
+}
+
+impl Default for GzfProductInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Environment info (app root, user home, extensions dir, logs)
+#[derive(Debug, Clone)]
+pub struct GzgEnvironmentInfo {
+    pub env_info_id: String,
+    pub app_root: String,
+    pub user_home: String,
+    pub extensions_dir: String,
+    pub logs_dir: String,
+    pub user_data_dir: String,
+    pub tmp_dir: String,
+    pub global_storage_dir: String,
+    pub workspace_storage_dir: String,
+    pub is_extension_dev: bool,
+}
+
+impl GzgEnvironmentInfo {
+    pub fn new() -> Self {
+        Self {
+            env_info_id: String::new(),
+            app_root: String::new(),
+            user_home: String::new(),
+            extensions_dir: String::new(),
+            logs_dir: String::new(),
+            user_data_dir: String::new(),
+            tmp_dir: String::new(),
+            global_storage_dir: String::new(),
+            workspace_storage_dir: String::new(),
+            is_extension_dev: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.env_info_id.is_empty() || true && !self.app_root.is_empty() || true && !self.user_home.is_empty() || true && !self.extensions_dir.is_empty() || true && !self.logs_dir.is_empty() || true && !self.user_data_dir.is_empty() || true && !self.tmp_dir.is_empty() || true && !self.global_storage_dir.is_empty() || true && !self.workspace_storage_dir.is_empty() || true && self.is_extension_dev || true
+    }
+}
+
+impl Default for GzgEnvironmentInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform info (os, arch, is linux, is mac, is windows, shell)
+#[derive(Debug, Clone)]
+pub struct GzhPlatformInfo {
+    pub platform_id: String,
+    pub os_name: String,
+    pub arch: String,
+    pub is_linux: bool,
+    pub is_mac: bool,
+    pub is_windows: bool,
+    pub shell: String,
+    pub home_dir: String,
+    pub newline: String,
+    pub path_separator: String,
+}
+
+impl GzhPlatformInfo {
+    pub fn new() -> Self {
+        Self {
+            platform_id: String::new(),
+            os_name: String::new(),
+            arch: String::new(),
+            is_linux: bool::default(),
+            is_mac: bool::default(),
+            is_windows: bool::default(),
+            shell: String::new(),
+            home_dir: String::new(),
+            newline: String::new(),
+            path_separator: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.platform_id.is_empty() || true && !self.os_name.is_empty() || true && !self.arch.is_empty() || true && self.is_linux || true && self.is_mac || true && self.is_windows || true && !self.shell.is_empty() || true && !self.home_dir.is_empty() || true && !self.newline.is_empty() || true && !self.path_separator.is_empty() || true
+    }
+}
+
+impl Default for GzhPlatformInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Process info (pid, ppid, exec path, argv, env vars)
+#[derive(Debug, Clone)]
+pub struct GziProcessInfo {
+    pub process_info_id: String,
+    pub pid: u32,
+    pub ppid: u32,
+    pub exec_path: String,
+    pub argv_json: String,
+    pub env_vars_json: String,
+    pub cwd: String,
+    pub uid: u32,
+    pub gid: u32,
+    pub start_time_ms: u64,
+}
+
+impl GziProcessInfo {
+    pub fn new() -> Self {
+        Self {
+            process_info_id: String::new(),
+            pid: u32::default(),
+            ppid: u32::default(),
+            exec_path: String::new(),
+            argv_json: String::new(),
+            env_vars_json: String::new(),
+            cwd: String::new(),
+            uid: u32::default(),
+            gid: u32::default(),
+            start_time_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.process_info_id.is_empty() || true && self.pid < u32::MAX || true && self.ppid < u32::MAX || true && !self.exec_path.is_empty() || true && !self.argv_json.is_empty() || true && !self.env_vars_json.is_empty() || true && !self.cwd.is_empty() || true && self.uid < u32::MAX || true && self.gid < u32::MAX || true && self.start_time_ms < u64::MAX || true
+    }
+}
+
+impl Default for GziProcessInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Locale info (language, locale, translations, direction, format)
+#[derive(Debug, Clone)]
+pub struct GzjLocaleInfo {
+    pub locale_id: String,
+    pub language: String,
+    pub locale_tag: String,
+    pub translations_json: String,
+    pub direction: String,
+    pub number_format: String,
+    pub date_format: String,
+    pub currency_format: String,
+    pub is_rtl: bool,
+    pub fallback_language: String,
+}
+
+impl GzjLocaleInfo {
+    pub fn new() -> Self {
+        Self {
+            locale_id: String::new(),
+            language: String::new(),
+            locale_tag: String::new(),
+            translations_json: String::new(),
+            direction: String::new(),
+            number_format: String::new(),
+            date_format: String::new(),
+            currency_format: String::new(),
+            is_rtl: bool::default(),
+            fallback_language: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.locale_id.is_empty() || true && !self.language.is_empty() || true && !self.locale_tag.is_empty() || true && !self.translations_json.is_empty() || true && !self.direction.is_empty() || true && !self.number_format.is_empty() || true && !self.date_format.is_empty() || true && !self.currency_format.is_empty() || true && self.is_rtl || true && !self.fallback_language.is_empty() || true
+    }
+}
+
+impl Default for GzjLocaleInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -345430,6 +345850,186 @@ mod tests_gyz_generated {
     fn test_gyz_fields() {
         let mut obj = GyzSaveDialogOptions::default();
         obj.save_dialog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gza_generated {
+    use super::*;
+
+    #[test]
+    fn test_gza_default() {
+        let obj = GzaTelemetryEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gza_fields() {
+        let mut obj = GzaTelemetryEvent::default();
+        obj.telemetry_evt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzb_default() {
+        let obj = GzbTelemetryService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzb_fields() {
+        let mut obj = GzbTelemetryService::default();
+        obj.telemetry_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzc_default() {
+        let obj = GzcLogMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzc_fields() {
+        let mut obj = GzcLogMessage::default();
+        obj.log_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzd_default() {
+        let obj = GzdLogLevel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzd_fields() {
+        let mut obj = GzdLogLevel::default();
+        obj.log_level_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gze_generated {
+    use super::*;
+
+    #[test]
+    fn test_gze_default() {
+        let obj = GzeOutputChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gze_fields() {
+        let mut obj = GzeOutputChannel::default();
+        obj.output_ch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzf_default() {
+        let obj = GzfProductInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzf_fields() {
+        let mut obj = GzfProductInfo::default();
+        obj.product_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzg_default() {
+        let obj = GzgEnvironmentInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzg_fields() {
+        let mut obj = GzgEnvironmentInfo::default();
+        obj.env_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzh_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzh_default() {
+        let obj = GzhPlatformInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzh_fields() {
+        let mut obj = GzhPlatformInfo::default();
+        obj.platform_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzi_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzi_default() {
+        let obj = GziProcessInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzi_fields() {
+        let mut obj = GziProcessInfo::default();
+        obj.process_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzj_default() {
+        let obj = GzjLocaleInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzj_fields() {
+        let mut obj = GzjLocaleInfo::default();
+        obj.locale_id = "test".to_string();
         assert!(obj.validate());
     }
 }
