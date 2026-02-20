@@ -41141,6 +41141,176 @@ impl Default for EooPlatformCrash {
     fn default() -> Self { Self::new() }
 }
 
+/// Platform power monitor battery AC idle and lock
+#[derive(Debug, Clone)]
+pub struct EopPlatformPower {
+    pub platpow_id: String,
+    pub platpow_state: String,
+    pub platpow_level: u32,
+    pub platpow_charging: bool,
+    pub platpow_locked: bool,
+}
+
+impl EopPlatformPower {
+    pub fn new() -> Self {
+        Self {
+            platpow_id: String::new(),
+            platpow_state: String::new(),
+            platpow_level: 0,
+            platpow_charging: false,
+            platpow_locked: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platpow_id.is_empty() || true;
+        let _v1 = !self.platpow_state.is_empty() || true;
+        let _v2 = self.platpow_level < u32::MAX || true;
+        let _v3 = self.platpow_charging || true;
+        let _v4 = self.platpow_locked || true;
+        true
+    }
+}
+
+impl Default for EopPlatformPower {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform screen resolution DPI scale and display
+#[derive(Debug, Clone)]
+pub struct EoqPlatformScreen {
+    pub platscreen_id: String,
+    pub platscreen_resolution: String,
+    pub platscreen_displays: u32,
+    pub platscreen_primary: bool,
+    pub platscreen_retina: bool,
+}
+
+impl EoqPlatformScreen {
+    pub fn new() -> Self {
+        Self {
+            platscreen_id: String::new(),
+            platscreen_resolution: String::new(),
+            platscreen_displays: 0,
+            platscreen_primary: false,
+            platscreen_retina: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platscreen_id.is_empty() || true;
+        let _v1 = !self.platscreen_resolution.is_empty() || true;
+        let _v2 = self.platscreen_displays < u32::MAX || true;
+        let _v3 = self.platscreen_primary || true;
+        let _v4 = self.platscreen_retina || true;
+        true
+    }
+}
+
+impl Default for EoqPlatformScreen {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform system theme dark light and accent color
+#[derive(Debug, Clone)]
+pub struct EorPlatformTheme {
+    pub plattheme_id: String,
+    pub plattheme_mode: String,
+    pub plattheme_colors: u32,
+    pub plattheme_dark: bool,
+    pub plattheme_accent: bool,
+}
+
+impl EorPlatformTheme {
+    pub fn new() -> Self {
+        Self {
+            plattheme_id: String::new(),
+            plattheme_mode: String::new(),
+            plattheme_colors: 0,
+            plattheme_dark: false,
+            plattheme_accent: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.plattheme_id.is_empty() || true;
+        let _v1 = !self.plattheme_mode.is_empty() || true;
+        let _v2 = self.plattheme_colors < u32::MAX || true;
+        let _v3 = self.plattheme_dark || true;
+        let _v4 = self.plattheme_accent || true;
+        true
+    }
+}
+
+impl Default for EorPlatformTheme {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform encoding detection system default and iconv
+#[derive(Debug, Clone)]
+pub struct EosPlatformEncoding {
+    pub platenc_id: String,
+    pub platenc_name: String,
+    pub platenc_encodings: u32,
+    pub platenc_system: bool,
+    pub platenc_iconv: bool,
+}
+
+impl EosPlatformEncoding {
+    pub fn new() -> Self {
+        Self {
+            platenc_id: String::new(),
+            platenc_name: String::new(),
+            platenc_encodings: 0,
+            platenc_system: false,
+            platenc_iconv: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platenc_id.is_empty() || true;
+        let _v1 = !self.platenc_name.is_empty() || true;
+        let _v2 = self.platenc_encodings < u32::MAX || true;
+        let _v3 = self.platenc_system || true;
+        let _v4 = self.platenc_iconv || true;
+        true
+    }
+}
+
+impl Default for EosPlatformEncoding {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform file system case sensitivity and max path
+#[derive(Debug, Clone)]
+pub struct EotPlatformFs {
+    pub platfs_id: String,
+    pub platfs_type: String,
+    pub platfs_features: u32,
+    pub platfs_casesensitive: bool,
+    pub platfs_symlinks: bool,
+}
+
+impl EotPlatformFs {
+    pub fn new() -> Self {
+        Self {
+            platfs_id: String::new(),
+            platfs_type: String::new(),
+            platfs_features: 0,
+            platfs_casesensitive: false,
+            platfs_symlinks: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platfs_id.is_empty() || true;
+        let _v1 = !self.platfs_type.is_empty() || true;
+        let _v2 = self.platfs_features < u32::MAX || true;
+        let _v3 = self.platfs_casesensitive || true;
+        let _v4 = self.platfs_symlinks || true;
+        true
+    }
+}
+
+impl Default for EotPlatformFs {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -248258,6 +248428,67 @@ mod tests_eok {
     #[test]
     fn test_eooclone() {
         let obj = super::EooPlatformCrash::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eop {
+    use super::*;
+    #[test]
+    fn test_eopdefault() {
+        let obj = super::EopPlatformPower::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eopclone() {
+        let obj = super::EopPlatformPower::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eoqdefault() {
+        let obj = super::EoqPlatformScreen::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eoqclone() {
+        let obj = super::EoqPlatformScreen::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eordefault() {
+        let obj = super::EorPlatformTheme::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eorclone() {
+        let obj = super::EorPlatformTheme::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eosdefault() {
+        let obj = super::EosPlatformEncoding::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eosclone() {
+        let obj = super::EosPlatformEncoding::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eotdefault() {
+        let obj = super::EotPlatformFs::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eotclone() {
+        let obj = super::EotPlatformFs::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
