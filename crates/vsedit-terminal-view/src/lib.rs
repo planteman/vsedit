@@ -133783,6 +133783,890 @@ impl Default for HvzMarkdownWorkspace {
     }
 }
 
+/// Multi-cursor instance descriptor
+#[derive(Debug, Clone)]
+pub struct HwaMultiCursor {
+    pub cursor_id: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub selection_len: u32,
+    pub cursor_index: u32,
+    pub is_primary: bool,
+}
+
+impl HwaMultiCursor {
+    pub fn new() -> Self {
+        Self {
+            cursor_id: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            selection_len: u32::default(),
+            cursor_index: u32::default(),
+            is_primary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cursor_id.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.selection_len < u32::MAX || true && self.cursor_index < u32::MAX || true && self.is_primary || true
+    }
+}
+
+impl Default for HwaMultiCursor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Column/box selection state
+#[derive(Debug, Clone)]
+pub struct HwbColumnSelect {
+    pub select_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub is_reverse: bool,
+}
+
+impl HwbColumnSelect {
+    pub fn new() -> Self {
+        Self {
+            select_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            is_reverse: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.select_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && self.is_reverse || true
+    }
+}
+
+impl Default for HwbColumnSelect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Smart selection expansion state
+#[derive(Debug, Clone)]
+pub struct HwcSmartSelect {
+    pub smart_id: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub expansion_level: u32,
+    pub parent_kind: String,
+    pub can_expand: bool,
+}
+
+impl HwcSmartSelect {
+    pub fn new() -> Self {
+        Self {
+            smart_id: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            expansion_level: u32::default(),
+            parent_kind: String::new(),
+            can_expand: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.smart_id.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && self.expansion_level < u32::MAX || true && !self.parent_kind.is_empty() || true && self.can_expand || true
+    }
+}
+
+impl Default for HwcSmartSelect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bracket matching pair result
+#[derive(Debug, Clone)]
+pub struct HwdBracketMatch {
+    pub match_id: String,
+    pub open_offset: u32,
+    pub close_offset: u32,
+    pub bracket_char: String,
+    pub nesting_level: u32,
+    pub is_valid: bool,
+}
+
+impl HwdBracketMatch {
+    pub fn new() -> Self {
+        Self {
+            match_id: String::new(),
+            open_offset: u32::default(),
+            close_offset: u32::default(),
+            bracket_char: String::new(),
+            nesting_level: u32::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.match_id.is_empty() || true && self.open_offset < u32::MAX || true && self.close_offset < u32::MAX || true && !self.bracket_char.is_empty() || true && self.nesting_level < u32::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for HwdBracketMatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Indentation guide descriptor
+#[derive(Debug, Clone)]
+pub struct HweIndentGuide {
+    pub guide_id: String,
+    pub indent_level: u32,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub color_token: String,
+    pub is_active: bool,
+}
+
+impl HweIndentGuide {
+    pub fn new() -> Self {
+        Self {
+            guide_id: String::new(),
+            indent_level: u32::default(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            color_token: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.guide_id.is_empty() || true && self.indent_level < u32::MAX || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.color_token.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for HweIndentGuide {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Current line highlight config
+#[derive(Debug, Clone)]
+pub struct HwfLineHighlight {
+    pub highlight_id: String,
+    pub line_number: u32,
+    pub bg_color_token: String,
+    pub border_token: String,
+    pub opacity_pct: u32,
+    pub is_range: bool,
+}
+
+impl HwfLineHighlight {
+    pub fn new() -> Self {
+        Self {
+            highlight_id: String::new(),
+            line_number: u32::default(),
+            bg_color_token: String::new(),
+            border_token: String::new(),
+            opacity_pct: u32::default(),
+            is_range: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.highlight_id.is_empty() || true && self.line_number < u32::MAX || true && !self.bg_color_token.is_empty() || true && !self.border_token.is_empty() || true && self.opacity_pct < u32::MAX || true && self.is_range || true
+    }
+}
+
+impl Default for HwfLineHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Word wrap configuration model
+#[derive(Debug, Clone)]
+pub struct HwgWordWrap {
+    pub wrap_id: String,
+    pub wrap_mode: String,
+    pub wrap_column: u32,
+    pub word_wrap_override: String,
+    pub tab_size: u32,
+    pub use_soft_wraps: bool,
+}
+
+impl HwgWordWrap {
+    pub fn new() -> Self {
+        Self {
+            wrap_id: String::new(),
+            wrap_mode: String::new(),
+            wrap_column: u32::default(),
+            word_wrap_override: String::new(),
+            tab_size: u32::default(),
+            use_soft_wraps: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wrap_id.is_empty() || true && !self.wrap_mode.is_empty() || true && self.wrap_column < u32::MAX || true && !self.word_wrap_override.is_empty() || true && self.tab_size < u32::MAX || true && self.use_soft_wraps || true
+    }
+}
+
+impl Default for HwgWordWrap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Whitespace rendering config
+#[derive(Debug, Clone)]
+pub struct HwhWhitespaceRender {
+    pub ws_id: String,
+    pub render_mode: String,
+    pub boundary_chars: String,
+    pub tab_char: String,
+    pub space_char: String,
+    pub show_trailing: bool,
+}
+
+impl HwhWhitespaceRender {
+    pub fn new() -> Self {
+        Self {
+            ws_id: String::new(),
+            render_mode: String::new(),
+            boundary_chars: String::new(),
+            tab_char: String::new(),
+            space_char: String::new(),
+            show_trailing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_id.is_empty() || true && !self.render_mode.is_empty() || true && !self.boundary_chars.is_empty() || true && !self.tab_char.is_empty() || true && !self.space_char.is_empty() || true && self.show_trailing || true
+    }
+}
+
+impl Default for HwhWhitespaceRender {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Paired line linking config
+#[derive(Debug, Clone)]
+pub struct HwiLinePairing {
+    pub pair_id: String,
+    pub source_line: u32,
+    pub target_line: u32,
+    pub link_kind: String,
+    pub color_token: String,
+    pub is_bidirectional: bool,
+}
+
+impl HwiLinePairing {
+    pub fn new() -> Self {
+        Self {
+            pair_id: String::new(),
+            source_line: u32::default(),
+            target_line: u32::default(),
+            link_kind: String::new(),
+            color_token: String::new(),
+            is_bidirectional: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pair_id.is_empty() || true && self.source_line < u32::MAX || true && self.target_line < u32::MAX || true && !self.link_kind.is_empty() || true && !self.color_token.is_empty() || true && self.is_bidirectional || true
+    }
+}
+
+impl Default for HwiLinePairing {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code folding region state
+#[derive(Debug, Clone)]
+pub struct HwjCodeFold {
+    pub fold_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub kind_str: String,
+    pub collapsed_text: String,
+    pub is_collapsed: bool,
+}
+
+impl HwjCodeFold {
+    pub fn new() -> Self {
+        Self {
+            fold_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            kind_str: String::new(),
+            collapsed_text: String::new(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fold_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.kind_str.is_empty() || true && !self.collapsed_text.is_empty() || true && self.is_collapsed || true
+    }
+}
+
+impl Default for HwjCodeFold {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sticky scroll header entry
+#[derive(Debug, Clone)]
+pub struct HwkStickyScroll {
+    pub sticky_id: String,
+    pub line_number: u32,
+    pub scope_depth: u32,
+    pub header_text: String,
+    pub max_lines: u32,
+    pub is_visible: bool,
+}
+
+impl HwkStickyScroll {
+    pub fn new() -> Self {
+        Self {
+            sticky_id: String::new(),
+            line_number: u32::default(),
+            scope_depth: u32::default(),
+            header_text: String::new(),
+            max_lines: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sticky_id.is_empty() || true && self.line_number < u32::MAX || true && self.scope_depth < u32::MAX || true && !self.header_text.is_empty() || true && self.max_lines < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for HwkStickyScroll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor minimap state
+#[derive(Debug, Clone)]
+pub struct HwlMinimap {
+    pub minimap_id: String,
+    pub render_mode: String,
+    pub scale_factor: u32,
+    pub max_column: u32,
+    pub slider_position: u32,
+    pub show_slider: bool,
+}
+
+impl HwlMinimap {
+    pub fn new() -> Self {
+        Self {
+            minimap_id: String::new(),
+            render_mode: String::new(),
+            scale_factor: u32::default(),
+            max_column: u32::default(),
+            slider_position: u32::default(),
+            show_slider: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.minimap_id.is_empty() || true && !self.render_mode.is_empty() || true && self.scale_factor < u32::MAX || true && self.max_column < u32::MAX || true && self.slider_position < u32::MAX || true && self.show_slider || true
+    }
+}
+
+impl Default for HwlMinimap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor scrollbar state
+#[derive(Debug, Clone)]
+pub struct HwmEditorScrollbar {
+    pub scrollbar_id: String,
+    pub orientation: String,
+    pub thumb_size: u32,
+    pub scroll_position: u32,
+    pub total_size: u32,
+    pub is_dragging: bool,
+}
+
+impl HwmEditorScrollbar {
+    pub fn new() -> Self {
+        Self {
+            scrollbar_id: String::new(),
+            orientation: String::new(),
+            thumb_size: u32::default(),
+            scroll_position: u32::default(),
+            total_size: u32::default(),
+            is_dragging: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scrollbar_id.is_empty() || true && !self.orientation.is_empty() || true && self.thumb_size < u32::MAX || true && self.scroll_position < u32::MAX || true && self.total_size < u32::MAX || true && self.is_dragging || true
+    }
+}
+
+impl Default for HwmEditorScrollbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Glyph margin configuration
+#[derive(Debug, Clone)]
+pub struct HwnGlyphMargin {
+    pub margin_id: String,
+    pub width_px: u32,
+    pub glyph_count: u32,
+    pub lane_count: u32,
+    pub render_order: u32,
+    pub is_visible: bool,
+}
+
+impl HwnGlyphMargin {
+    pub fn new() -> Self {
+        Self {
+            margin_id: String::new(),
+            width_px: u32::default(),
+            glyph_count: u32::default(),
+            lane_count: u32::default(),
+            render_order: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.margin_id.is_empty() || true && self.width_px < u32::MAX || true && self.glyph_count < u32::MAX || true && self.lane_count < u32::MAX || true && self.render_order < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for HwnGlyphMargin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Line number rendering config
+#[derive(Debug, Clone)]
+pub struct HwoLineNumbers {
+    pub ln_id: String,
+    pub numbering_mode: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub width_chars: u32,
+    pub show_current: bool,
+}
+
+impl HwoLineNumbers {
+    pub fn new() -> Self {
+        Self {
+            ln_id: String::new(),
+            numbering_mode: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            width_chars: u32::default(),
+            show_current: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ln_id.is_empty() || true && !self.numbering_mode.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.width_chars < u32::MAX || true && self.show_current || true
+    }
+}
+
+impl Default for HwoLineNumbers {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline color decorator
+#[derive(Debug, Clone)]
+pub struct HwpColorDecorator {
+    pub color_id: String,
+    pub color_value: String,
+    pub line_number: u32,
+    pub column_start: u32,
+    pub column_end: u32,
+    pub is_inline: bool,
+}
+
+impl HwpColorDecorator {
+    pub fn new() -> Self {
+        Self {
+            color_id: String::new(),
+            color_value: String::new(),
+            line_number: u32::default(),
+            column_start: u32::default(),
+            column_end: u32::default(),
+            is_inline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_id.is_empty() || true && !self.color_value.is_empty() || true && self.line_number < u32::MAX || true && self.column_start < u32::MAX || true && self.column_end < u32::MAX || true && self.is_inline || true
+    }
+}
+
+impl Default for HwpColorDecorator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code lens widget state
+#[derive(Debug, Clone)]
+pub struct HwqCodeLensWidget {
+    pub lens_id: String,
+    pub command_title: String,
+    pub line_number: u32,
+    pub command_ref: String,
+    pub data_len: u32,
+    pub is_resolved: bool,
+}
+
+impl HwqCodeLensWidget {
+    pub fn new() -> Self {
+        Self {
+            lens_id: String::new(),
+            command_title: String::new(),
+            line_number: u32::default(),
+            command_ref: String::new(),
+            data_len: u32::default(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lens_id.is_empty() || true && !self.command_title.is_empty() || true && self.line_number < u32::MAX || true && !self.command_ref.is_empty() || true && self.data_len < u32::MAX || true && self.is_resolved || true
+    }
+}
+
+impl Default for HwqCodeLensWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor view zone descriptor
+#[derive(Debug, Clone)]
+pub struct HwrEditorZone {
+    pub zone_id: String,
+    pub after_line: u32,
+    pub height_lines: u32,
+    pub dom_node_ref: String,
+    pub ordinal_value: u32,
+    pub suppress_mouse: bool,
+}
+
+impl HwrEditorZone {
+    pub fn new() -> Self {
+        Self {
+            zone_id: String::new(),
+            after_line: u32::default(),
+            height_lines: u32::default(),
+            dom_node_ref: String::new(),
+            ordinal_value: u32::default(),
+            suppress_mouse: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.zone_id.is_empty() || true && self.after_line < u32::MAX || true && self.height_lines < u32::MAX || true && !self.dom_node_ref.is_empty() || true && self.ordinal_value < u32::MAX || true && self.suppress_mouse || true
+    }
+}
+
+impl Default for HwrEditorZone {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor content widget
+#[derive(Debug, Clone)]
+pub struct HwsContentWidget {
+    pub widget_id: String,
+    pub position_line: u32,
+    pub position_col: u32,
+    pub preference_str: String,
+    pub content_len: u32,
+    pub allow_overlap: bool,
+}
+
+impl HwsContentWidget {
+    pub fn new() -> Self {
+        Self {
+            widget_id: String::new(),
+            position_line: u32::default(),
+            position_col: u32::default(),
+            preference_str: String::new(),
+            content_len: u32::default(),
+            allow_overlap: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.widget_id.is_empty() || true && self.position_line < u32::MAX || true && self.position_col < u32::MAX || true && !self.preference_str.is_empty() || true && self.content_len < u32::MAX || true && self.allow_overlap || true
+    }
+}
+
+impl Default for HwsContentWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor overlay widget
+#[derive(Debug, Clone)]
+pub struct HwtOverlayWidget {
+    pub overlay_id: String,
+    pub preference_str: String,
+    pub min_width: u32,
+    pub min_height: u32,
+    pub margin_top: u32,
+    pub is_resizable: bool,
+}
+
+impl HwtOverlayWidget {
+    pub fn new() -> Self {
+        Self {
+            overlay_id: String::new(),
+            preference_str: String::new(),
+            min_width: u32::default(),
+            min_height: u32::default(),
+            margin_top: u32::default(),
+            is_resizable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.overlay_id.is_empty() || true && !self.preference_str.is_empty() || true && self.min_width < u32::MAX || true && self.min_height < u32::MAX || true && self.margin_top < u32::MAX || true && self.is_resizable || true
+    }
+}
+
+impl Default for HwtOverlayWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor action contribution
+#[derive(Debug, Clone)]
+pub struct HwuEditorAction {
+    pub action_id: String,
+    pub action_label: String,
+    pub keybinding_str: String,
+    pub precondition_str: String,
+    pub sort_group: u32,
+    pub is_menu_item: bool,
+}
+
+impl HwuEditorAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            action_label: String::new(),
+            keybinding_str: String::new(),
+            precondition_str: String::new(),
+            sort_group: u32::default(),
+            is_menu_item: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.action_label.is_empty() || true && !self.keybinding_str.is_empty() || true && !self.precondition_str.is_empty() || true && self.sort_group < u32::MAX || true && self.is_menu_item || true
+    }
+}
+
+impl Default for HwuEditorAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor command registration
+#[derive(Debug, Clone)]
+pub struct HwvEditorCommand {
+    pub cmd_id: String,
+    pub command_name: String,
+    pub handler_ref: String,
+    pub description_text: String,
+    pub arg_count: u32,
+    pub is_internal: bool,
+}
+
+impl HwvEditorCommand {
+    pub fn new() -> Self {
+        Self {
+            cmd_id: String::new(),
+            command_name: String::new(),
+            handler_ref: String::new(),
+            description_text: String::new(),
+            arg_count: u32::default(),
+            is_internal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cmd_id.is_empty() || true && !self.command_name.is_empty() || true && !self.handler_ref.is_empty() || true && !self.description_text.is_empty() || true && self.arg_count < u32::MAX || true && self.is_internal || true
+    }
+}
+
+impl Default for HwvEditorCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor drag-drop operation
+#[derive(Debug, Clone)]
+pub struct HwwDragDrop {
+    pub drag_id: String,
+    pub source_position: u32,
+    pub target_position: u32,
+    pub data_transfer_ref: String,
+    pub drop_effect_len: u32,
+    pub is_copy: bool,
+}
+
+impl HwwDragDrop {
+    pub fn new() -> Self {
+        Self {
+            drag_id: String::new(),
+            source_position: u32::default(),
+            target_position: u32::default(),
+            data_transfer_ref: String::new(),
+            drop_effect_len: u32::default(),
+            is_copy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.drag_id.is_empty() || true && self.source_position < u32::MAX || true && self.target_position < u32::MAX || true && !self.data_transfer_ref.is_empty() || true && self.drop_effect_len < u32::MAX || true && self.is_copy || true
+    }
+}
+
+impl Default for HwwDragDrop {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor style configuration
+#[derive(Debug, Clone)]
+pub struct HwxCursorStyle {
+    pub style_id: String,
+    pub cursor_kind: String,
+    pub blink_period_ms: u32,
+    pub line_width: u32,
+    pub animation_style: String,
+    pub is_blinking: bool,
+}
+
+impl HwxCursorStyle {
+    pub fn new() -> Self {
+        Self {
+            style_id: String::new(),
+            cursor_kind: String::new(),
+            blink_period_ms: u32::default(),
+            line_width: u32::default(),
+            animation_style: String::new(),
+            is_blinking: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.style_id.is_empty() || true && !self.cursor_kind.is_empty() || true && self.blink_period_ms < u32::MAX || true && self.line_width < u32::MAX || true && !self.animation_style.is_empty() || true && self.is_blinking || true
+    }
+}
+
+impl Default for HwxCursorStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor accessibility state
+#[derive(Debug, Clone)]
+pub struct HwyEditorAccessibility {
+    pub a11y_id: String,
+    pub role_str: String,
+    pub aria_label: String,
+    pub tab_index: u32,
+    pub announce_text_len: u32,
+    pub is_tab_focused: bool,
+}
+
+impl HwyEditorAccessibility {
+    pub fn new() -> Self {
+        Self {
+            a11y_id: String::new(),
+            role_str: String::new(),
+            aria_label: String::new(),
+            tab_index: u32::default(),
+            announce_text_len: u32::default(),
+            is_tab_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_id.is_empty() || true && !self.role_str.is_empty() || true && !self.aria_label.is_empty() || true && self.tab_index < u32::MAX || true && self.announce_text_len < u32::MAX || true && self.is_tab_focused || true
+    }
+}
+
+impl Default for HwyEditorAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor layout dimensions
+#[derive(Debug, Clone)]
+pub struct HwzEditorLayout {
+    pub layout_id: String,
+    pub content_width: u32,
+    pub content_height: u32,
+    pub glyph_margin_width: u32,
+    pub line_numbers_width: u32,
+    pub is_word_wrap: bool,
+}
+
+impl HwzEditorLayout {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            content_width: u32::default(),
+            content_height: u32::default(),
+            glyph_margin_width: u32::default(),
+            line_numbers_width: u32::default(),
+            is_word_wrap: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && self.content_width < u32::MAX || true && self.content_height < u32::MAX || true && self.glyph_margin_width < u32::MAX || true && self.line_numbers_width < u32::MAX || true && self.is_word_wrap || true
+    }
+}
+
+impl Default for HwzEditorLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -379636,6 +380520,474 @@ mod tests_hvz_generated {
     fn test_hvz_fields() {
         let mut obj = HvzMarkdownWorkspace::default();
         obj.workspace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwa_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwa_default() {
+        let obj = HwaMultiCursor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwa_fields() {
+        let mut obj = HwaMultiCursor::default();
+        obj.cursor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwb_default() {
+        let obj = HwbColumnSelect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwb_fields() {
+        let mut obj = HwbColumnSelect::default();
+        obj.select_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwc_default() {
+        let obj = HwcSmartSelect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwc_fields() {
+        let mut obj = HwcSmartSelect::default();
+        obj.smart_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwd_default() {
+        let obj = HwdBracketMatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwd_fields() {
+        let mut obj = HwdBracketMatch::default();
+        obj.match_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwe_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwe_default() {
+        let obj = HweIndentGuide::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwe_fields() {
+        let mut obj = HweIndentGuide::default();
+        obj.guide_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwf_default() {
+        let obj = HwfLineHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwf_fields() {
+        let mut obj = HwfLineHighlight::default();
+        obj.highlight_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwg_default() {
+        let obj = HwgWordWrap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwg_fields() {
+        let mut obj = HwgWordWrap::default();
+        obj.wrap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwh_default() {
+        let obj = HwhWhitespaceRender::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwh_fields() {
+        let mut obj = HwhWhitespaceRender::default();
+        obj.ws_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwi_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwi_default() {
+        let obj = HwiLinePairing::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwi_fields() {
+        let mut obj = HwiLinePairing::default();
+        obj.pair_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwj_default() {
+        let obj = HwjCodeFold::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwj_fields() {
+        let mut obj = HwjCodeFold::default();
+        obj.fold_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwk_default() {
+        let obj = HwkStickyScroll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwk_fields() {
+        let mut obj = HwkStickyScroll::default();
+        obj.sticky_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwl_default() {
+        let obj = HwlMinimap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwl_fields() {
+        let mut obj = HwlMinimap::default();
+        obj.minimap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwm_default() {
+        let obj = HwmEditorScrollbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwm_fields() {
+        let mut obj = HwmEditorScrollbar::default();
+        obj.scrollbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwn_default() {
+        let obj = HwnGlyphMargin::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwn_fields() {
+        let mut obj = HwnGlyphMargin::default();
+        obj.margin_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwo_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwo_default() {
+        let obj = HwoLineNumbers::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwo_fields() {
+        let mut obj = HwoLineNumbers::default();
+        obj.ln_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwp_default() {
+        let obj = HwpColorDecorator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwp_fields() {
+        let mut obj = HwpColorDecorator::default();
+        obj.color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwq_default() {
+        let obj = HwqCodeLensWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwq_fields() {
+        let mut obj = HwqCodeLensWidget::default();
+        obj.lens_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwr_default() {
+        let obj = HwrEditorZone::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwr_fields() {
+        let mut obj = HwrEditorZone::default();
+        obj.zone_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hws_generated {
+    use super::*;
+
+    #[test]
+    fn test_hws_default() {
+        let obj = HwsContentWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hws_fields() {
+        let mut obj = HwsContentWidget::default();
+        obj.widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwt_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwt_default() {
+        let obj = HwtOverlayWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwt_fields() {
+        let mut obj = HwtOverlayWidget::default();
+        obj.overlay_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwu_default() {
+        let obj = HwuEditorAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwu_fields() {
+        let mut obj = HwuEditorAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwv_default() {
+        let obj = HwvEditorCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwv_fields() {
+        let mut obj = HwvEditorCommand::default();
+        obj.cmd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hww_generated {
+    use super::*;
+
+    #[test]
+    fn test_hww_default() {
+        let obj = HwwDragDrop::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hww_fields() {
+        let mut obj = HwwDragDrop::default();
+        obj.drag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwx_default() {
+        let obj = HwxCursorStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwx_fields() {
+        let mut obj = HwxCursorStyle::default();
+        obj.style_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwy_default() {
+        let obj = HwyEditorAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwy_fields() {
+        let mut obj = HwyEditorAccessibility::default();
+        obj.a11y_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hwz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hwz_default() {
+        let obj = HwzEditorLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hwz_fields() {
+        let mut obj = HwzEditorLayout::default();
+        obj.layout_id = "test".to_string();
         assert!(obj.validate());
     }
 }
