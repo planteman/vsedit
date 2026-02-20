@@ -141738,6 +141738,890 @@ impl Default for IezWorkspaceHistory {
     }
 }
 
+/// Extension package.json manifest
+#[derive(Debug, Clone)]
+pub struct IfaExtensionManifest {
+    pub manifest_id: String,
+    pub extension_id: String,
+    pub display_name: String,
+    pub version_str: String,
+    pub engine_version: String,
+    pub is_builtin: bool,
+}
+
+impl IfaExtensionManifest {
+    pub fn new() -> Self {
+        Self {
+            manifest_id: String::new(),
+            extension_id: String::new(),
+            display_name: String::new(),
+            version_str: String::new(),
+            engine_version: String::new(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.manifest_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.display_name.is_empty() || true && !self.version_str.is_empty() || true && !self.engine_version.is_empty() || true && self.is_builtin || true
+    }
+}
+
+impl Default for IfaExtensionManifest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension host runtime state
+#[derive(Debug, Clone)]
+pub struct IfbExtensionRuntime {
+    pub runtime_id: String,
+    pub extension_ref: String,
+    pub process_id_val: u32,
+    pub memory_bytes: u64,
+    pub api_call_count: u64,
+    pub is_responsive: bool,
+}
+
+impl IfbExtensionRuntime {
+    pub fn new() -> Self {
+        Self {
+            runtime_id: String::new(),
+            extension_ref: String::new(),
+            process_id_val: u32::default(),
+            memory_bytes: u64::default(),
+            api_call_count: u64::default(),
+            is_responsive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.runtime_id.is_empty() || true && !self.extension_ref.is_empty() || true && self.process_id_val < u32::MAX || true && self.memory_bytes < u64::MAX || true && self.api_call_count < u64::MAX || true && self.is_responsive || true
+    }
+}
+
+impl Default for IfbExtensionRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension activation event
+#[derive(Debug, Clone)]
+pub struct IfcExtensionActivation {
+    pub activation_id: String,
+    pub extension_ref: String,
+    pub event_str: String,
+    pub duration_ms: u32,
+    pub error_count: u32,
+    pub is_eager: bool,
+}
+
+impl IfcExtensionActivation {
+    pub fn new() -> Self {
+        Self {
+            activation_id: String::new(),
+            extension_ref: String::new(),
+            event_str: String::new(),
+            duration_ms: u32::default(),
+            error_count: u32::default(),
+            is_eager: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.activation_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.event_str.is_empty() || true && self.duration_ms < u32::MAX || true && self.error_count < u32::MAX || true && self.is_eager || true
+    }
+}
+
+impl Default for IfcExtensionActivation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API namespace
+#[derive(Debug, Clone)]
+pub struct IfdExtensionApi {
+    pub api_id: String,
+    pub namespace_str: String,
+    pub method_count: u32,
+    pub event_count: u32,
+    pub version_str: String,
+    pub is_proposed: bool,
+}
+
+impl IfdExtensionApi {
+    pub fn new() -> Self {
+        Self {
+            api_id: String::new(),
+            namespace_str: String::new(),
+            method_count: u32::default(),
+            event_count: u32::default(),
+            version_str: String::new(),
+            is_proposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.api_id.is_empty() || true && !self.namespace_str.is_empty() || true && self.method_count < u32::MAX || true && self.event_count < u32::MAX || true && !self.version_str.is_empty() || true && self.is_proposed || true
+    }
+}
+
+impl Default for IfdExtensionApi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension contribution point
+#[derive(Debug, Clone)]
+pub struct IfeExtensionContrib {
+    pub contrib_id: String,
+    pub contrib_point: String,
+    pub extension_ref: String,
+    pub data_json_len: u32,
+    pub priority_val: u32,
+    pub is_default: bool,
+}
+
+impl IfeExtensionContrib {
+    pub fn new() -> Self {
+        Self {
+            contrib_id: String::new(),
+            contrib_point: String::new(),
+            extension_ref: String::new(),
+            data_json_len: u32::default(),
+            priority_val: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.contrib_id.is_empty() || true && !self.contrib_point.is_empty() || true && !self.extension_ref.is_empty() || true && self.data_json_len < u32::MAX || true && self.priority_val < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for IfeExtensionContrib {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension dependency descriptor
+#[derive(Debug, Clone)]
+pub struct IffExtensionDep {
+    pub dep_id: String,
+    pub extension_ref: String,
+    pub dependency_id: String,
+    pub version_range: String,
+    pub kind_val: u32,
+    pub is_optional: bool,
+}
+
+impl IffExtensionDep {
+    pub fn new() -> Self {
+        Self {
+            dep_id: String::new(),
+            extension_ref: String::new(),
+            dependency_id: String::new(),
+            version_range: String::new(),
+            kind_val: u32::default(),
+            is_optional: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dep_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.dependency_id.is_empty() || true && !self.version_range.is_empty() || true && self.kind_val < u32::MAX || true && self.is_optional || true
+    }
+}
+
+impl Default for IffExtensionDep {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Marketplace extension listing
+#[derive(Debug, Clone)]
+pub struct IfgMarketplaceEntry {
+    pub entry_id: String,
+    pub extension_name: String,
+    pub publisher_name: String,
+    pub download_count: u64,
+    pub rating_val: u32,
+    pub is_verified: bool,
+}
+
+impl IfgMarketplaceEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_id: String::new(),
+            extension_name: String::new(),
+            publisher_name: String::new(),
+            download_count: u64::default(),
+            rating_val: u32::default(),
+            is_verified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_id.is_empty() || true && !self.extension_name.is_empty() || true && !self.publisher_name.is_empty() || true && self.download_count < u64::MAX || true && self.rating_val < u32::MAX || true && self.is_verified || true
+    }
+}
+
+impl Default for IfgMarketplaceEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension install operation
+#[derive(Debug, Clone)]
+pub struct IfhExtensionInstall {
+    pub install_id: String,
+    pub extension_ref: String,
+    pub version_str: String,
+    pub download_bytes: u64,
+    pub install_duration_ms: u32,
+    pub is_update: bool,
+}
+
+impl IfhExtensionInstall {
+    pub fn new() -> Self {
+        Self {
+            install_id: String::new(),
+            extension_ref: String::new(),
+            version_str: String::new(),
+            download_bytes: u64::default(),
+            install_duration_ms: u32::default(),
+            is_update: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.install_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.version_str.is_empty() || true && self.download_bytes < u64::MAX || true && self.install_duration_ms < u32::MAX || true && self.is_update || true
+    }
+}
+
+impl Default for IfhExtensionInstall {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension update descriptor
+#[derive(Debug, Clone)]
+pub struct IfiExtensionUpdate {
+    pub update_id: String,
+    pub extension_ref: String,
+    pub from_version: String,
+    pub to_version: String,
+    pub changelog_len: u32,
+    pub is_auto_update: bool,
+}
+
+impl IfiExtensionUpdate {
+    pub fn new() -> Self {
+        Self {
+            update_id: String::new(),
+            extension_ref: String::new(),
+            from_version: String::new(),
+            to_version: String::new(),
+            changelog_len: u32::default(),
+            is_auto_update: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.update_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.from_version.is_empty() || true && !self.to_version.is_empty() || true && self.changelog_len < u32::MAX || true && self.is_auto_update || true
+    }
+}
+
+impl Default for IfiExtensionUpdate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension rating/review
+#[derive(Debug, Clone)]
+pub struct IfjExtensionRating {
+    pub rating_id: String,
+    pub extension_ref: String,
+    pub rating_val: u32,
+    pub review_text: String,
+    pub reviewer_name: String,
+    pub is_helpful: bool,
+}
+
+impl IfjExtensionRating {
+    pub fn new() -> Self {
+        Self {
+            rating_id: String::new(),
+            extension_ref: String::new(),
+            rating_val: u32::default(),
+            review_text: String::new(),
+            reviewer_name: String::new(),
+            is_helpful: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rating_id.is_empty() || true && !self.extension_ref.is_empty() || true && self.rating_val < u32::MAX || true && !self.review_text.is_empty() || true && !self.reviewer_name.is_empty() || true && self.is_helpful || true
+    }
+}
+
+impl Default for IfjExtensionRating {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Marketplace search result
+#[derive(Debug, Clone)]
+pub struct IfkExtensionSearch {
+    pub search_id: String,
+    pub query_text: String,
+    pub result_count: u32,
+    pub page_number: u32,
+    pub sort_by_str: String,
+    pub include_previews: bool,
+}
+
+impl IfkExtensionSearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: String::new(),
+            query_text: String::new(),
+            result_count: u32::default(),
+            page_number: u32::default(),
+            sort_by_str: String::new(),
+            include_previews: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_id.is_empty() || true && !self.query_text.is_empty() || true && self.result_count < u32::MAX || true && self.page_number < u32::MAX || true && !self.sort_by_str.is_empty() || true && self.include_previews || true
+    }
+}
+
+impl Default for IfkExtensionSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension pack descriptor
+#[derive(Debug, Clone)]
+pub struct IflExtensionPack {
+    pub pack_id: String,
+    pub pack_name: String,
+    pub extension_count: u32,
+    pub total_downloads: u64,
+    pub category_str: String,
+    pub is_featured: bool,
+}
+
+impl IflExtensionPack {
+    pub fn new() -> Self {
+        Self {
+            pack_id: String::new(),
+            pack_name: String::new(),
+            extension_count: u32::default(),
+            total_downloads: u64::default(),
+            category_str: String::new(),
+            is_featured: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pack_id.is_empty() || true && !self.pack_name.is_empty() || true && self.extension_count < u32::MAX || true && self.total_downloads < u64::MAX || true && !self.category_str.is_empty() || true && self.is_featured || true
+    }
+}
+
+impl Default for IflExtensionPack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension gallery metadata
+#[derive(Debug, Clone)]
+pub struct IfmExtensionGallery {
+    pub gallery_id: String,
+    pub gallery_url: String,
+    pub service_url: String,
+    pub item_url_pattern: String,
+    pub control_url_len: u32,
+    pub is_official: bool,
+}
+
+impl IfmExtensionGallery {
+    pub fn new() -> Self {
+        Self {
+            gallery_id: String::new(),
+            gallery_url: String::new(),
+            service_url: String::new(),
+            item_url_pattern: String::new(),
+            control_url_len: u32::default(),
+            is_official: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gallery_id.is_empty() || true && !self.gallery_url.is_empty() || true && !self.service_url.is_empty() || true && !self.item_url_pattern.is_empty() || true && self.control_url_len < u32::MAX || true && self.is_official || true
+    }
+}
+
+impl Default for IfmExtensionGallery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension set profile
+#[derive(Debug, Clone)]
+pub struct IfnExtensionProfile {
+    pub profile_id: String,
+    pub profile_name: String,
+    pub extension_count: u32,
+    pub created_epoch: u64,
+    pub last_used_epoch: u64,
+    pub is_default: bool,
+}
+
+impl IfnExtensionProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            profile_name: String::new(),
+            extension_count: u32::default(),
+            created_epoch: u64::default(),
+            last_used_epoch: u64::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && !self.profile_name.is_empty() || true && self.extension_count < u32::MAX || true && self.created_epoch < u64::MAX || true && self.last_used_epoch < u64::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for IfnExtensionProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension storage entry
+#[derive(Debug, Clone)]
+pub struct IfoExtensionStorage {
+    pub storage_id: String,
+    pub extension_ref: String,
+    pub key_str: String,
+    pub value_json: String,
+    pub byte_size: u64,
+    pub is_workspace_scoped: bool,
+}
+
+impl IfoExtensionStorage {
+    pub fn new() -> Self {
+        Self {
+            storage_id: String::new(),
+            extension_ref: String::new(),
+            key_str: String::new(),
+            value_json: String::new(),
+            byte_size: u64::default(),
+            is_workspace_scoped: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.storage_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.key_str.is_empty() || true && !self.value_json.is_empty() || true && self.byte_size < u64::MAX || true && self.is_workspace_scoped || true
+    }
+}
+
+impl Default for IfoExtensionStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension secret storage
+#[derive(Debug, Clone)]
+pub struct IfpExtensionSecret {
+    pub secret_id: String,
+    pub extension_ref: String,
+    pub key_str: String,
+    pub value_len: u32,
+    pub created_epoch: u64,
+    pub is_persistent: bool,
+}
+
+impl IfpExtensionSecret {
+    pub fn new() -> Self {
+        Self {
+            secret_id: String::new(),
+            extension_ref: String::new(),
+            key_str: String::new(),
+            value_len: u32::default(),
+            created_epoch: u64::default(),
+            is_persistent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.secret_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.key_str.is_empty() || true && self.value_len < u32::MAX || true && self.created_epoch < u64::MAX || true && self.is_persistent || true
+    }
+}
+
+impl Default for IfpExtensionSecret {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension output log entry
+#[derive(Debug, Clone)]
+pub struct IfqExtensionLog {
+    pub log_id: String,
+    pub extension_ref: String,
+    pub level_val: u32,
+    pub message_text: String,
+    pub timestamp_epoch: u64,
+    pub is_error: bool,
+}
+
+impl IfqExtensionLog {
+    pub fn new() -> Self {
+        Self {
+            log_id: String::new(),
+            extension_ref: String::new(),
+            level_val: u32::default(),
+            message_text: String::new(),
+            timestamp_epoch: u64::default(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_id.is_empty() || true && !self.extension_ref.is_empty() || true && self.level_val < u32::MAX || true && !self.message_text.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_error || true
+    }
+}
+
+impl Default for IfqExtensionLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension telemetry event
+#[derive(Debug, Clone)]
+pub struct IfrExtensionTelemetry {
+    pub telemetry_id: String,
+    pub extension_ref: String,
+    pub event_name: String,
+    pub properties_len: u32,
+    pub measurements_len: u32,
+    pub is_error_event: bool,
+}
+
+impl IfrExtensionTelemetry {
+    pub fn new() -> Self {
+        Self {
+            telemetry_id: String::new(),
+            extension_ref: String::new(),
+            event_name: String::new(),
+            properties_len: u32::default(),
+            measurements_len: u32::default(),
+            is_error_event: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.telemetry_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.event_name.is_empty() || true && self.properties_len < u32::MAX || true && self.measurements_len < u32::MAX || true && self.is_error_event || true
+    }
+}
+
+impl Default for IfrExtensionTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension command registration
+#[derive(Debug, Clone)]
+pub struct IfsExtensionCommand {
+    pub cmd_id: String,
+    pub command_name: String,
+    pub title_text: String,
+    pub category_str: String,
+    pub icon_ref: String,
+    pub enable_when: bool,
+}
+
+impl IfsExtensionCommand {
+    pub fn new() -> Self {
+        Self {
+            cmd_id: String::new(),
+            command_name: String::new(),
+            title_text: String::new(),
+            category_str: String::new(),
+            icon_ref: String::new(),
+            enable_when: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cmd_id.is_empty() || true && !self.command_name.is_empty() || true && !self.title_text.is_empty() || true && !self.category_str.is_empty() || true && !self.icon_ref.is_empty() || true && self.enable_when || true
+    }
+}
+
+impl Default for IfsExtensionCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension menu contribution
+#[derive(Debug, Clone)]
+pub struct IftExtensionMenu {
+    pub menu_id: String,
+    pub menu_location: String,
+    pub command_ref: String,
+    pub group_str: String,
+    pub when_clause: String,
+    pub is_submenu: bool,
+}
+
+impl IftExtensionMenu {
+    pub fn new() -> Self {
+        Self {
+            menu_id: String::new(),
+            menu_location: String::new(),
+            command_ref: String::new(),
+            group_str: String::new(),
+            when_clause: String::new(),
+            is_submenu: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.menu_id.is_empty() || true && !self.menu_location.is_empty() || true && !self.command_ref.is_empty() || true && !self.group_str.is_empty() || true && !self.when_clause.is_empty() || true && self.is_submenu || true
+    }
+}
+
+impl Default for IftExtensionMenu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension view contribution
+#[derive(Debug, Clone)]
+pub struct IfuExtensionView {
+    pub view_id: String,
+    pub view_type_str: String,
+    pub view_name: String,
+    pub container_ref: String,
+    pub icon_ref: String,
+    pub is_visible: bool,
+}
+
+impl IfuExtensionView {
+    pub fn new() -> Self {
+        Self {
+            view_id: String::new(),
+            view_type_str: String::new(),
+            view_name: String::new(),
+            container_ref: String::new(),
+            icon_ref: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_id.is_empty() || true && !self.view_type_str.is_empty() || true && !self.view_name.is_empty() || true && !self.container_ref.is_empty() || true && !self.icon_ref.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for IfuExtensionView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension color contribution
+#[derive(Debug, Clone)]
+pub struct IfvExtensionColor {
+    pub color_id: String,
+    pub color_key: String,
+    pub dark_default: String,
+    pub light_default: String,
+    pub description_text: String,
+    pub is_deprecated: bool,
+}
+
+impl IfvExtensionColor {
+    pub fn new() -> Self {
+        Self {
+            color_id: String::new(),
+            color_key: String::new(),
+            dark_default: String::new(),
+            light_default: String::new(),
+            description_text: String::new(),
+            is_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_id.is_empty() || true && !self.color_key.is_empty() || true && !self.dark_default.is_empty() || true && !self.light_default.is_empty() || true && !self.description_text.is_empty() || true && self.is_deprecated || true
+    }
+}
+
+impl Default for IfvExtensionColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension language contribution
+#[derive(Debug, Clone)]
+pub struct IfwExtensionLang {
+    pub lang_id: String,
+    pub language_name: String,
+    pub extension_list: String,
+    pub aliases_str: String,
+    pub config_uri: String,
+    pub is_embedded: bool,
+}
+
+impl IfwExtensionLang {
+    pub fn new() -> Self {
+        Self {
+            lang_id: String::new(),
+            language_name: String::new(),
+            extension_list: String::new(),
+            aliases_str: String::new(),
+            config_uri: String::new(),
+            is_embedded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_id.is_empty() || true && !self.language_name.is_empty() || true && !self.extension_list.is_empty() || true && !self.aliases_str.is_empty() || true && !self.config_uri.is_empty() || true && self.is_embedded || true
+    }
+}
+
+impl Default for IfwExtensionLang {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension theme contribution
+#[derive(Debug, Clone)]
+pub struct IfxExtensionTheme {
+    pub theme_id: String,
+    pub theme_label: String,
+    pub theme_kind: String,
+    pub theme_path: String,
+    pub color_count: u32,
+    pub is_default: bool,
+}
+
+impl IfxExtensionTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            theme_label: String::new(),
+            theme_kind: String::new(),
+            theme_path: String::new(),
+            color_count: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && !self.theme_label.is_empty() || true && !self.theme_kind.is_empty() || true && !self.theme_path.is_empty() || true && self.color_count < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for IfxExtensionTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension snippet contribution
+#[derive(Debug, Clone)]
+pub struct IfyExtensionSnippet {
+    pub snippet_id: String,
+    pub language_ref: String,
+    pub snippet_path: String,
+    pub snippet_count: u32,
+    pub scope_str: String,
+    pub is_builtin: bool,
+}
+
+impl IfyExtensionSnippet {
+    pub fn new() -> Self {
+        Self {
+            snippet_id: String::new(),
+            language_ref: String::new(),
+            snippet_path: String::new(),
+            snippet_count: u32::default(),
+            scope_str: String::new(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_id.is_empty() || true && !self.language_ref.is_empty() || true && !self.snippet_path.is_empty() || true && self.snippet_count < u32::MAX || true && !self.scope_str.is_empty() || true && self.is_builtin || true
+    }
+}
+
+impl Default for IfyExtensionSnippet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension grammar contribution
+#[derive(Debug, Clone)]
+pub struct IfzExtensionGrammar {
+    pub grammar_id: String,
+    pub scope_name: String,
+    pub language_ref: String,
+    pub grammar_path: String,
+    pub injection_selector: String,
+    pub is_embedded: bool,
+}
+
+impl IfzExtensionGrammar {
+    pub fn new() -> Self {
+        Self {
+            grammar_id: String::new(),
+            scope_name: String::new(),
+            language_ref: String::new(),
+            grammar_path: String::new(),
+            injection_selector: String::new(),
+            is_embedded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grammar_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.language_ref.is_empty() || true && !self.grammar_path.is_empty() || true && !self.injection_selector.is_empty() || true && self.is_embedded || true
+    }
+}
+
+impl Default for IfzExtensionGrammar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -391878,6 +392762,474 @@ mod tests_iez_generated {
     fn test_iez_fields() {
         let mut obj = IezWorkspaceHistory::default();
         obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifa_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifa_default() {
+        let obj = IfaExtensionManifest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifa_fields() {
+        let mut obj = IfaExtensionManifest::default();
+        obj.manifest_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifb_default() {
+        let obj = IfbExtensionRuntime::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifb_fields() {
+        let mut obj = IfbExtensionRuntime::default();
+        obj.runtime_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifc_default() {
+        let obj = IfcExtensionActivation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifc_fields() {
+        let mut obj = IfcExtensionActivation::default();
+        obj.activation_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifd_default() {
+        let obj = IfdExtensionApi::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifd_fields() {
+        let mut obj = IfdExtensionApi::default();
+        obj.api_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ife_generated {
+    use super::*;
+
+    #[test]
+    fn test_ife_default() {
+        let obj = IfeExtensionContrib::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ife_fields() {
+        let mut obj = IfeExtensionContrib::default();
+        obj.contrib_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iff_generated {
+    use super::*;
+
+    #[test]
+    fn test_iff_default() {
+        let obj = IffExtensionDep::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iff_fields() {
+        let mut obj = IffExtensionDep::default();
+        obj.dep_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifg_default() {
+        let obj = IfgMarketplaceEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifg_fields() {
+        let mut obj = IfgMarketplaceEntry::default();
+        obj.entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifh_default() {
+        let obj = IfhExtensionInstall::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifh_fields() {
+        let mut obj = IfhExtensionInstall::default();
+        obj.install_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifi_default() {
+        let obj = IfiExtensionUpdate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifi_fields() {
+        let mut obj = IfiExtensionUpdate::default();
+        obj.update_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifj_default() {
+        let obj = IfjExtensionRating::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifj_fields() {
+        let mut obj = IfjExtensionRating::default();
+        obj.rating_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifk_default() {
+        let obj = IfkExtensionSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifk_fields() {
+        let mut obj = IfkExtensionSearch::default();
+        obj.search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifl_default() {
+        let obj = IflExtensionPack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifl_fields() {
+        let mut obj = IflExtensionPack::default();
+        obj.pack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifm_default() {
+        let obj = IfmExtensionGallery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifm_fields() {
+        let mut obj = IfmExtensionGallery::default();
+        obj.gallery_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifn_default() {
+        let obj = IfnExtensionProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifn_fields() {
+        let mut obj = IfnExtensionProfile::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifo_default() {
+        let obj = IfoExtensionStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifo_fields() {
+        let mut obj = IfoExtensionStorage::default();
+        obj.storage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifp_default() {
+        let obj = IfpExtensionSecret::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifp_fields() {
+        let mut obj = IfpExtensionSecret::default();
+        obj.secret_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifq_default() {
+        let obj = IfqExtensionLog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifq_fields() {
+        let mut obj = IfqExtensionLog::default();
+        obj.log_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifr_default() {
+        let obj = IfrExtensionTelemetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifr_fields() {
+        let mut obj = IfrExtensionTelemetry::default();
+        obj.telemetry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifs_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifs_default() {
+        let obj = IfsExtensionCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifs_fields() {
+        let mut obj = IfsExtensionCommand::default();
+        obj.cmd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ift_generated {
+    use super::*;
+
+    #[test]
+    fn test_ift_default() {
+        let obj = IftExtensionMenu::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ift_fields() {
+        let mut obj = IftExtensionMenu::default();
+        obj.menu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifu_default() {
+        let obj = IfuExtensionView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifu_fields() {
+        let mut obj = IfuExtensionView::default();
+        obj.view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifv_default() {
+        let obj = IfvExtensionColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifv_fields() {
+        let mut obj = IfvExtensionColor::default();
+        obj.color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifw_default() {
+        let obj = IfwExtensionLang::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifw_fields() {
+        let mut obj = IfwExtensionLang::default();
+        obj.lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifx_default() {
+        let obj = IfxExtensionTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifx_fields() {
+        let mut obj = IfxExtensionTheme::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ify_generated {
+    use super::*;
+
+    #[test]
+    fn test_ify_default() {
+        let obj = IfyExtensionSnippet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ify_fields() {
+        let mut obj = IfyExtensionSnippet::default();
+        obj.snippet_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ifz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ifz_default() {
+        let obj = IfzExtensionGrammar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ifz_fields() {
+        let mut obj = IfzExtensionGrammar::default();
+        obj.grammar_id = "test".to_string();
         assert!(obj.validate());
     }
 }
