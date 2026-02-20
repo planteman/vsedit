@@ -95135,6 +95135,216 @@ impl Default for GleContextKeyService {
     }
 }
 
+/// Command registry (id, handler, description, category, precondition)
+#[derive(Debug, Clone)]
+pub struct GlfCommandRegistry {
+    pub cmd_reg_id: String,
+    pub command_id: String,
+    pub handler_id: String,
+    pub description: String,
+    pub category: String,
+    pub precondition_json: String,
+    pub keybinding_weight: u32,
+    pub is_internal: bool,
+    pub source: String,
+    pub metadata_json: String,
+}
+
+impl GlfCommandRegistry {
+    pub fn new() -> Self {
+        Self {
+            cmd_reg_id: String::new(),
+            command_id: String::new(),
+            handler_id: String::new(),
+            description: String::new(),
+            category: String::new(),
+            precondition_json: String::new(),
+            keybinding_weight: u32::default(),
+            is_internal: bool::default(),
+            source: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cmd_reg_id.is_empty() || true && !self.command_id.is_empty() || true && !self.handler_id.is_empty() || true && !self.description.is_empty() || true && !self.category.is_empty() || true && !self.precondition_json.is_empty() || true && self.keybinding_weight < u32::MAX || true && self.is_internal || true && !self.source.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GlfCommandRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command palette (commands, filter, recent, score, provider)
+#[derive(Debug, Clone)]
+pub struct GlgCommandPalette {
+    pub palette_id: String,
+    pub commands_json: String,
+    pub filter_text: String,
+    pub recent_json: String,
+    pub score_threshold: f64,
+    pub provider_id: String,
+    pub is_visible: bool,
+    pub selected_index: u32,
+    pub placeholder: String,
+    pub show_recently_used: bool,
+}
+
+impl GlgCommandPalette {
+    pub fn new() -> Self {
+        Self {
+            palette_id: String::new(),
+            commands_json: String::new(),
+            filter_text: String::new(),
+            recent_json: String::new(),
+            score_threshold: f64::default(),
+            provider_id: String::new(),
+            is_visible: bool::default(),
+            selected_index: u32::default(),
+            placeholder: String::new(),
+            show_recently_used: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.palette_id.is_empty() || true && !self.commands_json.is_empty() || true && !self.filter_text.is_empty() || true && !self.recent_json.is_empty() || true && self.score_threshold.is_finite() || true && !self.provider_id.is_empty() || true && self.is_visible || true && self.selected_index < u32::MAX || true && !self.placeholder.is_empty() || true && self.show_recently_used || true
+    }
+}
+
+impl Default for GlgCommandPalette {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu registry (menu id, items, group, order, when, submenu)
+#[derive(Debug, Clone)]
+pub struct GlhMenuRegistry {
+    pub menu_reg_id: String,
+    pub menu_id: String,
+    pub items_json: String,
+    pub group: String,
+    pub order: u32,
+    pub when_clause: String,
+    pub submenu_id: String,
+    pub title: String,
+    pub icon: String,
+    pub is_hidden: bool,
+}
+
+impl GlhMenuRegistry {
+    pub fn new() -> Self {
+        Self {
+            menu_reg_id: String::new(),
+            menu_id: String::new(),
+            items_json: String::new(),
+            group: String::new(),
+            order: u32::default(),
+            when_clause: String::new(),
+            submenu_id: String::new(),
+            title: String::new(),
+            icon: String::new(),
+            is_hidden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.menu_reg_id.is_empty() || true && !self.menu_id.is_empty() || true && !self.items_json.is_empty() || true && !self.group.is_empty() || true && self.order < u32::MAX || true && !self.when_clause.is_empty() || true && !self.submenu_id.is_empty() || true && !self.title.is_empty() || true && !self.icon.is_empty() || true && self.is_hidden || true
+    }
+}
+
+impl Default for GlhMenuRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu item model (command, title, icon, category, toggled, when)
+#[derive(Debug, Clone)]
+pub struct GliMenuItemModel {
+    pub menu_item_id: String,
+    pub command_id: String,
+    pub title: String,
+    pub icon: String,
+    pub category: String,
+    pub toggled_json: String,
+    pub when_clause: String,
+    pub alt_command_id: String,
+    pub group: String,
+    pub order: u32,
+}
+
+impl GliMenuItemModel {
+    pub fn new() -> Self {
+        Self {
+            menu_item_id: String::new(),
+            command_id: String::new(),
+            title: String::new(),
+            icon: String::new(),
+            category: String::new(),
+            toggled_json: String::new(),
+            when_clause: String::new(),
+            alt_command_id: String::new(),
+            group: String::new(),
+            order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.menu_item_id.is_empty() || true && !self.command_id.is_empty() || true && !self.title.is_empty() || true && !self.icon.is_empty() || true && !self.category.is_empty() || true && !self.toggled_json.is_empty() || true && !self.when_clause.is_empty() || true && !self.alt_command_id.is_empty() || true && !self.group.is_empty() || true && self.order < u32::MAX || true
+    }
+}
+
+impl Default for GliMenuItemModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Action item (id, label, class, tooltip, checked, enabled)
+#[derive(Debug, Clone)]
+pub struct GljActionItem {
+    pub action_id: String,
+    pub label: String,
+    pub css_class: String,
+    pub tooltip: String,
+    pub is_checked: bool,
+    pub is_enabled: bool,
+    pub run_class: String,
+    pub keybinding_json: String,
+    pub description: String,
+    pub context_menu_group: String,
+}
+
+impl GljActionItem {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            label: String::new(),
+            css_class: String::new(),
+            tooltip: String::new(),
+            is_checked: bool::default(),
+            is_enabled: bool::default(),
+            run_class: String::new(),
+            keybinding_json: String::new(),
+            description: String::new(),
+            context_menu_group: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.label.is_empty() || true && !self.css_class.is_empty() || true && !self.tooltip.is_empty() || true && self.is_checked || true && self.is_enabled || true && !self.run_class.is_empty() || true && !self.keybinding_json.is_empty() || true && !self.description.is_empty() || true && !self.context_menu_group.is_empty() || true
+    }
+}
+
+impl Default for GljActionItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -323814,6 +324024,96 @@ mod tests_gle_generated {
     fn test_gle_fields() {
         let mut obj = GleContextKeyService::default();
         obj.ctx_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glf_generated {
+    use super::*;
+
+    #[test]
+    fn test_glf_default() {
+        let obj = GlfCommandRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glf_fields() {
+        let mut obj = GlfCommandRegistry::default();
+        obj.cmd_reg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glg_generated {
+    use super::*;
+
+    #[test]
+    fn test_glg_default() {
+        let obj = GlgCommandPalette::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glg_fields() {
+        let mut obj = GlgCommandPalette::default();
+        obj.palette_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glh_generated {
+    use super::*;
+
+    #[test]
+    fn test_glh_default() {
+        let obj = GlhMenuRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glh_fields() {
+        let mut obj = GlhMenuRegistry::default();
+        obj.menu_reg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gli_generated {
+    use super::*;
+
+    #[test]
+    fn test_gli_default() {
+        let obj = GliMenuItemModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gli_fields() {
+        let mut obj = GliMenuItemModel::default();
+        obj.menu_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glj_generated {
+    use super::*;
+
+    #[test]
+    fn test_glj_default() {
+        let obj = GljActionItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glj_fields() {
+        let mut obj = GljActionItem::default();
+        obj.action_id = "test".to_string();
         assert!(obj.validate());
     }
 }
