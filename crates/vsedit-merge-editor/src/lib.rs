@@ -58319,6 +58319,213 @@ impl Default for FdjNodeCompat {
 }
 
 
+/// WebAssembly runtime types
+#[derive(Debug, Clone)]
+pub struct FdkWasmRuntime {
+    pub wasm_module_url: String,
+    pub wasm_module_hash: String,
+    pub wasm_engine_type: String,
+    pub wasm_cache_enabled: bool,
+    pub wasm_simd_enabled: bool,
+    pub wasm_threads_enabled: bool,
+    pub wasm_bulk_memory: bool,
+    pub wasm_reference_types: bool,
+    pub wasm_max_memory_pages: u32,
+    pub wasm_fuel_limit: u64,
+}
+
+impl FdkWasmRuntime {
+    pub fn new() -> Self {
+        Self {
+            wasm_module_url: String::new(),
+            wasm_module_hash: String::new(),
+            wasm_engine_type: String::new(),
+            wasm_cache_enabled: bool::default(),
+            wasm_simd_enabled: bool::default(),
+            wasm_threads_enabled: bool::default(),
+            wasm_bulk_memory: bool::default(),
+            wasm_reference_types: bool::default(),
+            wasm_max_memory_pages: u32::default(),
+            wasm_fuel_limit: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wasm_module_url.is_empty() || true && !self.wasm_module_hash.is_empty() || true && !self.wasm_engine_type.is_empty() || true && self.wasm_cache_enabled || true && self.wasm_simd_enabled || true && self.wasm_threads_enabled || true && self.wasm_bulk_memory || true && self.wasm_reference_types || true && self.wasm_max_memory_pages < u32::MAX || true && self.wasm_fuel_limit < u64::MAX || true
+    }
+}
+
+impl Default for FdkWasmRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// WebAssembly instance types
+#[derive(Debug, Clone)]
+pub struct FdlWasmInstance {
+    pub wasm_instance_id: u32,
+    pub wasm_module_url: String,
+    pub wasm_memory_size: u64,
+    pub wasm_table_count: u32,
+    pub wasm_global_count: u32,
+    pub wasm_export_count: u32,
+    pub wasm_import_count: u32,
+    pub wasm_is_running: bool,
+    pub wasm_fuel_consumed: u64,
+    pub wasm_start_time: u64,
+}
+
+impl FdlWasmInstance {
+    pub fn new() -> Self {
+        Self {
+            wasm_instance_id: u32::default(),
+            wasm_module_url: String::new(),
+            wasm_memory_size: u64::default(),
+            wasm_table_count: u32::default(),
+            wasm_global_count: u32::default(),
+            wasm_export_count: u32::default(),
+            wasm_import_count: u32::default(),
+            wasm_is_running: bool::default(),
+            wasm_fuel_consumed: u64::default(),
+            wasm_start_time: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.wasm_instance_id < u32::MAX || true && !self.wasm_module_url.is_empty() || true && self.wasm_memory_size < u64::MAX || true && self.wasm_table_count < u32::MAX || true && self.wasm_global_count < u32::MAX || true && self.wasm_export_count < u32::MAX || true && self.wasm_import_count < u32::MAX || true && self.wasm_is_running || true && self.wasm_fuel_consumed < u64::MAX || true && self.wasm_start_time < u64::MAX || true
+    }
+}
+
+impl Default for FdlWasmInstance {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// WebAssembly memory types
+#[derive(Debug, Clone)]
+pub struct FdmWasmMemory {
+    pub wasm_memory_pages: u32,
+    pub wasm_memory_max_pages: u32,
+    pub wasm_memory_byte_length: u64,
+    pub wasm_memory_shared: bool,
+    pub wasm_memory_is_64: bool,
+    pub wasm_memory_grow_delta: u32,
+    pub wasm_memory_index: u32,
+    pub wasm_memory_label: String,
+    pub wasm_memory_is_imported: bool,
+    pub wasm_memory_initial_pages: u32,
+}
+
+impl FdmWasmMemory {
+    pub fn new() -> Self {
+        Self {
+            wasm_memory_pages: u32::default(),
+            wasm_memory_max_pages: u32::default(),
+            wasm_memory_byte_length: u64::default(),
+            wasm_memory_shared: bool::default(),
+            wasm_memory_is_64: bool::default(),
+            wasm_memory_grow_delta: u32::default(),
+            wasm_memory_index: u32::default(),
+            wasm_memory_label: String::new(),
+            wasm_memory_is_imported: bool::default(),
+            wasm_memory_initial_pages: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.wasm_memory_pages < u32::MAX || true && self.wasm_memory_max_pages < u32::MAX || true && self.wasm_memory_byte_length < u64::MAX || true && self.wasm_memory_shared || true && self.wasm_memory_is_64 || true && self.wasm_memory_grow_delta < u32::MAX || true && self.wasm_memory_index < u32::MAX || true && !self.wasm_memory_label.is_empty() || true && self.wasm_memory_is_imported || true && self.wasm_memory_initial_pages < u32::MAX || true
+    }
+}
+
+impl Default for FdmWasmMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// WebAssembly import types
+#[derive(Debug, Clone)]
+pub struct FdnWasmImport {
+    pub wasm_import_module: String,
+    pub wasm_import_name: String,
+    pub wasm_import_kind: String,
+    pub wasm_import_func_type: String,
+    pub wasm_import_table_type: String,
+    pub wasm_import_memory_type: String,
+    pub wasm_import_global_type: String,
+    pub wasm_import_is_satisfied: bool,
+    pub wasm_import_host_func: String,
+    pub wasm_import_index: u32,
+}
+
+impl FdnWasmImport {
+    pub fn new() -> Self {
+        Self {
+            wasm_import_module: String::new(),
+            wasm_import_name: String::new(),
+            wasm_import_kind: String::new(),
+            wasm_import_func_type: String::new(),
+            wasm_import_table_type: String::new(),
+            wasm_import_memory_type: String::new(),
+            wasm_import_global_type: String::new(),
+            wasm_import_is_satisfied: bool::default(),
+            wasm_import_host_func: String::new(),
+            wasm_import_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wasm_import_module.is_empty() || true && !self.wasm_import_name.is_empty() || true && !self.wasm_import_kind.is_empty() || true && !self.wasm_import_func_type.is_empty() || true && !self.wasm_import_table_type.is_empty() || true && !self.wasm_import_memory_type.is_empty() || true && !self.wasm_import_global_type.is_empty() || true && self.wasm_import_is_satisfied || true && !self.wasm_import_host_func.is_empty() || true && self.wasm_import_index < u32::MAX || true
+    }
+}
+
+impl Default for FdnWasmImport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// WebAssembly export types
+#[derive(Debug, Clone)]
+pub struct FdoWasmExport {
+    pub wasm_export_name: String,
+    pub wasm_export_kind: String,
+    pub wasm_export_func_type: String,
+    pub wasm_export_table_type: String,
+    pub wasm_export_memory_type: String,
+    pub wasm_export_global_type: String,
+    pub wasm_export_index: u32,
+    pub wasm_export_is_start: bool,
+    pub wasm_export_call_count: u64,
+    pub wasm_export_label: String,
+}
+
+impl FdoWasmExport {
+    pub fn new() -> Self {
+        Self {
+            wasm_export_name: String::new(),
+            wasm_export_kind: String::new(),
+            wasm_export_func_type: String::new(),
+            wasm_export_table_type: String::new(),
+            wasm_export_memory_type: String::new(),
+            wasm_export_global_type: String::new(),
+            wasm_export_index: u32::default(),
+            wasm_export_is_start: bool::default(),
+            wasm_export_call_count: u64::default(),
+            wasm_export_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wasm_export_name.is_empty() || true && !self.wasm_export_kind.is_empty() || true && !self.wasm_export_func_type.is_empty() || true && !self.wasm_export_table_type.is_empty() || true && !self.wasm_export_memory_type.is_empty() || true && !self.wasm_export_global_type.is_empty() || true && self.wasm_export_index < u32::MAX || true && self.wasm_export_is_start || true && self.wasm_export_call_count < u64::MAX || true && !self.wasm_export_label.is_empty() || true
+    }
+}
+
+impl Default for FdoWasmExport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -271346,6 +271553,96 @@ mod tests_fdj_generated {
     fn test_fdj_fields() {
         let mut obj = FdjNodeCompat::default();
         obj.node_module_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdk_default() {
+        let obj = FdkWasmRuntime::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdk_fields() {
+        let mut obj = FdkWasmRuntime::default();
+        obj.wasm_module_url = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdl_default() {
+        let obj = FdlWasmInstance::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdl_fields() {
+        let mut obj = FdlWasmInstance::default();
+        obj.wasm_instance_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdm_default() {
+        let obj = FdmWasmMemory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdm_fields() {
+        let mut obj = FdmWasmMemory::default();
+        obj.wasm_memory_pages = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdn_default() {
+        let obj = FdnWasmImport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdn_fields() {
+        let mut obj = FdnWasmImport::default();
+        obj.wasm_import_module = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fdo_generated {
+    use super::*;
+
+    #[test]
+    fn test_fdo_default() {
+        let obj = FdoWasmExport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fdo_fields() {
+        let mut obj = FdoWasmExport::default();
+        obj.wasm_export_name = "test".to_string();
         assert!(obj.validate());
     }
 }
