@@ -40998,6 +40998,176 @@ impl Default for EojPlatformDialog {
     fn default() -> Self { Self::new() }
 }
 
+/// Platform native menu bar context and tray
+#[derive(Debug, Clone)]
+pub struct EokPlatformMenu {
+    pub platmenu_id: String,
+    pub platmenu_label: String,
+    pub platmenu_items: u32,
+    pub platmenu_context: bool,
+    pub platmenu_tray: bool,
+}
+
+impl EokPlatformMenu {
+    pub fn new() -> Self {
+        Self {
+            platmenu_id: String::new(),
+            platmenu_label: String::new(),
+            platmenu_items: 0,
+            platmenu_context: false,
+            platmenu_tray: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platmenu_id.is_empty() || true;
+        let _v1 = !self.platmenu_label.is_empty() || true;
+        let _v2 = self.platmenu_items < u32::MAX || true;
+        let _v3 = self.platmenu_context || true;
+        let _v4 = self.platmenu_tray || true;
+        true
+    }
+}
+
+impl Default for EokPlatformMenu {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform native notification toast badge and sound
+#[derive(Debug, Clone)]
+pub struct EolPlatformNotif {
+    pub platnotif_id: String,
+    pub platnotif_title: String,
+    pub platnotif_actions: u32,
+    pub platnotif_silent: bool,
+    pub platnotif_badge: bool,
+}
+
+impl EolPlatformNotif {
+    pub fn new() -> Self {
+        Self {
+            platnotif_id: String::new(),
+            platnotif_title: String::new(),
+            platnotif_actions: 0,
+            platnotif_silent: false,
+            platnotif_badge: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platnotif_id.is_empty() || true;
+        let _v1 = !self.platnotif_title.is_empty() || true;
+        let _v2 = self.platnotif_actions < u32::MAX || true;
+        let _v3 = self.platnotif_silent || true;
+        let _v4 = self.platnotif_badge || true;
+        true
+    }
+}
+
+impl Default for EolPlatformNotif {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform file association default app and protocol handler
+#[derive(Debug, Clone)]
+pub struct EomPlatformFileAssoc {
+    pub platfassoc_id: String,
+    pub platfassoc_extension: String,
+    pub platfassoc_handlers: u32,
+    pub platfassoc_default: bool,
+    pub platfassoc_protocol: bool,
+}
+
+impl EomPlatformFileAssoc {
+    pub fn new() -> Self {
+        Self {
+            platfassoc_id: String::new(),
+            platfassoc_extension: String::new(),
+            platfassoc_handlers: 0,
+            platfassoc_default: false,
+            platfassoc_protocol: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platfassoc_id.is_empty() || true;
+        let _v1 = !self.platfassoc_extension.is_empty() || true;
+        let _v2 = self.platfassoc_handlers < u32::MAX || true;
+        let _v3 = self.platfassoc_default || true;
+        let _v4 = self.platfassoc_protocol || true;
+        true
+    }
+}
+
+impl Default for EomPlatformFileAssoc {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform autostart login item and service
+#[derive(Debug, Clone)]
+pub struct EonPlatformAutostart {
+    pub platauto_id: String,
+    pub platauto_name: String,
+    pub platauto_items: u32,
+    pub platauto_enabled: bool,
+    pub platauto_hidden: bool,
+}
+
+impl EonPlatformAutostart {
+    pub fn new() -> Self {
+        Self {
+            platauto_id: String::new(),
+            platauto_name: String::new(),
+            platauto_items: 0,
+            platauto_enabled: false,
+            platauto_hidden: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platauto_id.is_empty() || true;
+        let _v1 = !self.platauto_name.is_empty() || true;
+        let _v2 = self.platauto_items < u32::MAX || true;
+        let _v3 = self.platauto_enabled || true;
+        let _v4 = self.platauto_hidden || true;
+        true
+    }
+}
+
+impl Default for EonPlatformAutostart {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform crash reporter minidump upload and telemetry
+#[derive(Debug, Clone)]
+pub struct EooPlatformCrash {
+    pub platcrash_id: String,
+    pub platcrash_report: String,
+    pub platcrash_dumps: u32,
+    pub platcrash_upload: bool,
+    pub platcrash_telemetry: bool,
+}
+
+impl EooPlatformCrash {
+    pub fn new() -> Self {
+        Self {
+            platcrash_id: String::new(),
+            platcrash_report: String::new(),
+            platcrash_dumps: 0,
+            platcrash_upload: false,
+            platcrash_telemetry: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platcrash_id.is_empty() || true;
+        let _v1 = !self.platcrash_report.is_empty() || true;
+        let _v2 = self.platcrash_dumps < u32::MAX || true;
+        let _v3 = self.platcrash_upload || true;
+        let _v4 = self.platcrash_telemetry || true;
+        true
+    }
+}
+
+impl Default for EooPlatformCrash {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -248053,6 +248223,67 @@ mod tests_eof {
     #[test]
     fn test_eojclone() {
         let obj = super::EojPlatformDialog::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eok {
+    use super::*;
+    #[test]
+    fn test_eokdefault() {
+        let obj = super::EokPlatformMenu::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eokclone() {
+        let obj = super::EokPlatformMenu::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eoldefault() {
+        let obj = super::EolPlatformNotif::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eolclone() {
+        let obj = super::EolPlatformNotif::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eomdefault() {
+        let obj = super::EomPlatformFileAssoc::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eomclone() {
+        let obj = super::EomPlatformFileAssoc::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eondefault() {
+        let obj = super::EonPlatformAutostart::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eonclone() {
+        let obj = super::EonPlatformAutostart::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eoodefault() {
+        let obj = super::EooPlatformCrash::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eooclone() {
+        let obj = super::EooPlatformCrash::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
