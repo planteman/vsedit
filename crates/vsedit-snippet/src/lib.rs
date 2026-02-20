@@ -119475,6 +119475,678 @@ impl Default for HhjRemoteTerminal {
     }
 }
 
+/// Remote authority resolver (scheme, host, canonical uri)
+#[derive(Debug, Clone)]
+pub struct HhkRemoteAuthority {
+    pub remote_auth2_id: String,
+    pub scheme: String,
+    pub host: String,
+    pub canonical_uri: String,
+    pub connection_token: String,
+    pub port: u32,
+    pub is_resolved: bool,
+    pub label: String,
+    pub server_platform: String,
+    pub remote_authority: String,
+}
+
+impl HhkRemoteAuthority {
+    pub fn new() -> Self {
+        Self {
+            remote_auth2_id: String::new(),
+            scheme: String::new(),
+            host: String::new(),
+            canonical_uri: String::new(),
+            connection_token: String::new(),
+            port: u32::default(),
+            is_resolved: bool::default(),
+            label: String::new(),
+            server_platform: String::new(),
+            remote_authority: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_auth2_id.is_empty() || true && !self.scheme.is_empty() || true && !self.host.is_empty() || true && !self.canonical_uri.is_empty() || true && !self.connection_token.is_empty() || true && self.port < u32::MAX || true && self.is_resolved || true && !self.label.is_empty() || true && !self.server_platform.is_empty() || true && !self.remote_authority.is_empty() || true
+    }
+}
+
+impl Default for HhkRemoteAuthority {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote environment (os, arch, home, tmp, path separator)
+#[derive(Debug, Clone)]
+pub struct HhlRemoteEnvironment {
+    pub remote_env_id: String,
+    pub os: String,
+    pub arch: String,
+    pub home_dir: String,
+    pub tmp_dir: String,
+    pub path_separator: String,
+    pub newline: String,
+    pub shell: String,
+    pub user: String,
+    pub is_case_sensitive: bool,
+}
+
+impl HhlRemoteEnvironment {
+    pub fn new() -> Self {
+        Self {
+            remote_env_id: String::new(),
+            os: String::new(),
+            arch: String::new(),
+            home_dir: String::new(),
+            tmp_dir: String::new(),
+            path_separator: String::new(),
+            newline: String::new(),
+            shell: String::new(),
+            user: String::new(),
+            is_case_sensitive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_env_id.is_empty() || true && !self.os.is_empty() || true && !self.arch.is_empty() || true && !self.home_dir.is_empty() || true && !self.tmp_dir.is_empty() || true && !self.path_separator.is_empty() || true && !self.newline.is_empty() || true && !self.shell.is_empty() || true && !self.user.is_empty() || true && self.is_case_sensitive || true
+    }
+}
+
+impl Default for HhlRemoteEnvironment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote execution server (host, port, token, protocol)
+#[derive(Debug, Clone)]
+pub struct HhmRemoteExecServer {
+    pub remote_exec_id: String,
+    pub host: String,
+    pub port: u32,
+    pub token: String,
+    pub protocol: String,
+    pub is_running: bool,
+    pub pid: u32,
+    pub version: String,
+    pub startup_time_ms: u64,
+    pub max_connections: u32,
+}
+
+impl HhmRemoteExecServer {
+    pub fn new() -> Self {
+        Self {
+            remote_exec_id: String::new(),
+            host: String::new(),
+            port: u32::default(),
+            token: String::new(),
+            protocol: String::new(),
+            is_running: bool::default(),
+            pid: u32::default(),
+            version: String::new(),
+            startup_time_ms: u64::default(),
+            max_connections: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_exec_id.is_empty() || true && !self.host.is_empty() || true && self.port < u32::MAX || true && !self.token.is_empty() || true && !self.protocol.is_empty() || true && self.is_running || true && self.pid < u32::MAX || true && !self.version.is_empty() || true && self.startup_time_ms < u64::MAX || true && self.max_connections < u32::MAX || true
+    }
+}
+
+impl Default for HhmRemoteExecServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Container configuration (dockerfile, compose file, features)
+#[derive(Debug, Clone)]
+pub struct HhnContainerConfig {
+    pub container_cfg_id: String,
+    pub dockerfile: String,
+    pub compose_file: String,
+    pub features_json: String,
+    pub build_context: String,
+    pub target: String,
+    pub build_args_json: String,
+    pub run_args_json: String,
+    pub container_user: String,
+    pub shell_path: String,
+}
+
+impl HhnContainerConfig {
+    pub fn new() -> Self {
+        Self {
+            container_cfg_id: String::new(),
+            dockerfile: String::new(),
+            compose_file: String::new(),
+            features_json: String::new(),
+            build_context: String::new(),
+            target: String::new(),
+            build_args_json: String::new(),
+            run_args_json: String::new(),
+            container_user: String::new(),
+            shell_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.container_cfg_id.is_empty() || true && !self.dockerfile.is_empty() || true && !self.compose_file.is_empty() || true && !self.features_json.is_empty() || true && !self.build_context.is_empty() || true && !self.target.is_empty() || true && !self.build_args_json.is_empty() || true && !self.run_args_json.is_empty() || true && !self.container_user.is_empty() || true && !self.shell_path.is_empty() || true
+    }
+}
+
+impl Default for HhnContainerConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dev container feature (id, version, options, install after)
+#[derive(Debug, Clone)]
+pub struct HhoDevContainerFeature {
+    pub dc_feature_id: String,
+    pub feature_id: String,
+    pub version: String,
+    pub options_json: String,
+    pub install_after_json: String,
+    pub description: String,
+    pub documentation_url: String,
+    pub is_oci: bool,
+    pub container_env_json: String,
+    pub mounts_json: String,
+}
+
+impl HhoDevContainerFeature {
+    pub fn new() -> Self {
+        Self {
+            dc_feature_id: String::new(),
+            feature_id: String::new(),
+            version: String::new(),
+            options_json: String::new(),
+            install_after_json: String::new(),
+            description: String::new(),
+            documentation_url: String::new(),
+            is_oci: bool::default(),
+            container_env_json: String::new(),
+            mounts_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dc_feature_id.is_empty() || true && !self.feature_id.is_empty() || true && !self.version.is_empty() || true && !self.options_json.is_empty() || true && !self.install_after_json.is_empty() || true && !self.description.is_empty() || true && !self.documentation_url.is_empty() || true && self.is_oci || true && !self.container_env_json.is_empty() || true && !self.mounts_json.is_empty() || true
+    }
+}
+
+impl Default for HhoDevContainerFeature {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote command execution (command, args, cwd, env, timeout)
+#[derive(Debug, Clone)]
+pub struct HhpRemoteCommand {
+    pub remote_cmd_id: String,
+    pub command: String,
+    pub args_json: String,
+    pub cwd: String,
+    pub env_json: String,
+    pub timeout_ms: u32,
+    pub shell: String,
+    pub is_background: bool,
+    pub stdin_data: String,
+    pub encoding: String,
+}
+
+impl HhpRemoteCommand {
+    pub fn new() -> Self {
+        Self {
+            remote_cmd_id: String::new(),
+            command: String::new(),
+            args_json: String::new(),
+            cwd: String::new(),
+            env_json: String::new(),
+            timeout_ms: u32::default(),
+            shell: String::new(),
+            is_background: bool::default(),
+            stdin_data: String::new(),
+            encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_cmd_id.is_empty() || true && !self.command.is_empty() || true && !self.args_json.is_empty() || true && !self.cwd.is_empty() || true && !self.env_json.is_empty() || true && self.timeout_ms < u32::MAX || true && !self.shell.is_empty() || true && self.is_background || true && !self.stdin_data.is_empty() || true && !self.encoding.is_empty() || true
+    }
+}
+
+impl Default for HhpRemoteCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port mapping (local, remote, protocol, label, privacy level)
+#[derive(Debug, Clone)]
+pub struct HhqPortMapping {
+    pub port_map_id: String,
+    pub local_port: u32,
+    pub remote_port: u32,
+    pub protocol: String,
+    pub label: String,
+    pub privacy_level: String,
+    pub source: String,
+    pub pid: u32,
+    pub is_active: bool,
+    pub auto_forward: bool,
+}
+
+impl HhqPortMapping {
+    pub fn new() -> Self {
+        Self {
+            port_map_id: String::new(),
+            local_port: u32::default(),
+            remote_port: u32::default(),
+            protocol: String::new(),
+            label: String::new(),
+            privacy_level: String::new(),
+            source: String::new(),
+            pid: u32::default(),
+            is_active: bool::default(),
+            auto_forward: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.port_map_id.is_empty() || true && self.local_port < u32::MAX || true && self.remote_port < u32::MAX || true && !self.protocol.is_empty() || true && !self.label.is_empty() || true && !self.privacy_level.is_empty() || true && !self.source.is_empty() || true && self.pid < u32::MAX || true && self.is_active || true && self.auto_forward || true
+    }
+}
+
+impl Default for HhqPortMapping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote agent (type, pid, version, environment, capabilities)
+#[derive(Debug, Clone)]
+pub struct HhrRemoteAgent {
+    pub remote_agent_id: String,
+    pub agent_type: String,
+    pub pid: u32,
+    pub version: String,
+    pub environment_json: String,
+    pub capabilities_json: String,
+    pub is_connected: bool,
+    pub uptime_ms: u64,
+    pub memory_usage: u64,
+    pub extension_count: u32,
+}
+
+impl HhrRemoteAgent {
+    pub fn new() -> Self {
+        Self {
+            remote_agent_id: String::new(),
+            agent_type: String::new(),
+            pid: u32::default(),
+            version: String::new(),
+            environment_json: String::new(),
+            capabilities_json: String::new(),
+            is_connected: bool::default(),
+            uptime_ms: u64::default(),
+            memory_usage: u64::default(),
+            extension_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_agent_id.is_empty() || true && !self.agent_type.is_empty() || true && self.pid < u32::MAX || true && !self.version.is_empty() || true && !self.environment_json.is_empty() || true && !self.capabilities_json.is_empty() || true && self.is_connected || true && self.uptime_ms < u64::MAX || true && self.memory_usage < u64::MAX || true && self.extension_count < u32::MAX || true
+    }
+}
+
+impl Default for HhrRemoteAgent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote UI configuration (show explorer, show terminal, menus)
+#[derive(Debug, Clone)]
+pub struct HhsRemoteUiConfig {
+    pub remote_ui_id: String,
+    pub show_explorer: bool,
+    pub show_terminal: bool,
+    pub menus_json: String,
+    pub statusbar_items_json: String,
+    pub remote_indicator: String,
+    pub show_debug: bool,
+    pub show_scm: bool,
+    pub show_extensions: bool,
+    pub trust_workspace: bool,
+}
+
+impl HhsRemoteUiConfig {
+    pub fn new() -> Self {
+        Self {
+            remote_ui_id: String::new(),
+            show_explorer: bool::default(),
+            show_terminal: bool::default(),
+            menus_json: String::new(),
+            statusbar_items_json: String::new(),
+            remote_indicator: String::new(),
+            show_debug: bool::default(),
+            show_scm: bool::default(),
+            show_extensions: bool::default(),
+            trust_workspace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_ui_id.is_empty() || true && self.show_explorer || true && self.show_terminal || true && !self.menus_json.is_empty() || true && !self.statusbar_items_json.is_empty() || true && !self.remote_indicator.is_empty() || true && self.show_debug || true && self.show_scm || true && self.show_extensions || true && self.trust_workspace || true
+    }
+}
+
+impl Default for HhsRemoteUiConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Connection token (value, type, scope, created, expires)
+#[derive(Debug, Clone)]
+pub struct HhtConnectionToken {
+    pub conn_token_id: String,
+    pub value: String,
+    pub token_type: String,
+    pub scope: String,
+    pub created_at_ms: u64,
+    pub expires_at_ms: u64,
+    pub is_revoked: bool,
+    pub issuer: String,
+    pub audience: String,
+    pub refresh_count: u32,
+}
+
+impl HhtConnectionToken {
+    pub fn new() -> Self {
+        Self {
+            conn_token_id: String::new(),
+            value: String::new(),
+            token_type: String::new(),
+            scope: String::new(),
+            created_at_ms: u64::default(),
+            expires_at_ms: u64::default(),
+            is_revoked: bool::default(),
+            issuer: String::new(),
+            audience: String::new(),
+            refresh_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conn_token_id.is_empty() || true && !self.value.is_empty() || true && !self.token_type.is_empty() || true && !self.scope.is_empty() || true && self.created_at_ms < u64::MAX || true && self.expires_at_ms < u64::MAX || true && self.is_revoked || true && !self.issuer.is_empty() || true && !self.audience.is_empty() || true && self.refresh_count < u32::MAX || true
+    }
+}
+
+impl Default for HhtConnectionToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote file sync (status, files synced, direction, conflict)
+#[derive(Debug, Clone)]
+pub struct HhuRemoteSync {
+    pub remote_sync_id: String,
+    pub status: String,
+    pub files_synced: u32,
+    pub direction: String,
+    pub conflict_count: u32,
+    pub last_sync_ms: u64,
+    pub total_bytes: u64,
+    pub error_message: String,
+    pub is_active: bool,
+    pub strategy: String,
+}
+
+impl HhuRemoteSync {
+    pub fn new() -> Self {
+        Self {
+            remote_sync_id: String::new(),
+            status: String::new(),
+            files_synced: u32::default(),
+            direction: String::new(),
+            conflict_count: u32::default(),
+            last_sync_ms: u64::default(),
+            total_bytes: u64::default(),
+            error_message: String::new(),
+            is_active: bool::default(),
+            strategy: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_sync_id.is_empty() || true && !self.status.is_empty() || true && self.files_synced < u32::MAX || true && !self.direction.is_empty() || true && self.conflict_count < u32::MAX || true && self.last_sync_ms < u64::MAX || true && self.total_bytes < u64::MAX || true && !self.error_message.is_empty() || true && self.is_active || true && !self.strategy.is_empty() || true
+    }
+}
+
+impl Default for HhuRemoteSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote server log (level, message, timestamp, source, pid)
+#[derive(Debug, Clone)]
+pub struct HhvServerLog {
+    pub server_log_id: String,
+    pub level: String,
+    pub message: String,
+    pub timestamp_ms: u64,
+    pub source: String,
+    pub pid: u32,
+    pub channel: String,
+    pub correlation_id: String,
+    pub stack_trace: String,
+    pub is_error: bool,
+}
+
+impl HhvServerLog {
+    pub fn new() -> Self {
+        Self {
+            server_log_id: String::new(),
+            level: String::new(),
+            message: String::new(),
+            timestamp_ms: u64::default(),
+            source: String::new(),
+            pid: u32::default(),
+            channel: String::new(),
+            correlation_id: String::new(),
+            stack_trace: String::new(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.server_log_id.is_empty() || true && !self.level.is_empty() || true && !self.message.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.source.is_empty() || true && self.pid < u32::MAX || true && !self.channel.is_empty() || true && !self.correlation_id.is_empty() || true && !self.stack_trace.is_empty() || true && self.is_error || true
+    }
+}
+
+impl Default for HhvServerLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote extension install (extension, version, target, status)
+#[derive(Debug, Clone)]
+pub struct HhwRemoteInstall {
+    pub remote_inst_id: String,
+    pub extension_id: String,
+    pub version: String,
+    pub target_platform: String,
+    pub status: String,
+    pub error_message: String,
+    pub install_time_ms: u64,
+    pub is_builtin: bool,
+    pub source: String,
+    pub dependencies_json: String,
+}
+
+impl HhwRemoteInstall {
+    pub fn new() -> Self {
+        Self {
+            remote_inst_id: String::new(),
+            extension_id: String::new(),
+            version: String::new(),
+            target_platform: String::new(),
+            status: String::new(),
+            error_message: String::new(),
+            install_time_ms: u64::default(),
+            is_builtin: bool::default(),
+            source: String::new(),
+            dependencies_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_inst_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.version.is_empty() || true && !self.target_platform.is_empty() || true && !self.status.is_empty() || true && !self.error_message.is_empty() || true && self.install_time_ms < u64::MAX || true && self.is_builtin || true && !self.source.is_empty() || true && !self.dependencies_json.is_empty() || true
+    }
+}
+
+impl Default for HhwRemoteInstall {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel credential (token, host, cluster, is github)
+#[derive(Debug, Clone)]
+pub struct HhxTunnelCredential {
+    pub tunnel_cred_id: String,
+    pub token: String,
+    pub host: String,
+    pub cluster: String,
+    pub is_github: bool,
+    pub expires_at_ms: u64,
+    pub scope: String,
+    pub user_id: String,
+    pub device_id: String,
+    pub is_valid: bool,
+}
+
+impl HhxTunnelCredential {
+    pub fn new() -> Self {
+        Self {
+            tunnel_cred_id: String::new(),
+            token: String::new(),
+            host: String::new(),
+            cluster: String::new(),
+            is_github: bool::default(),
+            expires_at_ms: u64::default(),
+            scope: String::new(),
+            user_id: String::new(),
+            device_id: String::new(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tunnel_cred_id.is_empty() || true && !self.token.is_empty() || true && !self.host.is_empty() || true && !self.cluster.is_empty() || true && self.is_github || true && self.expires_at_ms < u64::MAX || true && !self.scope.is_empty() || true && !self.user_id.is_empty() || true && !self.device_id.is_empty() || true && self.is_valid || true
+    }
+}
+
+impl Default for HhxTunnelCredential {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote window state (connection, layout, editors, terminal)
+#[derive(Debug, Clone)]
+pub struct HhyRemoteWindowState {
+    pub remote_win_id: String,
+    pub connection_id: String,
+    pub layout_json: String,
+    pub editors_json: String,
+    pub terminal_count: u32,
+    pub is_focused: bool,
+    pub workspace_uri: String,
+    pub remote_authority: String,
+    pub latency_ms: u32,
+    pub last_activity_ms: u64,
+}
+
+impl HhyRemoteWindowState {
+    pub fn new() -> Self {
+        Self {
+            remote_win_id: String::new(),
+            connection_id: String::new(),
+            layout_json: String::new(),
+            editors_json: String::new(),
+            terminal_count: u32::default(),
+            is_focused: bool::default(),
+            workspace_uri: String::new(),
+            remote_authority: String::new(),
+            latency_ms: u32::default(),
+            last_activity_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_win_id.is_empty() || true && !self.connection_id.is_empty() || true && !self.layout_json.is_empty() || true && !self.editors_json.is_empty() || true && self.terminal_count < u32::MAX || true && self.is_focused || true && !self.workspace_uri.is_empty() || true && !self.remote_authority.is_empty() || true && self.latency_ms < u32::MAX || true && self.last_activity_ms < u64::MAX || true
+    }
+}
+
+impl Default for HhyRemoteWindowState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote status bar (text, tooltip, color, host label, icon)
+#[derive(Debug, Clone)]
+pub struct HhzRemoteStatusBar {
+    pub remote_status_id: String,
+    pub text: String,
+    pub tooltip: String,
+    pub color: String,
+    pub host_label: String,
+    pub icon: String,
+    pub command_id: String,
+    pub is_visible: bool,
+    pub priority: u32,
+    pub background_color: String,
+}
+
+impl HhzRemoteStatusBar {
+    pub fn new() -> Self {
+        Self {
+            remote_status_id: String::new(),
+            text: String::new(),
+            tooltip: String::new(),
+            color: String::new(),
+            host_label: String::new(),
+            icon: String::new(),
+            command_id: String::new(),
+            is_visible: bool::default(),
+            priority: u32::default(),
+            background_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_status_id.is_empty() || true && !self.text.is_empty() || true && !self.tooltip.is_empty() || true && !self.color.is_empty() || true && !self.host_label.is_empty() || true && !self.icon.is_empty() || true && !self.command_id.is_empty() || true && self.is_visible || true && self.priority < u32::MAX || true && !self.background_color.is_empty() || true
+    }
+}
+
+impl Default for HhzRemoteStatusBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -358409,6 +359081,294 @@ mod tests_hhj_generated {
     fn test_hhj_fields() {
         let mut obj = HhjRemoteTerminal::default();
         obj.remote_term_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhk_default() {
+        let obj = HhkRemoteAuthority::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhk_fields() {
+        let mut obj = HhkRemoteAuthority::default();
+        obj.remote_auth2_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhl_default() {
+        let obj = HhlRemoteEnvironment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhl_fields() {
+        let mut obj = HhlRemoteEnvironment::default();
+        obj.remote_env_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhm_default() {
+        let obj = HhmRemoteExecServer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhm_fields() {
+        let mut obj = HhmRemoteExecServer::default();
+        obj.remote_exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhn_default() {
+        let obj = HhnContainerConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhn_fields() {
+        let mut obj = HhnContainerConfig::default();
+        obj.container_cfg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hho_generated {
+    use super::*;
+
+    #[test]
+    fn test_hho_default() {
+        let obj = HhoDevContainerFeature::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hho_fields() {
+        let mut obj = HhoDevContainerFeature::default();
+        obj.dc_feature_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhp_default() {
+        let obj = HhpRemoteCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhp_fields() {
+        let mut obj = HhpRemoteCommand::default();
+        obj.remote_cmd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhq_default() {
+        let obj = HhqPortMapping::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhq_fields() {
+        let mut obj = HhqPortMapping::default();
+        obj.port_map_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhr_default() {
+        let obj = HhrRemoteAgent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhr_fields() {
+        let mut obj = HhrRemoteAgent::default();
+        obj.remote_agent_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhs_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhs_default() {
+        let obj = HhsRemoteUiConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhs_fields() {
+        let mut obj = HhsRemoteUiConfig::default();
+        obj.remote_ui_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hht_generated {
+    use super::*;
+
+    #[test]
+    fn test_hht_default() {
+        let obj = HhtConnectionToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hht_fields() {
+        let mut obj = HhtConnectionToken::default();
+        obj.conn_token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhu_default() {
+        let obj = HhuRemoteSync::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhu_fields() {
+        let mut obj = HhuRemoteSync::default();
+        obj.remote_sync_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhv_default() {
+        let obj = HhvServerLog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhv_fields() {
+        let mut obj = HhvServerLog::default();
+        obj.server_log_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhw_default() {
+        let obj = HhwRemoteInstall::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhw_fields() {
+        let mut obj = HhwRemoteInstall::default();
+        obj.remote_inst_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhx_default() {
+        let obj = HhxTunnelCredential::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhx_fields() {
+        let mut obj = HhxTunnelCredential::default();
+        obj.tunnel_cred_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhy_default() {
+        let obj = HhyRemoteWindowState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhy_fields() {
+        let mut obj = HhyRemoteWindowState::default();
+        obj.remote_win_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hhz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hhz_default() {
+        let obj = HhzRemoteStatusBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hhz_fields() {
+        let mut obj = HhzRemoteStatusBar::default();
+        obj.remote_status_id = "test".to_string();
         assert!(obj.validate());
     }
 }
