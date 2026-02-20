@@ -55025,6 +55025,213 @@ impl Default for FajLspWorkspace {
 }
 
 
+/// Debug Adapter Protocol message types
+#[derive(Debug, Clone)]
+pub struct FakDapProtocol {
+    pub dap_seq: u32,
+    pub dap_type: String,
+    pub dap_encoding: String,
+    pub dap_content_length: u32,
+    pub dap_protocol_version: String,
+    pub dap_trace_enabled: bool,
+    pub dap_locale: String,
+    pub dap_client_id: String,
+    pub dap_client_name: String,
+    pub dap_adapter_id: String,
+}
+
+impl FakDapProtocol {
+    pub fn new() -> Self {
+        Self {
+            dap_seq: u32::default(),
+            dap_type: String::new(),
+            dap_encoding: String::new(),
+            dap_content_length: u32::default(),
+            dap_protocol_version: String::new(),
+            dap_trace_enabled: bool::default(),
+            dap_locale: String::new(),
+            dap_client_id: String::new(),
+            dap_client_name: String::new(),
+            dap_adapter_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.dap_seq < u32::MAX || true && !self.dap_type.is_empty() || true && !self.dap_encoding.is_empty() || true && self.dap_content_length < u32::MAX || true && !self.dap_protocol_version.is_empty() || true && self.dap_trace_enabled || true && !self.dap_locale.is_empty() || true && !self.dap_client_id.is_empty() || true && !self.dap_client_name.is_empty() || true && !self.dap_adapter_id.is_empty() || true
+    }
+}
+
+impl Default for FakDapProtocol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// DAP request message types
+#[derive(Debug, Clone)]
+pub struct FalDapRequest {
+    pub dap_request_command: String,
+    pub dap_request_seq: u32,
+    pub dap_request_args: String,
+    pub dap_request_cancel_id: u32,
+    pub dap_request_timeout_ms: u32,
+    pub dap_request_progress_id: String,
+    pub dap_request_source: String,
+    pub dap_request_timestamp: u64,
+    pub dap_request_retry_count: u32,
+    pub dap_request_trace_id: String,
+}
+
+impl FalDapRequest {
+    pub fn new() -> Self {
+        Self {
+            dap_request_command: String::new(),
+            dap_request_seq: u32::default(),
+            dap_request_args: String::new(),
+            dap_request_cancel_id: u32::default(),
+            dap_request_timeout_ms: u32::default(),
+            dap_request_progress_id: String::new(),
+            dap_request_source: String::new(),
+            dap_request_timestamp: u64::default(),
+            dap_request_retry_count: u32::default(),
+            dap_request_trace_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dap_request_command.is_empty() || true && self.dap_request_seq < u32::MAX || true && !self.dap_request_args.is_empty() || true && self.dap_request_cancel_id < u32::MAX || true && self.dap_request_timeout_ms < u32::MAX || true && !self.dap_request_progress_id.is_empty() || true && !self.dap_request_source.is_empty() || true && self.dap_request_timestamp < u64::MAX || true && self.dap_request_retry_count < u32::MAX || true && !self.dap_request_trace_id.is_empty() || true
+    }
+}
+
+impl Default for FalDapRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// DAP response message types
+#[derive(Debug, Clone)]
+pub struct FamDapResponse {
+    pub dap_response_success: bool,
+    pub dap_response_seq: u32,
+    pub dap_response_request_seq: u32,
+    pub dap_response_command: String,
+    pub dap_response_body: String,
+    pub dap_response_message: String,
+    pub dap_response_timestamp: u64,
+    pub dap_response_duration_ms: u64,
+    pub dap_response_show_user: bool,
+    pub dap_response_error_format: String,
+}
+
+impl FamDapResponse {
+    pub fn new() -> Self {
+        Self {
+            dap_response_success: bool::default(),
+            dap_response_seq: u32::default(),
+            dap_response_request_seq: u32::default(),
+            dap_response_command: String::new(),
+            dap_response_body: String::new(),
+            dap_response_message: String::new(),
+            dap_response_timestamp: u64::default(),
+            dap_response_duration_ms: u64::default(),
+            dap_response_show_user: bool::default(),
+            dap_response_error_format: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.dap_response_success || true && self.dap_response_seq < u32::MAX || true && self.dap_response_request_seq < u32::MAX || true && !self.dap_response_command.is_empty() || true && !self.dap_response_body.is_empty() || true && !self.dap_response_message.is_empty() || true && self.dap_response_timestamp < u64::MAX || true && self.dap_response_duration_ms < u64::MAX || true && self.dap_response_show_user || true && !self.dap_response_error_format.is_empty() || true
+    }
+}
+
+impl Default for FamDapResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// DAP event message types
+#[derive(Debug, Clone)]
+pub struct FanDapEvent {
+    pub dap_event_name: String,
+    pub dap_event_seq: u32,
+    pub dap_event_body: String,
+    pub dap_event_timestamp: u64,
+    pub dap_event_source: String,
+    pub dap_event_category: String,
+    pub dap_event_group: String,
+    pub dap_event_data: String,
+    pub dap_event_trace_id: String,
+    pub dap_event_is_important: bool,
+}
+
+impl FanDapEvent {
+    pub fn new() -> Self {
+        Self {
+            dap_event_name: String::new(),
+            dap_event_seq: u32::default(),
+            dap_event_body: String::new(),
+            dap_event_timestamp: u64::default(),
+            dap_event_source: String::new(),
+            dap_event_category: String::new(),
+            dap_event_group: String::new(),
+            dap_event_data: String::new(),
+            dap_event_trace_id: String::new(),
+            dap_event_is_important: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dap_event_name.is_empty() || true && self.dap_event_seq < u32::MAX || true && !self.dap_event_body.is_empty() || true && self.dap_event_timestamp < u64::MAX || true && !self.dap_event_source.is_empty() || true && !self.dap_event_category.is_empty() || true && !self.dap_event_group.is_empty() || true && !self.dap_event_data.is_empty() || true && !self.dap_event_trace_id.is_empty() || true && self.dap_event_is_important || true
+    }
+}
+
+impl Default for FanDapEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// DAP adapter capability types
+#[derive(Debug, Clone)]
+pub struct FaoDapCapability {
+    pub dap_supports_config_done: bool,
+    pub dap_supports_function_bp: bool,
+    pub dap_supports_conditional_bp: bool,
+    pub dap_supports_hit_conditional: bool,
+    pub dap_supports_evaluate_for_hovers: bool,
+    pub dap_supports_step_back: bool,
+    pub dap_supports_set_variable: bool,
+    pub dap_supports_restart_frame: bool,
+    pub dap_supports_goto_targets: bool,
+    pub dap_supports_completions: bool,
+}
+
+impl FaoDapCapability {
+    pub fn new() -> Self {
+        Self {
+            dap_supports_config_done: bool::default(),
+            dap_supports_function_bp: bool::default(),
+            dap_supports_conditional_bp: bool::default(),
+            dap_supports_hit_conditional: bool::default(),
+            dap_supports_evaluate_for_hovers: bool::default(),
+            dap_supports_step_back: bool::default(),
+            dap_supports_set_variable: bool::default(),
+            dap_supports_restart_frame: bool::default(),
+            dap_supports_goto_targets: bool::default(),
+            dap_supports_completions: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.dap_supports_config_done || true && self.dap_supports_function_bp || true && self.dap_supports_conditional_bp || true && self.dap_supports_hit_conditional || true && self.dap_supports_evaluate_for_hovers || true && self.dap_supports_step_back || true && self.dap_supports_set_variable || true && self.dap_supports_restart_frame || true && self.dap_supports_goto_targets || true && self.dap_supports_completions || true
+    }
+}
+
+impl Default for FaoDapCapability {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -266586,6 +266793,96 @@ mod tests_faj_generated {
     fn test_faj_fields() {
         let mut obj = FajLspWorkspace::default();
         obj.workspace_root_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fak_generated {
+    use super::*;
+
+    #[test]
+    fn test_fak_default() {
+        let obj = FakDapProtocol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fak_fields() {
+        let mut obj = FakDapProtocol::default();
+        obj.dap_seq = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fal_generated {
+    use super::*;
+
+    #[test]
+    fn test_fal_default() {
+        let obj = FalDapRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fal_fields() {
+        let mut obj = FalDapRequest::default();
+        obj.dap_request_command = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fam_generated {
+    use super::*;
+
+    #[test]
+    fn test_fam_default() {
+        let obj = FamDapResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fam_fields() {
+        let mut obj = FamDapResponse::default();
+        obj.dap_response_success = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fan_generated {
+    use super::*;
+
+    #[test]
+    fn test_fan_default() {
+        let obj = FanDapEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fan_fields() {
+        let mut obj = FanDapEvent::default();
+        obj.dap_event_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fao_generated {
+    use super::*;
+
+    #[test]
+    fn test_fao_default() {
+        let obj = FaoDapCapability::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fao_fields() {
+        let mut obj = FaoDapCapability::default();
+        obj.dap_supports_config_done = true;
         assert!(obj.validate());
     }
 }
