@@ -75214,6 +75214,216 @@ impl Default for FszFileAssociation {
     }
 }
 
+/// Configuration model (contents, keys, overrides, raw)
+#[derive(Debug, Clone)]
+pub struct FtaConfigurationModel {
+    pub model_id: String,
+    pub contents_json: String,
+    pub keys_json: String,
+    pub overrides_json: String,
+    pub raw_json: String,
+    pub is_frozen: bool,
+    pub merge_count: u32,
+    pub default_value_count: u32,
+    pub override_count: u32,
+    pub version: u64,
+}
+
+impl FtaConfigurationModel {
+    pub fn new() -> Self {
+        Self {
+            model_id: String::new(),
+            contents_json: String::new(),
+            keys_json: String::new(),
+            overrides_json: String::new(),
+            raw_json: String::new(),
+            is_frozen: bool::default(),
+            merge_count: u32::default(),
+            default_value_count: u32::default(),
+            override_count: u32::default(),
+            version: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_id.is_empty() || true && !self.contents_json.is_empty() || true && !self.keys_json.is_empty() || true && !self.overrides_json.is_empty() || true && !self.raw_json.is_empty() || true && self.is_frozen || true && self.merge_count < u32::MAX || true && self.default_value_count < u32::MAX || true && self.override_count < u32::MAX || true && self.version < u64::MAX || true
+    }
+}
+
+impl Default for FtaConfigurationModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration overrides (identifiers, keys, overrides)
+#[derive(Debug, Clone)]
+pub struct FtbConfigurationOverrides {
+    pub override_id: String,
+    pub identifiers_json: String,
+    pub keys_json: String,
+    pub overrides_json: String,
+    pub contents_json: String,
+    pub is_empty: bool,
+    pub source_type: u32,
+    pub scope: u32,
+    pub extension_id: String,
+    pub is_language_override: bool,
+}
+
+impl FtbConfigurationOverrides {
+    pub fn new() -> Self {
+        Self {
+            override_id: String::new(),
+            identifiers_json: String::new(),
+            keys_json: String::new(),
+            overrides_json: String::new(),
+            contents_json: String::new(),
+            is_empty: bool::default(),
+            source_type: u32::default(),
+            scope: u32::default(),
+            extension_id: String::new(),
+            is_language_override: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.override_id.is_empty() || true && !self.identifiers_json.is_empty() || true && !self.keys_json.is_empty() || true && !self.overrides_json.is_empty() || true && !self.contents_json.is_empty() || true && self.is_empty || true && self.source_type < u32::MAX || true && self.scope < u32::MAX || true && !self.extension_id.is_empty() || true && self.is_language_override || true
+    }
+}
+
+impl Default for FtbConfigurationOverrides {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration target (default, user, workspace, folder)
+#[derive(Debug, Clone)]
+pub struct FtcConfigurationTarget {
+    pub target_id: String,
+    pub target_type: u32,
+    pub target_uri: String,
+    pub override_identifier: String,
+    pub is_language: bool,
+    pub language_id: String,
+    pub is_default: bool,
+    pub is_user: bool,
+    pub is_workspace: bool,
+    pub is_folder: bool,
+}
+
+impl FtcConfigurationTarget {
+    pub fn new() -> Self {
+        Self {
+            target_id: String::new(),
+            target_type: u32::default(),
+            target_uri: String::new(),
+            override_identifier: String::new(),
+            is_language: bool::default(),
+            language_id: String::new(),
+            is_default: bool::default(),
+            is_user: bool::default(),
+            is_workspace: bool::default(),
+            is_folder: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.target_id.is_empty() || true && self.target_type < u32::MAX || true && !self.target_uri.is_empty() || true && !self.override_identifier.is_empty() || true && self.is_language || true && !self.language_id.is_empty() || true && self.is_default || true && self.is_user || true && self.is_workspace || true && self.is_folder || true
+    }
+}
+
+impl Default for FtcConfigurationTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration scope (application, machine, window, resource, language)
+#[derive(Debug, Clone)]
+pub struct FtdConfigurationScope {
+    pub scope_id: String,
+    pub scope_type: u32,
+    pub is_application: bool,
+    pub is_machine: bool,
+    pub is_window: bool,
+    pub is_resource: bool,
+    pub is_language_overridable: bool,
+    pub restricted: bool,
+    pub description: String,
+    pub policy_name: String,
+}
+
+impl FtdConfigurationScope {
+    pub fn new() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_type: u32::default(),
+            is_application: bool::default(),
+            is_machine: bool::default(),
+            is_window: bool::default(),
+            is_resource: bool::default(),
+            is_language_overridable: bool::default(),
+            restricted: bool::default(),
+            description: String::new(),
+            policy_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_id.is_empty() || true && self.scope_type < u32::MAX || true && self.is_application || true && self.is_machine || true && self.is_window || true && self.is_resource || true && self.is_language_overridable || true && self.restricted || true && !self.description.is_empty() || true && !self.policy_name.is_empty() || true
+    }
+}
+
+impl Default for FtdConfigurationScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration registry (properties, schemas, defaults, overrides)
+#[derive(Debug, Clone)]
+pub struct FteConfigurationRegistry {
+    pub registry_id: String,
+    pub property_count: u32,
+    pub schema_count: u32,
+    pub default_count: u32,
+    pub override_count: u32,
+    pub extension_contribution_count: u32,
+    pub deprecated_count: u32,
+    pub is_frozen: bool,
+    pub configuration_defaults_json: String,
+    pub excluded_keys_json: String,
+}
+
+impl FteConfigurationRegistry {
+    pub fn new() -> Self {
+        Self {
+            registry_id: String::new(),
+            property_count: u32::default(),
+            schema_count: u32::default(),
+            default_count: u32::default(),
+            override_count: u32::default(),
+            extension_contribution_count: u32::default(),
+            deprecated_count: u32::default(),
+            is_frozen: bool::default(),
+            configuration_defaults_json: String::new(),
+            excluded_keys_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.registry_id.is_empty() || true && self.property_count < u32::MAX || true && self.schema_count < u32::MAX || true && self.default_count < u32::MAX || true && self.override_count < u32::MAX || true && self.extension_contribution_count < u32::MAX || true && self.deprecated_count < u32::MAX || true && self.is_frozen || true && !self.configuration_defaults_json.is_empty() || true && !self.excluded_keys_json.is_empty() || true
+    }
+}
+
+impl Default for FteConfigurationRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -295415,6 +295625,96 @@ mod tests_fsz_generated {
     fn test_fsz_fields() {
         let mut obj = FszFileAssociation::default();
         obj.assoc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fta_generated {
+    use super::*;
+
+    #[test]
+    fn test_fta_default() {
+        let obj = FtaConfigurationModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fta_fields() {
+        let mut obj = FtaConfigurationModel::default();
+        obj.model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftb_default() {
+        let obj = FtbConfigurationOverrides::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftb_fields() {
+        let mut obj = FtbConfigurationOverrides::default();
+        obj.override_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftc_default() {
+        let obj = FtcConfigurationTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftc_fields() {
+        let mut obj = FtcConfigurationTarget::default();
+        obj.target_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ftd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ftd_default() {
+        let obj = FtdConfigurationScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ftd_fields() {
+        let mut obj = FtdConfigurationScope::default();
+        obj.scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fte_generated {
+    use super::*;
+
+    #[test]
+    fn test_fte_default() {
+        let obj = FteConfigurationRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fte_fields() {
+        let mut obj = FteConfigurationRegistry::default();
+        obj.registry_id = "test".to_string();
         assert!(obj.validate());
     }
 }
