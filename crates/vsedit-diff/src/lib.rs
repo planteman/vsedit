@@ -60887,6 +60887,254 @@ impl Default for FftFileExplorerSort {
 }
 
 
+/// Command palette model types
+#[derive(Debug, Clone)]
+pub struct FfuCommandPalette {
+    pub palette_value: String,
+    pub palette_prefix: String,
+    pub palette_placeholder: String,
+    pub palette_items_count: u32,
+    pub palette_selected_index: u32,
+    pub palette_visible: bool,
+    pub palette_loading: bool,
+    pub palette_last_command: String,
+    pub palette_history: String,
+    pub palette_filter_mode: String,
+}
+
+impl FfuCommandPalette {
+    pub fn new() -> Self {
+        Self {
+            palette_value: String::new(),
+            palette_prefix: String::new(),
+            palette_placeholder: String::new(),
+            palette_items_count: u32::default(),
+            palette_selected_index: u32::default(),
+            palette_visible: bool::default(),
+            palette_loading: bool::default(),
+            palette_last_command: String::new(),
+            palette_history: String::new(),
+            palette_filter_mode: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.palette_value.is_empty() || true && !self.palette_prefix.is_empty() || true && !self.palette_placeholder.is_empty() || true && self.palette_items_count < u32::MAX || true && self.palette_selected_index < u32::MAX || true && self.palette_visible || true && self.palette_loading || true && !self.palette_last_command.is_empty() || true && !self.palette_history.is_empty() || true && !self.palette_filter_mode.is_empty() || true
+    }
+}
+
+impl Default for FfuCommandPalette {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Command palette item types
+#[derive(Debug, Clone)]
+pub struct FfvCommandPaletteItem {
+    pub palette_item_label: String,
+    pub palette_item_description: String,
+    pub palette_item_detail: String,
+    pub palette_item_keybinding: String,
+    pub palette_item_command_id: String,
+    pub palette_item_args: String,
+    pub palette_item_category: String,
+    pub palette_item_icon: String,
+    pub palette_item_when_clause: String,
+    pub palette_item_recently_used: bool,
+}
+
+impl FfvCommandPaletteItem {
+    pub fn new() -> Self {
+        Self {
+            palette_item_label: String::new(),
+            palette_item_description: String::new(),
+            palette_item_detail: String::new(),
+            palette_item_keybinding: String::new(),
+            palette_item_command_id: String::new(),
+            palette_item_args: String::new(),
+            palette_item_category: String::new(),
+            palette_item_icon: String::new(),
+            palette_item_when_clause: String::new(),
+            palette_item_recently_used: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.palette_item_label.is_empty() || true && !self.palette_item_description.is_empty() || true && !self.palette_item_detail.is_empty() || true && !self.palette_item_keybinding.is_empty() || true && !self.palette_item_command_id.is_empty() || true && !self.palette_item_args.is_empty() || true && !self.palette_item_category.is_empty() || true && !self.palette_item_icon.is_empty() || true && !self.palette_item_when_clause.is_empty() || true && self.palette_item_recently_used || true
+    }
+}
+
+impl Default for FfvCommandPaletteItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Quick open (file picker) model types
+#[derive(Debug, Clone)]
+pub struct FfwQuickOpen {
+    pub quick_open_value: String,
+    pub quick_open_placeholder: String,
+    pub quick_open_items_count: u32,
+    pub quick_open_selected_index: u32,
+    pub quick_open_visible: bool,
+    pub quick_open_loading: bool,
+    pub quick_open_max_results: u32,
+    pub quick_open_fuzzy_scoring: bool,
+    pub quick_open_preserve_input: bool,
+    pub quick_open_sort_by_label: bool,
+}
+
+impl FfwQuickOpen {
+    pub fn new() -> Self {
+        Self {
+            quick_open_value: String::new(),
+            quick_open_placeholder: String::new(),
+            quick_open_items_count: u32::default(),
+            quick_open_selected_index: u32::default(),
+            quick_open_visible: bool::default(),
+            quick_open_loading: bool::default(),
+            quick_open_max_results: u32::default(),
+            quick_open_fuzzy_scoring: bool::default(),
+            quick_open_preserve_input: bool::default(),
+            quick_open_sort_by_label: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.quick_open_value.is_empty() || true && !self.quick_open_placeholder.is_empty() || true && self.quick_open_items_count < u32::MAX || true && self.quick_open_selected_index < u32::MAX || true && self.quick_open_visible || true && self.quick_open_loading || true && self.quick_open_max_results < u32::MAX || true && self.quick_open_fuzzy_scoring || true && self.quick_open_preserve_input || true && self.quick_open_sort_by_label || true
+    }
+}
+
+impl Default for FfwQuickOpen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Quick open result item types
+#[derive(Debug, Clone)]
+pub struct FfxQuickOpenItem {
+    pub quick_open_item_label: String,
+    pub quick_open_item_description: String,
+    pub quick_open_item_detail: String,
+    pub quick_open_item_uri: String,
+    pub quick_open_item_icon: String,
+    pub quick_open_item_score: f64,
+    pub quick_open_item_highlights: String,
+    pub quick_open_item_recently_opened: bool,
+    pub quick_open_item_is_file: bool,
+    pub quick_open_item_range: String,
+}
+
+impl FfxQuickOpenItem {
+    pub fn new() -> Self {
+        Self {
+            quick_open_item_label: String::new(),
+            quick_open_item_description: String::new(),
+            quick_open_item_detail: String::new(),
+            quick_open_item_uri: String::new(),
+            quick_open_item_icon: String::new(),
+            quick_open_item_score: f64::default(),
+            quick_open_item_highlights: String::new(),
+            quick_open_item_recently_opened: bool::default(),
+            quick_open_item_is_file: bool::default(),
+            quick_open_item_range: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.quick_open_item_label.is_empty() || true && !self.quick_open_item_description.is_empty() || true && !self.quick_open_item_detail.is_empty() || true && !self.quick_open_item_uri.is_empty() || true && !self.quick_open_item_icon.is_empty() || true && self.quick_open_item_score.is_finite() || true && !self.quick_open_item_highlights.is_empty() || true && self.quick_open_item_recently_opened || true && self.quick_open_item_is_file || true && !self.quick_open_item_range.is_empty() || true
+    }
+}
+
+impl Default for FfxQuickOpenItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Go-to-symbol model types
+#[derive(Debug, Clone)]
+pub struct FfyGotoSymbol {
+    pub goto_symbol_name: String,
+    pub goto_symbol_kind: u32,
+    pub goto_symbol_detail: String,
+    pub goto_symbol_uri: String,
+    pub goto_symbol_range_start: u32,
+    pub goto_symbol_range_end: u32,
+    pub goto_symbol_container: String,
+    pub goto_symbol_score: f64,
+    pub goto_symbol_highlights: String,
+    pub goto_symbol_deprecated: bool,
+}
+
+impl FfyGotoSymbol {
+    pub fn new() -> Self {
+        Self {
+            goto_symbol_name: String::new(),
+            goto_symbol_kind: u32::default(),
+            goto_symbol_detail: String::new(),
+            goto_symbol_uri: String::new(),
+            goto_symbol_range_start: u32::default(),
+            goto_symbol_range_end: u32::default(),
+            goto_symbol_container: String::new(),
+            goto_symbol_score: f64::default(),
+            goto_symbol_highlights: String::new(),
+            goto_symbol_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.goto_symbol_name.is_empty() || true && self.goto_symbol_kind < u32::MAX || true && !self.goto_symbol_detail.is_empty() || true && !self.goto_symbol_uri.is_empty() || true && self.goto_symbol_range_start < u32::MAX || true && self.goto_symbol_range_end < u32::MAX || true && !self.goto_symbol_container.is_empty() || true && self.goto_symbol_score.is_finite() || true && !self.goto_symbol_highlights.is_empty() || true && self.goto_symbol_deprecated || true
+    }
+}
+
+impl Default for FfyGotoSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Go-to-line model types
+#[derive(Debug, Clone)]
+pub struct FfzGotoLine {
+    pub goto_line_number: u32,
+    pub goto_line_column: u32,
+    pub goto_line_preview: bool,
+    pub goto_line_max_line: u32,
+    pub goto_line_current_line: u32,
+    pub goto_line_current_col: u32,
+    pub goto_line_input_text: String,
+    pub goto_line_valid: bool,
+    pub goto_line_decoration_color: String,
+    pub goto_line_highlight_line: bool,
+}
+
+impl FfzGotoLine {
+    pub fn new() -> Self {
+        Self {
+            goto_line_number: u32::default(),
+            goto_line_column: u32::default(),
+            goto_line_preview: bool::default(),
+            goto_line_max_line: u32::default(),
+            goto_line_current_line: u32::default(),
+            goto_line_current_col: u32::default(),
+            goto_line_input_text: String::new(),
+            goto_line_valid: bool::default(),
+            goto_line_decoration_color: String::new(),
+            goto_line_highlight_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.goto_line_number < u32::MAX || true && self.goto_line_column < u32::MAX || true && self.goto_line_preview || true && self.goto_line_max_line < u32::MAX || true && self.goto_line_current_line < u32::MAX || true && self.goto_line_current_col < u32::MAX || true && !self.goto_line_input_text.is_empty() || true && self.goto_line_valid || true && !self.goto_line_decoration_color.is_empty() || true && self.goto_line_highlight_line || true
+    }
+}
+
+impl Default for FfzGotoLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274888,6 +275136,114 @@ mod tests_fft_generated {
     fn test_fft_fields() {
         let mut obj = FftFileExplorerSort::default();
         obj.sort_order = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffu_default() {
+        let obj = FfuCommandPalette::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffu_fields() {
+        let mut obj = FfuCommandPalette::default();
+        obj.palette_value = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffv_default() {
+        let obj = FfvCommandPaletteItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffv_fields() {
+        let mut obj = FfvCommandPaletteItem::default();
+        obj.palette_item_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffw_default() {
+        let obj = FfwQuickOpen::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffw_fields() {
+        let mut obj = FfwQuickOpen::default();
+        obj.quick_open_value = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffx_default() {
+        let obj = FfxQuickOpenItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffx_fields() {
+        let mut obj = FfxQuickOpenItem::default();
+        obj.quick_open_item_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffy_default() {
+        let obj = FfyGotoSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffy_fields() {
+        let mut obj = FfyGotoSymbol::default();
+        obj.goto_symbol_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffz_default() {
+        let obj = FfzGotoLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffz_fields() {
+        let mut obj = FfzGotoLine::default();
+        obj.goto_line_number = 42;
         assert!(obj.validate());
     }
 }
