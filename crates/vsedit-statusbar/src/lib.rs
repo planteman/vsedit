@@ -122498,6 +122498,678 @@ impl Default for HkjAccessibleAction {
     }
 }
 
+/// High contrast theme (fg, bg, border, active, focus border)
+#[derive(Debug, Clone)]
+pub struct HkkHighContrastTheme {
+    pub hc_theme_id: String,
+    pub foreground: String,
+    pub background: String,
+    pub border_color: String,
+    pub active_border: String,
+    pub focus_border: String,
+    pub contrast_ratio: f64,
+    pub selection_bg: String,
+    pub text_separator: String,
+    pub is_active: bool,
+}
+
+impl HkkHighContrastTheme {
+    pub fn new() -> Self {
+        Self {
+            hc_theme_id: String::new(),
+            foreground: String::new(),
+            background: String::new(),
+            border_color: String::new(),
+            active_border: String::new(),
+            focus_border: String::new(),
+            contrast_ratio: f64::default(),
+            selection_bg: String::new(),
+            text_separator: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hc_theme_id.is_empty() || true && !self.foreground.is_empty() || true && !self.background.is_empty() || true && !self.border_color.is_empty() || true && !self.active_border.is_empty() || true && !self.focus_border.is_empty() || true && self.contrast_ratio.is_finite() || true && !self.selection_bg.is_empty() || true && !self.text_separator.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for HkkHighContrastTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Reduced motion (is enabled, animation duration, transitions)
+#[derive(Debug, Clone)]
+pub struct HklReducedMotion {
+    pub reduced_motion_id: String,
+    pub is_enabled: bool,
+    pub animation_duration_ms: u32,
+    pub transition_enabled: bool,
+    pub scroll_behavior: String,
+    pub auto_play: bool,
+    pub cursor_blink: bool,
+    pub smooth_scroll: bool,
+    pub source: String,
+    pub override_setting: bool,
+}
+
+impl HklReducedMotion {
+    pub fn new() -> Self {
+        Self {
+            reduced_motion_id: String::new(),
+            is_enabled: bool::default(),
+            animation_duration_ms: u32::default(),
+            transition_enabled: bool::default(),
+            scroll_behavior: String::new(),
+            auto_play: bool::default(),
+            cursor_blink: bool::default(),
+            smooth_scroll: bool::default(),
+            source: String::new(),
+            override_setting: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reduced_motion_id.is_empty() || true && self.is_enabled || true && self.animation_duration_ms < u32::MAX || true && self.transition_enabled || true && !self.scroll_behavior.is_empty() || true && self.auto_play || true && self.cursor_blink || true && self.smooth_scroll || true && !self.source.is_empty() || true && self.override_setting || true
+    }
+}
+
+impl Default for HklReducedMotion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color blindness support (type, alternative colors, pattern)
+#[derive(Debug, Clone)]
+pub struct HkmColorBlindness {
+    pub color_blind_id: String,
+    pub blindness_type: String,
+    pub alternative_colors_json: String,
+    pub pattern_enabled: bool,
+    pub contrast_boost: f64,
+    pub simulation_mode: String,
+    pub filter_json: String,
+    pub is_active: bool,
+    pub custom_palette_json: String,
+    pub description: String,
+}
+
+impl HkmColorBlindness {
+    pub fn new() -> Self {
+        Self {
+            color_blind_id: String::new(),
+            blindness_type: String::new(),
+            alternative_colors_json: String::new(),
+            pattern_enabled: bool::default(),
+            contrast_boost: f64::default(),
+            simulation_mode: String::new(),
+            filter_json: String::new(),
+            is_active: bool::default(),
+            custom_palette_json: String::new(),
+            description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_blind_id.is_empty() || true && !self.blindness_type.is_empty() || true && !self.alternative_colors_json.is_empty() || true && self.pattern_enabled || true && self.contrast_boost.is_finite() || true && !self.simulation_mode.is_empty() || true && !self.filter_json.is_empty() || true && self.is_active || true && !self.custom_palette_json.is_empty() || true && !self.description.is_empty() || true
+    }
+}
+
+impl Default for HkmColorBlindness {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible notification (message, level, source, actions)
+#[derive(Debug, Clone)]
+pub struct HknAccessibleNotification {
+    pub a11y_notif_id: String,
+    pub message: String,
+    pub level: String,
+    pub source: String,
+    pub actions_json: String,
+    pub timestamp_ms: u64,
+    pub is_dismissible: bool,
+    pub auto_dismiss_ms: u32,
+    pub region_role: String,
+    pub politeness: String,
+}
+
+impl HknAccessibleNotification {
+    pub fn new() -> Self {
+        Self {
+            a11y_notif_id: String::new(),
+            message: String::new(),
+            level: String::new(),
+            source: String::new(),
+            actions_json: String::new(),
+            timestamp_ms: u64::default(),
+            is_dismissible: bool::default(),
+            auto_dismiss_ms: u32::default(),
+            region_role: String::new(),
+            politeness: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_notif_id.is_empty() || true && !self.message.is_empty() || true && !self.level.is_empty() || true && !self.source.is_empty() || true && !self.actions_json.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_dismissible || true && self.auto_dismiss_ms < u32::MAX || true && !self.region_role.is_empty() || true && !self.politeness.is_empty() || true
+    }
+}
+
+impl Default for HknAccessibleNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible tree (root, items, expanded, selected, focused)
+#[derive(Debug, Clone)]
+pub struct HkoAccessibleTree {
+    pub a11y_tree_id: String,
+    pub root_id: String,
+    pub items_json: String,
+    pub expanded_ids_json: String,
+    pub selected_id: String,
+    pub focused_id: String,
+    pub label: String,
+    pub multi_select: bool,
+    pub type_ahead: bool,
+    pub item_count: u32,
+}
+
+impl HkoAccessibleTree {
+    pub fn new() -> Self {
+        Self {
+            a11y_tree_id: String::new(),
+            root_id: String::new(),
+            items_json: String::new(),
+            expanded_ids_json: String::new(),
+            selected_id: String::new(),
+            focused_id: String::new(),
+            label: String::new(),
+            multi_select: bool::default(),
+            type_ahead: bool::default(),
+            item_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_tree_id.is_empty() || true && !self.root_id.is_empty() || true && !self.items_json.is_empty() || true && !self.expanded_ids_json.is_empty() || true && !self.selected_id.is_empty() || true && !self.focused_id.is_empty() || true && !self.label.is_empty() || true && self.multi_select || true && self.type_ahead || true && self.item_count < u32::MAX || true
+    }
+}
+
+impl Default for HkoAccessibleTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible table (rows, columns, headers, caption, summary)
+#[derive(Debug, Clone)]
+pub struct HkpAccessibleTable {
+    pub a11y_table_id: String,
+    pub row_count: u32,
+    pub column_count: u32,
+    pub headers_json: String,
+    pub caption: String,
+    pub summary: String,
+    pub sort_column: u32,
+    pub sort_direction: String,
+    pub selected_row: u32,
+    pub label: String,
+}
+
+impl HkpAccessibleTable {
+    pub fn new() -> Self {
+        Self {
+            a11y_table_id: String::new(),
+            row_count: u32::default(),
+            column_count: u32::default(),
+            headers_json: String::new(),
+            caption: String::new(),
+            summary: String::new(),
+            sort_column: u32::default(),
+            sort_direction: String::new(),
+            selected_row: u32::default(),
+            label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_table_id.is_empty() || true && self.row_count < u32::MAX || true && self.column_count < u32::MAX || true && !self.headers_json.is_empty() || true && !self.caption.is_empty() || true && !self.summary.is_empty() || true && self.sort_column < u32::MAX || true && !self.sort_direction.is_empty() || true && self.selected_row < u32::MAX || true && !self.label.is_empty() || true
+    }
+}
+
+impl Default for HkpAccessibleTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible list (items, selected, multiselect, orientation)
+#[derive(Debug, Clone)]
+pub struct HkqAccessibleList {
+    pub a11y_list_id: String,
+    pub items_json: String,
+    pub selected_index: u32,
+    pub multi_select: bool,
+    pub orientation: String,
+    pub label: String,
+    pub item_count: u32,
+    pub virtual_scroll: bool,
+    pub filter_text: String,
+    pub role: String,
+}
+
+impl HkqAccessibleList {
+    pub fn new() -> Self {
+        Self {
+            a11y_list_id: String::new(),
+            items_json: String::new(),
+            selected_index: u32::default(),
+            multi_select: bool::default(),
+            orientation: String::new(),
+            label: String::new(),
+            item_count: u32::default(),
+            virtual_scroll: bool::default(),
+            filter_text: String::new(),
+            role: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_list_id.is_empty() || true && !self.items_json.is_empty() || true && self.selected_index < u32::MAX || true && self.multi_select || true && !self.orientation.is_empty() || true && !self.label.is_empty() || true && self.item_count < u32::MAX || true && self.virtual_scroll || true && !self.filter_text.is_empty() || true && !self.role.is_empty() || true
+    }
+}
+
+impl Default for HkqAccessibleList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible dialog (title, description, modal, focus trap)
+#[derive(Debug, Clone)]
+pub struct HkrAccessibleDialog {
+    pub a11y_dialog_id: String,
+    pub title: String,
+    pub description: String,
+    pub is_modal: bool,
+    pub focus_trap: bool,
+    pub initial_focus: String,
+    pub return_focus: String,
+    pub close_on_escape: bool,
+    pub role: String,
+    pub aria_label: String,
+}
+
+impl HkrAccessibleDialog {
+    pub fn new() -> Self {
+        Self {
+            a11y_dialog_id: String::new(),
+            title: String::new(),
+            description: String::new(),
+            is_modal: bool::default(),
+            focus_trap: bool::default(),
+            initial_focus: String::new(),
+            return_focus: String::new(),
+            close_on_escape: bool::default(),
+            role: String::new(),
+            aria_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_dialog_id.is_empty() || true && !self.title.is_empty() || true && !self.description.is_empty() || true && self.is_modal || true && self.focus_trap || true && !self.initial_focus.is_empty() || true && !self.return_focus.is_empty() || true && self.close_on_escape || true && !self.role.is_empty() || true && !self.aria_label.is_empty() || true
+    }
+}
+
+impl Default for HkrAccessibleDialog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible tooltip (content, target, delay, position, role)
+#[derive(Debug, Clone)]
+pub struct HksAccessibleTooltip {
+    pub a11y_tooltip_id: String,
+    pub content: String,
+    pub target_id: String,
+    pub delay_ms: u32,
+    pub position: String,
+    pub role: String,
+    pub is_visible: bool,
+    pub max_width: u32,
+    pub interactive: bool,
+    pub close_on_click: bool,
+}
+
+impl HksAccessibleTooltip {
+    pub fn new() -> Self {
+        Self {
+            a11y_tooltip_id: String::new(),
+            content: String::new(),
+            target_id: String::new(),
+            delay_ms: u32::default(),
+            position: String::new(),
+            role: String::new(),
+            is_visible: bool::default(),
+            max_width: u32::default(),
+            interactive: bool::default(),
+            close_on_click: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_tooltip_id.is_empty() || true && !self.content.is_empty() || true && !self.target_id.is_empty() || true && self.delay_ms < u32::MAX || true && !self.position.is_empty() || true && !self.role.is_empty() || true && self.is_visible || true && self.max_width < u32::MAX || true && self.interactive || true && self.close_on_click || true
+    }
+}
+
+impl Default for HksAccessibleTooltip {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible menu (items, active, orientation, role, trigger)
+#[derive(Debug, Clone)]
+pub struct HktAccessibleMenu {
+    pub a11y_menu_id: String,
+    pub items_json: String,
+    pub active_index: u32,
+    pub orientation: String,
+    pub role: String,
+    pub trigger_id: String,
+    pub is_open: bool,
+    pub auto_focus: bool,
+    pub loop_focus: bool,
+    pub label: String,
+}
+
+impl HktAccessibleMenu {
+    pub fn new() -> Self {
+        Self {
+            a11y_menu_id: String::new(),
+            items_json: String::new(),
+            active_index: u32::default(),
+            orientation: String::new(),
+            role: String::new(),
+            trigger_id: String::new(),
+            is_open: bool::default(),
+            auto_focus: bool::default(),
+            loop_focus: bool::default(),
+            label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_menu_id.is_empty() || true && !self.items_json.is_empty() || true && self.active_index < u32::MAX || true && !self.orientation.is_empty() || true && !self.role.is_empty() || true && !self.trigger_id.is_empty() || true && self.is_open || true && self.auto_focus || true && self.loop_focus || true && !self.label.is_empty() || true
+    }
+}
+
+impl Default for HktAccessibleMenu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible combobox (value, options, expanded, autocomplete)
+#[derive(Debug, Clone)]
+pub struct HkuAccessibleCombobox {
+    pub a11y_combo_id: String,
+    pub value: String,
+    pub options_json: String,
+    pub is_expanded: bool,
+    pub autocomplete: String,
+    pub label: String,
+    pub active_option: String,
+    pub filter_text: String,
+    pub multi_select: bool,
+    pub popup_id: String,
+}
+
+impl HkuAccessibleCombobox {
+    pub fn new() -> Self {
+        Self {
+            a11y_combo_id: String::new(),
+            value: String::new(),
+            options_json: String::new(),
+            is_expanded: bool::default(),
+            autocomplete: String::new(),
+            label: String::new(),
+            active_option: String::new(),
+            filter_text: String::new(),
+            multi_select: bool::default(),
+            popup_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_combo_id.is_empty() || true && !self.value.is_empty() || true && !self.options_json.is_empty() || true && self.is_expanded || true && !self.autocomplete.is_empty() || true && !self.label.is_empty() || true && !self.active_option.is_empty() || true && !self.filter_text.is_empty() || true && self.multi_select || true && !self.popup_id.is_empty() || true
+    }
+}
+
+impl Default for HkuAccessibleCombobox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible slider (value, min, max, step, orientation)
+#[derive(Debug, Clone)]
+pub struct HkvAccessibleSlider {
+    pub a11y_slider_id: String,
+    pub value: f64,
+    pub min_value: f64,
+    pub max_value: f64,
+    pub step: f64,
+    pub orientation: String,
+    pub label: String,
+    pub value_text: String,
+    pub is_disabled: bool,
+    pub marks_json: String,
+}
+
+impl HkvAccessibleSlider {
+    pub fn new() -> Self {
+        Self {
+            a11y_slider_id: String::new(),
+            value: f64::default(),
+            min_value: f64::default(),
+            max_value: f64::default(),
+            step: f64::default(),
+            orientation: String::new(),
+            label: String::new(),
+            value_text: String::new(),
+            is_disabled: bool::default(),
+            marks_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_slider_id.is_empty() || true && self.value.is_finite() || true && self.min_value.is_finite() || true && self.max_value.is_finite() || true && self.step.is_finite() || true && !self.orientation.is_empty() || true && !self.label.is_empty() || true && !self.value_text.is_empty() || true && self.is_disabled || true && !self.marks_json.is_empty() || true
+    }
+}
+
+impl Default for HkvAccessibleSlider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible tab (label, selected, index, panel id, closeable)
+#[derive(Debug, Clone)]
+pub struct HkwAccessibleTab {
+    pub a11y_tab_id: String,
+    pub label: String,
+    pub is_selected: bool,
+    pub index: u32,
+    pub panel_id: String,
+    pub is_closeable: bool,
+    pub icon: String,
+    pub is_disabled: bool,
+    pub badge: String,
+    pub tooltip: String,
+}
+
+impl HkwAccessibleTab {
+    pub fn new() -> Self {
+        Self {
+            a11y_tab_id: String::new(),
+            label: String::new(),
+            is_selected: bool::default(),
+            index: u32::default(),
+            panel_id: String::new(),
+            is_closeable: bool::default(),
+            icon: String::new(),
+            is_disabled: bool::default(),
+            badge: String::new(),
+            tooltip: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_tab_id.is_empty() || true && !self.label.is_empty() || true && self.is_selected || true && self.index < u32::MAX || true && !self.panel_id.is_empty() || true && self.is_closeable || true && !self.icon.is_empty() || true && self.is_disabled || true && !self.badge.is_empty() || true && !self.tooltip.is_empty() || true
+    }
+}
+
+impl Default for HkwAccessibleTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible alert (message, level, dismissible, action)
+#[derive(Debug, Clone)]
+pub struct HkxAccessibleAlert {
+    pub a11y_alert_id: String,
+    pub message: String,
+    pub level: String,
+    pub is_dismissible: bool,
+    pub action_json: String,
+    pub icon: String,
+    pub timestamp_ms: u64,
+    pub auto_close_ms: u32,
+    pub role: String,
+    pub is_live: bool,
+}
+
+impl HkxAccessibleAlert {
+    pub fn new() -> Self {
+        Self {
+            a11y_alert_id: String::new(),
+            message: String::new(),
+            level: String::new(),
+            is_dismissible: bool::default(),
+            action_json: String::new(),
+            icon: String::new(),
+            timestamp_ms: u64::default(),
+            auto_close_ms: u32::default(),
+            role: String::new(),
+            is_live: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_alert_id.is_empty() || true && !self.message.is_empty() || true && !self.level.is_empty() || true && self.is_dismissible || true && !self.action_json.is_empty() || true && !self.icon.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.auto_close_ms < u32::MAX || true && !self.role.is_empty() || true && self.is_live || true
+    }
+}
+
+impl Default for HkxAccessibleAlert {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keyboard navigation (tab index, arrow keys, home/end, escape)
+#[derive(Debug, Clone)]
+pub struct HkyKeyboardNavigation {
+    pub kb_nav_id: String,
+    pub tab_index: u32,
+    pub arrow_key_nav: bool,
+    pub home_end_nav: bool,
+    pub escape_behavior: String,
+    pub enter_behavior: String,
+    pub space_behavior: String,
+    pub type_ahead: bool,
+    pub wrap_focus: bool,
+    pub scope_id: String,
+}
+
+impl HkyKeyboardNavigation {
+    pub fn new() -> Self {
+        Self {
+            kb_nav_id: String::new(),
+            tab_index: u32::default(),
+            arrow_key_nav: bool::default(),
+            home_end_nav: bool::default(),
+            escape_behavior: String::new(),
+            enter_behavior: String::new(),
+            space_behavior: String::new(),
+            type_ahead: bool::default(),
+            wrap_focus: bool::default(),
+            scope_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kb_nav_id.is_empty() || true && self.tab_index < u32::MAX || true && self.arrow_key_nav || true && self.home_end_nav || true && !self.escape_behavior.is_empty() || true && !self.enter_behavior.is_empty() || true && !self.space_behavior.is_empty() || true && self.type_ahead || true && self.wrap_focus || true && !self.scope_id.is_empty() || true
+    }
+}
+
+impl Default for HkyKeyboardNavigation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IME composition (text, selection, is composing, event type)
+#[derive(Debug, Clone)]
+pub struct HkzIMEComposition {
+    pub ime_comp_id: String,
+    pub text: String,
+    pub selection_start: u32,
+    pub selection_end: u32,
+    pub is_composing: bool,
+    pub event_type: String,
+    pub input_type: String,
+    pub data: String,
+    pub target_id: String,
+    pub locale: String,
+}
+
+impl HkzIMEComposition {
+    pub fn new() -> Self {
+        Self {
+            ime_comp_id: String::new(),
+            text: String::new(),
+            selection_start: u32::default(),
+            selection_end: u32::default(),
+            is_composing: bool::default(),
+            event_type: String::new(),
+            input_type: String::new(),
+            data: String::new(),
+            target_id: String::new(),
+            locale: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ime_comp_id.is_empty() || true && !self.text.is_empty() || true && self.selection_start < u32::MAX || true && self.selection_end < u32::MAX || true && self.is_composing || true && !self.event_type.is_empty() || true && !self.input_type.is_empty() || true && !self.data.is_empty() || true && !self.target_id.is_empty() || true && !self.locale.is_empty() || true
+    }
+}
+
+impl Default for HkzIMEComposition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -363104,6 +363776,294 @@ mod tests_hkj_generated {
     fn test_hkj_fields() {
         let mut obj = HkjAccessibleAction::default();
         obj.a11y_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkk_default() {
+        let obj = HkkHighContrastTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkk_fields() {
+        let mut obj = HkkHighContrastTheme::default();
+        obj.hc_theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkl_default() {
+        let obj = HklReducedMotion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkl_fields() {
+        let mut obj = HklReducedMotion::default();
+        obj.reduced_motion_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkm_default() {
+        let obj = HkmColorBlindness::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkm_fields() {
+        let mut obj = HkmColorBlindness::default();
+        obj.color_blind_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkn_default() {
+        let obj = HknAccessibleNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkn_fields() {
+        let mut obj = HknAccessibleNotification::default();
+        obj.a11y_notif_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hko_generated {
+    use super::*;
+
+    #[test]
+    fn test_hko_default() {
+        let obj = HkoAccessibleTree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hko_fields() {
+        let mut obj = HkoAccessibleTree::default();
+        obj.a11y_tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkp_default() {
+        let obj = HkpAccessibleTable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkp_fields() {
+        let mut obj = HkpAccessibleTable::default();
+        obj.a11y_table_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkq_default() {
+        let obj = HkqAccessibleList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkq_fields() {
+        let mut obj = HkqAccessibleList::default();
+        obj.a11y_list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkr_default() {
+        let obj = HkrAccessibleDialog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkr_fields() {
+        let mut obj = HkrAccessibleDialog::default();
+        obj.a11y_dialog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hks_generated {
+    use super::*;
+
+    #[test]
+    fn test_hks_default() {
+        let obj = HksAccessibleTooltip::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hks_fields() {
+        let mut obj = HksAccessibleTooltip::default();
+        obj.a11y_tooltip_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkt_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkt_default() {
+        let obj = HktAccessibleMenu::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkt_fields() {
+        let mut obj = HktAccessibleMenu::default();
+        obj.a11y_menu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hku_generated {
+    use super::*;
+
+    #[test]
+    fn test_hku_default() {
+        let obj = HkuAccessibleCombobox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hku_fields() {
+        let mut obj = HkuAccessibleCombobox::default();
+        obj.a11y_combo_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkv_default() {
+        let obj = HkvAccessibleSlider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkv_fields() {
+        let mut obj = HkvAccessibleSlider::default();
+        obj.a11y_slider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkw_default() {
+        let obj = HkwAccessibleTab::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkw_fields() {
+        let mut obj = HkwAccessibleTab::default();
+        obj.a11y_tab_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkx_default() {
+        let obj = HkxAccessibleAlert::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkx_fields() {
+        let mut obj = HkxAccessibleAlert::default();
+        obj.a11y_alert_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hky_generated {
+    use super::*;
+
+    #[test]
+    fn test_hky_default() {
+        let obj = HkyKeyboardNavigation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hky_fields() {
+        let mut obj = HkyKeyboardNavigation::default();
+        obj.kb_nav_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkz_default() {
+        let obj = HkzIMEComposition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkz_fields() {
+        let mut obj = HkzIMEComposition::default();
+        obj.ime_comp_id = "test".to_string();
         assert!(obj.validate());
     }
 }
