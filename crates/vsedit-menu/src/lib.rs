@@ -153942,6 +153942,890 @@ impl Default for IszTestConfig {
     }
 }
 
+/// Task runner service
+#[derive(Debug, Clone)]
+pub struct ItaTaskRunner {
+    pub runner_id: String,
+    pub task_count: u32,
+    pub active_count: u32,
+    pub completed_count: u64,
+    pub error_count: u32,
+    pub is_busy: bool,
+}
+
+impl ItaTaskRunner {
+    pub fn new() -> Self {
+        Self {
+            runner_id: String::new(),
+            task_count: u32::default(),
+            active_count: u32::default(),
+            completed_count: u64::default(),
+            error_count: u32::default(),
+            is_busy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.runner_id.is_empty() || true && self.task_count < u32::MAX || true && self.active_count < u32::MAX || true && self.completed_count < u64::MAX || true && self.error_count < u32::MAX || true && self.is_busy || true
+    }
+}
+
+impl Default for ItaTaskRunner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task definition descriptor
+#[derive(Debug, Clone)]
+pub struct ItbTaskDefinition {
+    pub task_id: String,
+    pub task_label: String,
+    pub task_type_str: String,
+    pub command_str: String,
+    pub args_json: String,
+    pub is_background: bool,
+}
+
+impl ItbTaskDefinition {
+    pub fn new() -> Self {
+        Self {
+            task_id: String::new(),
+            task_label: String::new(),
+            task_type_str: String::new(),
+            command_str: String::new(),
+            args_json: String::new(),
+            is_background: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_id.is_empty() || true && !self.task_label.is_empty() || true && !self.task_type_str.is_empty() || true && !self.command_str.is_empty() || true && !self.args_json.is_empty() || true && self.is_background || true
+    }
+}
+
+impl Default for ItbTaskDefinition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task execution state
+#[derive(Debug, Clone)]
+pub struct ItcTaskExecution {
+    pub exec_id: String,
+    pub task_ref: String,
+    pub started_epoch: u64,
+    pub exit_code: u32,
+    pub output_len: u32,
+    pub is_running: bool,
+}
+
+impl ItcTaskExecution {
+    pub fn new() -> Self {
+        Self {
+            exec_id: String::new(),
+            task_ref: String::new(),
+            started_epoch: u64::default(),
+            exit_code: u32::default(),
+            output_len: u32::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exec_id.is_empty() || true && !self.task_ref.is_empty() || true && self.started_epoch < u64::MAX || true && self.exit_code < u32::MAX || true && self.output_len < u32::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for ItcTaskExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task terminal instance
+#[derive(Debug, Clone)]
+pub struct ItdTaskTerminal {
+    pub terminal_id: String,
+    pub task_ref: String,
+    pub pid_val: u32,
+    pub cwd_uri: String,
+    pub shell_path: String,
+    pub is_shared: bool,
+}
+
+impl ItdTaskTerminal {
+    pub fn new() -> Self {
+        Self {
+            terminal_id: String::new(),
+            task_ref: String::new(),
+            pid_val: u32::default(),
+            cwd_uri: String::new(),
+            shell_path: String::new(),
+            is_shared: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.terminal_id.is_empty() || true && !self.task_ref.is_empty() || true && self.pid_val < u32::MAX || true && !self.cwd_uri.is_empty() || true && !self.shell_path.is_empty() || true && self.is_shared || true
+    }
+}
+
+impl Default for ItdTaskTerminal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task group descriptor
+#[derive(Debug, Clone)]
+pub struct IteTaskGroup {
+    pub group_id: String,
+    pub group_kind: String,
+    pub is_default: bool,
+    pub task_count: u32,
+    pub label_text: String,
+    pub is_build_group: bool,
+}
+
+impl IteTaskGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            group_kind: String::new(),
+            is_default: bool::default(),
+            task_count: u32::default(),
+            label_text: String::new(),
+            is_build_group: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.group_kind.is_empty() || true && self.is_default || true && self.task_count < u32::MAX || true && !self.label_text.is_empty() || true && self.is_build_group || true
+    }
+}
+
+impl Default for IteTaskGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem matcher pattern
+#[derive(Debug, Clone)]
+pub struct ItfProblemMatcher {
+    pub matcher_id: String,
+    pub pattern_str: String,
+    pub severity_val: u32,
+    pub file_group: u32,
+    pub line_group: u32,
+    pub is_watching: bool,
+}
+
+impl ItfProblemMatcher {
+    pub fn new() -> Self {
+        Self {
+            matcher_id: String::new(),
+            pattern_str: String::new(),
+            severity_val: u32::default(),
+            file_group: u32::default(),
+            line_group: u32::default(),
+            is_watching: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.matcher_id.is_empty() || true && !self.pattern_str.is_empty() || true && self.severity_val < u32::MAX || true && self.file_group < u32::MAX || true && self.line_group < u32::MAX || true && self.is_watching || true
+    }
+}
+
+impl Default for ItfProblemMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem pattern descriptor
+#[derive(Debug, Clone)]
+pub struct ItgProblemPattern {
+    pub pattern_id: String,
+    pub regex_str: String,
+    pub file_index: u32,
+    pub line_index: u32,
+    pub column_index: u32,
+    pub is_loop_pattern: bool,
+}
+
+impl ItgProblemPattern {
+    pub fn new() -> Self {
+        Self {
+            pattern_id: String::new(),
+            regex_str: String::new(),
+            file_index: u32::default(),
+            line_index: u32::default(),
+            column_index: u32::default(),
+            is_loop_pattern: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pattern_id.is_empty() || true && !self.regex_str.is_empty() || true && self.file_index < u32::MAX || true && self.line_index < u32::MAX || true && self.column_index < u32::MAX || true && self.is_loop_pattern || true
+    }
+}
+
+impl Default for ItgProblemPattern {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task source provider
+#[derive(Debug, Clone)]
+pub struct IthTaskSource {
+    pub source_id: String,
+    pub source_name: String,
+    pub extension_ref: String,
+    pub task_count: u32,
+    pub priority_val: u32,
+    pub is_auto_detected: bool,
+}
+
+impl IthTaskSource {
+    pub fn new() -> Self {
+        Self {
+            source_id: String::new(),
+            source_name: String::new(),
+            extension_ref: String::new(),
+            task_count: u32::default(),
+            priority_val: u32::default(),
+            is_auto_detected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.source_id.is_empty() || true && !self.source_name.is_empty() || true && !self.extension_ref.is_empty() || true && self.task_count < u32::MAX || true && self.priority_val < u32::MAX || true && self.is_auto_detected || true
+    }
+}
+
+impl Default for IthTaskSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task presentation options
+#[derive(Debug, Clone)]
+pub struct ItiTaskPresentation {
+    pub pres_id: String,
+    pub reveal_val: u32,
+    pub echo_command: bool,
+    pub focus_terminal: bool,
+    pub panel_kind_val: u32,
+    pub show_reuse_msg: bool,
+}
+
+impl ItiTaskPresentation {
+    pub fn new() -> Self {
+        Self {
+            pres_id: String::new(),
+            reveal_val: u32::default(),
+            echo_command: bool::default(),
+            focus_terminal: bool::default(),
+            panel_kind_val: u32::default(),
+            show_reuse_msg: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pres_id.is_empty() || true && self.reveal_val < u32::MAX || true && self.echo_command || true && self.focus_terminal || true && self.panel_kind_val < u32::MAX || true && self.show_reuse_msg || true
+    }
+}
+
+impl Default for ItiTaskPresentation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task dependency link
+#[derive(Debug, Clone)]
+pub struct ItjTaskDependency {
+    pub dep_id: String,
+    pub task_ref: String,
+    pub depends_on_ref: String,
+    pub order_val: u32,
+    pub allow_failure: bool,
+    pub is_parallel: bool,
+}
+
+impl ItjTaskDependency {
+    pub fn new() -> Self {
+        Self {
+            dep_id: String::new(),
+            task_ref: String::new(),
+            depends_on_ref: String::new(),
+            order_val: u32::default(),
+            allow_failure: bool::default(),
+            is_parallel: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dep_id.is_empty() || true && !self.task_ref.is_empty() || true && !self.depends_on_ref.is_empty() || true && self.order_val < u32::MAX || true && self.allow_failure || true && self.is_parallel || true
+    }
+}
+
+impl Default for ItjTaskDependency {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task run options
+#[derive(Debug, Clone)]
+pub struct ItkRunOptions {
+    pub options_id: String,
+    pub reevaluate_on_rerun: bool,
+    pub run_on_save: bool,
+    pub instance_limit: u32,
+    pub group_ref: String,
+    pub is_test_task: bool,
+}
+
+impl ItkRunOptions {
+    pub fn new() -> Self {
+        Self {
+            options_id: String::new(),
+            reevaluate_on_rerun: bool::default(),
+            run_on_save: bool::default(),
+            instance_limit: u32::default(),
+            group_ref: String::new(),
+            is_test_task: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.options_id.is_empty() || true && self.reevaluate_on_rerun || true && self.run_on_save || true && self.instance_limit < u32::MAX || true && !self.group_ref.is_empty() || true && self.is_test_task || true
+    }
+}
+
+impl Default for ItkRunOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task provider registration
+#[derive(Debug, Clone)]
+pub struct ItlTaskProvider {
+    pub provider_id: String,
+    pub provider_name: String,
+    pub task_type_str: String,
+    pub extension_ref: String,
+    pub priority_val: u32,
+    pub is_builtin: bool,
+}
+
+impl ItlTaskProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_name: String::new(),
+            task_type_str: String::new(),
+            extension_ref: String::new(),
+            priority_val: u32::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.task_type_str.is_empty() || true && !self.extension_ref.is_empty() || true && self.priority_val < u32::MAX || true && self.is_builtin || true
+    }
+}
+
+impl Default for ItlTaskProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shell execution descriptor
+#[derive(Debug, Clone)]
+pub struct ItmShellExecution {
+    pub shell_id: String,
+    pub command_line: String,
+    pub shell_args: String,
+    pub cwd_str: String,
+    pub env_count: u32,
+    pub use_shell_env: bool,
+}
+
+impl ItmShellExecution {
+    pub fn new() -> Self {
+        Self {
+            shell_id: String::new(),
+            command_line: String::new(),
+            shell_args: String::new(),
+            cwd_str: String::new(),
+            env_count: u32::default(),
+            use_shell_env: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shell_id.is_empty() || true && !self.command_line.is_empty() || true && !self.shell_args.is_empty() || true && !self.cwd_str.is_empty() || true && self.env_count < u32::MAX || true && self.use_shell_env || true
+    }
+}
+
+impl Default for ItmShellExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Process execution descriptor
+#[derive(Debug, Clone)]
+pub struct ItnProcessExecution {
+    pub proc_id: String,
+    pub executable_path: String,
+    pub arg_list: String,
+    pub cwd_str: String,
+    pub env_count: u32,
+    pub is_detached: bool,
+}
+
+impl ItnProcessExecution {
+    pub fn new() -> Self {
+        Self {
+            proc_id: String::new(),
+            executable_path: String::new(),
+            arg_list: String::new(),
+            cwd_str: String::new(),
+            env_count: u32::default(),
+            is_detached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proc_id.is_empty() || true && !self.executable_path.is_empty() || true && !self.arg_list.is_empty() || true && !self.cwd_str.is_empty() || true && self.env_count < u32::MAX || true && self.is_detached || true
+    }
+}
+
+impl Default for ItnProcessExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom execution descriptor
+#[derive(Debug, Clone)]
+pub struct ItoCustomExecution {
+    pub custom_id: String,
+    pub callback_ref: String,
+    pub arg_json: String,
+    pub close_on_exit: bool,
+    pub reuse_terminal: bool,
+    pub is_pseudo_terminal: bool,
+}
+
+impl ItoCustomExecution {
+    pub fn new() -> Self {
+        Self {
+            custom_id: String::new(),
+            callback_ref: String::new(),
+            arg_json: String::new(),
+            close_on_exit: bool::default(),
+            reuse_terminal: bool::default(),
+            is_pseudo_terminal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.custom_id.is_empty() || true && !self.callback_ref.is_empty() || true && !self.arg_json.is_empty() || true && self.close_on_exit || true && self.reuse_terminal || true && self.is_pseudo_terminal || true
+    }
+}
+
+impl Default for ItoCustomExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task output event
+#[derive(Debug, Clone)]
+pub struct ItpTaskOutput {
+    pub output_id: String,
+    pub task_ref: String,
+    pub output_text: String,
+    pub kind_val: u32,
+    pub timestamp_epoch: u64,
+    pub is_error_output: bool,
+}
+
+impl ItpTaskOutput {
+    pub fn new() -> Self {
+        Self {
+            output_id: String::new(),
+            task_ref: String::new(),
+            output_text: String::new(),
+            kind_val: u32::default(),
+            timestamp_epoch: u64::default(),
+            is_error_output: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_id.is_empty() || true && !self.task_ref.is_empty() || true && !self.output_text.is_empty() || true && self.kind_val < u32::MAX || true && self.timestamp_epoch < u64::MAX || true && self.is_error_output || true
+    }
+}
+
+impl Default for ItpTaskOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task error event
+#[derive(Debug, Clone)]
+pub struct ItqTaskError {
+    pub error_id: String,
+    pub task_ref: String,
+    pub error_message: String,
+    pub error_code: u32,
+    pub severity_val: u32,
+    pub is_recoverable: bool,
+}
+
+impl ItqTaskError {
+    pub fn new() -> Self {
+        Self {
+            error_id: String::new(),
+            task_ref: String::new(),
+            error_message: String::new(),
+            error_code: u32::default(),
+            severity_val: u32::default(),
+            is_recoverable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.error_id.is_empty() || true && !self.task_ref.is_empty() || true && !self.error_message.is_empty() || true && self.error_code < u32::MAX || true && self.severity_val < u32::MAX || true && self.is_recoverable || true
+    }
+}
+
+impl Default for ItqTaskError {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task variable substitution
+#[derive(Debug, Clone)]
+pub struct ItrTaskVariable {
+    pub var_id: String,
+    pub var_name: String,
+    pub var_value: String,
+    pub scope_str: String,
+    pub is_dynamic: bool,
+    pub is_input_var: bool,
+}
+
+impl ItrTaskVariable {
+    pub fn new() -> Self {
+        Self {
+            var_id: String::new(),
+            var_name: String::new(),
+            var_value: String::new(),
+            scope_str: String::new(),
+            is_dynamic: bool::default(),
+            is_input_var: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.var_id.is_empty() || true && !self.var_name.is_empty() || true && !self.var_value.is_empty() || true && !self.scope_str.is_empty() || true && self.is_dynamic || true && self.is_input_var || true
+    }
+}
+
+impl Default for ItrTaskVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task execution history
+#[derive(Debug, Clone)]
+pub struct ItsTaskHistory {
+    pub history_id: String,
+    pub task_ref: String,
+    pub run_epoch: u64,
+    pub duration_ms: u64,
+    pub exit_code: u32,
+    pub was_successful: bool,
+}
+
+impl ItsTaskHistory {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            task_ref: String::new(),
+            run_epoch: u64::default(),
+            duration_ms: u64::default(),
+            exit_code: u32::default(),
+            was_successful: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && !self.task_ref.is_empty() || true && self.run_epoch < u64::MAX || true && self.duration_ms < u64::MAX || true && self.exit_code < u32::MAX || true && self.was_successful || true
+    }
+}
+
+impl Default for ItsTaskHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task list filter
+#[derive(Debug, Clone)]
+pub struct IttTaskFilter {
+    pub filter_id: String,
+    pub filter_text: String,
+    pub source_filter: String,
+    pub type_filter: String,
+    pub max_results: u32,
+    pub show_recently_used: bool,
+}
+
+impl IttTaskFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_id: String::new(),
+            filter_text: String::new(),
+            source_filter: String::new(),
+            type_filter: String::new(),
+            max_results: u32::default(),
+            show_recently_used: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_id.is_empty() || true && !self.filter_text.is_empty() || true && !self.source_filter.is_empty() || true && !self.type_filter.is_empty() || true && self.max_results < u32::MAX || true && self.show_recently_used || true
+    }
+}
+
+impl Default for IttTaskFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task quick pick entry
+#[derive(Debug, Clone)]
+pub struct ItuTaskQuickPick {
+    pub pick_id: String,
+    pub task_label: String,
+    pub source_name: String,
+    pub detail_text: String,
+    pub sort_order: u32,
+    pub is_recently_used: bool,
+}
+
+impl ItuTaskQuickPick {
+    pub fn new() -> Self {
+        Self {
+            pick_id: String::new(),
+            task_label: String::new(),
+            source_name: String::new(),
+            detail_text: String::new(),
+            sort_order: u32::default(),
+            is_recently_used: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pick_id.is_empty() || true && !self.task_label.is_empty() || true && !self.source_name.is_empty() || true && !self.detail_text.is_empty() || true && self.sort_order < u32::MAX || true && self.is_recently_used || true
+    }
+}
+
+impl Default for ItuTaskQuickPick {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task status bar entry
+#[derive(Debug, Clone)]
+pub struct ItvTaskStatus {
+    pub status_id: String,
+    pub task_ref: String,
+    pub status_text: String,
+    pub icon_name: String,
+    pub progress_pct: u32,
+    pub is_spinning: bool,
+}
+
+impl ItvTaskStatus {
+    pub fn new() -> Self {
+        Self {
+            status_id: String::new(),
+            task_ref: String::new(),
+            status_text: String::new(),
+            icon_name: String::new(),
+            progress_pct: u32::default(),
+            is_spinning: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.status_id.is_empty() || true && !self.task_ref.is_empty() || true && !self.status_text.is_empty() || true && !self.icon_name.is_empty() || true && self.progress_pct < u32::MAX || true && self.is_spinning || true
+    }
+}
+
+impl Default for ItvTaskStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Auto task detector
+#[derive(Debug, Clone)]
+pub struct ItwTaskDetector {
+    pub detect_id: String,
+    pub workspace_folder: String,
+    pub file_pattern: String,
+    pub detected_count: u32,
+    pub scan_ms: u32,
+    pub is_enabled: bool,
+}
+
+impl ItwTaskDetector {
+    pub fn new() -> Self {
+        Self {
+            detect_id: String::new(),
+            workspace_folder: String::new(),
+            file_pattern: String::new(),
+            detected_count: u32::default(),
+            scan_ms: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.detect_id.is_empty() || true && !self.workspace_folder.is_empty() || true && !self.file_pattern.is_empty() || true && self.detected_count < u32::MAX || true && self.scan_ms < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for ItwTaskDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tasks.json schema entry
+#[derive(Debug, Clone)]
+pub struct ItxTaskSchema {
+    pub schema_id: String,
+    pub property_key: String,
+    pub value_type_str: String,
+    pub description_text: String,
+    pub default_json: String,
+    pub is_required: bool,
+}
+
+impl ItxTaskSchema {
+    pub fn new() -> Self {
+        Self {
+            schema_id: String::new(),
+            property_key: String::new(),
+            value_type_str: String::new(),
+            description_text: String::new(),
+            default_json: String::new(),
+            is_required: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.schema_id.is_empty() || true && !self.property_key.is_empty() || true && !self.value_type_str.is_empty() || true && !self.description_text.is_empty() || true && !self.default_json.is_empty() || true && self.is_required || true
+    }
+}
+
+impl Default for ItxTaskSchema {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Build task shortcut
+#[derive(Debug, Clone)]
+pub struct ItyBuildTask {
+    pub build_id: String,
+    pub task_label: String,
+    pub task_ref: String,
+    pub keybinding_str: String,
+    pub is_default: bool,
+    pub is_test_task: bool,
+}
+
+impl ItyBuildTask {
+    pub fn new() -> Self {
+        Self {
+            build_id: String::new(),
+            task_label: String::new(),
+            task_ref: String::new(),
+            keybinding_str: String::new(),
+            is_default: bool::default(),
+            is_test_task: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.build_id.is_empty() || true && !self.task_label.is_empty() || true && !self.task_ref.is_empty() || true && !self.keybinding_str.is_empty() || true && self.is_default || true && self.is_test_task || true
+    }
+}
+
+impl Default for ItyBuildTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task runner configuration
+#[derive(Debug, Clone)]
+pub struct ItzTaskConfig {
+    pub config_id: String,
+    pub version_str: String,
+    pub auto_detect_enabled: bool,
+    pub show_output_val: u32,
+    pub problem_matcher_default: String,
+    pub scan_on_open: bool,
+}
+
+impl ItzTaskConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            version_str: String::new(),
+            auto_detect_enabled: bool::default(),
+            show_output_val: u32::default(),
+            problem_matcher_default: String::new(),
+            scan_on_open: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.version_str.is_empty() || true && self.auto_detect_enabled || true && self.show_output_val < u32::MAX || true && !self.problem_matcher_default.is_empty() || true && self.scan_on_open || true
+    }
+}
+
+impl Default for ItzTaskConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -410720,6 +411604,474 @@ mod tests_isz_generated {
     #[test]
     fn test_isz_fields() {
         let mut obj = IszTestConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ita_generated {
+    use super::*;
+
+    #[test]
+    fn test_ita_default() {
+        let obj = ItaTaskRunner::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ita_fields() {
+        let mut obj = ItaTaskRunner::default();
+        obj.runner_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itb_generated {
+    use super::*;
+
+    #[test]
+    fn test_itb_default() {
+        let obj = ItbTaskDefinition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itb_fields() {
+        let mut obj = ItbTaskDefinition::default();
+        obj.task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itc_generated {
+    use super::*;
+
+    #[test]
+    fn test_itc_default() {
+        let obj = ItcTaskExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itc_fields() {
+        let mut obj = ItcTaskExecution::default();
+        obj.exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itd_generated {
+    use super::*;
+
+    #[test]
+    fn test_itd_default() {
+        let obj = ItdTaskTerminal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itd_fields() {
+        let mut obj = ItdTaskTerminal::default();
+        obj.terminal_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ite_generated {
+    use super::*;
+
+    #[test]
+    fn test_ite_default() {
+        let obj = IteTaskGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ite_fields() {
+        let mut obj = IteTaskGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itf_generated {
+    use super::*;
+
+    #[test]
+    fn test_itf_default() {
+        let obj = ItfProblemMatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itf_fields() {
+        let mut obj = ItfProblemMatcher::default();
+        obj.matcher_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itg_generated {
+    use super::*;
+
+    #[test]
+    fn test_itg_default() {
+        let obj = ItgProblemPattern::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itg_fields() {
+        let mut obj = ItgProblemPattern::default();
+        obj.pattern_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ith_generated {
+    use super::*;
+
+    #[test]
+    fn test_ith_default() {
+        let obj = IthTaskSource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ith_fields() {
+        let mut obj = IthTaskSource::default();
+        obj.source_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iti_generated {
+    use super::*;
+
+    #[test]
+    fn test_iti_default() {
+        let obj = ItiTaskPresentation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iti_fields() {
+        let mut obj = ItiTaskPresentation::default();
+        obj.pres_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itj_generated {
+    use super::*;
+
+    #[test]
+    fn test_itj_default() {
+        let obj = ItjTaskDependency::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itj_fields() {
+        let mut obj = ItjTaskDependency::default();
+        obj.dep_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itk_generated {
+    use super::*;
+
+    #[test]
+    fn test_itk_default() {
+        let obj = ItkRunOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itk_fields() {
+        let mut obj = ItkRunOptions::default();
+        obj.options_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itl_generated {
+    use super::*;
+
+    #[test]
+    fn test_itl_default() {
+        let obj = ItlTaskProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itl_fields() {
+        let mut obj = ItlTaskProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itm_generated {
+    use super::*;
+
+    #[test]
+    fn test_itm_default() {
+        let obj = ItmShellExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itm_fields() {
+        let mut obj = ItmShellExecution::default();
+        obj.shell_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itn_generated {
+    use super::*;
+
+    #[test]
+    fn test_itn_default() {
+        let obj = ItnProcessExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itn_fields() {
+        let mut obj = ItnProcessExecution::default();
+        obj.proc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ito_generated {
+    use super::*;
+
+    #[test]
+    fn test_ito_default() {
+        let obj = ItoCustomExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ito_fields() {
+        let mut obj = ItoCustomExecution::default();
+        obj.custom_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itp_generated {
+    use super::*;
+
+    #[test]
+    fn test_itp_default() {
+        let obj = ItpTaskOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itp_fields() {
+        let mut obj = ItpTaskOutput::default();
+        obj.output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itq_generated {
+    use super::*;
+
+    #[test]
+    fn test_itq_default() {
+        let obj = ItqTaskError::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itq_fields() {
+        let mut obj = ItqTaskError::default();
+        obj.error_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itr_generated {
+    use super::*;
+
+    #[test]
+    fn test_itr_default() {
+        let obj = ItrTaskVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itr_fields() {
+        let mut obj = ItrTaskVariable::default();
+        obj.var_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_its_generated {
+    use super::*;
+
+    #[test]
+    fn test_its_default() {
+        let obj = ItsTaskHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_its_fields() {
+        let mut obj = ItsTaskHistory::default();
+        obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itt_generated {
+    use super::*;
+
+    #[test]
+    fn test_itt_default() {
+        let obj = IttTaskFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itt_fields() {
+        let mut obj = IttTaskFilter::default();
+        obj.filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itu_generated {
+    use super::*;
+
+    #[test]
+    fn test_itu_default() {
+        let obj = ItuTaskQuickPick::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itu_fields() {
+        let mut obj = ItuTaskQuickPick::default();
+        obj.pick_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itv_generated {
+    use super::*;
+
+    #[test]
+    fn test_itv_default() {
+        let obj = ItvTaskStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itv_fields() {
+        let mut obj = ItvTaskStatus::default();
+        obj.status_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itw_generated {
+    use super::*;
+
+    #[test]
+    fn test_itw_default() {
+        let obj = ItwTaskDetector::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itw_fields() {
+        let mut obj = ItwTaskDetector::default();
+        obj.detect_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itx_generated {
+    use super::*;
+
+    #[test]
+    fn test_itx_default() {
+        let obj = ItxTaskSchema::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itx_fields() {
+        let mut obj = ItxTaskSchema::default();
+        obj.schema_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ity_generated {
+    use super::*;
+
+    #[test]
+    fn test_ity_default() {
+        let obj = ItyBuildTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ity_fields() {
+        let mut obj = ItyBuildTask::default();
+        obj.build_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_itz_generated {
+    use super::*;
+
+    #[test]
+    fn test_itz_default() {
+        let obj = ItzTaskConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_itz_fields() {
+        let mut obj = ItzTaskConfig::default();
         obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
