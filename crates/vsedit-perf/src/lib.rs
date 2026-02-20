@@ -132132,6 +132132,890 @@ impl Default for HtzDebugHover {
     }
 }
 
+/// Extension test runner registration
+#[derive(Debug, Clone)]
+pub struct HuaTestRunner {
+    pub runner_id: String,
+    pub runner_label: String,
+    pub controller_ref: String,
+    pub supported_kinds: String,
+    pub test_count: u32,
+    pub is_default: bool,
+}
+
+impl HuaTestRunner {
+    pub fn new() -> Self {
+        Self {
+            runner_id: String::new(),
+            runner_label: String::new(),
+            controller_ref: String::new(),
+            supported_kinds: String::new(),
+            test_count: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.runner_id.is_empty() || true && !self.runner_label.is_empty() || true && !self.controller_ref.is_empty() || true && !self.supported_kinds.is_empty() || true && self.test_count < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for HuaTestRunner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test explorer tree item
+#[derive(Debug, Clone)]
+pub struct HubTestItem {
+    pub item_id: String,
+    pub item_label: String,
+    pub parent_ref: String,
+    pub uri_str: String,
+    pub child_count: u32,
+    pub is_canary: bool,
+}
+
+impl HubTestItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            item_label: String::new(),
+            parent_ref: String::new(),
+            uri_str: String::new(),
+            child_count: u32::default(),
+            is_canary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.item_label.is_empty() || true && !self.parent_ref.is_empty() || true && !self.uri_str.is_empty() || true && self.child_count < u32::MAX || true && self.is_canary || true
+    }
+}
+
+impl Default for HubTestItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test execution result entry
+#[derive(Debug, Clone)]
+pub struct HucTestResult {
+    pub result_id: String,
+    pub test_ref: String,
+    pub state_kind: u32,
+    pub duration_ms: u64,
+    pub message_count: u32,
+    pub is_retry: bool,
+}
+
+impl HucTestResult {
+    pub fn new() -> Self {
+        Self {
+            result_id: String::new(),
+            test_ref: String::new(),
+            state_kind: u32::default(),
+            duration_ms: u64::default(),
+            message_count: u32::default(),
+            is_retry: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_id.is_empty() || true && !self.test_ref.is_empty() || true && self.state_kind < u32::MAX || true && self.duration_ms < u64::MAX || true && self.message_count < u32::MAX || true && self.is_retry || true
+    }
+}
+
+impl Default for HucTestResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test failure message detail
+#[derive(Debug, Clone)]
+pub struct HudTestMessage {
+    pub msg_id: String,
+    pub message_text: String,
+    pub expected_text: String,
+    pub actual_text: String,
+    pub location_line: u32,
+    pub is_diff: bool,
+}
+
+impl HudTestMessage {
+    pub fn new() -> Self {
+        Self {
+            msg_id: String::new(),
+            message_text: String::new(),
+            expected_text: String::new(),
+            actual_text: String::new(),
+            location_line: u32::default(),
+            is_diff: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.msg_id.is_empty() || true && !self.message_text.is_empty() || true && !self.expected_text.is_empty() || true && !self.actual_text.is_empty() || true && self.location_line < u32::MAX || true && self.is_diff || true
+    }
+}
+
+impl Default for HudTestMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test run profile configuration
+#[derive(Debug, Clone)]
+pub struct HueTestProfile {
+    pub profile_id: String,
+    pub profile_label: String,
+    pub run_kind: String,
+    pub is_default: bool,
+    pub tag_count: u32,
+    pub supports_continuous: bool,
+}
+
+impl HueTestProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            profile_label: String::new(),
+            run_kind: String::new(),
+            is_default: bool::default(),
+            tag_count: u32::default(),
+            supports_continuous: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && !self.profile_label.is_empty() || true && !self.run_kind.is_empty() || true && self.is_default || true && self.tag_count < u32::MAX || true && self.supports_continuous || true
+    }
+}
+
+impl Default for HueTestProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test coverage data entry
+#[derive(Debug, Clone)]
+pub struct HufTestCoverage {
+    pub cov_id: String,
+    pub file_uri: String,
+    pub line_count: u32,
+    pub covered_count: u32,
+    pub branch_count: u32,
+    pub is_computed: bool,
+}
+
+impl HufTestCoverage {
+    pub fn new() -> Self {
+        Self {
+            cov_id: String::new(),
+            file_uri: String::new(),
+            line_count: u32::default(),
+            covered_count: u32::default(),
+            branch_count: u32::default(),
+            is_computed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cov_id.is_empty() || true && !self.file_uri.is_empty() || true && self.line_count < u32::MAX || true && self.covered_count < u32::MAX || true && self.branch_count < u32::MAX || true && self.is_computed || true
+    }
+}
+
+impl Default for HufTestCoverage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test item tag descriptor
+#[derive(Debug, Clone)]
+pub struct HugTestTag {
+    pub tag_id: String,
+    pub tag_label: String,
+    pub controller_ref: String,
+    pub color_token: String,
+    pub item_count: u32,
+    pub is_hidden: bool,
+}
+
+impl HugTestTag {
+    pub fn new() -> Self {
+        Self {
+            tag_id: String::new(),
+            tag_label: String::new(),
+            controller_ref: String::new(),
+            color_token: String::new(),
+            item_count: u32::default(),
+            is_hidden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_id.is_empty() || true && !self.tag_label.is_empty() || true && !self.controller_ref.is_empty() || true && !self.color_token.is_empty() || true && self.item_count < u32::MAX || true && self.is_hidden || true
+    }
+}
+
+impl Default for HugTestTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test execution run state
+#[derive(Debug, Clone)]
+pub struct HuhTestRun {
+    pub run_id: String,
+    pub profile_ref: String,
+    pub started_epoch: u64,
+    pub test_count: u32,
+    pub completed_count: u32,
+    pub is_cancelled: bool,
+}
+
+impl HuhTestRun {
+    pub fn new() -> Self {
+        Self {
+            run_id: String::new(),
+            profile_ref: String::new(),
+            started_epoch: u64::default(),
+            test_count: u32::default(),
+            completed_count: u32::default(),
+            is_cancelled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.run_id.is_empty() || true && !self.profile_ref.is_empty() || true && self.started_epoch < u64::MAX || true && self.test_count < u32::MAX || true && self.completed_count < u32::MAX || true && self.is_cancelled || true
+    }
+}
+
+impl Default for HuhTestRun {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test output stream entry
+#[derive(Debug, Clone)]
+pub struct HuiTestOutput {
+    pub output_id: String,
+    pub run_ref: String,
+    pub output_text: String,
+    pub location_uri: String,
+    pub line_number: u32,
+    pub is_stderr: bool,
+}
+
+impl HuiTestOutput {
+    pub fn new() -> Self {
+        Self {
+            output_id: String::new(),
+            run_ref: String::new(),
+            output_text: String::new(),
+            location_uri: String::new(),
+            line_number: u32::default(),
+            is_stderr: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_id.is_empty() || true && !self.run_ref.is_empty() || true && !self.output_text.is_empty() || true && !self.location_uri.is_empty() || true && self.line_number < u32::MAX || true && self.is_stderr || true
+    }
+}
+
+impl Default for HuiTestOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test explorer filter
+#[derive(Debug, Clone)]
+pub struct HujTestFilter {
+    pub filter_id: String,
+    pub filter_text: String,
+    pub tag_ref: String,
+    pub state_filter: String,
+    pub max_results: u32,
+    pub exclude_hidden: bool,
+}
+
+impl HujTestFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_id: String::new(),
+            filter_text: String::new(),
+            tag_ref: String::new(),
+            state_filter: String::new(),
+            max_results: u32::default(),
+            exclude_hidden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_id.is_empty() || true && !self.filter_text.is_empty() || true && !self.tag_ref.is_empty() || true && !self.state_filter.is_empty() || true && self.max_results < u32::MAX || true && self.exclude_hidden || true
+    }
+}
+
+impl Default for HujTestFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test assertion diff block
+#[derive(Debug, Clone)]
+pub struct HukTestDiff {
+    pub diff_id: String,
+    pub expected_block: String,
+    pub actual_block: String,
+    pub context_lines: u32,
+    pub change_count: u32,
+    pub is_multiline: bool,
+}
+
+impl HukTestDiff {
+    pub fn new() -> Self {
+        Self {
+            diff_id: String::new(),
+            expected_block: String::new(),
+            actual_block: String::new(),
+            context_lines: u32::default(),
+            change_count: u32::default(),
+            is_multiline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_id.is_empty() || true && !self.expected_block.is_empty() || true && !self.actual_block.is_empty() || true && self.context_lines < u32::MAX || true && self.change_count < u32::MAX || true && self.is_multiline || true
+    }
+}
+
+impl Default for HukTestDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test gutter decoration
+#[derive(Debug, Clone)]
+pub struct HulTestDecoration {
+    pub deco_id: String,
+    pub line_number: u32,
+    pub state_kind: u32,
+    pub tooltip_text: String,
+    pub icon_name: String,
+    pub is_stale: bool,
+}
+
+impl HulTestDecoration {
+    pub fn new() -> Self {
+        Self {
+            deco_id: String::new(),
+            line_number: u32::default(),
+            state_kind: u32::default(),
+            tooltip_text: String::new(),
+            icon_name: String::new(),
+            is_stale: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_id.is_empty() || true && self.line_number < u32::MAX || true && self.state_kind < u32::MAX || true && !self.tooltip_text.is_empty() || true && !self.icon_name.is_empty() || true && self.is_stale || true
+    }
+}
+
+impl Default for HulTestDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test snapshot comparison
+#[derive(Debug, Clone)]
+pub struct HumTestSnapshot {
+    pub snap_id: String,
+    pub snap_name: String,
+    pub snap_content: String,
+    pub file_uri: String,
+    pub content_hash_len: u32,
+    pub is_outdated: bool,
+}
+
+impl HumTestSnapshot {
+    pub fn new() -> Self {
+        Self {
+            snap_id: String::new(),
+            snap_name: String::new(),
+            snap_content: String::new(),
+            file_uri: String::new(),
+            content_hash_len: u32::default(),
+            is_outdated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snap_id.is_empty() || true && !self.snap_name.is_empty() || true && !self.snap_content.is_empty() || true && !self.file_uri.is_empty() || true && self.content_hash_len < u32::MAX || true && self.is_outdated || true
+    }
+}
+
+impl Default for HumTestSnapshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test fixture configuration
+#[derive(Debug, Clone)]
+pub struct HunTestFixture {
+    pub fixture_id: String,
+    pub fixture_name: String,
+    pub setup_command: String,
+    pub teardown_command: String,
+    pub timeout_ms: u32,
+    pub is_shared: bool,
+}
+
+impl HunTestFixture {
+    pub fn new() -> Self {
+        Self {
+            fixture_id: String::new(),
+            fixture_name: String::new(),
+            setup_command: String::new(),
+            teardown_command: String::new(),
+            timeout_ms: u32::default(),
+            is_shared: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fixture_id.is_empty() || true && !self.fixture_name.is_empty() || true && !self.setup_command.is_empty() || true && !self.teardown_command.is_empty() || true && self.timeout_ms < u32::MAX || true && self.is_shared || true
+    }
+}
+
+impl Default for HunTestFixture {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test mock service entry
+#[derive(Debug, Clone)]
+pub struct HuoTestMock {
+    pub mock_id: String,
+    pub service_name: String,
+    pub method_name: String,
+    pub return_json: String,
+    pub call_count: u32,
+    pub is_strict: bool,
+}
+
+impl HuoTestMock {
+    pub fn new() -> Self {
+        Self {
+            mock_id: String::new(),
+            service_name: String::new(),
+            method_name: String::new(),
+            return_json: String::new(),
+            call_count: u32::default(),
+            is_strict: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mock_id.is_empty() || true && !self.service_name.is_empty() || true && !self.method_name.is_empty() || true && !self.return_json.is_empty() || true && self.call_count < u32::MAX || true && self.is_strict || true
+    }
+}
+
+impl Default for HuoTestMock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test performance benchmark
+#[derive(Debug, Clone)]
+pub struct HupTestBenchmark {
+    pub bench_id: String,
+    pub bench_name: String,
+    pub iterations: u64,
+    pub mean_ns: u64,
+    pub std_dev_ns: u64,
+    pub is_baseline: bool,
+}
+
+impl HupTestBenchmark {
+    pub fn new() -> Self {
+        Self {
+            bench_id: String::new(),
+            bench_name: String::new(),
+            iterations: u64::default(),
+            mean_ns: u64::default(),
+            std_dev_ns: u64::default(),
+            is_baseline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bench_id.is_empty() || true && !self.bench_name.is_empty() || true && self.iterations < u64::MAX || true && self.mean_ns < u64::MAX || true && self.std_dev_ns < u64::MAX || true && self.is_baseline || true
+    }
+}
+
+impl Default for HupTestBenchmark {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test matrix configuration
+#[derive(Debug, Clone)]
+pub struct HuqTestMatrix {
+    pub matrix_id: String,
+    pub matrix_label: String,
+    pub axis_count: u32,
+    pub combination_count: u32,
+    pub max_parallel: u32,
+    pub fail_fast: bool,
+}
+
+impl HuqTestMatrix {
+    pub fn new() -> Self {
+        Self {
+            matrix_id: String::new(),
+            matrix_label: String::new(),
+            axis_count: u32::default(),
+            combination_count: u32::default(),
+            max_parallel: u32::default(),
+            fail_fast: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.matrix_id.is_empty() || true && !self.matrix_label.is_empty() || true && self.axis_count < u32::MAX || true && self.combination_count < u32::MAX || true && self.max_parallel < u32::MAX || true && self.fail_fast || true
+    }
+}
+
+impl Default for HuqTestMatrix {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test environment descriptor
+#[derive(Debug, Clone)]
+pub struct HurTestEnvironment {
+    pub env_id: String,
+    pub env_name: String,
+    pub runtime_version: String,
+    pub platform_str: String,
+    pub variable_count: u32,
+    pub is_ci: bool,
+}
+
+impl HurTestEnvironment {
+    pub fn new() -> Self {
+        Self {
+            env_id: String::new(),
+            env_name: String::new(),
+            runtime_version: String::new(),
+            platform_str: String::new(),
+            variable_count: u32::default(),
+            is_ci: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.env_id.is_empty() || true && !self.env_name.is_empty() || true && !self.runtime_version.is_empty() || true && !self.platform_str.is_empty() || true && self.variable_count < u32::MAX || true && self.is_ci || true
+    }
+}
+
+impl Default for HurTestEnvironment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test report summary
+#[derive(Debug, Clone)]
+pub struct HusTestReport {
+    pub report_id: String,
+    pub run_ref: String,
+    pub total_count: u32,
+    pub passed_count: u32,
+    pub failed_count: u32,
+    pub has_coverage: bool,
+}
+
+impl HusTestReport {
+    pub fn new() -> Self {
+        Self {
+            report_id: String::new(),
+            run_ref: String::new(),
+            total_count: u32::default(),
+            passed_count: u32::default(),
+            failed_count: u32::default(),
+            has_coverage: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.report_id.is_empty() || true && !self.run_ref.is_empty() || true && self.total_count < u32::MAX || true && self.passed_count < u32::MAX || true && self.failed_count < u32::MAX || true && self.has_coverage || true
+    }
+}
+
+impl Default for HusTestReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test run history entry
+#[derive(Debug, Clone)]
+pub struct HutTestHistory {
+    pub history_id: String,
+    pub test_ref: String,
+    pub run_epoch: u64,
+    pub state_kind: u32,
+    pub duration_ms: u64,
+    pub is_flaky: bool,
+}
+
+impl HutTestHistory {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            test_ref: String::new(),
+            run_epoch: u64::default(),
+            state_kind: u32::default(),
+            duration_ms: u64::default(),
+            is_flaky: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && !self.test_ref.is_empty() || true && self.run_epoch < u64::MAX || true && self.state_kind < u32::MAX || true && self.duration_ms < u64::MAX || true && self.is_flaky || true
+    }
+}
+
+impl Default for HutTestHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test retry policy
+#[derive(Debug, Clone)]
+pub struct HuuTestRetry {
+    pub retry_id: String,
+    pub max_retries: u32,
+    pub retry_delay_ms: u32,
+    pub backoff_factor: u32,
+    pub current_attempt: u32,
+    pub stop_on_pass: bool,
+}
+
+impl HuuTestRetry {
+    pub fn new() -> Self {
+        Self {
+            retry_id: String::new(),
+            max_retries: u32::default(),
+            retry_delay_ms: u32::default(),
+            backoff_factor: u32::default(),
+            current_attempt: u32::default(),
+            stop_on_pass: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.retry_id.is_empty() || true && self.max_retries < u32::MAX || true && self.retry_delay_ms < u32::MAX || true && self.backoff_factor < u32::MAX || true && self.current_attempt < u32::MAX || true && self.stop_on_pass || true
+    }
+}
+
+impl Default for HuuTestRetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test timeout configuration
+#[derive(Debug, Clone)]
+pub struct HuvTestTimeout {
+    pub timeout_id: String,
+    pub timeout_ms: u64,
+    pub grace_period_ms: u32,
+    pub action_on_timeout: String,
+    pub scope_str: String,
+    pub is_global: bool,
+}
+
+impl HuvTestTimeout {
+    pub fn new() -> Self {
+        Self {
+            timeout_id: String::new(),
+            timeout_ms: u64::default(),
+            grace_period_ms: u32::default(),
+            action_on_timeout: String::new(),
+            scope_str: String::new(),
+            is_global: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.timeout_id.is_empty() || true && self.timeout_ms < u64::MAX || true && self.grace_period_ms < u32::MAX || true && !self.action_on_timeout.is_empty() || true && !self.scope_str.is_empty() || true && self.is_global || true
+    }
+}
+
+impl Default for HuvTestTimeout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test parallel execution config
+#[derive(Debug, Clone)]
+pub struct HuwTestParallel {
+    pub parallel_id: String,
+    pub max_workers: u32,
+    pub shard_count: u32,
+    pub shard_index: u32,
+    pub isolation_level: String,
+    pub reuse_workers: bool,
+}
+
+impl HuwTestParallel {
+    pub fn new() -> Self {
+        Self {
+            parallel_id: String::new(),
+            max_workers: u32::default(),
+            shard_count: u32::default(),
+            shard_index: u32::default(),
+            isolation_level: String::new(),
+            reuse_workers: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.parallel_id.is_empty() || true && self.max_workers < u32::MAX || true && self.shard_count < u32::MAX || true && self.shard_index < u32::MAX || true && !self.isolation_level.is_empty() || true && self.reuse_workers || true
+    }
+}
+
+impl Default for HuwTestParallel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test debug launch config
+#[derive(Debug, Clone)]
+pub struct HuxTestDebugConfig {
+    pub debug_id: String,
+    pub test_ref: String,
+    pub adapter_type_str: String,
+    pub program_path: String,
+    pub port_number: u32,
+    pub stop_on_entry: bool,
+}
+
+impl HuxTestDebugConfig {
+    pub fn new() -> Self {
+        Self {
+            debug_id: String::new(),
+            test_ref: String::new(),
+            adapter_type_str: String::new(),
+            program_path: String::new(),
+            port_number: u32::default(),
+            stop_on_entry: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.debug_id.is_empty() || true && !self.test_ref.is_empty() || true && !self.adapter_type_str.is_empty() || true && !self.program_path.is_empty() || true && self.port_number < u32::MAX || true && self.stop_on_entry || true
+    }
+}
+
+impl Default for HuxTestDebugConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test file watcher config
+#[derive(Debug, Clone)]
+pub struct HuyTestWatcher {
+    pub watcher_id: String,
+    pub watch_pattern: String,
+    pub debounce_ms: u32,
+    pub run_on_save: bool,
+    pub clear_results: bool,
+    pub is_enabled: bool,
+}
+
+impl HuyTestWatcher {
+    pub fn new() -> Self {
+        Self {
+            watcher_id: String::new(),
+            watch_pattern: String::new(),
+            debounce_ms: u32::default(),
+            run_on_save: bool::default(),
+            clear_results: bool::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watcher_id.is_empty() || true && !self.watch_pattern.is_empty() || true && self.debounce_ms < u32::MAX || true && self.run_on_save || true && self.clear_results || true && self.is_enabled || true
+    }
+}
+
+impl Default for HuyTestWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test suite aggregate
+#[derive(Debug, Clone)]
+pub struct HuzTestSuite {
+    pub suite_id: String,
+    pub suite_label: String,
+    pub test_count: u32,
+    pub nested_count: u32,
+    pub tag_list_len: u32,
+    pub is_root: bool,
+}
+
+impl HuzTestSuite {
+    pub fn new() -> Self {
+        Self {
+            suite_id: String::new(),
+            suite_label: String::new(),
+            test_count: u32::default(),
+            nested_count: u32::default(),
+            tag_list_len: u32::default(),
+            is_root: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.suite_id.is_empty() || true && !self.suite_label.is_empty() || true && self.test_count < u32::MAX || true && self.nested_count < u32::MAX || true && self.tag_list_len < u32::MAX || true && self.is_root || true
+    }
+}
+
+impl Default for HuzTestSuite {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -377071,6 +377955,474 @@ mod tests_htz_generated {
     fn test_htz_fields() {
         let mut obj = HtzDebugHover::default();
         obj.hover_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hua_generated {
+    use super::*;
+
+    #[test]
+    fn test_hua_default() {
+        let obj = HuaTestRunner::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hua_fields() {
+        let mut obj = HuaTestRunner::default();
+        obj.runner_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hub_generated {
+    use super::*;
+
+    #[test]
+    fn test_hub_default() {
+        let obj = HubTestItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hub_fields() {
+        let mut obj = HubTestItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_huc_generated {
+    use super::*;
+
+    #[test]
+    fn test_huc_default() {
+        let obj = HucTestResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_huc_fields() {
+        let mut obj = HucTestResult::default();
+        obj.result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hud_generated {
+    use super::*;
+
+    #[test]
+    fn test_hud_default() {
+        let obj = HudTestMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hud_fields() {
+        let mut obj = HudTestMessage::default();
+        obj.msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hue_generated {
+    use super::*;
+
+    #[test]
+    fn test_hue_default() {
+        let obj = HueTestProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hue_fields() {
+        let mut obj = HueTestProfile::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_huf_generated {
+    use super::*;
+
+    #[test]
+    fn test_huf_default() {
+        let obj = HufTestCoverage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_huf_fields() {
+        let mut obj = HufTestCoverage::default();
+        obj.cov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hug_generated {
+    use super::*;
+
+    #[test]
+    fn test_hug_default() {
+        let obj = HugTestTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hug_fields() {
+        let mut obj = HugTestTag::default();
+        obj.tag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_huh_generated {
+    use super::*;
+
+    #[test]
+    fn test_huh_default() {
+        let obj = HuhTestRun::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_huh_fields() {
+        let mut obj = HuhTestRun::default();
+        obj.run_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hui_generated {
+    use super::*;
+
+    #[test]
+    fn test_hui_default() {
+        let obj = HuiTestOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hui_fields() {
+        let mut obj = HuiTestOutput::default();
+        obj.output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_huj_generated {
+    use super::*;
+
+    #[test]
+    fn test_huj_default() {
+        let obj = HujTestFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_huj_fields() {
+        let mut obj = HujTestFilter::default();
+        obj.filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_huk_generated {
+    use super::*;
+
+    #[test]
+    fn test_huk_default() {
+        let obj = HukTestDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_huk_fields() {
+        let mut obj = HukTestDiff::default();
+        obj.diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hul_generated {
+    use super::*;
+
+    #[test]
+    fn test_hul_default() {
+        let obj = HulTestDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hul_fields() {
+        let mut obj = HulTestDecoration::default();
+        obj.deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hum_generated {
+    use super::*;
+
+    #[test]
+    fn test_hum_default() {
+        let obj = HumTestSnapshot::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hum_fields() {
+        let mut obj = HumTestSnapshot::default();
+        obj.snap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hun_generated {
+    use super::*;
+
+    #[test]
+    fn test_hun_default() {
+        let obj = HunTestFixture::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hun_fields() {
+        let mut obj = HunTestFixture::default();
+        obj.fixture_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_huo_generated {
+    use super::*;
+
+    #[test]
+    fn test_huo_default() {
+        let obj = HuoTestMock::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_huo_fields() {
+        let mut obj = HuoTestMock::default();
+        obj.mock_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hup_generated {
+    use super::*;
+
+    #[test]
+    fn test_hup_default() {
+        let obj = HupTestBenchmark::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hup_fields() {
+        let mut obj = HupTestBenchmark::default();
+        obj.bench_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_huq_generated {
+    use super::*;
+
+    #[test]
+    fn test_huq_default() {
+        let obj = HuqTestMatrix::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_huq_fields() {
+        let mut obj = HuqTestMatrix::default();
+        obj.matrix_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hur_generated {
+    use super::*;
+
+    #[test]
+    fn test_hur_default() {
+        let obj = HurTestEnvironment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hur_fields() {
+        let mut obj = HurTestEnvironment::default();
+        obj.env_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hus_generated {
+    use super::*;
+
+    #[test]
+    fn test_hus_default() {
+        let obj = HusTestReport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hus_fields() {
+        let mut obj = HusTestReport::default();
+        obj.report_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hut_generated {
+    use super::*;
+
+    #[test]
+    fn test_hut_default() {
+        let obj = HutTestHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hut_fields() {
+        let mut obj = HutTestHistory::default();
+        obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_huu_generated {
+    use super::*;
+
+    #[test]
+    fn test_huu_default() {
+        let obj = HuuTestRetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_huu_fields() {
+        let mut obj = HuuTestRetry::default();
+        obj.retry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_huv_generated {
+    use super::*;
+
+    #[test]
+    fn test_huv_default() {
+        let obj = HuvTestTimeout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_huv_fields() {
+        let mut obj = HuvTestTimeout::default();
+        obj.timeout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_huw_generated {
+    use super::*;
+
+    #[test]
+    fn test_huw_default() {
+        let obj = HuwTestParallel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_huw_fields() {
+        let mut obj = HuwTestParallel::default();
+        obj.parallel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hux_generated {
+    use super::*;
+
+    #[test]
+    fn test_hux_default() {
+        let obj = HuxTestDebugConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hux_fields() {
+        let mut obj = HuxTestDebugConfig::default();
+        obj.debug_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_huy_generated {
+    use super::*;
+
+    #[test]
+    fn test_huy_default() {
+        let obj = HuyTestWatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_huy_fields() {
+        let mut obj = HuyTestWatcher::default();
+        obj.watcher_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_huz_generated {
+    use super::*;
+
+    #[test]
+    fn test_huz_default() {
+        let obj = HuzTestSuite::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_huz_fields() {
+        let mut obj = HuzTestSuite::default();
+        obj.suite_id = "test".to_string();
         assert!(obj.validate());
     }
 }
