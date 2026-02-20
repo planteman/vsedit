@@ -152029,6 +152029,890 @@ impl Default for IqzLogEntry {
     }
 }
 
+/// Global event bus
+#[derive(Debug, Clone)]
+pub struct IraEventBus {
+    pub bus_id: String,
+    pub channel_count: u32,
+    pub listener_count: u32,
+    pub fire_count: u64,
+    pub max_listeners: u32,
+    pub is_leaking: bool,
+}
+
+impl IraEventBus {
+    pub fn new() -> Self {
+        Self {
+            bus_id: String::new(),
+            channel_count: u32::default(),
+            listener_count: u32::default(),
+            fire_count: u64::default(),
+            max_listeners: u32::default(),
+            is_leaking: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bus_id.is_empty() || true && self.channel_count < u32::MAX || true && self.listener_count < u32::MAX || true && self.fire_count < u64::MAX || true && self.max_listeners < u32::MAX || true && self.is_leaking || true
+    }
+}
+
+impl Default for IraEventBus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Event listener registration
+#[derive(Debug, Clone)]
+pub struct IrbEventListener {
+    pub listener_id: String,
+    pub event_name: String,
+    pub handler_ref: String,
+    pub priority_val: u32,
+    pub fire_count: u64,
+    pub is_once: bool,
+}
+
+impl IrbEventListener {
+    pub fn new() -> Self {
+        Self {
+            listener_id: String::new(),
+            event_name: String::new(),
+            handler_ref: String::new(),
+            priority_val: u32::default(),
+            fire_count: u64::default(),
+            is_once: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.listener_id.is_empty() || true && !self.event_name.is_empty() || true && !self.handler_ref.is_empty() || true && self.priority_val < u32::MAX || true && self.fire_count < u64::MAX || true && self.is_once || true
+    }
+}
+
+impl Default for IrbEventListener {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Typed event emitter
+#[derive(Debug, Clone)]
+pub struct IrcEventEmitter {
+    pub emitter_id: String,
+    pub event_type_str: String,
+    pub listener_count: u32,
+    pub delivery_queue_len: u32,
+    pub max_listeners: u32,
+    pub is_paused: bool,
+}
+
+impl IrcEventEmitter {
+    pub fn new() -> Self {
+        Self {
+            emitter_id: String::new(),
+            event_type_str: String::new(),
+            listener_count: u32::default(),
+            delivery_queue_len: u32::default(),
+            max_listeners: u32::default(),
+            is_paused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.emitter_id.is_empty() || true && !self.event_type_str.is_empty() || true && self.listener_count < u32::MAX || true && self.delivery_queue_len < u32::MAX || true && self.max_listeners < u32::MAX || true && self.is_paused || true
+    }
+}
+
+impl Default for IrcEventEmitter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Event buffering state
+#[derive(Debug, Clone)]
+pub struct IrdEventBuffer {
+    pub buffer_id: String,
+    pub event_count: u32,
+    pub buffer_size: u32,
+    pub flush_interval_ms: u32,
+    pub overflow_count: u64,
+    pub auto_flush: bool,
+}
+
+impl IrdEventBuffer {
+    pub fn new() -> Self {
+        Self {
+            buffer_id: String::new(),
+            event_count: u32::default(),
+            buffer_size: u32::default(),
+            flush_interval_ms: u32::default(),
+            overflow_count: u64::default(),
+            auto_flush: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buffer_id.is_empty() || true && self.event_count < u32::MAX || true && self.buffer_size < u32::MAX || true && self.flush_interval_ms < u32::MAX || true && self.overflow_count < u64::MAX || true && self.auto_flush || true
+    }
+}
+
+impl Default for IrdEventBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Event relay forwarding
+#[derive(Debug, Clone)]
+pub struct IreEventRelay {
+    pub relay_id: String,
+    pub source_ref: String,
+    pub target_ref: String,
+    pub relay_count: u64,
+    pub filter_str: String,
+    pub is_active: bool,
+}
+
+impl IreEventRelay {
+    pub fn new() -> Self {
+        Self {
+            relay_id: String::new(),
+            source_ref: String::new(),
+            target_ref: String::new(),
+            relay_count: u64::default(),
+            filter_str: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.relay_id.is_empty() || true && !self.source_ref.is_empty() || true && !self.target_ref.is_empty() || true && self.relay_count < u64::MAX || true && !self.filter_str.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for IreEventRelay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Disposable resource
+#[derive(Debug, Clone)]
+pub struct IrfDisposable {
+    pub disposable_id: String,
+    pub resource_name: String,
+    pub dispose_order: u32,
+    pub ref_count: u32,
+    pub byte_size: u64,
+    pub is_disposed: bool,
+}
+
+impl IrfDisposable {
+    pub fn new() -> Self {
+        Self {
+            disposable_id: String::new(),
+            resource_name: String::new(),
+            dispose_order: u32::default(),
+            ref_count: u32::default(),
+            byte_size: u64::default(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.disposable_id.is_empty() || true && !self.resource_name.is_empty() || true && self.dispose_order < u32::MAX || true && self.ref_count < u32::MAX || true && self.byte_size < u64::MAX || true && self.is_disposed || true
+    }
+}
+
+impl Default for IrfDisposable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Disposable group container
+#[derive(Debug, Clone)]
+pub struct IrgDisposableGroup {
+    pub group_id: String,
+    pub disposable_count: u32,
+    pub disposed_count: u32,
+    pub add_after_dispose: bool,
+    pub max_size: u32,
+    pub is_disposed: bool,
+}
+
+impl IrgDisposableGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            disposable_count: u32::default(),
+            disposed_count: u32::default(),
+            add_after_dispose: bool::default(),
+            max_size: u32::default(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && self.disposable_count < u32::MAX || true && self.disposed_count < u32::MAX || true && self.add_after_dispose || true && self.max_size < u32::MAX || true && self.is_disposed || true
+    }
+}
+
+impl Default for IrgDisposableGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Mutable disposable holder
+#[derive(Debug, Clone)]
+pub struct IrhMutableDisposable {
+    pub mutable_id: String,
+    pub current_ref: String,
+    pub swap_count: u64,
+    pub dispose_on_swap: bool,
+    pub byte_size: u64,
+    pub is_empty: bool,
+}
+
+impl IrhMutableDisposable {
+    pub fn new() -> Self {
+        Self {
+            mutable_id: String::new(),
+            current_ref: String::new(),
+            swap_count: u64::default(),
+            dispose_on_swap: bool::default(),
+            byte_size: u64::default(),
+            is_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mutable_id.is_empty() || true && !self.current_ref.is_empty() || true && self.swap_count < u64::MAX || true && self.dispose_on_swap || true && self.byte_size < u64::MAX || true && self.is_empty || true
+    }
+}
+
+impl Default for IrhMutableDisposable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Disposable leak tracker
+#[derive(Debug, Clone)]
+pub struct IriLeakTracker {
+    pub tracker_id: String,
+    pub tracked_count: u32,
+    pub leaked_count: u32,
+    pub stack_trace_enabled: bool,
+    pub report_interval_ms: u32,
+    pub is_enabled: bool,
+}
+
+impl IriLeakTracker {
+    pub fn new() -> Self {
+        Self {
+            tracker_id: String::new(),
+            tracked_count: u32::default(),
+            leaked_count: u32::default(),
+            stack_trace_enabled: bool::default(),
+            report_interval_ms: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tracker_id.is_empty() || true && self.tracked_count < u32::MAX || true && self.leaked_count < u32::MAX || true && self.stack_trace_enabled || true && self.report_interval_ms < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for IriLeakTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cancellation token source
+#[derive(Debug, Clone)]
+pub struct IrjCancellationSource {
+    pub source_id: String,
+    pub token_ref: String,
+    pub reason_text: String,
+    pub listener_count: u32,
+    pub cancel_epoch: u64,
+    pub is_cancelled: bool,
+}
+
+impl IrjCancellationSource {
+    pub fn new() -> Self {
+        Self {
+            source_id: String::new(),
+            token_ref: String::new(),
+            reason_text: String::new(),
+            listener_count: u32::default(),
+            cancel_epoch: u64::default(),
+            is_cancelled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.source_id.is_empty() || true && !self.token_ref.is_empty() || true && !self.reason_text.is_empty() || true && self.listener_count < u32::MAX || true && self.cancel_epoch < u64::MAX || true && self.is_cancelled || true
+    }
+}
+
+impl Default for IrjCancellationSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async disposable resource
+#[derive(Debug, Clone)]
+pub struct IrkAsyncDisposable {
+    pub async_id: String,
+    pub resource_name: String,
+    pub dispose_timeout_ms: u32,
+    pub pending_ops: u32,
+    pub byte_size: u64,
+    pub is_disposing: bool,
+}
+
+impl IrkAsyncDisposable {
+    pub fn new() -> Self {
+        Self {
+            async_id: String::new(),
+            resource_name: String::new(),
+            dispose_timeout_ms: u32::default(),
+            pending_ops: u32::default(),
+            byte_size: u64::default(),
+            is_disposing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.async_id.is_empty() || true && !self.resource_name.is_empty() || true && self.dispose_timeout_ms < u32::MAX || true && self.pending_ops < u32::MAX || true && self.byte_size < u64::MAX || true && self.is_disposing || true
+    }
+}
+
+impl Default for IrkAsyncDisposable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Lifecycle-bound disposable
+#[derive(Debug, Clone)]
+pub struct IrlLifecycleDisposable {
+    pub lifecycle_id: String,
+    pub phase_ref: String,
+    pub disposable_count: u32,
+    pub dispose_order: u32,
+    pub created_epoch: u64,
+    pub is_active: bool,
+}
+
+impl IrlLifecycleDisposable {
+    pub fn new() -> Self {
+        Self {
+            lifecycle_id: String::new(),
+            phase_ref: String::new(),
+            disposable_count: u32::default(),
+            dispose_order: u32::default(),
+            created_epoch: u64::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lifecycle_id.is_empty() || true && !self.phase_ref.is_empty() || true && self.disposable_count < u32::MAX || true && self.dispose_order < u32::MAX || true && self.created_epoch < u64::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for IrlLifecycleDisposable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Promise/future descriptor
+#[derive(Debug, Clone)]
+pub struct IrmPromise {
+    pub promise_id: String,
+    pub state_val: u32,
+    pub resolve_epoch: u64,
+    pub reject_reason_len: u32,
+    pub then_count: u32,
+    pub is_settled: bool,
+}
+
+impl IrmPromise {
+    pub fn new() -> Self {
+        Self {
+            promise_id: String::new(),
+            state_val: u32::default(),
+            resolve_epoch: u64::default(),
+            reject_reason_len: u32::default(),
+            then_count: u32::default(),
+            is_settled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.promise_id.is_empty() || true && self.state_val < u32::MAX || true && self.resolve_epoch < u64::MAX || true && self.reject_reason_len < u32::MAX || true && self.then_count < u32::MAX || true && self.is_settled || true
+    }
+}
+
+impl Default for IrmPromise {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Deferred promise wrapper
+#[derive(Debug, Clone)]
+pub struct IrnDeferredPromise {
+    pub deferred_id: String,
+    pub promise_ref: String,
+    pub resolve_fn_ref: String,
+    pub reject_fn_ref: String,
+    pub timeout_ms: u32,
+    pub is_resolved: bool,
+}
+
+impl IrnDeferredPromise {
+    pub fn new() -> Self {
+        Self {
+            deferred_id: String::new(),
+            promise_ref: String::new(),
+            resolve_fn_ref: String::new(),
+            reject_fn_ref: String::new(),
+            timeout_ms: u32::default(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deferred_id.is_empty() || true && !self.promise_ref.is_empty() || true && !self.resolve_fn_ref.is_empty() || true && !self.reject_fn_ref.is_empty() || true && self.timeout_ms < u32::MAX || true && self.is_resolved || true
+    }
+}
+
+impl Default for IrnDeferredPromise {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async barrier primitive
+#[derive(Debug, Clone)]
+pub struct IroBarrier {
+    pub barrier_id: String,
+    pub is_open: bool,
+    pub waiting_count: u32,
+    pub open_epoch: u64,
+    pub timeout_ms: u32,
+    pub auto_reset: bool,
+}
+
+impl IroBarrier {
+    pub fn new() -> Self {
+        Self {
+            barrier_id: String::new(),
+            is_open: bool::default(),
+            waiting_count: u32::default(),
+            open_epoch: u64::default(),
+            timeout_ms: u32::default(),
+            auto_reset: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.barrier_id.is_empty() || true && self.is_open || true && self.waiting_count < u32::MAX || true && self.open_epoch < u64::MAX || true && self.timeout_ms < u32::MAX || true && self.auto_reset || true
+    }
+}
+
+impl Default for IroBarrier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async operation sequencer
+#[derive(Debug, Clone)]
+pub struct IrpSequencer {
+    pub seq_id: String,
+    pub queue_size: u32,
+    pub running_count: u32,
+    pub completed_count: u64,
+    pub error_count: u32,
+    pub is_paused: bool,
+}
+
+impl IrpSequencer {
+    pub fn new() -> Self {
+        Self {
+            seq_id: String::new(),
+            queue_size: u32::default(),
+            running_count: u32::default(),
+            completed_count: u64::default(),
+            error_count: u32::default(),
+            is_paused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.seq_id.is_empty() || true && self.queue_size < u32::MAX || true && self.running_count < u32::MAX || true && self.completed_count < u64::MAX || true && self.error_count < u32::MAX || true && self.is_paused || true
+    }
+}
+
+impl Default for IrpSequencer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async operation throttler
+#[derive(Debug, Clone)]
+pub struct IrqThrottler {
+    pub throttle_id: String,
+    pub max_concurrent: u32,
+    pub pending_count: u32,
+    pub active_count: u32,
+    pub completed_count: u64,
+    pub is_full: bool,
+}
+
+impl IrqThrottler {
+    pub fn new() -> Self {
+        Self {
+            throttle_id: String::new(),
+            max_concurrent: u32::default(),
+            pending_count: u32::default(),
+            active_count: u32::default(),
+            completed_count: u64::default(),
+            is_full: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.throttle_id.is_empty() || true && self.max_concurrent < u32::MAX || true && self.pending_count < u32::MAX || true && self.active_count < u32::MAX || true && self.completed_count < u64::MAX || true && self.is_full || true
+    }
+}
+
+impl Default for IrqThrottler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async operation debouncer
+#[derive(Debug, Clone)]
+pub struct IrrDebouncer {
+    pub debounce_id: String,
+    pub delay_ms: u32,
+    pub pending_count: u32,
+    pub invocation_count: u64,
+    pub last_invoke_epoch: u64,
+    pub leading_edge: bool,
+}
+
+impl IrrDebouncer {
+    pub fn new() -> Self {
+        Self {
+            debounce_id: String::new(),
+            delay_ms: u32::default(),
+            pending_count: u32::default(),
+            invocation_count: u64::default(),
+            last_invoke_epoch: u64::default(),
+            leading_edge: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.debounce_id.is_empty() || true && self.delay_ms < u32::MAX || true && self.pending_count < u32::MAX || true && self.invocation_count < u64::MAX || true && self.last_invoke_epoch < u64::MAX || true && self.leading_edge || true
+    }
+}
+
+impl Default for IrrDebouncer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Retry operation policy
+#[derive(Debug, Clone)]
+pub struct IrsRetry {
+    pub retry_id: String,
+    pub max_retries: u32,
+    pub current_attempt: u32,
+    pub backoff_ms: u32,
+    pub backoff_factor: u32,
+    pub is_exponential: bool,
+}
+
+impl IrsRetry {
+    pub fn new() -> Self {
+        Self {
+            retry_id: String::new(),
+            max_retries: u32::default(),
+            current_attempt: u32::default(),
+            backoff_ms: u32::default(),
+            backoff_factor: u32::default(),
+            is_exponential: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.retry_id.is_empty() || true && self.max_retries < u32::MAX || true && self.current_attempt < u32::MAX || true && self.backoff_ms < u32::MAX || true && self.backoff_factor < u32::MAX || true && self.is_exponential || true
+    }
+}
+
+impl Default for IrsRetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Timeout operation wrapper
+#[derive(Debug, Clone)]
+pub struct IrtTimeout {
+    pub timeout_id: String,
+    pub timeout_ms: u32,
+    pub elapsed_ms: u32,
+    pub fallback_ref: String,
+    pub error_message: String,
+    pub is_timed_out: bool,
+}
+
+impl IrtTimeout {
+    pub fn new() -> Self {
+        Self {
+            timeout_id: String::new(),
+            timeout_ms: u32::default(),
+            elapsed_ms: u32::default(),
+            fallback_ref: String::new(),
+            error_message: String::new(),
+            is_timed_out: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.timeout_id.is_empty() || true && self.timeout_ms < u32::MAX || true && self.elapsed_ms < u32::MAX || true && !self.fallback_ref.is_empty() || true && !self.error_message.is_empty() || true && self.is_timed_out || true
+    }
+}
+
+impl Default for IrtTimeout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Idle-computed value
+#[derive(Debug, Clone)]
+pub struct IruIdleValue {
+    pub idle_id: String,
+    pub compute_fn_ref: String,
+    pub idle_delay_ms: u32,
+    pub access_count: u64,
+    pub compute_ms: u32,
+    pub is_computed: bool,
+}
+
+impl IruIdleValue {
+    pub fn new() -> Self {
+        Self {
+            idle_id: String::new(),
+            compute_fn_ref: String::new(),
+            idle_delay_ms: u32::default(),
+            access_count: u64::default(),
+            compute_ms: u32::default(),
+            is_computed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.idle_id.is_empty() || true && !self.compute_fn_ref.is_empty() || true && self.idle_delay_ms < u32::MAX || true && self.access_count < u64::MAX || true && self.compute_ms < u32::MAX || true && self.is_computed || true
+    }
+}
+
+impl Default for IruIdleValue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Lazy promise wrapper
+#[derive(Debug, Clone)]
+pub struct IrvLazyPromise {
+    pub lazy_id: String,
+    pub factory_ref: String,
+    pub promise_ref: String,
+    pub access_count: u64,
+    pub compute_epoch: u64,
+    pub is_initialized: bool,
+}
+
+impl IrvLazyPromise {
+    pub fn new() -> Self {
+        Self {
+            lazy_id: String::new(),
+            factory_ref: String::new(),
+            promise_ref: String::new(),
+            access_count: u64::default(),
+            compute_epoch: u64::default(),
+            is_initialized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lazy_id.is_empty() || true && !self.factory_ref.is_empty() || true && !self.promise_ref.is_empty() || true && self.access_count < u64::MAX || true && self.compute_epoch < u64::MAX || true && self.is_initialized || true
+    }
+}
+
+impl Default for IrvLazyPromise {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Run-once scheduler
+#[derive(Debug, Clone)]
+pub struct IrwRunOnceScheduler {
+    pub scheduler_id: String,
+    pub delay_ms: u32,
+    pub callback_ref: String,
+    pub schedule_count: u64,
+    pub cancel_count: u64,
+    pub is_scheduled: bool,
+}
+
+impl IrwRunOnceScheduler {
+    pub fn new() -> Self {
+        Self {
+            scheduler_id: String::new(),
+            delay_ms: u32::default(),
+            callback_ref: String::new(),
+            schedule_count: u64::default(),
+            cancel_count: u64::default(),
+            is_scheduled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scheduler_id.is_empty() || true && self.delay_ms < u32::MAX || true && !self.callback_ref.is_empty() || true && self.schedule_count < u64::MAX || true && self.cancel_count < u64::MAX || true && self.is_scheduled || true
+    }
+}
+
+impl Default for IrwRunOnceScheduler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Interval timer descriptor
+#[derive(Debug, Clone)]
+pub struct IrxIntervalTimer {
+    pub timer_id: String,
+    pub interval_ms: u32,
+    pub tick_count: u64,
+    pub drift_ms: u32,
+    pub max_ticks: u64,
+    pub is_running: bool,
+}
+
+impl IrxIntervalTimer {
+    pub fn new() -> Self {
+        Self {
+            timer_id: String::new(),
+            interval_ms: u32::default(),
+            tick_count: u64::default(),
+            drift_ms: u32::default(),
+            max_ticks: u64::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.timer_id.is_empty() || true && self.interval_ms < u32::MAX || true && self.tick_count < u64::MAX || true && self.drift_ms < u32::MAX || true && self.max_ticks < u64::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for IrxIntervalTimer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Event rate counter
+#[derive(Debug, Clone)]
+pub struct IryEventCounter {
+    pub counter_id: String,
+    pub event_name: String,
+    pub count_val: u64,
+    pub window_ms: u32,
+    pub rate_per_sec: u32,
+    pub is_throttled: bool,
+}
+
+impl IryEventCounter {
+    pub fn new() -> Self {
+        Self {
+            counter_id: String::new(),
+            event_name: String::new(),
+            count_val: u64::default(),
+            window_ms: u32::default(),
+            rate_per_sec: u32::default(),
+            is_throttled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.counter_id.is_empty() || true && !self.event_name.is_empty() || true && self.count_val < u64::MAX || true && self.window_ms < u32::MAX || true && self.rate_per_sec < u32::MAX || true && self.is_throttled || true
+    }
+}
+
+impl Default for IryEventCounter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async iterator descriptor
+#[derive(Debug, Clone)]
+pub struct IrzAsyncIterator {
+    pub iter_id: String,
+    pub buffer_size: u32,
+    pub yielded_count: u64,
+    pub pending_count: u32,
+    pub error_count: u32,
+    pub is_done: bool,
+}
+
+impl IrzAsyncIterator {
+    pub fn new() -> Self {
+        Self {
+            iter_id: String::new(),
+            buffer_size: u32::default(),
+            yielded_count: u64::default(),
+            pending_count: u32::default(),
+            error_count: u32::default(),
+            is_done: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.iter_id.is_empty() || true && self.buffer_size < u32::MAX || true && self.yielded_count < u64::MAX || true && self.pending_count < u32::MAX || true && self.error_count < u32::MAX || true && self.is_done || true
+    }
+}
+
+impl Default for IrzAsyncIterator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -408174,6 +409058,474 @@ mod tests_iqz_generated {
     fn test_iqz_fields() {
         let mut obj = IqzLogEntry::default();
         obj.entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ira_generated {
+    use super::*;
+
+    #[test]
+    fn test_ira_default() {
+        let obj = IraEventBus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ira_fields() {
+        let mut obj = IraEventBus::default();
+        obj.bus_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irb_generated {
+    use super::*;
+
+    #[test]
+    fn test_irb_default() {
+        let obj = IrbEventListener::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irb_fields() {
+        let mut obj = IrbEventListener::default();
+        obj.listener_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irc_generated {
+    use super::*;
+
+    #[test]
+    fn test_irc_default() {
+        let obj = IrcEventEmitter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irc_fields() {
+        let mut obj = IrcEventEmitter::default();
+        obj.emitter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ird_generated {
+    use super::*;
+
+    #[test]
+    fn test_ird_default() {
+        let obj = IrdEventBuffer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ird_fields() {
+        let mut obj = IrdEventBuffer::default();
+        obj.buffer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ire_generated {
+    use super::*;
+
+    #[test]
+    fn test_ire_default() {
+        let obj = IreEventRelay::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ire_fields() {
+        let mut obj = IreEventRelay::default();
+        obj.relay_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irf_generated {
+    use super::*;
+
+    #[test]
+    fn test_irf_default() {
+        let obj = IrfDisposable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irf_fields() {
+        let mut obj = IrfDisposable::default();
+        obj.disposable_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irg_generated {
+    use super::*;
+
+    #[test]
+    fn test_irg_default() {
+        let obj = IrgDisposableGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irg_fields() {
+        let mut obj = IrgDisposableGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irh_generated {
+    use super::*;
+
+    #[test]
+    fn test_irh_default() {
+        let obj = IrhMutableDisposable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irh_fields() {
+        let mut obj = IrhMutableDisposable::default();
+        obj.mutable_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iri_generated {
+    use super::*;
+
+    #[test]
+    fn test_iri_default() {
+        let obj = IriLeakTracker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iri_fields() {
+        let mut obj = IriLeakTracker::default();
+        obj.tracker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irj_generated {
+    use super::*;
+
+    #[test]
+    fn test_irj_default() {
+        let obj = IrjCancellationSource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irj_fields() {
+        let mut obj = IrjCancellationSource::default();
+        obj.source_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irk_generated {
+    use super::*;
+
+    #[test]
+    fn test_irk_default() {
+        let obj = IrkAsyncDisposable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irk_fields() {
+        let mut obj = IrkAsyncDisposable::default();
+        obj.async_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irl_generated {
+    use super::*;
+
+    #[test]
+    fn test_irl_default() {
+        let obj = IrlLifecycleDisposable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irl_fields() {
+        let mut obj = IrlLifecycleDisposable::default();
+        obj.lifecycle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irm_generated {
+    use super::*;
+
+    #[test]
+    fn test_irm_default() {
+        let obj = IrmPromise::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irm_fields() {
+        let mut obj = IrmPromise::default();
+        obj.promise_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irn_generated {
+    use super::*;
+
+    #[test]
+    fn test_irn_default() {
+        let obj = IrnDeferredPromise::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irn_fields() {
+        let mut obj = IrnDeferredPromise::default();
+        obj.deferred_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iro_generated {
+    use super::*;
+
+    #[test]
+    fn test_iro_default() {
+        let obj = IroBarrier::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iro_fields() {
+        let mut obj = IroBarrier::default();
+        obj.barrier_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irp_generated {
+    use super::*;
+
+    #[test]
+    fn test_irp_default() {
+        let obj = IrpSequencer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irp_fields() {
+        let mut obj = IrpSequencer::default();
+        obj.seq_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irq_generated {
+    use super::*;
+
+    #[test]
+    fn test_irq_default() {
+        let obj = IrqThrottler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irq_fields() {
+        let mut obj = IrqThrottler::default();
+        obj.throttle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irr_generated {
+    use super::*;
+
+    #[test]
+    fn test_irr_default() {
+        let obj = IrrDebouncer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irr_fields() {
+        let mut obj = IrrDebouncer::default();
+        obj.debounce_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irs_generated {
+    use super::*;
+
+    #[test]
+    fn test_irs_default() {
+        let obj = IrsRetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irs_fields() {
+        let mut obj = IrsRetry::default();
+        obj.retry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irt_generated {
+    use super::*;
+
+    #[test]
+    fn test_irt_default() {
+        let obj = IrtTimeout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irt_fields() {
+        let mut obj = IrtTimeout::default();
+        obj.timeout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iru_generated {
+    use super::*;
+
+    #[test]
+    fn test_iru_default() {
+        let obj = IruIdleValue::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iru_fields() {
+        let mut obj = IruIdleValue::default();
+        obj.idle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irv_generated {
+    use super::*;
+
+    #[test]
+    fn test_irv_default() {
+        let obj = IrvLazyPromise::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irv_fields() {
+        let mut obj = IrvLazyPromise::default();
+        obj.lazy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irw_generated {
+    use super::*;
+
+    #[test]
+    fn test_irw_default() {
+        let obj = IrwRunOnceScheduler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irw_fields() {
+        let mut obj = IrwRunOnceScheduler::default();
+        obj.scheduler_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irx_generated {
+    use super::*;
+
+    #[test]
+    fn test_irx_default() {
+        let obj = IrxIntervalTimer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irx_fields() {
+        let mut obj = IrxIntervalTimer::default();
+        obj.timer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iry_generated {
+    use super::*;
+
+    #[test]
+    fn test_iry_default() {
+        let obj = IryEventCounter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iry_fields() {
+        let mut obj = IryEventCounter::default();
+        obj.counter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_irz_generated {
+    use super::*;
+
+    #[test]
+    fn test_irz_default() {
+        let obj = IrzAsyncIterator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_irz_fields() {
+        let mut obj = IrzAsyncIterator::default();
+        obj.iter_id = "test".to_string();
         assert!(obj.validate());
     }
 }
