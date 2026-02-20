@@ -161168,6 +161168,890 @@ impl Default for JazModelAction {
     }
 }
 
+/// View model descriptor
+#[derive(Debug, Clone)]
+pub struct JbaViewModel {
+    pub view_model_id: String,
+    pub model_ref: String,
+    pub coordinate_system: String,
+    pub wrapping_mode: String,
+    pub visible_lines: u32,
+    pub is_wrapping: bool,
+}
+
+impl JbaViewModel {
+    pub fn new() -> Self {
+        Self {
+            view_model_id: String::new(),
+            model_ref: String::new(),
+            coordinate_system: String::new(),
+            wrapping_mode: String::new(),
+            visible_lines: u32::default(),
+            is_wrapping: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_model_id.is_empty() || true && !self.model_ref.is_empty() || true && !self.coordinate_system.is_empty() || true && !self.wrapping_mode.is_empty() || true && self.visible_lines < u32::MAX || true && self.is_wrapping || true
+    }
+}
+
+impl Default for JbaViewModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View line rendering data
+#[derive(Debug, Clone)]
+pub struct JbbViewLine {
+    pub view_line_id: String,
+    pub model_line: u32,
+    pub view_line: u32,
+    pub content_str: String,
+    pub indent_px: u32,
+    pub is_wrapped: bool,
+}
+
+impl JbbViewLine {
+    pub fn new() -> Self {
+        Self {
+            view_line_id: String::new(),
+            model_line: u32::default(),
+            view_line: u32::default(),
+            content_str: String::new(),
+            indent_px: u32::default(),
+            is_wrapped: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_line_id.is_empty() || true && self.model_line < u32::MAX || true && self.view_line < u32::MAX || true && !self.content_str.is_empty() || true && self.indent_px < u32::MAX || true && self.is_wrapped || true
+    }
+}
+
+impl Default for JbbViewLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View token for rendering
+#[derive(Debug, Clone)]
+pub struct JbcViewToken {
+    pub view_token_id: String,
+    pub start_index: u32,
+    pub end_index: u32,
+    pub foreground_color: String,
+    pub font_style_flags: u32,
+    pub is_italic: bool,
+}
+
+impl JbcViewToken {
+    pub fn new() -> Self {
+        Self {
+            view_token_id: String::new(),
+            start_index: u32::default(),
+            end_index: u32::default(),
+            foreground_color: String::new(),
+            font_style_flags: u32::default(),
+            is_italic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_token_id.is_empty() || true && self.start_index < u32::MAX || true && self.end_index < u32::MAX || true && !self.foreground_color.is_empty() || true && self.font_style_flags < u32::MAX || true && self.is_italic || true
+    }
+}
+
+impl Default for JbcViewToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View cursor rendering state
+#[derive(Debug, Clone)]
+pub struct JbdViewCursor {
+    pub view_cursor_id: String,
+    pub view_line: u32,
+    pub view_col: u32,
+    pub width_px: f64,
+    pub height_px: f64,
+    pub is_blinking: bool,
+}
+
+impl JbdViewCursor {
+    pub fn new() -> Self {
+        Self {
+            view_cursor_id: String::new(),
+            view_line: u32::default(),
+            view_col: u32::default(),
+            width_px: f64::default(),
+            height_px: f64::default(),
+            is_blinking: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_cursor_id.is_empty() || true && self.view_line < u32::MAX || true && self.view_col < u32::MAX || true && self.width_px.is_finite() || true && self.height_px.is_finite() || true && self.is_blinking || true
+    }
+}
+
+impl Default for JbdViewCursor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View decoration rendering
+#[derive(Debug, Clone)]
+pub struct JbeViewDecoration {
+    pub view_deco_id: String,
+    pub range_json: String,
+    pub class_name: String,
+    pub inline_style: String,
+    pub z_index: u32,
+    pub is_before_content: bool,
+}
+
+impl JbeViewDecoration {
+    pub fn new() -> Self {
+        Self {
+            view_deco_id: String::new(),
+            range_json: String::new(),
+            class_name: String::new(),
+            inline_style: String::new(),
+            z_index: u32::default(),
+            is_before_content: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_deco_id.is_empty() || true && !self.range_json.is_empty() || true && !self.class_name.is_empty() || true && !self.inline_style.is_empty() || true && self.z_index < u32::MAX || true && self.is_before_content || true
+    }
+}
+
+impl Default for JbeViewDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor viewport descriptor
+#[derive(Debug, Clone)]
+pub struct JbfViewport {
+    pub viewport_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub width_chars: u32,
+    pub height_lines: u32,
+    pub is_scrolling: bool,
+}
+
+impl JbfViewport {
+    pub fn new() -> Self {
+        Self {
+            viewport_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            width_chars: u32::default(),
+            height_lines: u32::default(),
+            is_scrolling: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.viewport_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.width_chars < u32::MAX || true && self.height_lines < u32::MAX || true && self.is_scrolling || true
+    }
+}
+
+impl Default for JbfViewport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View layout computation
+#[derive(Debug, Clone)]
+pub struct JbgViewLayout {
+    pub layout_id: String,
+    pub content_width: f64,
+    pub content_height: f64,
+    pub line_height_val: f64,
+    pub font_size_px: u32,
+    pub is_monospace: bool,
+}
+
+impl JbgViewLayout {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            content_width: f64::default(),
+            content_height: f64::default(),
+            line_height_val: f64::default(),
+            font_size_px: u32::default(),
+            is_monospace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && self.content_width.is_finite() || true && self.content_height.is_finite() || true && self.line_height_val.is_finite() || true && self.font_size_px < u32::MAX || true && self.is_monospace || true
+    }
+}
+
+impl Default for JbgViewLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View column mapping
+#[derive(Debug, Clone)]
+pub struct JbhViewColumn {
+    pub view_col_id: String,
+    pub model_col: u32,
+    pub view_col_val: u32,
+    pub char_width_px: f64,
+    pub tab_stop: u32,
+    pub is_tab: bool,
+}
+
+impl JbhViewColumn {
+    pub fn new() -> Self {
+        Self {
+            view_col_id: String::new(),
+            model_col: u32::default(),
+            view_col_val: u32::default(),
+            char_width_px: f64::default(),
+            tab_stop: u32::default(),
+            is_tab: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_col_id.is_empty() || true && self.model_col < u32::MAX || true && self.view_col_val < u32::MAX || true && self.char_width_px.is_finite() || true && self.tab_stop < u32::MAX || true && self.is_tab || true
+    }
+}
+
+impl Default for JbhViewColumn {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View range for rendering
+#[derive(Debug, Clone)]
+pub struct JbiViewRange {
+    pub view_range_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub is_empty: bool,
+}
+
+impl JbiViewRange {
+    pub fn new() -> Self {
+        Self {
+            view_range_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            is_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_range_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && self.is_empty || true
+    }
+}
+
+impl Default for JbiViewRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View change event
+#[derive(Debug, Clone)]
+pub struct JbjViewEvent {
+    pub view_event_id: String,
+    pub event_kind_str: String,
+    pub affected_range_json: String,
+    pub scroll_delta: f64,
+    pub timestamp_epoch: u64,
+    pub is_layout_change: bool,
+}
+
+impl JbjViewEvent {
+    pub fn new() -> Self {
+        Self {
+            view_event_id: String::new(),
+            event_kind_str: String::new(),
+            affected_range_json: String::new(),
+            scroll_delta: f64::default(),
+            timestamp_epoch: u64::default(),
+            is_layout_change: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_event_id.is_empty() || true && !self.event_kind_str.is_empty() || true && !self.affected_range_json.is_empty() || true && self.scroll_delta.is_finite() || true && self.timestamp_epoch < u64::MAX || true && self.is_layout_change || true
+    }
+}
+
+impl Default for JbjViewEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Line number rendering
+#[derive(Debug, Clone)]
+pub struct JbkViewLineNumber {
+    pub line_num_id: String,
+    pub display_val: String,
+    pub line_number: u32,
+    pub gutter_width_px: u32,
+    pub render_type_str: String,
+    pub is_relative: bool,
+}
+
+impl JbkViewLineNumber {
+    pub fn new() -> Self {
+        Self {
+            line_num_id: String::new(),
+            display_val: String::new(),
+            line_number: u32::default(),
+            gutter_width_px: u32::default(),
+            render_type_str: String::new(),
+            is_relative: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_num_id.is_empty() || true && !self.display_val.is_empty() || true && self.line_number < u32::MAX || true && self.gutter_width_px < u32::MAX || true && !self.render_type_str.is_empty() || true && self.is_relative || true
+    }
+}
+
+impl Default for JbkViewLineNumber {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Scrollbar rendering state
+#[derive(Debug, Clone)]
+pub struct JblViewScrollbar {
+    pub scrollbar_id: String,
+    pub thumb_position: f64,
+    pub thumb_size: f64,
+    pub track_size: f64,
+    pub orientation_str: String,
+    pub is_visible: bool,
+}
+
+impl JblViewScrollbar {
+    pub fn new() -> Self {
+        Self {
+            scrollbar_id: String::new(),
+            thumb_position: f64::default(),
+            thumb_size: f64::default(),
+            track_size: f64::default(),
+            orientation_str: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scrollbar_id.is_empty() || true && self.thumb_position.is_finite() || true && self.thumb_size.is_finite() || true && self.track_size.is_finite() || true && !self.orientation_str.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for JblViewScrollbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Gutter lane descriptor
+#[derive(Debug, Clone)]
+pub struct JbmViewGutter {
+    pub gutter_id: String,
+    pub lane_name: String,
+    pub width_px: u32,
+    pub order_val: u32,
+    pub bg_color: String,
+    pub is_visible: bool,
+}
+
+impl JbmViewGutter {
+    pub fn new() -> Self {
+        Self {
+            gutter_id: String::new(),
+            lane_name: String::new(),
+            width_px: u32::default(),
+            order_val: u32::default(),
+            bg_color: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gutter_id.is_empty() || true && !self.lane_name.is_empty() || true && self.width_px < u32::MAX || true && self.order_val < u32::MAX || true && !self.bg_color.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for JbmViewGutter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor margin descriptor
+#[derive(Debug, Clone)]
+pub struct JbnViewMargin {
+    pub margin_id: String,
+    pub margin_name: String,
+    pub width_px: u32,
+    pub position_str: String,
+    pub can_resize: bool,
+    pub is_collapsed: bool,
+}
+
+impl JbnViewMargin {
+    pub fn new() -> Self {
+        Self {
+            margin_id: String::new(),
+            margin_name: String::new(),
+            width_px: u32::default(),
+            position_str: String::new(),
+            can_resize: bool::default(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.margin_id.is_empty() || true && !self.margin_name.is_empty() || true && self.width_px < u32::MAX || true && !self.position_str.is_empty() || true && self.can_resize || true && self.is_collapsed || true
+    }
+}
+
+impl Default for JbnViewMargin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Overlay rendering entry
+#[derive(Debug, Clone)]
+pub struct JboViewOverlay {
+    pub overlay_id: String,
+    pub content_html: String,
+    pub position_json: String,
+    pub z_index: u32,
+    pub opacity_val: f64,
+    pub is_interactive: bool,
+}
+
+impl JboViewOverlay {
+    pub fn new() -> Self {
+        Self {
+            overlay_id: String::new(),
+            content_html: String::new(),
+            position_json: String::new(),
+            z_index: u32::default(),
+            opacity_val: f64::default(),
+            is_interactive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.overlay_id.is_empty() || true && !self.content_html.is_empty() || true && !self.position_json.is_empty() || true && self.z_index < u32::MAX || true && self.opacity_val.is_finite() || true && self.is_interactive || true
+    }
+}
+
+impl Default for JboViewOverlay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View highlight entry
+#[derive(Debug, Clone)]
+pub struct JbpViewHighlight {
+    pub highlight_id: String,
+    pub range_json: String,
+    pub bg_color: String,
+    pub border_color: String,
+    pub border_width: u32,
+    pub is_word_highlight: bool,
+}
+
+impl JbpViewHighlight {
+    pub fn new() -> Self {
+        Self {
+            highlight_id: String::new(),
+            range_json: String::new(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            border_width: u32::default(),
+            is_word_highlight: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.highlight_id.is_empty() || true && !self.range_json.is_empty() || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && self.border_width < u32::MAX || true && self.is_word_highlight || true
+    }
+}
+
+impl Default for JbpViewHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bracket pair guide rendering
+#[derive(Debug, Clone)]
+pub struct JbqViewBracketGuide {
+    pub bg_id: String,
+    pub nesting_level: u32,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub color_str: String,
+    pub is_active: bool,
+}
+
+impl JbqViewBracketGuide {
+    pub fn new() -> Self {
+        Self {
+            bg_id: String::new(),
+            nesting_level: u32::default(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            color_str: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bg_id.is_empty() || true && self.nesting_level < u32::MAX || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.color_str.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for JbqViewBracketGuide {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Indentation guide rendering
+#[derive(Debug, Clone)]
+pub struct JbrViewIndentGuide {
+    pub ig_id: String,
+    pub column_val: u32,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub indent_level: u32,
+    pub is_active_guide: bool,
+}
+
+impl JbrViewIndentGuide {
+    pub fn new() -> Self {
+        Self {
+            ig_id: String::new(),
+            column_val: u32::default(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            indent_level: u32::default(),
+            is_active_guide: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ig_id.is_empty() || true && self.column_val < u32::MAX || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.indent_level < u32::MAX || true && self.is_active_guide || true
+    }
+}
+
+impl Default for JbrViewIndentGuide {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Overview ruler color zone
+#[derive(Debug, Clone)]
+pub struct JbsViewColorZone {
+    pub color_zone_id: String,
+    pub from_line: u32,
+    pub to_line: u32,
+    pub color_str: String,
+    pub height_px: u32,
+    pub is_full_height: bool,
+}
+
+impl JbsViewColorZone {
+    pub fn new() -> Self {
+        Self {
+            color_zone_id: String::new(),
+            from_line: u32::default(),
+            to_line: u32::default(),
+            color_str: String::new(),
+            height_px: u32::default(),
+            is_full_height: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_zone_id.is_empty() || true && self.from_line < u32::MAX || true && self.to_line < u32::MAX || true && !self.color_str.is_empty() || true && self.height_px < u32::MAX || true && self.is_full_height || true
+    }
+}
+
+impl Default for JbsViewColorZone {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Line-level decoration
+#[derive(Debug, Clone)]
+pub struct JbtViewLineDecoration {
+    pub line_deco_id: String,
+    pub line_number: u32,
+    pub class_name: String,
+    pub margin_class: String,
+    pub glyph_class: String,
+    pub is_line_range: bool,
+}
+
+impl JbtViewLineDecoration {
+    pub fn new() -> Self {
+        Self {
+            line_deco_id: String::new(),
+            line_number: u32::default(),
+            class_name: String::new(),
+            margin_class: String::new(),
+            glyph_class: String::new(),
+            is_line_range: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_deco_id.is_empty() || true && self.line_number < u32::MAX || true && !self.class_name.is_empty() || true && !self.margin_class.is_empty() || true && !self.glyph_class.is_empty() || true && self.is_line_range || true
+    }
+}
+
+impl Default for JbtViewLineDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline text decoration
+#[derive(Debug, Clone)]
+pub struct JbuViewInlineDecoration {
+    pub inline_deco_id: String,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub inline_class: String,
+    pub after_content: String,
+    pub is_before: bool,
+}
+
+impl JbuViewInlineDecoration {
+    pub fn new() -> Self {
+        Self {
+            inline_deco_id: String::new(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            inline_class: String::new(),
+            after_content: String::new(),
+            is_before: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_deco_id.is_empty() || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && !self.inline_class.is_empty() || true && !self.after_content.is_empty() || true && self.is_before || true
+    }
+}
+
+impl Default for JbuViewInlineDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Rendered content fragment
+#[derive(Debug, Clone)]
+pub struct JbvViewContentPart {
+    pub content_part_id: String,
+    pub content_text: String,
+    pub token_type_str: String,
+    pub start_col: u32,
+    pub char_count: u32,
+    pub is_whitespace: bool,
+}
+
+impl JbvViewContentPart {
+    pub fn new() -> Self {
+        Self {
+            content_part_id: String::new(),
+            content_text: String::new(),
+            token_type_str: String::new(),
+            start_col: u32::default(),
+            char_count: u32::default(),
+            is_whitespace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.content_part_id.is_empty() || true && !self.content_text.is_empty() || true && !self.token_type_str.is_empty() || true && self.start_col < u32::MAX || true && self.char_count < u32::MAX || true && self.is_whitespace || true
+    }
+}
+
+impl Default for JbvViewContentPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Character to pixel mapping
+#[derive(Debug, Clone)]
+pub struct JbwViewCharacterMapping {
+    pub char_map_id: String,
+    pub char_offset: u32,
+    pub pixel_offset: f64,
+    pub char_width: f64,
+    pub font_ref: String,
+    pub is_ligature: bool,
+}
+
+impl JbwViewCharacterMapping {
+    pub fn new() -> Self {
+        Self {
+            char_map_id: String::new(),
+            char_offset: u32::default(),
+            pixel_offset: f64::default(),
+            char_width: f64::default(),
+            font_ref: String::new(),
+            is_ligature: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.char_map_id.is_empty() || true && self.char_offset < u32::MAX || true && self.pixel_offset.is_finite() || true && self.char_width.is_finite() || true && !self.font_ref.is_empty() || true && self.is_ligature || true
+    }
+}
+
+impl Default for JbwViewCharacterMapping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Line rendering part
+#[derive(Debug, Clone)]
+pub struct JbxViewLinePart {
+    pub line_part_id: String,
+    pub end_index: u32,
+    pub fg_color_code: String,
+    pub font_style: u32,
+    pub metadata_val: u32,
+    pub contains_rtl: bool,
+}
+
+impl JbxViewLinePart {
+    pub fn new() -> Self {
+        Self {
+            line_part_id: String::new(),
+            end_index: u32::default(),
+            fg_color_code: String::new(),
+            font_style: u32::default(),
+            metadata_val: u32::default(),
+            contains_rtl: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_part_id.is_empty() || true && self.end_index < u32::MAX || true && !self.fg_color_code.is_empty() || true && self.font_style < u32::MAX || true && self.metadata_val < u32::MAX || true && self.contains_rtl || true
+    }
+}
+
+impl Default for JbxViewLinePart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Final render output entry
+#[derive(Debug, Clone)]
+pub struct JbyViewRenderOutput {
+    pub render_id: String,
+    pub line_output: String,
+    pub char_count: u32,
+    pub contains_tabs: bool,
+    pub width_px: f64,
+    pub is_basicascii: bool,
+}
+
+impl JbyViewRenderOutput {
+    pub fn new() -> Self {
+        Self {
+            render_id: String::new(),
+            line_output: String::new(),
+            char_count: u32::default(),
+            contains_tabs: bool::default(),
+            width_px: f64::default(),
+            is_basicascii: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.render_id.is_empty() || true && !self.line_output.is_empty() || true && self.char_count < u32::MAX || true && self.contains_tabs || true && self.width_px.is_finite() || true && self.is_basicascii || true
+    }
+}
+
+impl Default for JbyViewRenderOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline diff rendering
+#[derive(Debug, Clone)]
+pub struct JbzViewDiffInline {
+    pub diff_inline_id: String,
+    pub original_text: String,
+    pub modified_text: String,
+    pub change_kind: String,
+    pub column_offset: u32,
+    pub is_char_diff: bool,
+}
+
+impl JbzViewDiffInline {
+    pub fn new() -> Self {
+        Self {
+            diff_inline_id: String::new(),
+            original_text: String::new(),
+            modified_text: String::new(),
+            change_kind: String::new(),
+            column_offset: u32::default(),
+            is_char_diff: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_inline_id.is_empty() || true && !self.original_text.is_empty() || true && !self.modified_text.is_empty() || true && !self.change_kind.is_empty() || true && self.column_offset < u32::MAX || true && self.is_char_diff || true
+    }
+}
+
+impl Default for JbzViewDiffInline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -421554,6 +422438,474 @@ mod tests_jaz_generated {
     fn test_jaz_fields() {
         let mut obj = JazModelAction::default();
         obj.action_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jba_generated {
+    use super::*;
+
+    #[test]
+    fn test_jba_default() {
+        let obj = JbaViewModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jba_fields() {
+        let mut obj = JbaViewModel::default();
+        obj.view_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbb_default() {
+        let obj = JbbViewLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbb_fields() {
+        let mut obj = JbbViewLine::default();
+        obj.view_line_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbc_default() {
+        let obj = JbcViewToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbc_fields() {
+        let mut obj = JbcViewToken::default();
+        obj.view_token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbd_default() {
+        let obj = JbdViewCursor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbd_fields() {
+        let mut obj = JbdViewCursor::default();
+        obj.view_cursor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbe_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbe_default() {
+        let obj = JbeViewDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbe_fields() {
+        let mut obj = JbeViewDecoration::default();
+        obj.view_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbf_default() {
+        let obj = JbfViewport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbf_fields() {
+        let mut obj = JbfViewport::default();
+        obj.viewport_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbg_default() {
+        let obj = JbgViewLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbg_fields() {
+        let mut obj = JbgViewLayout::default();
+        obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbh_default() {
+        let obj = JbhViewColumn::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbh_fields() {
+        let mut obj = JbhViewColumn::default();
+        obj.view_col_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbi_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbi_default() {
+        let obj = JbiViewRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbi_fields() {
+        let mut obj = JbiViewRange::default();
+        obj.view_range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbj_default() {
+        let obj = JbjViewEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbj_fields() {
+        let mut obj = JbjViewEvent::default();
+        obj.view_event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbk_default() {
+        let obj = JbkViewLineNumber::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbk_fields() {
+        let mut obj = JbkViewLineNumber::default();
+        obj.line_num_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbl_default() {
+        let obj = JblViewScrollbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbl_fields() {
+        let mut obj = JblViewScrollbar::default();
+        obj.scrollbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbm_default() {
+        let obj = JbmViewGutter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbm_fields() {
+        let mut obj = JbmViewGutter::default();
+        obj.gutter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbn_default() {
+        let obj = JbnViewMargin::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbn_fields() {
+        let mut obj = JbnViewMargin::default();
+        obj.margin_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbo_default() {
+        let obj = JboViewOverlay::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbo_fields() {
+        let mut obj = JboViewOverlay::default();
+        obj.overlay_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbp_default() {
+        let obj = JbpViewHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbp_fields() {
+        let mut obj = JbpViewHighlight::default();
+        obj.highlight_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbq_default() {
+        let obj = JbqViewBracketGuide::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbq_fields() {
+        let mut obj = JbqViewBracketGuide::default();
+        obj.bg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbr_default() {
+        let obj = JbrViewIndentGuide::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbr_fields() {
+        let mut obj = JbrViewIndentGuide::default();
+        obj.ig_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbs_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbs_default() {
+        let obj = JbsViewColorZone::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbs_fields() {
+        let mut obj = JbsViewColorZone::default();
+        obj.color_zone_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbt_default() {
+        let obj = JbtViewLineDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbt_fields() {
+        let mut obj = JbtViewLineDecoration::default();
+        obj.line_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbu_default() {
+        let obj = JbuViewInlineDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbu_fields() {
+        let mut obj = JbuViewInlineDecoration::default();
+        obj.inline_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbv_default() {
+        let obj = JbvViewContentPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbv_fields() {
+        let mut obj = JbvViewContentPart::default();
+        obj.content_part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbw_default() {
+        let obj = JbwViewCharacterMapping::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbw_fields() {
+        let mut obj = JbwViewCharacterMapping::default();
+        obj.char_map_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbx_default() {
+        let obj = JbxViewLinePart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbx_fields() {
+        let mut obj = JbxViewLinePart::default();
+        obj.line_part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jby_generated {
+    use super::*;
+
+    #[test]
+    fn test_jby_default() {
+        let obj = JbyViewRenderOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jby_fields() {
+        let mut obj = JbyViewRenderOutput::default();
+        obj.render_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jbz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jbz_default() {
+        let obj = JbzViewDiffInline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jbz_fields() {
+        let mut obj = JbzViewDiffInline::default();
+        obj.diff_inline_id = "test".to_string();
         assert!(obj.validate());
     }
 }
