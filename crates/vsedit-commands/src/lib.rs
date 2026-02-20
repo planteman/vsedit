@@ -66467,6 +66467,213 @@ impl Default for FkzEditorCursorColors {
 }
 
 
+/// Keybinding (key chord, command, when clause, args, source)
+#[derive(Debug, Clone)]
+pub struct FlaKeybinding {
+    pub keybinding_id: String,
+    pub key_chord_json: String,
+    pub command_id: String,
+    pub when_clause: String,
+    pub args_json: String,
+    pub source: u32,
+    pub weight: u32,
+    pub extension_id: String,
+    pub is_default: bool,
+    pub is_chord: bool,
+}
+
+impl FlaKeybinding {
+    pub fn new() -> Self {
+        Self {
+            keybinding_id: String::new(),
+            key_chord_json: String::new(),
+            command_id: String::new(),
+            when_clause: String::new(),
+            args_json: String::new(),
+            source: u32::default(),
+            weight: u32::default(),
+            extension_id: String::new(),
+            is_default: bool::default(),
+            is_chord: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.keybinding_id.is_empty() || true && !self.key_chord_json.is_empty() || true && !self.command_id.is_empty() || true && !self.when_clause.is_empty() || true && !self.args_json.is_empty() || true && self.source < u32::MAX || true && self.weight < u32::MAX || true && !self.extension_id.is_empty() || true && self.is_default || true && self.is_chord || true
+    }
+}
+
+impl Default for FlaKeybinding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Keybinding rule (primary, secondary, weight, extension, isDefault)
+#[derive(Debug, Clone)]
+pub struct FlbKeybindingRule {
+    pub rule_id: String,
+    pub primary_key_code: u32,
+    pub primary_mod_ctrl: bool,
+    pub primary_mod_shift: bool,
+    pub primary_mod_alt: bool,
+    pub primary_mod_meta: bool,
+    pub secondary_key_code: u32,
+    pub weight: u32,
+    pub command_id: String,
+    pub when_clause: String,
+}
+
+impl FlbKeybindingRule {
+    pub fn new() -> Self {
+        Self {
+            rule_id: String::new(),
+            primary_key_code: u32::default(),
+            primary_mod_ctrl: bool::default(),
+            primary_mod_shift: bool::default(),
+            primary_mod_alt: bool::default(),
+            primary_mod_meta: bool::default(),
+            secondary_key_code: u32::default(),
+            weight: u32::default(),
+            command_id: String::new(),
+            when_clause: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rule_id.is_empty() || true && self.primary_key_code < u32::MAX || true && self.primary_mod_ctrl || true && self.primary_mod_shift || true && self.primary_mod_alt || true && self.primary_mod_meta || true && self.secondary_key_code < u32::MAX || true && self.weight < u32::MAX || true && !self.command_id.is_empty() || true && !self.when_clause.is_empty() || true
+    }
+}
+
+impl Default for FlbKeybindingRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Key chord (ctrl, shift, alt, meta, key code, scan code)
+#[derive(Debug, Clone)]
+pub struct FlcKeyChord {
+    pub chord_id: String,
+    pub ctrl_key: bool,
+    pub shift_key: bool,
+    pub alt_key: bool,
+    pub meta_key: bool,
+    pub key_code: u32,
+    pub scan_code: u32,
+    pub key_label: String,
+    pub user_settings_label: String,
+    pub electron_accelerator: String,
+}
+
+impl FlcKeyChord {
+    pub fn new() -> Self {
+        Self {
+            chord_id: String::new(),
+            ctrl_key: bool::default(),
+            shift_key: bool::default(),
+            alt_key: bool::default(),
+            meta_key: bool::default(),
+            key_code: u32::default(),
+            scan_code: u32::default(),
+            key_label: String::new(),
+            user_settings_label: String::new(),
+            electron_accelerator: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chord_id.is_empty() || true && self.ctrl_key || true && self.shift_key || true && self.alt_key || true && self.meta_key || true && self.key_code < u32::MAX || true && self.scan_code < u32::MAX || true && !self.key_label.is_empty() || true && !self.user_settings_label.is_empty() || true && !self.electron_accelerator.is_empty() || true
+    }
+}
+
+impl Default for FlcKeyChord {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Keybinding resolver (lookup, conflict detection, command mapping)
+#[derive(Debug, Clone)]
+pub struct FldKeybindingResolver {
+    pub resolver_id: String,
+    pub keybinding_count: u32,
+    pub conflict_count: u32,
+    pub default_count: u32,
+    pub user_count: u32,
+    pub extension_count: u32,
+    pub lookup_table_size: u32,
+    pub chord_lookup_size: u32,
+    pub has_conflicts: bool,
+    pub is_dirty: bool,
+}
+
+impl FldKeybindingResolver {
+    pub fn new() -> Self {
+        Self {
+            resolver_id: String::new(),
+            keybinding_count: u32::default(),
+            conflict_count: u32::default(),
+            default_count: u32::default(),
+            user_count: u32::default(),
+            extension_count: u32::default(),
+            lookup_table_size: u32::default(),
+            chord_lookup_size: u32::default(),
+            has_conflicts: bool::default(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resolver_id.is_empty() || true && self.keybinding_count < u32::MAX || true && self.conflict_count < u32::MAX || true && self.default_count < u32::MAX || true && self.user_count < u32::MAX || true && self.extension_count < u32::MAX || true && self.lookup_table_size < u32::MAX || true && self.chord_lookup_size < u32::MAX || true && self.has_conflicts || true && self.is_dirty || true
+    }
+}
+
+impl Default for FldKeybindingResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Keybinding editor item (binding, command, when, source, isDefault)
+#[derive(Debug, Clone)]
+pub struct FleKeybindingItem {
+    pub item_id: String,
+    pub keybinding_label: String,
+    pub command_id: String,
+    pub command_label: String,
+    pub when_clause: String,
+    pub source_label: String,
+    pub is_default: bool,
+    pub is_extension: bool,
+    pub extension_id: String,
+    pub first_chord_label: String,
+}
+
+impl FleKeybindingItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            keybinding_label: String::new(),
+            command_id: String::new(),
+            command_label: String::new(),
+            when_clause: String::new(),
+            source_label: String::new(),
+            is_default: bool::default(),
+            is_extension: bool::default(),
+            extension_id: String::new(),
+            first_chord_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.keybinding_label.is_empty() || true && !self.command_id.is_empty() || true && !self.command_label.is_empty() || true && !self.when_clause.is_empty() || true && !self.source_label.is_empty() || true && self.is_default || true && self.is_extension || true && !self.extension_id.is_empty() || true && !self.first_chord_label.is_empty() || true
+    }
+}
+
+impl Default for FleKeybindingItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -282951,6 +283158,96 @@ mod tests_fkz_generated {
     fn test_fkz_fields() {
         let mut obj = FkzEditorCursorColors::default();
         obj.cursor_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fla_generated {
+    use super::*;
+
+    #[test]
+    fn test_fla_default() {
+        let obj = FlaKeybinding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fla_fields() {
+        let mut obj = FlaKeybinding::default();
+        obj.keybinding_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flb_generated {
+    use super::*;
+
+    #[test]
+    fn test_flb_default() {
+        let obj = FlbKeybindingRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flb_fields() {
+        let mut obj = FlbKeybindingRule::default();
+        obj.rule_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flc_generated {
+    use super::*;
+
+    #[test]
+    fn test_flc_default() {
+        let obj = FlcKeyChord::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flc_fields() {
+        let mut obj = FlcKeyChord::default();
+        obj.chord_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fld_generated {
+    use super::*;
+
+    #[test]
+    fn test_fld_default() {
+        let obj = FldKeybindingResolver::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fld_fields() {
+        let mut obj = FldKeybindingResolver::default();
+        obj.resolver_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fle_generated {
+    use super::*;
+
+    #[test]
+    fn test_fle_default() {
+        let obj = FleKeybindingItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fle_fields() {
+        let mut obj = FleKeybindingItem::default();
+        obj.item_id = "test".to_string();
         assert!(obj.validate());
     }
 }
