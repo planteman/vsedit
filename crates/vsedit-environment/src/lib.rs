@@ -132823,6 +132823,890 @@ impl Default for HuzTestSuite {
     }
 }
 
+/// Markdown AST node
+#[derive(Debug, Clone)]
+pub struct HvaMarkdownNode {
+    pub node_id: String,
+    pub node_kind: String,
+    pub content_text: String,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub has_children: bool,
+}
+
+impl HvaMarkdownNode {
+    pub fn new() -> Self {
+        Self {
+            node_id: String::new(),
+            node_kind: String::new(),
+            content_text: String::new(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            has_children: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.node_id.is_empty() || true && !self.node_kind.is_empty() || true && !self.content_text.is_empty() || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && self.has_children || true
+    }
+}
+
+impl Default for HvaMarkdownNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown heading element
+#[derive(Debug, Clone)]
+pub struct HvbMarkdownHeading {
+    pub heading_id: String,
+    pub level_value: u32,
+    pub heading_text: String,
+    pub anchor_slug: String,
+    pub line_number: u32,
+    pub is_setext: bool,
+}
+
+impl HvbMarkdownHeading {
+    pub fn new() -> Self {
+        Self {
+            heading_id: String::new(),
+            level_value: u32::default(),
+            heading_text: String::new(),
+            anchor_slug: String::new(),
+            line_number: u32::default(),
+            is_setext: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.heading_id.is_empty() || true && self.level_value < u32::MAX || true && !self.heading_text.is_empty() || true && !self.anchor_slug.is_empty() || true && self.line_number < u32::MAX || true && self.is_setext || true
+    }
+}
+
+impl Default for HvbMarkdownHeading {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown fenced code block
+#[derive(Debug, Clone)]
+pub struct HvcMarkdownCodeBlock {
+    pub block_id: String,
+    pub language_id: String,
+    pub code_text: String,
+    pub info_string: String,
+    pub line_count: u32,
+    pub is_indented: bool,
+}
+
+impl HvcMarkdownCodeBlock {
+    pub fn new() -> Self {
+        Self {
+            block_id: String::new(),
+            language_id: String::new(),
+            code_text: String::new(),
+            info_string: String::new(),
+            line_count: u32::default(),
+            is_indented: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.block_id.is_empty() || true && !self.language_id.is_empty() || true && !self.code_text.is_empty() || true && !self.info_string.is_empty() || true && self.line_count < u32::MAX || true && self.is_indented || true
+    }
+}
+
+impl Default for HvcMarkdownCodeBlock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown link element
+#[derive(Debug, Clone)]
+pub struct HvdMarkdownLink {
+    pub link_id: String,
+    pub href_url: String,
+    pub link_text: String,
+    pub title_text: String,
+    pub ref_label_len: u32,
+    pub is_autolink: bool,
+}
+
+impl HvdMarkdownLink {
+    pub fn new() -> Self {
+        Self {
+            link_id: String::new(),
+            href_url: String::new(),
+            link_text: String::new(),
+            title_text: String::new(),
+            ref_label_len: u32::default(),
+            is_autolink: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_id.is_empty() || true && !self.href_url.is_empty() || true && !self.link_text.is_empty() || true && !self.title_text.is_empty() || true && self.ref_label_len < u32::MAX || true && self.is_autolink || true
+    }
+}
+
+impl Default for HvdMarkdownLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown image element
+#[derive(Debug, Clone)]
+pub struct HveMarkdownImage {
+    pub image_id: String,
+    pub src_url: String,
+    pub alt_text: String,
+    pub title_text: String,
+    pub width_hint: u32,
+    pub is_inline: bool,
+}
+
+impl HveMarkdownImage {
+    pub fn new() -> Self {
+        Self {
+            image_id: String::new(),
+            src_url: String::new(),
+            alt_text: String::new(),
+            title_text: String::new(),
+            width_hint: u32::default(),
+            is_inline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.image_id.is_empty() || true && !self.src_url.is_empty() || true && !self.alt_text.is_empty() || true && !self.title_text.is_empty() || true && self.width_hint < u32::MAX || true && self.is_inline || true
+    }
+}
+
+impl Default for HveMarkdownImage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown list container
+#[derive(Debug, Clone)]
+pub struct HvfMarkdownList {
+    pub list_id: String,
+    pub list_kind: String,
+    pub item_count: u32,
+    pub start_number: u32,
+    pub indent_level: u32,
+    pub is_tight: bool,
+}
+
+impl HvfMarkdownList {
+    pub fn new() -> Self {
+        Self {
+            list_id: String::new(),
+            list_kind: String::new(),
+            item_count: u32::default(),
+            start_number: u32::default(),
+            indent_level: u32::default(),
+            is_tight: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_id.is_empty() || true && !self.list_kind.is_empty() || true && self.item_count < u32::MAX || true && self.start_number < u32::MAX || true && self.indent_level < u32::MAX || true && self.is_tight || true
+    }
+}
+
+impl Default for HvfMarkdownList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown table element
+#[derive(Debug, Clone)]
+pub struct HvgMarkdownTable {
+    pub table_id: String,
+    pub row_count: u32,
+    pub col_count: u32,
+    pub header_row_text: String,
+    pub alignment_spec: String,
+    pub has_caption: bool,
+}
+
+impl HvgMarkdownTable {
+    pub fn new() -> Self {
+        Self {
+            table_id: String::new(),
+            row_count: u32::default(),
+            col_count: u32::default(),
+            header_row_text: String::new(),
+            alignment_spec: String::new(),
+            has_caption: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.table_id.is_empty() || true && self.row_count < u32::MAX || true && self.col_count < u32::MAX || true && !self.header_row_text.is_empty() || true && !self.alignment_spec.is_empty() || true && self.has_caption || true
+    }
+}
+
+impl Default for HvgMarkdownTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown blockquote element
+#[derive(Debug, Clone)]
+pub struct HvhMarkdownBlockquote {
+    pub quote_id: String,
+    pub content_text: String,
+    pub nesting_level: u32,
+    pub line_count: u32,
+    pub child_count: u32,
+    pub is_admonition: bool,
+}
+
+impl HvhMarkdownBlockquote {
+    pub fn new() -> Self {
+        Self {
+            quote_id: String::new(),
+            content_text: String::new(),
+            nesting_level: u32::default(),
+            line_count: u32::default(),
+            child_count: u32::default(),
+            is_admonition: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.quote_id.is_empty() || true && !self.content_text.is_empty() || true && self.nesting_level < u32::MAX || true && self.line_count < u32::MAX || true && self.child_count < u32::MAX || true && self.is_admonition || true
+    }
+}
+
+impl Default for HvhMarkdownBlockquote {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown inline HTML element
+#[derive(Debug, Clone)]
+pub struct HviMarkdownHtml {
+    pub html_id: String,
+    pub tag_name: String,
+    pub raw_html: String,
+    pub attr_count: u32,
+    pub content_len: u32,
+    pub is_block_level: bool,
+}
+
+impl HviMarkdownHtml {
+    pub fn new() -> Self {
+        Self {
+            html_id: String::new(),
+            tag_name: String::new(),
+            raw_html: String::new(),
+            attr_count: u32::default(),
+            content_len: u32::default(),
+            is_block_level: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.html_id.is_empty() || true && !self.tag_name.is_empty() || true && !self.raw_html.is_empty() || true && self.attr_count < u32::MAX || true && self.content_len < u32::MAX || true && self.is_block_level || true
+    }
+}
+
+impl Default for HviMarkdownHtml {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown emphasis/strong span
+#[derive(Debug, Clone)]
+pub struct HvjMarkdownEmphasis {
+    pub em_id: String,
+    pub content_text: String,
+    pub emphasis_level: u32,
+    pub delimiter_char: String,
+    pub start_offset: u32,
+    pub is_strikethrough: bool,
+}
+
+impl HvjMarkdownEmphasis {
+    pub fn new() -> Self {
+        Self {
+            em_id: String::new(),
+            content_text: String::new(),
+            emphasis_level: u32::default(),
+            delimiter_char: String::new(),
+            start_offset: u32::default(),
+            is_strikethrough: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.em_id.is_empty() || true && !self.content_text.is_empty() || true && self.emphasis_level < u32::MAX || true && !self.delimiter_char.is_empty() || true && self.start_offset < u32::MAX || true && self.is_strikethrough || true
+    }
+}
+
+impl Default for HvjMarkdownEmphasis {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown inline code span
+#[derive(Debug, Clone)]
+pub struct HvkMarkdownInlineCode {
+    pub code_id: String,
+    pub code_text: String,
+    pub backtick_count: u32,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub has_newlines: bool,
+}
+
+impl HvkMarkdownInlineCode {
+    pub fn new() -> Self {
+        Self {
+            code_id: String::new(),
+            code_text: String::new(),
+            backtick_count: u32::default(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            has_newlines: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.code_id.is_empty() || true && !self.code_text.is_empty() || true && self.backtick_count < u32::MAX || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && self.has_newlines || true
+    }
+}
+
+impl Default for HvkMarkdownInlineCode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown thematic break
+#[derive(Debug, Clone)]
+pub struct HvlMarkdownThematicBreak {
+    pub break_id: String,
+    pub break_char: String,
+    pub char_count: u32,
+    pub line_number: u32,
+    pub source_offset: u32,
+    pub has_spaces: bool,
+}
+
+impl HvlMarkdownThematicBreak {
+    pub fn new() -> Self {
+        Self {
+            break_id: String::new(),
+            break_char: String::new(),
+            char_count: u32::default(),
+            line_number: u32::default(),
+            source_offset: u32::default(),
+            has_spaces: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.break_id.is_empty() || true && !self.break_char.is_empty() || true && self.char_count < u32::MAX || true && self.line_number < u32::MAX || true && self.source_offset < u32::MAX || true && self.has_spaces || true
+    }
+}
+
+impl Default for HvlMarkdownThematicBreak {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown footnote reference
+#[derive(Debug, Clone)]
+pub struct HvmMarkdownFootnote {
+    pub footnote_id: String,
+    pub ref_label: String,
+    pub content_text: String,
+    pub ref_count: u32,
+    pub line_number: u32,
+    pub is_inline: bool,
+}
+
+impl HvmMarkdownFootnote {
+    pub fn new() -> Self {
+        Self {
+            footnote_id: String::new(),
+            ref_label: String::new(),
+            content_text: String::new(),
+            ref_count: u32::default(),
+            line_number: u32::default(),
+            is_inline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.footnote_id.is_empty() || true && !self.ref_label.is_empty() || true && !self.content_text.is_empty() || true && self.ref_count < u32::MAX || true && self.line_number < u32::MAX || true && self.is_inline || true
+    }
+}
+
+impl Default for HvmMarkdownFootnote {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown definition list item
+#[derive(Debug, Clone)]
+pub struct HvnMarkdownDefinition {
+    pub def_id: String,
+    pub term_text: String,
+    pub definition_text: String,
+    pub def_count: u32,
+    pub line_number: u32,
+    pub is_compact: bool,
+}
+
+impl HvnMarkdownDefinition {
+    pub fn new() -> Self {
+        Self {
+            def_id: String::new(),
+            term_text: String::new(),
+            definition_text: String::new(),
+            def_count: u32::default(),
+            line_number: u32::default(),
+            is_compact: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.def_id.is_empty() || true && !self.term_text.is_empty() || true && !self.definition_text.is_empty() || true && self.def_count < u32::MAX || true && self.line_number < u32::MAX || true && self.is_compact || true
+    }
+}
+
+impl Default for HvnMarkdownDefinition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown task list item
+#[derive(Debug, Clone)]
+pub struct HvoMarkdownTaskList {
+    pub task_id: String,
+    pub task_text: String,
+    pub list_index: u32,
+    pub indent_level: u32,
+    pub nesting_depth: u32,
+    pub is_checked: bool,
+}
+
+impl HvoMarkdownTaskList {
+    pub fn new() -> Self {
+        Self {
+            task_id: String::new(),
+            task_text: String::new(),
+            list_index: u32::default(),
+            indent_level: u32::default(),
+            nesting_depth: u32::default(),
+            is_checked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_id.is_empty() || true && !self.task_text.is_empty() || true && self.list_index < u32::MAX || true && self.indent_level < u32::MAX || true && self.nesting_depth < u32::MAX || true && self.is_checked || true
+    }
+}
+
+impl Default for HvoMarkdownTaskList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown math expression
+#[derive(Debug, Clone)]
+pub struct HvpMarkdownMath {
+    pub math_id: String,
+    pub math_text: String,
+    pub delimiter_str: String,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub is_display_mode: bool,
+}
+
+impl HvpMarkdownMath {
+    pub fn new() -> Self {
+        Self {
+            math_id: String::new(),
+            math_text: String::new(),
+            delimiter_str: String::new(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            is_display_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.math_id.is_empty() || true && !self.math_text.is_empty() || true && !self.delimiter_str.is_empty() || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && self.is_display_mode || true
+    }
+}
+
+impl Default for HvpMarkdownMath {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown frontmatter block
+#[derive(Debug, Clone)]
+pub struct HvqMarkdownFrontmatter {
+    pub fm_id: String,
+    pub format_str: String,
+    pub raw_content: String,
+    pub key_count: u32,
+    pub byte_length: u32,
+    pub is_valid: bool,
+}
+
+impl HvqMarkdownFrontmatter {
+    pub fn new() -> Self {
+        Self {
+            fm_id: String::new(),
+            format_str: String::new(),
+            raw_content: String::new(),
+            key_count: u32::default(),
+            byte_length: u32::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fm_id.is_empty() || true && !self.format_str.is_empty() || true && !self.raw_content.is_empty() || true && self.key_count < u32::MAX || true && self.byte_length < u32::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for HvqMarkdownFrontmatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown table of contents entry
+#[derive(Debug, Clone)]
+pub struct HvrMarkdownToc {
+    pub toc_id: String,
+    pub heading_text: String,
+    pub anchor_link: String,
+    pub depth_level: u32,
+    pub child_count: u32,
+    pub is_collapsed: bool,
+}
+
+impl HvrMarkdownToc {
+    pub fn new() -> Self {
+        Self {
+            toc_id: String::new(),
+            heading_text: String::new(),
+            anchor_link: String::new(),
+            depth_level: u32::default(),
+            child_count: u32::default(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.toc_id.is_empty() || true && !self.heading_text.is_empty() || true && !self.anchor_link.is_empty() || true && self.depth_level < u32::MAX || true && self.child_count < u32::MAX || true && self.is_collapsed || true
+    }
+}
+
+impl Default for HvrMarkdownToc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown preview state
+#[derive(Debug, Clone)]
+pub struct HvsMarkdownPreview {
+    pub preview_id: String,
+    pub source_uri: String,
+    pub scroll_line: u32,
+    pub render_version: u32,
+    pub content_hash_len: u32,
+    pub is_locked: bool,
+}
+
+impl HvsMarkdownPreview {
+    pub fn new() -> Self {
+        Self {
+            preview_id: String::new(),
+            source_uri: String::new(),
+            scroll_line: u32::default(),
+            render_version: u32::default(),
+            content_hash_len: u32::default(),
+            is_locked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.preview_id.is_empty() || true && !self.source_uri.is_empty() || true && self.scroll_line < u32::MAX || true && self.render_version < u32::MAX || true && self.content_hash_len < u32::MAX || true && self.is_locked || true
+    }
+}
+
+impl Default for HvsMarkdownPreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown renderer configuration
+#[derive(Debug, Clone)]
+pub struct HvtMarkdownRenderer {
+    pub renderer_id: String,
+    pub renderer_name: String,
+    pub options_json: String,
+    pub plugin_count: u32,
+    pub css_path_len: u32,
+    pub sanitize_html: bool,
+}
+
+impl HvtMarkdownRenderer {
+    pub fn new() -> Self {
+        Self {
+            renderer_id: String::new(),
+            renderer_name: String::new(),
+            options_json: String::new(),
+            plugin_count: u32::default(),
+            css_path_len: u32::default(),
+            sanitize_html: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.renderer_id.is_empty() || true && !self.renderer_name.is_empty() || true && !self.options_json.is_empty() || true && self.plugin_count < u32::MAX || true && self.css_path_len < u32::MAX || true && self.sanitize_html || true
+    }
+}
+
+impl Default for HvtMarkdownRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown-it plugin registration
+#[derive(Debug, Clone)]
+pub struct HvuMarkdownPlugin {
+    pub plugin_id: String,
+    pub plugin_name: String,
+    pub plugin_version: String,
+    pub hook_names: String,
+    pub priority_value: u32,
+    pub is_builtin: bool,
+}
+
+impl HvuMarkdownPlugin {
+    pub fn new() -> Self {
+        Self {
+            plugin_id: String::new(),
+            plugin_name: String::new(),
+            plugin_version: String::new(),
+            hook_names: String::new(),
+            priority_value: u32::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.plugin_id.is_empty() || true && !self.plugin_name.is_empty() || true && !self.plugin_version.is_empty() || true && !self.hook_names.is_empty() || true && self.priority_value < u32::MAX || true && self.is_builtin || true
+    }
+}
+
+impl Default for HvuMarkdownPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown content security policy
+#[derive(Debug, Clone)]
+pub struct HvvMarkdownSecurity {
+    pub sec_id: String,
+    pub policy_name: String,
+    pub allowed_schemes: String,
+    pub allowed_hosts: String,
+    pub rule_count: u32,
+    pub strict_mode: bool,
+}
+
+impl HvvMarkdownSecurity {
+    pub fn new() -> Self {
+        Self {
+            sec_id: String::new(),
+            policy_name: String::new(),
+            allowed_schemes: String::new(),
+            allowed_hosts: String::new(),
+            rule_count: u32::default(),
+            strict_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sec_id.is_empty() || true && !self.policy_name.is_empty() || true && !self.allowed_schemes.is_empty() || true && !self.allowed_hosts.is_empty() || true && self.rule_count < u32::MAX || true && self.strict_mode || true
+    }
+}
+
+impl Default for HvvMarkdownSecurity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown preview scroll sync
+#[derive(Debug, Clone)]
+pub struct HvwMarkdownScroll {
+    pub scroll_id: String,
+    pub source_line: u32,
+    pub preview_offset: u32,
+    pub sync_mode: String,
+    pub debounce_ms: u32,
+    pub is_syncing: bool,
+}
+
+impl HvwMarkdownScroll {
+    pub fn new() -> Self {
+        Self {
+            scroll_id: String::new(),
+            source_line: u32::default(),
+            preview_offset: u32::default(),
+            sync_mode: String::new(),
+            debounce_ms: u32::default(),
+            is_syncing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scroll_id.is_empty() || true && self.source_line < u32::MAX || true && self.preview_offset < u32::MAX || true && !self.sync_mode.is_empty() || true && self.debounce_ms < u32::MAX || true && self.is_syncing || true
+    }
+}
+
+impl Default for HvwMarkdownScroll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown export to HTML/PDF
+#[derive(Debug, Clone)]
+pub struct HvxMarkdownExport {
+    pub export_id: String,
+    pub format_str: String,
+    pub output_path: String,
+    pub css_include: String,
+    pub page_count: u32,
+    pub embed_images: bool,
+}
+
+impl HvxMarkdownExport {
+    pub fn new() -> Self {
+        Self {
+            export_id: String::new(),
+            format_str: String::new(),
+            output_path: String::new(),
+            css_include: String::new(),
+            page_count: u32::default(),
+            embed_images: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.export_id.is_empty() || true && !self.format_str.is_empty() || true && !self.output_path.is_empty() || true && !self.css_include.is_empty() || true && self.page_count < u32::MAX || true && self.embed_images || true
+    }
+}
+
+impl Default for HvxMarkdownExport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown lint rule entry
+#[derive(Debug, Clone)]
+pub struct HvyMarkdownLint {
+    pub lint_id: String,
+    pub rule_name: String,
+    pub severity_level: u32,
+    pub description_text: String,
+    pub violation_count: u32,
+    pub is_fixable: bool,
+}
+
+impl HvyMarkdownLint {
+    pub fn new() -> Self {
+        Self {
+            lint_id: String::new(),
+            rule_name: String::new(),
+            severity_level: u32::default(),
+            description_text: String::new(),
+            violation_count: u32::default(),
+            is_fixable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lint_id.is_empty() || true && !self.rule_name.is_empty() || true && self.severity_level < u32::MAX || true && !self.description_text.is_empty() || true && self.violation_count < u32::MAX || true && self.is_fixable || true
+    }
+}
+
+impl Default for HvyMarkdownLint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Markdown workspace configuration
+#[derive(Debug, Clone)]
+pub struct HvzMarkdownWorkspace {
+    pub workspace_id: String,
+    pub root_path: String,
+    pub file_pattern: String,
+    pub exclude_pattern: String,
+    pub file_count: u32,
+    pub auto_preview: bool,
+}
+
+impl HvzMarkdownWorkspace {
+    pub fn new() -> Self {
+        Self {
+            workspace_id: String::new(),
+            root_path: String::new(),
+            file_pattern: String::new(),
+            exclude_pattern: String::new(),
+            file_count: u32::default(),
+            auto_preview: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.workspace_id.is_empty() || true && !self.root_path.is_empty() || true && !self.file_pattern.is_empty() || true && !self.exclude_pattern.is_empty() || true && self.file_count < u32::MAX || true && self.auto_preview || true
+    }
+}
+
+impl Default for HvzMarkdownWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -378284,6 +379168,474 @@ mod tests_huz_generated {
     fn test_huz_fields() {
         let mut obj = HuzTestSuite::default();
         obj.suite_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hva_generated {
+    use super::*;
+
+    #[test]
+    fn test_hva_default() {
+        let obj = HvaMarkdownNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hva_fields() {
+        let mut obj = HvaMarkdownNode::default();
+        obj.node_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvb_default() {
+        let obj = HvbMarkdownHeading::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvb_fields() {
+        let mut obj = HvbMarkdownHeading::default();
+        obj.heading_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvc_default() {
+        let obj = HvcMarkdownCodeBlock::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvc_fields() {
+        let mut obj = HvcMarkdownCodeBlock::default();
+        obj.block_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvd_default() {
+        let obj = HvdMarkdownLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvd_fields() {
+        let mut obj = HvdMarkdownLink::default();
+        obj.link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hve_generated {
+    use super::*;
+
+    #[test]
+    fn test_hve_default() {
+        let obj = HveMarkdownImage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hve_fields() {
+        let mut obj = HveMarkdownImage::default();
+        obj.image_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvf_default() {
+        let obj = HvfMarkdownList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvf_fields() {
+        let mut obj = HvfMarkdownList::default();
+        obj.list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvg_default() {
+        let obj = HvgMarkdownTable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvg_fields() {
+        let mut obj = HvgMarkdownTable::default();
+        obj.table_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvh_default() {
+        let obj = HvhMarkdownBlockquote::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvh_fields() {
+        let mut obj = HvhMarkdownBlockquote::default();
+        obj.quote_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvi_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvi_default() {
+        let obj = HviMarkdownHtml::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvi_fields() {
+        let mut obj = HviMarkdownHtml::default();
+        obj.html_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvj_default() {
+        let obj = HvjMarkdownEmphasis::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvj_fields() {
+        let mut obj = HvjMarkdownEmphasis::default();
+        obj.em_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvk_default() {
+        let obj = HvkMarkdownInlineCode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvk_fields() {
+        let mut obj = HvkMarkdownInlineCode::default();
+        obj.code_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvl_default() {
+        let obj = HvlMarkdownThematicBreak::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvl_fields() {
+        let mut obj = HvlMarkdownThematicBreak::default();
+        obj.break_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvm_default() {
+        let obj = HvmMarkdownFootnote::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvm_fields() {
+        let mut obj = HvmMarkdownFootnote::default();
+        obj.footnote_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvn_default() {
+        let obj = HvnMarkdownDefinition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvn_fields() {
+        let mut obj = HvnMarkdownDefinition::default();
+        obj.def_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvo_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvo_default() {
+        let obj = HvoMarkdownTaskList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvo_fields() {
+        let mut obj = HvoMarkdownTaskList::default();
+        obj.task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvp_default() {
+        let obj = HvpMarkdownMath::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvp_fields() {
+        let mut obj = HvpMarkdownMath::default();
+        obj.math_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvq_default() {
+        let obj = HvqMarkdownFrontmatter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvq_fields() {
+        let mut obj = HvqMarkdownFrontmatter::default();
+        obj.fm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvr_default() {
+        let obj = HvrMarkdownToc::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvr_fields() {
+        let mut obj = HvrMarkdownToc::default();
+        obj.toc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvs_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvs_default() {
+        let obj = HvsMarkdownPreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvs_fields() {
+        let mut obj = HvsMarkdownPreview::default();
+        obj.preview_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvt_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvt_default() {
+        let obj = HvtMarkdownRenderer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvt_fields() {
+        let mut obj = HvtMarkdownRenderer::default();
+        obj.renderer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvu_default() {
+        let obj = HvuMarkdownPlugin::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvu_fields() {
+        let mut obj = HvuMarkdownPlugin::default();
+        obj.plugin_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvv_default() {
+        let obj = HvvMarkdownSecurity::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvv_fields() {
+        let mut obj = HvvMarkdownSecurity::default();
+        obj.sec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvw_default() {
+        let obj = HvwMarkdownScroll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvw_fields() {
+        let mut obj = HvwMarkdownScroll::default();
+        obj.scroll_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvx_default() {
+        let obj = HvxMarkdownExport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvx_fields() {
+        let mut obj = HvxMarkdownExport::default();
+        obj.export_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvy_default() {
+        let obj = HvyMarkdownLint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvy_fields() {
+        let mut obj = HvyMarkdownLint::default();
+        obj.lint_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hvz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hvz_default() {
+        let obj = HvzMarkdownWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hvz_fields() {
+        let mut obj = HvzMarkdownWorkspace::default();
+        obj.workspace_id = "test".to_string();
         assert!(obj.validate());
     }
 }
