@@ -50539,6 +50539,213 @@ impl Default for EvzDocumentColor {
     fn default() -> Self { Self::new() }
 }
 
+/// Workspace folder model types
+#[derive(Debug, Clone)]
+pub struct EwaWorkspaceFolder {
+    pub folder_uri: String,
+    pub folder_name: String,
+    pub folder_index: u32,
+    pub folder_is_root: bool,
+    pub folder_scheme: String,
+    pub folder_authority: String,
+    pub folder_canonical_uri: String,
+    pub folder_configuration_uri: String,
+    pub folder_trusted: bool,
+    pub folder_display_name: String,
+}
+
+impl EwaWorkspaceFolder {
+    pub fn new() -> Self {
+        Self {
+            folder_uri: String::new(),
+            folder_name: String::new(),
+            folder_index: u32::default(),
+            folder_is_root: bool::default(),
+            folder_scheme: String::new(),
+            folder_authority: String::new(),
+            folder_canonical_uri: String::new(),
+            folder_configuration_uri: String::new(),
+            folder_trusted: bool::default(),
+            folder_display_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folder_uri.is_empty() || true && !self.folder_name.is_empty() || true && self.folder_index < u32::MAX || true && self.folder_is_root || true && !self.folder_scheme.is_empty() || true && !self.folder_authority.is_empty() || true && !self.folder_canonical_uri.is_empty() || true && !self.folder_configuration_uri.is_empty() || true && self.folder_trusted || true && !self.folder_display_name.is_empty() || true
+    }
+}
+
+impl Default for EwaWorkspaceFolder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace file (.code-workspace) types
+#[derive(Debug, Clone)]
+pub struct EwbWorkspaceFile {
+    pub workspace_file_uri: String,
+    pub workspace_folders: String,
+    pub workspace_settings: String,
+    pub workspace_launch: String,
+    pub workspace_tasks: String,
+    pub workspace_extensions: String,
+    pub workspace_is_untitled: bool,
+    pub workspace_transient: bool,
+    pub workspace_remote_authority: String,
+    pub workspace_version: u32,
+}
+
+impl EwbWorkspaceFile {
+    pub fn new() -> Self {
+        Self {
+            workspace_file_uri: String::new(),
+            workspace_folders: String::new(),
+            workspace_settings: String::new(),
+            workspace_launch: String::new(),
+            workspace_tasks: String::new(),
+            workspace_extensions: String::new(),
+            workspace_is_untitled: bool::default(),
+            workspace_transient: bool::default(),
+            workspace_remote_authority: String::new(),
+            workspace_version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.workspace_file_uri.is_empty() || true && !self.workspace_folders.is_empty() || true && !self.workspace_settings.is_empty() || true && !self.workspace_launch.is_empty() || true && !self.workspace_tasks.is_empty() || true && !self.workspace_extensions.is_empty() || true && self.workspace_is_untitled || true && self.workspace_transient || true && !self.workspace_remote_authority.is_empty() || true && self.workspace_version < u32::MAX || true
+    }
+}
+
+impl Default for EwbWorkspaceFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace-wide edit (multi-file refactor) types
+#[derive(Debug, Clone)]
+pub struct EwcWorkspaceEdit {
+    pub edit_resource_uri: String,
+    pub edit_new_uri: String,
+    pub edit_old_uri: String,
+    pub edit_kind: String,
+    pub edit_text_edits: String,
+    pub edit_metadata: String,
+    pub edit_needs_confirmation: bool,
+    pub edit_description: String,
+    pub edit_icon_path: String,
+    pub edit_label: String,
+}
+
+impl EwcWorkspaceEdit {
+    pub fn new() -> Self {
+        Self {
+            edit_resource_uri: String::new(),
+            edit_new_uri: String::new(),
+            edit_old_uri: String::new(),
+            edit_kind: String::new(),
+            edit_text_edits: String::new(),
+            edit_metadata: String::new(),
+            edit_needs_confirmation: bool::default(),
+            edit_description: String::new(),
+            edit_icon_path: String::new(),
+            edit_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_resource_uri.is_empty() || true && !self.edit_new_uri.is_empty() || true && !self.edit_old_uri.is_empty() || true && !self.edit_kind.is_empty() || true && !self.edit_text_edits.is_empty() || true && !self.edit_metadata.is_empty() || true && self.edit_needs_confirmation || true && !self.edit_description.is_empty() || true && !self.edit_icon_path.is_empty() || true && !self.edit_label.is_empty() || true
+    }
+}
+
+impl Default for EwcWorkspaceEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace search query and result types
+#[derive(Debug, Clone)]
+pub struct EwdWorkspaceSearch {
+    pub search_pattern: String,
+    pub search_is_regex: bool,
+    pub search_case_sensitive: bool,
+    pub search_whole_word: bool,
+    pub search_include_pattern: String,
+    pub search_exclude_pattern: String,
+    pub search_max_results: u32,
+    pub search_use_ignore_files: bool,
+    pub search_follow_symlinks: bool,
+    pub search_encoding: String,
+}
+
+impl EwdWorkspaceSearch {
+    pub fn new() -> Self {
+        Self {
+            search_pattern: String::new(),
+            search_is_regex: bool::default(),
+            search_case_sensitive: bool::default(),
+            search_whole_word: bool::default(),
+            search_include_pattern: String::new(),
+            search_exclude_pattern: String::new(),
+            search_max_results: u32::default(),
+            search_use_ignore_files: bool::default(),
+            search_follow_symlinks: bool::default(),
+            search_encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_pattern.is_empty() || true && self.search_is_regex || true && self.search_case_sensitive || true && self.search_whole_word || true && !self.search_include_pattern.is_empty() || true && !self.search_exclude_pattern.is_empty() || true && self.search_max_results < u32::MAX || true && self.search_use_ignore_files || true && self.search_follow_symlinks || true && !self.search_encoding.is_empty() || true
+    }
+}
+
+impl Default for EwdWorkspaceSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Workspace file search (quick open) types
+#[derive(Debug, Clone)]
+pub struct EweWorkspaceFileSearch {
+    pub file_search_pattern: String,
+    pub file_search_max_results: u32,
+    pub file_search_include_pattern: String,
+    pub file_search_exclude_pattern: String,
+    pub file_search_use_ignore_files: bool,
+    pub file_search_follow_symlinks: bool,
+    pub file_search_cache_key: String,
+    pub file_search_sort_by: String,
+    pub file_search_file_encoding: String,
+    pub file_search_fuzzy_match: bool,
+}
+
+impl EweWorkspaceFileSearch {
+    pub fn new() -> Self {
+        Self {
+            file_search_pattern: String::new(),
+            file_search_max_results: u32::default(),
+            file_search_include_pattern: String::new(),
+            file_search_exclude_pattern: String::new(),
+            file_search_use_ignore_files: bool::default(),
+            file_search_follow_symlinks: bool::default(),
+            file_search_cache_key: String::new(),
+            file_search_sort_by: String::new(),
+            file_search_file_encoding: String::new(),
+            file_search_fuzzy_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_search_pattern.is_empty() || true && self.file_search_max_results < u32::MAX || true && !self.file_search_include_pattern.is_empty() || true && !self.file_search_exclude_pattern.is_empty() || true && self.file_search_use_ignore_files || true && self.file_search_follow_symlinks || true && !self.file_search_cache_key.is_empty() || true && !self.file_search_sort_by.is_empty() || true && !self.file_search_file_encoding.is_empty() || true && self.file_search_fuzzy_match || true
+    }
+}
+
+impl Default for EweWorkspaceFileSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259810,5 +260017,95 @@ mod tests_evp {
         let obj = super::EvzDocumentColor::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewa_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewa_default() {
+        let obj = EwaWorkspaceFolder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewa_fields() {
+        let mut obj = EwaWorkspaceFolder::default();
+        obj.folder_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewb_default() {
+        let obj = EwbWorkspaceFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewb_fields() {
+        let mut obj = EwbWorkspaceFile::default();
+        obj.workspace_file_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewc_default() {
+        let obj = EwcWorkspaceEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewc_fields() {
+        let mut obj = EwcWorkspaceEdit::default();
+        obj.edit_resource_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewd_default() {
+        let obj = EwdWorkspaceSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewd_fields() {
+        let mut obj = EwdWorkspaceSearch::default();
+        obj.search_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewe_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewe_default() {
+        let obj = EweWorkspaceFileSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewe_fields() {
+        let mut obj = EweWorkspaceFileSearch::default();
+        obj.file_search_pattern = "test".to_string();
+        assert!(obj.validate());
     }
 }

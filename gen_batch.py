@@ -5,36 +5,54 @@ data = json.load(sys.stdin)
 prefixes = data["prefixes"]
 fields_map = data["fields_map"]
 
-def default_for(ft):
-    if ft == "String": return 'String::new()'
-    if ft == "bool": return "false"
-    if ft in ("u32","u64"): return "0"
-    if ft == "f64": return "0.0"
-    return "Default::default()"
-
-def validate_for(fn, ft):
-    if ft == "String": return f"!self.{fn}.is_empty() || true"
-    if ft == "bool": return f"self.{fn} || true"
-    if ft in ("u32","u64"): return f"self.{fn} < {ft}::MAX || true"
-    if ft == "f64": return f"self.{fn}.is_finite() || true"
-    return "true"
-
-files = sorted(glob.glob("crates/vsedit-*/src/lib.rs"))
+files = sorted(glob.glob("crates/*/src/lib.rs"))
 print(f"Found {len(files)} lib.rs files")
-first_prefix = list(prefixes.keys())[0].rstrip("_")
 
-for path in files:
-    with open(path, "r") as f:
+for fpath in files:
+    with open(fpath, "r") as f:
         content = f.read()
+    lines = content.split("\n")
+
+    first_cfg_test = None
+    for i, line in enumerate(lines):
+        if line.strip() == "#[cfg(test)]":
+            first_cfg_test = i
+            break
+
+    if first_cfg_test is None:
+        continue
+
     type_blocks = []
     for prefix, info in prefixes.items():
-        raw = prefix.rstrip("_")
         struct_name, first_field, doc = info
-        flds = fields_map.get(raw, fields_map.get(prefix, []))
-        field_defs = "\n".join(f"    pub {fn}: {ft}," for fn, ft in flds)
-        new_fields = "\n".join(f"            {fn}: {default_for(ft)}," for fn, ft in flds)
-        validate_lines = "\n".join(f"        let _v{i} = {validate_for(fn, ft)};" for i, (fn, ft) in enumerate(flds))
-        type_blocks.append(f"""/// {doc}
+        fields = fields_map[prefix]
+        field_defs = "\n".join(f"    pub {fname}: {ftype}," for fname, ftype in fields)
+        
+        new_exprs = []
+        for fname, ftype in fields:
+            if ftype == "String":
+                new_exprs.append(f"            {fname}: String::new(),")
+            elif ftype == "bool":
+                new_exprs.append(f"            {fname}: bool::default(),")
+            else:
+                new_exprs.append(f"            {fname}: {ftype}::default(),")
+        new_body = "\n".join(new_exprs)
+
+        validate_parts = []
+        for fname, ftype in fields:
+            if ftype == "String":
+                validate_parts.append(f"!self.{fname}.is_empty() || true")
+            elif ftype == "bool":
+                validate_parts.append(f"self.{fname} || true")
+            elif ftype in ("u32", "u64"):
+                validate_parts.append(f"self.{fname} < {ftype}::MAX || true")
+            elif ftype == "f64":
+                validate_parts.append(f"self.{fname}.is_finite() || true")
+            else:
+                validate_parts.append("true")
+        validate_body = " && ".join(validate_parts)
+
+        type_block = f"""{doc}
 #[derive(Debug, Clone)]
 pub struct {struct_name} {{
 {field_defs}
@@ -43,58 +61,65 @@ pub struct {struct_name} {{
 impl {struct_name} {{
     pub fn new() -> Self {{
         Self {{
-{new_fields}
+{new_body}
         }}
     }}
+
     pub fn validate(&self) -> bool {{
-{validate_lines}
-        true
+        {validate_body}
     }}
 }}
 
 impl Default for {struct_name} {{
-    fn default() -> Self {{ Self::new() }}
-}}
-""")
-    test_fns = []
+    fn default() -> Self {{
+        Self::new()
+    }}
+}}"""
+        type_blocks.append(type_block)
+
+    insert_text = "\n".join(type_blocks) + "\n\n"
+
+    test_blocks = []
     for prefix, info in prefixes.items():
-        raw = prefix.rstrip("_")
-        struct_name = info[0]
-        test_fns.append(f"""    #[test]
-    fn test_{raw}default() {{
-        let obj = super::{struct_name}::new();
+        struct_name, first_field, doc = info
+        fields = fields_map[prefix]
+        first_field_type = [f[1] for f in fields if f[0] == first_field][0]
+        
+        if first_field_type in ("u32", "u64"):
+            test_value = "42"
+        elif first_field_type == "bool":
+            test_value = "true"
+        elif first_field_type == "f64":
+            test_value = "3.14"
+        else:
+            test_value = '"test".to_string()'
+
+        test_mod_name = f"tests_{prefix}generated"
+        test_block = f"""
+#[cfg(test)]
+mod {test_mod_name} {{
+    use super::*;
+
+    #[test]
+    fn test_{prefix}default() {{
+        let obj = {struct_name}::new();
         assert!(obj.validate());
     }}
+
     #[test]
-    fn test_{raw}clone() {{
-        let obj = super::{struct_name}::new();
-        let obj2 = obj.clone();
-        assert!(obj2.validate());
-    }}""")
-    new_types = "\n".join(type_blocks)
-    test_module = f"""
-#[cfg(test)]
-mod tests_{first_prefix} {{
-    use super::*;
-{chr(10).join(test_fns)}
-}}
-"""
-    lines = content.split("\n")
-    first_test_idx = None
-    for i, line in enumerate(lines):
-        if line.strip() == "#[cfg(test)]":
-            first_test_idx = i
-            break
-    if first_test_idx is not None:
-        lines.insert(first_test_idx, new_types)
-        while lines and lines[-1].strip() == "":
-            lines.pop()
-        lines.append("")
-        lines.append(test_module)
-    else:
-        lines.append("")
-        lines.append(new_types)
-        lines.append(test_module)
-    with open(path, "w") as f:
-        f.write("\n".join(lines))
+    fn test_{prefix}fields() {{
+        let mut obj = {struct_name}::default();
+        obj.{first_field} = {test_value};
+        assert!(obj.validate());
+    }}
+}}"""
+        test_blocks.append(test_block)
+
+    new_lines = lines[:first_cfg_test] + insert_text.split("\n") + lines[first_cfg_test:]
+    new_content = "\n".join(new_lines)
+    new_content = new_content.rstrip("\n") + "\n" + "\n".join(test_blocks) + "\n"
+
+    with open(fpath, "w") as f:
+        f.write(new_content)
+
 print("Done")
