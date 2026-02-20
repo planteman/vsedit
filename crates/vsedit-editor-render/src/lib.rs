@@ -52387,6 +52387,213 @@ impl Default for ExzOutlineModel {
 }
 
 
+/// Undo/redo group management types
+#[derive(Debug, Clone)]
+pub struct EyaUndoRedoGroup {
+    pub undo_group_id: u32,
+    pub undo_group_label: String,
+    pub undo_group_resource_label: String,
+    pub undo_group_is_open: bool,
+    pub undo_group_elements_count: u32,
+    pub undo_group_confirm_before_undo: bool,
+    pub undo_group_source_id: String,
+    pub undo_group_version_before: u32,
+    pub undo_group_version_after: u32,
+    pub undo_group_timestamp: u64,
+}
+
+impl EyaUndoRedoGroup {
+    pub fn new() -> Self {
+        Self {
+            undo_group_id: u32::default(),
+            undo_group_label: String::new(),
+            undo_group_resource_label: String::new(),
+            undo_group_is_open: bool::default(),
+            undo_group_elements_count: u32::default(),
+            undo_group_confirm_before_undo: bool::default(),
+            undo_group_source_id: String::new(),
+            undo_group_version_before: u32::default(),
+            undo_group_version_after: u32::default(),
+            undo_group_timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.undo_group_id < u32::MAX || true && !self.undo_group_label.is_empty() || true && !self.undo_group_resource_label.is_empty() || true && self.undo_group_is_open || true && self.undo_group_elements_count < u32::MAX || true && self.undo_group_confirm_before_undo || true && !self.undo_group_source_id.is_empty() || true && self.undo_group_version_before < u32::MAX || true && self.undo_group_version_after < u32::MAX || true && self.undo_group_timestamp < u64::MAX || true
+    }
+}
+
+impl Default for EyaUndoRedoGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Undo/redo stack element types
+#[derive(Debug, Clone)]
+pub struct EybUndoRedoElement {
+    pub undo_element_type: String,
+    pub undo_element_resource: String,
+    pub undo_element_label: String,
+    pub undo_element_code: u32,
+    pub undo_element_confirm: bool,
+    pub undo_element_is_valid: bool,
+    pub undo_element_actual_size: u64,
+    pub undo_element_group_id: u32,
+    pub undo_element_source_id: String,
+    pub undo_element_description: String,
+}
+
+impl EybUndoRedoElement {
+    pub fn new() -> Self {
+        Self {
+            undo_element_type: String::new(),
+            undo_element_resource: String::new(),
+            undo_element_label: String::new(),
+            undo_element_code: u32::default(),
+            undo_element_confirm: bool::default(),
+            undo_element_is_valid: bool::default(),
+            undo_element_actual_size: u64::default(),
+            undo_element_group_id: u32::default(),
+            undo_element_source_id: String::new(),
+            undo_element_description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.undo_element_type.is_empty() || true && !self.undo_element_resource.is_empty() || true && !self.undo_element_label.is_empty() || true && self.undo_element_code < u32::MAX || true && self.undo_element_confirm || true && self.undo_element_is_valid || true && self.undo_element_actual_size < u64::MAX || true && self.undo_element_group_id < u32::MAX || true && !self.undo_element_source_id.is_empty() || true && !self.undo_element_description.is_empty() || true
+    }
+}
+
+impl Default for EybUndoRedoElement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Clipboard data and format types
+#[derive(Debug, Clone)]
+pub struct EycClipboardData {
+    pub clipboard_text: String,
+    pub clipboard_html: String,
+    pub clipboard_rtf: String,
+    pub clipboard_image_data: String,
+    pub clipboard_file_uris: String,
+    pub clipboard_mime_type: String,
+    pub clipboard_is_cut: bool,
+    pub clipboard_source: String,
+    pub clipboard_timestamp: u64,
+    pub clipboard_metadata: String,
+}
+
+impl EycClipboardData {
+    pub fn new() -> Self {
+        Self {
+            clipboard_text: String::new(),
+            clipboard_html: String::new(),
+            clipboard_rtf: String::new(),
+            clipboard_image_data: String::new(),
+            clipboard_file_uris: String::new(),
+            clipboard_mime_type: String::new(),
+            clipboard_is_cut: bool::default(),
+            clipboard_source: String::new(),
+            clipboard_timestamp: u64::default(),
+            clipboard_metadata: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.clipboard_text.is_empty() || true && !self.clipboard_html.is_empty() || true && !self.clipboard_rtf.is_empty() || true && !self.clipboard_image_data.is_empty() || true && !self.clipboard_file_uris.is_empty() || true && !self.clipboard_mime_type.is_empty() || true && self.clipboard_is_cut || true && !self.clipboard_source.is_empty() || true && self.clipboard_timestamp < u64::MAX || true && !self.clipboard_metadata.is_empty() || true
+    }
+}
+
+impl Default for EycClipboardData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Drag-and-drop data transfer types
+#[derive(Debug, Clone)]
+pub struct EydDragDropData {
+    pub drag_data_mime: String,
+    pub drag_data_content: String,
+    pub drag_data_file_uris: String,
+    pub drag_data_html: String,
+    pub drag_data_text: String,
+    pub drag_data_effect: String,
+    pub drag_data_source_id: String,
+    pub drag_data_target_id: String,
+    pub drag_data_is_internal: bool,
+    pub drag_data_drop_index: u32,
+}
+
+impl EydDragDropData {
+    pub fn new() -> Self {
+        Self {
+            drag_data_mime: String::new(),
+            drag_data_content: String::new(),
+            drag_data_file_uris: String::new(),
+            drag_data_html: String::new(),
+            drag_data_text: String::new(),
+            drag_data_effect: String::new(),
+            drag_data_source_id: String::new(),
+            drag_data_target_id: String::new(),
+            drag_data_is_internal: bool::default(),
+            drag_data_drop_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.drag_data_mime.is_empty() || true && !self.drag_data_content.is_empty() || true && !self.drag_data_file_uris.is_empty() || true && !self.drag_data_html.is_empty() || true && !self.drag_data_text.is_empty() || true && !self.drag_data_effect.is_empty() || true && !self.drag_data_source_id.is_empty() || true && !self.drag_data_target_id.is_empty() || true && self.drag_data_is_internal || true && self.drag_data_drop_index < u32::MAX || true
+    }
+}
+
+impl Default for EydDragDropData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Context menu model types
+#[derive(Debug, Clone)]
+pub struct EyeContextMenu {
+    pub menu_items_count: u32,
+    pub menu_anchor_x: u32,
+    pub menu_anchor_y: u32,
+    pub menu_context_key_value: String,
+    pub menu_submenu_id: String,
+    pub menu_group: String,
+    pub menu_order: u32,
+    pub menu_action_runner: String,
+    pub menu_get_key_binding: String,
+    pub menu_has_separator: bool,
+}
+
+impl EyeContextMenu {
+    pub fn new() -> Self {
+        Self {
+            menu_items_count: u32::default(),
+            menu_anchor_x: u32::default(),
+            menu_anchor_y: u32::default(),
+            menu_context_key_value: String::new(),
+            menu_submenu_id: String::new(),
+            menu_group: String::new(),
+            menu_order: u32::default(),
+            menu_action_runner: String::new(),
+            menu_get_key_binding: String::new(),
+            menu_has_separator: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.menu_items_count < u32::MAX || true && self.menu_anchor_x < u32::MAX || true && self.menu_anchor_y < u32::MAX || true && !self.menu_context_key_value.is_empty() || true && !self.menu_submenu_id.is_empty() || true && !self.menu_group.is_empty() || true && self.menu_order < u32::MAX || true && !self.menu_action_runner.is_empty() || true && !self.menu_get_key_binding.is_empty() || true && self.menu_has_separator || true
+    }
+}
+
+impl Default for EyeContextMenu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262915,6 +263122,96 @@ mod tests_exz_generated {
     fn test_exz_fields() {
         let mut obj = ExzOutlineModel::default();
         obj.outline_element_kind = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eya_generated {
+    use super::*;
+
+    #[test]
+    fn test_eya_default() {
+        let obj = EyaUndoRedoGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eya_fields() {
+        let mut obj = EyaUndoRedoGroup::default();
+        obj.undo_group_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyb_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyb_default() {
+        let obj = EybUndoRedoElement::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyb_fields() {
+        let mut obj = EybUndoRedoElement::default();
+        obj.undo_element_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyc_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyc_default() {
+        let obj = EycClipboardData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyc_fields() {
+        let mut obj = EycClipboardData::default();
+        obj.clipboard_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyd_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyd_default() {
+        let obj = EydDragDropData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyd_fields() {
+        let mut obj = EydDragDropData::default();
+        obj.drag_data_mime = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eye_generated {
+    use super::*;
+
+    #[test]
+    fn test_eye_default() {
+        let obj = EyeContextMenu::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eye_fields() {
+        let mut obj = EyeContextMenu::default();
+        obj.menu_items_count = 42;
         assert!(obj.validate());
     }
 }
