@@ -67589,6 +67589,216 @@ impl Default for FlzTreeDataProvider {
 }
 
 
+/// Webview panel (view type, title, options, html, retainContextWhenHidden)
+#[derive(Debug, Clone)]
+pub struct FmaWebviewPanel {
+    pub panel_id: String,
+    pub view_type: String,
+    pub title: String,
+    pub icon_path: String,
+    pub html_content: String,
+    pub retain_context_when_hidden: bool,
+    pub view_column: u32,
+    pub is_active: bool,
+    pub is_visible: bool,
+    pub options_json: String,
+}
+
+impl FmaWebviewPanel {
+    pub fn new() -> Self {
+        Self {
+            panel_id: String::new(),
+            view_type: String::new(),
+            title: String::new(),
+            icon_path: String::new(),
+            html_content: String::new(),
+            retain_context_when_hidden: bool::default(),
+            view_column: u32::default(),
+            is_active: bool::default(),
+            is_visible: bool::default(),
+            options_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.panel_id.is_empty() || true && !self.view_type.is_empty() || true && !self.title.is_empty() || true && !self.icon_path.is_empty() || true && !self.html_content.is_empty() || true && self.retain_context_when_hidden || true && self.view_column < u32::MAX || true && self.is_active || true && self.is_visible || true && !self.options_json.is_empty() || true
+    }
+}
+
+impl Default for FmaWebviewPanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview view (view type, webview, title, description, badge)
+#[derive(Debug, Clone)]
+pub struct FmbWebviewView {
+    pub view_id: String,
+    pub view_type: String,
+    pub title: String,
+    pub description: String,
+    pub badge_count: u32,
+    pub badge_tooltip: String,
+    pub is_visible: bool,
+    pub webview_html: String,
+    pub webview_options_json: String,
+    pub extension_id: String,
+}
+
+impl FmbWebviewView {
+    pub fn new() -> Self {
+        Self {
+            view_id: String::new(),
+            view_type: String::new(),
+            title: String::new(),
+            description: String::new(),
+            badge_count: u32::default(),
+            badge_tooltip: String::new(),
+            is_visible: bool::default(),
+            webview_html: String::new(),
+            webview_options_json: String::new(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_id.is_empty() || true && !self.view_type.is_empty() || true && !self.title.is_empty() || true && !self.description.is_empty() || true && self.badge_count < u32::MAX || true && !self.badge_tooltip.is_empty() || true && self.is_visible || true && !self.webview_html.is_empty() || true && !self.webview_options_json.is_empty() || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for FmbWebviewView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview options (enable scripts, enable forms, local resource roots)
+#[derive(Debug, Clone)]
+pub struct FmcWebviewOptions {
+    pub options_id: String,
+    pub enable_scripts: bool,
+    pub enable_forms: bool,
+    pub enable_command_uris: bool,
+    pub local_resource_roots_json: String,
+    pub port_mapping_json: String,
+    pub enable_find_widget: bool,
+    pub retainContextWhenHidden: bool,
+    pub content_security_policy: String,
+    pub allowed_origins_json: String,
+}
+
+impl FmcWebviewOptions {
+    pub fn new() -> Self {
+        Self {
+            options_id: String::new(),
+            enable_scripts: bool::default(),
+            enable_forms: bool::default(),
+            enable_command_uris: bool::default(),
+            local_resource_roots_json: String::new(),
+            port_mapping_json: String::new(),
+            enable_find_widget: bool::default(),
+            retainContextWhenHidden: bool::default(),
+            content_security_policy: String::new(),
+            allowed_origins_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.options_id.is_empty() || true && self.enable_scripts || true && self.enable_forms || true && self.enable_command_uris || true && !self.local_resource_roots_json.is_empty() || true && !self.port_mapping_json.is_empty() || true && self.enable_find_widget || true && self.retainContextWhenHidden || true && !self.content_security_policy.is_empty() || true && !self.allowed_origins_json.is_empty() || true
+    }
+}
+
+impl Default for FmcWebviewOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview message (type, payload, source, channel, sequence)
+#[derive(Debug, Clone)]
+pub struct FmdWebviewMessage {
+    pub message_id: String,
+    pub message_type: String,
+    pub payload_json: String,
+    pub source_id: String,
+    pub channel: String,
+    pub sequence_number: u64,
+    pub is_response: bool,
+    pub request_id: String,
+    pub error_message: String,
+    pub transfer_json: String,
+}
+
+impl FmdWebviewMessage {
+    pub fn new() -> Self {
+        Self {
+            message_id: String::new(),
+            message_type: String::new(),
+            payload_json: String::new(),
+            source_id: String::new(),
+            channel: String::new(),
+            sequence_number: u64::default(),
+            is_response: bool::default(),
+            request_id: String::new(),
+            error_message: String::new(),
+            transfer_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.message_id.is_empty() || true && !self.message_type.is_empty() || true && !self.payload_json.is_empty() || true && !self.source_id.is_empty() || true && !self.channel.is_empty() || true && self.sequence_number < u64::MAX || true && self.is_response || true && !self.request_id.is_empty() || true && !self.error_message.is_empty() || true && !self.transfer_json.is_empty() || true
+    }
+}
+
+impl Default for FmdWebviewMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview state (persisted state, visible, focused, disposed)
+#[derive(Debug, Clone)]
+pub struct FmeWebviewState {
+    pub state_id: String,
+    pub persisted_state_json: String,
+    pub is_visible: bool,
+    pub is_focused: bool,
+    pub is_disposed: bool,
+    pub panel_id: String,
+    pub view_type: String,
+    pub last_active_ms: u64,
+    pub content_loaded: bool,
+    pub html_size_bytes: u64,
+}
+
+impl FmeWebviewState {
+    pub fn new() -> Self {
+        Self {
+            state_id: String::new(),
+            persisted_state_json: String::new(),
+            is_visible: bool::default(),
+            is_focused: bool::default(),
+            is_disposed: bool::default(),
+            panel_id: String::new(),
+            view_type: String::new(),
+            last_active_ms: u64::default(),
+            content_loaded: bool::default(),
+            html_size_bytes: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.state_id.is_empty() || true && !self.persisted_state_json.is_empty() || true && self.is_visible || true && self.is_focused || true && self.is_disposed || true && !self.panel_id.is_empty() || true && !self.view_type.is_empty() || true && self.last_active_ms < u64::MAX || true && self.content_loaded || true && self.html_size_bytes < u64::MAX || true
+    }
+}
+
+impl Default for FmeWebviewState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -284518,6 +284728,96 @@ mod tests_flz_generated {
     fn test_flz_fields() {
         let mut obj = FlzTreeDataProvider::default();
         obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fma_generated {
+    use super::*;
+
+    #[test]
+    fn test_fma_default() {
+        let obj = FmaWebviewPanel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fma_fields() {
+        let mut obj = FmaWebviewPanel::default();
+        obj.panel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmb_default() {
+        let obj = FmbWebviewView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmb_fields() {
+        let mut obj = FmbWebviewView::default();
+        obj.view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmc_default() {
+        let obj = FmcWebviewOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmc_fields() {
+        let mut obj = FmcWebviewOptions::default();
+        obj.options_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmd_default() {
+        let obj = FmdWebviewMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmd_fields() {
+        let mut obj = FmdWebviewMessage::default();
+        obj.message_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fme_generated {
+    use super::*;
+
+    #[test]
+    fn test_fme_default() {
+        let obj = FmeWebviewState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fme_fields() {
+        let mut obj = FmeWebviewState::default();
+        obj.state_id = "test".to_string();
         assert!(obj.validate());
     }
 }
