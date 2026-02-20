@@ -52879,6 +52879,213 @@ impl Default for EyjProgressBar {
 }
 
 
+/// Split view layout widget types
+#[derive(Debug, Clone)]
+pub struct EykSplitView {
+    pub split_view_id: String,
+    pub split_view_orientation: String,
+    pub split_view_count: u32,
+    pub split_view_proportional: bool,
+    pub split_view_inverse_alt: bool,
+    pub split_view_sash_size: u32,
+    pub split_view_drag_overflow: bool,
+    pub split_view_bg_color: String,
+    pub split_view_border_color: String,
+    pub split_view_min_size: u32,
+}
+
+impl EykSplitView {
+    pub fn new() -> Self {
+        Self {
+            split_view_id: String::new(),
+            split_view_orientation: String::new(),
+            split_view_count: u32::default(),
+            split_view_proportional: bool::default(),
+            split_view_inverse_alt: bool::default(),
+            split_view_sash_size: u32::default(),
+            split_view_drag_overflow: bool::default(),
+            split_view_bg_color: String::new(),
+            split_view_border_color: String::new(),
+            split_view_min_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.split_view_id.is_empty() || true && !self.split_view_orientation.is_empty() || true && self.split_view_count < u32::MAX || true && self.split_view_proportional || true && self.split_view_inverse_alt || true && self.split_view_sash_size < u32::MAX || true && self.split_view_drag_overflow || true && !self.split_view_bg_color.is_empty() || true && !self.split_view_border_color.is_empty() || true && self.split_view_min_size < u32::MAX || true
+    }
+}
+
+impl Default for EykSplitView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Grid view layout widget types
+#[derive(Debug, Clone)]
+pub struct EylGridView {
+    pub grid_view_id: String,
+    pub grid_view_rows: u32,
+    pub grid_view_cols: u32,
+    pub grid_view_gap: u32,
+    pub grid_view_proportional: bool,
+    pub grid_view_max_items: u32,
+    pub grid_view_min_item_width: u32,
+    pub grid_view_min_item_height: u32,
+    pub grid_view_bg_color: String,
+    pub grid_view_border_color: String,
+}
+
+impl EylGridView {
+    pub fn new() -> Self {
+        Self {
+            grid_view_id: String::new(),
+            grid_view_rows: u32::default(),
+            grid_view_cols: u32::default(),
+            grid_view_gap: u32::default(),
+            grid_view_proportional: bool::default(),
+            grid_view_max_items: u32::default(),
+            grid_view_min_item_width: u32::default(),
+            grid_view_min_item_height: u32::default(),
+            grid_view_bg_color: String::new(),
+            grid_view_border_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grid_view_id.is_empty() || true && self.grid_view_rows < u32::MAX || true && self.grid_view_cols < u32::MAX || true && self.grid_view_gap < u32::MAX || true && self.grid_view_proportional || true && self.grid_view_max_items < u32::MAX || true && self.grid_view_min_item_width < u32::MAX || true && self.grid_view_min_item_height < u32::MAX || true && !self.grid_view_bg_color.is_empty() || true && !self.grid_view_border_color.is_empty() || true
+    }
+}
+
+impl Default for EylGridView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Sash (resizable border) widget types
+#[derive(Debug, Clone)]
+pub struct EymSashWidget {
+    pub sash_orientation: String,
+    pub sash_size: u32,
+    pub sash_hover_delay: u32,
+    pub sash_minimum_size: u32,
+    pub sash_maximum_size: u32,
+    pub sash_enabled: bool,
+    pub sash_visible: bool,
+    pub sash_color: String,
+    pub sash_hover_color: String,
+    pub sash_snap_enabled: bool,
+}
+
+impl EymSashWidget {
+    pub fn new() -> Self {
+        Self {
+            sash_orientation: String::new(),
+            sash_size: u32::default(),
+            sash_hover_delay: u32::default(),
+            sash_minimum_size: u32::default(),
+            sash_maximum_size: u32::default(),
+            sash_enabled: bool::default(),
+            sash_visible: bool::default(),
+            sash_color: String::new(),
+            sash_hover_color: String::new(),
+            sash_snap_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sash_orientation.is_empty() || true && self.sash_size < u32::MAX || true && self.sash_hover_delay < u32::MAX || true && self.sash_minimum_size < u32::MAX || true && self.sash_maximum_size < u32::MAX || true && self.sash_enabled || true && self.sash_visible || true && !self.sash_color.is_empty() || true && !self.sash_hover_color.is_empty() || true && self.sash_snap_enabled || true
+    }
+}
+
+impl Default for EymSashWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Scrollable container widget types
+#[derive(Debug, Clone)]
+pub struct EynScrollable {
+    pub scrollable_width: u32,
+    pub scrollable_height: u32,
+    pub scrollable_scroll_width: u32,
+    pub scrollable_scroll_height: u32,
+    pub scrollable_scroll_left: f64,
+    pub scrollable_scroll_top: f64,
+    pub scrollable_smooth: bool,
+    pub scrollable_flip_axes: bool,
+    pub scrollable_always_consume: bool,
+    pub scrollable_fade_out: bool,
+}
+
+impl EynScrollable {
+    pub fn new() -> Self {
+        Self {
+            scrollable_width: u32::default(),
+            scrollable_height: u32::default(),
+            scrollable_scroll_width: u32::default(),
+            scrollable_scroll_height: u32::default(),
+            scrollable_scroll_left: f64::default(),
+            scrollable_scroll_top: f64::default(),
+            scrollable_smooth: bool::default(),
+            scrollable_flip_axes: bool::default(),
+            scrollable_always_consume: bool::default(),
+            scrollable_fade_out: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.scrollable_width < u32::MAX || true && self.scrollable_height < u32::MAX || true && self.scrollable_scroll_width < u32::MAX || true && self.scrollable_scroll_height < u32::MAX || true && self.scrollable_scroll_left.is_finite() || true && self.scrollable_scroll_top.is_finite() || true && self.scrollable_smooth || true && self.scrollable_flip_axes || true && self.scrollable_always_consume || true && self.scrollable_fade_out || true
+    }
+}
+
+impl Default for EynScrollable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Input box widget types
+#[derive(Debug, Clone)]
+pub struct EyoInputBox {
+    pub input_value: String,
+    pub input_placeholder: String,
+    pub input_title: String,
+    pub input_password: bool,
+    pub input_prompt: String,
+    pub input_validation_message: String,
+    pub input_validation_severity: u32,
+    pub input_step: u32,
+    pub input_total_steps: u32,
+    pub input_ignore_focus_out: bool,
+}
+
+impl EyoInputBox {
+    pub fn new() -> Self {
+        Self {
+            input_value: String::new(),
+            input_placeholder: String::new(),
+            input_title: String::new(),
+            input_password: bool::default(),
+            input_prompt: String::new(),
+            input_validation_message: String::new(),
+            input_validation_severity: u32::default(),
+            input_step: u32::default(),
+            input_total_steps: u32::default(),
+            input_ignore_focus_out: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_value.is_empty() || true && !self.input_placeholder.is_empty() || true && !self.input_title.is_empty() || true && self.input_password || true && !self.input_prompt.is_empty() || true && !self.input_validation_message.is_empty() || true && self.input_validation_severity < u32::MAX || true && self.input_step < u32::MAX || true && self.input_total_steps < u32::MAX || true && self.input_ignore_focus_out || true
+    }
+}
+
+impl Default for EyoInputBox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263652,6 +263859,96 @@ mod tests_eyj_generated {
     fn test_eyj_fields() {
         let mut obj = EyjProgressBar::default();
         obj.progress_total = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyk_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyk_default() {
+        let obj = EykSplitView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyk_fields() {
+        let mut obj = EykSplitView::default();
+        obj.split_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyl_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyl_default() {
+        let obj = EylGridView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyl_fields() {
+        let mut obj = EylGridView::default();
+        obj.grid_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eym_generated {
+    use super::*;
+
+    #[test]
+    fn test_eym_default() {
+        let obj = EymSashWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eym_fields() {
+        let mut obj = EymSashWidget::default();
+        obj.sash_orientation = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyn_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyn_default() {
+        let obj = EynScrollable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyn_fields() {
+        let mut obj = EynScrollable::default();
+        obj.scrollable_width = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyo_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyo_default() {
+        let obj = EyoInputBox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyo_fields() {
+        let mut obj = EyoInputBox::default();
+        obj.input_value = "test".to_string();
         assert!(obj.validate());
     }
 }
