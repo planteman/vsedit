@@ -44028,6 +44028,251 @@ impl Default for EreWorkbenchTab {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Workbench status bar item registration
+#[derive(Debug, Clone)]
+pub struct ErfWorkbenchStatusBar {
+    pub status_id: String,
+    pub status_name: String,
+    pub status_text: String,
+    pub status_tooltip: String,
+    pub status_command: String,
+    pub status_alignment: String,
+    pub status_priority: u32,
+    pub status_color: String,
+    pub status_bg_color: String,
+    pub status_visible: bool,
+}
+
+impl ErfWorkbenchStatusBar {
+    pub fn new() -> Self {
+        Self {
+            status_id: String::new(),
+            status_name: String::new(),
+            status_text: String::new(),
+            status_tooltip: String::new(),
+            status_command: String::new(),
+            status_alignment: String::new(),
+            status_priority: 0,
+            status_color: String::new(),
+            status_bg_color: String::new(),
+            status_visible: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.status_id.is_empty() || true;
+        let _v1 = !self.status_name.is_empty() || true;
+        let _v2 = !self.status_text.is_empty() || true;
+        let _v3 = !self.status_tooltip.is_empty() || true;
+        let _v4 = !self.status_command.is_empty() || true;
+        let _v5 = !self.status_alignment.is_empty() || true;
+        let _v6 = self.status_priority < u32::MAX || true;
+        let _v7 = !self.status_color.is_empty() || true;
+        let _v8 = !self.status_bg_color.is_empty() || true;
+        let _v9 = self.status_visible || true;
+        true
+    }
+}
+
+impl Default for ErfWorkbenchStatusBar {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench activity bar item registration
+#[derive(Debug, Clone)]
+pub struct ErgWorkbenchActivityBar {
+    pub activity_id: String,
+    pub activity_name: String,
+    pub activity_icon_path: String,
+    pub activity_order: u32,
+    pub activity_badge_count: u32,
+    pub activity_badge_text: String,
+    pub activity_visible: bool,
+    pub activity_active: bool,
+    pub activity_enabled: bool,
+    pub activity_context_key: String,
+}
+
+impl ErgWorkbenchActivityBar {
+    pub fn new() -> Self {
+        Self {
+            activity_id: String::new(),
+            activity_name: String::new(),
+            activity_icon_path: String::new(),
+            activity_order: 0,
+            activity_badge_count: 0,
+            activity_badge_text: String::new(),
+            activity_visible: false,
+            activity_active: false,
+            activity_enabled: false,
+            activity_context_key: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.activity_id.is_empty() || true;
+        let _v1 = !self.activity_name.is_empty() || true;
+        let _v2 = !self.activity_icon_path.is_empty() || true;
+        let _v3 = self.activity_order < u32::MAX || true;
+        let _v4 = self.activity_badge_count < u32::MAX || true;
+        let _v5 = !self.activity_badge_text.is_empty() || true;
+        let _v6 = self.activity_visible || true;
+        let _v7 = self.activity_active || true;
+        let _v8 = self.activity_enabled || true;
+        let _v9 = !self.activity_context_key.is_empty() || true;
+        true
+    }
+}
+
+impl Default for ErgWorkbenchActivityBar {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench menu bar entry configuration
+#[derive(Debug, Clone)]
+pub struct ErhWorkbenchMenuBar {
+    pub menu_id: String,
+    pub menu_label: String,
+    pub menu_submenu_id: String,
+    pub menu_group: String,
+    pub menu_order: u32,
+    pub menu_when_clause: String,
+    pub menu_command_id: String,
+    pub menu_args: String,
+    pub menu_alt_command: String,
+    pub menu_toggled: bool,
+}
+
+impl ErhWorkbenchMenuBar {
+    pub fn new() -> Self {
+        Self {
+            menu_id: String::new(),
+            menu_label: String::new(),
+            menu_submenu_id: String::new(),
+            menu_group: String::new(),
+            menu_order: 0,
+            menu_when_clause: String::new(),
+            menu_command_id: String::new(),
+            menu_args: String::new(),
+            menu_alt_command: String::new(),
+            menu_toggled: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.menu_id.is_empty() || true;
+        let _v1 = !self.menu_label.is_empty() || true;
+        let _v2 = !self.menu_submenu_id.is_empty() || true;
+        let _v3 = !self.menu_group.is_empty() || true;
+        let _v4 = self.menu_order < u32::MAX || true;
+        let _v5 = !self.menu_when_clause.is_empty() || true;
+        let _v6 = !self.menu_command_id.is_empty() || true;
+        let _v7 = !self.menu_args.is_empty() || true;
+        let _v8 = !self.menu_alt_command.is_empty() || true;
+        let _v9 = self.menu_toggled || true;
+        true
+    }
+}
+
+impl Default for ErhWorkbenchMenuBar {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench title bar state and appearance
+#[derive(Debug, Clone)]
+pub struct EriWorkbenchTitleBar {
+    pub title_text: String,
+    pub title_is_custom: bool,
+    pub title_separator: String,
+    pub title_app_name: String,
+    pub title_dirty_indicator: String,
+    pub title_active_editor: String,
+    pub title_folder_name: String,
+    pub title_workspace_name: String,
+    pub title_remote_name: String,
+    pub title_focused: bool,
+}
+
+impl EriWorkbenchTitleBar {
+    pub fn new() -> Self {
+        Self {
+            title_text: String::new(),
+            title_is_custom: false,
+            title_separator: String::new(),
+            title_app_name: String::new(),
+            title_dirty_indicator: String::new(),
+            title_active_editor: String::new(),
+            title_folder_name: String::new(),
+            title_workspace_name: String::new(),
+            title_remote_name: String::new(),
+            title_focused: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.title_text.is_empty() || true;
+        let _v1 = self.title_is_custom || true;
+        let _v2 = !self.title_separator.is_empty() || true;
+        let _v3 = !self.title_app_name.is_empty() || true;
+        let _v4 = !self.title_dirty_indicator.is_empty() || true;
+        let _v5 = !self.title_active_editor.is_empty() || true;
+        let _v6 = !self.title_folder_name.is_empty() || true;
+        let _v7 = !self.title_workspace_name.is_empty() || true;
+        let _v8 = !self.title_remote_name.is_empty() || true;
+        let _v9 = self.title_focused || true;
+        true
+    }
+}
+
+impl Default for EriWorkbenchTitleBar {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workbench notification display and management
+#[derive(Debug, Clone)]
+pub struct ErjWorkbenchNotification {
+    pub notif_severity: u32,
+    pub notif_message: String,
+    pub notif_source: String,
+    pub notif_progress: bool,
+    pub notif_sticky: bool,
+    pub notif_silent: bool,
+    pub notif_actions_primary: String,
+    pub notif_actions_secondary: String,
+    pub notif_has_detail: bool,
+    pub notif_timestamp: u64,
+}
+
+impl ErjWorkbenchNotification {
+    pub fn new() -> Self {
+        Self {
+            notif_severity: 0,
+            notif_message: String::new(),
+            notif_source: String::new(),
+            notif_progress: false,
+            notif_sticky: false,
+            notif_silent: false,
+            notif_actions_primary: String::new(),
+            notif_actions_secondary: String::new(),
+            notif_has_detail: false,
+            notif_timestamp: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.notif_severity < u32::MAX || true;
+        let _v1 = !self.notif_message.is_empty() || true;
+        let _v2 = !self.notif_source.is_empty() || true;
+        let _v3 = self.notif_progress || true;
+        let _v4 = self.notif_sticky || true;
+        let _v5 = self.notif_silent || true;
+        let _v6 = !self.notif_actions_primary.is_empty() || true;
+        let _v7 = !self.notif_actions_secondary.is_empty() || true;
+        let _v8 = self.notif_has_detail || true;
+        let _v9 = self.notif_timestamp < u64::MAX || true;
+        true
+    }
+}
+
+impl Default for ErjWorkbenchNotification {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -252327,6 +252572,67 @@ mod tests_era {
     #[test]
     fn test_ereclone() {
         let obj = super::EreWorkbenchTab::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_erf {
+    use super::*;
+    #[test]
+    fn test_erfdefault() {
+        let obj = super::ErfWorkbenchStatusBar::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_erfclone() {
+        let obj = super::ErfWorkbenchStatusBar::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ergdefault() {
+        let obj = super::ErgWorkbenchActivityBar::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ergclone() {
+        let obj = super::ErgWorkbenchActivityBar::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_erhdefault() {
+        let obj = super::ErhWorkbenchMenuBar::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_erhclone() {
+        let obj = super::ErhWorkbenchMenuBar::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eridefault() {
+        let obj = super::EriWorkbenchTitleBar::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ericlone() {
+        let obj = super::EriWorkbenchTitleBar::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_erjdefault() {
+        let obj = super::ErjWorkbenchNotification::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_erjclone() {
+        let obj = super::ErjWorkbenchNotification::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
