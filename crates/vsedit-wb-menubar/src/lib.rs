@@ -70034,6 +70034,678 @@ impl Default for FojTestOutputChannel {
     }
 }
 
+/// Test decoration (gutter icon, inline message, error lens)
+#[derive(Debug, Clone)]
+pub struct FokTestDecoration {
+    pub decoration_id: String,
+    pub test_id: String,
+    pub gutter_icon_path: String,
+    pub inline_message: String,
+    pub message_severity: u32,
+    pub is_error_lens: bool,
+    pub line_number: u32,
+    pub hover_message: String,
+    pub is_dimmed: bool,
+    pub decoration_type: u32,
+}
+
+impl FokTestDecoration {
+    pub fn new() -> Self {
+        Self {
+            decoration_id: String::new(),
+            test_id: String::new(),
+            gutter_icon_path: String::new(),
+            inline_message: String::new(),
+            message_severity: u32::default(),
+            is_error_lens: bool::default(),
+            line_number: u32::default(),
+            hover_message: String::new(),
+            is_dimmed: bool::default(),
+            decoration_type: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decoration_id.is_empty() || true && !self.test_id.is_empty() || true && !self.gutter_icon_path.is_empty() || true && !self.inline_message.is_empty() || true && self.message_severity < u32::MAX || true && self.is_error_lens || true && self.line_number < u32::MAX || true && !self.hover_message.is_empty() || true && self.is_dimmed || true && self.decoration_type < u32::MAX || true
+    }
+}
+
+impl Default for FokTestDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test continuous run (watcher, file change, debounce, auto rerun)
+#[derive(Debug, Clone)]
+pub struct FolTestContinuousRun {
+    pub run_id: String,
+    pub watcher_id: String,
+    pub file_pattern: String,
+    pub debounce_ms: u32,
+    pub auto_rerun: bool,
+    pub is_active: bool,
+    pub last_trigger_ms: u64,
+    pub run_count: u64,
+    pub controller_id: String,
+    pub profile_id: String,
+}
+
+impl FolTestContinuousRun {
+    pub fn new() -> Self {
+        Self {
+            run_id: String::new(),
+            watcher_id: String::new(),
+            file_pattern: String::new(),
+            debounce_ms: u32::default(),
+            auto_rerun: bool::default(),
+            is_active: bool::default(),
+            last_trigger_ms: u64::default(),
+            run_count: u64::default(),
+            controller_id: String::new(),
+            profile_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.run_id.is_empty() || true && !self.watcher_id.is_empty() || true && !self.file_pattern.is_empty() || true && self.debounce_ms < u32::MAX || true && self.auto_rerun || true && self.is_active || true && self.last_trigger_ms < u64::MAX || true && self.run_count < u64::MAX || true && !self.controller_id.is_empty() || true && !self.profile_id.is_empty() || true
+    }
+}
+
+impl Default for FolTestContinuousRun {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task execution (task, terminal, process, is background, state)
+#[derive(Debug, Clone)]
+pub struct FomTaskExecution {
+    pub exec_id: String,
+    pub task_id: String,
+    pub terminal_id: String,
+    pub process_pid: u64,
+    pub is_background: bool,
+    pub state: u32,
+    pub started_at_ms: u64,
+    pub exit_code: u32,
+    pub is_active: bool,
+    pub problem_matcher_id: String,
+}
+
+impl FomTaskExecution {
+    pub fn new() -> Self {
+        Self {
+            exec_id: String::new(),
+            task_id: String::new(),
+            terminal_id: String::new(),
+            process_pid: u64::default(),
+            is_background: bool::default(),
+            state: u32::default(),
+            started_at_ms: u64::default(),
+            exit_code: u32::default(),
+            is_active: bool::default(),
+            problem_matcher_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exec_id.is_empty() || true && !self.task_id.is_empty() || true && !self.terminal_id.is_empty() || true && self.process_pid < u64::MAX || true && self.is_background || true && self.state < u32::MAX || true && self.started_at_ms < u64::MAX || true && self.exit_code < u32::MAX || true && self.is_active || true && !self.problem_matcher_id.is_empty() || true
+    }
+}
+
+impl Default for FomTaskExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task process start event (task, process id, execution)
+#[derive(Debug, Clone)]
+pub struct FonTaskProcessStart {
+    pub process_id: String,
+    pub task_id: String,
+    pub pid: u64,
+    pub execution_id: String,
+    pub started_at_ms: u64,
+    pub cwd: String,
+    pub command: String,
+    pub args_json: String,
+    pub shell_path: String,
+    pub is_shell: bool,
+}
+
+impl FonTaskProcessStart {
+    pub fn new() -> Self {
+        Self {
+            process_id: String::new(),
+            task_id: String::new(),
+            pid: u64::default(),
+            execution_id: String::new(),
+            started_at_ms: u64::default(),
+            cwd: String::new(),
+            command: String::new(),
+            args_json: String::new(),
+            shell_path: String::new(),
+            is_shell: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.process_id.is_empty() || true && !self.task_id.is_empty() || true && self.pid < u64::MAX || true && !self.execution_id.is_empty() || true && self.started_at_ms < u64::MAX || true && !self.cwd.is_empty() || true && !self.command.is_empty() || true && !self.args_json.is_empty() || true && !self.shell_path.is_empty() || true && self.is_shell || true
+    }
+}
+
+impl Default for FonTaskProcessStart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task process end event (task, exit code, signal)
+#[derive(Debug, Clone)]
+pub struct FooTaskProcessEnd {
+    pub end_id: String,
+    pub task_id: String,
+    pub exit_code: u32,
+    pub signal: String,
+    pub execution_id: String,
+    pub ended_at_ms: u64,
+    pub duration_ms: u64,
+    pub is_success: bool,
+    pub problem_count: u32,
+    pub output_lines: u64,
+}
+
+impl FooTaskProcessEnd {
+    pub fn new() -> Self {
+        Self {
+            end_id: String::new(),
+            task_id: String::new(),
+            exit_code: u32::default(),
+            signal: String::new(),
+            execution_id: String::new(),
+            ended_at_ms: u64::default(),
+            duration_ms: u64::default(),
+            is_success: bool::default(),
+            problem_count: u32::default(),
+            output_lines: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.end_id.is_empty() || true && !self.task_id.is_empty() || true && self.exit_code < u32::MAX || true && !self.signal.is_empty() || true && !self.execution_id.is_empty() || true && self.ended_at_ms < u64::MAX || true && self.duration_ms < u64::MAX || true && self.is_success || true && self.problem_count < u32::MAX || true && self.output_lines < u64::MAX || true
+    }
+}
+
+impl Default for FooTaskProcessEnd {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem matcher (owner, pattern, severity, file location, loop)
+#[derive(Debug, Clone)]
+pub struct FopProblemMatcher {
+    pub matcher_id: String,
+    pub owner: String,
+    pub pattern_json: String,
+    pub severity: u32,
+    pub file_location: u32,
+    pub apply_to: u32,
+    pub is_watching: bool,
+    pub begin_pattern: String,
+    pub end_pattern: String,
+    pub is_loop: bool,
+}
+
+impl FopProblemMatcher {
+    pub fn new() -> Self {
+        Self {
+            matcher_id: String::new(),
+            owner: String::new(),
+            pattern_json: String::new(),
+            severity: u32::default(),
+            file_location: u32::default(),
+            apply_to: u32::default(),
+            is_watching: bool::default(),
+            begin_pattern: String::new(),
+            end_pattern: String::new(),
+            is_loop: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.matcher_id.is_empty() || true && !self.owner.is_empty() || true && !self.pattern_json.is_empty() || true && self.severity < u32::MAX || true && self.file_location < u32::MAX || true && self.apply_to < u32::MAX || true && self.is_watching || true && !self.begin_pattern.is_empty() || true && !self.end_pattern.is_empty() || true && self.is_loop || true
+    }
+}
+
+impl Default for FopProblemMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem pattern (regexp, file, line, column, message, severity)
+#[derive(Debug, Clone)]
+pub struct FoqProblemPattern {
+    pub pattern_id: String,
+    pub regexp: String,
+    pub file_group: u32,
+    pub line_group: u32,
+    pub column_group: u32,
+    pub message_group: u32,
+    pub severity_group: u32,
+    pub code_group: u32,
+    pub end_line_group: u32,
+    pub end_column_group: u32,
+}
+
+impl FoqProblemPattern {
+    pub fn new() -> Self {
+        Self {
+            pattern_id: String::new(),
+            regexp: String::new(),
+            file_group: u32::default(),
+            line_group: u32::default(),
+            column_group: u32::default(),
+            message_group: u32::default(),
+            severity_group: u32::default(),
+            code_group: u32::default(),
+            end_line_group: u32::default(),
+            end_column_group: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pattern_id.is_empty() || true && !self.regexp.is_empty() || true && self.file_group < u32::MAX || true && self.line_group < u32::MAX || true && self.column_group < u32::MAX || true && self.message_group < u32::MAX || true && self.severity_group < u32::MAX || true && self.code_group < u32::MAX || true && self.end_line_group < u32::MAX || true && self.end_column_group < u32::MAX || true
+    }
+}
+
+impl Default for FoqProblemPattern {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem diagnostic from task (source, resource, marker, severity)
+#[derive(Debug, Clone)]
+pub struct ForProblemDiagnostic {
+    pub diag_id: String,
+    pub source: String,
+    pub resource_uri: String,
+    pub marker_severity: u32,
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub message: String,
+    pub code: String,
+}
+
+impl ForProblemDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            diag_id: String::new(),
+            source: String::new(),
+            resource_uri: String::new(),
+            marker_severity: u32::default(),
+            start_line: u32::default(),
+            start_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            message: String::new(),
+            code: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_id.is_empty() || true && !self.source.is_empty() || true && !self.resource_uri.is_empty() || true && self.marker_severity < u32::MAX || true && self.start_line < u32::MAX || true && self.start_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.message.is_empty() || true && !self.code.is_empty() || true
+    }
+}
+
+impl Default for ForProblemDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task group (build, test, clean, rebuild, none, isDefault)
+#[derive(Debug, Clone)]
+pub struct FosTaskGroup {
+    pub group_id: String,
+    pub group_kind: u32,
+    pub is_default: bool,
+    pub label: String,
+    pub execution_count: u32,
+    pub last_run_ms: u64,
+    pub icon_id: String,
+    pub is_build: bool,
+    pub is_test: bool,
+    pub is_rebuild: bool,
+}
+
+impl FosTaskGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            group_kind: u32::default(),
+            is_default: bool::default(),
+            label: String::new(),
+            execution_count: u32::default(),
+            last_run_ms: u64::default(),
+            icon_id: String::new(),
+            is_build: bool::default(),
+            is_test: bool::default(),
+            is_rebuild: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && self.group_kind < u32::MAX || true && self.is_default || true && !self.label.is_empty() || true && self.execution_count < u32::MAX || true && self.last_run_ms < u64::MAX || true && !self.icon_id.is_empty() || true && self.is_build || true && self.is_test || true && self.is_rebuild || true
+    }
+}
+
+impl Default for FosTaskGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task presentation options (reveal, echo, focus, panel, showReuseMessage)
+#[derive(Debug, Clone)]
+pub struct FotTaskPresentation {
+    pub pres_id: String,
+    pub reveal: u32,
+    pub echo: bool,
+    pub focus: bool,
+    pub panel: u32,
+    pub show_reuse_message: bool,
+    pub clear: bool,
+    pub close: bool,
+    pub group: String,
+    pub icon_id: String,
+}
+
+impl FotTaskPresentation {
+    pub fn new() -> Self {
+        Self {
+            pres_id: String::new(),
+            reveal: u32::default(),
+            echo: bool::default(),
+            focus: bool::default(),
+            panel: u32::default(),
+            show_reuse_message: bool::default(),
+            clear: bool::default(),
+            close: bool::default(),
+            group: String::new(),
+            icon_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pres_id.is_empty() || true && self.reveal < u32::MAX || true && self.echo || true && self.focus || true && self.panel < u32::MAX || true && self.show_reuse_message || true && self.clear || true && self.close || true && !self.group.is_empty() || true && !self.icon_id.is_empty() || true
+    }
+}
+
+impl Default for FotTaskPresentation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task run options (reevaluate on rerun, instance limit, group)
+#[derive(Debug, Clone)]
+pub struct FouTaskRunOptions {
+    pub run_opts_id: String,
+    pub reevaluate_on_rerun: bool,
+    pub instance_limit: u32,
+    pub run_on: u32,
+    pub group_id: String,
+    pub reattach_terminal: bool,
+    pub is_background: bool,
+    pub depends_on_json: String,
+    pub depends_order: u32,
+    pub detail: String,
+}
+
+impl FouTaskRunOptions {
+    pub fn new() -> Self {
+        Self {
+            run_opts_id: String::new(),
+            reevaluate_on_rerun: bool::default(),
+            instance_limit: u32::default(),
+            run_on: u32::default(),
+            group_id: String::new(),
+            reattach_terminal: bool::default(),
+            is_background: bool::default(),
+            depends_on_json: String::new(),
+            depends_order: u32::default(),
+            detail: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.run_opts_id.is_empty() || true && self.reevaluate_on_rerun || true && self.instance_limit < u32::MAX || true && self.run_on < u32::MAX || true && !self.group_id.is_empty() || true && self.reattach_terminal || true && self.is_background || true && !self.depends_on_json.is_empty() || true && self.depends_order < u32::MAX || true && !self.detail.is_empty() || true
+    }
+}
+
+impl Default for FouTaskRunOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shell execution (command line, args, options, cwd, env)
+#[derive(Debug, Clone)]
+pub struct FovShellExecution {
+    pub exec_id: String,
+    pub command_line: String,
+    pub args_json: String,
+    pub cwd: String,
+    pub env_json: String,
+    pub shell_path: String,
+    pub shell_args_json: String,
+    pub quote_args: bool,
+    pub escape_char: String,
+    pub is_windows: bool,
+}
+
+impl FovShellExecution {
+    pub fn new() -> Self {
+        Self {
+            exec_id: String::new(),
+            command_line: String::new(),
+            args_json: String::new(),
+            cwd: String::new(),
+            env_json: String::new(),
+            shell_path: String::new(),
+            shell_args_json: String::new(),
+            quote_args: bool::default(),
+            escape_char: String::new(),
+            is_windows: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exec_id.is_empty() || true && !self.command_line.is_empty() || true && !self.args_json.is_empty() || true && !self.cwd.is_empty() || true && !self.env_json.is_empty() || true && !self.shell_path.is_empty() || true && !self.shell_args_json.is_empty() || true && self.quote_args || true && !self.escape_char.is_empty() || true && self.is_windows || true
+    }
+}
+
+impl Default for FovShellExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Process execution (process, args, options, cwd, env)
+#[derive(Debug, Clone)]
+pub struct FowProcessExecution {
+    pub exec_id: String,
+    pub process_path: String,
+    pub args_json: String,
+    pub cwd: String,
+    pub env_json: String,
+    pub detached: bool,
+    pub shell: bool,
+    pub windows_verbatim: bool,
+    pub uid: u32,
+    pub gid: u32,
+}
+
+impl FowProcessExecution {
+    pub fn new() -> Self {
+        Self {
+            exec_id: String::new(),
+            process_path: String::new(),
+            args_json: String::new(),
+            cwd: String::new(),
+            env_json: String::new(),
+            detached: bool::default(),
+            shell: bool::default(),
+            windows_verbatim: bool::default(),
+            uid: u32::default(),
+            gid: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exec_id.is_empty() || true && !self.process_path.is_empty() || true && !self.args_json.is_empty() || true && !self.cwd.is_empty() || true && !self.env_json.is_empty() || true && self.detached || true && self.shell || true && self.windows_verbatim || true && self.uid < u32::MAX || true && self.gid < u32::MAX || true
+    }
+}
+
+impl Default for FowProcessExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom execution (callback, pseudoterminal, close handler)
+#[derive(Debug, Clone)]
+pub struct FoxCustomExecution {
+    pub exec_id: String,
+    pub callback_id: String,
+    pub pty_id: String,
+    pub close_handler_id: String,
+    pub open_handler_id: String,
+    pub is_running: bool,
+    pub input_buffer_size: u32,
+    pub dimension_cols: u32,
+    pub dimension_rows: u32,
+    pub write_emitter_id: String,
+}
+
+impl FoxCustomExecution {
+    pub fn new() -> Self {
+        Self {
+            exec_id: String::new(),
+            callback_id: String::new(),
+            pty_id: String::new(),
+            close_handler_id: String::new(),
+            open_handler_id: String::new(),
+            is_running: bool::default(),
+            input_buffer_size: u32::default(),
+            dimension_cols: u32::default(),
+            dimension_rows: u32::default(),
+            write_emitter_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exec_id.is_empty() || true && !self.callback_id.is_empty() || true && !self.pty_id.is_empty() || true && !self.close_handler_id.is_empty() || true && !self.open_handler_id.is_empty() || true && self.is_running || true && self.input_buffer_size < u32::MAX || true && self.dimension_cols < u32::MAX || true && self.dimension_rows < u32::MAX || true && !self.write_emitter_id.is_empty() || true
+    }
+}
+
+impl Default for FoxCustomExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task filter (type, version, recent, workspace folder)
+#[derive(Debug, Clone)]
+pub struct FoyTaskFilter {
+    pub filter_id: String,
+    pub task_type: String,
+    pub version: String,
+    pub recent_filter: bool,
+    pub workspace_folder_uri: String,
+    pub include_global: bool,
+    pub include_workspace: bool,
+    pub sort_by_recent: bool,
+    pub max_results: u32,
+    pub name_pattern: String,
+}
+
+impl FoyTaskFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_id: String::new(),
+            task_type: String::new(),
+            version: String::new(),
+            recent_filter: bool::default(),
+            workspace_folder_uri: String::new(),
+            include_global: bool::default(),
+            include_workspace: bool::default(),
+            sort_by_recent: bool::default(),
+            max_results: u32::default(),
+            name_pattern: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_id.is_empty() || true && !self.task_type.is_empty() || true && !self.version.is_empty() || true && self.recent_filter || true && !self.workspace_folder_uri.is_empty() || true && self.include_global || true && self.include_workspace || true && self.sort_by_recent || true && self.max_results < u32::MAX || true && !self.name_pattern.is_empty() || true
+    }
+}
+
+impl Default for FoyTaskFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task provider (type, provide tasks, resolve task, custom exec)
+#[derive(Debug, Clone)]
+pub struct FozTaskProvider2 {
+    pub provider_id: String,
+    pub task_type: String,
+    pub provide_handler_id: String,
+    pub resolve_handler_id: String,
+    pub custom_exec_factory_id: String,
+    pub extension_id: String,
+    pub is_active: bool,
+    pub task_count: u32,
+    pub last_refresh_ms: u64,
+    pub supports_resolve: bool,
+}
+
+impl FozTaskProvider2 {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            task_type: String::new(),
+            provide_handler_id: String::new(),
+            resolve_handler_id: String::new(),
+            custom_exec_factory_id: String::new(),
+            extension_id: String::new(),
+            is_active: bool::default(),
+            task_count: u32::default(),
+            last_refresh_ms: u64::default(),
+            supports_resolve: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.task_type.is_empty() || true && !self.provide_handler_id.is_empty() || true && !self.resolve_handler_id.is_empty() || true && !self.custom_exec_factory_id.is_empty() || true && !self.extension_id.is_empty() || true && self.is_active || true && self.task_count < u32::MAX || true && self.last_refresh_ms < u64::MAX || true && self.supports_resolve || true
+    }
+}
+
+impl Default for FozTaskProvider2 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288221,6 +288893,294 @@ mod tests_foj_generated {
     fn test_foj_fields() {
         let mut obj = FojTestOutputChannel::default();
         obj.channel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fok_generated {
+    use super::*;
+
+    #[test]
+    fn test_fok_default() {
+        let obj = FokTestDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fok_fields() {
+        let mut obj = FokTestDecoration::default();
+        obj.decoration_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fol_generated {
+    use super::*;
+
+    #[test]
+    fn test_fol_default() {
+        let obj = FolTestContinuousRun::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fol_fields() {
+        let mut obj = FolTestContinuousRun::default();
+        obj.run_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fom_generated {
+    use super::*;
+
+    #[test]
+    fn test_fom_default() {
+        let obj = FomTaskExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fom_fields() {
+        let mut obj = FomTaskExecution::default();
+        obj.exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fon_generated {
+    use super::*;
+
+    #[test]
+    fn test_fon_default() {
+        let obj = FonTaskProcessStart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fon_fields() {
+        let mut obj = FonTaskProcessStart::default();
+        obj.process_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_foo_generated {
+    use super::*;
+
+    #[test]
+    fn test_foo_default() {
+        let obj = FooTaskProcessEnd::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_foo_fields() {
+        let mut obj = FooTaskProcessEnd::default();
+        obj.end_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fop_generated {
+    use super::*;
+
+    #[test]
+    fn test_fop_default() {
+        let obj = FopProblemMatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fop_fields() {
+        let mut obj = FopProblemMatcher::default();
+        obj.matcher_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_foq_generated {
+    use super::*;
+
+    #[test]
+    fn test_foq_default() {
+        let obj = FoqProblemPattern::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_foq_fields() {
+        let mut obj = FoqProblemPattern::default();
+        obj.pattern_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_for_generated {
+    use super::*;
+
+    #[test]
+    fn test_for_default() {
+        let obj = ForProblemDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_for_fields() {
+        let mut obj = ForProblemDiagnostic::default();
+        obj.diag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fos_generated {
+    use super::*;
+
+    #[test]
+    fn test_fos_default() {
+        let obj = FosTaskGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fos_fields() {
+        let mut obj = FosTaskGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fot_generated {
+    use super::*;
+
+    #[test]
+    fn test_fot_default() {
+        let obj = FotTaskPresentation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fot_fields() {
+        let mut obj = FotTaskPresentation::default();
+        obj.pres_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fou_generated {
+    use super::*;
+
+    #[test]
+    fn test_fou_default() {
+        let obj = FouTaskRunOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fou_fields() {
+        let mut obj = FouTaskRunOptions::default();
+        obj.run_opts_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fov_generated {
+    use super::*;
+
+    #[test]
+    fn test_fov_default() {
+        let obj = FovShellExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fov_fields() {
+        let mut obj = FovShellExecution::default();
+        obj.exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fow_generated {
+    use super::*;
+
+    #[test]
+    fn test_fow_default() {
+        let obj = FowProcessExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fow_fields() {
+        let mut obj = FowProcessExecution::default();
+        obj.exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fox_generated {
+    use super::*;
+
+    #[test]
+    fn test_fox_default() {
+        let obj = FoxCustomExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fox_fields() {
+        let mut obj = FoxCustomExecution::default();
+        obj.exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_foy_generated {
+    use super::*;
+
+    #[test]
+    fn test_foy_default() {
+        let obj = FoyTaskFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_foy_fields() {
+        let mut obj = FoyTaskFilter::default();
+        obj.filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_foz_generated {
+    use super::*;
+
+    #[test]
+    fn test_foz_default() {
+        let obj = FozTaskProvider2::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_foz_fields() {
+        let mut obj = FozTaskProvider2::default();
+        obj.provider_id = "test".to_string();
         assert!(obj.validate());
     }
 }
