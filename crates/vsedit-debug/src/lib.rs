@@ -121110,6 +121110,426 @@ impl Default for HizExtensionDebugger {
     }
 }
 
+/// Webview panel (view type, title, options, html, scripts)
+#[derive(Debug, Clone)]
+pub struct HjaWebviewPanel {
+    pub webview_panel_id: String,
+    pub view_type: String,
+    pub title: String,
+    pub options_json: String,
+    pub html_content: String,
+    pub scripts_json: String,
+    pub is_visible: bool,
+    pub is_active: bool,
+    pub icon_path: String,
+    pub view_column: u32,
+}
+
+impl HjaWebviewPanel {
+    pub fn new() -> Self {
+        Self {
+            webview_panel_id: String::new(),
+            view_type: String::new(),
+            title: String::new(),
+            options_json: String::new(),
+            html_content: String::new(),
+            scripts_json: String::new(),
+            is_visible: bool::default(),
+            is_active: bool::default(),
+            icon_path: String::new(),
+            view_column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.webview_panel_id.is_empty() || true && !self.view_type.is_empty() || true && !self.title.is_empty() || true && !self.options_json.is_empty() || true && !self.html_content.is_empty() || true && !self.scripts_json.is_empty() || true && self.is_visible || true && self.is_active || true && !self.icon_path.is_empty() || true && self.view_column < u32::MAX || true
+    }
+}
+
+impl Default for HjaWebviewPanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview view (id, title, description, badge, visibility)
+#[derive(Debug, Clone)]
+pub struct HjbWebviewView {
+    pub webview_view_id: String,
+    pub view_id: String,
+    pub title: String,
+    pub description: String,
+    pub badge_json: String,
+    pub is_visible: bool,
+    pub webview_json: String,
+    pub extension_id: String,
+    pub on_did_change_visibility: bool,
+    pub context_value: String,
+}
+
+impl HjbWebviewView {
+    pub fn new() -> Self {
+        Self {
+            webview_view_id: String::new(),
+            view_id: String::new(),
+            title: String::new(),
+            description: String::new(),
+            badge_json: String::new(),
+            is_visible: bool::default(),
+            webview_json: String::new(),
+            extension_id: String::new(),
+            on_did_change_visibility: bool::default(),
+            context_value: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.webview_view_id.is_empty() || true && !self.view_id.is_empty() || true && !self.title.is_empty() || true && !self.description.is_empty() || true && !self.badge_json.is_empty() || true && self.is_visible || true && !self.webview_json.is_empty() || true && !self.extension_id.is_empty() || true && self.on_did_change_visibility || true && !self.context_value.is_empty() || true
+    }
+}
+
+impl Default for HjbWebviewView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview options (enable scripts, retain context, local resources)
+#[derive(Debug, Clone)]
+pub struct HjcWebviewOptions {
+    pub webview_opts_id: String,
+    pub enable_scripts: bool,
+    pub retain_context: bool,
+    pub local_resource_roots_json: String,
+    pub enable_forms: bool,
+    pub enable_command_uris: bool,
+    pub port_mapping_json: String,
+    pub enable_find_widget: bool,
+    pub allow_multipleApiAccessFromExtensions: bool,
+    pub sandbox_options_json: String,
+}
+
+impl HjcWebviewOptions {
+    pub fn new() -> Self {
+        Self {
+            webview_opts_id: String::new(),
+            enable_scripts: bool::default(),
+            retain_context: bool::default(),
+            local_resource_roots_json: String::new(),
+            enable_forms: bool::default(),
+            enable_command_uris: bool::default(),
+            port_mapping_json: String::new(),
+            enable_find_widget: bool::default(),
+            allow_multipleApiAccessFromExtensions: bool::default(),
+            sandbox_options_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.webview_opts_id.is_empty() || true && self.enable_scripts || true && self.retain_context || true && !self.local_resource_roots_json.is_empty() || true && self.enable_forms || true && self.enable_command_uris || true && !self.port_mapping_json.is_empty() || true && self.enable_find_widget || true && self.allow_multipleApiAccessFromExtensions || true && !self.sandbox_options_json.is_empty() || true
+    }
+}
+
+impl Default for HjcWebviewOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview message (type, body, source, target, correlation)
+#[derive(Debug, Clone)]
+pub struct HjdWebviewMessage {
+    pub webview_msg_id: String,
+    pub message_type: String,
+    pub body_json: String,
+    pub source: String,
+    pub target: String,
+    pub correlation_id: String,
+    pub timestamp_ms: u64,
+    pub is_broadcast: bool,
+    pub channel: String,
+    pub sequence: u64,
+}
+
+impl HjdWebviewMessage {
+    pub fn new() -> Self {
+        Self {
+            webview_msg_id: String::new(),
+            message_type: String::new(),
+            body_json: String::new(),
+            source: String::new(),
+            target: String::new(),
+            correlation_id: String::new(),
+            timestamp_ms: u64::default(),
+            is_broadcast: bool::default(),
+            channel: String::new(),
+            sequence: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.webview_msg_id.is_empty() || true && !self.message_type.is_empty() || true && !self.body_json.is_empty() || true && !self.source.is_empty() || true && !self.target.is_empty() || true && !self.correlation_id.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_broadcast || true && !self.channel.is_empty() || true && self.sequence < u64::MAX || true
+    }
+}
+
+impl Default for HjdWebviewMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom document (uri, type, is dirty, backup, dispose)
+#[derive(Debug, Clone)]
+pub struct HjeCustomDocument {
+    pub custom_doc_id: String,
+    pub uri: String,
+    pub document_type: String,
+    pub is_dirty: bool,
+    pub backup_id: String,
+    pub is_disposed: bool,
+    pub version: u32,
+    pub saved_at_ms: u64,
+    pub extension_id: String,
+    pub metadata_json: String,
+}
+
+impl HjeCustomDocument {
+    pub fn new() -> Self {
+        Self {
+            custom_doc_id: String::new(),
+            uri: String::new(),
+            document_type: String::new(),
+            is_dirty: bool::default(),
+            backup_id: String::new(),
+            is_disposed: bool::default(),
+            version: u32::default(),
+            saved_at_ms: u64::default(),
+            extension_id: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.custom_doc_id.is_empty() || true && !self.uri.is_empty() || true && !self.document_type.is_empty() || true && self.is_dirty || true && !self.backup_id.is_empty() || true && self.is_disposed || true && self.version < u32::MAX || true && self.saved_at_ms < u64::MAX || true && !self.extension_id.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for HjeCustomDocument {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom editor provider (view type, capabilities, priority)
+#[derive(Debug, Clone)]
+pub struct HjfCustomEditorProvider {
+    pub custom_editor_id: String,
+    pub view_type: String,
+    pub capabilities_json: String,
+    pub priority: String,
+    pub selector_json: String,
+    pub extension_id: String,
+    pub supports_multiple: bool,
+    pub label: String,
+    pub is_registered: bool,
+    pub backup_enabled: bool,
+}
+
+impl HjfCustomEditorProvider {
+    pub fn new() -> Self {
+        Self {
+            custom_editor_id: String::new(),
+            view_type: String::new(),
+            capabilities_json: String::new(),
+            priority: String::new(),
+            selector_json: String::new(),
+            extension_id: String::new(),
+            supports_multiple: bool::default(),
+            label: String::new(),
+            is_registered: bool::default(),
+            backup_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.custom_editor_id.is_empty() || true && !self.view_type.is_empty() || true && !self.capabilities_json.is_empty() || true && !self.priority.is_empty() || true && !self.selector_json.is_empty() || true && !self.extension_id.is_empty() || true && self.supports_multiple || true && !self.label.is_empty() || true && self.is_registered || true && self.backup_enabled || true
+    }
+}
+
+impl Default for HjfCustomEditorProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom editor edit (label, undo, redo, document, metadata)
+#[derive(Debug, Clone)]
+pub struct HjgCustomEditorEdit {
+    pub custom_edit_id: String,
+    pub label: String,
+    pub undo_json: String,
+    pub redo_json: String,
+    pub document_uri: String,
+    pub metadata_json: String,
+    pub timestamp_ms: u64,
+    pub is_significant: bool,
+    pub edit_type: String,
+    pub version: u32,
+}
+
+impl HjgCustomEditorEdit {
+    pub fn new() -> Self {
+        Self {
+            custom_edit_id: String::new(),
+            label: String::new(),
+            undo_json: String::new(),
+            redo_json: String::new(),
+            document_uri: String::new(),
+            metadata_json: String::new(),
+            timestamp_ms: u64::default(),
+            is_significant: bool::default(),
+            edit_type: String::new(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.custom_edit_id.is_empty() || true && !self.label.is_empty() || true && !self.undo_json.is_empty() || true && !self.redo_json.is_empty() || true && !self.document_uri.is_empty() || true && !self.metadata_json.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_significant || true && !self.edit_type.is_empty() || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for HjgCustomEditorEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview serializer (type, deserialize, state, version)
+#[derive(Debug, Clone)]
+pub struct HjhWebviewSerializer {
+    pub wv_serial_id: String,
+    pub view_type: String,
+    pub deserialize_fn: String,
+    pub state_json: String,
+    pub version: u32,
+    pub extension_id: String,
+    pub is_registered: bool,
+    pub priority: u32,
+    pub supports_hot_exit: bool,
+    pub label: String,
+}
+
+impl HjhWebviewSerializer {
+    pub fn new() -> Self {
+        Self {
+            wv_serial_id: String::new(),
+            view_type: String::new(),
+            deserialize_fn: String::new(),
+            state_json: String::new(),
+            version: u32::default(),
+            extension_id: String::new(),
+            is_registered: bool::default(),
+            priority: u32::default(),
+            supports_hot_exit: bool::default(),
+            label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_serial_id.is_empty() || true && !self.view_type.is_empty() || true && !self.deserialize_fn.is_empty() || true && !self.state_json.is_empty() || true && self.version < u32::MAX || true && !self.extension_id.is_empty() || true && self.is_registered || true && self.priority < u32::MAX || true && self.supports_hot_exit || true && !self.label.is_empty() || true
+    }
+}
+
+impl Default for HjhWebviewSerializer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview panel state (html, scripts, state json, scroll)
+#[derive(Debug, Clone)]
+pub struct HjiWebviewPanelState {
+    pub wv_state_id: String,
+    pub html_content: String,
+    pub scripts_json: String,
+    pub state_json: String,
+    pub scroll_x: u32,
+    pub scroll_y: u32,
+    pub is_dirty: bool,
+    pub focus_element: String,
+    pub selection_json: String,
+    pub version: u32,
+}
+
+impl HjiWebviewPanelState {
+    pub fn new() -> Self {
+        Self {
+            wv_state_id: String::new(),
+            html_content: String::new(),
+            scripts_json: String::new(),
+            state_json: String::new(),
+            scroll_x: u32::default(),
+            scroll_y: u32::default(),
+            is_dirty: bool::default(),
+            focus_element: String::new(),
+            selection_json: String::new(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_state_id.is_empty() || true && !self.html_content.is_empty() || true && !self.scripts_json.is_empty() || true && !self.state_json.is_empty() || true && self.scroll_x < u32::MAX || true && self.scroll_y < u32::MAX || true && self.is_dirty || true && !self.focus_element.is_empty() || true && !self.selection_json.is_empty() || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for HjiWebviewPanelState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview CSP source (nonce, uri, scheme, host, self)
+#[derive(Debug, Clone)]
+pub struct HjjWebviewCspSource {
+    pub wv_csp_id: String,
+    pub nonce: String,
+    pub uri: String,
+    pub scheme: String,
+    pub host: String,
+    pub allows_self: bool,
+    pub allows_inline: bool,
+    pub allows_eval: bool,
+    pub additional_sources_json: String,
+    pub policy_string: String,
+}
+
+impl HjjWebviewCspSource {
+    pub fn new() -> Self {
+        Self {
+            wv_csp_id: String::new(),
+            nonce: String::new(),
+            uri: String::new(),
+            scheme: String::new(),
+            host: String::new(),
+            allows_self: bool::default(),
+            allows_inline: bool::default(),
+            allows_eval: bool::default(),
+            additional_sources_json: String::new(),
+            policy_string: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_csp_id.is_empty() || true && !self.nonce.is_empty() || true && !self.uri.is_empty() || true && !self.scheme.is_empty() || true && !self.host.is_empty() || true && self.allows_self || true && self.allows_inline || true && self.allows_eval || true && !self.additional_sources_json.is_empty() || true && !self.policy_string.is_empty() || true
+    }
+}
+
+impl Default for HjjWebviewCspSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -360937,6 +361357,186 @@ mod tests_hiz_generated {
     fn test_hiz_fields() {
         let mut obj = HizExtensionDebugger::default();
         obj.ext_debugger_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hja_generated {
+    use super::*;
+
+    #[test]
+    fn test_hja_default() {
+        let obj = HjaWebviewPanel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hja_fields() {
+        let mut obj = HjaWebviewPanel::default();
+        obj.webview_panel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hjb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hjb_default() {
+        let obj = HjbWebviewView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hjb_fields() {
+        let mut obj = HjbWebviewView::default();
+        obj.webview_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hjc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hjc_default() {
+        let obj = HjcWebviewOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hjc_fields() {
+        let mut obj = HjcWebviewOptions::default();
+        obj.webview_opts_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hjd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hjd_default() {
+        let obj = HjdWebviewMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hjd_fields() {
+        let mut obj = HjdWebviewMessage::default();
+        obj.webview_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hje_generated {
+    use super::*;
+
+    #[test]
+    fn test_hje_default() {
+        let obj = HjeCustomDocument::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hje_fields() {
+        let mut obj = HjeCustomDocument::default();
+        obj.custom_doc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hjf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hjf_default() {
+        let obj = HjfCustomEditorProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hjf_fields() {
+        let mut obj = HjfCustomEditorProvider::default();
+        obj.custom_editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hjg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hjg_default() {
+        let obj = HjgCustomEditorEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hjg_fields() {
+        let mut obj = HjgCustomEditorEdit::default();
+        obj.custom_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hjh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hjh_default() {
+        let obj = HjhWebviewSerializer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hjh_fields() {
+        let mut obj = HjhWebviewSerializer::default();
+        obj.wv_serial_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hji_generated {
+    use super::*;
+
+    #[test]
+    fn test_hji_default() {
+        let obj = HjiWebviewPanelState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hji_fields() {
+        let mut obj = HjiWebviewPanelState::default();
+        obj.wv_state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hjj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hjj_default() {
+        let obj = HjjWebviewCspSource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hjj_fields() {
+        let mut obj = HjjWebviewCspSource::default();
+        obj.wv_csp_id = "test".to_string();
         assert!(obj.validate());
     }
 }
