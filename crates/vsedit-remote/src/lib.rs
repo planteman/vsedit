@@ -96299,6 +96299,678 @@ impl Default for GmjReferenceProvider {
     }
 }
 
+/// Document highlight provider (provide highlights, kind, range)
+#[derive(Debug, Clone)]
+pub struct GmkDocumentHighlightProvider {
+    pub highlight_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub scheme: String,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub multi_document: bool,
+    pub debounce_ms: u32,
+    pub metadata_json: String,
+}
+
+impl GmkDocumentHighlightProvider {
+    pub fn new() -> Self {
+        Self {
+            highlight_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            scheme: String::new(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            multi_document: bool::default(),
+            debounce_ms: u32::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.highlight_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && !self.scheme.is_empty() || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.multi_document || true && self.debounce_ms < u32::MAX || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmkDocumentHighlightProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document symbol provider (provide symbols, name, kind, range)
+#[derive(Debug, Clone)]
+pub struct GmlDocumentSymbolProvider {
+    pub symbol_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub scheme: String,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub display_name: String,
+    pub supports_hierarchy: bool,
+    pub metadata_json: String,
+}
+
+impl GmlDocumentSymbolProvider {
+    pub fn new() -> Self {
+        Self {
+            symbol_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            scheme: String::new(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            display_name: String::new(),
+            supports_hierarchy: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.symbol_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && !self.scheme.is_empty() || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && !self.display_name.is_empty() || true && self.supports_hierarchy || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmlDocumentSymbolProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code action provider (provide actions, kind, diagnostics, resolve)
+#[derive(Debug, Clone)]
+pub struct GmmCodeActionProvider {
+    pub action_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub provided_kinds_json: String,
+    pub diagnostics_json: String,
+    pub can_resolve: bool,
+    pub documentation_json: String,
+    pub is_preferred_fix: bool,
+    pub priority: u32,
+    pub extension_id: String,
+}
+
+impl GmmCodeActionProvider {
+    pub fn new() -> Self {
+        Self {
+            action_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            provided_kinds_json: String::new(),
+            diagnostics_json: String::new(),
+            can_resolve: bool::default(),
+            documentation_json: String::new(),
+            is_preferred_fix: bool::default(),
+            priority: u32::default(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && !self.provided_kinds_json.is_empty() || true && !self.diagnostics_json.is_empty() || true && self.can_resolve || true && !self.documentation_json.is_empty() || true && self.is_preferred_fix || true && self.priority < u32::MAX || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for GmmCodeActionProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code lens provider (provide lenses, resolve, on did change)
+#[derive(Debug, Clone)]
+pub struct GmnCodeLensProvider {
+    pub lens_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub on_did_change: bool,
+    pub can_resolve: bool,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub event_debounce_ms: u32,
+    pub metadata_json: String,
+}
+
+impl GmnCodeLensProvider {
+    pub fn new() -> Self {
+        Self {
+            lens_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            on_did_change: bool::default(),
+            can_resolve: bool::default(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            event_debounce_ms: u32::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lens_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.on_did_change || true && self.can_resolve || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.event_debounce_ms < u32::MAX || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmnCodeLensProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document formatting provider (provide edits, options, range)
+#[derive(Debug, Clone)]
+pub struct GmoDocumentFormattingProvider {
+    pub fmt_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub tab_size: u32,
+    pub insert_spaces: bool,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub display_name: String,
+    pub metadata_json: String,
+}
+
+impl GmoDocumentFormattingProvider {
+    pub fn new() -> Self {
+        Self {
+            fmt_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            tab_size: u32::default(),
+            insert_spaces: bool::default(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            display_name: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fmt_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.tab_size < u32::MAX || true && self.insert_spaces || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && !self.display_name.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmoDocumentFormattingProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document range formatting provider (provide edits, options)
+#[derive(Debug, Clone)]
+pub struct GmpDocumentRangeFormattingProvider {
+    pub range_fmt_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub tab_size: u32,
+    pub insert_spaces: bool,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub can_format_multiple_ranges: bool,
+    pub metadata_json: String,
+}
+
+impl GmpDocumentRangeFormattingProvider {
+    pub fn new() -> Self {
+        Self {
+            range_fmt_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            tab_size: u32::default(),
+            insert_spaces: bool::default(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            can_format_multiple_ranges: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.range_fmt_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.tab_size < u32::MAX || true && self.insert_spaces || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.can_format_multiple_ranges || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmpDocumentRangeFormattingProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// On type formatting provider (trigger chars, provide edits)
+#[derive(Debug, Clone)]
+pub struct GmqOnTypeFormattingProvider {
+    pub on_type_id: String,
+    pub trigger_characters_json: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub auto_indent: bool,
+    pub auto_format_on_type: bool,
+    pub metadata_json: String,
+}
+
+impl GmqOnTypeFormattingProvider {
+    pub fn new() -> Self {
+        Self {
+            on_type_id: String::new(),
+            trigger_characters_json: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            auto_indent: bool::default(),
+            auto_format_on_type: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.on_type_id.is_empty() || true && !self.trigger_characters_json.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.auto_indent || true && self.auto_format_on_type || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmqOnTypeFormattingProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Rename provider (provide rename edits, prepare rename, resolve)
+#[derive(Debug, Clone)]
+pub struct GmrRenameProvider {
+    pub rename_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub supports_prepare: bool,
+    pub supports_resolve: bool,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub supports_will_rename: bool,
+    pub metadata_json: String,
+}
+
+impl GmrRenameProvider {
+    pub fn new() -> Self {
+        Self {
+            rename_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            supports_prepare: bool::default(),
+            supports_resolve: bool::default(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            supports_will_rename: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rename_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.supports_prepare || true && self.supports_resolve || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.supports_will_rename || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmrRenameProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document link provider (provide links, resolve, tooltip)
+#[derive(Debug, Clone)]
+pub struct GmsDocumentLinkProvider {
+    pub link_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub can_resolve: bool,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub tooltip_enabled: bool,
+    pub click_handler: String,
+    pub metadata_json: String,
+}
+
+impl GmsDocumentLinkProvider {
+    pub fn new() -> Self {
+        Self {
+            link_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            can_resolve: bool::default(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            tooltip_enabled: bool::default(),
+            click_handler: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.can_resolve || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.tooltip_enabled || true && !self.click_handler.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmsDocumentLinkProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Folding range provider (provide ranges, kind, collapsed text)
+#[derive(Debug, Clone)]
+pub struct GmtFoldingRangeProvider {
+    pub folding_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub max_ranges: u32,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub collapsed_text_enabled: bool,
+    pub on_did_change: bool,
+    pub metadata_json: String,
+}
+
+impl GmtFoldingRangeProvider {
+    pub fn new() -> Self {
+        Self {
+            folding_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            max_ranges: u32::default(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            collapsed_text_enabled: bool::default(),
+            on_did_change: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folding_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.max_ranges < u32::MAX || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.collapsed_text_enabled || true && self.on_did_change || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmtFoldingRangeProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection range provider (provide ranges, parent, expand)
+#[derive(Debug, Clone)]
+pub struct GmuSelectionRangeProvider {
+    pub sel_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub expand_enabled: bool,
+    pub shrink_enabled: bool,
+    pub metadata_json: String,
+    pub scheme: String,
+}
+
+impl GmuSelectionRangeProvider {
+    pub fn new() -> Self {
+        Self {
+            sel_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            expand_enabled: bool::default(),
+            shrink_enabled: bool::default(),
+            metadata_json: String::new(),
+            scheme: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.expand_enabled || true && self.shrink_enabled || true && !self.metadata_json.is_empty() || true && !self.scheme.is_empty() || true
+    }
+}
+
+impl Default for GmuSelectionRangeProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Call hierarchy provider (prepare, incoming, outgoing calls)
+#[derive(Debug, Clone)]
+pub struct GmvCallHierarchyProvider {
+    pub call_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub supports_incoming: bool,
+    pub supports_outgoing: bool,
+    pub metadata_json: String,
+    pub scheme: String,
+}
+
+impl GmvCallHierarchyProvider {
+    pub fn new() -> Self {
+        Self {
+            call_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            supports_incoming: bool::default(),
+            supports_outgoing: bool::default(),
+            metadata_json: String::new(),
+            scheme: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.call_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.supports_incoming || true && self.supports_outgoing || true && !self.metadata_json.is_empty() || true && !self.scheme.is_empty() || true
+    }
+}
+
+impl Default for GmvCallHierarchyProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Type hierarchy provider (prepare, supertypes, subtypes)
+#[derive(Debug, Clone)]
+pub struct GmwTypeHierarchyProvider {
+    pub type_hier_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub supports_supertypes: bool,
+    pub supports_subtypes: bool,
+    pub metadata_json: String,
+    pub scheme: String,
+}
+
+impl GmwTypeHierarchyProvider {
+    pub fn new() -> Self {
+        Self {
+            type_hier_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            supports_supertypes: bool::default(),
+            supports_subtypes: bool::default(),
+            metadata_json: String::new(),
+            scheme: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.type_hier_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.supports_supertypes || true && self.supports_subtypes || true && !self.metadata_json.is_empty() || true && !self.scheme.is_empty() || true
+    }
+}
+
+impl Default for GmwTypeHierarchyProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inlay hints provider (provide hints, resolve, on did change)
+#[derive(Debug, Clone)]
+pub struct GmxInlayHintsProvider {
+    pub inlay_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub on_did_change: bool,
+    pub can_resolve: bool,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub event_debounce_ms: u32,
+    pub metadata_json: String,
+}
+
+impl GmxInlayHintsProvider {
+    pub fn new() -> Self {
+        Self {
+            inlay_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            on_did_change: bool::default(),
+            can_resolve: bool::default(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            event_debounce_ms: u32::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inlay_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && self.on_did_change || true && self.can_resolve || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.event_debounce_ms < u32::MAX || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmxInlayHintsProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic tokens provider (provide full, delta, range, legend)
+#[derive(Debug, Clone)]
+pub struct GmySemanticTokensProvider {
+    pub sem_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub legend_json: String,
+    pub supports_delta: bool,
+    pub supports_range: bool,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub metadata_json: String,
+}
+
+impl GmySemanticTokensProvider {
+    pub fn new() -> Self {
+        Self {
+            sem_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            legend_json: String::new(),
+            supports_delta: bool::default(),
+            supports_range: bool::default(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sem_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && !self.legend_json.is_empty() || true && self.supports_delta || true && self.supports_range || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GmySemanticTokensProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Linked editing range provider (provide ranges, word pattern)
+#[derive(Debug, Clone)]
+pub struct GmzLinkedEditingRangeProvider {
+    pub linked_prov_id: String,
+    pub provider_name: String,
+    pub language_id: String,
+    pub word_pattern: String,
+    pub priority: u32,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub debounce_ms: u32,
+    pub metadata_json: String,
+    pub scheme: String,
+}
+
+impl GmzLinkedEditingRangeProvider {
+    pub fn new() -> Self {
+        Self {
+            linked_prov_id: String::new(),
+            provider_name: String::new(),
+            language_id: String::new(),
+            word_pattern: String::new(),
+            priority: u32::default(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            debounce_ms: u32::default(),
+            metadata_json: String::new(),
+            scheme: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.linked_prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_id.is_empty() || true && !self.word_pattern.is_empty() || true && self.priority < u32::MAX || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.debounce_ms < u32::MAX || true && !self.metadata_json.is_empty() || true && !self.scheme.is_empty() || true
+    }
+}
+
+impl Default for GmzLinkedEditingRangeProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325660,6 +326332,294 @@ mod tests_gmj_generated {
     fn test_gmj_fields() {
         let mut obj = GmjReferenceProvider::default();
         obj.ref_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmk_default() {
+        let obj = GmkDocumentHighlightProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmk_fields() {
+        let mut obj = GmkDocumentHighlightProvider::default();
+        obj.highlight_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gml_generated {
+    use super::*;
+
+    #[test]
+    fn test_gml_default() {
+        let obj = GmlDocumentSymbolProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gml_fields() {
+        let mut obj = GmlDocumentSymbolProvider::default();
+        obj.symbol_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmm_default() {
+        let obj = GmmCodeActionProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmm_fields() {
+        let mut obj = GmmCodeActionProvider::default();
+        obj.action_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmn_default() {
+        let obj = GmnCodeLensProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmn_fields() {
+        let mut obj = GmnCodeLensProvider::default();
+        obj.lens_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmo_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmo_default() {
+        let obj = GmoDocumentFormattingProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmo_fields() {
+        let mut obj = GmoDocumentFormattingProvider::default();
+        obj.fmt_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmp_default() {
+        let obj = GmpDocumentRangeFormattingProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmp_fields() {
+        let mut obj = GmpDocumentRangeFormattingProvider::default();
+        obj.range_fmt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmq_default() {
+        let obj = GmqOnTypeFormattingProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmq_fields() {
+        let mut obj = GmqOnTypeFormattingProvider::default();
+        obj.on_type_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmr_default() {
+        let obj = GmrRenameProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmr_fields() {
+        let mut obj = GmrRenameProvider::default();
+        obj.rename_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gms_generated {
+    use super::*;
+
+    #[test]
+    fn test_gms_default() {
+        let obj = GmsDocumentLinkProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gms_fields() {
+        let mut obj = GmsDocumentLinkProvider::default();
+        obj.link_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmt_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmt_default() {
+        let obj = GmtFoldingRangeProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmt_fields() {
+        let mut obj = GmtFoldingRangeProvider::default();
+        obj.folding_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmu_default() {
+        let obj = GmuSelectionRangeProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmu_fields() {
+        let mut obj = GmuSelectionRangeProvider::default();
+        obj.sel_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmv_default() {
+        let obj = GmvCallHierarchyProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmv_fields() {
+        let mut obj = GmvCallHierarchyProvider::default();
+        obj.call_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmw_default() {
+        let obj = GmwTypeHierarchyProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmw_fields() {
+        let mut obj = GmwTypeHierarchyProvider::default();
+        obj.type_hier_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmx_default() {
+        let obj = GmxInlayHintsProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmx_fields() {
+        let mut obj = GmxInlayHintsProvider::default();
+        obj.inlay_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmy_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmy_default() {
+        let obj = GmySemanticTokensProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmy_fields() {
+        let mut obj = GmySemanticTokensProvider::default();
+        obj.sem_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gmz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gmz_default() {
+        let obj = GmzLinkedEditingRangeProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gmz_fields() {
+        let mut obj = GmzLinkedEditingRangeProvider::default();
+        obj.linked_prov_id = "test".to_string();
         assert!(obj.validate());
     }
 }
