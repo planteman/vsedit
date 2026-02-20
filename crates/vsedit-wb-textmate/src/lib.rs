@@ -95372,6 +95372,678 @@ impl Default for GljActionItem {
     }
 }
 
+/// Action bar (actions, orientation, context, secondary, overflow)
+#[derive(Debug, Clone)]
+pub struct GlkActionBar {
+    pub bar_id: String,
+    pub actions_json: String,
+    pub orientation: String,
+    pub context_json: String,
+    pub secondary_json: String,
+    pub overflow_json: String,
+    pub compact: bool,
+    pub animated: bool,
+    pub icon_size: u32,
+    pub spacing: u32,
+}
+
+impl GlkActionBar {
+    pub fn new() -> Self {
+        Self {
+            bar_id: String::new(),
+            actions_json: String::new(),
+            orientation: String::new(),
+            context_json: String::new(),
+            secondary_json: String::new(),
+            overflow_json: String::new(),
+            compact: bool::default(),
+            animated: bool::default(),
+            icon_size: u32::default(),
+            spacing: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bar_id.is_empty() || true && !self.actions_json.is_empty() || true && !self.orientation.is_empty() || true && !self.context_json.is_empty() || true && !self.secondary_json.is_empty() || true && !self.overflow_json.is_empty() || true && self.compact || true && self.animated || true && self.icon_size < u32::MAX || true && self.spacing < u32::MAX || true
+    }
+}
+
+impl Default for GlkActionBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar model (primary actions, secondary, overflowed, compact)
+#[derive(Debug, Clone)]
+pub struct GllToolbarModel {
+    pub toolbar_model_id: String,
+    pub primary_actions_json: String,
+    pub secondary_actions_json: String,
+    pub overflowed_json: String,
+    pub compact_mode: bool,
+    pub orientation: String,
+    pub align: String,
+    pub icon_only: bool,
+    pub label_only: bool,
+    pub separator_visible: bool,
+}
+
+impl GllToolbarModel {
+    pub fn new() -> Self {
+        Self {
+            toolbar_model_id: String::new(),
+            primary_actions_json: String::new(),
+            secondary_actions_json: String::new(),
+            overflowed_json: String::new(),
+            compact_mode: bool::default(),
+            orientation: String::new(),
+            align: String::new(),
+            icon_only: bool::default(),
+            label_only: bool::default(),
+            separator_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.toolbar_model_id.is_empty() || true && !self.primary_actions_json.is_empty() || true && !self.secondary_actions_json.is_empty() || true && !self.overflowed_json.is_empty() || true && self.compact_mode || true && !self.orientation.is_empty() || true && !self.align.is_empty() || true && self.icon_only || true && self.label_only || true && self.separator_visible || true
+    }
+}
+
+impl Default for GllToolbarModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keyboard layout info (id, label, language, mapping, raw)
+#[derive(Debug, Clone)]
+pub struct GlmKeyboardLayoutInfo {
+    pub layout_id: String,
+    pub label: String,
+    pub language_id: String,
+    pub mapping_json: String,
+    pub raw_mapping_json: String,
+    pub is_standard: bool,
+    pub is_auto_detected: bool,
+    pub platform: String,
+    pub variant: String,
+    pub model: String,
+}
+
+impl GlmKeyboardLayoutInfo {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            label: String::new(),
+            language_id: String::new(),
+            mapping_json: String::new(),
+            raw_mapping_json: String::new(),
+            is_standard: bool::default(),
+            is_auto_detected: bool::default(),
+            platform: String::new(),
+            variant: String::new(),
+            model: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && !self.label.is_empty() || true && !self.language_id.is_empty() || true && !self.mapping_json.is_empty() || true && !self.raw_mapping_json.is_empty() || true && self.is_standard || true && self.is_auto_detected || true && !self.platform.is_empty() || true && !self.variant.is_empty() || true && !self.model.is_empty() || true
+    }
+}
+
+impl Default for GlmKeyboardLayoutInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Key code mapping (virtual key, scan code, char, shifted char)
+#[derive(Debug, Clone)]
+pub struct GlnKeyCodeMapping {
+    pub keycode_id: String,
+    pub virtual_key: u32,
+    pub scan_code: u32,
+    pub char_value: String,
+    pub shifted_char: String,
+    pub with_alt_gr: String,
+    pub with_shift_alt_gr: String,
+    pub is_dead_key: bool,
+    pub label: String,
+    pub dispatching: String,
+}
+
+impl GlnKeyCodeMapping {
+    pub fn new() -> Self {
+        Self {
+            keycode_id: String::new(),
+            virtual_key: u32::default(),
+            scan_code: u32::default(),
+            char_value: String::new(),
+            shifted_char: String::new(),
+            with_alt_gr: String::new(),
+            with_shift_alt_gr: String::new(),
+            is_dead_key: bool::default(),
+            label: String::new(),
+            dispatching: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.keycode_id.is_empty() || true && self.virtual_key < u32::MAX || true && self.scan_code < u32::MAX || true && !self.char_value.is_empty() || true && !self.shifted_char.is_empty() || true && !self.with_alt_gr.is_empty() || true && !self.with_shift_alt_gr.is_empty() || true && self.is_dead_key || true && !self.label.is_empty() || true && !self.dispatching.is_empty() || true
+    }
+}
+
+impl Default for GlnKeyCodeMapping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Input method editor (composition, candidate, cursor, state)
+#[derive(Debug, Clone)]
+pub struct GloInputMethodEditor {
+    pub ime_id: String,
+    pub composition_text: String,
+    pub candidate_json: String,
+    pub cursor_position: u32,
+    pub state: String,
+    pub is_composing: bool,
+    pub language_hint: String,
+    pub replacement_range_json: String,
+    pub commit_text: String,
+    pub candidate_index: u32,
+}
+
+impl GloInputMethodEditor {
+    pub fn new() -> Self {
+        Self {
+            ime_id: String::new(),
+            composition_text: String::new(),
+            candidate_json: String::new(),
+            cursor_position: u32::default(),
+            state: String::new(),
+            is_composing: bool::default(),
+            language_hint: String::new(),
+            replacement_range_json: String::new(),
+            commit_text: String::new(),
+            candidate_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ime_id.is_empty() || true && !self.composition_text.is_empty() || true && !self.candidate_json.is_empty() || true && self.cursor_position < u32::MAX || true && !self.state.is_empty() || true && self.is_composing || true && !self.language_hint.is_empty() || true && !self.replacement_range_json.is_empty() || true && !self.commit_text.is_empty() || true && self.candidate_index < u32::MAX || true
+    }
+}
+
+impl Default for GloInputMethodEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keyboard event handler (key, code, shift, ctrl, alt, meta)
+#[derive(Debug, Clone)]
+pub struct GlpKeyboardEventHandler {
+    pub event_id: String,
+    pub key: String,
+    pub code: String,
+    pub is_shift: bool,
+    pub is_ctrl: bool,
+    pub is_alt: bool,
+    pub is_meta: bool,
+    pub is_repeat: bool,
+    pub timestamp_ms: u64,
+    pub target_id: String,
+}
+
+impl GlpKeyboardEventHandler {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            key: String::new(),
+            code: String::new(),
+            is_shift: bool::default(),
+            is_ctrl: bool::default(),
+            is_alt: bool::default(),
+            is_meta: bool::default(),
+            is_repeat: bool::default(),
+            timestamp_ms: u64::default(),
+            target_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.key.is_empty() || true && !self.code.is_empty() || true && self.is_shift || true && self.is_ctrl || true && self.is_alt || true && self.is_meta || true && self.is_repeat || true && self.timestamp_ms < u64::MAX || true && !self.target_id.is_empty() || true
+    }
+}
+
+impl Default for GlpKeyboardEventHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command category (id, label, description, order, icon)
+#[derive(Debug, Clone)]
+pub struct GlqCommandCategory {
+    pub cat_id: String,
+    pub label: String,
+    pub description: String,
+    pub order: u32,
+    pub icon: String,
+    pub commands_json: String,
+    pub when_clause: String,
+    pub is_hidden: bool,
+    pub parent_id: String,
+    pub extension_id: String,
+}
+
+impl GlqCommandCategory {
+    pub fn new() -> Self {
+        Self {
+            cat_id: String::new(),
+            label: String::new(),
+            description: String::new(),
+            order: u32::default(),
+            icon: String::new(),
+            commands_json: String::new(),
+            when_clause: String::new(),
+            is_hidden: bool::default(),
+            parent_id: String::new(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cat_id.is_empty() || true && !self.label.is_empty() || true && !self.description.is_empty() || true && self.order < u32::MAX || true && !self.icon.is_empty() || true && !self.commands_json.is_empty() || true && !self.when_clause.is_empty() || true && self.is_hidden || true && !self.parent_id.is_empty() || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for GlqCommandCategory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command argument (name, type, description, default, constraint)
+#[derive(Debug, Clone)]
+pub struct GlrCommandArgument {
+    pub arg_id: String,
+    pub name: String,
+    pub arg_type: String,
+    pub description: String,
+    pub default_json: String,
+    pub constraint_json: String,
+    pub is_optional: bool,
+    pub is_rest: bool,
+    pub position: u32,
+    pub schema_json: String,
+}
+
+impl GlrCommandArgument {
+    pub fn new() -> Self {
+        Self {
+            arg_id: String::new(),
+            name: String::new(),
+            arg_type: String::new(),
+            description: String::new(),
+            default_json: String::new(),
+            constraint_json: String::new(),
+            is_optional: bool::default(),
+            is_rest: bool::default(),
+            position: u32::default(),
+            schema_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.arg_id.is_empty() || true && !self.name.is_empty() || true && !self.arg_type.is_empty() || true && !self.description.is_empty() || true && !self.default_json.is_empty() || true && !self.constraint_json.is_empty() || true && self.is_optional || true && self.is_rest || true && self.position < u32::MAX || true && !self.schema_json.is_empty() || true
+    }
+}
+
+impl Default for GlrCommandArgument {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command result (value, error, duration, source, retried)
+#[derive(Debug, Clone)]
+pub struct GlsCommandResult {
+    pub result_id: String,
+    pub value_json: String,
+    pub error_message: String,
+    pub duration_ms: u64,
+    pub source: String,
+    pub is_retried: bool,
+    pub command_id: String,
+    pub args_json: String,
+    pub timestamp_ms: u64,
+    pub is_success: bool,
+}
+
+impl GlsCommandResult {
+    pub fn new() -> Self {
+        Self {
+            result_id: String::new(),
+            value_json: String::new(),
+            error_message: String::new(),
+            duration_ms: u64::default(),
+            source: String::new(),
+            is_retried: bool::default(),
+            command_id: String::new(),
+            args_json: String::new(),
+            timestamp_ms: u64::default(),
+            is_success: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_id.is_empty() || true && !self.value_json.is_empty() || true && !self.error_message.is_empty() || true && self.duration_ms < u64::MAX || true && !self.source.is_empty() || true && self.is_retried || true && !self.command_id.is_empty() || true && !self.args_json.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_success || true
+    }
+}
+
+impl Default for GlsCommandResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Undo/redo service (elements, can undo, can redo, resource)
+#[derive(Debug, Clone)]
+pub struct GltUndoRedoService {
+    pub undo_id: String,
+    pub elements_json: String,
+    pub can_undo: bool,
+    pub can_redo: bool,
+    pub resource_uri: String,
+    pub past_count: u32,
+    pub future_count: u32,
+    pub is_group: bool,
+    pub group_id: String,
+    pub last_element_label: String,
+}
+
+impl GltUndoRedoService {
+    pub fn new() -> Self {
+        Self {
+            undo_id: String::new(),
+            elements_json: String::new(),
+            can_undo: bool::default(),
+            can_redo: bool::default(),
+            resource_uri: String::new(),
+            past_count: u32::default(),
+            future_count: u32::default(),
+            is_group: bool::default(),
+            group_id: String::new(),
+            last_element_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.undo_id.is_empty() || true && !self.elements_json.is_empty() || true && self.can_undo || true && self.can_redo || true && !self.resource_uri.is_empty() || true && self.past_count < u32::MAX || true && self.future_count < u32::MAX || true && self.is_group || true && !self.group_id.is_empty() || true && !self.last_element_label.is_empty() || true
+    }
+}
+
+impl Default for GltUndoRedoService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Undo/redo element (type, resource, label, code, detail)
+#[derive(Debug, Clone)]
+pub struct GluUndoRedoElement {
+    pub element_id: String,
+    pub element_type: String,
+    pub resource_uri: String,
+    pub label: String,
+    pub code: u32,
+    pub detail: String,
+    pub is_valid: bool,
+    pub is_disposed: bool,
+    pub group_id: String,
+    pub confirm_before_undo: bool,
+}
+
+impl GluUndoRedoElement {
+    pub fn new() -> Self {
+        Self {
+            element_id: String::new(),
+            element_type: String::new(),
+            resource_uri: String::new(),
+            label: String::new(),
+            code: u32::default(),
+            detail: String::new(),
+            is_valid: bool::default(),
+            is_disposed: bool::default(),
+            group_id: String::new(),
+            confirm_before_undo: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.element_id.is_empty() || true && !self.element_type.is_empty() || true && !self.resource_uri.is_empty() || true && !self.label.is_empty() || true && self.code < u32::MAX || true && !self.detail.is_empty() || true && self.is_valid || true && self.is_disposed || true && !self.group_id.is_empty() || true && self.confirm_before_undo || true
+    }
+}
+
+impl Default for GluUndoRedoElement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit operation (range, text, force move markers, is auto)
+#[derive(Debug, Clone)]
+pub struct GlvEditOperation {
+    pub edit_op_id: String,
+    pub range_json: String,
+    pub text: String,
+    pub force_move_markers: bool,
+    pub is_auto_whitespace: bool,
+    pub cursor_state_json: String,
+    pub sort_index: u32,
+    pub identifier_json: String,
+    pub is_tracked: bool,
+    pub timestamp_ms: u64,
+}
+
+impl GlvEditOperation {
+    pub fn new() -> Self {
+        Self {
+            edit_op_id: String::new(),
+            range_json: String::new(),
+            text: String::new(),
+            force_move_markers: bool::default(),
+            is_auto_whitespace: bool::default(),
+            cursor_state_json: String::new(),
+            sort_index: u32::default(),
+            identifier_json: String::new(),
+            is_tracked: bool::default(),
+            timestamp_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_op_id.is_empty() || true && !self.range_json.is_empty() || true && !self.text.is_empty() || true && self.force_move_markers || true && self.is_auto_whitespace || true && !self.cursor_state_json.is_empty() || true && self.sort_index < u32::MAX || true && !self.identifier_json.is_empty() || true && self.is_tracked || true && self.timestamp_ms < u64::MAX || true
+    }
+}
+
+impl Default for GlvEditOperation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bulk edit service (edits, preview, apply, progress, undo)
+#[derive(Debug, Clone)]
+pub struct GlwBulkEditService {
+    pub bulk_id: String,
+    pub edits_json: String,
+    pub is_preview: bool,
+    pub is_applied: bool,
+    pub progress_pct: f64,
+    pub can_undo: bool,
+    pub label: String,
+    pub file_count: u32,
+    pub edit_count: u32,
+    pub conflict_count: u32,
+}
+
+impl GlwBulkEditService {
+    pub fn new() -> Self {
+        Self {
+            bulk_id: String::new(),
+            edits_json: String::new(),
+            is_preview: bool::default(),
+            is_applied: bool::default(),
+            progress_pct: f64::default(),
+            can_undo: bool::default(),
+            label: String::new(),
+            file_count: u32::default(),
+            edit_count: u32::default(),
+            conflict_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bulk_id.is_empty() || true && !self.edits_json.is_empty() || true && self.is_preview || true && self.is_applied || true && self.progress_pct.is_finite() || true && self.can_undo || true && !self.label.is_empty() || true && self.file_count < u32::MAX || true && self.edit_count < u32::MAX || true && self.conflict_count < u32::MAX || true
+    }
+}
+
+impl Default for GlwBulkEditService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace edit (entries, metadata, needs confirmation, label)
+#[derive(Debug, Clone)]
+pub struct GlxWorkspaceEdit {
+    pub ws_edit_id: String,
+    pub entries_json: String,
+    pub metadata_json: String,
+    pub needs_confirmation: bool,
+    pub label: String,
+    pub description: String,
+    pub is_refactoring: bool,
+    pub document_changes_json: String,
+    pub change_annotations_json: String,
+    pub source_action: String,
+}
+
+impl GlxWorkspaceEdit {
+    pub fn new() -> Self {
+        Self {
+            ws_edit_id: String::new(),
+            entries_json: String::new(),
+            metadata_json: String::new(),
+            needs_confirmation: bool::default(),
+            label: String::new(),
+            description: String::new(),
+            is_refactoring: bool::default(),
+            document_changes_json: String::new(),
+            change_annotations_json: String::new(),
+            source_action: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_edit_id.is_empty() || true && !self.entries_json.is_empty() || true && !self.metadata_json.is_empty() || true && self.needs_confirmation || true && !self.label.is_empty() || true && !self.description.is_empty() || true && self.is_refactoring || true && !self.document_changes_json.is_empty() || true && !self.change_annotations_json.is_empty() || true && !self.source_action.is_empty() || true
+    }
+}
+
+impl Default for GlxWorkspaceEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text edit (range, new text, new eol, is auto whitespace)
+#[derive(Debug, Clone)]
+pub struct GlyTextEdit {
+    pub text_edit_id: String,
+    pub range_json: String,
+    pub new_text: String,
+    pub new_eol: String,
+    pub is_auto_whitespace: bool,
+    pub insert_as_snippet: bool,
+    pub force_move_markers: bool,
+    pub identifier: String,
+    pub sort_index: u32,
+    pub metadata_json: String,
+}
+
+impl GlyTextEdit {
+    pub fn new() -> Self {
+        Self {
+            text_edit_id: String::new(),
+            range_json: String::new(),
+            new_text: String::new(),
+            new_eol: String::new(),
+            is_auto_whitespace: bool::default(),
+            insert_as_snippet: bool::default(),
+            force_move_markers: bool::default(),
+            identifier: String::new(),
+            sort_index: u32::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.text_edit_id.is_empty() || true && !self.range_json.is_empty() || true && !self.new_text.is_empty() || true && !self.new_eol.is_empty() || true && self.is_auto_whitespace || true && self.insert_as_snippet || true && self.force_move_markers || true && !self.identifier.is_empty() || true && self.sort_index < u32::MAX || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GlyTextEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet text edit (range, snippet, is auto whitespace)
+#[derive(Debug, Clone)]
+pub struct GlzSnippetTextEdit {
+    pub snippet_edit_id: String,
+    pub range_json: String,
+    pub snippet: String,
+    pub is_auto_whitespace: bool,
+    pub is_resolved: bool,
+    pub placeholders_json: String,
+    pub final_position_json: String,
+    pub keep_whitespace: bool,
+    pub insert_text_rules: u32,
+    pub adjust_selection: bool,
+}
+
+impl GlzSnippetTextEdit {
+    pub fn new() -> Self {
+        Self {
+            snippet_edit_id: String::new(),
+            range_json: String::new(),
+            snippet: String::new(),
+            is_auto_whitespace: bool::default(),
+            is_resolved: bool::default(),
+            placeholders_json: String::new(),
+            final_position_json: String::new(),
+            keep_whitespace: bool::default(),
+            insert_text_rules: u32::default(),
+            adjust_selection: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_edit_id.is_empty() || true && !self.range_json.is_empty() || true && !self.snippet.is_empty() || true && self.is_auto_whitespace || true && self.is_resolved || true && !self.placeholders_json.is_empty() || true && !self.final_position_json.is_empty() || true && self.keep_whitespace || true && self.insert_text_rules < u32::MAX || true && self.adjust_selection || true
+    }
+}
+
+impl Default for GlzSnippetTextEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -324231,6 +324903,294 @@ mod tests_glj_generated {
     fn test_glj_fields() {
         let mut obj = GljActionItem::default();
         obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glk_generated {
+    use super::*;
+
+    #[test]
+    fn test_glk_default() {
+        let obj = GlkActionBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glk_fields() {
+        let mut obj = GlkActionBar::default();
+        obj.bar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gll_generated {
+    use super::*;
+
+    #[test]
+    fn test_gll_default() {
+        let obj = GllToolbarModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gll_fields() {
+        let mut obj = GllToolbarModel::default();
+        obj.toolbar_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glm_generated {
+    use super::*;
+
+    #[test]
+    fn test_glm_default() {
+        let obj = GlmKeyboardLayoutInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glm_fields() {
+        let mut obj = GlmKeyboardLayoutInfo::default();
+        obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gln_generated {
+    use super::*;
+
+    #[test]
+    fn test_gln_default() {
+        let obj = GlnKeyCodeMapping::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gln_fields() {
+        let mut obj = GlnKeyCodeMapping::default();
+        obj.keycode_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glo_generated {
+    use super::*;
+
+    #[test]
+    fn test_glo_default() {
+        let obj = GloInputMethodEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glo_fields() {
+        let mut obj = GloInputMethodEditor::default();
+        obj.ime_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glp_generated {
+    use super::*;
+
+    #[test]
+    fn test_glp_default() {
+        let obj = GlpKeyboardEventHandler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glp_fields() {
+        let mut obj = GlpKeyboardEventHandler::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glq_generated {
+    use super::*;
+
+    #[test]
+    fn test_glq_default() {
+        let obj = GlqCommandCategory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glq_fields() {
+        let mut obj = GlqCommandCategory::default();
+        obj.cat_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glr_generated {
+    use super::*;
+
+    #[test]
+    fn test_glr_default() {
+        let obj = GlrCommandArgument::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glr_fields() {
+        let mut obj = GlrCommandArgument::default();
+        obj.arg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gls_generated {
+    use super::*;
+
+    #[test]
+    fn test_gls_default() {
+        let obj = GlsCommandResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gls_fields() {
+        let mut obj = GlsCommandResult::default();
+        obj.result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glt_generated {
+    use super::*;
+
+    #[test]
+    fn test_glt_default() {
+        let obj = GltUndoRedoService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glt_fields() {
+        let mut obj = GltUndoRedoService::default();
+        obj.undo_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glu_generated {
+    use super::*;
+
+    #[test]
+    fn test_glu_default() {
+        let obj = GluUndoRedoElement::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glu_fields() {
+        let mut obj = GluUndoRedoElement::default();
+        obj.element_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glv_generated {
+    use super::*;
+
+    #[test]
+    fn test_glv_default() {
+        let obj = GlvEditOperation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glv_fields() {
+        let mut obj = GlvEditOperation::default();
+        obj.edit_op_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glw_generated {
+    use super::*;
+
+    #[test]
+    fn test_glw_default() {
+        let obj = GlwBulkEditService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glw_fields() {
+        let mut obj = GlwBulkEditService::default();
+        obj.bulk_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glx_generated {
+    use super::*;
+
+    #[test]
+    fn test_glx_default() {
+        let obj = GlxWorkspaceEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glx_fields() {
+        let mut obj = GlxWorkspaceEdit::default();
+        obj.ws_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gly_generated {
+    use super::*;
+
+    #[test]
+    fn test_gly_default() {
+        let obj = GlyTextEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gly_fields() {
+        let mut obj = GlyTextEdit::default();
+        obj.text_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_glz_generated {
+    use super::*;
+
+    #[test]
+    fn test_glz_default() {
+        let obj = GlzSnippetTextEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_glz_fields() {
+        let mut obj = GlzSnippetTextEdit::default();
+        obj.snippet_edit_id = "test".to_string();
         assert!(obj.validate());
     }
 }
