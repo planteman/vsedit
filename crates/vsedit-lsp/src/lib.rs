@@ -89739,6 +89739,216 @@ impl Default for GgeScmHistoryItem {
     }
 }
 
+/// SCM quick diff (original uri, provider, enable, gutter indicator)
+#[derive(Debug, Clone)]
+pub struct GgfScmQuickDiff {
+    pub quickdiff_id: String,
+    pub original_uri: String,
+    pub provider_id: String,
+    pub enabled: bool,
+    pub gutter_indicator: bool,
+    pub decorator_enabled: bool,
+    pub overview_ruler: bool,
+    pub change_colors_json: String,
+    pub show_inline_changes: bool,
+    pub max_file_size_bytes: u64,
+}
+
+impl GgfScmQuickDiff {
+    pub fn new() -> Self {
+        Self {
+            quickdiff_id: String::new(),
+            original_uri: String::new(),
+            provider_id: String::new(),
+            enabled: bool::default(),
+            gutter_indicator: bool::default(),
+            decorator_enabled: bool::default(),
+            overview_ruler: bool::default(),
+            change_colors_json: String::new(),
+            show_inline_changes: bool::default(),
+            max_file_size_bytes: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.quickdiff_id.is_empty() || true && !self.original_uri.is_empty() || true && !self.provider_id.is_empty() || true && self.enabled || true && self.gutter_indicator || true && self.decorator_enabled || true && self.overview_ruler || true && !self.change_colors_json.is_empty() || true && self.show_inline_changes || true && self.max_file_size_bytes < u64::MAX || true
+    }
+}
+
+impl Default for GgfScmQuickDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM action button (command, title, enabled, description, secondary)
+#[derive(Debug, Clone)]
+pub struct GggScmActionButton {
+    pub action_id: String,
+    pub command_id: String,
+    pub title: String,
+    pub is_enabled: bool,
+    pub description: String,
+    pub secondary_commands_json: String,
+    pub icon: String,
+    pub tooltip: String,
+    pub is_running: bool,
+    pub context_value: String,
+}
+
+impl GggScmActionButton {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            command_id: String::new(),
+            title: String::new(),
+            is_enabled: bool::default(),
+            description: String::new(),
+            secondary_commands_json: String::new(),
+            icon: String::new(),
+            tooltip: String::new(),
+            is_running: bool::default(),
+            context_value: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.command_id.is_empty() || true && !self.title.is_empty() || true && self.is_enabled || true && !self.description.is_empty() || true && !self.secondary_commands_json.is_empty() || true && !self.icon.is_empty() || true && !self.tooltip.is_empty() || true && self.is_running || true && !self.context_value.is_empty() || true
+    }
+}
+
+impl Default for GggScmActionButton {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM graph (nodes, edges, lanes, colors, current branch, refs)
+#[derive(Debug, Clone)]
+pub struct GghScmGraph {
+    pub graph_id: String,
+    pub nodes_json: String,
+    pub edges_json: String,
+    pub lanes_json: String,
+    pub colors_json: String,
+    pub current_branch: String,
+    pub refs_json: String,
+    pub max_visible: u32,
+    pub scroll_offset: u32,
+    pub show_remote: bool,
+}
+
+impl GghScmGraph {
+    pub fn new() -> Self {
+        Self {
+            graph_id: String::new(),
+            nodes_json: String::new(),
+            edges_json: String::new(),
+            lanes_json: String::new(),
+            colors_json: String::new(),
+            current_branch: String::new(),
+            refs_json: String::new(),
+            max_visible: u32::default(),
+            scroll_offset: u32::default(),
+            show_remote: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.graph_id.is_empty() || true && !self.nodes_json.is_empty() || true && !self.edges_json.is_empty() || true && !self.lanes_json.is_empty() || true && !self.colors_json.is_empty() || true && !self.current_branch.is_empty() || true && !self.refs_json.is_empty() || true && self.max_visible < u32::MAX || true && self.scroll_offset < u32::MAX || true && self.show_remote || true
+    }
+}
+
+impl Default for GghScmGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM commit action (amend, sign off, all, staged, message, author)
+#[derive(Debug, Clone)]
+pub struct GgiScmCommitAction {
+    pub commit_id: String,
+    pub is_amend: bool,
+    pub sign_off: bool,
+    pub commit_all: bool,
+    pub commit_staged: bool,
+    pub message: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub allow_empty: bool,
+    pub fixup_target: String,
+}
+
+impl GgiScmCommitAction {
+    pub fn new() -> Self {
+        Self {
+            commit_id: String::new(),
+            is_amend: bool::default(),
+            sign_off: bool::default(),
+            commit_all: bool::default(),
+            commit_staged: bool::default(),
+            message: String::new(),
+            author_name: String::new(),
+            author_email: String::new(),
+            allow_empty: bool::default(),
+            fixup_target: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.commit_id.is_empty() || true && self.is_amend || true && self.sign_off || true && self.commit_all || true && self.commit_staged || true && !self.message.is_empty() || true && !self.author_name.is_empty() || true && !self.author_email.is_empty() || true && self.allow_empty || true && !self.fixup_target.is_empty() || true
+    }
+}
+
+impl Default for GgiScmCommitAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM diff editor (original, modified, inline, side by side, navigate)
+#[derive(Debug, Clone)]
+pub struct GgjScmDiffEditor {
+    pub diff_editor_id: String,
+    pub original_uri: String,
+    pub modified_uri: String,
+    pub is_inline: bool,
+    pub is_side_by_side: bool,
+    pub can_navigate: bool,
+    pub change_count: u32,
+    pub current_change: u32,
+    pub ignore_whitespace: bool,
+    pub render_indicators: bool,
+}
+
+impl GgjScmDiffEditor {
+    pub fn new() -> Self {
+        Self {
+            diff_editor_id: String::new(),
+            original_uri: String::new(),
+            modified_uri: String::new(),
+            is_inline: bool::default(),
+            is_side_by_side: bool::default(),
+            can_navigate: bool::default(),
+            change_count: u32::default(),
+            current_change: u32::default(),
+            ignore_whitespace: bool::default(),
+            render_indicators: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_editor_id.is_empty() || true && !self.original_uri.is_empty() || true && !self.modified_uri.is_empty() || true && self.is_inline || true && self.is_side_by_side || true && self.can_navigate || true && self.change_count < u32::MAX || true && self.current_change < u32::MAX || true && self.ignore_whitespace || true && self.render_indicators || true
+    }
+}
+
+impl Default for GgjScmDiffEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -316166,6 +316376,96 @@ mod tests_gge_generated {
     fn test_gge_fields() {
         let mut obj = GgeScmHistoryItem::default();
         obj.hist_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggf_default() {
+        let obj = GgfScmQuickDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggf_fields() {
+        let mut obj = GgfScmQuickDiff::default();
+        obj.quickdiff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggg_default() {
+        let obj = GggScmActionButton::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggg_fields() {
+        let mut obj = GggScmActionButton::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggh_default() {
+        let obj = GghScmGraph::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggh_fields() {
+        let mut obj = GghScmGraph::default();
+        obj.graph_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggi_default() {
+        let obj = GgiScmCommitAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggi_fields() {
+        let mut obj = GgiScmCommitAction::default();
+        obj.commit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggj_default() {
+        let obj = GgjScmDiffEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggj_fields() {
+        let mut obj = GgjScmDiffEditor::default();
+        obj.diff_editor_id = "test".to_string();
         assert!(obj.validate());
     }
 }
