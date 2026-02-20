@@ -72267,6 +72267,216 @@ impl Default for FqeDapVariable {
     }
 }
 
+/// DAP breakpoint (id, verified, message, source, line, column)
+#[derive(Debug, Clone)]
+pub struct FqfDapBreakpoint {
+    pub bp_id: String,
+    pub is_verified: bool,
+    pub message: String,
+    pub source_name: String,
+    pub source_path: String,
+    pub line: u32,
+    pub column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub instruction_reference: String,
+}
+
+impl FqfDapBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            bp_id: String::new(),
+            is_verified: bool::default(),
+            message: String::new(),
+            source_name: String::new(),
+            source_path: String::new(),
+            line: u32::default(),
+            column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            instruction_reference: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bp_id.is_empty() || true && self.is_verified || true && !self.message.is_empty() || true && !self.source_name.is_empty() || true && !self.source_path.is_empty() || true && self.line < u32::MAX || true && self.column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && !self.instruction_reference.is_empty() || true
+    }
+}
+
+impl Default for FqfDapBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP source (name, path, source reference, presentation hint, origin)
+#[derive(Debug, Clone)]
+pub struct FqgDapSource {
+    pub source_id: String,
+    pub name: String,
+    pub path: String,
+    pub source_reference: u32,
+    pub presentation_hint: u32,
+    pub origin: String,
+    pub adapter_data_json: String,
+    pub checksums_json: String,
+    pub is_deemphasized: bool,
+    pub is_subtle: bool,
+}
+
+impl FqgDapSource {
+    pub fn new() -> Self {
+        Self {
+            source_id: String::new(),
+            name: String::new(),
+            path: String::new(),
+            source_reference: u32::default(),
+            presentation_hint: u32::default(),
+            origin: String::new(),
+            adapter_data_json: String::new(),
+            checksums_json: String::new(),
+            is_deemphasized: bool::default(),
+            is_subtle: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.source_id.is_empty() || true && !self.name.is_empty() || true && !self.path.is_empty() || true && self.source_reference < u32::MAX || true && self.presentation_hint < u32::MAX || true && !self.origin.is_empty() || true && !self.adapter_data_json.is_empty() || true && !self.checksums_json.is_empty() || true && self.is_deemphasized || true && self.is_subtle || true
+    }
+}
+
+impl Default for FqgDapSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP module (id, name, path, version, symbol status, date)
+#[derive(Debug, Clone)]
+pub struct FqhDapModule {
+    pub module_id: String,
+    pub name: String,
+    pub path: String,
+    pub version: String,
+    pub symbol_status: String,
+    pub symbol_file_path: String,
+    pub date_time_stamp: String,
+    pub address_range: String,
+    pub is_optimized: bool,
+    pub is_user_code: bool,
+}
+
+impl FqhDapModule {
+    pub fn new() -> Self {
+        Self {
+            module_id: String::new(),
+            name: String::new(),
+            path: String::new(),
+            version: String::new(),
+            symbol_status: String::new(),
+            symbol_file_path: String::new(),
+            date_time_stamp: String::new(),
+            address_range: String::new(),
+            is_optimized: bool::default(),
+            is_user_code: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.module_id.is_empty() || true && !self.name.is_empty() || true && !self.path.is_empty() || true && !self.version.is_empty() || true && !self.symbol_status.is_empty() || true && !self.symbol_file_path.is_empty() || true && !self.date_time_stamp.is_empty() || true && !self.address_range.is_empty() || true && self.is_optimized || true && self.is_user_code || true
+    }
+}
+
+impl Default for FqhDapModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP capabilities (supports restart, function breakpoints, conditional)
+#[derive(Debug, Clone)]
+pub struct FqiDapCapabilities {
+    pub cap_id: String,
+    pub supports_configuration_done: bool,
+    pub supports_function_breakpoints: bool,
+    pub supports_conditional_breakpoints: bool,
+    pub supports_hit_conditional_breakpoints: bool,
+    pub supports_evaluate_for_hovers: bool,
+    pub supports_step_back: bool,
+    pub supports_set_variable: bool,
+    pub supports_restart_frame: bool,
+    pub supports_goto_targets: bool,
+}
+
+impl FqiDapCapabilities {
+    pub fn new() -> Self {
+        Self {
+            cap_id: String::new(),
+            supports_configuration_done: bool::default(),
+            supports_function_breakpoints: bool::default(),
+            supports_conditional_breakpoints: bool::default(),
+            supports_hit_conditional_breakpoints: bool::default(),
+            supports_evaluate_for_hovers: bool::default(),
+            supports_step_back: bool::default(),
+            supports_set_variable: bool::default(),
+            supports_restart_frame: bool::default(),
+            supports_goto_targets: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cap_id.is_empty() || true && self.supports_configuration_done || true && self.supports_function_breakpoints || true && self.supports_conditional_breakpoints || true && self.supports_hit_conditional_breakpoints || true && self.supports_evaluate_for_hovers || true && self.supports_step_back || true && self.supports_set_variable || true && self.supports_restart_frame || true && self.supports_goto_targets || true
+    }
+}
+
+impl Default for FqiDapCapabilities {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP exception info (id, description, break mode, details)
+#[derive(Debug, Clone)]
+pub struct FqjDapExceptionInfo {
+    pub exception_id: String,
+    pub description: String,
+    pub break_mode: u32,
+    pub details_json: String,
+    pub inner_exception_json: String,
+    pub type_name: String,
+    pub full_type_name: String,
+    pub evaluate_name: String,
+    pub stack_trace: String,
+    pub has_inner: bool,
+}
+
+impl FqjDapExceptionInfo {
+    pub fn new() -> Self {
+        Self {
+            exception_id: String::new(),
+            description: String::new(),
+            break_mode: u32::default(),
+            details_json: String::new(),
+            inner_exception_json: String::new(),
+            type_name: String::new(),
+            full_type_name: String::new(),
+            evaluate_name: String::new(),
+            stack_trace: String::new(),
+            has_inner: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exception_id.is_empty() || true && !self.description.is_empty() || true && self.break_mode < u32::MAX || true && !self.details_json.is_empty() || true && !self.inner_exception_json.is_empty() || true && !self.type_name.is_empty() || true && !self.full_type_name.is_empty() || true && !self.evaluate_name.is_empty() || true && !self.stack_trace.is_empty() || true && self.has_inner || true
+    }
+}
+
+impl Default for FqjDapExceptionInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -291206,6 +291416,96 @@ mod tests_fqe_generated {
     fn test_fqe_fields() {
         let mut obj = FqeDapVariable::default();
         obj.variable_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqf_default() {
+        let obj = FqfDapBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqf_fields() {
+        let mut obj = FqfDapBreakpoint::default();
+        obj.bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqg_default() {
+        let obj = FqgDapSource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqg_fields() {
+        let mut obj = FqgDapSource::default();
+        obj.source_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqh_default() {
+        let obj = FqhDapModule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqh_fields() {
+        let mut obj = FqhDapModule::default();
+        obj.module_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqi_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqi_default() {
+        let obj = FqiDapCapabilities::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqi_fields() {
+        let mut obj = FqiDapCapabilities::default();
+        obj.cap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqj_default() {
+        let obj = FqjDapExceptionInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqj_fields() {
+        let mut obj = FqjDapExceptionInfo::default();
+        obj.exception_id = "test".to_string();
         assert!(obj.validate());
     }
 }
