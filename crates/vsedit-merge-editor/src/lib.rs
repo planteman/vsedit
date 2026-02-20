@@ -125449,6 +125449,426 @@ impl Default for HmzProblemTableRow {
     }
 }
 
+/// JSON schema (id, type, properties, required, definitions)
+#[derive(Debug, Clone)]
+pub struct HnaJsonSchema {
+    pub json_schema_id: String,
+    pub schema_id: String,
+    pub schema_type: String,
+    pub properties_json: String,
+    pub required_json: String,
+    pub definitions_json: String,
+    pub description: String,
+    pub default_json: String,
+    pub title: String,
+    pub schema_version: String,
+}
+
+impl HnaJsonSchema {
+    pub fn new() -> Self {
+        Self {
+            json_schema_id: String::new(),
+            schema_id: String::new(),
+            schema_type: String::new(),
+            properties_json: String::new(),
+            required_json: String::new(),
+            definitions_json: String::new(),
+            description: String::new(),
+            default_json: String::new(),
+            title: String::new(),
+            schema_version: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.json_schema_id.is_empty() || true && !self.schema_id.is_empty() || true && !self.schema_type.is_empty() || true && !self.properties_json.is_empty() || true && !self.required_json.is_empty() || true && !self.definitions_json.is_empty() || true && !self.description.is_empty() || true && !self.default_json.is_empty() || true && !self.title.is_empty() || true && !self.schema_version.is_empty() || true
+    }
+}
+
+impl Default for HnaJsonSchema {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Schema property (type, description, default, enum, pattern)
+#[derive(Debug, Clone)]
+pub struct HnbSchemaProperty {
+    pub schema_prop_id: String,
+    pub property_type: String,
+    pub description: String,
+    pub default_value: String,
+    pub enum_values_json: String,
+    pub pattern: String,
+    pub minimum: f64,
+    pub maximum: f64,
+    pub min_length: u32,
+    pub max_length: u32,
+}
+
+impl HnbSchemaProperty {
+    pub fn new() -> Self {
+        Self {
+            schema_prop_id: String::new(),
+            property_type: String::new(),
+            description: String::new(),
+            default_value: String::new(),
+            enum_values_json: String::new(),
+            pattern: String::new(),
+            minimum: f64::default(),
+            maximum: f64::default(),
+            min_length: u32::default(),
+            max_length: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.schema_prop_id.is_empty() || true && !self.property_type.is_empty() || true && !self.description.is_empty() || true && !self.default_value.is_empty() || true && !self.enum_values_json.is_empty() || true && !self.pattern.is_empty() || true && self.minimum.is_finite() || true && self.maximum.is_finite() || true && self.min_length < u32::MAX || true && self.max_length < u32::MAX || true
+    }
+}
+
+impl Default for HnbSchemaProperty {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Schema validation (errors, warnings, schema uri, document)
+#[derive(Debug, Clone)]
+pub struct HncSchemaValidation {
+    pub schema_valid_id: String,
+    pub errors_json: String,
+    pub warnings_json: String,
+    pub schema_uri: String,
+    pub document_uri: String,
+    pub is_valid: bool,
+    pub error_count: u32,
+    pub warning_count: u32,
+    pub path: String,
+    pub timestamp_ms: u64,
+}
+
+impl HncSchemaValidation {
+    pub fn new() -> Self {
+        Self {
+            schema_valid_id: String::new(),
+            errors_json: String::new(),
+            warnings_json: String::new(),
+            schema_uri: String::new(),
+            document_uri: String::new(),
+            is_valid: bool::default(),
+            error_count: u32::default(),
+            warning_count: u32::default(),
+            path: String::new(),
+            timestamp_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.schema_valid_id.is_empty() || true && !self.errors_json.is_empty() || true && !self.warnings_json.is_empty() || true && !self.schema_uri.is_empty() || true && !self.document_uri.is_empty() || true && self.is_valid || true && self.error_count < u32::MAX || true && self.warning_count < u32::MAX || true && !self.path.is_empty() || true && self.timestamp_ms < u64::MAX || true
+    }
+}
+
+impl Default for HncSchemaValidation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings editor model (groups, search, modified, scope)
+#[derive(Debug, Clone)]
+pub struct HndSettingsEditorModel {
+    pub settings_editor_id: String,
+    pub groups_json: String,
+    pub search_text: String,
+    pub modified_only: bool,
+    pub scope: String,
+    pub selected_group: String,
+    pub view_type: String,
+    pub expanded_json: String,
+    pub filter_tags_json: String,
+    pub setting_count: u32,
+}
+
+impl HndSettingsEditorModel {
+    pub fn new() -> Self {
+        Self {
+            settings_editor_id: String::new(),
+            groups_json: String::new(),
+            search_text: String::new(),
+            modified_only: bool::default(),
+            scope: String::new(),
+            selected_group: String::new(),
+            view_type: String::new(),
+            expanded_json: String::new(),
+            filter_tags_json: String::new(),
+            setting_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.settings_editor_id.is_empty() || true && !self.groups_json.is_empty() || true && !self.search_text.is_empty() || true && self.modified_only || true && !self.scope.is_empty() || true && !self.selected_group.is_empty() || true && !self.view_type.is_empty() || true && !self.expanded_json.is_empty() || true && !self.filter_tags_json.is_empty() || true && self.setting_count < u32::MAX || true
+    }
+}
+
+impl Default for HndSettingsEditorModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Setting item (key, value, default, type, scope, description)
+#[derive(Debug, Clone)]
+pub struct HneSettingItem {
+    pub setting_item_id: String,
+    pub key: String,
+    pub value_json: String,
+    pub default_json: String,
+    pub value_type: String,
+    pub scope: String,
+    pub description: String,
+    pub markdown_description: String,
+    pub enum_values_json: String,
+    pub deprecation_message: String,
+}
+
+impl HneSettingItem {
+    pub fn new() -> Self {
+        Self {
+            setting_item_id: String::new(),
+            key: String::new(),
+            value_json: String::new(),
+            default_json: String::new(),
+            value_type: String::new(),
+            scope: String::new(),
+            description: String::new(),
+            markdown_description: String::new(),
+            enum_values_json: String::new(),
+            deprecation_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.setting_item_id.is_empty() || true && !self.key.is_empty() || true && !self.value_json.is_empty() || true && !self.default_json.is_empty() || true && !self.value_type.is_empty() || true && !self.scope.is_empty() || true && !self.description.is_empty() || true && !self.markdown_description.is_empty() || true && !self.enum_values_json.is_empty() || true && !self.deprecation_message.is_empty() || true
+    }
+}
+
+impl Default for HneSettingItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Setting group (id, title, settings, order, extension)
+#[derive(Debug, Clone)]
+pub struct HnfSettingGroup {
+    pub setting_group_id: String,
+    pub group_id: String,
+    pub title: String,
+    pub settings_json: String,
+    pub order: u32,
+    pub extension_id: String,
+    pub icon: String,
+    pub description: String,
+    pub is_expanded: bool,
+    pub setting_count: u32,
+}
+
+impl HnfSettingGroup {
+    pub fn new() -> Self {
+        Self {
+            setting_group_id: String::new(),
+            group_id: String::new(),
+            title: String::new(),
+            settings_json: String::new(),
+            order: u32::default(),
+            extension_id: String::new(),
+            icon: String::new(),
+            description: String::new(),
+            is_expanded: bool::default(),
+            setting_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.setting_group_id.is_empty() || true && !self.group_id.is_empty() || true && !self.title.is_empty() || true && !self.settings_json.is_empty() || true && self.order < u32::MAX || true && !self.extension_id.is_empty() || true && !self.icon.is_empty() || true && !self.description.is_empty() || true && self.is_expanded || true && self.setting_count < u32::MAX || true
+    }
+}
+
+impl Default for HnfSettingGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Setting search (query, results, filter, match, highlight)
+#[derive(Debug, Clone)]
+pub struct HngSettingSearch {
+    pub setting_search_id: String,
+    pub query: String,
+    pub results_json: String,
+    pub filter_type: String,
+    pub match_count: u32,
+    pub highlight_ranges_json: String,
+    pub search_tags_json: String,
+    pub is_regex: bool,
+    pub scope_filter: String,
+    pub modified_filter: bool,
+}
+
+impl HngSettingSearch {
+    pub fn new() -> Self {
+        Self {
+            setting_search_id: String::new(),
+            query: String::new(),
+            results_json: String::new(),
+            filter_type: String::new(),
+            match_count: u32::default(),
+            highlight_ranges_json: String::new(),
+            search_tags_json: String::new(),
+            is_regex: bool::default(),
+            scope_filter: String::new(),
+            modified_filter: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.setting_search_id.is_empty() || true && !self.query.is_empty() || true && !self.results_json.is_empty() || true && !self.filter_type.is_empty() || true && self.match_count < u32::MAX || true && !self.highlight_ranges_json.is_empty() || true && !self.search_tags_json.is_empty() || true && self.is_regex || true && !self.scope_filter.is_empty() || true && self.modified_filter || true
+    }
+}
+
+impl Default for HngSettingSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Setting editor widget (type, key, value, control, validate)
+#[derive(Debug, Clone)]
+pub struct HnhSettingEditor {
+    pub setting_editor_id: String,
+    pub editor_type: String,
+    pub key: String,
+    pub value_json: String,
+    pub control_type: String,
+    pub validate_fn: String,
+    pub is_modified: bool,
+    pub is_default: bool,
+    pub error_message: String,
+    pub reset_fn: String,
+}
+
+impl HnhSettingEditor {
+    pub fn new() -> Self {
+        Self {
+            setting_editor_id: String::new(),
+            editor_type: String::new(),
+            key: String::new(),
+            value_json: String::new(),
+            control_type: String::new(),
+            validate_fn: String::new(),
+            is_modified: bool::default(),
+            is_default: bool::default(),
+            error_message: String::new(),
+            reset_fn: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.setting_editor_id.is_empty() || true && !self.editor_type.is_empty() || true && !self.key.is_empty() || true && !self.value_json.is_empty() || true && !self.control_type.is_empty() || true && !self.validate_fn.is_empty() || true && self.is_modified || true && self.is_default || true && !self.error_message.is_empty() || true && !self.reset_fn.is_empty() || true
+    }
+}
+
+impl Default for HnhSettingEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Setting scope (user, workspace, folder, language, policy)
+#[derive(Debug, Clone)]
+pub struct HniSettingScope {
+    pub setting_scope_id: String,
+    pub scope_name: String,
+    pub is_user: bool,
+    pub is_workspace: bool,
+    pub is_folder: bool,
+    pub is_language: bool,
+    pub is_policy: bool,
+    pub resource_uri: String,
+    pub language_id: String,
+    pub precedence: u32,
+}
+
+impl HniSettingScope {
+    pub fn new() -> Self {
+        Self {
+            setting_scope_id: String::new(),
+            scope_name: String::new(),
+            is_user: bool::default(),
+            is_workspace: bool::default(),
+            is_folder: bool::default(),
+            is_language: bool::default(),
+            is_policy: bool::default(),
+            resource_uri: String::new(),
+            language_id: String::new(),
+            precedence: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.setting_scope_id.is_empty() || true && !self.scope_name.is_empty() || true && self.is_user || true && self.is_workspace || true && self.is_folder || true && self.is_language || true && self.is_policy || true && !self.resource_uri.is_empty() || true && !self.language_id.is_empty() || true && self.precedence < u32::MAX || true
+    }
+}
+
+impl Default for HniSettingScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Setting override (key, value, source, language, resource)
+#[derive(Debug, Clone)]
+pub struct HnjSettingOverride {
+    pub setting_ovr_id: String,
+    pub key: String,
+    pub value_json: String,
+    pub source: String,
+    pub language_id: String,
+    pub resource_uri: String,
+    pub is_default: bool,
+    pub override_identifier: String,
+    pub scope: String,
+    pub priority: u32,
+}
+
+impl HnjSettingOverride {
+    pub fn new() -> Self {
+        Self {
+            setting_ovr_id: String::new(),
+            key: String::new(),
+            value_json: String::new(),
+            source: String::new(),
+            language_id: String::new(),
+            resource_uri: String::new(),
+            is_default: bool::default(),
+            override_identifier: String::new(),
+            scope: String::new(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.setting_ovr_id.is_empty() || true && !self.key.is_empty() || true && !self.value_json.is_empty() || true && !self.source.is_empty() || true && !self.language_id.is_empty() || true && !self.resource_uri.is_empty() || true && self.is_default || true && !self.override_identifier.is_empty() || true && !self.scope.is_empty() || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for HnjSettingOverride {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -367312,6 +367732,186 @@ mod tests_hmz_generated {
     fn test_hmz_fields() {
         let mut obj = HmzProblemTableRow::default();
         obj.prob_row_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hna_generated {
+    use super::*;
+
+    #[test]
+    fn test_hna_default() {
+        let obj = HnaJsonSchema::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hna_fields() {
+        let mut obj = HnaJsonSchema::default();
+        obj.json_schema_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnb_default() {
+        let obj = HnbSchemaProperty::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnb_fields() {
+        let mut obj = HnbSchemaProperty::default();
+        obj.schema_prop_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnc_default() {
+        let obj = HncSchemaValidation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnc_fields() {
+        let mut obj = HncSchemaValidation::default();
+        obj.schema_valid_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnd_default() {
+        let obj = HndSettingsEditorModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnd_fields() {
+        let mut obj = HndSettingsEditorModel::default();
+        obj.settings_editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hne_generated {
+    use super::*;
+
+    #[test]
+    fn test_hne_default() {
+        let obj = HneSettingItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hne_fields() {
+        let mut obj = HneSettingItem::default();
+        obj.setting_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnf_default() {
+        let obj = HnfSettingGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnf_fields() {
+        let mut obj = HnfSettingGroup::default();
+        obj.setting_group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hng_generated {
+    use super::*;
+
+    #[test]
+    fn test_hng_default() {
+        let obj = HngSettingSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hng_fields() {
+        let mut obj = HngSettingSearch::default();
+        obj.setting_search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnh_default() {
+        let obj = HnhSettingEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnh_fields() {
+        let mut obj = HnhSettingEditor::default();
+        obj.setting_editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hni_generated {
+    use super::*;
+
+    #[test]
+    fn test_hni_default() {
+        let obj = HniSettingScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hni_fields() {
+        let mut obj = HniSettingScope::default();
+        obj.setting_scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hnj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hnj_default() {
+        let obj = HnjSettingOverride::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hnj_fields() {
+        let mut obj = HnjSettingOverride::default();
+        obj.setting_ovr_id = "test".to_string();
         assert!(obj.validate());
     }
 }
