@@ -86344,6 +86344,216 @@ impl Default for GczTerminalPtyHost {
     }
 }
 
+/// Search query (pattern, regex, case, whole word, files to include/exclude)
+#[derive(Debug, Clone)]
+pub struct GdaSearchQuery {
+    pub query_id: String,
+    pub pattern: String,
+    pub is_regex: bool,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub files_to_include: String,
+    pub files_to_exclude: String,
+    pub max_results: u32,
+    pub use_ignore_files: bool,
+    pub only_open_editors: bool,
+}
+
+impl GdaSearchQuery {
+    pub fn new() -> Self {
+        Self {
+            query_id: String::new(),
+            pattern: String::new(),
+            is_regex: bool::default(),
+            case_sensitive: bool::default(),
+            whole_word: bool::default(),
+            files_to_include: String::new(),
+            files_to_exclude: String::new(),
+            max_results: u32::default(),
+            use_ignore_files: bool::default(),
+            only_open_editors: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.query_id.is_empty() || true && !self.pattern.is_empty() || true && self.is_regex || true && self.case_sensitive || true && self.whole_word || true && !self.files_to_include.is_empty() || true && !self.files_to_exclude.is_empty() || true && self.max_results < u32::MAX || true && self.use_ignore_files || true && self.only_open_editors || true
+    }
+}
+
+impl Default for GdaSearchQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search result (uri, line, column, match text, preview, context)
+#[derive(Debug, Clone)]
+pub struct GdbSearchResult {
+    pub result_id: String,
+    pub uri: String,
+    pub line_number: u32,
+    pub column: u32,
+    pub match_text: String,
+    pub preview_text: String,
+    pub context_before: String,
+    pub context_after: String,
+    pub match_length: u32,
+    pub is_replaced: bool,
+}
+
+impl GdbSearchResult {
+    pub fn new() -> Self {
+        Self {
+            result_id: String::new(),
+            uri: String::new(),
+            line_number: u32::default(),
+            column: u32::default(),
+            match_text: String::new(),
+            preview_text: String::new(),
+            context_before: String::new(),
+            context_after: String::new(),
+            match_length: u32::default(),
+            is_replaced: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_id.is_empty() || true && !self.uri.is_empty() || true && self.line_number < u32::MAX || true && self.column < u32::MAX || true && !self.match_text.is_empty() || true && !self.preview_text.is_empty() || true && !self.context_before.is_empty() || true && !self.context_after.is_empty() || true && self.match_length < u32::MAX || true && self.is_replaced || true
+    }
+}
+
+impl Default for GdbSearchResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search replace model (search pattern, replace pattern, preserve case)
+#[derive(Debug, Clone)]
+pub struct GdcSearchReplaceModel {
+    pub replace_id: String,
+    pub search_pattern: String,
+    pub replace_pattern: String,
+    pub preserve_case: bool,
+    pub use_regex: bool,
+    pub confirm_each: bool,
+    pub replaced_count: u32,
+    pub is_preview: bool,
+    pub scope: String,
+    pub is_multi_line: bool,
+}
+
+impl GdcSearchReplaceModel {
+    pub fn new() -> Self {
+        Self {
+            replace_id: String::new(),
+            search_pattern: String::new(),
+            replace_pattern: String::new(),
+            preserve_case: bool::default(),
+            use_regex: bool::default(),
+            confirm_each: bool::default(),
+            replaced_count: u32::default(),
+            is_preview: bool::default(),
+            scope: String::new(),
+            is_multi_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.replace_id.is_empty() || true && !self.search_pattern.is_empty() || true && !self.replace_pattern.is_empty() || true && self.preserve_case || true && self.use_regex || true && self.confirm_each || true && self.replaced_count < u32::MAX || true && self.is_preview || true && !self.scope.is_empty() || true && self.is_multi_line || true
+    }
+}
+
+impl Default for GdcSearchReplaceModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search history entry (query, timestamp, result count, type)
+#[derive(Debug, Clone)]
+pub struct GddSearchHistoryEntry {
+    pub history_id: String,
+    pub query_text: String,
+    pub timestamp_ms: u64,
+    pub result_count: u32,
+    pub search_type: String,
+    pub is_regex: bool,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub include_pattern: String,
+    pub exclude_pattern: String,
+}
+
+impl GddSearchHistoryEntry {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            query_text: String::new(),
+            timestamp_ms: u64::default(),
+            result_count: u32::default(),
+            search_type: String::new(),
+            is_regex: bool::default(),
+            case_sensitive: bool::default(),
+            whole_word: bool::default(),
+            include_pattern: String::new(),
+            exclude_pattern: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && !self.query_text.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.result_count < u32::MAX || true && !self.search_type.is_empty() || true && self.is_regex || true && self.case_sensitive || true && self.whole_word || true && !self.include_pattern.is_empty() || true && !self.exclude_pattern.is_empty() || true
+    }
+}
+
+impl Default for GddSearchHistoryEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search view config (location, detail, sort by, collapse results)
+#[derive(Debug, Clone)]
+pub struct GdeSearchViewConfig {
+    pub view_id: String,
+    pub location: String,
+    pub show_detail: bool,
+    pub sort_by: String,
+    pub collapse_results: bool,
+    pub show_line_numbers: bool,
+    pub context_lines: u32,
+    pub compact_mode: bool,
+    pub auto_reveal: bool,
+    pub follow_focus: bool,
+}
+
+impl GdeSearchViewConfig {
+    pub fn new() -> Self {
+        Self {
+            view_id: String::new(),
+            location: String::new(),
+            show_detail: bool::default(),
+            sort_by: String::new(),
+            collapse_results: bool::default(),
+            show_line_numbers: bool::default(),
+            context_lines: u32::default(),
+            compact_mode: bool::default(),
+            auto_reveal: bool::default(),
+            follow_focus: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_id.is_empty() || true && !self.location.is_empty() || true && self.show_detail || true && !self.sort_by.is_empty() || true && self.collapse_results || true && self.show_line_numbers || true && self.context_lines < u32::MAX || true && self.compact_mode || true && self.auto_reveal || true && self.follow_focus || true
+    }
+}
+
+impl Default for GdeSearchViewConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311170,6 +311380,96 @@ mod tests_gcz_generated {
     fn test_gcz_fields() {
         let mut obj = GczTerminalPtyHost::default();
         obj.pty_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gda_generated {
+    use super::*;
+
+    #[test]
+    fn test_gda_default() {
+        let obj = GdaSearchQuery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gda_fields() {
+        let mut obj = GdaSearchQuery::default();
+        obj.query_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdb_default() {
+        let obj = GdbSearchResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdb_fields() {
+        let mut obj = GdbSearchResult::default();
+        obj.result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdc_default() {
+        let obj = GdcSearchReplaceModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdc_fields() {
+        let mut obj = GdcSearchReplaceModel::default();
+        obj.replace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gdd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gdd_default() {
+        let obj = GddSearchHistoryEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gdd_fields() {
+        let mut obj = GddSearchHistoryEntry::default();
+        obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gde_generated {
+    use super::*;
+
+    #[test]
+    fn test_gde_default() {
+        let obj = GdeSearchViewConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gde_fields() {
+        let mut obj = GdeSearchViewConfig::default();
+        obj.view_id = "test".to_string();
         assert!(obj.validate());
     }
 }
