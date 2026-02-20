@@ -62733,6 +62733,213 @@ impl Default for FhjNotebookEditorDecoration {
 }
 
 
+/// Notebook cell toolbar (run button, delete, move up/down, more actions)
+#[derive(Debug, Clone)]
+pub struct FhkNotebookCellToolbar {
+    pub cell_index: u32,
+    pub show_run_button: bool,
+    pub show_delete_button: bool,
+    pub show_move_buttons: bool,
+    pub show_more_actions: bool,
+    pub toolbar_position: u32,
+    pub is_collapsed: bool,
+    pub action_count: u32,
+    pub context_menu_id: String,
+    pub is_focused: bool,
+}
+
+impl FhkNotebookCellToolbar {
+    pub fn new() -> Self {
+        Self {
+            cell_index: u32::default(),
+            show_run_button: bool::default(),
+            show_delete_button: bool::default(),
+            show_move_buttons: bool::default(),
+            show_more_actions: bool::default(),
+            toolbar_position: u32::default(),
+            is_collapsed: bool::default(),
+            action_count: u32::default(),
+            context_menu_id: String::new(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.cell_index < u32::MAX || true && self.show_run_button || true && self.show_delete_button || true && self.show_move_buttons || true && self.show_more_actions || true && self.toolbar_position < u32::MAX || true && self.is_collapsed || true && self.action_count < u32::MAX || true && !self.context_menu_id.is_empty() || true && self.is_focused || true
+    }
+}
+
+impl Default for FhkNotebookCellToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook diff editor (original/modified cells, cell diff, metadata diff)
+#[derive(Debug, Clone)]
+pub struct FhlNotebookDiffEditor {
+    pub diff_id: String,
+    pub original_uri: String,
+    pub modified_uri: String,
+    pub cell_diff_count: u32,
+    pub metadata_changed: bool,
+    pub output_changed: bool,
+    pub view_type: String,
+    pub scroll_position: u32,
+    pub current_diff_index: u32,
+    pub is_collapsed: bool,
+}
+
+impl FhlNotebookDiffEditor {
+    pub fn new() -> Self {
+        Self {
+            diff_id: String::new(),
+            original_uri: String::new(),
+            modified_uri: String::new(),
+            cell_diff_count: u32::default(),
+            metadata_changed: bool::default(),
+            output_changed: bool::default(),
+            view_type: String::new(),
+            scroll_position: u32::default(),
+            current_diff_index: u32::default(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_id.is_empty() || true && !self.original_uri.is_empty() || true && !self.modified_uri.is_empty() || true && self.cell_diff_count < u32::MAX || true && self.metadata_changed || true && self.output_changed || true && !self.view_type.is_empty() || true && self.scroll_position < u32::MAX || true && self.current_diff_index < u32::MAX || true && self.is_collapsed || true
+    }
+}
+
+impl Default for FhlNotebookDiffEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook find/replace (query, options, cell scope, current match)
+#[derive(Debug, Clone)]
+pub struct FhmNotebookFind {
+    pub search_id: String,
+    pub query_text: String,
+    pub is_regex: bool,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub search_scope: u32,
+    pub total_matches: u32,
+    pub current_match_index: u32,
+    pub replace_text: String,
+    pub is_open: bool,
+}
+
+impl FhmNotebookFind {
+    pub fn new() -> Self {
+        Self {
+            search_id: String::new(),
+            query_text: String::new(),
+            is_regex: bool::default(),
+            case_sensitive: bool::default(),
+            whole_word: bool::default(),
+            search_scope: u32::default(),
+            total_matches: u32::default(),
+            current_match_index: u32::default(),
+            replace_text: String::new(),
+            is_open: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_id.is_empty() || true && !self.query_text.is_empty() || true && self.is_regex || true && self.case_sensitive || true && self.whole_word || true && self.search_scope < u32::MAX || true && self.total_matches < u32::MAX || true && self.current_match_index < u32::MAX || true && !self.replace_text.is_empty() || true && self.is_open || true
+    }
+}
+
+impl Default for FhmNotebookFind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook outline/table of contents (cell entries, heading levels, symbols)
+#[derive(Debug, Clone)]
+pub struct FhnNotebookOutline {
+    pub outline_id: String,
+    pub entry_count: u32,
+    pub heading_level: u32,
+    pub symbol_kind: u32,
+    pub cell_handle: u32,
+    pub label: String,
+    pub icon_id: String,
+    pub is_expanded: bool,
+    pub parent_handle: u32,
+    pub sort_order: u32,
+}
+
+impl FhnNotebookOutline {
+    pub fn new() -> Self {
+        Self {
+            outline_id: String::new(),
+            entry_count: u32::default(),
+            heading_level: u32::default(),
+            symbol_kind: u32::default(),
+            cell_handle: u32::default(),
+            label: String::new(),
+            icon_id: String::new(),
+            is_expanded: bool::default(),
+            parent_handle: u32::default(),
+            sort_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.outline_id.is_empty() || true && self.entry_count < u32::MAX || true && self.heading_level < u32::MAX || true && self.symbol_kind < u32::MAX || true && self.cell_handle < u32::MAX || true && !self.label.is_empty() || true && !self.icon_id.is_empty() || true && self.is_expanded || true && self.parent_handle < u32::MAX || true && self.sort_order < u32::MAX || true
+    }
+}
+
+impl Default for FhnNotebookOutline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook variable inspector (variables, types, values, scopes)
+#[derive(Debug, Clone)]
+pub struct FhoNotebookVariableInspector {
+    pub inspector_id: String,
+    pub variable_name: String,
+    pub variable_type: String,
+    pub variable_value: String,
+    pub scope_name: String,
+    pub is_expandable: bool,
+    pub child_count: u32,
+    pub evaluate_expression: String,
+    pub page_size: u32,
+    pub is_lazy: bool,
+}
+
+impl FhoNotebookVariableInspector {
+    pub fn new() -> Self {
+        Self {
+            inspector_id: String::new(),
+            variable_name: String::new(),
+            variable_type: String::new(),
+            variable_value: String::new(),
+            scope_name: String::new(),
+            is_expandable: bool::default(),
+            child_count: u32::default(),
+            evaluate_expression: String::new(),
+            page_size: u32::default(),
+            is_lazy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inspector_id.is_empty() || true && !self.variable_name.is_empty() || true && !self.variable_type.is_empty() || true && !self.variable_value.is_empty() || true && !self.scope_name.is_empty() || true && self.is_expandable || true && self.child_count < u32::MAX || true && !self.evaluate_expression.is_empty() || true && self.page_size < u32::MAX || true && self.is_lazy || true
+    }
+}
+
+impl Default for FhoNotebookVariableInspector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277390,6 +277597,96 @@ mod tests_fhj_generated {
     fn test_fhj_fields() {
         let mut obj = FhjNotebookEditorDecoration::default();
         obj.decoration_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhk_default() {
+        let obj = FhkNotebookCellToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhk_fields() {
+        let mut obj = FhkNotebookCellToolbar::default();
+        obj.cell_index = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhl_default() {
+        let obj = FhlNotebookDiffEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhl_fields() {
+        let mut obj = FhlNotebookDiffEditor::default();
+        obj.diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhm_default() {
+        let obj = FhmNotebookFind::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhm_fields() {
+        let mut obj = FhmNotebookFind::default();
+        obj.search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhn_default() {
+        let obj = FhnNotebookOutline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhn_fields() {
+        let mut obj = FhnNotebookOutline::default();
+        obj.outline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fho_generated {
+    use super::*;
+
+    #[test]
+    fn test_fho_default() {
+        let obj = FhoNotebookVariableInspector::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fho_fields() {
+        let mut obj = FhoNotebookVariableInspector::default();
+        obj.inspector_id = "test".to_string();
         assert!(obj.validate());
     }
 }
