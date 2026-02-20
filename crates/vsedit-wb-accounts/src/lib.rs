@@ -54210,6 +54210,459 @@ impl Default for EzoOpenerService {
 }
 
 
+/// Label/URI formatting service types
+#[derive(Debug, Clone)]
+pub struct EzpLabelService {
+    pub label_uri: String,
+    pub label_separator: String,
+    pub label_relative: bool,
+    pub label_no_prefix: bool,
+    pub label_end_of_path: bool,
+    pub label_authority_prefix: String,
+    pub label_strip_path_start: bool,
+    pub label_formatting_options: String,
+    pub label_scheme_override: String,
+    pub label_max_length: u32,
+}
+
+impl EzpLabelService {
+    pub fn new() -> Self {
+        Self {
+            label_uri: String::new(),
+            label_separator: String::new(),
+            label_relative: bool::default(),
+            label_no_prefix: bool::default(),
+            label_end_of_path: bool::default(),
+            label_authority_prefix: String::new(),
+            label_strip_path_start: bool::default(),
+            label_formatting_options: String::new(),
+            label_scheme_override: String::new(),
+            label_max_length: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.label_uri.is_empty() || true && !self.label_separator.is_empty() || true && self.label_relative || true && self.label_no_prefix || true && self.label_end_of_path || true && !self.label_authority_prefix.is_empty() || true && self.label_strip_path_start || true && !self.label_formatting_options.is_empty() || true && !self.label_scheme_override.is_empty() || true && self.label_max_length < u32::MAX || true
+    }
+}
+
+impl Default for EzpLabelService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Text model service (create/get/dispose) types
+#[derive(Debug, Clone)]
+pub struct EzqModelService {
+    pub model_uri: String,
+    pub model_language_id: String,
+    pub model_value: String,
+    pub model_eol: String,
+    pub model_encoding: String,
+    pub model_is_for_simple_widget: bool,
+    pub model_is_generated: bool,
+    pub model_associated_resource: String,
+    pub model_keep_alive: bool,
+    pub model_reference_count: u32,
+}
+
+impl EzqModelService {
+    pub fn new() -> Self {
+        Self {
+            model_uri: String::new(),
+            model_language_id: String::new(),
+            model_value: String::new(),
+            model_eol: String::new(),
+            model_encoding: String::new(),
+            model_is_for_simple_widget: bool::default(),
+            model_is_generated: bool::default(),
+            model_associated_resource: String::new(),
+            model_keep_alive: bool::default(),
+            model_reference_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_uri.is_empty() || true && !self.model_language_id.is_empty() || true && !self.model_value.is_empty() || true && !self.model_eol.is_empty() || true && !self.model_encoding.is_empty() || true && self.model_is_for_simple_widget || true && self.model_is_generated || true && !self.model_associated_resource.is_empty() || true && self.model_keep_alive || true && self.model_reference_count < u32::MAX || true
+    }
+}
+
+impl Default for EzqModelService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor service (open/close/focus) types
+#[derive(Debug, Clone)]
+pub struct EzrEditorService {
+    pub editor_active_id: String,
+    pub editor_visible_count: u32,
+    pub editor_dirty_count: u32,
+    pub editor_pinned_count: u32,
+    pub editor_sticky_count: u32,
+    pub editor_side_by_side: bool,
+    pub editor_focus_group_id: u32,
+    pub editor_last_closed: String,
+    pub editor_mru_list: String,
+    pub editor_max_visible: u32,
+}
+
+impl EzrEditorService {
+    pub fn new() -> Self {
+        Self {
+            editor_active_id: String::new(),
+            editor_visible_count: u32::default(),
+            editor_dirty_count: u32::default(),
+            editor_pinned_count: u32::default(),
+            editor_sticky_count: u32::default(),
+            editor_side_by_side: bool::default(),
+            editor_focus_group_id: u32::default(),
+            editor_last_closed: String::new(),
+            editor_mru_list: String::new(),
+            editor_max_visible: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_active_id.is_empty() || true && self.editor_visible_count < u32::MAX || true && self.editor_dirty_count < u32::MAX || true && self.editor_pinned_count < u32::MAX || true && self.editor_sticky_count < u32::MAX || true && self.editor_side_by_side || true && self.editor_focus_group_id < u32::MAX || true && !self.editor_last_closed.is_empty() || true && !self.editor_mru_list.is_empty() || true && self.editor_max_visible < u32::MAX || true
+    }
+}
+
+impl Default for EzrEditorService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor resolver (pick editor) types
+#[derive(Debug, Clone)]
+pub struct EzsEditorResolverService {
+    pub resolver_input: String,
+    pub resolver_preferred_id: String,
+    pub resolver_available_count: u32,
+    pub resolver_default_id: String,
+    pub resolver_glob_patterns: String,
+    pub resolver_priority: u32,
+    pub resolver_label: String,
+    pub resolver_detail: String,
+    pub resolver_extension_id: String,
+    pub resolver_exclusive: bool,
+}
+
+impl EzsEditorResolverService {
+    pub fn new() -> Self {
+        Self {
+            resolver_input: String::new(),
+            resolver_preferred_id: String::new(),
+            resolver_available_count: u32::default(),
+            resolver_default_id: String::new(),
+            resolver_glob_patterns: String::new(),
+            resolver_priority: u32::default(),
+            resolver_label: String::new(),
+            resolver_detail: String::new(),
+            resolver_extension_id: String::new(),
+            resolver_exclusive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resolver_input.is_empty() || true && !self.resolver_preferred_id.is_empty() || true && self.resolver_available_count < u32::MAX || true && !self.resolver_default_id.is_empty() || true && !self.resolver_glob_patterns.is_empty() || true && self.resolver_priority < u32::MAX || true && !self.resolver_label.is_empty() || true && !self.resolver_detail.is_empty() || true && !self.resolver_extension_id.is_empty() || true && self.resolver_exclusive || true
+    }
+}
+
+impl Default for EzsEditorResolverService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor group service types
+#[derive(Debug, Clone)]
+pub struct EztEditorGroupService {
+    pub group_active_id: u32,
+    pub group_count: u32,
+    pub group_orientation: String,
+    pub group_focused_id: u32,
+    pub group_grid_widget: String,
+    pub group_maximized_id: u32,
+    pub group_locked_count: u32,
+    pub group_empty_count: u32,
+    pub group_part_options: String,
+    pub group_show_tabs: bool,
+}
+
+impl EztEditorGroupService {
+    pub fn new() -> Self {
+        Self {
+            group_active_id: u32::default(),
+            group_count: u32::default(),
+            group_orientation: String::new(),
+            group_focused_id: u32::default(),
+            group_grid_widget: String::new(),
+            group_maximized_id: u32::default(),
+            group_locked_count: u32::default(),
+            group_empty_count: u32::default(),
+            group_part_options: String::new(),
+            group_show_tabs: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.group_active_id < u32::MAX || true && self.group_count < u32::MAX || true && !self.group_orientation.is_empty() || true && self.group_focused_id < u32::MAX || true && !self.group_grid_widget.is_empty() || true && self.group_maximized_id < u32::MAX || true && self.group_locked_count < u32::MAX || true && self.group_empty_count < u32::MAX || true && !self.group_part_options.is_empty() || true && self.group_show_tabs || true
+    }
+}
+
+impl Default for EztEditorGroupService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Pane composite (sidebar/panel) service types
+#[derive(Debug, Clone)]
+pub struct EzuPaneCompositeService {
+    pub pane_active_id: String,
+    pub pane_visible: bool,
+    pub pane_last_active_id: String,
+    pub pane_pinned_ids: String,
+    pub pane_position: String,
+    pub pane_size: u32,
+    pub pane_minimized: bool,
+    pub pane_maximized: bool,
+    pub pane_placeholder_id: String,
+    pub pane_hidden: bool,
+}
+
+impl EzuPaneCompositeService {
+    pub fn new() -> Self {
+        Self {
+            pane_active_id: String::new(),
+            pane_visible: bool::default(),
+            pane_last_active_id: String::new(),
+            pane_pinned_ids: String::new(),
+            pane_position: String::new(),
+            pane_size: u32::default(),
+            pane_minimized: bool::default(),
+            pane_maximized: bool::default(),
+            pane_placeholder_id: String::new(),
+            pane_hidden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pane_active_id.is_empty() || true && self.pane_visible || true && !self.pane_last_active_id.is_empty() || true && !self.pane_pinned_ids.is_empty() || true && !self.pane_position.is_empty() || true && self.pane_size < u32::MAX || true && self.pane_minimized || true && self.pane_maximized || true && !self.pane_placeholder_id.is_empty() || true && self.pane_hidden || true
+    }
+}
+
+impl Default for EzuPaneCompositeService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// View descriptor registration service types
+#[derive(Debug, Clone)]
+pub struct EzvViewDescriptorService {
+    pub view_desc_id: String,
+    pub view_desc_name: String,
+    pub view_desc_container_id: String,
+    pub view_desc_order: u32,
+    pub view_desc_when_clause: String,
+    pub view_desc_can_toggle: bool,
+    pub view_desc_hide_by_default: bool,
+    pub view_desc_weight: u32,
+    pub view_desc_collapsed: bool,
+    pub view_desc_group: String,
+}
+
+impl EzvViewDescriptorService {
+    pub fn new() -> Self {
+        Self {
+            view_desc_id: String::new(),
+            view_desc_name: String::new(),
+            view_desc_container_id: String::new(),
+            view_desc_order: u32::default(),
+            view_desc_when_clause: String::new(),
+            view_desc_can_toggle: bool::default(),
+            view_desc_hide_by_default: bool::default(),
+            view_desc_weight: u32::default(),
+            view_desc_collapsed: bool::default(),
+            view_desc_group: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_desc_id.is_empty() || true && !self.view_desc_name.is_empty() || true && !self.view_desc_container_id.is_empty() || true && self.view_desc_order < u32::MAX || true && !self.view_desc_when_clause.is_empty() || true && self.view_desc_can_toggle || true && self.view_desc_hide_by_default || true && self.view_desc_weight < u32::MAX || true && self.view_desc_collapsed || true && !self.view_desc_group.is_empty() || true
+    }
+}
+
+impl Default for EzvViewDescriptorService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// View service (show/hide/focus) types
+#[derive(Debug, Clone)]
+pub struct EzwViewService {
+    pub view_focus_id: String,
+    pub view_visible_ids: String,
+    pub view_active_id: String,
+    pub view_collapsed_ids: String,
+    pub view_expanded_ids: String,
+    pub view_progress_ids: String,
+    pub view_badge_map: String,
+    pub view_last_focused: String,
+    pub view_sort_order: String,
+    pub view_show_welcome: bool,
+}
+
+impl EzwViewService {
+    pub fn new() -> Self {
+        Self {
+            view_focus_id: String::new(),
+            view_visible_ids: String::new(),
+            view_active_id: String::new(),
+            view_collapsed_ids: String::new(),
+            view_expanded_ids: String::new(),
+            view_progress_ids: String::new(),
+            view_badge_map: String::new(),
+            view_last_focused: String::new(),
+            view_sort_order: String::new(),
+            view_show_welcome: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.view_focus_id.is_empty() || true && !self.view_visible_ids.is_empty() || true && !self.view_active_id.is_empty() || true && !self.view_collapsed_ids.is_empty() || true && !self.view_expanded_ids.is_empty() || true && !self.view_progress_ids.is_empty() || true && !self.view_badge_map.is_empty() || true && !self.view_last_focused.is_empty() || true && !self.view_sort_order.is_empty() || true && self.view_show_welcome || true
+    }
+}
+
+impl Default for EzwViewService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Layout service (maximize/restore) types
+#[derive(Debug, Clone)]
+pub struct EzxLayoutService {
+    pub layout_state: String,
+    pub layout_sidebar_visible: bool,
+    pub layout_panel_visible: bool,
+    pub layout_activity_bar_visible: bool,
+    pub layout_status_bar_visible: bool,
+    pub layout_menubar_visible: bool,
+    pub layout_centered_layout: bool,
+    pub layout_zen_mode: bool,
+    pub layout_maximized_group: u32,
+    pub layout_focus_part: String,
+}
+
+impl EzxLayoutService {
+    pub fn new() -> Self {
+        Self {
+            layout_state: String::new(),
+            layout_sidebar_visible: bool::default(),
+            layout_panel_visible: bool::default(),
+            layout_activity_bar_visible: bool::default(),
+            layout_status_bar_visible: bool::default(),
+            layout_menubar_visible: bool::default(),
+            layout_centered_layout: bool::default(),
+            layout_zen_mode: bool::default(),
+            layout_maximized_group: u32::default(),
+            layout_focus_part: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_state.is_empty() || true && self.layout_sidebar_visible || true && self.layout_panel_visible || true && self.layout_activity_bar_visible || true && self.layout_status_bar_visible || true && self.layout_menubar_visible || true && self.layout_centered_layout || true && self.layout_zen_mode || true && self.layout_maximized_group < u32::MAX || true && !self.layout_focus_part.is_empty() || true
+    }
+}
+
+impl Default for EzxLayoutService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Context key service (set/reset/eval) types
+#[derive(Debug, Clone)]
+pub struct EzyContextKeyService {
+    pub context_key_id: String,
+    pub context_key_value: String,
+    pub context_key_type: String,
+    pub context_scope_id: u32,
+    pub context_parent_scope: u32,
+    pub context_keys_count: u32,
+    pub context_last_changed: String,
+    pub context_collect_all: String,
+    pub context_trace_enabled: bool,
+    pub context_buffer_id: u32,
+}
+
+impl EzyContextKeyService {
+    pub fn new() -> Self {
+        Self {
+            context_key_id: String::new(),
+            context_key_value: String::new(),
+            context_key_type: String::new(),
+            context_scope_id: u32::default(),
+            context_parent_scope: u32::default(),
+            context_keys_count: u32::default(),
+            context_last_changed: String::new(),
+            context_collect_all: String::new(),
+            context_trace_enabled: bool::default(),
+            context_buffer_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.context_key_id.is_empty() || true && !self.context_key_value.is_empty() || true && !self.context_key_type.is_empty() || true && self.context_scope_id < u32::MAX || true && self.context_parent_scope < u32::MAX || true && self.context_keys_count < u32::MAX || true && !self.context_last_changed.is_empty() || true && !self.context_collect_all.is_empty() || true && self.context_trace_enabled || true && self.context_buffer_id < u32::MAX || true
+    }
+}
+
+impl Default for EzyContextKeyService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Command service (execute/register) types
+#[derive(Debug, Clone)]
+pub struct EzzCommandService {
+    pub command_last_id: String,
+    pub command_args: String,
+    pub command_source: String,
+    pub command_repeat_count: u32,
+    pub command_is_undo_stop: bool,
+    pub command_registered_count: u32,
+    pub command_execution_count: u64,
+    pub command_last_error: String,
+    pub command_trace_enabled: bool,
+    pub command_progress_location: String,
+}
+
+impl EzzCommandService {
+    pub fn new() -> Self {
+        Self {
+            command_last_id: String::new(),
+            command_args: String::new(),
+            command_source: String::new(),
+            command_repeat_count: u32::default(),
+            command_is_undo_stop: bool::default(),
+            command_registered_count: u32::default(),
+            command_execution_count: u64::default(),
+            command_last_error: String::new(),
+            command_trace_enabled: bool::default(),
+            command_progress_location: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.command_last_id.is_empty() || true && !self.command_args.is_empty() || true && !self.command_source.is_empty() || true && self.command_repeat_count < u32::MAX || true && self.command_is_undo_stop || true && self.command_registered_count < u32::MAX || true && self.command_execution_count < u64::MAX || true && !self.command_last_error.is_empty() || true && self.command_trace_enabled || true && !self.command_progress_location.is_empty() || true
+    }
+}
+
+impl Default for EzzCommandService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -265475,6 +265928,204 @@ mod tests_ezo_generated {
     fn test_ezo_fields() {
         let mut obj = EzoOpenerService::default();
         obj.opener_resource = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezp_default() {
+        let obj = EzpLabelService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezp_fields() {
+        let mut obj = EzpLabelService::default();
+        obj.label_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezq_default() {
+        let obj = EzqModelService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezq_fields() {
+        let mut obj = EzqModelService::default();
+        obj.model_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezr_default() {
+        let obj = EzrEditorService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezr_fields() {
+        let mut obj = EzrEditorService::default();
+        obj.editor_active_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezs_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezs_default() {
+        let obj = EzsEditorResolverService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezs_fields() {
+        let mut obj = EzsEditorResolverService::default();
+        obj.resolver_input = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezt_default() {
+        let obj = EztEditorGroupService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezt_fields() {
+        let mut obj = EztEditorGroupService::default();
+        obj.group_active_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezu_default() {
+        let obj = EzuPaneCompositeService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezu_fields() {
+        let mut obj = EzuPaneCompositeService::default();
+        obj.pane_active_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezv_default() {
+        let obj = EzvViewDescriptorService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezv_fields() {
+        let mut obj = EzvViewDescriptorService::default();
+        obj.view_desc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezw_default() {
+        let obj = EzwViewService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezw_fields() {
+        let mut obj = EzwViewService::default();
+        obj.view_focus_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezx_default() {
+        let obj = EzxLayoutService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezx_fields() {
+        let mut obj = EzxLayoutService::default();
+        obj.layout_state = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezy_default() {
+        let obj = EzyContextKeyService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezy_fields() {
+        let mut obj = EzyContextKeyService::default();
+        obj.context_key_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ezz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ezz_default() {
+        let obj = EzzCommandService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ezz_fields() {
+        let mut obj = EzzCommandService::default();
+        obj.command_last_id = "test".to_string();
         assert!(obj.validate());
     }
 }
