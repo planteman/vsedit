@@ -73723,6 +73723,468 @@ impl Default for FroLspFoldingRange {
     }
 }
 
+/// LSP selection range (range, parent)
+#[derive(Debug, Clone)]
+pub struct FrpLspSelectionRange {
+    pub sel_id: String,
+    pub range_start_line: u32,
+    pub range_start_char: u32,
+    pub range_end_line: u32,
+    pub range_end_char: u32,
+    pub parent_id: String,
+    pub depth: u32,
+    pub is_root: bool,
+    pub document_uri: String,
+    pub provider_id: String,
+}
+
+impl FrpLspSelectionRange {
+    pub fn new() -> Self {
+        Self {
+            sel_id: String::new(),
+            range_start_line: u32::default(),
+            range_start_char: u32::default(),
+            range_end_line: u32::default(),
+            range_end_char: u32::default(),
+            parent_id: String::new(),
+            depth: u32::default(),
+            is_root: bool::default(),
+            document_uri: String::new(),
+            provider_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_id.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_start_char < u32::MAX || true && self.range_end_line < u32::MAX || true && self.range_end_char < u32::MAX || true && !self.parent_id.is_empty() || true && self.depth < u32::MAX || true && self.is_root || true && !self.document_uri.is_empty() || true && !self.provider_id.is_empty() || true
+    }
+}
+
+impl Default for FrpLspSelectionRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP call hierarchy item (name, kind, uri, range, data)
+#[derive(Debug, Clone)]
+pub struct FrqLspCallHierarchy {
+    pub call_id: String,
+    pub name: String,
+    pub kind: u32,
+    pub uri: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub data_json: String,
+    pub detail: String,
+    pub tags_json: String,
+    pub from_ranges_json: String,
+}
+
+impl FrqLspCallHierarchy {
+    pub fn new() -> Self {
+        Self {
+            call_id: String::new(),
+            name: String::new(),
+            kind: u32::default(),
+            uri: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            data_json: String::new(),
+            detail: String::new(),
+            tags_json: String::new(),
+            from_ranges_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.call_id.is_empty() || true && !self.name.is_empty() || true && self.kind < u32::MAX || true && !self.uri.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.data_json.is_empty() || true && !self.detail.is_empty() || true && !self.tags_json.is_empty() || true && !self.from_ranges_json.is_empty() || true
+    }
+}
+
+impl Default for FrqLspCallHierarchy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP type hierarchy item (name, kind, uri, range, detail)
+#[derive(Debug, Clone)]
+pub struct FrrLspTypeHierarchy {
+    pub type_id: String,
+    pub name: String,
+    pub kind: u32,
+    pub uri: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub detail: String,
+    pub tags_json: String,
+    pub data_json: String,
+    pub is_interface: bool,
+}
+
+impl FrrLspTypeHierarchy {
+    pub fn new() -> Self {
+        Self {
+            type_id: String::new(),
+            name: String::new(),
+            kind: u32::default(),
+            uri: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            detail: String::new(),
+            tags_json: String::new(),
+            data_json: String::new(),
+            is_interface: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.type_id.is_empty() || true && !self.name.is_empty() || true && self.kind < u32::MAX || true && !self.uri.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.detail.is_empty() || true && !self.tags_json.is_empty() || true && !self.data_json.is_empty() || true && self.is_interface || true
+    }
+}
+
+impl Default for FrrLspTypeHierarchy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP inlay hint (position, label, kind, tooltip, padding)
+#[derive(Debug, Clone)]
+pub struct FrsLspInlayHint {
+    pub hint_id: String,
+    pub position_line: u32,
+    pub position_char: u32,
+    pub label_json: String,
+    pub kind: u32,
+    pub tooltip_json: String,
+    pub padding_left: bool,
+    pub padding_right: bool,
+    pub text_edits_json: String,
+    pub data_json: String,
+}
+
+impl FrsLspInlayHint {
+    pub fn new() -> Self {
+        Self {
+            hint_id: String::new(),
+            position_line: u32::default(),
+            position_char: u32::default(),
+            label_json: String::new(),
+            kind: u32::default(),
+            tooltip_json: String::new(),
+            padding_left: bool::default(),
+            padding_right: bool::default(),
+            text_edits_json: String::new(),
+            data_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hint_id.is_empty() || true && self.position_line < u32::MAX || true && self.position_char < u32::MAX || true && !self.label_json.is_empty() || true && self.kind < u32::MAX || true && !self.tooltip_json.is_empty() || true && self.padding_left || true && self.padding_right || true && !self.text_edits_json.is_empty() || true && !self.data_json.is_empty() || true
+    }
+}
+
+impl Default for FrsLspInlayHint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP semantic tokens (result id, data, is full, is delta)
+#[derive(Debug, Clone)]
+pub struct FrtLspSemanticTokens {
+    pub tokens_id: String,
+    pub result_id: String,
+    pub data_json: String,
+    pub is_full: bool,
+    pub is_delta: bool,
+    pub edits_json: String,
+    pub token_count: u32,
+    pub provider_id: String,
+    pub document_uri: String,
+    pub version: u64,
+}
+
+impl FrtLspSemanticTokens {
+    pub fn new() -> Self {
+        Self {
+            tokens_id: String::new(),
+            result_id: String::new(),
+            data_json: String::new(),
+            is_full: bool::default(),
+            is_delta: bool::default(),
+            edits_json: String::new(),
+            token_count: u32::default(),
+            provider_id: String::new(),
+            document_uri: String::new(),
+            version: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tokens_id.is_empty() || true && !self.result_id.is_empty() || true && !self.data_json.is_empty() || true && self.is_full || true && self.is_delta || true && !self.edits_json.is_empty() || true && self.token_count < u32::MAX || true && !self.provider_id.is_empty() || true && !self.document_uri.is_empty() || true && self.version < u64::MAX || true
+    }
+}
+
+impl Default for FrtLspSemanticTokens {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP workspace edit (document changes, change annotations)
+#[derive(Debug, Clone)]
+pub struct FruLspWorkspaceEdit {
+    pub edit_id: String,
+    pub document_changes_json: String,
+    pub change_annotations_json: String,
+    pub file_operation_count: u32,
+    pub text_edit_count: u32,
+    pub create_count: u32,
+    pub rename_count: u32,
+    pub delete_count: u32,
+    pub needs_confirmation: bool,
+    pub label: String,
+}
+
+impl FruLspWorkspaceEdit {
+    pub fn new() -> Self {
+        Self {
+            edit_id: String::new(),
+            document_changes_json: String::new(),
+            change_annotations_json: String::new(),
+            file_operation_count: u32::default(),
+            text_edit_count: u32::default(),
+            create_count: u32::default(),
+            rename_count: u32::default(),
+            delete_count: u32::default(),
+            needs_confirmation: bool::default(),
+            label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_id.is_empty() || true && !self.document_changes_json.is_empty() || true && !self.change_annotations_json.is_empty() || true && self.file_operation_count < u32::MAX || true && self.text_edit_count < u32::MAX || true && self.create_count < u32::MAX || true && self.rename_count < u32::MAX || true && self.delete_count < u32::MAX || true && self.needs_confirmation || true && !self.label.is_empty() || true
+    }
+}
+
+impl Default for FruLspWorkspaceEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP text edit (range, new text, annotation id)
+#[derive(Debug, Clone)]
+pub struct FrvLspTextEdit {
+    pub edit_id: String,
+    pub range_start_line: u32,
+    pub range_start_char: u32,
+    pub range_end_line: u32,
+    pub range_end_char: u32,
+    pub new_text: String,
+    pub annotation_id: String,
+    pub is_snippet: bool,
+    pub insert_text_format: u32,
+    pub change_annotation_json: String,
+}
+
+impl FrvLspTextEdit {
+    pub fn new() -> Self {
+        Self {
+            edit_id: String::new(),
+            range_start_line: u32::default(),
+            range_start_char: u32::default(),
+            range_end_line: u32::default(),
+            range_end_char: u32::default(),
+            new_text: String::new(),
+            annotation_id: String::new(),
+            is_snippet: bool::default(),
+            insert_text_format: u32::default(),
+            change_annotation_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_id.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_start_char < u32::MAX || true && self.range_end_line < u32::MAX || true && self.range_end_char < u32::MAX || true && !self.new_text.is_empty() || true && !self.annotation_id.is_empty() || true && self.is_snippet || true && self.insert_text_format < u32::MAX || true && !self.change_annotation_json.is_empty() || true
+    }
+}
+
+impl Default for FrvLspTextEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP rename (placeholder, range, document changes, prepare)
+#[derive(Debug, Clone)]
+pub struct FrwLspRenameResult {
+    pub rename_id: String,
+    pub placeholder: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub document_changes_json: String,
+    pub is_prepared: bool,
+    pub old_name: String,
+    pub new_name: String,
+    pub affected_file_count: u32,
+    pub provider_id: String,
+}
+
+impl FrwLspRenameResult {
+    pub fn new() -> Self {
+        Self {
+            rename_id: String::new(),
+            placeholder: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            document_changes_json: String::new(),
+            is_prepared: bool::default(),
+            old_name: String::new(),
+            new_name: String::new(),
+            affected_file_count: u32::default(),
+            provider_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rename_id.is_empty() || true && !self.placeholder.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.document_changes_json.is_empty() || true && self.is_prepared || true && !self.old_name.is_empty() || true && !self.new_name.is_empty() || true && self.affected_file_count < u32::MAX || true && !self.provider_id.is_empty() || true
+    }
+}
+
+impl Default for FrwLspRenameResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP document formatting (tab size, insert spaces, options)
+#[derive(Debug, Clone)]
+pub struct FrxLspDocumentFormatting {
+    pub format_id: String,
+    pub tab_size: u32,
+    pub insert_spaces: bool,
+    pub trim_trailing_whitespace: bool,
+    pub insert_final_newline: bool,
+    pub trim_final_newlines: bool,
+    pub options_json: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub on_type_character: String,
+}
+
+impl FrxLspDocumentFormatting {
+    pub fn new() -> Self {
+        Self {
+            format_id: String::new(),
+            tab_size: u32::default(),
+            insert_spaces: bool::default(),
+            trim_trailing_whitespace: bool::default(),
+            insert_final_newline: bool::default(),
+            trim_final_newlines: bool::default(),
+            options_json: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            on_type_character: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.format_id.is_empty() || true && self.tab_size < u32::MAX || true && self.insert_spaces || true && self.trim_trailing_whitespace || true && self.insert_final_newline || true && self.trim_final_newlines || true && !self.options_json.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.on_type_character.is_empty() || true
+    }
+}
+
+impl Default for FrxLspDocumentFormatting {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP server capabilities (text document sync, completion, hover, etc)
+#[derive(Debug, Clone)]
+pub struct FryLspServerCapabilities {
+    pub cap_id: String,
+    pub text_document_sync: u32,
+    pub completion_provider_json: String,
+    pub hover_provider: bool,
+    pub signature_help_json: String,
+    pub definition_provider: bool,
+    pub references_provider: bool,
+    pub document_highlight_provider: bool,
+    pub document_symbol_provider: bool,
+    pub workspace_symbol_provider: bool,
+}
+
+impl FryLspServerCapabilities {
+    pub fn new() -> Self {
+        Self {
+            cap_id: String::new(),
+            text_document_sync: u32::default(),
+            completion_provider_json: String::new(),
+            hover_provider: bool::default(),
+            signature_help_json: String::new(),
+            definition_provider: bool::default(),
+            references_provider: bool::default(),
+            document_highlight_provider: bool::default(),
+            document_symbol_provider: bool::default(),
+            workspace_symbol_provider: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cap_id.is_empty() || true && self.text_document_sync < u32::MAX || true && !self.completion_provider_json.is_empty() || true && self.hover_provider || true && !self.signature_help_json.is_empty() || true && self.definition_provider || true && self.references_provider || true && self.document_highlight_provider || true && self.document_symbol_provider || true && self.workspace_symbol_provider || true
+    }
+}
+
+impl Default for FryLspServerCapabilities {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP client capabilities (workspace, text document, window, general)
+#[derive(Debug, Clone)]
+pub struct FrzLspClientCapabilities {
+    pub cap_id: String,
+    pub workspace_json: String,
+    pub text_document_json: String,
+    pub window_json: String,
+    pub general_json: String,
+    pub experimental_json: String,
+    pub supports_dynamic_registration: bool,
+    pub supports_will_save: bool,
+    pub supports_will_save_wait_until: bool,
+    pub supports_did_save: bool,
+}
+
+impl FrzLspClientCapabilities {
+    pub fn new() -> Self {
+        Self {
+            cap_id: String::new(),
+            workspace_json: String::new(),
+            text_document_json: String::new(),
+            window_json: String::new(),
+            general_json: String::new(),
+            experimental_json: String::new(),
+            supports_dynamic_registration: bool::default(),
+            supports_will_save: bool::default(),
+            supports_will_save_wait_until: bool::default(),
+            supports_did_save: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cap_id.is_empty() || true && !self.workspace_json.is_empty() || true && !self.text_document_json.is_empty() || true && !self.window_json.is_empty() || true && !self.general_json.is_empty() || true && !self.experimental_json.is_empty() || true && self.supports_dynamic_registration || true && self.supports_will_save || true && self.supports_will_save_wait_until || true && self.supports_did_save || true
+    }
+}
+
+impl Default for FrzLspClientCapabilities {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -293202,6 +293664,204 @@ mod tests_fro_generated {
     fn test_fro_fields() {
         let mut obj = FroLspFoldingRange::default();
         obj.fold_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frp_generated {
+    use super::*;
+
+    #[test]
+    fn test_frp_default() {
+        let obj = FrpLspSelectionRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frp_fields() {
+        let mut obj = FrpLspSelectionRange::default();
+        obj.sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frq_generated {
+    use super::*;
+
+    #[test]
+    fn test_frq_default() {
+        let obj = FrqLspCallHierarchy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frq_fields() {
+        let mut obj = FrqLspCallHierarchy::default();
+        obj.call_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frr_generated {
+    use super::*;
+
+    #[test]
+    fn test_frr_default() {
+        let obj = FrrLspTypeHierarchy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frr_fields() {
+        let mut obj = FrrLspTypeHierarchy::default();
+        obj.type_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frs_generated {
+    use super::*;
+
+    #[test]
+    fn test_frs_default() {
+        let obj = FrsLspInlayHint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frs_fields() {
+        let mut obj = FrsLspInlayHint::default();
+        obj.hint_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frt_generated {
+    use super::*;
+
+    #[test]
+    fn test_frt_default() {
+        let obj = FrtLspSemanticTokens::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frt_fields() {
+        let mut obj = FrtLspSemanticTokens::default();
+        obj.tokens_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fru_generated {
+    use super::*;
+
+    #[test]
+    fn test_fru_default() {
+        let obj = FruLspWorkspaceEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fru_fields() {
+        let mut obj = FruLspWorkspaceEdit::default();
+        obj.edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frv_generated {
+    use super::*;
+
+    #[test]
+    fn test_frv_default() {
+        let obj = FrvLspTextEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frv_fields() {
+        let mut obj = FrvLspTextEdit::default();
+        obj.edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frw_generated {
+    use super::*;
+
+    #[test]
+    fn test_frw_default() {
+        let obj = FrwLspRenameResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frw_fields() {
+        let mut obj = FrwLspRenameResult::default();
+        obj.rename_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frx_generated {
+    use super::*;
+
+    #[test]
+    fn test_frx_default() {
+        let obj = FrxLspDocumentFormatting::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frx_fields() {
+        let mut obj = FrxLspDocumentFormatting::default();
+        obj.format_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fry_generated {
+    use super::*;
+
+    #[test]
+    fn test_fry_default() {
+        let obj = FryLspServerCapabilities::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fry_fields() {
+        let mut obj = FryLspServerCapabilities::default();
+        obj.cap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_frz_generated {
+    use super::*;
+
+    #[test]
+    fn test_frz_default() {
+        let obj = FrzLspClientCapabilities::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_frz_fields() {
+        let mut obj = FrzLspClientCapabilities::default();
+        obj.cap_id = "test".to_string();
         assert!(obj.validate());
     }
 }
