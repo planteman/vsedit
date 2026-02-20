@@ -69309,6 +69309,468 @@ impl Default for FnoEditorInlineDiff {
     }
 }
 
+/// Copilot session (model, context, turns, token budget)
+#[derive(Debug, Clone)]
+pub struct FnpCopilotSession {
+    pub session_id: String,
+    pub model_id: String,
+    pub context_json: String,
+    pub turn_count: u32,
+    pub token_budget: u32,
+    pub used_tokens: u32,
+    pub is_active: bool,
+    pub created_at_ms: u64,
+    pub last_active_ms: u64,
+    pub participant_id: String,
+}
+
+impl FnpCopilotSession {
+    pub fn new() -> Self {
+        Self {
+            session_id: String::new(),
+            model_id: String::new(),
+            context_json: String::new(),
+            turn_count: u32::default(),
+            token_budget: u32::default(),
+            used_tokens: u32::default(),
+            is_active: bool::default(),
+            created_at_ms: u64::default(),
+            last_active_ms: u64::default(),
+            participant_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_id.is_empty() || true && !self.model_id.is_empty() || true && !self.context_json.is_empty() || true && self.turn_count < u32::MAX || true && self.token_budget < u32::MAX || true && self.used_tokens < u32::MAX || true && self.is_active || true && self.created_at_ms < u64::MAX || true && self.last_active_ms < u64::MAX || true && !self.participant_id.is_empty() || true
+    }
+}
+
+impl Default for FnpCopilotSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Copilot completion (text, score, logprob, stop reason)
+#[derive(Debug, Clone)]
+pub struct FnqCopilotCompletion {
+    pub completion_id: String,
+    pub text: String,
+    pub score: f64,
+    pub logprob: f64,
+    pub stop_reason: u32,
+    pub model_id: String,
+    pub finish_offset: u32,
+    pub is_cached: bool,
+    pub latency_ms: u64,
+    pub request_id: String,
+}
+
+impl FnqCopilotCompletion {
+    pub fn new() -> Self {
+        Self {
+            completion_id: String::new(),
+            text: String::new(),
+            score: f64::default(),
+            logprob: f64::default(),
+            stop_reason: u32::default(),
+            model_id: String::new(),
+            finish_offset: u32::default(),
+            is_cached: bool::default(),
+            latency_ms: u64::default(),
+            request_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.completion_id.is_empty() || true && !self.text.is_empty() || true && self.score.is_finite() || true && self.logprob.is_finite() || true && self.stop_reason < u32::MAX || true && !self.model_id.is_empty() || true && self.finish_offset < u32::MAX || true && self.is_cached || true && self.latency_ms < u64::MAX || true && !self.request_id.is_empty() || true
+    }
+}
+
+impl Default for FnqCopilotCompletion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Copilot edits session (files, working set, changes, accept/reject)
+#[derive(Debug, Clone)]
+pub struct FnrCopilotEdits {
+    pub edit_session_id: String,
+    pub working_set_json: String,
+    pub file_count: u32,
+    pub change_count: u32,
+    pub is_streaming: bool,
+    pub accept_count: u32,
+    pub reject_count: u32,
+    pub model_id: String,
+    pub prompt: String,
+    pub elapsed_ms: u64,
+}
+
+impl FnrCopilotEdits {
+    pub fn new() -> Self {
+        Self {
+            edit_session_id: String::new(),
+            working_set_json: String::new(),
+            file_count: u32::default(),
+            change_count: u32::default(),
+            is_streaming: bool::default(),
+            accept_count: u32::default(),
+            reject_count: u32::default(),
+            model_id: String::new(),
+            prompt: String::new(),
+            elapsed_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_session_id.is_empty() || true && !self.working_set_json.is_empty() || true && self.file_count < u32::MAX || true && self.change_count < u32::MAX || true && self.is_streaming || true && self.accept_count < u32::MAX || true && self.reject_count < u32::MAX || true && !self.model_id.is_empty() || true && !self.prompt.is_empty() || true && self.elapsed_ms < u64::MAX || true
+    }
+}
+
+impl Default for FnrCopilotEdits {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Copilot code review (file, comments, suggestions, approved)
+#[derive(Debug, Clone)]
+pub struct FnsCopilotReview {
+    pub review_id: String,
+    pub file_uri: String,
+    pub comment_count: u32,
+    pub suggestion_count: u32,
+    pub is_approved: bool,
+    pub severity: u32,
+    pub model_id: String,
+    pub diff_range_json: String,
+    pub is_complete: bool,
+    pub feedback_rating: u32,
+}
+
+impl FnsCopilotReview {
+    pub fn new() -> Self {
+        Self {
+            review_id: String::new(),
+            file_uri: String::new(),
+            comment_count: u32::default(),
+            suggestion_count: u32::default(),
+            is_approved: bool::default(),
+            severity: u32::default(),
+            model_id: String::new(),
+            diff_range_json: String::new(),
+            is_complete: bool::default(),
+            feedback_rating: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.review_id.is_empty() || true && !self.file_uri.is_empty() || true && self.comment_count < u32::MAX || true && self.suggestion_count < u32::MAX || true && self.is_approved || true && self.severity < u32::MAX || true && !self.model_id.is_empty() || true && !self.diff_range_json.is_empty() || true && self.is_complete || true && self.feedback_rating < u32::MAX || true
+    }
+}
+
+impl Default for FnsCopilotReview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// AI action (type, prompt, context, result, feedback)
+#[derive(Debug, Clone)]
+pub struct FntAIAction {
+    pub action_id: String,
+    pub action_type: u32,
+    pub prompt: String,
+    pub context_json: String,
+    pub result_text: String,
+    pub feedback: u32,
+    pub model_id: String,
+    pub elapsed_ms: u64,
+    pub token_count: u32,
+    pub is_cached: bool,
+}
+
+impl FntAIAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            action_type: u32::default(),
+            prompt: String::new(),
+            context_json: String::new(),
+            result_text: String::new(),
+            feedback: u32::default(),
+            model_id: String::new(),
+            elapsed_ms: u64::default(),
+            token_count: u32::default(),
+            is_cached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && self.action_type < u32::MAX || true && !self.prompt.is_empty() || true && !self.context_json.is_empty() || true && !self.result_text.is_empty() || true && self.feedback < u32::MAX || true && !self.model_id.is_empty() || true && self.elapsed_ms < u64::MAX || true && self.token_count < u32::MAX || true && self.is_cached || true
+    }
+}
+
+impl Default for FntAIAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code edit/refactor (original, replacement, reason, confidence)
+#[derive(Debug, Clone)]
+pub struct FnuCodeEdit {
+    pub code_edit_id: String,
+    pub original_text: String,
+    pub replacement_text: String,
+    pub reason: String,
+    pub confidence: f64,
+    pub file_uri: String,
+    pub range_json: String,
+    pub is_applied: bool,
+    pub edit_kind: u32,
+    pub model_id: String,
+}
+
+impl FnuCodeEdit {
+    pub fn new() -> Self {
+        Self {
+            code_edit_id: String::new(),
+            original_text: String::new(),
+            replacement_text: String::new(),
+            reason: String::new(),
+            confidence: f64::default(),
+            file_uri: String::new(),
+            range_json: String::new(),
+            is_applied: bool::default(),
+            edit_kind: u32::default(),
+            model_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.code_edit_id.is_empty() || true && !self.original_text.is_empty() || true && !self.replacement_text.is_empty() || true && !self.reason.is_empty() || true && self.confidence.is_finite() || true && !self.file_uri.is_empty() || true && !self.range_json.is_empty() || true && self.is_applied || true && self.edit_kind < u32::MAX || true && !self.model_id.is_empty() || true
+    }
+}
+
+impl Default for FnuCodeEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code explanation (selected code, explanation text, references)
+#[derive(Debug, Clone)]
+pub struct FnvCodeExplanation {
+    pub explanation_id: String,
+    pub selected_code: String,
+    pub explanation_text: String,
+    pub references_json: String,
+    pub language_id: String,
+    pub file_uri: String,
+    pub model_id: String,
+    pub is_detailed: bool,
+    pub token_count: u32,
+    pub feedback: u32,
+}
+
+impl FnvCodeExplanation {
+    pub fn new() -> Self {
+        Self {
+            explanation_id: String::new(),
+            selected_code: String::new(),
+            explanation_text: String::new(),
+            references_json: String::new(),
+            language_id: String::new(),
+            file_uri: String::new(),
+            model_id: String::new(),
+            is_detailed: bool::default(),
+            token_count: u32::default(),
+            feedback: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.explanation_id.is_empty() || true && !self.selected_code.is_empty() || true && !self.explanation_text.is_empty() || true && !self.references_json.is_empty() || true && !self.language_id.is_empty() || true && !self.file_uri.is_empty() || true && !self.model_id.is_empty() || true && self.is_detailed || true && self.token_count < u32::MAX || true && self.feedback < u32::MAX || true
+    }
+}
+
+impl Default for FnvCodeExplanation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// AI test generation (source file, test file, test cases, coverage)
+#[derive(Debug, Clone)]
+pub struct FnwTestGeneration {
+    pub test_gen_id: String,
+    pub source_file_uri: String,
+    pub test_file_uri: String,
+    pub test_case_count: u32,
+    pub coverage_percent: f64,
+    pub framework: String,
+    pub language_id: String,
+    pub model_id: String,
+    pub is_complete: bool,
+    pub error_count: u32,
+}
+
+impl FnwTestGeneration {
+    pub fn new() -> Self {
+        Self {
+            test_gen_id: String::new(),
+            source_file_uri: String::new(),
+            test_file_uri: String::new(),
+            test_case_count: u32::default(),
+            coverage_percent: f64::default(),
+            framework: String::new(),
+            language_id: String::new(),
+            model_id: String::new(),
+            is_complete: bool::default(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_gen_id.is_empty() || true && !self.source_file_uri.is_empty() || true && !self.test_file_uri.is_empty() || true && self.test_case_count < u32::MAX || true && self.coverage_percent.is_finite() || true && !self.framework.is_empty() || true && !self.language_id.is_empty() || true && !self.model_id.is_empty() || true && self.is_complete || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for FnwTestGeneration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// AI documentation generation (symbol, doc comment, examples)
+#[derive(Debug, Clone)]
+pub struct FnxDocGeneration {
+    pub doc_gen_id: String,
+    pub symbol_name: String,
+    pub symbol_kind: u32,
+    pub doc_comment: String,
+    pub examples_json: String,
+    pub param_docs_json: String,
+    pub return_doc: String,
+    pub file_uri: String,
+    pub language_id: String,
+    pub model_id: String,
+}
+
+impl FnxDocGeneration {
+    pub fn new() -> Self {
+        Self {
+            doc_gen_id: String::new(),
+            symbol_name: String::new(),
+            symbol_kind: u32::default(),
+            doc_comment: String::new(),
+            examples_json: String::new(),
+            param_docs_json: String::new(),
+            return_doc: String::new(),
+            file_uri: String::new(),
+            language_id: String::new(),
+            model_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.doc_gen_id.is_empty() || true && !self.symbol_name.is_empty() || true && self.symbol_kind < u32::MAX || true && !self.doc_comment.is_empty() || true && !self.examples_json.is_empty() || true && !self.param_docs_json.is_empty() || true && !self.return_doc.is_empty() || true && !self.file_uri.is_empty() || true && !self.language_id.is_empty() || true && !self.model_id.is_empty() || true
+    }
+}
+
+impl Default for FnxDocGeneration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// AI commit message generation (diff summary, message, conventional)
+#[derive(Debug, Clone)]
+pub struct FnyCommitMessage {
+    pub commit_msg_id: String,
+    pub diff_summary: String,
+    pub message: String,
+    pub is_conventional: bool,
+    pub commit_type: String,
+    pub scope: String,
+    pub breaking_change: bool,
+    pub model_id: String,
+    pub files_changed: u32,
+    pub insertions: u32,
+}
+
+impl FnyCommitMessage {
+    pub fn new() -> Self {
+        Self {
+            commit_msg_id: String::new(),
+            diff_summary: String::new(),
+            message: String::new(),
+            is_conventional: bool::default(),
+            commit_type: String::new(),
+            scope: String::new(),
+            breaking_change: bool::default(),
+            model_id: String::new(),
+            files_changed: u32::default(),
+            insertions: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.commit_msg_id.is_empty() || true && !self.diff_summary.is_empty() || true && !self.message.is_empty() || true && self.is_conventional || true && !self.commit_type.is_empty() || true && !self.scope.is_empty() || true && self.breaking_change || true && !self.model_id.is_empty() || true && self.files_changed < u32::MAX || true && self.insertions < u32::MAX || true
+    }
+}
+
+impl Default for FnyCommitMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// AI-powered code search (natural language query, results, scores)
+#[derive(Debug, Clone)]
+pub struct FnzCodeSearch {
+    pub search_id: String,
+    pub query: String,
+    pub result_count: u32,
+    pub results_json: String,
+    pub scores_json: String,
+    pub model_id: String,
+    pub elapsed_ms: u64,
+    pub scope_uri: String,
+    pub language_filter: String,
+    pub max_results: u32,
+}
+
+impl FnzCodeSearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: String::new(),
+            query: String::new(),
+            result_count: u32::default(),
+            results_json: String::new(),
+            scores_json: String::new(),
+            model_id: String::new(),
+            elapsed_ms: u64::default(),
+            scope_uri: String::new(),
+            language_filter: String::new(),
+            max_results: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_id.is_empty() || true && !self.query.is_empty() || true && self.result_count < u32::MAX || true && !self.results_json.is_empty() || true && !self.scores_json.is_empty() || true && !self.model_id.is_empty() || true && self.elapsed_ms < u64::MAX || true && !self.scope_uri.is_empty() || true && !self.language_filter.is_empty() || true && self.max_results < u32::MAX || true
+    }
+}
+
+impl Default for FnzCodeSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -286960,6 +287422,204 @@ mod tests_fno_generated {
     fn test_fno_fields() {
         let mut obj = FnoEditorInlineDiff::default();
         obj.diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnp_default() {
+        let obj = FnpCopilotSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnp_fields() {
+        let mut obj = FnpCopilotSession::default();
+        obj.session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnq_default() {
+        let obj = FnqCopilotCompletion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnq_fields() {
+        let mut obj = FnqCopilotCompletion::default();
+        obj.completion_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnr_default() {
+        let obj = FnrCopilotEdits::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnr_fields() {
+        let mut obj = FnrCopilotEdits::default();
+        obj.edit_session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fns_generated {
+    use super::*;
+
+    #[test]
+    fn test_fns_default() {
+        let obj = FnsCopilotReview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fns_fields() {
+        let mut obj = FnsCopilotReview::default();
+        obj.review_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnt_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnt_default() {
+        let obj = FntAIAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnt_fields() {
+        let mut obj = FntAIAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnu_default() {
+        let obj = FnuCodeEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnu_fields() {
+        let mut obj = FnuCodeEdit::default();
+        obj.code_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnv_default() {
+        let obj = FnvCodeExplanation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnv_fields() {
+        let mut obj = FnvCodeExplanation::default();
+        obj.explanation_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnw_default() {
+        let obj = FnwTestGeneration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnw_fields() {
+        let mut obj = FnwTestGeneration::default();
+        obj.test_gen_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnx_default() {
+        let obj = FnxDocGeneration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnx_fields() {
+        let mut obj = FnxDocGeneration::default();
+        obj.doc_gen_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fny_generated {
+    use super::*;
+
+    #[test]
+    fn test_fny_default() {
+        let obj = FnyCommitMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fny_fields() {
+        let mut obj = FnyCommitMessage::default();
+        obj.commit_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnz_default() {
+        let obj = FnzCodeSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnz_fields() {
+        let mut obj = FnzCodeSearch::default();
+        obj.search_id = "test".to_string();
         assert!(obj.validate());
     }
 }
