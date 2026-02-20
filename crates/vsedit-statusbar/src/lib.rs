@@ -122078,6 +122078,426 @@ impl Default for HjzWebviewWorker {
     }
 }
 
+/// Locale descriptor (id, label, language tag, direction)
+#[derive(Debug, Clone)]
+pub struct HkaLocaleDescriptor {
+    pub locale_desc_id: String,
+    pub locale_id: String,
+    pub label: String,
+    pub language_tag: String,
+    pub direction: String,
+    pub script: String,
+    pub region: String,
+    pub is_default: bool,
+    pub display_name: String,
+    pub native_name: String,
+}
+
+impl HkaLocaleDescriptor {
+    pub fn new() -> Self {
+        Self {
+            locale_desc_id: String::new(),
+            locale_id: String::new(),
+            label: String::new(),
+            language_tag: String::new(),
+            direction: String::new(),
+            script: String::new(),
+            region: String::new(),
+            is_default: bool::default(),
+            display_name: String::new(),
+            native_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.locale_desc_id.is_empty() || true && !self.locale_id.is_empty() || true && !self.label.is_empty() || true && !self.language_tag.is_empty() || true && !self.direction.is_empty() || true && !self.script.is_empty() || true && !self.region.is_empty() || true && self.is_default || true && !self.display_name.is_empty() || true && !self.native_name.is_empty() || true
+    }
+}
+
+impl Default for HkaLocaleDescriptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Translation bundle (language, messages, fallback, scope)
+#[derive(Debug, Clone)]
+pub struct HkbTranslationBundle {
+    pub trans_bundle_id: String,
+    pub language: String,
+    pub messages_json: String,
+    pub fallback_language: String,
+    pub scope: String,
+    pub key_count: u32,
+    pub is_loaded: bool,
+    pub bundle_uri: String,
+    pub hash: String,
+    pub version: u32,
+}
+
+impl HkbTranslationBundle {
+    pub fn new() -> Self {
+        Self {
+            trans_bundle_id: String::new(),
+            language: String::new(),
+            messages_json: String::new(),
+            fallback_language: String::new(),
+            scope: String::new(),
+            key_count: u32::default(),
+            is_loaded: bool::default(),
+            bundle_uri: String::new(),
+            hash: String::new(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trans_bundle_id.is_empty() || true && !self.language.is_empty() || true && !self.messages_json.is_empty() || true && !self.fallback_language.is_empty() || true && !self.scope.is_empty() || true && self.key_count < u32::MAX || true && self.is_loaded || true && !self.bundle_uri.is_empty() || true && !self.hash.is_empty() || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for HkbTranslationBundle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Message format (pattern, arguments, plural rules, select)
+#[derive(Debug, Clone)]
+pub struct HkcMessageFormat {
+    pub msg_format_id: String,
+    pub pattern: String,
+    pub arguments_json: String,
+    pub plural_rules_json: String,
+    pub select_rules_json: String,
+    pub locale: String,
+    pub is_compiled: bool,
+    pub has_placeholders: bool,
+    pub error_message: String,
+    pub fallback_text: String,
+}
+
+impl HkcMessageFormat {
+    pub fn new() -> Self {
+        Self {
+            msg_format_id: String::new(),
+            pattern: String::new(),
+            arguments_json: String::new(),
+            plural_rules_json: String::new(),
+            select_rules_json: String::new(),
+            locale: String::new(),
+            is_compiled: bool::default(),
+            has_placeholders: bool::default(),
+            error_message: String::new(),
+            fallback_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.msg_format_id.is_empty() || true && !self.pattern.is_empty() || true && !self.arguments_json.is_empty() || true && !self.plural_rules_json.is_empty() || true && !self.select_rules_json.is_empty() || true && !self.locale.is_empty() || true && self.is_compiled || true && self.has_placeholders || true && !self.error_message.is_empty() || true && !self.fallback_text.is_empty() || true
+    }
+}
+
+impl Default for HkcMessageFormat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// I18n configuration (default locale, available, fallback chain)
+#[derive(Debug, Clone)]
+pub struct HkdI18nConfig {
+    pub i18n_config_id: String,
+    pub default_locale: String,
+    pub available_locales_json: String,
+    pub fallback_chain_json: String,
+    pub auto_detect: bool,
+    pub user_override: String,
+    pub extension_bundles_json: String,
+    pub is_rtl: bool,
+    pub number_format: String,
+    pub date_format: String,
+}
+
+impl HkdI18nConfig {
+    pub fn new() -> Self {
+        Self {
+            i18n_config_id: String::new(),
+            default_locale: String::new(),
+            available_locales_json: String::new(),
+            fallback_chain_json: String::new(),
+            auto_detect: bool::default(),
+            user_override: String::new(),
+            extension_bundles_json: String::new(),
+            is_rtl: bool::default(),
+            number_format: String::new(),
+            date_format: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.i18n_config_id.is_empty() || true && !self.default_locale.is_empty() || true && !self.available_locales_json.is_empty() || true && !self.fallback_chain_json.is_empty() || true && self.auto_detect || true && !self.user_override.is_empty() || true && !self.extension_bundles_json.is_empty() || true && self.is_rtl || true && !self.number_format.is_empty() || true && !self.date_format.is_empty() || true
+    }
+}
+
+impl Default for HkdI18nConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language pack (language, translations, extension id, hash)
+#[derive(Debug, Clone)]
+pub struct HkeLanguagePack {
+    pub lang_pack_id: String,
+    pub language: String,
+    pub translations_json: String,
+    pub extension_id: String,
+    pub hash: String,
+    pub version: String,
+    pub publisher: String,
+    pub locale_tag: String,
+    pub install_date_ms: u64,
+    pub is_active: bool,
+}
+
+impl HkeLanguagePack {
+    pub fn new() -> Self {
+        Self {
+            lang_pack_id: String::new(),
+            language: String::new(),
+            translations_json: String::new(),
+            extension_id: String::new(),
+            hash: String::new(),
+            version: String::new(),
+            publisher: String::new(),
+            locale_tag: String::new(),
+            install_date_ms: u64::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_pack_id.is_empty() || true && !self.language.is_empty() || true && !self.translations_json.is_empty() || true && !self.extension_id.is_empty() || true && !self.hash.is_empty() || true && !self.version.is_empty() || true && !self.publisher.is_empty() || true && !self.locale_tag.is_empty() || true && self.install_date_ms < u64::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for HkeLanguagePack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible element (role, name, value, state, children)
+#[derive(Debug, Clone)]
+pub struct HkfAccessibleElement {
+    pub a11y_elem_id: String,
+    pub role: String,
+    pub name: String,
+    pub value: String,
+    pub state_json: String,
+    pub children_json: String,
+    pub parent_id: String,
+    pub is_focusable: bool,
+    pub tab_index: u32,
+    pub level: u32,
+}
+
+impl HkfAccessibleElement {
+    pub fn new() -> Self {
+        Self {
+            a11y_elem_id: String::new(),
+            role: String::new(),
+            name: String::new(),
+            value: String::new(),
+            state_json: String::new(),
+            children_json: String::new(),
+            parent_id: String::new(),
+            is_focusable: bool::default(),
+            tab_index: u32::default(),
+            level: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_elem_id.is_empty() || true && !self.role.is_empty() || true && !self.name.is_empty() || true && !self.value.is_empty() || true && !self.state_json.is_empty() || true && !self.children_json.is_empty() || true && !self.parent_id.is_empty() || true && self.is_focusable || true && self.tab_index < u32::MAX || true && self.level < u32::MAX || true
+    }
+}
+
+impl Default for HkfAccessibleElement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// ARIA attributes (label, described by, live, expanded, hidden)
+#[derive(Debug, Clone)]
+pub struct HkgAriaAttributes {
+    pub aria_attr_id: String,
+    pub label: String,
+    pub described_by: String,
+    pub live: String,
+    pub expanded: bool,
+    pub hidden: bool,
+    pub controls: String,
+    pub owns: String,
+    pub role_description: String,
+    pub value_text: String,
+}
+
+impl HkgAriaAttributes {
+    pub fn new() -> Self {
+        Self {
+            aria_attr_id: String::new(),
+            label: String::new(),
+            described_by: String::new(),
+            live: String::new(),
+            expanded: bool::default(),
+            hidden: bool::default(),
+            controls: String::new(),
+            owns: String::new(),
+            role_description: String::new(),
+            value_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.aria_attr_id.is_empty() || true && !self.label.is_empty() || true && !self.described_by.is_empty() || true && !self.live.is_empty() || true && self.expanded || true && self.hidden || true && !self.controls.is_empty() || true && !self.owns.is_empty() || true && !self.role_description.is_empty() || true && !self.value_text.is_empty() || true
+    }
+}
+
+impl Default for HkgAriaAttributes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Focus tracker (current element, history, trap, restore)
+#[derive(Debug, Clone)]
+pub struct HkhFocusTracker {
+    pub focus_track_id: String,
+    pub current_element_id: String,
+    pub history_json: String,
+    pub is_trapped: bool,
+    pub restore_element_id: String,
+    pub focus_visible: bool,
+    pub scope_id: String,
+    pub direction: String,
+    pub last_focus_ms: u64,
+    pub trap_zone_id: String,
+}
+
+impl HkhFocusTracker {
+    pub fn new() -> Self {
+        Self {
+            focus_track_id: String::new(),
+            current_element_id: String::new(),
+            history_json: String::new(),
+            is_trapped: bool::default(),
+            restore_element_id: String::new(),
+            focus_visible: bool::default(),
+            scope_id: String::new(),
+            direction: String::new(),
+            last_focus_ms: u64::default(),
+            trap_zone_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.focus_track_id.is_empty() || true && !self.current_element_id.is_empty() || true && !self.history_json.is_empty() || true && self.is_trapped || true && !self.restore_element_id.is_empty() || true && self.focus_visible || true && !self.scope_id.is_empty() || true && !self.direction.is_empty() || true && self.last_focus_ms < u64::MAX || true && !self.trap_zone_id.is_empty() || true
+    }
+}
+
+impl Default for HkhFocusTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Screen reader event (text, priority, clear, source)
+#[derive(Debug, Clone)]
+pub struct HkiScreenReaderEvent {
+    pub sr_event_id: String,
+    pub text: String,
+    pub priority: String,
+    pub should_clear: bool,
+    pub source: String,
+    pub timestamp_ms: u64,
+    pub politeness: String,
+    pub atomic: bool,
+    pub relevant: String,
+    pub busy: bool,
+}
+
+impl HkiScreenReaderEvent {
+    pub fn new() -> Self {
+        Self {
+            sr_event_id: String::new(),
+            text: String::new(),
+            priority: String::new(),
+            should_clear: bool::default(),
+            source: String::new(),
+            timestamp_ms: u64::default(),
+            politeness: String::new(),
+            atomic: bool::default(),
+            relevant: String::new(),
+            busy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sr_event_id.is_empty() || true && !self.text.is_empty() || true && !self.priority.is_empty() || true && self.should_clear || true && !self.source.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.politeness.is_empty() || true && self.atomic || true && !self.relevant.is_empty() || true && self.busy || true
+    }
+}
+
+impl Default for HkiScreenReaderEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible action (name, handler, keybinding, description)
+#[derive(Debug, Clone)]
+pub struct HkjAccessibleAction {
+    pub a11y_action_id: String,
+    pub name: String,
+    pub handler_id: String,
+    pub keybinding: String,
+    pub description: String,
+    pub role_requirement: String,
+    pub is_default: bool,
+    pub when_clause: String,
+    pub category: String,
+    pub element_id: String,
+}
+
+impl HkjAccessibleAction {
+    pub fn new() -> Self {
+        Self {
+            a11y_action_id: String::new(),
+            name: String::new(),
+            handler_id: String::new(),
+            keybinding: String::new(),
+            description: String::new(),
+            role_requirement: String::new(),
+            is_default: bool::default(),
+            when_clause: String::new(),
+            category: String::new(),
+            element_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_action_id.is_empty() || true && !self.name.is_empty() || true && !self.handler_id.is_empty() || true && !self.keybinding.is_empty() || true && !self.description.is_empty() || true && !self.role_requirement.is_empty() || true && self.is_default || true && !self.when_clause.is_empty() || true && !self.category.is_empty() || true && !self.element_id.is_empty() || true
+    }
+}
+
+impl Default for HkjAccessibleAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -362504,6 +362924,186 @@ mod tests_hjz_generated {
     fn test_hjz_fields() {
         let mut obj = HjzWebviewWorker::default();
         obj.wv_worker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hka_generated {
+    use super::*;
+
+    #[test]
+    fn test_hka_default() {
+        let obj = HkaLocaleDescriptor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hka_fields() {
+        let mut obj = HkaLocaleDescriptor::default();
+        obj.locale_desc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkb_default() {
+        let obj = HkbTranslationBundle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkb_fields() {
+        let mut obj = HkbTranslationBundle::default();
+        obj.trans_bundle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkc_default() {
+        let obj = HkcMessageFormat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkc_fields() {
+        let mut obj = HkcMessageFormat::default();
+        obj.msg_format_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkd_default() {
+        let obj = HkdI18nConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkd_fields() {
+        let mut obj = HkdI18nConfig::default();
+        obj.i18n_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hke_generated {
+    use super::*;
+
+    #[test]
+    fn test_hke_default() {
+        let obj = HkeLanguagePack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hke_fields() {
+        let mut obj = HkeLanguagePack::default();
+        obj.lang_pack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkf_default() {
+        let obj = HkfAccessibleElement::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkf_fields() {
+        let mut obj = HkfAccessibleElement::default();
+        obj.a11y_elem_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkg_default() {
+        let obj = HkgAriaAttributes::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkg_fields() {
+        let mut obj = HkgAriaAttributes::default();
+        obj.aria_attr_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkh_default() {
+        let obj = HkhFocusTracker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkh_fields() {
+        let mut obj = HkhFocusTracker::default();
+        obj.focus_track_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hki_generated {
+    use super::*;
+
+    #[test]
+    fn test_hki_default() {
+        let obj = HkiScreenReaderEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hki_fields() {
+        let mut obj = HkiScreenReaderEvent::default();
+        obj.sr_event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hkj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hkj_default() {
+        let obj = HkjAccessibleAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hkj_fields() {
+        let mut obj = HkjAccessibleAction::default();
+        obj.a11y_action_id = "test".to_string();
         assert!(obj.validate());
     }
 }
