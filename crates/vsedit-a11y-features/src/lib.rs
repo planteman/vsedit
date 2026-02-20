@@ -109218,6 +109218,426 @@ impl Default for GxzNetworkError {
     }
 }
 
+/// File watcher service (watchers, on did change, correlation map)
+#[derive(Debug, Clone)]
+pub struct GyaFileWatcherService {
+    pub fw_service_id: String,
+    pub watcher_count: u32,
+    pub on_did_change: bool,
+    pub correlation_map_json: String,
+    pub is_disposed: bool,
+    pub polling_interval_ms: u32,
+    pub debounce_ms: u32,
+    pub max_watchers: u32,
+    pub error_count: u32,
+    pub platform: String,
+}
+
+impl GyaFileWatcherService {
+    pub fn new() -> Self {
+        Self {
+            fw_service_id: String::new(),
+            watcher_count: u32::default(),
+            on_did_change: bool::default(),
+            correlation_map_json: String::new(),
+            is_disposed: bool::default(),
+            polling_interval_ms: u32::default(),
+            debounce_ms: u32::default(),
+            max_watchers: u32::default(),
+            error_count: u32::default(),
+            platform: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fw_service_id.is_empty() || true && self.watcher_count < u32::MAX || true && self.on_did_change || true && !self.correlation_map_json.is_empty() || true && self.is_disposed || true && self.polling_interval_ms < u32::MAX || true && self.debounce_ms < u32::MAX || true && self.max_watchers < u32::MAX || true && self.error_count < u32::MAX || true && !self.platform.is_empty() || true
+    }
+}
+
+impl Default for GyaFileWatcherService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File change type descriptor (created, changed, deleted, renamed)
+#[derive(Debug, Clone)]
+pub struct GybFileChangeType {
+    pub fc_type_id: String,
+    pub change_type: String,
+    pub uri: String,
+    pub is_directory: bool,
+    pub timestamp_ms: u64,
+    pub old_uri: String,
+    pub correlation_id: String,
+    pub source: String,
+    pub is_external: bool,
+    pub stat_json: String,
+}
+
+impl GybFileChangeType {
+    pub fn new() -> Self {
+        Self {
+            fc_type_id: String::new(),
+            change_type: String::new(),
+            uri: String::new(),
+            is_directory: bool::default(),
+            timestamp_ms: u64::default(),
+            old_uri: String::new(),
+            correlation_id: String::new(),
+            source: String::new(),
+            is_external: bool::default(),
+            stat_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fc_type_id.is_empty() || true && !self.change_type.is_empty() || true && !self.uri.is_empty() || true && self.is_directory || true && self.timestamp_ms < u64::MAX || true && !self.old_uri.is_empty() || true && !self.correlation_id.is_empty() || true && !self.source.is_empty() || true && self.is_external || true && !self.stat_json.is_empty() || true
+    }
+}
+
+impl Default for GybFileChangeType {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Recursive watcher (root path, excludes, polling, debounce ms)
+#[derive(Debug, Clone)]
+pub struct GycRecursiveWatcher {
+    pub rec_watcher_id: String,
+    pub root_path: String,
+    pub excludes_json: String,
+    pub is_polling: bool,
+    pub debounce_ms: u32,
+    pub max_depth: u32,
+    pub follow_symlinks: bool,
+    pub is_active: bool,
+    pub watched_count: u64,
+    pub error_message: String,
+}
+
+impl GycRecursiveWatcher {
+    pub fn new() -> Self {
+        Self {
+            rec_watcher_id: String::new(),
+            root_path: String::new(),
+            excludes_json: String::new(),
+            is_polling: bool::default(),
+            debounce_ms: u32::default(),
+            max_depth: u32::default(),
+            follow_symlinks: bool::default(),
+            is_active: bool::default(),
+            watched_count: u64::default(),
+            error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rec_watcher_id.is_empty() || true && !self.root_path.is_empty() || true && !self.excludes_json.is_empty() || true && self.is_polling || true && self.debounce_ms < u32::MAX || true && self.max_depth < u32::MAX || true && self.follow_symlinks || true && self.is_active || true && self.watched_count < u64::MAX || true && !self.error_message.is_empty() || true
+    }
+}
+
+impl Default for GycRecursiveWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Non-recursive watcher (path, file filter, on event, active)
+#[derive(Debug, Clone)]
+pub struct GydNonRecursiveWatcher {
+    pub nr_watcher_id: String,
+    pub path: String,
+    pub file_filter: String,
+    pub on_event: bool,
+    pub is_active: bool,
+    pub last_event_ms: u64,
+    pub event_count: u64,
+    pub platform_watcher: String,
+    pub error_message: String,
+    pub correlation_id: String,
+}
+
+impl GydNonRecursiveWatcher {
+    pub fn new() -> Self {
+        Self {
+            nr_watcher_id: String::new(),
+            path: String::new(),
+            file_filter: String::new(),
+            on_event: bool::default(),
+            is_active: bool::default(),
+            last_event_ms: u64::default(),
+            event_count: u64::default(),
+            platform_watcher: String::new(),
+            error_message: String::new(),
+            correlation_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nr_watcher_id.is_empty() || true && !self.path.is_empty() || true && !self.file_filter.is_empty() || true && self.on_event || true && self.is_active || true && self.last_event_ms < u64::MAX || true && self.event_count < u64::MAX || true && !self.platform_watcher.is_empty() || true && !self.error_message.is_empty() || true && !self.correlation_id.is_empty() || true
+    }
+}
+
+impl Default for GydNonRecursiveWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Watcher request (path, recursive, excludes, includes, correlation)
+#[derive(Debug, Clone)]
+pub struct GyeWatcherRequest {
+    pub watcher_req_id: String,
+    pub path: String,
+    pub is_recursive: bool,
+    pub excludes_json: String,
+    pub includes_json: String,
+    pub correlation_id: String,
+    pub priority: u32,
+    pub pollingInterval: u32,
+    pub is_pending: bool,
+    pub requester: String,
+}
+
+impl GyeWatcherRequest {
+    pub fn new() -> Self {
+        Self {
+            watcher_req_id: String::new(),
+            path: String::new(),
+            is_recursive: bool::default(),
+            excludes_json: String::new(),
+            includes_json: String::new(),
+            correlation_id: String::new(),
+            priority: u32::default(),
+            pollingInterval: u32::default(),
+            is_pending: bool::default(),
+            requester: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watcher_req_id.is_empty() || true && !self.path.is_empty() || true && self.is_recursive || true && !self.excludes_json.is_empty() || true && !self.includes_json.is_empty() || true && !self.correlation_id.is_empty() || true && self.priority < u32::MAX || true && self.pollingInterval < u32::MAX || true && self.is_pending || true && !self.requester.is_empty() || true
+    }
+}
+
+impl Default for GyeWatcherRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Watcher event batch (events, source, timestamp, is coalesced)
+#[derive(Debug, Clone)]
+pub struct GyfWatcherEvent {
+    pub watcher_evt_id: String,
+    pub events_json: String,
+    pub source: String,
+    pub timestamp_ms: u64,
+    pub is_coalesced: bool,
+    pub event_count: u32,
+    pub correlation_id: String,
+    pub batch_id: String,
+    pub debounced: bool,
+    pub latency_ms: u32,
+}
+
+impl GyfWatcherEvent {
+    pub fn new() -> Self {
+        Self {
+            watcher_evt_id: String::new(),
+            events_json: String::new(),
+            source: String::new(),
+            timestamp_ms: u64::default(),
+            is_coalesced: bool::default(),
+            event_count: u32::default(),
+            correlation_id: String::new(),
+            batch_id: String::new(),
+            debounced: bool::default(),
+            latency_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watcher_evt_id.is_empty() || true && !self.events_json.is_empty() || true && !self.source.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_coalesced || true && self.event_count < u32::MAX || true && !self.correlation_id.is_empty() || true && !self.batch_id.is_empty() || true && self.debounced || true && self.latency_ms < u32::MAX || true
+    }
+}
+
+impl Default for GyfWatcherEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File system event (type, path, old path, is rename, stat)
+#[derive(Debug, Clone)]
+pub struct GygFileSystemEvent {
+    pub fs_evt_id: String,
+    pub event_type: String,
+    pub path: String,
+    pub old_path: String,
+    pub is_rename: bool,
+    pub stat_json: String,
+    pub is_directory: bool,
+    pub timestamp_ms: u64,
+    pub watcher_id: String,
+    pub platform: String,
+}
+
+impl GygFileSystemEvent {
+    pub fn new() -> Self {
+        Self {
+            fs_evt_id: String::new(),
+            event_type: String::new(),
+            path: String::new(),
+            old_path: String::new(),
+            is_rename: bool::default(),
+            stat_json: String::new(),
+            is_directory: bool::default(),
+            timestamp_ms: u64::default(),
+            watcher_id: String::new(),
+            platform: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fs_evt_id.is_empty() || true && !self.event_type.is_empty() || true && !self.path.is_empty() || true && !self.old_path.is_empty() || true && self.is_rename || true && !self.stat_json.is_empty() || true && self.is_directory || true && self.timestamp_ms < u64::MAX || true && !self.watcher_id.is_empty() || true && !self.platform.is_empty() || true
+    }
+}
+
+impl Default for GygFileSystemEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Glob pattern (pattern, base path, is negated, parsed segments)
+#[derive(Debug, Clone)]
+pub struct GyhGlobPattern {
+    pub glob_pat_id: String,
+    pub pattern: String,
+    pub base_path: String,
+    pub is_negated: bool,
+    pub parsed_segments_json: String,
+    pub has_globstar: bool,
+    pub has_bracket: bool,
+    pub has_brace: bool,
+    pub is_absolute: bool,
+    pub match_count: u64,
+}
+
+impl GyhGlobPattern {
+    pub fn new() -> Self {
+        Self {
+            glob_pat_id: String::new(),
+            pattern: String::new(),
+            base_path: String::new(),
+            is_negated: bool::default(),
+            parsed_segments_json: String::new(),
+            has_globstar: bool::default(),
+            has_bracket: bool::default(),
+            has_brace: bool::default(),
+            is_absolute: bool::default(),
+            match_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.glob_pat_id.is_empty() || true && !self.pattern.is_empty() || true && !self.base_path.is_empty() || true && self.is_negated || true && !self.parsed_segments_json.is_empty() || true && self.has_globstar || true && self.has_bracket || true && self.has_brace || true && self.is_absolute || true && self.match_count < u64::MAX || true
+    }
+}
+
+impl Default for GyhGlobPattern {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File filter (includes, excludes, file suffixes, scheme)
+#[derive(Debug, Clone)]
+pub struct GyiFileFilter {
+    pub file_filter_id: String,
+    pub includes_json: String,
+    pub excludes_json: String,
+    pub file_suffixes_json: String,
+    pub scheme: String,
+    pub max_file_size: u64,
+    pub is_case_sensitive: bool,
+    pub follow_symlinks: bool,
+    pub use_gitignore: bool,
+    pub filter_count: u32,
+}
+
+impl GyiFileFilter {
+    pub fn new() -> Self {
+        Self {
+            file_filter_id: String::new(),
+            includes_json: String::new(),
+            excludes_json: String::new(),
+            file_suffixes_json: String::new(),
+            scheme: String::new(),
+            max_file_size: u64::default(),
+            is_case_sensitive: bool::default(),
+            follow_symlinks: bool::default(),
+            use_gitignore: bool::default(),
+            filter_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_filter_id.is_empty() || true && !self.includes_json.is_empty() || true && !self.excludes_json.is_empty() || true && !self.file_suffixes_json.is_empty() || true && !self.scheme.is_empty() || true && self.max_file_size < u64::MAX || true && self.is_case_sensitive || true && self.follow_symlinks || true && self.use_gitignore || true && self.filter_count < u32::MAX || true
+    }
+}
+
+impl Default for GyiFileFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Watcher statistics (event count, error count, uptime, memory)
+#[derive(Debug, Clone)]
+pub struct GyjWatcherStatistics {
+    pub watcher_stats_id: String,
+    pub event_count: u64,
+    pub error_count: u32,
+    pub uptime_ms: u64,
+    pub memory_bytes: u64,
+    pub watched_paths: u32,
+    pub active_watchers: u32,
+    pub coalesced_count: u64,
+    pub peak_events_per_sec: u32,
+    pub last_event_ms: u64,
+}
+
+impl GyjWatcherStatistics {
+    pub fn new() -> Self {
+        Self {
+            watcher_stats_id: String::new(),
+            event_count: u64::default(),
+            error_count: u32::default(),
+            uptime_ms: u64::default(),
+            memory_bytes: u64::default(),
+            watched_paths: u32::default(),
+            active_watchers: u32::default(),
+            coalesced_count: u64::default(),
+            peak_events_per_sec: u32::default(),
+            last_event_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watcher_stats_id.is_empty() || true && self.event_count < u64::MAX || true && self.error_count < u32::MAX || true && self.uptime_ms < u64::MAX || true && self.memory_bytes < u64::MAX || true && self.watched_paths < u32::MAX || true && self.active_watchers < u32::MAX || true && self.coalesced_count < u64::MAX || true && self.peak_events_per_sec < u32::MAX || true && self.last_event_ms < u64::MAX || true
+    }
+}
+
+impl Default for GyjWatcherStatistics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -343909,6 +344329,186 @@ mod tests_gxz_generated {
     fn test_gxz_fields() {
         let mut obj = GxzNetworkError::default();
         obj.net_error_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gya_generated {
+    use super::*;
+
+    #[test]
+    fn test_gya_default() {
+        let obj = GyaFileWatcherService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gya_fields() {
+        let mut obj = GyaFileWatcherService::default();
+        obj.fw_service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyb_default() {
+        let obj = GybFileChangeType::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyb_fields() {
+        let mut obj = GybFileChangeType::default();
+        obj.fc_type_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyc_default() {
+        let obj = GycRecursiveWatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyc_fields() {
+        let mut obj = GycRecursiveWatcher::default();
+        obj.rec_watcher_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyd_default() {
+        let obj = GydNonRecursiveWatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyd_fields() {
+        let mut obj = GydNonRecursiveWatcher::default();
+        obj.nr_watcher_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gye_generated {
+    use super::*;
+
+    #[test]
+    fn test_gye_default() {
+        let obj = GyeWatcherRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gye_fields() {
+        let mut obj = GyeWatcherRequest::default();
+        obj.watcher_req_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyf_default() {
+        let obj = GyfWatcherEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyf_fields() {
+        let mut obj = GyfWatcherEvent::default();
+        obj.watcher_evt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyg_default() {
+        let obj = GygFileSystemEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyg_fields() {
+        let mut obj = GygFileSystemEvent::default();
+        obj.fs_evt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyh_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyh_default() {
+        let obj = GyhGlobPattern::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyh_fields() {
+        let mut obj = GyhGlobPattern::default();
+        obj.glob_pat_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyi_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyi_default() {
+        let obj = GyiFileFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyi_fields() {
+        let mut obj = GyiFileFilter::default();
+        obj.file_filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyj_default() {
+        let obj = GyjWatcherStatistics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyj_fields() {
+        let mut obj = GyjWatcherStatistics::default();
+        obj.watcher_stats_id = "test".to_string();
         assert!(obj.validate());
     }
 }
