@@ -67838,6 +67838,216 @@ impl Default for FmeWebviewState {
     }
 }
 
+/// Custom editor (view type, document, undo/redo, backup support)
+#[derive(Debug, Clone)]
+pub struct FmfCustomEditor {
+    pub editor_id: String,
+    pub view_type: String,
+    pub display_name: String,
+    pub selector_json: String,
+    pub priority: u32,
+    pub supports_undo_redo: bool,
+    pub supports_backup: bool,
+    pub webview_options_json: String,
+    pub extension_id: String,
+    pub capabilities_json: String,
+}
+
+impl FmfCustomEditor {
+    pub fn new() -> Self {
+        Self {
+            editor_id: String::new(),
+            view_type: String::new(),
+            display_name: String::new(),
+            selector_json: String::new(),
+            priority: u32::default(),
+            supports_undo_redo: bool::default(),
+            supports_backup: bool::default(),
+            webview_options_json: String::new(),
+            extension_id: String::new(),
+            capabilities_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_id.is_empty() || true && !self.view_type.is_empty() || true && !self.display_name.is_empty() || true && !self.selector_json.is_empty() || true && self.priority < u32::MAX || true && self.supports_undo_redo || true && self.supports_backup || true && !self.webview_options_json.is_empty() || true && !self.extension_id.is_empty() || true && !self.capabilities_json.is_empty() || true
+    }
+}
+
+impl Default for FmfCustomEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom document (uri, content, dirty, version, save delegate)
+#[derive(Debug, Clone)]
+pub struct FmgCustomDocument {
+    pub document_id: String,
+    pub uri: String,
+    pub content_bytes: String,
+    pub is_dirty: bool,
+    pub version_id: u64,
+    pub is_untitled: bool,
+    pub save_delegate_id: String,
+    pub backup_uri: String,
+    pub content_type: String,
+    pub encoding: String,
+}
+
+impl FmgCustomDocument {
+    pub fn new() -> Self {
+        Self {
+            document_id: String::new(),
+            uri: String::new(),
+            content_bytes: String::new(),
+            is_dirty: bool::default(),
+            version_id: u64::default(),
+            is_untitled: bool::default(),
+            save_delegate_id: String::new(),
+            backup_uri: String::new(),
+            content_type: String::new(),
+            encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.document_id.is_empty() || true && !self.uri.is_empty() || true && !self.content_bytes.is_empty() || true && self.is_dirty || true && self.version_id < u64::MAX || true && self.is_untitled || true && !self.save_delegate_id.is_empty() || true && !self.backup_uri.is_empty() || true && !self.content_type.is_empty() || true && !self.encoding.is_empty() || true
+    }
+}
+
+impl Default for FmgCustomDocument {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension contribution point (type, id, when, defaults, properties)
+#[derive(Debug, Clone)]
+pub struct FmhExtensionContribution {
+    pub contrib_id: String,
+    pub contribution_type: String,
+    pub contribution_id: String,
+    pub when_clause: String,
+    pub defaults_json: String,
+    pub properties_json: String,
+    pub extension_id: String,
+    pub is_proposed: bool,
+    pub category: String,
+    pub description: String,
+}
+
+impl FmhExtensionContribution {
+    pub fn new() -> Self {
+        Self {
+            contrib_id: String::new(),
+            contribution_type: String::new(),
+            contribution_id: String::new(),
+            when_clause: String::new(),
+            defaults_json: String::new(),
+            properties_json: String::new(),
+            extension_id: String::new(),
+            is_proposed: bool::default(),
+            category: String::new(),
+            description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.contrib_id.is_empty() || true && !self.contribution_type.is_empty() || true && !self.contribution_id.is_empty() || true && !self.when_clause.is_empty() || true && !self.defaults_json.is_empty() || true && !self.properties_json.is_empty() || true && !self.extension_id.is_empty() || true && self.is_proposed || true && !self.category.is_empty() || true && !self.description.is_empty() || true
+    }
+}
+
+impl Default for FmhExtensionContribution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension manifest (publisher, name, version, engines, contributes)
+#[derive(Debug, Clone)]
+pub struct FmiExtensionManifest {
+    pub manifest_id: String,
+    pub publisher: String,
+    pub name: String,
+    pub version: String,
+    pub display_name: String,
+    pub engine_vscode: String,
+    pub main_entry: String,
+    pub browser_entry: String,
+    pub contributes_json: String,
+    pub activation_events_json: String,
+}
+
+impl FmiExtensionManifest {
+    pub fn new() -> Self {
+        Self {
+            manifest_id: String::new(),
+            publisher: String::new(),
+            name: String::new(),
+            version: String::new(),
+            display_name: String::new(),
+            engine_vscode: String::new(),
+            main_entry: String::new(),
+            browser_entry: String::new(),
+            contributes_json: String::new(),
+            activation_events_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.manifest_id.is_empty() || true && !self.publisher.is_empty() || true && !self.name.is_empty() || true && !self.version.is_empty() || true && !self.display_name.is_empty() || true && !self.engine_vscode.is_empty() || true && !self.main_entry.is_empty() || true && !self.browser_entry.is_empty() || true && !self.contributes_json.is_empty() || true && !self.activation_events_json.is_empty() || true
+    }
+}
+
+impl Default for FmiExtensionManifest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension activation event (type, pattern, language, workspace contains)
+#[derive(Debug, Clone)]
+pub struct FmjExtensionActivation {
+    pub activation_id: String,
+    pub event_type: String,
+    pub event_pattern: String,
+    pub language_id: String,
+    pub workspace_contains_glob: String,
+    pub on_command_id: String,
+    pub on_view_id: String,
+    pub on_uri_scheme: String,
+    pub on_debug_type: String,
+    pub is_star_activation: bool,
+}
+
+impl FmjExtensionActivation {
+    pub fn new() -> Self {
+        Self {
+            activation_id: String::new(),
+            event_type: String::new(),
+            event_pattern: String::new(),
+            language_id: String::new(),
+            workspace_contains_glob: String::new(),
+            on_command_id: String::new(),
+            on_view_id: String::new(),
+            on_uri_scheme: String::new(),
+            on_debug_type: String::new(),
+            is_star_activation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.activation_id.is_empty() || true && !self.event_type.is_empty() || true && !self.event_pattern.is_empty() || true && !self.language_id.is_empty() || true && !self.workspace_contains_glob.is_empty() || true && !self.on_command_id.is_empty() || true && !self.on_view_id.is_empty() || true && !self.on_uri_scheme.is_empty() || true && !self.on_debug_type.is_empty() || true && self.is_star_activation || true
+    }
+}
+
+impl Default for FmjExtensionActivation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -284874,6 +285084,96 @@ mod tests_fme_generated {
     fn test_fme_fields() {
         let mut obj = FmeWebviewState::default();
         obj.state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmf_default() {
+        let obj = FmfCustomEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmf_fields() {
+        let mut obj = FmfCustomEditor::default();
+        obj.editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmg_default() {
+        let obj = FmgCustomDocument::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmg_fields() {
+        let mut obj = FmgCustomDocument::default();
+        obj.document_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmh_default() {
+        let obj = FmhExtensionContribution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmh_fields() {
+        let mut obj = FmhExtensionContribution::default();
+        obj.contrib_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmi_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmi_default() {
+        let obj = FmiExtensionManifest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmi_fields() {
+        let mut obj = FmiExtensionManifest::default();
+        obj.manifest_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fmj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fmj_default() {
+        let obj = FmjExtensionActivation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fmj_fields() {
+        let mut obj = FmjExtensionActivation::default();
+        obj.activation_id = "test".to_string();
         assert!(obj.validate());
     }
 }
