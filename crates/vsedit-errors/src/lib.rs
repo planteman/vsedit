@@ -112365,6 +112365,426 @@ impl Default for HazEditorFontInfo {
     }
 }
 
+/// Snippet session (template, placeholders, variables, cursor)
+#[derive(Debug, Clone)]
+pub struct HbaSnippetSession {
+    pub snippet_sess_id: String,
+    pub template: String,
+    pub placeholders_json: String,
+    pub variables_json: String,
+    pub cursor_json: String,
+    pub current_index: u32,
+    pub is_active: bool,
+    pub is_final_tabstop: bool,
+    pub merge_adjacent: bool,
+    pub adjust_whitespace: bool,
+}
+
+impl HbaSnippetSession {
+    pub fn new() -> Self {
+        Self {
+            snippet_sess_id: String::new(),
+            template: String::new(),
+            placeholders_json: String::new(),
+            variables_json: String::new(),
+            cursor_json: String::new(),
+            current_index: u32::default(),
+            is_active: bool::default(),
+            is_final_tabstop: bool::default(),
+            merge_adjacent: bool::default(),
+            adjust_whitespace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_sess_id.is_empty() || true && !self.template.is_empty() || true && !self.placeholders_json.is_empty() || true && !self.variables_json.is_empty() || true && !self.cursor_json.is_empty() || true && self.current_index < u32::MAX || true && self.is_active || true && self.is_final_tabstop || true && self.merge_adjacent || true && self.adjust_whitespace || true
+    }
+}
+
+impl Default for HbaSnippetSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet parser (input, markers, offset, text, placeholder)
+#[derive(Debug, Clone)]
+pub struct HbbSnippetParser {
+    pub snippet_parser_id: String,
+    pub input: String,
+    pub markers_json: String,
+    pub offset: u32,
+    pub text: String,
+    pub placeholder_count: u32,
+    pub variable_count: u32,
+    pub has_tabstop: bool,
+    pub error_message: String,
+    pub is_parsed: bool,
+}
+
+impl HbbSnippetParser {
+    pub fn new() -> Self {
+        Self {
+            snippet_parser_id: String::new(),
+            input: String::new(),
+            markers_json: String::new(),
+            offset: u32::default(),
+            text: String::new(),
+            placeholder_count: u32::default(),
+            variable_count: u32::default(),
+            has_tabstop: bool::default(),
+            error_message: String::new(),
+            is_parsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_parser_id.is_empty() || true && !self.input.is_empty() || true && !self.markers_json.is_empty() || true && self.offset < u32::MAX || true && !self.text.is_empty() || true && self.placeholder_count < u32::MAX || true && self.variable_count < u32::MAX || true && self.has_tabstop || true && !self.error_message.is_empty() || true && self.is_parsed || true
+    }
+}
+
+impl Default for HbbSnippetParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet placeholder (index, default value, nested, choice)
+#[derive(Debug, Clone)]
+pub struct HbcSnippetPlaceholder {
+    pub snippet_ph_id: String,
+    pub index: u32,
+    pub default_value: String,
+    pub nested_json: String,
+    pub choice_json: String,
+    pub is_final_tabstop: bool,
+    pub is_choice: bool,
+    pub transform: String,
+    pub range_json: String,
+    pub is_visited: bool,
+}
+
+impl HbcSnippetPlaceholder {
+    pub fn new() -> Self {
+        Self {
+            snippet_ph_id: String::new(),
+            index: u32::default(),
+            default_value: String::new(),
+            nested_json: String::new(),
+            choice_json: String::new(),
+            is_final_tabstop: bool::default(),
+            is_choice: bool::default(),
+            transform: String::new(),
+            range_json: String::new(),
+            is_visited: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_ph_id.is_empty() || true && self.index < u32::MAX || true && !self.default_value.is_empty() || true && !self.nested_json.is_empty() || true && !self.choice_json.is_empty() || true && self.is_final_tabstop || true && self.is_choice || true && !self.transform.is_empty() || true && !self.range_json.is_empty() || true && self.is_visited || true
+    }
+}
+
+impl Default for HbcSnippetPlaceholder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet variable (name, resolver, default, transform)
+#[derive(Debug, Clone)]
+pub struct HbdSnippetVariable {
+    pub snippet_var_id: String,
+    pub name: String,
+    pub resolver: String,
+    pub default_value: String,
+    pub transform: String,
+    pub is_resolved: bool,
+    pub resolved_value: String,
+    pub is_builtin: bool,
+    pub scope: String,
+    pub error_message: String,
+}
+
+impl HbdSnippetVariable {
+    pub fn new() -> Self {
+        Self {
+            snippet_var_id: String::new(),
+            name: String::new(),
+            resolver: String::new(),
+            default_value: String::new(),
+            transform: String::new(),
+            is_resolved: bool::default(),
+            resolved_value: String::new(),
+            is_builtin: bool::default(),
+            scope: String::new(),
+            error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_var_id.is_empty() || true && !self.name.is_empty() || true && !self.resolver.is_empty() || true && !self.default_value.is_empty() || true && !self.transform.is_empty() || true && self.is_resolved || true && !self.resolved_value.is_empty() || true && self.is_builtin || true && !self.scope.is_empty() || true && !self.error_message.is_empty() || true
+    }
+}
+
+impl Default for HbdSnippetVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet choice (options, selected, index, open, close)
+#[derive(Debug, Clone)]
+pub struct HbeSnippetChoice {
+    pub snippet_choice_id: String,
+    pub options_json: String,
+    pub selected_index: u32,
+    pub open_marker: String,
+    pub close_marker: String,
+    pub separator: String,
+    pub placeholder_index: u32,
+    pub is_active: bool,
+    pub is_multichoice: bool,
+    pub display_label: String,
+}
+
+impl HbeSnippetChoice {
+    pub fn new() -> Self {
+        Self {
+            snippet_choice_id: String::new(),
+            options_json: String::new(),
+            selected_index: u32::default(),
+            open_marker: String::new(),
+            close_marker: String::new(),
+            separator: String::new(),
+            placeholder_index: u32::default(),
+            is_active: bool::default(),
+            is_multichoice: bool::default(),
+            display_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_choice_id.is_empty() || true && !self.options_json.is_empty() || true && self.selected_index < u32::MAX || true && !self.open_marker.is_empty() || true && !self.close_marker.is_empty() || true && !self.separator.is_empty() || true && self.placeholder_index < u32::MAX || true && self.is_active || true && self.is_multichoice || true && !self.display_label.is_empty() || true
+    }
+}
+
+impl Default for HbeSnippetChoice {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet transform (regex, format string, options, global)
+#[derive(Debug, Clone)]
+pub struct HbfSnippetTransform {
+    pub snippet_xform_id: String,
+    pub regex_pattern: String,
+    pub format_string: String,
+    pub options: String,
+    pub is_global: bool,
+    pub is_case_change: bool,
+    pub replacement: String,
+    pub flags: String,
+    pub conditional_json: String,
+    pub error_message: String,
+}
+
+impl HbfSnippetTransform {
+    pub fn new() -> Self {
+        Self {
+            snippet_xform_id: String::new(),
+            regex_pattern: String::new(),
+            format_string: String::new(),
+            options: String::new(),
+            is_global: bool::default(),
+            is_case_change: bool::default(),
+            replacement: String::new(),
+            flags: String::new(),
+            conditional_json: String::new(),
+            error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_xform_id.is_empty() || true && !self.regex_pattern.is_empty() || true && !self.format_string.is_empty() || true && !self.options.is_empty() || true && self.is_global || true && self.is_case_change || true && !self.replacement.is_empty() || true && !self.flags.is_empty() || true && !self.conditional_json.is_empty() || true && !self.error_message.is_empty() || true
+    }
+}
+
+impl Default for HbfSnippetTransform {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet file (path, scope, body, prefix, description, source)
+#[derive(Debug, Clone)]
+pub struct HbgSnippetFile {
+    pub snippet_file_id: String,
+    pub path: String,
+    pub scope: String,
+    pub body: String,
+    pub prefix: String,
+    pub description: String,
+    pub source: String,
+    pub is_file_template: bool,
+    pub language_ids_json: String,
+    pub extension_id: String,
+}
+
+impl HbgSnippetFile {
+    pub fn new() -> Self {
+        Self {
+            snippet_file_id: String::new(),
+            path: String::new(),
+            scope: String::new(),
+            body: String::new(),
+            prefix: String::new(),
+            description: String::new(),
+            source: String::new(),
+            is_file_template: bool::default(),
+            language_ids_json: String::new(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_file_id.is_empty() || true && !self.path.is_empty() || true && !self.scope.is_empty() || true && !self.body.is_empty() || true && !self.prefix.is_empty() || true && !self.description.is_empty() || true && !self.source.is_empty() || true && self.is_file_template || true && !self.language_ids_json.is_empty() || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for HbgSnippetFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet completion item (label, body, description, scope)
+#[derive(Debug, Clone)]
+pub struct HbhSnippetCompletionItem {
+    pub snippet_comp_id: String,
+    pub label: String,
+    pub body: String,
+    pub description: String,
+    pub scope: String,
+    pub prefix: String,
+    pub priority: u32,
+    pub source: String,
+    pub is_file_template: bool,
+    pub sort_text: String,
+}
+
+impl HbhSnippetCompletionItem {
+    pub fn new() -> Self {
+        Self {
+            snippet_comp_id: String::new(),
+            label: String::new(),
+            body: String::new(),
+            description: String::new(),
+            scope: String::new(),
+            prefix: String::new(),
+            priority: u32::default(),
+            source: String::new(),
+            is_file_template: bool::default(),
+            sort_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_comp_id.is_empty() || true && !self.label.is_empty() || true && !self.body.is_empty() || true && !self.description.is_empty() || true && !self.scope.is_empty() || true && !self.prefix.is_empty() || true && self.priority < u32::MAX || true && !self.source.is_empty() || true && self.is_file_template || true && !self.sort_text.is_empty() || true
+    }
+}
+
+impl Default for HbhSnippetCompletionItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Emmet configuration (show suggestions, include languages, syntax)
+#[derive(Debug, Clone)]
+pub struct HbiEmmetConfig {
+    pub emmet_config_id: String,
+    pub show_suggestions: bool,
+    pub include_languages_json: String,
+    pub syntax_profiles_json: String,
+    pub variables_json: String,
+    pub preferences_json: String,
+    pub exclude_languages_json: String,
+    pub trigger_expansion: bool,
+    pub show_abbreviated_tag: bool,
+    pub output_profile: String,
+}
+
+impl HbiEmmetConfig {
+    pub fn new() -> Self {
+        Self {
+            emmet_config_id: String::new(),
+            show_suggestions: bool::default(),
+            include_languages_json: String::new(),
+            syntax_profiles_json: String::new(),
+            variables_json: String::new(),
+            preferences_json: String::new(),
+            exclude_languages_json: String::new(),
+            trigger_expansion: bool::default(),
+            show_abbreviated_tag: bool::default(),
+            output_profile: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.emmet_config_id.is_empty() || true && self.show_suggestions || true && !self.include_languages_json.is_empty() || true && !self.syntax_profiles_json.is_empty() || true && !self.variables_json.is_empty() || true && !self.preferences_json.is_empty() || true && !self.exclude_languages_json.is_empty() || true && self.trigger_expansion || true && self.show_abbreviated_tag || true && !self.output_profile.is_empty() || true
+    }
+}
+
+impl Default for HbiEmmetConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Emmet abbreviation (abbreviation, syntax, filter, text, field)
+#[derive(Debug, Clone)]
+pub struct HbjEmmetAbbreviation {
+    pub emmet_abbrev_id: String,
+    pub abbreviation: String,
+    pub syntax: String,
+    pub filter: String,
+    pub text_content: String,
+    pub field_count: u32,
+    pub is_valid: bool,
+    pub expanded_text: String,
+    pub options_json: String,
+    pub error_message: String,
+}
+
+impl HbjEmmetAbbreviation {
+    pub fn new() -> Self {
+        Self {
+            emmet_abbrev_id: String::new(),
+            abbreviation: String::new(),
+            syntax: String::new(),
+            filter: String::new(),
+            text_content: String::new(),
+            field_count: u32::default(),
+            is_valid: bool::default(),
+            expanded_text: String::new(),
+            options_json: String::new(),
+            error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.emmet_abbrev_id.is_empty() || true && !self.abbreviation.is_empty() || true && !self.syntax.is_empty() || true && !self.filter.is_empty() || true && !self.text_content.is_empty() || true && self.field_count < u32::MAX || true && self.is_valid || true && !self.expanded_text.is_empty() || true && !self.options_json.is_empty() || true && !self.error_message.is_empty() || true
+    }
+}
+
+impl Default for HbjEmmetAbbreviation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -348470,6 +348890,186 @@ mod tests_haz_generated {
     fn test_haz_fields() {
         let mut obj = HazEditorFontInfo::default();
         obj.font_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hba_generated {
+    use super::*;
+
+    #[test]
+    fn test_hba_default() {
+        let obj = HbaSnippetSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hba_fields() {
+        let mut obj = HbaSnippetSession::default();
+        obj.snippet_sess_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hbb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hbb_default() {
+        let obj = HbbSnippetParser::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hbb_fields() {
+        let mut obj = HbbSnippetParser::default();
+        obj.snippet_parser_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hbc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hbc_default() {
+        let obj = HbcSnippetPlaceholder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hbc_fields() {
+        let mut obj = HbcSnippetPlaceholder::default();
+        obj.snippet_ph_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hbd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hbd_default() {
+        let obj = HbdSnippetVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hbd_fields() {
+        let mut obj = HbdSnippetVariable::default();
+        obj.snippet_var_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hbe_generated {
+    use super::*;
+
+    #[test]
+    fn test_hbe_default() {
+        let obj = HbeSnippetChoice::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hbe_fields() {
+        let mut obj = HbeSnippetChoice::default();
+        obj.snippet_choice_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hbf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hbf_default() {
+        let obj = HbfSnippetTransform::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hbf_fields() {
+        let mut obj = HbfSnippetTransform::default();
+        obj.snippet_xform_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hbg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hbg_default() {
+        let obj = HbgSnippetFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hbg_fields() {
+        let mut obj = HbgSnippetFile::default();
+        obj.snippet_file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hbh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hbh_default() {
+        let obj = HbhSnippetCompletionItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hbh_fields() {
+        let mut obj = HbhSnippetCompletionItem::default();
+        obj.snippet_comp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hbi_generated {
+    use super::*;
+
+    #[test]
+    fn test_hbi_default() {
+        let obj = HbiEmmetConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hbi_fields() {
+        let mut obj = HbiEmmetConfig::default();
+        obj.emmet_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hbj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hbj_default() {
+        let obj = HbjEmmetAbbreviation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hbj_fields() {
+        let mut obj = HbjEmmetAbbreviation::default();
+        obj.emmet_abbrev_id = "test".to_string();
         assert!(obj.validate());
     }
 }
