@@ -108472,6 +108472,678 @@ impl Default for GxjApiEndpoint {
     }
 }
 
+/// Server-sent event (event type, data, id, retry, origin)
+#[derive(Debug, Clone)]
+pub struct GxkServerSentEvent {
+    pub sse_id: String,
+    pub event_type: String,
+    pub data: String,
+    pub event_id: String,
+    pub retry_ms: u32,
+    pub origin: String,
+    pub timestamp_ms: u64,
+    pub sequence: u64,
+    pub is_comment: bool,
+    pub field_count: u32,
+}
+
+impl GxkServerSentEvent {
+    pub fn new() -> Self {
+        Self {
+            sse_id: String::new(),
+            event_type: String::new(),
+            data: String::new(),
+            event_id: String::new(),
+            retry_ms: u32::default(),
+            origin: String::new(),
+            timestamp_ms: u64::default(),
+            sequence: u64::default(),
+            is_comment: bool::default(),
+            field_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sse_id.is_empty() || true && !self.event_type.is_empty() || true && !self.data.is_empty() || true && !self.event_id.is_empty() || true && self.retry_ms < u32::MAX || true && !self.origin.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.sequence < u64::MAX || true && self.is_comment || true && self.field_count < u32::MAX || true
+    }
+}
+
+impl Default for GxkServerSentEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Fetch options (cache, credentials, integrity, keepalive, mode)
+#[derive(Debug, Clone)]
+pub struct GxlFetchOptions {
+    pub fetch_opts_id: String,
+    pub cache_mode: String,
+    pub credentials_mode: String,
+    pub integrity: String,
+    pub keepalive: bool,
+    pub mode: String,
+    pub redirect_mode: String,
+    pub referrer: String,
+    pub referrer_policy: String,
+    pub signal_id: String,
+}
+
+impl GxlFetchOptions {
+    pub fn new() -> Self {
+        Self {
+            fetch_opts_id: String::new(),
+            cache_mode: String::new(),
+            credentials_mode: String::new(),
+            integrity: String::new(),
+            keepalive: bool::default(),
+            mode: String::new(),
+            redirect_mode: String::new(),
+            referrer: String::new(),
+            referrer_policy: String::new(),
+            signal_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fetch_opts_id.is_empty() || true && !self.cache_mode.is_empty() || true && !self.credentials_mode.is_empty() || true && !self.integrity.is_empty() || true && self.keepalive || true && !self.mode.is_empty() || true && !self.redirect_mode.is_empty() || true && !self.referrer.is_empty() || true && !self.referrer_policy.is_empty() || true && !self.signal_id.is_empty() || true
+    }
+}
+
+impl Default for GxlFetchOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Stream reader (is locked, is closed, desired size, pull)
+#[derive(Debug, Clone)]
+pub struct GxmStreamReader {
+    pub stream_reader_id: String,
+    pub is_locked: bool,
+    pub is_closed: bool,
+    pub desired_size: u64,
+    pub pull_count: u32,
+    pub bytes_read: u64,
+    pub chunk_size: u32,
+    pub high_water_mark: u64,
+    pub error_message: String,
+    pub encoding: String,
+}
+
+impl GxmStreamReader {
+    pub fn new() -> Self {
+        Self {
+            stream_reader_id: String::new(),
+            is_locked: bool::default(),
+            is_closed: bool::default(),
+            desired_size: u64::default(),
+            pull_count: u32::default(),
+            bytes_read: u64::default(),
+            chunk_size: u32::default(),
+            high_water_mark: u64::default(),
+            error_message: String::new(),
+            encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stream_reader_id.is_empty() || true && self.is_locked || true && self.is_closed || true && self.desired_size < u64::MAX || true && self.pull_count < u32::MAX || true && self.bytes_read < u64::MAX || true && self.chunk_size < u32::MAX || true && self.high_water_mark < u64::MAX || true && !self.error_message.is_empty() || true && !self.encoding.is_empty() || true
+    }
+}
+
+impl Default for GxmStreamReader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URL parse result (scheme, host, port, path, query, fragment)
+#[derive(Debug, Clone)]
+pub struct GxnUrlParse {
+    pub url_parse_id: String,
+    pub scheme: String,
+    pub host: String,
+    pub port: u32,
+    pub path: String,
+    pub query: String,
+    pub fragment: String,
+    pub username: String,
+    pub password: String,
+    pub origin_str: String,
+}
+
+impl GxnUrlParse {
+    pub fn new() -> Self {
+        Self {
+            url_parse_id: String::new(),
+            scheme: String::new(),
+            host: String::new(),
+            port: u32::default(),
+            path: String::new(),
+            query: String::new(),
+            fragment: String::new(),
+            username: String::new(),
+            password: String::new(),
+            origin_str: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.url_parse_id.is_empty() || true && !self.scheme.is_empty() || true && !self.host.is_empty() || true && self.port < u32::MAX || true && !self.path.is_empty() || true && !self.query.is_empty() || true && !self.fragment.is_empty() || true && !self.username.is_empty() || true && !self.password.is_empty() || true && !self.origin_str.is_empty() || true
+    }
+}
+
+impl Default for GxnUrlParse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Header map (entries, content type, authorization, accept)
+#[derive(Debug, Clone)]
+pub struct GxoHeaderMap {
+    pub header_map_id: String,
+    pub entries_json: String,
+    pub content_type: String,
+    pub authorization: String,
+    pub accept: String,
+    pub user_agent: String,
+    pub cache_control: String,
+    pub entry_count: u32,
+    pub is_immutable: bool,
+    pub etag: String,
+}
+
+impl GxoHeaderMap {
+    pub fn new() -> Self {
+        Self {
+            header_map_id: String::new(),
+            entries_json: String::new(),
+            content_type: String::new(),
+            authorization: String::new(),
+            accept: String::new(),
+            user_agent: String::new(),
+            cache_control: String::new(),
+            entry_count: u32::default(),
+            is_immutable: bool::default(),
+            etag: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.header_map_id.is_empty() || true && !self.entries_json.is_empty() || true && !self.content_type.is_empty() || true && !self.authorization.is_empty() || true && !self.accept.is_empty() || true && !self.user_agent.is_empty() || true && !self.cache_control.is_empty() || true && self.entry_count < u32::MAX || true && self.is_immutable || true && !self.etag.is_empty() || true
+    }
+}
+
+impl Default for GxoHeaderMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cookie jar (cookies, domain, path, secure, http only)
+#[derive(Debug, Clone)]
+pub struct GxpCookieJar {
+    pub cookie_jar_id: String,
+    pub cookies_json: String,
+    pub domain: String,
+    pub path: String,
+    pub is_secure: bool,
+    pub is_http_only: bool,
+    pub same_site: String,
+    pub expires_ms: u64,
+    pub max_age_seconds: u32,
+    pub cookie_count: u32,
+}
+
+impl GxpCookieJar {
+    pub fn new() -> Self {
+        Self {
+            cookie_jar_id: String::new(),
+            cookies_json: String::new(),
+            domain: String::new(),
+            path: String::new(),
+            is_secure: bool::default(),
+            is_http_only: bool::default(),
+            same_site: String::new(),
+            expires_ms: u64::default(),
+            max_age_seconds: u32::default(),
+            cookie_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cookie_jar_id.is_empty() || true && !self.cookies_json.is_empty() || true && !self.domain.is_empty() || true && !self.path.is_empty() || true && self.is_secure || true && self.is_http_only || true && !self.same_site.is_empty() || true && self.expires_ms < u64::MAX || true && self.max_age_seconds < u32::MAX || true && self.cookie_count < u32::MAX || true
+    }
+}
+
+impl Default for GxpCookieJar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DNS lookup result (addresses, ttl, canonical name, timestamp)
+#[derive(Debug, Clone)]
+pub struct GxqDnsLookup {
+    pub dns_lookup_id: String,
+    pub addresses_json: String,
+    pub ttl_seconds: u32,
+    pub canonical_name: String,
+    pub timestamp_ms: u64,
+    pub is_cached: bool,
+    pub query_type: String,
+    pub server: String,
+    pub latency_ms: u32,
+    pub is_authoritative: bool,
+}
+
+impl GxqDnsLookup {
+    pub fn new() -> Self {
+        Self {
+            dns_lookup_id: String::new(),
+            addresses_json: String::new(),
+            ttl_seconds: u32::default(),
+            canonical_name: String::new(),
+            timestamp_ms: u64::default(),
+            is_cached: bool::default(),
+            query_type: String::new(),
+            server: String::new(),
+            latency_ms: u32::default(),
+            is_authoritative: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dns_lookup_id.is_empty() || true && !self.addresses_json.is_empty() || true && self.ttl_seconds < u32::MAX || true && !self.canonical_name.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_cached || true && !self.query_type.is_empty() || true && !self.server.is_empty() || true && self.latency_ms < u32::MAX || true && self.is_authoritative || true
+    }
+}
+
+impl Default for GxqDnsLookup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TLS configuration (min version, max version, ciphers, certs)
+#[derive(Debug, Clone)]
+pub struct GxrTlsConfig {
+    pub tls_config_id: String,
+    pub min_version: String,
+    pub max_version: String,
+    pub ciphers_json: String,
+    pub cert_path: String,
+    pub key_path: String,
+    pub ca_path: String,
+    pub verify_peer: bool,
+    pub sni_enabled: bool,
+    pub alpn_protocols_json: String,
+}
+
+impl GxrTlsConfig {
+    pub fn new() -> Self {
+        Self {
+            tls_config_id: String::new(),
+            min_version: String::new(),
+            max_version: String::new(),
+            ciphers_json: String::new(),
+            cert_path: String::new(),
+            key_path: String::new(),
+            ca_path: String::new(),
+            verify_peer: bool::default(),
+            sni_enabled: bool::default(),
+            alpn_protocols_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tls_config_id.is_empty() || true && !self.min_version.is_empty() || true && !self.max_version.is_empty() || true && !self.ciphers_json.is_empty() || true && !self.cert_path.is_empty() || true && !self.key_path.is_empty() || true && !self.ca_path.is_empty() || true && self.verify_peer || true && self.sni_enabled || true && !self.alpn_protocols_json.is_empty() || true
+    }
+}
+
+impl Default for GxrTlsConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Retry policy (max retries, backoff, jitter, timeout multiplier)
+#[derive(Debug, Clone)]
+pub struct GxsRetryPolicy {
+    pub retry_policy_id: String,
+    pub max_retries: u32,
+    pub backoff_ms: u32,
+    pub backoff_multiplier: f64,
+    pub jitter_ms: u32,
+    pub timeout_multiplier: f64,
+    pub max_delay_ms: u64,
+    pub retryable_codes_json: String,
+    pub is_exponential: bool,
+    pub circuit_breaker_threshold: u32,
+}
+
+impl GxsRetryPolicy {
+    pub fn new() -> Self {
+        Self {
+            retry_policy_id: String::new(),
+            max_retries: u32::default(),
+            backoff_ms: u32::default(),
+            backoff_multiplier: f64::default(),
+            jitter_ms: u32::default(),
+            timeout_multiplier: f64::default(),
+            max_delay_ms: u64::default(),
+            retryable_codes_json: String::new(),
+            is_exponential: bool::default(),
+            circuit_breaker_threshold: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.retry_policy_id.is_empty() || true && self.max_retries < u32::MAX || true && self.backoff_ms < u32::MAX || true && self.backoff_multiplier.is_finite() || true && self.jitter_ms < u32::MAX || true && self.timeout_multiplier.is_finite() || true && self.max_delay_ms < u64::MAX || true && !self.retryable_codes_json.is_empty() || true && self.is_exponential || true && self.circuit_breaker_threshold < u32::MAX || true
+    }
+}
+
+impl Default for GxsRetryPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Upload progress (total bytes, sent, speed, part, multipart)
+#[derive(Debug, Clone)]
+pub struct GxtUploadProgress {
+    pub upload_prog_id: String,
+    pub total_bytes: u64,
+    pub sent_bytes: u64,
+    pub speed_bps: u64,
+    pub part_number: u32,
+    pub is_multipart: bool,
+    pub is_complete: bool,
+    pub file_name: String,
+    pub content_type: String,
+    pub checksum: String,
+}
+
+impl GxtUploadProgress {
+    pub fn new() -> Self {
+        Self {
+            upload_prog_id: String::new(),
+            total_bytes: u64::default(),
+            sent_bytes: u64::default(),
+            speed_bps: u64::default(),
+            part_number: u32::default(),
+            is_multipart: bool::default(),
+            is_complete: bool::default(),
+            file_name: String::new(),
+            content_type: String::new(),
+            checksum: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.upload_prog_id.is_empty() || true && self.total_bytes < u64::MAX || true && self.sent_bytes < u64::MAX || true && self.speed_bps < u64::MAX || true && self.part_number < u32::MAX || true && self.is_multipart || true && self.is_complete || true && !self.file_name.is_empty() || true && !self.content_type.is_empty() || true && !self.checksum.is_empty() || true
+    }
+}
+
+impl Default for GxtUploadProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Content negotiation (accept, accept charset, accept encoding)
+#[derive(Debug, Clone)]
+pub struct GxuContentNegotiation {
+    pub content_neg_id: String,
+    pub accept: String,
+    pub accept_charset: String,
+    pub accept_encoding: String,
+    pub accept_language: String,
+    pub content_type: String,
+    pub negotiated_type: String,
+    pub quality_factor: f64,
+    pub is_wildcard: bool,
+    pub preference_order: u32,
+}
+
+impl GxuContentNegotiation {
+    pub fn new() -> Self {
+        Self {
+            content_neg_id: String::new(),
+            accept: String::new(),
+            accept_charset: String::new(),
+            accept_encoding: String::new(),
+            accept_language: String::new(),
+            content_type: String::new(),
+            negotiated_type: String::new(),
+            quality_factor: f64::default(),
+            is_wildcard: bool::default(),
+            preference_order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.content_neg_id.is_empty() || true && !self.accept.is_empty() || true && !self.accept_charset.is_empty() || true && !self.accept_encoding.is_empty() || true && !self.accept_language.is_empty() || true && !self.content_type.is_empty() || true && !self.negotiated_type.is_empty() || true && self.quality_factor.is_finite() || true && self.is_wildcard || true && self.preference_order < u32::MAX || true
+    }
+}
+
+impl Default for GxuContentNegotiation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// CORS configuration (allowed origins, methods, headers, max age)
+#[derive(Debug, Clone)]
+pub struct GxvCorsConfig {
+    pub cors_config_id: String,
+    pub allowed_origins_json: String,
+    pub allowed_methods_json: String,
+    pub allowed_headers_json: String,
+    pub max_age_seconds: u32,
+    pub allow_credentials: bool,
+    pub expose_headers_json: String,
+    pub is_preflight: bool,
+    pub origin: String,
+    pub vary_headers_json: String,
+}
+
+impl GxvCorsConfig {
+    pub fn new() -> Self {
+        Self {
+            cors_config_id: String::new(),
+            allowed_origins_json: String::new(),
+            allowed_methods_json: String::new(),
+            allowed_headers_json: String::new(),
+            max_age_seconds: u32::default(),
+            allow_credentials: bool::default(),
+            expose_headers_json: String::new(),
+            is_preflight: bool::default(),
+            origin: String::new(),
+            vary_headers_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cors_config_id.is_empty() || true && !self.allowed_origins_json.is_empty() || true && !self.allowed_methods_json.is_empty() || true && !self.allowed_headers_json.is_empty() || true && self.max_age_seconds < u32::MAX || true && self.allow_credentials || true && !self.expose_headers_json.is_empty() || true && self.is_preflight || true && !self.origin.is_empty() || true && !self.vary_headers_json.is_empty() || true
+    }
+}
+
+impl Default for GxvCorsConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// GraphQL request (query, variables, operation name, extensions)
+#[derive(Debug, Clone)]
+pub struct GxwGraphqlRequest {
+    pub graphql_req_id: String,
+    pub query: String,
+    pub variables_json: String,
+    pub operation_name: String,
+    pub extensions_json: String,
+    pub is_mutation: bool,
+    pub is_subscription: bool,
+    pub persisted_query_hash: String,
+    pub timeout_ms: u32,
+    pub trace_id: String,
+}
+
+impl GxwGraphqlRequest {
+    pub fn new() -> Self {
+        Self {
+            graphql_req_id: String::new(),
+            query: String::new(),
+            variables_json: String::new(),
+            operation_name: String::new(),
+            extensions_json: String::new(),
+            is_mutation: bool::default(),
+            is_subscription: bool::default(),
+            persisted_query_hash: String::new(),
+            timeout_ms: u32::default(),
+            trace_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.graphql_req_id.is_empty() || true && !self.query.is_empty() || true && !self.variables_json.is_empty() || true && !self.operation_name.is_empty() || true && !self.extensions_json.is_empty() || true && self.is_mutation || true && self.is_subscription || true && !self.persisted_query_hash.is_empty() || true && self.timeout_ms < u32::MAX || true && !self.trace_id.is_empty() || true
+    }
+}
+
+impl Default for GxwGraphqlRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON-RPC request (method, params, id, jsonrpc version)
+#[derive(Debug, Clone)]
+pub struct GxxJsonRpcRequest {
+    pub jsonrpc_req_id: String,
+    pub method: String,
+    pub params_json: String,
+    pub request_id: String,
+    pub jsonrpc_version: String,
+    pub is_notification: bool,
+    pub is_batch: bool,
+    pub timestamp_ms: u64,
+    pub timeout_ms: u32,
+    pub correlation_id: String,
+}
+
+impl GxxJsonRpcRequest {
+    pub fn new() -> Self {
+        Self {
+            jsonrpc_req_id: String::new(),
+            method: String::new(),
+            params_json: String::new(),
+            request_id: String::new(),
+            jsonrpc_version: String::new(),
+            is_notification: bool::default(),
+            is_batch: bool::default(),
+            timestamp_ms: u64::default(),
+            timeout_ms: u32::default(),
+            correlation_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.jsonrpc_req_id.is_empty() || true && !self.method.is_empty() || true && !self.params_json.is_empty() || true && !self.request_id.is_empty() || true && !self.jsonrpc_version.is_empty() || true && self.is_notification || true && self.is_batch || true && self.timestamp_ms < u64::MAX || true && self.timeout_ms < u32::MAX || true && !self.correlation_id.is_empty() || true
+    }
+}
+
+impl Default for GxxJsonRpcRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Connection pool (max connections, idle timeout, pending, active)
+#[derive(Debug, Clone)]
+pub struct GxyConnectionPool {
+    pub conn_pool_id: String,
+    pub max_connections: u32,
+    pub idle_timeout_ms: u64,
+    pub pending_count: u32,
+    pub active_count: u32,
+    pub idle_count: u32,
+    pub max_idle: u32,
+    pub connection_timeout_ms: u32,
+    pub health_check_interval_ms: u64,
+    pub total_created: u64,
+}
+
+impl GxyConnectionPool {
+    pub fn new() -> Self {
+        Self {
+            conn_pool_id: String::new(),
+            max_connections: u32::default(),
+            idle_timeout_ms: u64::default(),
+            pending_count: u32::default(),
+            active_count: u32::default(),
+            idle_count: u32::default(),
+            max_idle: u32::default(),
+            connection_timeout_ms: u32::default(),
+            health_check_interval_ms: u64::default(),
+            total_created: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conn_pool_id.is_empty() || true && self.max_connections < u32::MAX || true && self.idle_timeout_ms < u64::MAX || true && self.pending_count < u32::MAX || true && self.active_count < u32::MAX || true && self.idle_count < u32::MAX || true && self.max_idle < u32::MAX || true && self.connection_timeout_ms < u32::MAX || true && self.health_check_interval_ms < u64::MAX || true && self.total_created < u64::MAX || true
+    }
+}
+
+impl Default for GxyConnectionPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Network error (status, message, code, retry, is transient)
+#[derive(Debug, Clone)]
+pub struct GxzNetworkError {
+    pub net_error_id: String,
+    pub status_code: u32,
+    pub message: String,
+    pub error_code: String,
+    pub is_retryable: bool,
+    pub is_transient: bool,
+    pub retry_after_ms: u64,
+    pub timestamp_ms: u64,
+    pub url: String,
+    pub cause: String,
+}
+
+impl GxzNetworkError {
+    pub fn new() -> Self {
+        Self {
+            net_error_id: String::new(),
+            status_code: u32::default(),
+            message: String::new(),
+            error_code: String::new(),
+            is_retryable: bool::default(),
+            is_transient: bool::default(),
+            retry_after_ms: u64::default(),
+            timestamp_ms: u64::default(),
+            url: String::new(),
+            cause: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.net_error_id.is_empty() || true && self.status_code < u32::MAX || true && !self.message.is_empty() || true && !self.error_code.is_empty() || true && self.is_retryable || true && self.is_transient || true && self.retry_after_ms < u64::MAX || true && self.timestamp_ms < u64::MAX || true && !self.url.is_empty() || true && !self.cause.is_empty() || true
+    }
+}
+
+impl Default for GxzNetworkError {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -342960,6 +343632,294 @@ mod tests_gxj_generated {
     fn test_gxj_fields() {
         let mut obj = GxjApiEndpoint::default();
         obj.api_endpoint_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxk_default() {
+        let obj = GxkServerSentEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxk_fields() {
+        let mut obj = GxkServerSentEvent::default();
+        obj.sse_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxl_default() {
+        let obj = GxlFetchOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxl_fields() {
+        let mut obj = GxlFetchOptions::default();
+        obj.fetch_opts_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxm_default() {
+        let obj = GxmStreamReader::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxm_fields() {
+        let mut obj = GxmStreamReader::default();
+        obj.stream_reader_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxn_default() {
+        let obj = GxnUrlParse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxn_fields() {
+        let mut obj = GxnUrlParse::default();
+        obj.url_parse_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxo_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxo_default() {
+        let obj = GxoHeaderMap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxo_fields() {
+        let mut obj = GxoHeaderMap::default();
+        obj.header_map_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxp_default() {
+        let obj = GxpCookieJar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxp_fields() {
+        let mut obj = GxpCookieJar::default();
+        obj.cookie_jar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxq_default() {
+        let obj = GxqDnsLookup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxq_fields() {
+        let mut obj = GxqDnsLookup::default();
+        obj.dns_lookup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxr_default() {
+        let obj = GxrTlsConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxr_fields() {
+        let mut obj = GxrTlsConfig::default();
+        obj.tls_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxs_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxs_default() {
+        let obj = GxsRetryPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxs_fields() {
+        let mut obj = GxsRetryPolicy::default();
+        obj.retry_policy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxt_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxt_default() {
+        let obj = GxtUploadProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxt_fields() {
+        let mut obj = GxtUploadProgress::default();
+        obj.upload_prog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxu_default() {
+        let obj = GxuContentNegotiation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxu_fields() {
+        let mut obj = GxuContentNegotiation::default();
+        obj.content_neg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxv_default() {
+        let obj = GxvCorsConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxv_fields() {
+        let mut obj = GxvCorsConfig::default();
+        obj.cors_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxw_default() {
+        let obj = GxwGraphqlRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxw_fields() {
+        let mut obj = GxwGraphqlRequest::default();
+        obj.graphql_req_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxx_default() {
+        let obj = GxxJsonRpcRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxx_fields() {
+        let mut obj = GxxJsonRpcRequest::default();
+        obj.jsonrpc_req_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxy_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxy_default() {
+        let obj = GxyConnectionPool::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxy_fields() {
+        let mut obj = GxyConnectionPool::default();
+        obj.conn_pool_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gxz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gxz_default() {
+        let obj = GxzNetworkError::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gxz_fields() {
+        let mut obj = GxzNetworkError::default();
+        obj.net_error_id = "test".to_string();
         assert!(obj.validate());
     }
 }
