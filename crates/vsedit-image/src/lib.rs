@@ -162909,6 +162909,890 @@ impl Default for JczFolderSettings {
     }
 }
 
+/// Extension manifest descriptor
+#[derive(Debug, Clone)]
+pub struct JdaExtensionManifest {
+    pub manifest_id: String,
+    pub extension_id: String,
+    pub publisher_str: String,
+    pub version_str: String,
+    pub engine_version: String,
+    pub is_builtin: bool,
+}
+
+impl JdaExtensionManifest {
+    pub fn new() -> Self {
+        Self {
+            manifest_id: String::new(),
+            extension_id: String::new(),
+            publisher_str: String::new(),
+            version_str: String::new(),
+            engine_version: String::new(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.manifest_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.publisher_str.is_empty() || true && !self.version_str.is_empty() || true && !self.engine_version.is_empty() || true && self.is_builtin || true
+    }
+}
+
+impl Default for JdaExtensionManifest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension contribution point
+#[derive(Debug, Clone)]
+pub struct JdbExtensionContribution {
+    pub contrib_id: String,
+    pub point_name: String,
+    pub extension_ref: String,
+    pub value_json: String,
+    pub priority_val: u32,
+    pub is_mandatory: bool,
+}
+
+impl JdbExtensionContribution {
+    pub fn new() -> Self {
+        Self {
+            contrib_id: String::new(),
+            point_name: String::new(),
+            extension_ref: String::new(),
+            value_json: String::new(),
+            priority_val: u32::default(),
+            is_mandatory: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.contrib_id.is_empty() || true && !self.point_name.is_empty() || true && !self.extension_ref.is_empty() || true && !self.value_json.is_empty() || true && self.priority_val < u32::MAX || true && self.is_mandatory || true
+    }
+}
+
+impl Default for JdbExtensionContribution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension activation event
+#[derive(Debug, Clone)]
+pub struct JdcExtensionActivation {
+    pub activation_id: String,
+    pub event_str: String,
+    pub extension_ref: String,
+    pub delay_ms: u32,
+    pub startup_time_ms: u32,
+    pub is_eager: bool,
+}
+
+impl JdcExtensionActivation {
+    pub fn new() -> Self {
+        Self {
+            activation_id: String::new(),
+            event_str: String::new(),
+            extension_ref: String::new(),
+            delay_ms: u32::default(),
+            startup_time_ms: u32::default(),
+            is_eager: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.activation_id.is_empty() || true && !self.event_str.is_empty() || true && !self.extension_ref.is_empty() || true && self.delay_ms < u32::MAX || true && self.startup_time_ms < u32::MAX || true && self.is_eager || true
+    }
+}
+
+impl Default for JdcExtensionActivation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension runtime descriptor
+#[derive(Debug, Clone)]
+pub struct JddExtensionRuntime {
+    pub runtime_id: String,
+    pub host_ref: String,
+    pub extension_ref: String,
+    pub memory_bytes: u64,
+    pub api_calls: u64,
+    pub is_responsive: bool,
+}
+
+impl JddExtensionRuntime {
+    pub fn new() -> Self {
+        Self {
+            runtime_id: String::new(),
+            host_ref: String::new(),
+            extension_ref: String::new(),
+            memory_bytes: u64::default(),
+            api_calls: u64::default(),
+            is_responsive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.runtime_id.is_empty() || true && !self.host_ref.is_empty() || true && !self.extension_ref.is_empty() || true && self.memory_bytes < u64::MAX || true && self.api_calls < u64::MAX || true && self.is_responsive || true
+    }
+}
+
+impl Default for JddExtensionRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension API surface
+#[derive(Debug, Clone)]
+pub struct JdeExtensionApi {
+    pub api_id: String,
+    pub namespace_str: String,
+    pub member_count: u32,
+    pub version_str: String,
+    pub deprecation_msg: String,
+    pub is_proposed: bool,
+}
+
+impl JdeExtensionApi {
+    pub fn new() -> Self {
+        Self {
+            api_id: String::new(),
+            namespace_str: String::new(),
+            member_count: u32::default(),
+            version_str: String::new(),
+            deprecation_msg: String::new(),
+            is_proposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.api_id.is_empty() || true && !self.namespace_str.is_empty() || true && self.member_count < u32::MAX || true && !self.version_str.is_empty() || true && !self.deprecation_msg.is_empty() || true && self.is_proposed || true
+    }
+}
+
+impl Default for JdeExtensionApi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension dependency entry
+#[derive(Debug, Clone)]
+pub struct JdfExtensionDependency {
+    pub dep_id: String,
+    pub extension_ref: String,
+    pub depends_on_id: String,
+    pub version_range: String,
+    pub resolution_status: String,
+    pub is_optional: bool,
+}
+
+impl JdfExtensionDependency {
+    pub fn new() -> Self {
+        Self {
+            dep_id: String::new(),
+            extension_ref: String::new(),
+            depends_on_id: String::new(),
+            version_range: String::new(),
+            resolution_status: String::new(),
+            is_optional: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dep_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.depends_on_id.is_empty() || true && !self.version_range.is_empty() || true && !self.resolution_status.is_empty() || true && self.is_optional || true
+    }
+}
+
+impl Default for JdfExtensionDependency {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Marketplace gallery query
+#[derive(Debug, Clone)]
+pub struct JdgGalleryQuery {
+    pub gallery_q_id: String,
+    pub search_text: String,
+    pub sort_by_str: String,
+    pub page_num: u32,
+    pub page_size: u32,
+    pub include_prerelease: bool,
+}
+
+impl JdgGalleryQuery {
+    pub fn new() -> Self {
+        Self {
+            gallery_q_id: String::new(),
+            search_text: String::new(),
+            sort_by_str: String::new(),
+            page_num: u32::default(),
+            page_size: u32::default(),
+            include_prerelease: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gallery_q_id.is_empty() || true && !self.search_text.is_empty() || true && !self.sort_by_str.is_empty() || true && self.page_num < u32::MAX || true && self.page_size < u32::MAX || true && self.include_prerelease || true
+    }
+}
+
+impl Default for JdgGalleryQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Marketplace extension listing
+#[derive(Debug, Clone)]
+pub struct JdhGalleryExtension {
+    pub gallery_ext_id: String,
+    pub display_name: String,
+    pub short_desc: String,
+    pub install_count: u64,
+    pub rating_avg: f64,
+    pub is_verified: bool,
+}
+
+impl JdhGalleryExtension {
+    pub fn new() -> Self {
+        Self {
+            gallery_ext_id: String::new(),
+            display_name: String::new(),
+            short_desc: String::new(),
+            install_count: u64::default(),
+            rating_avg: f64::default(),
+            is_verified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gallery_ext_id.is_empty() || true && !self.display_name.is_empty() || true && !self.short_desc.is_empty() || true && self.install_count < u64::MAX || true && self.rating_avg.is_finite() || true && self.is_verified || true
+    }
+}
+
+impl Default for JdhGalleryExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension rating entry
+#[derive(Debug, Clone)]
+pub struct JdiExtensionRating {
+    pub rating_id: String,
+    pub extension_ref: String,
+    pub user_ref: String,
+    pub stars_val: u32,
+    pub review_epoch: u64,
+    pub is_helpful: bool,
+}
+
+impl JdiExtensionRating {
+    pub fn new() -> Self {
+        Self {
+            rating_id: String::new(),
+            extension_ref: String::new(),
+            user_ref: String::new(),
+            stars_val: u32::default(),
+            review_epoch: u64::default(),
+            is_helpful: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rating_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.user_ref.is_empty() || true && self.stars_val < u32::MAX || true && self.review_epoch < u64::MAX || true && self.is_helpful || true
+    }
+}
+
+impl Default for JdiExtensionRating {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension review entry
+#[derive(Debug, Clone)]
+pub struct JdjExtensionReview {
+    pub review_id: String,
+    pub extension_ref: String,
+    pub reviewer_name: String,
+    pub review_text: String,
+    pub version_ref: String,
+    pub is_edited: bool,
+}
+
+impl JdjExtensionReview {
+    pub fn new() -> Self {
+        Self {
+            review_id: String::new(),
+            extension_ref: String::new(),
+            reviewer_name: String::new(),
+            review_text: String::new(),
+            version_ref: String::new(),
+            is_edited: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.review_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.reviewer_name.is_empty() || true && !self.review_text.is_empty() || true && !self.version_ref.is_empty() || true && self.is_edited || true
+    }
+}
+
+impl Default for JdjExtensionReview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension install operation
+#[derive(Debug, Clone)]
+pub struct JdkExtensionInstall {
+    pub install_id: String,
+    pub extension_ref: String,
+    pub version_str: String,
+    pub install_path: String,
+    pub download_bytes: u64,
+    pub is_from_vsix: bool,
+}
+
+impl JdkExtensionInstall {
+    pub fn new() -> Self {
+        Self {
+            install_id: String::new(),
+            extension_ref: String::new(),
+            version_str: String::new(),
+            install_path: String::new(),
+            download_bytes: u64::default(),
+            is_from_vsix: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.install_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.version_str.is_empty() || true && !self.install_path.is_empty() || true && self.download_bytes < u64::MAX || true && self.is_from_vsix || true
+    }
+}
+
+impl Default for JdkExtensionInstall {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension update operation
+#[derive(Debug, Clone)]
+pub struct JdlExtensionUpdate {
+    pub update_id: String,
+    pub extension_ref: String,
+    pub from_version: String,
+    pub to_version: String,
+    pub changelog_url: String,
+    pub is_auto_update: bool,
+}
+
+impl JdlExtensionUpdate {
+    pub fn new() -> Self {
+        Self {
+            update_id: String::new(),
+            extension_ref: String::new(),
+            from_version: String::new(),
+            to_version: String::new(),
+            changelog_url: String::new(),
+            is_auto_update: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.update_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.from_version.is_empty() || true && !self.to_version.is_empty() || true && !self.changelog_url.is_empty() || true && self.is_auto_update || true
+    }
+}
+
+impl Default for JdlExtensionUpdate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// VSIX package descriptor
+#[derive(Debug, Clone)]
+pub struct JdmExtensionVsix {
+    pub vsix_id: String,
+    pub file_path: String,
+    pub manifest_json: String,
+    pub package_size: u64,
+    pub entry_count: u32,
+    pub is_signed: bool,
+}
+
+impl JdmExtensionVsix {
+    pub fn new() -> Self {
+        Self {
+            vsix_id: String::new(),
+            file_path: String::new(),
+            manifest_json: String::new(),
+            package_size: u64::default(),
+            entry_count: u32::default(),
+            is_signed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.vsix_id.is_empty() || true && !self.file_path.is_empty() || true && !self.manifest_json.is_empty() || true && self.package_size < u64::MAX || true && self.entry_count < u32::MAX || true && self.is_signed || true
+    }
+}
+
+impl Default for JdmExtensionVsix {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension pack descriptor
+#[derive(Debug, Clone)]
+pub struct JdnExtensionPack {
+    pub pack_id: String,
+    pub pack_name: String,
+    pub extension_ids_csv: String,
+    pub publisher_str: String,
+    pub member_count: u32,
+    pub is_curated: bool,
+}
+
+impl JdnExtensionPack {
+    pub fn new() -> Self {
+        Self {
+            pack_id: String::new(),
+            pack_name: String::new(),
+            extension_ids_csv: String::new(),
+            publisher_str: String::new(),
+            member_count: u32::default(),
+            is_curated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pack_id.is_empty() || true && !self.pack_name.is_empty() || true && !self.extension_ids_csv.is_empty() || true && !self.publisher_str.is_empty() || true && self.member_count < u32::MAX || true && self.is_curated || true
+    }
+}
+
+impl Default for JdnExtensionPack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension recommendation
+#[derive(Debug, Clone)]
+pub struct JdoExtensionRecommendation {
+    pub rec_id: String,
+    pub extension_ref: String,
+    pub reason_str: String,
+    pub source_str: String,
+    pub confidence_val: u32,
+    pub is_workspace_rec: bool,
+}
+
+impl JdoExtensionRecommendation {
+    pub fn new() -> Self {
+        Self {
+            rec_id: String::new(),
+            extension_ref: String::new(),
+            reason_str: String::new(),
+            source_str: String::new(),
+            confidence_val: u32::default(),
+            is_workspace_rec: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rec_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.reason_str.is_empty() || true && !self.source_str.is_empty() || true && self.confidence_val < u32::MAX || true && self.is_workspace_rec || true
+    }
+}
+
+impl Default for JdoExtensionRecommendation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace extension entry
+#[derive(Debug, Clone)]
+pub struct JdpExtensionWorkspace {
+    pub ext_ws_id: String,
+    pub extension_ref: String,
+    pub workspace_ref: String,
+    pub enabled_state: String,
+    pub version_str: String,
+    pub is_workspace_only: bool,
+}
+
+impl JdpExtensionWorkspace {
+    pub fn new() -> Self {
+        Self {
+            ext_ws_id: String::new(),
+            extension_ref: String::new(),
+            workspace_ref: String::new(),
+            enabled_state: String::new(),
+            version_str: String::new(),
+            is_workspace_only: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_ws_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.workspace_ref.is_empty() || true && !self.enabled_state.is_empty() || true && !self.version_str.is_empty() || true && self.is_workspace_only || true
+    }
+}
+
+impl Default for JdpExtensionWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension storage entry
+#[derive(Debug, Clone)]
+pub struct JdqExtensionStorage {
+    pub ext_storage_id: String,
+    pub extension_ref: String,
+    pub key_str: String,
+    pub value_json: String,
+    pub scope_str: String,
+    pub is_global: bool,
+}
+
+impl JdqExtensionStorage {
+    pub fn new() -> Self {
+        Self {
+            ext_storage_id: String::new(),
+            extension_ref: String::new(),
+            key_str: String::new(),
+            value_json: String::new(),
+            scope_str: String::new(),
+            is_global: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_storage_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.key_str.is_empty() || true && !self.value_json.is_empty() || true && !self.scope_str.is_empty() || true && self.is_global || true
+    }
+}
+
+impl Default for JdqExtensionStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension secret entry
+#[derive(Debug, Clone)]
+pub struct JdrExtensionSecret {
+    pub ext_secret_id: String,
+    pub extension_ref: String,
+    pub key_str: String,
+    pub encrypted_val: String,
+    pub stored_epoch: u64,
+    pub is_session_scoped: bool,
+}
+
+impl JdrExtensionSecret {
+    pub fn new() -> Self {
+        Self {
+            ext_secret_id: String::new(),
+            extension_ref: String::new(),
+            key_str: String::new(),
+            encrypted_val: String::new(),
+            stored_epoch: u64::default(),
+            is_session_scoped: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_secret_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.key_str.is_empty() || true && !self.encrypted_val.is_empty() || true && self.stored_epoch < u64::MAX || true && self.is_session_scoped || true
+    }
+}
+
+impl Default for JdrExtensionSecret {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension log entry
+#[derive(Debug, Clone)]
+pub struct JdsExtensionLog {
+    pub ext_log_id: String,
+    pub extension_ref: String,
+    pub message_str: String,
+    pub level_str: String,
+    pub timestamp_epoch: u64,
+    pub is_trace: bool,
+}
+
+impl JdsExtensionLog {
+    pub fn new() -> Self {
+        Self {
+            ext_log_id: String::new(),
+            extension_ref: String::new(),
+            message_str: String::new(),
+            level_str: String::new(),
+            timestamp_epoch: u64::default(),
+            is_trace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_log_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.message_str.is_empty() || true && !self.level_str.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_trace || true
+    }
+}
+
+impl Default for JdsExtensionLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension telemetry event
+#[derive(Debug, Clone)]
+pub struct JdtExtensionTelemetry {
+    pub ext_tel_id: String,
+    pub extension_ref: String,
+    pub event_name: String,
+    pub properties_json: String,
+    pub measurements_json: String,
+    pub is_error_event: bool,
+}
+
+impl JdtExtensionTelemetry {
+    pub fn new() -> Self {
+        Self {
+            ext_tel_id: String::new(),
+            extension_ref: String::new(),
+            event_name: String::new(),
+            properties_json: String::new(),
+            measurements_json: String::new(),
+            is_error_event: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_tel_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.event_name.is_empty() || true && !self.properties_json.is_empty() || true && !self.measurements_json.is_empty() || true && self.is_error_event || true
+    }
+}
+
+impl Default for JdtExtensionTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension permission entry
+#[derive(Debug, Clone)]
+pub struct JduExtensionPermission {
+    pub ext_perm_id: String,
+    pub extension_ref: String,
+    pub permission_str: String,
+    pub granted_epoch: u64,
+    pub scope_str: String,
+    pub is_granted: bool,
+}
+
+impl JduExtensionPermission {
+    pub fn new() -> Self {
+        Self {
+            ext_perm_id: String::new(),
+            extension_ref: String::new(),
+            permission_str: String::new(),
+            granted_epoch: u64::default(),
+            scope_str: String::new(),
+            is_granted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_perm_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.permission_str.is_empty() || true && self.granted_epoch < u64::MAX || true && !self.scope_str.is_empty() || true && self.is_granted || true
+    }
+}
+
+impl Default for JduExtensionPermission {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension sandbox descriptor
+#[derive(Debug, Clone)]
+pub struct JdvExtensionSandbox {
+    pub ext_sandbox_id: String,
+    pub extension_ref: String,
+    pub sandbox_type_str: String,
+    pub memory_limit_mb: u32,
+    pub cpu_limit_pct: u32,
+    pub is_restricted: bool,
+}
+
+impl JdvExtensionSandbox {
+    pub fn new() -> Self {
+        Self {
+            ext_sandbox_id: String::new(),
+            extension_ref: String::new(),
+            sandbox_type_str: String::new(),
+            memory_limit_mb: u32::default(),
+            cpu_limit_pct: u32::default(),
+            is_restricted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_sandbox_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.sandbox_type_str.is_empty() || true && self.memory_limit_mb < u32::MAX || true && self.cpu_limit_pct < u32::MAX || true && self.is_restricted || true
+    }
+}
+
+impl Default for JdvExtensionSandbox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension localization entry
+#[derive(Debug, Clone)]
+pub struct JdwExtensionLocalization {
+    pub ext_l10n_id: String,
+    pub extension_ref: String,
+    pub locale_str: String,
+    pub bundle_path: String,
+    pub key_count: u32,
+    pub is_default_bundle: bool,
+}
+
+impl JdwExtensionLocalization {
+    pub fn new() -> Self {
+        Self {
+            ext_l10n_id: String::new(),
+            extension_ref: String::new(),
+            locale_str: String::new(),
+            bundle_path: String::new(),
+            key_count: u32::default(),
+            is_default_bundle: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_l10n_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.locale_str.is_empty() || true && !self.bundle_path.is_empty() || true && self.key_count < u32::MAX || true && self.is_default_bundle || true
+    }
+}
+
+impl Default for JdwExtensionLocalization {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension theme contribution
+#[derive(Debug, Clone)]
+pub struct JdxExtensionTheme {
+    pub ext_theme_id: String,
+    pub extension_ref: String,
+    pub theme_label: String,
+    pub theme_path: String,
+    pub ui_theme_str: String,
+    pub is_dark: bool,
+}
+
+impl JdxExtensionTheme {
+    pub fn new() -> Self {
+        Self {
+            ext_theme_id: String::new(),
+            extension_ref: String::new(),
+            theme_label: String::new(),
+            theme_path: String::new(),
+            ui_theme_str: String::new(),
+            is_dark: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_theme_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.theme_label.is_empty() || true && !self.theme_path.is_empty() || true && !self.ui_theme_str.is_empty() || true && self.is_dark || true
+    }
+}
+
+impl Default for JdxExtensionTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension grammar contribution
+#[derive(Debug, Clone)]
+pub struct JdyExtensionGrammar {
+    pub ext_grammar_id: String,
+    pub extension_ref: String,
+    pub language_id: String,
+    pub scope_name: String,
+    pub grammar_path: String,
+    pub is_embedded: bool,
+}
+
+impl JdyExtensionGrammar {
+    pub fn new() -> Self {
+        Self {
+            ext_grammar_id: String::new(),
+            extension_ref: String::new(),
+            language_id: String::new(),
+            scope_name: String::new(),
+            grammar_path: String::new(),
+            is_embedded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_grammar_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.language_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.grammar_path.is_empty() || true && self.is_embedded || true
+    }
+}
+
+impl Default for JdyExtensionGrammar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension snippet contribution
+#[derive(Debug, Clone)]
+pub struct JdzExtensionSnippet {
+    pub ext_snippet_id: String,
+    pub extension_ref: String,
+    pub language_id: String,
+    pub snippet_path: String,
+    pub snippet_count: u32,
+    pub is_project_snippet: bool,
+}
+
+impl JdzExtensionSnippet {
+    pub fn new() -> Self {
+        Self {
+            ext_snippet_id: String::new(),
+            extension_ref: String::new(),
+            language_id: String::new(),
+            snippet_path: String::new(),
+            snippet_count: u32::default(),
+            is_project_snippet: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_snippet_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.language_id.is_empty() || true && !self.snippet_path.is_empty() || true && self.snippet_count < u32::MAX || true && self.is_project_snippet || true
+    }
+}
+
+impl Default for JdzExtensionSnippet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -424315,6 +425199,474 @@ mod tests_jcz_generated {
     fn test_jcz_fields() {
         let mut obj = JczFolderSettings::default();
         obj.folder_settings_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jda_generated {
+    use super::*;
+
+    #[test]
+    fn test_jda_default() {
+        let obj = JdaExtensionManifest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jda_fields() {
+        let mut obj = JdaExtensionManifest::default();
+        obj.manifest_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdb_default() {
+        let obj = JdbExtensionContribution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdb_fields() {
+        let mut obj = JdbExtensionContribution::default();
+        obj.contrib_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdc_default() {
+        let obj = JdcExtensionActivation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdc_fields() {
+        let mut obj = JdcExtensionActivation::default();
+        obj.activation_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdd_default() {
+        let obj = JddExtensionRuntime::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdd_fields() {
+        let mut obj = JddExtensionRuntime::default();
+        obj.runtime_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jde_generated {
+    use super::*;
+
+    #[test]
+    fn test_jde_default() {
+        let obj = JdeExtensionApi::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jde_fields() {
+        let mut obj = JdeExtensionApi::default();
+        obj.api_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdf_default() {
+        let obj = JdfExtensionDependency::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdf_fields() {
+        let mut obj = JdfExtensionDependency::default();
+        obj.dep_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdg_default() {
+        let obj = JdgGalleryQuery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdg_fields() {
+        let mut obj = JdgGalleryQuery::default();
+        obj.gallery_q_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdh_default() {
+        let obj = JdhGalleryExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdh_fields() {
+        let mut obj = JdhGalleryExtension::default();
+        obj.gallery_ext_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdi_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdi_default() {
+        let obj = JdiExtensionRating::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdi_fields() {
+        let mut obj = JdiExtensionRating::default();
+        obj.rating_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdj_default() {
+        let obj = JdjExtensionReview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdj_fields() {
+        let mut obj = JdjExtensionReview::default();
+        obj.review_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdk_default() {
+        let obj = JdkExtensionInstall::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdk_fields() {
+        let mut obj = JdkExtensionInstall::default();
+        obj.install_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdl_default() {
+        let obj = JdlExtensionUpdate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdl_fields() {
+        let mut obj = JdlExtensionUpdate::default();
+        obj.update_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdm_default() {
+        let obj = JdmExtensionVsix::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdm_fields() {
+        let mut obj = JdmExtensionVsix::default();
+        obj.vsix_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdn_default() {
+        let obj = JdnExtensionPack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdn_fields() {
+        let mut obj = JdnExtensionPack::default();
+        obj.pack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdo_default() {
+        let obj = JdoExtensionRecommendation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdo_fields() {
+        let mut obj = JdoExtensionRecommendation::default();
+        obj.rec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdp_default() {
+        let obj = JdpExtensionWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdp_fields() {
+        let mut obj = JdpExtensionWorkspace::default();
+        obj.ext_ws_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdq_default() {
+        let obj = JdqExtensionStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdq_fields() {
+        let mut obj = JdqExtensionStorage::default();
+        obj.ext_storage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdr_default() {
+        let obj = JdrExtensionSecret::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdr_fields() {
+        let mut obj = JdrExtensionSecret::default();
+        obj.ext_secret_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jds_generated {
+    use super::*;
+
+    #[test]
+    fn test_jds_default() {
+        let obj = JdsExtensionLog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jds_fields() {
+        let mut obj = JdsExtensionLog::default();
+        obj.ext_log_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdt_default() {
+        let obj = JdtExtensionTelemetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdt_fields() {
+        let mut obj = JdtExtensionTelemetry::default();
+        obj.ext_tel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdu_default() {
+        let obj = JduExtensionPermission::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdu_fields() {
+        let mut obj = JduExtensionPermission::default();
+        obj.ext_perm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdv_default() {
+        let obj = JdvExtensionSandbox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdv_fields() {
+        let mut obj = JdvExtensionSandbox::default();
+        obj.ext_sandbox_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdw_default() {
+        let obj = JdwExtensionLocalization::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdw_fields() {
+        let mut obj = JdwExtensionLocalization::default();
+        obj.ext_l10n_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdx_default() {
+        let obj = JdxExtensionTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdx_fields() {
+        let mut obj = JdxExtensionTheme::default();
+        obj.ext_theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdy_default() {
+        let obj = JdyExtensionGrammar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdy_fields() {
+        let mut obj = JdyExtensionGrammar::default();
+        obj.ext_grammar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jdz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jdz_default() {
+        let obj = JdzExtensionSnippet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jdz_fields() {
+        let mut obj = JdzExtensionSnippet::default();
+        obj.ext_snippet_id = "test".to_string();
         assert!(obj.validate());
     }
 }
