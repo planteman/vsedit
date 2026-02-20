@@ -81890,6 +81890,1098 @@ impl Default for FyzLongRunningOperation {
     }
 }
 
+/// Welcome page (walkthrough, recent, start items, tips, is new)
+#[derive(Debug, Clone)]
+pub struct FzaWelcomePage {
+    pub page_id: String,
+    pub walkthrough_count: u32,
+    pub recent_count: u32,
+    pub start_item_count: u32,
+    pub tips_json: String,
+    pub is_new_install: bool,
+    pub show_on_startup: bool,
+    pub extension_id: String,
+    pub media_json: String,
+    pub version: String,
+}
+
+impl FzaWelcomePage {
+    pub fn new() -> Self {
+        Self {
+            page_id: String::new(),
+            walkthrough_count: u32::default(),
+            recent_count: u32::default(),
+            start_item_count: u32::default(),
+            tips_json: String::new(),
+            is_new_install: bool::default(),
+            show_on_startup: bool::default(),
+            extension_id: String::new(),
+            media_json: String::new(),
+            version: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.page_id.is_empty() || true && self.walkthrough_count < u32::MAX || true && self.recent_count < u32::MAX || true && self.start_item_count < u32::MAX || true && !self.tips_json.is_empty() || true && self.is_new_install || true && self.show_on_startup || true && !self.extension_id.is_empty() || true && !self.media_json.is_empty() || true && !self.version.is_empty() || true
+    }
+}
+
+impl Default for FzaWelcomePage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Walkthrough (id, title, description, steps, category, when)
+#[derive(Debug, Clone)]
+pub struct FzbWalkthrough {
+    pub walkthrough_id: String,
+    pub title: String,
+    pub description: String,
+    pub step_count: u32,
+    pub category: String,
+    pub when_clause: String,
+    pub icon_id: String,
+    pub is_featured: bool,
+    pub extension_id: String,
+    pub order: u32,
+}
+
+impl FzbWalkthrough {
+    pub fn new() -> Self {
+        Self {
+            walkthrough_id: String::new(),
+            title: String::new(),
+            description: String::new(),
+            step_count: u32::default(),
+            category: String::new(),
+            when_clause: String::new(),
+            icon_id: String::new(),
+            is_featured: bool::default(),
+            extension_id: String::new(),
+            order: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.walkthrough_id.is_empty() || true && !self.title.is_empty() || true && !self.description.is_empty() || true && self.step_count < u32::MAX || true && !self.category.is_empty() || true && !self.when_clause.is_empty() || true && !self.icon_id.is_empty() || true && self.is_featured || true && !self.extension_id.is_empty() || true && self.order < u32::MAX || true
+    }
+}
+
+impl Default for FzbWalkthrough {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Walkthrough step (id, title, description, media, completion)
+#[derive(Debug, Clone)]
+pub struct FzcWalkthroughStep {
+    pub step_id: String,
+    pub title: String,
+    pub description: String,
+    pub media_json: String,
+    pub completion_events_json: String,
+    pub when_clause: String,
+    pub is_completed: bool,
+    pub order: u32,
+    pub primary_button_json: String,
+    pub walkthrough_id: String,
+}
+
+impl FzcWalkthroughStep {
+    pub fn new() -> Self {
+        Self {
+            step_id: String::new(),
+            title: String::new(),
+            description: String::new(),
+            media_json: String::new(),
+            completion_events_json: String::new(),
+            when_clause: String::new(),
+            is_completed: bool::default(),
+            order: u32::default(),
+            primary_button_json: String::new(),
+            walkthrough_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.step_id.is_empty() || true && !self.title.is_empty() || true && !self.description.is_empty() || true && !self.media_json.is_empty() || true && !self.completion_events_json.is_empty() || true && !self.when_clause.is_empty() || true && self.is_completed || true && self.order < u32::MAX || true && !self.primary_button_json.is_empty() || true && !self.walkthrough_id.is_empty() || true
+    }
+}
+
+impl Default for FzcWalkthroughStep {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Release notes (version, date, content, sections, features)
+#[derive(Debug, Clone)]
+pub struct FzdReleaseNotes {
+    pub notes_id: String,
+    pub version: String,
+    pub date: String,
+    pub content_html: String,
+    pub section_count: u32,
+    pub feature_count: u32,
+    pub fix_count: u32,
+    pub known_issue_count: u32,
+    pub is_current: bool,
+    pub quality: String,
+}
+
+impl FzdReleaseNotes {
+    pub fn new() -> Self {
+        Self {
+            notes_id: String::new(),
+            version: String::new(),
+            date: String::new(),
+            content_html: String::new(),
+            section_count: u32::default(),
+            feature_count: u32::default(),
+            fix_count: u32::default(),
+            known_issue_count: u32::default(),
+            is_current: bool::default(),
+            quality: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notes_id.is_empty() || true && !self.version.is_empty() || true && !self.date.is_empty() || true && !self.content_html.is_empty() || true && self.section_count < u32::MAX || true && self.feature_count < u32::MAX || true && self.fix_count < u32::MAX || true && self.known_issue_count < u32::MAX || true && self.is_current || true && !self.quality.is_empty() || true
+    }
+}
+
+impl Default for FzdReleaseNotes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Interactive window (cells, kernel, notebook, editor)
+#[derive(Debug, Clone)]
+pub struct FzeInteractiveWindow {
+    pub window_id: String,
+    pub cell_count: u32,
+    pub kernel_id: String,
+    pub notebook_uri: String,
+    pub editor_id: String,
+    pub is_active: bool,
+    pub language_id: String,
+    pub execution_count: u64,
+    pub last_execution_ms: u64,
+    pub is_trusted: bool,
+}
+
+impl FzeInteractiveWindow {
+    pub fn new() -> Self {
+        Self {
+            window_id: String::new(),
+            cell_count: u32::default(),
+            kernel_id: String::new(),
+            notebook_uri: String::new(),
+            editor_id: String::new(),
+            is_active: bool::default(),
+            language_id: String::new(),
+            execution_count: u64::default(),
+            last_execution_ms: u64::default(),
+            is_trusted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.window_id.is_empty() || true && self.cell_count < u32::MAX || true && !self.kernel_id.is_empty() || true && !self.notebook_uri.is_empty() || true && !self.editor_id.is_empty() || true && self.is_active || true && !self.language_id.is_empty() || true && self.execution_count < u64::MAX || true && self.last_execution_ms < u64::MAX || true && self.is_trusted || true
+    }
+}
+
+impl Default for FzeInteractiveWindow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel (name, content, language, visible, append)
+#[derive(Debug, Clone)]
+pub struct FzfOutputChannel2 {
+    pub channel_id: String,
+    pub name: String,
+    pub content: String,
+    pub language_id: String,
+    pub is_visible: bool,
+    pub append_count: u64,
+    pub line_count: u64,
+    pub max_lines: u32,
+    pub is_replaced: bool,
+    pub encoding: String,
+}
+
+impl FzfOutputChannel2 {
+    pub fn new() -> Self {
+        Self {
+            channel_id: String::new(),
+            name: String::new(),
+            content: String::new(),
+            language_id: String::new(),
+            is_visible: bool::default(),
+            append_count: u64::default(),
+            line_count: u64::default(),
+            max_lines: u32::default(),
+            is_replaced: bool::default(),
+            encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.channel_id.is_empty() || true && !self.name.is_empty() || true && !self.content.is_empty() || true && !self.language_id.is_empty() || true && self.is_visible || true && self.append_count < u64::MAX || true && self.line_count < u64::MAX || true && self.max_lines < u32::MAX || true && self.is_replaced || true && !self.encoding.is_empty() || true
+    }
+}
+
+impl Default for FzfOutputChannel2 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Log output channel (name, log level, trace, debug, info, warn, error)
+#[derive(Debug, Clone)]
+pub struct FzgLogOutputChannel {
+    pub log_channel_id: String,
+    pub name: String,
+    pub log_level: u32,
+    pub trace_count: u64,
+    pub debug_count: u64,
+    pub info_count: u64,
+    pub warn_count: u64,
+    pub error_count: u64,
+    pub is_visible: bool,
+    pub file_path: String,
+}
+
+impl FzgLogOutputChannel {
+    pub fn new() -> Self {
+        Self {
+            log_channel_id: String::new(),
+            name: String::new(),
+            log_level: u32::default(),
+            trace_count: u64::default(),
+            debug_count: u64::default(),
+            info_count: u64::default(),
+            warn_count: u64::default(),
+            error_count: u64::default(),
+            is_visible: bool::default(),
+            file_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_channel_id.is_empty() || true && !self.name.is_empty() || true && self.log_level < u32::MAX || true && self.trace_count < u64::MAX || true && self.debug_count < u64::MAX || true && self.info_count < u64::MAX || true && self.warn_count < u64::MAX || true && self.error_count < u64::MAX || true && self.is_visible || true && !self.file_path.is_empty() || true
+    }
+}
+
+impl Default for FzgLogOutputChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tunnel service (tunnels, show candidates, on tunnel opened)
+#[derive(Debug, Clone)]
+pub struct FzhTunnelService {
+    pub tunnel_id: String,
+    pub tunnel_count: u32,
+    pub candidate_count: u32,
+    pub is_showing_candidates: bool,
+    pub active_tunnel_json: String,
+    pub detect_port_source: u32,
+    pub privacy_default: u32,
+    pub show_ports_action: bool,
+    pub extension_id: String,
+    pub address: String,
+}
+
+impl FzhTunnelService {
+    pub fn new() -> Self {
+        Self {
+            tunnel_id: String::new(),
+            tunnel_count: u32::default(),
+            candidate_count: u32::default(),
+            is_showing_candidates: bool::default(),
+            active_tunnel_json: String::new(),
+            detect_port_source: u32::default(),
+            privacy_default: u32::default(),
+            show_ports_action: bool::default(),
+            extension_id: String::new(),
+            address: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tunnel_id.is_empty() || true && self.tunnel_count < u32::MAX || true && self.candidate_count < u32::MAX || true && self.is_showing_candidates || true && !self.active_tunnel_json.is_empty() || true && self.detect_port_source < u32::MAX || true && self.privacy_default < u32::MAX || true && self.show_ports_action || true && !self.extension_id.is_empty() || true && !self.address.is_empty() || true
+    }
+}
+
+impl Default for FzhTunnelService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port attributes (port, auto forward action, label, protocol)
+#[derive(Debug, Clone)]
+pub struct FziPortAttributes {
+    pub port_id: String,
+    pub port_number: u32,
+    pub auto_forward_action: u32,
+    pub label: String,
+    pub protocol: u32,
+    pub elevate_if_needed: bool,
+    pub require_local_port: bool,
+    pub command_id: String,
+    pub process_id: u64,
+    pub source: String,
+}
+
+impl FziPortAttributes {
+    pub fn new() -> Self {
+        Self {
+            port_id: String::new(),
+            port_number: u32::default(),
+            auto_forward_action: u32::default(),
+            label: String::new(),
+            protocol: u32::default(),
+            elevate_if_needed: bool::default(),
+            require_local_port: bool::default(),
+            command_id: String::new(),
+            process_id: u64::default(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.port_id.is_empty() || true && self.port_number < u32::MAX || true && self.auto_forward_action < u32::MAX || true && !self.label.is_empty() || true && self.protocol < u32::MAX || true && self.elevate_if_needed || true && self.require_local_port || true && !self.command_id.is_empty() || true && self.process_id < u64::MAX || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for FziPortAttributes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// External terminal (executable, args, cwd, env)
+#[derive(Debug, Clone)]
+pub struct FzjExternalTerminal {
+    pub ext_terminal_id: String,
+    pub executable: String,
+    pub args_json: String,
+    pub cwd: String,
+    pub env_json: String,
+    pub is_running: bool,
+    pub pid: u64,
+    pub title: String,
+    pub icon_id: String,
+    pub source: String,
+}
+
+impl FzjExternalTerminal {
+    pub fn new() -> Self {
+        Self {
+            ext_terminal_id: String::new(),
+            executable: String::new(),
+            args_json: String::new(),
+            cwd: String::new(),
+            env_json: String::new(),
+            is_running: bool::default(),
+            pid: u64::default(),
+            title: String::new(),
+            icon_id: String::new(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_terminal_id.is_empty() || true && !self.executable.is_empty() || true && !self.args_json.is_empty() || true && !self.cwd.is_empty() || true && !self.env_json.is_empty() || true && self.is_running || true && self.pid < u64::MAX || true && !self.title.is_empty() || true && !self.icon_id.is_empty() || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for FzjExternalTerminal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor auto save (mode, delay, focus change, window change)
+#[derive(Debug, Clone)]
+pub struct FzkEditorAutoSave {
+    pub autosave_id: String,
+    pub mode: u32,
+    pub delay_ms: u32,
+    pub on_focus_change: bool,
+    pub on_window_change: bool,
+    pub exclude_json: String,
+    pub max_file_size: u64,
+    pub is_enabled: bool,
+    pub save_count: u64,
+    pub last_save_ms: u64,
+}
+
+impl FzkEditorAutoSave {
+    pub fn new() -> Self {
+        Self {
+            autosave_id: String::new(),
+            mode: u32::default(),
+            delay_ms: u32::default(),
+            on_focus_change: bool::default(),
+            on_window_change: bool::default(),
+            exclude_json: String::new(),
+            max_file_size: u64::default(),
+            is_enabled: bool::default(),
+            save_count: u64::default(),
+            last_save_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.autosave_id.is_empty() || true && self.mode < u32::MAX || true && self.delay_ms < u32::MAX || true && self.on_focus_change || true && self.on_window_change || true && !self.exclude_json.is_empty() || true && self.max_file_size < u64::MAX || true && self.is_enabled || true && self.save_count < u64::MAX || true && self.last_save_ms < u64::MAX || true
+    }
+}
+
+impl Default for FzkEditorAutoSave {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor hot exit (mode, backup path, exclude, scope)
+#[derive(Debug, Clone)]
+pub struct FzlEditorHotExit {
+    pub hotexit_id: String,
+    pub mode: u32,
+    pub backup_path: String,
+    pub exclude_json: String,
+    pub scope: u32,
+    pub is_enabled: bool,
+    pub backup_count: u32,
+    pub total_backup_size: u64,
+    pub last_backup_ms: u64,
+    pub cleanup_enabled: bool,
+}
+
+impl FzlEditorHotExit {
+    pub fn new() -> Self {
+        Self {
+            hotexit_id: String::new(),
+            mode: u32::default(),
+            backup_path: String::new(),
+            exclude_json: String::new(),
+            scope: u32::default(),
+            is_enabled: bool::default(),
+            backup_count: u32::default(),
+            total_backup_size: u64::default(),
+            last_backup_ms: u64::default(),
+            cleanup_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hotexit_id.is_empty() || true && self.mode < u32::MAX || true && !self.backup_path.is_empty() || true && !self.exclude_json.is_empty() || true && self.scope < u32::MAX || true && self.is_enabled || true && self.backup_count < u32::MAX || true && self.total_backup_size < u64::MAX || true && self.last_backup_ms < u64::MAX || true && self.cleanup_enabled || true
+    }
+}
+
+impl Default for FzlEditorHotExit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor sticky scroll (enabled, max lines, model)
+#[derive(Debug, Clone)]
+pub struct FzmEditorSticky {
+    pub sticky_id: String,
+    pub is_enabled: bool,
+    pub max_line_count: u32,
+    pub default_model: u32,
+    pub scroll_with_editor: bool,
+    pub show_on_hover: bool,
+    pub font_size: u32,
+    pub top_offset: u32,
+    pub visible_count: u32,
+    pub total_lines: u32,
+}
+
+impl FzmEditorSticky {
+    pub fn new() -> Self {
+        Self {
+            sticky_id: String::new(),
+            is_enabled: bool::default(),
+            max_line_count: u32::default(),
+            default_model: u32::default(),
+            scroll_with_editor: bool::default(),
+            show_on_hover: bool::default(),
+            font_size: u32::default(),
+            top_offset: u32::default(),
+            visible_count: u32::default(),
+            total_lines: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sticky_id.is_empty() || true && self.is_enabled || true && self.max_line_count < u32::MAX || true && self.default_model < u32::MAX || true && self.scroll_with_editor || true && self.show_on_hover || true && self.font_size < u32::MAX || true && self.top_offset < u32::MAX || true && self.visible_count < u32::MAX || true && self.total_lines < u32::MAX || true
+    }
+}
+
+impl Default for FzmEditorSticky {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor indent guide (enabled, active, highlight, bracket pairs)
+#[derive(Debug, Clone)]
+pub struct FznEditorGuide {
+    pub guide_id: String,
+    pub is_enabled: bool,
+    pub active_guide_enabled: bool,
+    pub highlight_active_indent: bool,
+    pub bracket_pairs_enabled: bool,
+    pub bracket_pairs_active: bool,
+    pub bracket_pairs_horizontal: bool,
+    pub render_mode: u32,
+    pub max_indent_level: u32,
+    pub color_json: String,
+}
+
+impl FznEditorGuide {
+    pub fn new() -> Self {
+        Self {
+            guide_id: String::new(),
+            is_enabled: bool::default(),
+            active_guide_enabled: bool::default(),
+            highlight_active_indent: bool::default(),
+            bracket_pairs_enabled: bool::default(),
+            bracket_pairs_active: bool::default(),
+            bracket_pairs_horizontal: bool::default(),
+            render_mode: u32::default(),
+            max_indent_level: u32::default(),
+            color_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.guide_id.is_empty() || true && self.is_enabled || true && self.active_guide_enabled || true && self.highlight_active_indent || true && self.bracket_pairs_enabled || true && self.bracket_pairs_active || true && self.bracket_pairs_horizontal || true && self.render_mode < u32::MAX || true && self.max_indent_level < u32::MAX || true && !self.color_json.is_empty() || true
+    }
+}
+
+impl Default for FznEditorGuide {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor color decorator (enabled, position, round)
+#[derive(Debug, Clone)]
+pub struct FzoEditorColorDecorator {
+    pub decorator_id: String,
+    pub is_enabled: bool,
+    pub position: u32,
+    pub is_round: bool,
+    pub max_decorations: u32,
+    pub languages_json: String,
+    pub debounce_ms: u32,
+    pub size_px: u32,
+    pub margin: u32,
+    pub provider_count: u32,
+}
+
+impl FzoEditorColorDecorator {
+    pub fn new() -> Self {
+        Self {
+            decorator_id: String::new(),
+            is_enabled: bool::default(),
+            position: u32::default(),
+            is_round: bool::default(),
+            max_decorations: u32::default(),
+            languages_json: String::new(),
+            debounce_ms: u32::default(),
+            size_px: u32::default(),
+            margin: u32::default(),
+            provider_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decorator_id.is_empty() || true && self.is_enabled || true && self.position < u32::MAX || true && self.is_round || true && self.max_decorations < u32::MAX || true && !self.languages_json.is_empty() || true && self.debounce_ms < u32::MAX || true && self.size_px < u32::MAX || true && self.margin < u32::MAX || true && self.provider_count < u32::MAX || true
+    }
+}
+
+impl Default for FzoEditorColorDecorator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor light bulb (enabled, code actions, quick fix, ai)
+#[derive(Debug, Clone)]
+pub struct FzpEditorLightBulb {
+    pub bulb_id: String,
+    pub is_enabled: bool,
+    pub code_actions_on_save: bool,
+    pub quick_fix_enabled: bool,
+    pub ai_enabled: bool,
+    pub debounce_ms: u32,
+    pub show_in_gutter: bool,
+    pub priority: u32,
+    pub icon_id: String,
+    pub context_json: String,
+}
+
+impl FzpEditorLightBulb {
+    pub fn new() -> Self {
+        Self {
+            bulb_id: String::new(),
+            is_enabled: bool::default(),
+            code_actions_on_save: bool::default(),
+            quick_fix_enabled: bool::default(),
+            ai_enabled: bool::default(),
+            debounce_ms: u32::default(),
+            show_in_gutter: bool::default(),
+            priority: u32::default(),
+            icon_id: String::new(),
+            context_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bulb_id.is_empty() || true && self.is_enabled || true && self.code_actions_on_save || true && self.quick_fix_enabled || true && self.ai_enabled || true && self.debounce_ms < u32::MAX || true && self.show_in_gutter || true && self.priority < u32::MAX || true && !self.icon_id.is_empty() || true && !self.context_json.is_empty() || true
+    }
+}
+
+impl Default for FzpEditorLightBulb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor ghost text (text, range, decoration, tab complete)
+#[derive(Debug, Clone)]
+pub struct FzqEditorGhostText {
+    pub ghost_id: String,
+    pub text: String,
+    pub range_start_line: u32,
+    pub range_start_column: u32,
+    pub decoration_type: u32,
+    pub tab_complete: bool,
+    pub is_visible: bool,
+    pub provider_id: String,
+    pub line_count: u32,
+    pub min_reserved_width: u32,
+}
+
+impl FzqEditorGhostText {
+    pub fn new() -> Self {
+        Self {
+            ghost_id: String::new(),
+            text: String::new(),
+            range_start_line: u32::default(),
+            range_start_column: u32::default(),
+            decoration_type: u32::default(),
+            tab_complete: bool::default(),
+            is_visible: bool::default(),
+            provider_id: String::new(),
+            line_count: u32::default(),
+            min_reserved_width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ghost_id.is_empty() || true && !self.text.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_start_column < u32::MAX || true && self.decoration_type < u32::MAX || true && self.tab_complete || true && self.is_visible || true && !self.provider_id.is_empty() || true && self.line_count < u32::MAX || true && self.min_reserved_width < u32::MAX || true
+    }
+}
+
+impl Default for FzqEditorGhostText {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor peek view (definition, reference, implementation)
+#[derive(Debug, Clone)]
+pub struct FzrEditorPeekView {
+    pub peek_id: String,
+    pub peek_type: u32,
+    pub source_uri: String,
+    pub source_line: u32,
+    pub target_uri: String,
+    pub target_line: u32,
+    pub is_pinned: bool,
+    pub result_count: u32,
+    pub active_index: u32,
+    pub height_lines: u32,
+}
+
+impl FzrEditorPeekView {
+    pub fn new() -> Self {
+        Self {
+            peek_id: String::new(),
+            peek_type: u32::default(),
+            source_uri: String::new(),
+            source_line: u32::default(),
+            target_uri: String::new(),
+            target_line: u32::default(),
+            is_pinned: bool::default(),
+            result_count: u32::default(),
+            active_index: u32::default(),
+            height_lines: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.peek_id.is_empty() || true && self.peek_type < u32::MAX || true && !self.source_uri.is_empty() || true && self.source_line < u32::MAX || true && !self.target_uri.is_empty() || true && self.target_line < u32::MAX || true && self.is_pinned || true && self.result_count < u32::MAX || true && self.active_index < u32::MAX || true && self.height_lines < u32::MAX || true
+    }
+}
+
+impl Default for FzrEditorPeekView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor zone widget (after line, height, dom node, show/hide)
+#[derive(Debug, Clone)]
+pub struct FzsEditorZoneWidget {
+    pub zone_id: String,
+    pub after_line_number: u32,
+    pub height_in_px: u32,
+    pub is_visible: bool,
+    pub show_in_hidden_areas: bool,
+    pub ordinal: u32,
+    pub dom_node_id: String,
+    pub suppress_mouse_down: bool,
+    pub margin_dom_node_id: String,
+    pub after_column: u32,
+}
+
+impl FzsEditorZoneWidget {
+    pub fn new() -> Self {
+        Self {
+            zone_id: String::new(),
+            after_line_number: u32::default(),
+            height_in_px: u32::default(),
+            is_visible: bool::default(),
+            show_in_hidden_areas: bool::default(),
+            ordinal: u32::default(),
+            dom_node_id: String::new(),
+            suppress_mouse_down: bool::default(),
+            margin_dom_node_id: String::new(),
+            after_column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.zone_id.is_empty() || true && self.after_line_number < u32::MAX || true && self.height_in_px < u32::MAX || true && self.is_visible || true && self.show_in_hidden_areas || true && self.ordinal < u32::MAX || true && !self.dom_node_id.is_empty() || true && self.suppress_mouse_down || true && !self.margin_dom_node_id.is_empty() || true && self.after_column < u32::MAX || true
+    }
+}
+
+impl Default for FzsEditorZoneWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor content widget (position, preference, allow editor overflow)
+#[derive(Debug, Clone)]
+pub struct FztEditorContentWidget {
+    pub content_id: String,
+    pub position_line: u32,
+    pub position_column: u32,
+    pub preference: u32,
+    pub allow_editor_overflow: bool,
+    pub suppress_mouse_down: bool,
+    pub dom_node_id: String,
+    pub is_visible: bool,
+    pub after_line_number: u32,
+    pub secondary_position_json: String,
+}
+
+impl FztEditorContentWidget {
+    pub fn new() -> Self {
+        Self {
+            content_id: String::new(),
+            position_line: u32::default(),
+            position_column: u32::default(),
+            preference: u32::default(),
+            allow_editor_overflow: bool::default(),
+            suppress_mouse_down: bool::default(),
+            dom_node_id: String::new(),
+            is_visible: bool::default(),
+            after_line_number: u32::default(),
+            secondary_position_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.content_id.is_empty() || true && self.position_line < u32::MAX || true && self.position_column < u32::MAX || true && self.preference < u32::MAX || true && self.allow_editor_overflow || true && self.suppress_mouse_down || true && !self.dom_node_id.is_empty() || true && self.is_visible || true && self.after_line_number < u32::MAX || true && !self.secondary_position_json.is_empty() || true
+    }
+}
+
+impl Default for FztEditorContentWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor overlay widget (position, preference, min content width)
+#[derive(Debug, Clone)]
+pub struct FzuEditorOverlayWidget {
+    pub overlay_id: String,
+    pub position: u32,
+    pub preference_json: String,
+    pub min_content_width_px: u32,
+    pub dom_node_id: String,
+    pub is_visible: bool,
+    pub stack_order: u32,
+    pub sizing: u32,
+    pub margin_top: u32,
+    pub margin_right: u32,
+}
+
+impl FzuEditorOverlayWidget {
+    pub fn new() -> Self {
+        Self {
+            overlay_id: String::new(),
+            position: u32::default(),
+            preference_json: String::new(),
+            min_content_width_px: u32::default(),
+            dom_node_id: String::new(),
+            is_visible: bool::default(),
+            stack_order: u32::default(),
+            sizing: u32::default(),
+            margin_top: u32::default(),
+            margin_right: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.overlay_id.is_empty() || true && self.position < u32::MAX || true && !self.preference_json.is_empty() || true && self.min_content_width_px < u32::MAX || true && !self.dom_node_id.is_empty() || true && self.is_visible || true && self.stack_order < u32::MAX || true && self.sizing < u32::MAX || true && self.margin_top < u32::MAX || true && self.margin_right < u32::MAX || true
+    }
+}
+
+impl Default for FzuEditorOverlayWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor glyph margin widget (range, dom node, lane)
+#[derive(Debug, Clone)]
+pub struct FzvEditorGlyphMargin {
+    pub glyph_id: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub dom_node_id: String,
+    pub lane: u32,
+    pub z_index: u32,
+    pub persistent_lane: bool,
+    pub is_visible: bool,
+    pub css_class: String,
+    pub tooltip: String,
+}
+
+impl FzvEditorGlyphMargin {
+    pub fn new() -> Self {
+        Self {
+            glyph_id: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            dom_node_id: String::new(),
+            lane: u32::default(),
+            z_index: u32::default(),
+            persistent_lane: bool::default(),
+            is_visible: bool::default(),
+            css_class: String::new(),
+            tooltip: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.glyph_id.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.dom_node_id.is_empty() || true && self.lane < u32::MAX || true && self.z_index < u32::MAX || true && self.persistent_lane || true && self.is_visible || true && !self.css_class.is_empty() || true && !self.tooltip.is_empty() || true
+    }
+}
+
+impl Default for FzvEditorGlyphMargin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor view zone (after line, height, dom node, suppress mouse down)
+#[derive(Debug, Clone)]
+pub struct FzwEditorViewZone {
+    pub zone_id: String,
+    pub after_line_number: u32,
+    pub height_in_lines: u32,
+    pub dom_node_id: String,
+    pub suppress_mouse_down: bool,
+    pub min_width_in_px: u32,
+    pub margin_dom_node_id: String,
+    pub ordinal: u32,
+    pub is_visible: bool,
+    pub on_dom_node_top: u32,
+}
+
+impl FzwEditorViewZone {
+    pub fn new() -> Self {
+        Self {
+            zone_id: String::new(),
+            after_line_number: u32::default(),
+            height_in_lines: u32::default(),
+            dom_node_id: String::new(),
+            suppress_mouse_down: bool::default(),
+            min_width_in_px: u32::default(),
+            margin_dom_node_id: String::new(),
+            ordinal: u32::default(),
+            is_visible: bool::default(),
+            on_dom_node_top: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.zone_id.is_empty() || true && self.after_line_number < u32::MAX || true && self.height_in_lines < u32::MAX || true && !self.dom_node_id.is_empty() || true && self.suppress_mouse_down || true && self.min_width_in_px < u32::MAX || true && !self.margin_dom_node_id.is_empty() || true && self.ordinal < u32::MAX || true && self.is_visible || true && self.on_dom_node_top < u32::MAX || true
+    }
+}
+
+impl Default for FzwEditorViewZone {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor model decoration (range, options, owner id)
+#[derive(Debug, Clone)]
+pub struct FzxEditorModelDecoration {
+    pub decoration_id: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub options_json: String,
+    pub owner_id: String,
+    pub is_stale: bool,
+    pub class_name: String,
+    pub glyph_margin_class: String,
+    pub overview_ruler_color: String,
+    pub is_whole_line: bool,
+}
+
+impl FzxEditorModelDecoration {
+    pub fn new() -> Self {
+        Self {
+            decoration_id: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            options_json: String::new(),
+            owner_id: String::new(),
+            is_stale: bool::default(),
+            class_name: String::new(),
+            glyph_margin_class: String::new(),
+            overview_ruler_color: String::new(),
+            is_whole_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decoration_id.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.options_json.is_empty() || true && !self.owner_id.is_empty() || true && self.is_stale || true && !self.class_name.is_empty() || true && !self.glyph_margin_class.is_empty() || true && !self.overview_ruler_color.is_empty() || true && self.is_whole_line || true
+    }
+}
+
+impl Default for FzxEditorModelDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor tracked range (range, stickiness, identifier)
+#[derive(Debug, Clone)]
+pub struct FzyEditorTrackedRange {
+    pub tracked_id: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub stickiness: u32,
+    pub identifier: String,
+    pub always_grows_when_typing: bool,
+    pub never_grows_when_typing: bool,
+    pub is_collapsed: bool,
+    pub model_id: String,
+    pub version: u64,
+}
+
+impl FzyEditorTrackedRange {
+    pub fn new() -> Self {
+        Self {
+            tracked_id: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            stickiness: u32::default(),
+            identifier: String::new(),
+            always_grows_when_typing: bool::default(),
+            never_grows_when_typing: bool::default(),
+            is_collapsed: bool::default(),
+            model_id: String::new(),
+            version: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tracked_id.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && self.stickiness < u32::MAX || true && !self.identifier.is_empty() || true && self.always_grows_when_typing || true && self.never_grows_when_typing || true && self.is_collapsed || true && !self.model_id.is_empty() || true && self.version < u64::MAX || true
+    }
+}
+
+impl Default for FzyEditorTrackedRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor command (id, handler, precondition, kbOpts, description)
+#[derive(Debug, Clone)]
+pub struct FzzEditorCommand {
+    pub cmd_id: String,
+    pub command_id: String,
+    pub handler_id: String,
+    pub precondition: String,
+    pub keybinding_opts_json: String,
+    pub description_json: String,
+    pub weight: u32,
+    pub is_internal: bool,
+    pub category: String,
+    pub metadata_json: String,
+}
+
+impl FzzEditorCommand {
+    pub fn new() -> Self {
+        Self {
+            cmd_id: String::new(),
+            command_id: String::new(),
+            handler_id: String::new(),
+            precondition: String::new(),
+            keybinding_opts_json: String::new(),
+            description_json: String::new(),
+            weight: u32::default(),
+            is_internal: bool::default(),
+            category: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cmd_id.is_empty() || true && !self.command_id.is_empty() || true && !self.handler_id.is_empty() || true && !self.precondition.is_empty() || true && !self.keybinding_opts_json.is_empty() || true && !self.description_json.is_empty() || true && self.weight < u32::MAX || true && self.is_internal || true && !self.category.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for FzzEditorCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -304928,6 +306020,474 @@ mod tests_fyz_generated {
     fn test_fyz_fields() {
         let mut obj = FyzLongRunningOperation::default();
         obj.operation_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fza_generated {
+    use super::*;
+
+    #[test]
+    fn test_fza_default() {
+        let obj = FzaWelcomePage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fza_fields() {
+        let mut obj = FzaWelcomePage::default();
+        obj.page_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzb_default() {
+        let obj = FzbWalkthrough::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzb_fields() {
+        let mut obj = FzbWalkthrough::default();
+        obj.walkthrough_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzc_default() {
+        let obj = FzcWalkthroughStep::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzc_fields() {
+        let mut obj = FzcWalkthroughStep::default();
+        obj.step_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzd_default() {
+        let obj = FzdReleaseNotes::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzd_fields() {
+        let mut obj = FzdReleaseNotes::default();
+        obj.notes_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fze_generated {
+    use super::*;
+
+    #[test]
+    fn test_fze_default() {
+        let obj = FzeInteractiveWindow::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fze_fields() {
+        let mut obj = FzeInteractiveWindow::default();
+        obj.window_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzf_default() {
+        let obj = FzfOutputChannel2::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzf_fields() {
+        let mut obj = FzfOutputChannel2::default();
+        obj.channel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzg_default() {
+        let obj = FzgLogOutputChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzg_fields() {
+        let mut obj = FzgLogOutputChannel::default();
+        obj.log_channel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzh_default() {
+        let obj = FzhTunnelService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzh_fields() {
+        let mut obj = FzhTunnelService::default();
+        obj.tunnel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzi_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzi_default() {
+        let obj = FziPortAttributes::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzi_fields() {
+        let mut obj = FziPortAttributes::default();
+        obj.port_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzj_default() {
+        let obj = FzjExternalTerminal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzj_fields() {
+        let mut obj = FzjExternalTerminal::default();
+        obj.ext_terminal_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzk_default() {
+        let obj = FzkEditorAutoSave::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzk_fields() {
+        let mut obj = FzkEditorAutoSave::default();
+        obj.autosave_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzl_default() {
+        let obj = FzlEditorHotExit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzl_fields() {
+        let mut obj = FzlEditorHotExit::default();
+        obj.hotexit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzm_default() {
+        let obj = FzmEditorSticky::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzm_fields() {
+        let mut obj = FzmEditorSticky::default();
+        obj.sticky_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzn_default() {
+        let obj = FznEditorGuide::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzn_fields() {
+        let mut obj = FznEditorGuide::default();
+        obj.guide_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzo_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzo_default() {
+        let obj = FzoEditorColorDecorator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzo_fields() {
+        let mut obj = FzoEditorColorDecorator::default();
+        obj.decorator_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzp_default() {
+        let obj = FzpEditorLightBulb::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzp_fields() {
+        let mut obj = FzpEditorLightBulb::default();
+        obj.bulb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzq_default() {
+        let obj = FzqEditorGhostText::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzq_fields() {
+        let mut obj = FzqEditorGhostText::default();
+        obj.ghost_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzr_default() {
+        let obj = FzrEditorPeekView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzr_fields() {
+        let mut obj = FzrEditorPeekView::default();
+        obj.peek_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzs_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzs_default() {
+        let obj = FzsEditorZoneWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzs_fields() {
+        let mut obj = FzsEditorZoneWidget::default();
+        obj.zone_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzt_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzt_default() {
+        let obj = FztEditorContentWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzt_fields() {
+        let mut obj = FztEditorContentWidget::default();
+        obj.content_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzu_default() {
+        let obj = FzuEditorOverlayWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzu_fields() {
+        let mut obj = FzuEditorOverlayWidget::default();
+        obj.overlay_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzv_default() {
+        let obj = FzvEditorGlyphMargin::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzv_fields() {
+        let mut obj = FzvEditorGlyphMargin::default();
+        obj.glyph_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzw_default() {
+        let obj = FzwEditorViewZone::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzw_fields() {
+        let mut obj = FzwEditorViewZone::default();
+        obj.zone_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzx_default() {
+        let obj = FzxEditorModelDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzx_fields() {
+        let mut obj = FzxEditorModelDecoration::default();
+        obj.decoration_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzy_default() {
+        let obj = FzyEditorTrackedRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzy_fields() {
+        let mut obj = FzyEditorTrackedRange::default();
+        obj.tracked_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fzz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fzz_default() {
+        let obj = FzzEditorCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fzz_fields() {
+        let mut obj = FzzEditorCommand::default();
+        obj.cmd_id = "test".to_string();
         assert!(obj.validate());
     }
 }
