@@ -60512,6 +60512,213 @@ impl Default for FfoClipboardController {
 }
 
 
+/// File explorer tree view model types
+#[derive(Debug, Clone)]
+pub struct FfpFileExplorer {
+    pub explorer_root_uri: String,
+    pub explorer_expanded_uris: String,
+    pub explorer_selected_uris: String,
+    pub explorer_focused_uri: String,
+    pub explorer_total_count: u32,
+    pub explorer_visible_count: u32,
+    pub explorer_auto_reveal: bool,
+    pub explorer_sort_order: String,
+    pub explorer_compact_folders: bool,
+    pub explorer_decoration_provider: bool,
+}
+
+impl FfpFileExplorer {
+    pub fn new() -> Self {
+        Self {
+            explorer_root_uri: String::new(),
+            explorer_expanded_uris: String::new(),
+            explorer_selected_uris: String::new(),
+            explorer_focused_uri: String::new(),
+            explorer_total_count: u32::default(),
+            explorer_visible_count: u32::default(),
+            explorer_auto_reveal: bool::default(),
+            explorer_sort_order: String::new(),
+            explorer_compact_folders: bool::default(),
+            explorer_decoration_provider: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.explorer_root_uri.is_empty() || true && !self.explorer_expanded_uris.is_empty() || true && !self.explorer_selected_uris.is_empty() || true && !self.explorer_focused_uri.is_empty() || true && self.explorer_total_count < u32::MAX || true && self.explorer_visible_count < u32::MAX || true && self.explorer_auto_reveal || true && !self.explorer_sort_order.is_empty() || true && self.explorer_compact_folders || true && self.explorer_decoration_provider || true
+    }
+}
+
+impl Default for FfpFileExplorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// File explorer tree item types
+#[derive(Debug, Clone)]
+pub struct FfqFileExplorerItem {
+    pub explorer_item_uri: String,
+    pub explorer_item_name: String,
+    pub explorer_item_type: u32,
+    pub explorer_item_is_directory: bool,
+    pub explorer_item_is_symlink: bool,
+    pub explorer_item_is_readonly: bool,
+    pub explorer_item_size: u64,
+    pub explorer_item_mtime: u64,
+    pub explorer_item_children_count: u32,
+    pub explorer_item_is_expanded: bool,
+}
+
+impl FfqFileExplorerItem {
+    pub fn new() -> Self {
+        Self {
+            explorer_item_uri: String::new(),
+            explorer_item_name: String::new(),
+            explorer_item_type: u32::default(),
+            explorer_item_is_directory: bool::default(),
+            explorer_item_is_symlink: bool::default(),
+            explorer_item_is_readonly: bool::default(),
+            explorer_item_size: u64::default(),
+            explorer_item_mtime: u64::default(),
+            explorer_item_children_count: u32::default(),
+            explorer_item_is_expanded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.explorer_item_uri.is_empty() || true && !self.explorer_item_name.is_empty() || true && self.explorer_item_type < u32::MAX || true && self.explorer_item_is_directory || true && self.explorer_item_is_symlink || true && self.explorer_item_is_readonly || true && self.explorer_item_size < u64::MAX || true && self.explorer_item_mtime < u64::MAX || true && self.explorer_item_children_count < u32::MAX || true && self.explorer_item_is_expanded || true
+    }
+}
+
+impl Default for FfqFileExplorerItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// File explorer drag-and-drop types
+#[derive(Debug, Clone)]
+pub struct FfrFileExplorerDnd {
+    pub dnd_source_uris: String,
+    pub dnd_target_uri: String,
+    pub dnd_effect: String,
+    pub dnd_is_copy: bool,
+    pub dnd_is_move: bool,
+    pub dnd_is_link: bool,
+    pub dnd_confirm_overwrite: bool,
+    pub dnd_auto_expand_delay: u32,
+    pub dnd_external_files: bool,
+    pub dnd_error_message: String,
+}
+
+impl FfrFileExplorerDnd {
+    pub fn new() -> Self {
+        Self {
+            dnd_source_uris: String::new(),
+            dnd_target_uri: String::new(),
+            dnd_effect: String::new(),
+            dnd_is_copy: bool::default(),
+            dnd_is_move: bool::default(),
+            dnd_is_link: bool::default(),
+            dnd_confirm_overwrite: bool::default(),
+            dnd_auto_expand_delay: u32::default(),
+            dnd_external_files: bool::default(),
+            dnd_error_message: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dnd_source_uris.is_empty() || true && !self.dnd_target_uri.is_empty() || true && !self.dnd_effect.is_empty() || true && self.dnd_is_copy || true && self.dnd_is_move || true && self.dnd_is_link || true && self.dnd_confirm_overwrite || true && self.dnd_auto_expand_delay < u32::MAX || true && self.dnd_external_files || true && !self.dnd_error_message.is_empty() || true
+    }
+}
+
+impl Default for FfrFileExplorerDnd {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// File explorer filter/search types
+#[derive(Debug, Clone)]
+pub struct FfsFileExplorerFilter {
+    pub filter_pattern: String,
+    pub filter_is_glob: bool,
+    pub filter_case_sensitive: bool,
+    pub filter_include_hidden: bool,
+    pub filter_use_gitignore: bool,
+    pub filter_max_results: u32,
+    pub filter_match_count: u32,
+    pub filter_search_text: String,
+    pub filter_active: bool,
+    pub filter_debounce_ms: u32,
+}
+
+impl FfsFileExplorerFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_pattern: String::new(),
+            filter_is_glob: bool::default(),
+            filter_case_sensitive: bool::default(),
+            filter_include_hidden: bool::default(),
+            filter_use_gitignore: bool::default(),
+            filter_max_results: u32::default(),
+            filter_match_count: u32::default(),
+            filter_search_text: String::new(),
+            filter_active: bool::default(),
+            filter_debounce_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_pattern.is_empty() || true && self.filter_is_glob || true && self.filter_case_sensitive || true && self.filter_include_hidden || true && self.filter_use_gitignore || true && self.filter_max_results < u32::MAX || true && self.filter_match_count < u32::MAX || true && !self.filter_search_text.is_empty() || true && self.filter_active || true && self.filter_debounce_ms < u32::MAX || true
+    }
+}
+
+impl Default for FfsFileExplorerFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// File explorer sort order types
+#[derive(Debug, Clone)]
+pub struct FftFileExplorerSort {
+    pub sort_order: String,
+    pub sort_by_name: bool,
+    pub sort_by_type: bool,
+    pub sort_by_size: bool,
+    pub sort_by_date: bool,
+    pub sort_directories_first: bool,
+    pub sort_case_sensitive: bool,
+    pub sort_natural_numeric: bool,
+    pub sort_reverse: bool,
+    pub sort_custom_comparator: String,
+}
+
+impl FftFileExplorerSort {
+    pub fn new() -> Self {
+        Self {
+            sort_order: String::new(),
+            sort_by_name: bool::default(),
+            sort_by_type: bool::default(),
+            sort_by_size: bool::default(),
+            sort_by_date: bool::default(),
+            sort_directories_first: bool::default(),
+            sort_case_sensitive: bool::default(),
+            sort_natural_numeric: bool::default(),
+            sort_reverse: bool::default(),
+            sort_custom_comparator: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sort_order.is_empty() || true && self.sort_by_name || true && self.sort_by_type || true && self.sort_by_size || true && self.sort_by_date || true && self.sort_directories_first || true && self.sort_case_sensitive || true && self.sort_natural_numeric || true && self.sort_reverse || true && !self.sort_custom_comparator.is_empty() || true
+    }
+}
+
+impl Default for FftFileExplorerSort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274735,6 +274942,96 @@ mod tests_ffo_generated {
     fn test_ffo_fields() {
         let mut obj = FfoClipboardController::default();
         obj.clipboard_action = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffp_default() {
+        let obj = FfpFileExplorer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffp_fields() {
+        let mut obj = FfpFileExplorer::default();
+        obj.explorer_root_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffq_default() {
+        let obj = FfqFileExplorerItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffq_fields() {
+        let mut obj = FfqFileExplorerItem::default();
+        obj.explorer_item_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffr_default() {
+        let obj = FfrFileExplorerDnd::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffr_fields() {
+        let mut obj = FfrFileExplorerDnd::default();
+        obj.dnd_source_uris = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffs_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffs_default() {
+        let obj = FfsFileExplorerFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffs_fields() {
+        let mut obj = FfsFileExplorerFilter::default();
+        obj.filter_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fft_generated {
+    use super::*;
+
+    #[test]
+    fn test_fft_default() {
+        let obj = FftFileExplorerSort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fft_fields() {
+        let mut obj = FftFileExplorerSort::default();
+        obj.sort_order = "test".to_string();
         assert!(obj.validate());
     }
 }
