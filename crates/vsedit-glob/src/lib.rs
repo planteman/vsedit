@@ -55472,6 +55472,213 @@ impl Default for FaoDapCapability {
 }
 
 
+/// Extension host API namespace types
+#[derive(Debug, Clone)]
+pub struct FapExtHostApi {
+    pub api_namespace: String,
+    pub api_version: String,
+    pub api_is_proposed: bool,
+    pub api_extension_id: String,
+    pub api_factory_id: String,
+    pub api_activation_event: String,
+    pub api_deprecation_message: String,
+    pub api_since_version: String,
+    pub api_methods_count: u32,
+    pub api_events_count: u32,
+}
+
+impl FapExtHostApi {
+    pub fn new() -> Self {
+        Self {
+            api_namespace: String::new(),
+            api_version: String::new(),
+            api_is_proposed: bool::default(),
+            api_extension_id: String::new(),
+            api_factory_id: String::new(),
+            api_activation_event: String::new(),
+            api_deprecation_message: String::new(),
+            api_since_version: String::new(),
+            api_methods_count: u32::default(),
+            api_events_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.api_namespace.is_empty() || true && !self.api_version.is_empty() || true && self.api_is_proposed || true && !self.api_extension_id.is_empty() || true && !self.api_factory_id.is_empty() || true && !self.api_activation_event.is_empty() || true && !self.api_deprecation_message.is_empty() || true && !self.api_since_version.is_empty() || true && self.api_methods_count < u32::MAX || true && self.api_events_count < u32::MAX || true
+    }
+}
+
+impl Default for FapExtHostApi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Extension host proxy (main↔ext) types
+#[derive(Debug, Clone)]
+pub struct FaqExtHostProxy {
+    pub proxy_identifier: String,
+    pub proxy_target_id: u32,
+    pub proxy_method_name: String,
+    pub proxy_args: String,
+    pub proxy_is_event: bool,
+    pub proxy_is_call: bool,
+    pub proxy_is_dispose: bool,
+    pub proxy_source_thread: u32,
+    pub proxy_target_thread: u32,
+    pub proxy_trace_enabled: bool,
+}
+
+impl FaqExtHostProxy {
+    pub fn new() -> Self {
+        Self {
+            proxy_identifier: String::new(),
+            proxy_target_id: u32::default(),
+            proxy_method_name: String::new(),
+            proxy_args: String::new(),
+            proxy_is_event: bool::default(),
+            proxy_is_call: bool::default(),
+            proxy_is_dispose: bool::default(),
+            proxy_source_thread: u32::default(),
+            proxy_target_thread: u32::default(),
+            proxy_trace_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proxy_identifier.is_empty() || true && self.proxy_target_id < u32::MAX || true && !self.proxy_method_name.is_empty() || true && !self.proxy_args.is_empty() || true && self.proxy_is_event || true && self.proxy_is_call || true && self.proxy_is_dispose || true && self.proxy_source_thread < u32::MAX || true && self.proxy_target_thread < u32::MAX || true && self.proxy_trace_enabled || true
+    }
+}
+
+impl Default for FaqExtHostProxy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Extension host worker thread types
+#[derive(Debug, Clone)]
+pub struct FarExtHostThread {
+    pub thread_id: u32,
+    pub thread_name: String,
+    pub thread_kind: String,
+    pub thread_pid: u32,
+    pub thread_is_ready: bool,
+    pub thread_extensions_count: u32,
+    pub thread_memory_usage: u64,
+    pub thread_cpu_time_ms: u64,
+    pub thread_start_time: u64,
+    pub thread_responsive: bool,
+}
+
+impl FarExtHostThread {
+    pub fn new() -> Self {
+        Self {
+            thread_id: u32::default(),
+            thread_name: String::new(),
+            thread_kind: String::new(),
+            thread_pid: u32::default(),
+            thread_is_ready: bool::default(),
+            thread_extensions_count: u32::default(),
+            thread_memory_usage: u64::default(),
+            thread_cpu_time_ms: u64::default(),
+            thread_start_time: u64::default(),
+            thread_responsive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.thread_id < u32::MAX || true && !self.thread_name.is_empty() || true && !self.thread_kind.is_empty() || true && self.thread_pid < u32::MAX || true && self.thread_is_ready || true && self.thread_extensions_count < u32::MAX || true && self.thread_memory_usage < u64::MAX || true && self.thread_cpu_time_ms < u64::MAX || true && self.thread_start_time < u64::MAX || true && self.thread_responsive || true
+    }
+}
+
+impl Default for FarExtHostThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Extension host document mirror types
+#[derive(Debug, Clone)]
+pub struct FasExtHostDocument {
+    pub ext_doc_uri: String,
+    pub ext_doc_version: u32,
+    pub ext_doc_language_id: String,
+    pub ext_doc_line_count: u32,
+    pub ext_doc_is_dirty: bool,
+    pub ext_doc_is_closed: bool,
+    pub ext_doc_eol: String,
+    pub ext_doc_encoding: String,
+    pub ext_doc_notebook_type: String,
+    pub ext_doc_is_untitled: bool,
+}
+
+impl FasExtHostDocument {
+    pub fn new() -> Self {
+        Self {
+            ext_doc_uri: String::new(),
+            ext_doc_version: u32::default(),
+            ext_doc_language_id: String::new(),
+            ext_doc_line_count: u32::default(),
+            ext_doc_is_dirty: bool::default(),
+            ext_doc_is_closed: bool::default(),
+            ext_doc_eol: String::new(),
+            ext_doc_encoding: String::new(),
+            ext_doc_notebook_type: String::new(),
+            ext_doc_is_untitled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_doc_uri.is_empty() || true && self.ext_doc_version < u32::MAX || true && !self.ext_doc_language_id.is_empty() || true && self.ext_doc_line_count < u32::MAX || true && self.ext_doc_is_dirty || true && self.ext_doc_is_closed || true && !self.ext_doc_eol.is_empty() || true && !self.ext_doc_encoding.is_empty() || true && !self.ext_doc_notebook_type.is_empty() || true && self.ext_doc_is_untitled || true
+    }
+}
+
+impl Default for FasExtHostDocument {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Extension host editor mirror types
+#[derive(Debug, Clone)]
+pub struct FatExtHostEditor {
+    pub ext_editor_id: String,
+    pub ext_editor_doc_uri: String,
+    pub ext_editor_selection_start: u32,
+    pub ext_editor_selection_end: u32,
+    pub ext_editor_visible_start: u32,
+    pub ext_editor_visible_end: u32,
+    pub ext_editor_options: String,
+    pub ext_editor_view_column: u32,
+    pub ext_editor_is_diff: bool,
+    pub ext_editor_is_notebook: bool,
+}
+
+impl FatExtHostEditor {
+    pub fn new() -> Self {
+        Self {
+            ext_editor_id: String::new(),
+            ext_editor_doc_uri: String::new(),
+            ext_editor_selection_start: u32::default(),
+            ext_editor_selection_end: u32::default(),
+            ext_editor_visible_start: u32::default(),
+            ext_editor_visible_end: u32::default(),
+            ext_editor_options: String::new(),
+            ext_editor_view_column: u32::default(),
+            ext_editor_is_diff: bool::default(),
+            ext_editor_is_notebook: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_editor_id.is_empty() || true && !self.ext_editor_doc_uri.is_empty() || true && self.ext_editor_selection_start < u32::MAX || true && self.ext_editor_selection_end < u32::MAX || true && self.ext_editor_visible_start < u32::MAX || true && self.ext_editor_visible_end < u32::MAX || true && !self.ext_editor_options.is_empty() || true && self.ext_editor_view_column < u32::MAX || true && self.ext_editor_is_diff || true && self.ext_editor_is_notebook || true
+    }
+}
+
+impl Default for FatExtHostEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -266956,6 +267163,96 @@ mod tests_fao_generated {
     fn test_fao_fields() {
         let mut obj = FaoDapCapability::default();
         obj.dap_supports_config_done = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fap_generated {
+    use super::*;
+
+    #[test]
+    fn test_fap_default() {
+        let obj = FapExtHostApi::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fap_fields() {
+        let mut obj = FapExtHostApi::default();
+        obj.api_namespace = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_faq_generated {
+    use super::*;
+
+    #[test]
+    fn test_faq_default() {
+        let obj = FaqExtHostProxy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_faq_fields() {
+        let mut obj = FaqExtHostProxy::default();
+        obj.proxy_identifier = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_far_generated {
+    use super::*;
+
+    #[test]
+    fn test_far_default() {
+        let obj = FarExtHostThread::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_far_fields() {
+        let mut obj = FarExtHostThread::default();
+        obj.thread_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fas_generated {
+    use super::*;
+
+    #[test]
+    fn test_fas_default() {
+        let obj = FasExtHostDocument::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fas_fields() {
+        let mut obj = FasExtHostDocument::default();
+        obj.ext_doc_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fat_generated {
+    use super::*;
+
+    #[test]
+    fn test_fat_default() {
+        let obj = FatExtHostEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fat_fields() {
+        let mut obj = FatExtHostEditor::default();
+        obj.ext_editor_id = "test".to_string();
         assert!(obj.validate());
     }
 }
