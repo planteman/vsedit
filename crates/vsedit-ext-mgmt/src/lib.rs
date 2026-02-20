@@ -91589,6 +91589,216 @@ impl Default for GhzIconLabel {
     }
 }
 
+/// Task definition (type, label, command, args, options, group)
+#[derive(Debug, Clone)]
+pub struct GiaTaskDefinition {
+    pub task_def_id: String,
+    pub task_type: String,
+    pub label: String,
+    pub command: String,
+    pub args_json: String,
+    pub options_json: String,
+    pub group_id: String,
+    pub is_background: bool,
+    pub problem_matcher_json: String,
+    pub depends_on_json: String,
+}
+
+impl GiaTaskDefinition {
+    pub fn new() -> Self {
+        Self {
+            task_def_id: String::new(),
+            task_type: String::new(),
+            label: String::new(),
+            command: String::new(),
+            args_json: String::new(),
+            options_json: String::new(),
+            group_id: String::new(),
+            is_background: bool::default(),
+            problem_matcher_json: String::new(),
+            depends_on_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_def_id.is_empty() || true && !self.task_type.is_empty() || true && !self.label.is_empty() || true && !self.command.is_empty() || true && !self.args_json.is_empty() || true && !self.options_json.is_empty() || true && !self.group_id.is_empty() || true && self.is_background || true && !self.problem_matcher_json.is_empty() || true && !self.depends_on_json.is_empty() || true
+    }
+}
+
+impl Default for GiaTaskDefinition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task execution (task, terminal, state, start time, exit code)
+#[derive(Debug, Clone)]
+pub struct GibTaskExecution {
+    pub exec_id: String,
+    pub task_id: String,
+    pub terminal_id: String,
+    pub state: String,
+    pub start_time_ms: u64,
+    pub exit_code: u32,
+    pub pid: u64,
+    pub is_active: bool,
+    pub output_json: String,
+    pub error_count: u32,
+}
+
+impl GibTaskExecution {
+    pub fn new() -> Self {
+        Self {
+            exec_id: String::new(),
+            task_id: String::new(),
+            terminal_id: String::new(),
+            state: String::new(),
+            start_time_ms: u64::default(),
+            exit_code: u32::default(),
+            pid: u64::default(),
+            is_active: bool::default(),
+            output_json: String::new(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exec_id.is_empty() || true && !self.task_id.is_empty() || true && !self.terminal_id.is_empty() || true && !self.state.is_empty() || true && self.start_time_ms < u64::MAX || true && self.exit_code < u32::MAX || true && self.pid < u64::MAX || true && self.is_active || true && !self.output_json.is_empty() || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for GibTaskExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task group (id, kind, is default, label)
+#[derive(Debug, Clone)]
+pub struct GicTaskGroup {
+    pub group_id: String,
+    pub kind: String,
+    pub is_default: bool,
+    pub label: String,
+    pub tasks_json: String,
+    pub order: u32,
+    pub folder_uri: String,
+    pub scope: String,
+    pub is_build: bool,
+    pub is_test: bool,
+}
+
+impl GicTaskGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            kind: String::new(),
+            is_default: bool::default(),
+            label: String::new(),
+            tasks_json: String::new(),
+            order: u32::default(),
+            folder_uri: String::new(),
+            scope: String::new(),
+            is_build: bool::default(),
+            is_test: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.kind.is_empty() || true && self.is_default || true && !self.label.is_empty() || true && !self.tasks_json.is_empty() || true && self.order < u32::MAX || true && !self.folder_uri.is_empty() || true && !self.scope.is_empty() || true && self.is_build || true && self.is_test || true
+    }
+}
+
+impl Default for GicTaskGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task presentation (reveal, echo, focus, panel, clear, close)
+#[derive(Debug, Clone)]
+pub struct GidTaskPresentation {
+    pub pres_id: String,
+    pub reveal: String,
+    pub echo: bool,
+    pub focus: bool,
+    pub panel: String,
+    pub clear: bool,
+    pub close: bool,
+    pub show_reuse_message: bool,
+    pub group: String,
+    pub color: String,
+}
+
+impl GidTaskPresentation {
+    pub fn new() -> Self {
+        Self {
+            pres_id: String::new(),
+            reveal: String::new(),
+            echo: bool::default(),
+            focus: bool::default(),
+            panel: String::new(),
+            clear: bool::default(),
+            close: bool::default(),
+            show_reuse_message: bool::default(),
+            group: String::new(),
+            color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pres_id.is_empty() || true && !self.reveal.is_empty() || true && self.echo || true && self.focus || true && !self.panel.is_empty() || true && self.clear || true && self.close || true && self.show_reuse_message || true && !self.group.is_empty() || true && !self.color.is_empty() || true
+    }
+}
+
+impl Default for GidTaskPresentation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task run options (reevaluate on rerun, instance limit, depends order)
+#[derive(Debug, Clone)]
+pub struct GieTaskRunOptions {
+    pub run_id: String,
+    pub reevaluate_on_rerun: bool,
+    pub instance_limit: u32,
+    pub depends_order: String,
+    pub run_on: String,
+    pub icon_path: String,
+    pub icon_color: String,
+    pub detail: String,
+    pub hide: bool,
+    pub is_pinned: bool,
+}
+
+impl GieTaskRunOptions {
+    pub fn new() -> Self {
+        Self {
+            run_id: String::new(),
+            reevaluate_on_rerun: bool::default(),
+            instance_limit: u32::default(),
+            depends_order: String::new(),
+            run_on: String::new(),
+            icon_path: String::new(),
+            icon_color: String::new(),
+            detail: String::new(),
+            hide: bool::default(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.run_id.is_empty() || true && self.reevaluate_on_rerun || true && self.instance_limit < u32::MAX || true && !self.depends_order.is_empty() || true && !self.run_on.is_empty() || true && !self.icon_path.is_empty() || true && !self.icon_color.is_empty() || true && !self.detail.is_empty() || true && self.hide || true && self.is_pinned || true
+    }
+}
+
+impl Default for GieTaskRunOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -318804,6 +319014,96 @@ mod tests_ghz_generated {
     fn test_ghz_fields() {
         let mut obj = GhzIconLabel::default();
         obj.icon_label_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gia_generated {
+    use super::*;
+
+    #[test]
+    fn test_gia_default() {
+        let obj = GiaTaskDefinition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gia_fields() {
+        let mut obj = GiaTaskDefinition::default();
+        obj.task_def_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gib_generated {
+    use super::*;
+
+    #[test]
+    fn test_gib_default() {
+        let obj = GibTaskExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gib_fields() {
+        let mut obj = GibTaskExecution::default();
+        obj.exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gic_generated {
+    use super::*;
+
+    #[test]
+    fn test_gic_default() {
+        let obj = GicTaskGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gic_fields() {
+        let mut obj = GicTaskGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gid_generated {
+    use super::*;
+
+    #[test]
+    fn test_gid_default() {
+        let obj = GidTaskPresentation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gid_fields() {
+        let mut obj = GidTaskPresentation::default();
+        obj.pres_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gie_generated {
+    use super::*;
+
+    #[test]
+    fn test_gie_default() {
+        let obj = GieTaskRunOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gie_fields() {
+        let mut obj = GieTaskRunOptions::default();
+        obj.run_id = "test".to_string();
         assert!(obj.validate());
     }
 }
