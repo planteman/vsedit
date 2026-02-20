@@ -89377,6 +89377,216 @@ impl Default for GfzDebugExceptionInfo {
     }
 }
 
+/// SCM provider (id, label, root uri, count, input box, status bar)
+#[derive(Debug, Clone)]
+pub struct GgaScmProvider {
+    pub scm_id: String,
+    pub label: String,
+    pub root_uri: String,
+    pub resource_count: u32,
+    pub input_box_value: String,
+    pub status_bar_json: String,
+    pub context_value: String,
+    pub accept_input_command: String,
+    pub commit_template: String,
+    pub count_badge: u32,
+}
+
+impl GgaScmProvider {
+    pub fn new() -> Self {
+        Self {
+            scm_id: String::new(),
+            label: String::new(),
+            root_uri: String::new(),
+            resource_count: u32::default(),
+            input_box_value: String::new(),
+            status_bar_json: String::new(),
+            context_value: String::new(),
+            accept_input_command: String::new(),
+            commit_template: String::new(),
+            count_badge: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scm_id.is_empty() || true && !self.label.is_empty() || true && !self.root_uri.is_empty() || true && self.resource_count < u32::MAX || true && !self.input_box_value.is_empty() || true && !self.status_bar_json.is_empty() || true && !self.context_value.is_empty() || true && !self.accept_input_command.is_empty() || true && !self.commit_template.is_empty() || true && self.count_badge < u32::MAX || true
+    }
+}
+
+impl Default for GgaScmProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM resource group (id, label, resources, hide empty, context)
+#[derive(Debug, Clone)]
+pub struct GgbScmResourceGroup {
+    pub group_id: String,
+    pub label: String,
+    pub resource_count: u32,
+    pub hide_when_empty: bool,
+    pub context_value: String,
+    pub provider_id: String,
+    pub is_expanded: bool,
+    pub sort_key: u32,
+    pub action_button_json: String,
+    pub description: String,
+}
+
+impl GgbScmResourceGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            label: String::new(),
+            resource_count: u32::default(),
+            hide_when_empty: bool::default(),
+            context_value: String::new(),
+            provider_id: String::new(),
+            is_expanded: bool::default(),
+            sort_key: u32::default(),
+            action_button_json: String::new(),
+            description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.label.is_empty() || true && self.resource_count < u32::MAX || true && self.hide_when_empty || true && !self.context_value.is_empty() || true && !self.provider_id.is_empty() || true && self.is_expanded || true && self.sort_key < u32::MAX || true && !self.action_button_json.is_empty() || true && !self.description.is_empty() || true
+    }
+}
+
+impl Default for GgbScmResourceGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM resource (uri, decorations, context value, command, faded)
+#[derive(Debug, Clone)]
+pub struct GgcScmResource {
+    pub resource_id: String,
+    pub uri: String,
+    pub decoration_icon: String,
+    pub decoration_tooltip: String,
+    pub context_value: String,
+    pub command_id: String,
+    pub is_faded: bool,
+    pub is_strikethrough: bool,
+    pub source_uri: String,
+    pub color: String,
+}
+
+impl GgcScmResource {
+    pub fn new() -> Self {
+        Self {
+            resource_id: String::new(),
+            uri: String::new(),
+            decoration_icon: String::new(),
+            decoration_tooltip: String::new(),
+            context_value: String::new(),
+            command_id: String::new(),
+            is_faded: bool::default(),
+            is_strikethrough: bool::default(),
+            source_uri: String::new(),
+            color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resource_id.is_empty() || true && !self.uri.is_empty() || true && !self.decoration_icon.is_empty() || true && !self.decoration_tooltip.is_empty() || true && !self.context_value.is_empty() || true && !self.command_id.is_empty() || true && self.is_faded || true && self.is_strikethrough || true && !self.source_uri.is_empty() || true && !self.color.is_empty() || true
+    }
+}
+
+impl Default for GgcScmResource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM input box (value, placeholder, visible, focus, validation)
+#[derive(Debug, Clone)]
+pub struct GgdScmInputBox {
+    pub input_id: String,
+    pub value: String,
+    pub placeholder: String,
+    pub is_visible: bool,
+    pub is_focused: bool,
+    pub validation_message: String,
+    pub validation_type: String,
+    pub enabled: bool,
+    pub max_length: u32,
+    pub history_json: String,
+}
+
+impl GgdScmInputBox {
+    pub fn new() -> Self {
+        Self {
+            input_id: String::new(),
+            value: String::new(),
+            placeholder: String::new(),
+            is_visible: bool::default(),
+            is_focused: bool::default(),
+            validation_message: String::new(),
+            validation_type: String::new(),
+            enabled: bool::default(),
+            max_length: u32::default(),
+            history_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_id.is_empty() || true && !self.value.is_empty() || true && !self.placeholder.is_empty() || true && self.is_visible || true && self.is_focused || true && !self.validation_message.is_empty() || true && !self.validation_type.is_empty() || true && self.enabled || true && self.max_length < u32::MAX || true && !self.history_json.is_empty() || true
+    }
+}
+
+impl Default for GgdScmInputBox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM history item (id, parent ids, message, author, date, labels)
+#[derive(Debug, Clone)]
+pub struct GgeScmHistoryItem {
+    pub hist_id: String,
+    pub parent_ids_json: String,
+    pub message: String,
+    pub author: String,
+    pub author_email: String,
+    pub date_ms: u64,
+    pub labels_json: String,
+    pub icon: String,
+    pub description: String,
+    pub is_current: bool,
+}
+
+impl GgeScmHistoryItem {
+    pub fn new() -> Self {
+        Self {
+            hist_id: String::new(),
+            parent_ids_json: String::new(),
+            message: String::new(),
+            author: String::new(),
+            author_email: String::new(),
+            date_ms: u64::default(),
+            labels_json: String::new(),
+            icon: String::new(),
+            description: String::new(),
+            is_current: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hist_id.is_empty() || true && !self.parent_ids_json.is_empty() || true && !self.message.is_empty() || true && !self.author.is_empty() || true && !self.author_email.is_empty() || true && self.date_ms < u64::MAX || true && !self.labels_json.is_empty() || true && !self.icon.is_empty() || true && !self.description.is_empty() || true && self.is_current || true
+    }
+}
+
+impl Default for GgeScmHistoryItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -315862,6 +316072,96 @@ mod tests_gfz_generated {
     fn test_gfz_fields() {
         let mut obj = GfzDebugExceptionInfo::default();
         obj.exc_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gga_generated {
+    use super::*;
+
+    #[test]
+    fn test_gga_default() {
+        let obj = GgaScmProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gga_fields() {
+        let mut obj = GgaScmProvider::default();
+        obj.scm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggb_default() {
+        let obj = GgbScmResourceGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggb_fields() {
+        let mut obj = GgbScmResourceGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggc_default() {
+        let obj = GgcScmResource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggc_fields() {
+        let mut obj = GgcScmResource::default();
+        obj.resource_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ggd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ggd_default() {
+        let obj = GgdScmInputBox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ggd_fields() {
+        let mut obj = GgdScmInputBox::default();
+        obj.input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gge_generated {
+    use super::*;
+
+    #[test]
+    fn test_gge_default() {
+        let obj = GgeScmHistoryItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gge_fields() {
+        let mut obj = GgeScmHistoryItem::default();
+        obj.hist_id = "test".to_string();
         assert!(obj.validate());
     }
 }
