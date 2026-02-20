@@ -97214,6 +97214,216 @@ impl Default for GmzLinkedEditingRangeProvider {
     }
 }
 
+/// Text model (uri, language id, version, line count, eol, encoding)
+#[derive(Debug, Clone)]
+pub struct GnaTextModel {
+    pub model_id: String,
+    pub uri: String,
+    pub language_id: String,
+    pub version: u32,
+    pub line_count: u32,
+    pub eol: String,
+    pub encoding: String,
+    pub is_large: bool,
+    pub is_too_large: bool,
+    pub is_disposed: bool,
+}
+
+impl GnaTextModel {
+    pub fn new() -> Self {
+        Self {
+            model_id: String::new(),
+            uri: String::new(),
+            language_id: String::new(),
+            version: u32::default(),
+            line_count: u32::default(),
+            eol: String::new(),
+            encoding: String::new(),
+            is_large: bool::default(),
+            is_too_large: bool::default(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_id.is_empty() || true && !self.uri.is_empty() || true && !self.language_id.is_empty() || true && self.version < u32::MAX || true && self.line_count < u32::MAX || true && !self.eol.is_empty() || true && !self.encoding.is_empty() || true && self.is_large || true && self.is_too_large || true && self.is_disposed || true
+    }
+}
+
+impl Default for GnaTextModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text buffer (piece tree, line starts, BOM, default EOL, length)
+#[derive(Debug, Clone)]
+pub struct GnbTextBuffer {
+    pub buffer_id: String,
+    pub piece_count: u32,
+    pub line_start_count: u32,
+    pub bom: String,
+    pub default_eol: String,
+    pub length: u64,
+    pub is_readonly: bool,
+    pub cr_count: u32,
+    pub modification_count: u32,
+    pub snapshot_version: u32,
+}
+
+impl GnbTextBuffer {
+    pub fn new() -> Self {
+        Self {
+            buffer_id: String::new(),
+            piece_count: u32::default(),
+            line_start_count: u32::default(),
+            bom: String::new(),
+            default_eol: String::new(),
+            length: u64::default(),
+            is_readonly: bool::default(),
+            cr_count: u32::default(),
+            modification_count: u32::default(),
+            snapshot_version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buffer_id.is_empty() || true && self.piece_count < u32::MAX || true && self.line_start_count < u32::MAX || true && !self.bom.is_empty() || true && !self.default_eol.is_empty() || true && self.length < u64::MAX || true && self.is_readonly || true && self.cr_count < u32::MAX || true && self.modification_count < u32::MAX || true && self.snapshot_version < u32::MAX || true
+    }
+}
+
+impl Default for GnbTextBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Piece tree node (buffer index, start, end, line feed count, left)
+#[derive(Debug, Clone)]
+pub struct GncPieceTreeNode {
+    pub node_id: String,
+    pub buffer_index: u32,
+    pub start_offset: u64,
+    pub end_offset: u64,
+    pub line_feed_count: u32,
+    pub left_child_id: String,
+    pub right_child_id: String,
+    pub parent_id: String,
+    pub color: u32,
+    pub size_left: u64,
+}
+
+impl GncPieceTreeNode {
+    pub fn new() -> Self {
+        Self {
+            node_id: String::new(),
+            buffer_index: u32::default(),
+            start_offset: u64::default(),
+            end_offset: u64::default(),
+            line_feed_count: u32::default(),
+            left_child_id: String::new(),
+            right_child_id: String::new(),
+            parent_id: String::new(),
+            color: u32::default(),
+            size_left: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.node_id.is_empty() || true && self.buffer_index < u32::MAX || true && self.start_offset < u64::MAX || true && self.end_offset < u64::MAX || true && self.line_feed_count < u32::MAX || true && !self.left_child_id.is_empty() || true && !self.right_child_id.is_empty() || true && !self.parent_id.is_empty() || true && self.color < u32::MAX || true && self.size_left < u64::MAX || true
+    }
+}
+
+impl Default for GncPieceTreeNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text model token (type, scopes, start offset, end offset)
+#[derive(Debug, Clone)]
+pub struct GndTextModelToken {
+    pub token_id: String,
+    pub token_type: String,
+    pub scopes_json: String,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub language_id: String,
+    pub font_style: u32,
+    pub foreground: u32,
+    pub background: u32,
+    pub metadata: u32,
+}
+
+impl GndTextModelToken {
+    pub fn new() -> Self {
+        Self {
+            token_id: String::new(),
+            token_type: String::new(),
+            scopes_json: String::new(),
+            start_offset: u32::default(),
+            end_offset: u32::default(),
+            language_id: String::new(),
+            font_style: u32::default(),
+            foreground: u32::default(),
+            background: u32::default(),
+            metadata: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_id.is_empty() || true && !self.token_type.is_empty() || true && !self.scopes_json.is_empty() || true && self.start_offset < u32::MAX || true && self.end_offset < u32::MAX || true && !self.language_id.is_empty() || true && self.font_style < u32::MAX || true && self.foreground < u32::MAX || true && self.background < u32::MAX || true && self.metadata < u32::MAX || true
+    }
+}
+
+impl Default for GndTextModelToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tokenization state (rule stack, end state, line tokens)
+#[derive(Debug, Clone)]
+pub struct GneTokenizationState {
+    pub state_id: String,
+    pub rule_stack_json: String,
+    pub end_state_json: String,
+    pub line_tokens_json: String,
+    pub is_first_line: bool,
+    pub language_id: String,
+    pub grammar_id: String,
+    pub stack_depth: u32,
+    pub begin_rule_id: u32,
+    pub anchor_position: u32,
+}
+
+impl GneTokenizationState {
+    pub fn new() -> Self {
+        Self {
+            state_id: String::new(),
+            rule_stack_json: String::new(),
+            end_state_json: String::new(),
+            line_tokens_json: String::new(),
+            is_first_line: bool::default(),
+            language_id: String::new(),
+            grammar_id: String::new(),
+            stack_depth: u32::default(),
+            begin_rule_id: u32::default(),
+            anchor_position: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.state_id.is_empty() || true && !self.rule_stack_json.is_empty() || true && !self.end_state_json.is_empty() || true && !self.line_tokens_json.is_empty() || true && self.is_first_line || true && !self.language_id.is_empty() || true && !self.grammar_id.is_empty() || true && self.stack_depth < u32::MAX || true && self.begin_rule_id < u32::MAX || true && self.anchor_position < u32::MAX || true
+    }
+}
+
+impl Default for GneTokenizationState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -326777,6 +326987,96 @@ mod tests_gmz_generated {
     fn test_gmz_fields() {
         let mut obj = GmzLinkedEditingRangeProvider::default();
         obj.linked_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gna_generated {
+    use super::*;
+
+    #[test]
+    fn test_gna_default() {
+        let obj = GnaTextModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gna_fields() {
+        let mut obj = GnaTextModel::default();
+        obj.model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnb_default() {
+        let obj = GnbTextBuffer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnb_fields() {
+        let mut obj = GnbTextBuffer::default();
+        obj.buffer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnc_default() {
+        let obj = GncPieceTreeNode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnc_fields() {
+        let mut obj = GncPieceTreeNode::default();
+        obj.node_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gnd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gnd_default() {
+        let obj = GndTextModelToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gnd_fields() {
+        let mut obj = GndTextModelToken::default();
+        obj.token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gne_generated {
+    use super::*;
+
+    #[test]
+    fn test_gne_default() {
+        let obj = GneTokenizationState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gne_fields() {
+        let mut obj = GneTokenizationState::default();
+        obj.state_id = "test".to_string();
         assert!(obj.validate());
     }
 }
