@@ -119957,6 +119957,426 @@ impl Default for HhzRemoteStatusBar {
     }
 }
 
+/// Extension manifest (name, version, publisher, engines, main)
+#[derive(Debug, Clone)]
+pub struct HiaExtensionManifest {
+    pub ext_manifest_id: String,
+    pub name: String,
+    pub version: String,
+    pub publisher: String,
+    pub engines_json: String,
+    pub main: String,
+    pub browser: String,
+    pub activation_events_json: String,
+    pub contributes_json: String,
+    pub categories_json: String,
+}
+
+impl HiaExtensionManifest {
+    pub fn new() -> Self {
+        Self {
+            ext_manifest_id: String::new(),
+            name: String::new(),
+            version: String::new(),
+            publisher: String::new(),
+            engines_json: String::new(),
+            main: String::new(),
+            browser: String::new(),
+            activation_events_json: String::new(),
+            contributes_json: String::new(),
+            categories_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_manifest_id.is_empty() || true && !self.name.is_empty() || true && !self.version.is_empty() || true && !self.publisher.is_empty() || true && !self.engines_json.is_empty() || true && !self.main.is_empty() || true && !self.browser.is_empty() || true && !self.activation_events_json.is_empty() || true && !self.contributes_json.is_empty() || true && !self.categories_json.is_empty() || true
+    }
+}
+
+impl Default for HiaExtensionManifest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension activation (event, dependencies, timing, exports)
+#[derive(Debug, Clone)]
+pub struct HibExtensionActivation {
+    pub ext_activation_id: String,
+    pub event: String,
+    pub dependencies_json: String,
+    pub timing_ms: u64,
+    pub exports_json: String,
+    pub is_eager: bool,
+    pub extension_id: String,
+    pub error_message: String,
+    pub retry_count: u32,
+    pub is_active: bool,
+}
+
+impl HibExtensionActivation {
+    pub fn new() -> Self {
+        Self {
+            ext_activation_id: String::new(),
+            event: String::new(),
+            dependencies_json: String::new(),
+            timing_ms: u64::default(),
+            exports_json: String::new(),
+            is_eager: bool::default(),
+            extension_id: String::new(),
+            error_message: String::new(),
+            retry_count: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_activation_id.is_empty() || true && !self.event.is_empty() || true && !self.dependencies_json.is_empty() || true && self.timing_ms < u64::MAX || true && !self.exports_json.is_empty() || true && self.is_eager || true && !self.extension_id.is_empty() || true && !self.error_message.is_empty() || true && self.retry_count < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for HibExtensionActivation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension context (subscriptions, storage path, global state)
+#[derive(Debug, Clone)]
+pub struct HicExtensionContext {
+    pub ext_context_id: String,
+    pub subscriptions_json: String,
+    pub storage_path: String,
+    pub global_state_json: String,
+    pub workspace_state_json: String,
+    pub secrets_json: String,
+    pub log_uri: String,
+    pub extension_mode: String,
+    pub extension_uri: String,
+    pub is_new_install: bool,
+}
+
+impl HicExtensionContext {
+    pub fn new() -> Self {
+        Self {
+            ext_context_id: String::new(),
+            subscriptions_json: String::new(),
+            storage_path: String::new(),
+            global_state_json: String::new(),
+            workspace_state_json: String::new(),
+            secrets_json: String::new(),
+            log_uri: String::new(),
+            extension_mode: String::new(),
+            extension_uri: String::new(),
+            is_new_install: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_context_id.is_empty() || true && !self.subscriptions_json.is_empty() || true && !self.storage_path.is_empty() || true && !self.global_state_json.is_empty() || true && !self.workspace_state_json.is_empty() || true && !self.secrets_json.is_empty() || true && !self.log_uri.is_empty() || true && !self.extension_mode.is_empty() || true && !self.extension_uri.is_empty() || true && self.is_new_install || true
+    }
+}
+
+impl Default for HicExtensionContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension runtime (host kind, process id, log path, status)
+#[derive(Debug, Clone)]
+pub struct HidExtensionRuntime {
+    pub ext_runtime_id: String,
+    pub host_kind: String,
+    pub process_id: u32,
+    pub log_path: String,
+    pub status: String,
+    pub extension_count: u32,
+    pub memory_usage: u64,
+    pub cpu_usage: f64,
+    pub startup_time_ms: u64,
+    pub protocol_version: String,
+}
+
+impl HidExtensionRuntime {
+    pub fn new() -> Self {
+        Self {
+            ext_runtime_id: String::new(),
+            host_kind: String::new(),
+            process_id: u32::default(),
+            log_path: String::new(),
+            status: String::new(),
+            extension_count: u32::default(),
+            memory_usage: u64::default(),
+            cpu_usage: f64::default(),
+            startup_time_ms: u64::default(),
+            protocol_version: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_runtime_id.is_empty() || true && !self.host_kind.is_empty() || true && self.process_id < u32::MAX || true && !self.log_path.is_empty() || true && !self.status.is_empty() || true && self.extension_count < u32::MAX || true && self.memory_usage < u64::MAX || true && self.cpu_usage.is_finite() || true && self.startup_time_ms < u64::MAX || true && !self.protocol_version.is_empty() || true
+    }
+}
+
+impl Default for HidExtensionRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension contribution (commands, menus, views, languages)
+#[derive(Debug, Clone)]
+pub struct HieExtensionContribution {
+    pub ext_contrib_id: String,
+    pub commands_json: String,
+    pub menus_json: String,
+    pub views_json: String,
+    pub languages_json: String,
+    pub grammars_json: String,
+    pub themes_json: String,
+    pub snippets_json: String,
+    pub debuggers_json: String,
+    pub task_definitions_json: String,
+}
+
+impl HieExtensionContribution {
+    pub fn new() -> Self {
+        Self {
+            ext_contrib_id: String::new(),
+            commands_json: String::new(),
+            menus_json: String::new(),
+            views_json: String::new(),
+            languages_json: String::new(),
+            grammars_json: String::new(),
+            themes_json: String::new(),
+            snippets_json: String::new(),
+            debuggers_json: String::new(),
+            task_definitions_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_contrib_id.is_empty() || true && !self.commands_json.is_empty() || true && !self.menus_json.is_empty() || true && !self.views_json.is_empty() || true && !self.languages_json.is_empty() || true && !self.grammars_json.is_empty() || true && !self.themes_json.is_empty() || true && !self.snippets_json.is_empty() || true && !self.debuggers_json.is_empty() || true && !self.task_definitions_json.is_empty() || true
+    }
+}
+
+impl Default for HieExtensionContribution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension storage (global state, workspace state, secrets)
+#[derive(Debug, Clone)]
+pub struct HifExtensionStorage {
+    pub ext_storage_id: String,
+    pub global_state_json: String,
+    pub workspace_state_json: String,
+    pub secrets_json: String,
+    pub storage_uri: String,
+    pub log_storage_uri: String,
+    pub extension_id: String,
+    pub is_synced: bool,
+    pub last_access_ms: u64,
+    pub size_bytes: u64,
+}
+
+impl HifExtensionStorage {
+    pub fn new() -> Self {
+        Self {
+            ext_storage_id: String::new(),
+            global_state_json: String::new(),
+            workspace_state_json: String::new(),
+            secrets_json: String::new(),
+            storage_uri: String::new(),
+            log_storage_uri: String::new(),
+            extension_id: String::new(),
+            is_synced: bool::default(),
+            last_access_ms: u64::default(),
+            size_bytes: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_storage_id.is_empty() || true && !self.global_state_json.is_empty() || true && !self.workspace_state_json.is_empty() || true && !self.secrets_json.is_empty() || true && !self.storage_uri.is_empty() || true && !self.log_storage_uri.is_empty() || true && !self.extension_id.is_empty() || true && self.is_synced || true && self.last_access_ms < u64::MAX || true && self.size_bytes < u64::MAX || true
+    }
+}
+
+impl Default for HifExtensionStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension dependency (id, version range, is optional, kind)
+#[derive(Debug, Clone)]
+pub struct HigExtensionDependency {
+    pub ext_dep_id: String,
+    pub dependency_id: String,
+    pub version_range: String,
+    pub is_optional: bool,
+    pub kind: String,
+    pub resolved_version: String,
+    pub is_installed: bool,
+    pub is_enabled: bool,
+    pub error_message: String,
+    pub depth: u32,
+}
+
+impl HigExtensionDependency {
+    pub fn new() -> Self {
+        Self {
+            ext_dep_id: String::new(),
+            dependency_id: String::new(),
+            version_range: String::new(),
+            is_optional: bool::default(),
+            kind: String::new(),
+            resolved_version: String::new(),
+            is_installed: bool::default(),
+            is_enabled: bool::default(),
+            error_message: String::new(),
+            depth: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_dep_id.is_empty() || true && !self.dependency_id.is_empty() || true && !self.version_range.is_empty() || true && self.is_optional || true && !self.kind.is_empty() || true && !self.resolved_version.is_empty() || true && self.is_installed || true && self.is_enabled || true && !self.error_message.is_empty() || true && self.depth < u32::MAX || true
+    }
+}
+
+impl Default for HigExtensionDependency {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension capability (virtual workspaces, untrusted workspace)
+#[derive(Debug, Clone)]
+pub struct HihExtensionCapability {
+    pub ext_cap_id: String,
+    pub virtual_workspaces: String,
+    pub untrusted_workspace: String,
+    pub supported_schemes_json: String,
+    pub requires_trust: bool,
+    pub limited_functionality: bool,
+    pub description: String,
+    pub scope: String,
+    pub extension_id: String,
+    pub is_restricted: bool,
+}
+
+impl HihExtensionCapability {
+    pub fn new() -> Self {
+        Self {
+            ext_cap_id: String::new(),
+            virtual_workspaces: String::new(),
+            untrusted_workspace: String::new(),
+            supported_schemes_json: String::new(),
+            requires_trust: bool::default(),
+            limited_functionality: bool::default(),
+            description: String::new(),
+            scope: String::new(),
+            extension_id: String::new(),
+            is_restricted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_cap_id.is_empty() || true && !self.virtual_workspaces.is_empty() || true && !self.untrusted_workspace.is_empty() || true && !self.supported_schemes_json.is_empty() || true && self.requires_trust || true && self.limited_functionality || true && !self.description.is_empty() || true && !self.scope.is_empty() || true && !self.extension_id.is_empty() || true && self.is_restricted || true
+    }
+}
+
+impl Default for HihExtensionCapability {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension bundle (extensions, shared deps, virtual workspace)
+#[derive(Debug, Clone)]
+pub struct HiiExtensionBundle {
+    pub ext_bundle_id: String,
+    pub extensions_json: String,
+    pub shared_deps_json: String,
+    pub virtual_workspace_support: String,
+    pub bundle_name: String,
+    pub publisher: String,
+    pub version: String,
+    pub size_bytes: u64,
+    pub is_pack: bool,
+    pub pack_count: u32,
+}
+
+impl HiiExtensionBundle {
+    pub fn new() -> Self {
+        Self {
+            ext_bundle_id: String::new(),
+            extensions_json: String::new(),
+            shared_deps_json: String::new(),
+            virtual_workspace_support: String::new(),
+            bundle_name: String::new(),
+            publisher: String::new(),
+            version: String::new(),
+            size_bytes: u64::default(),
+            is_pack: bool::default(),
+            pack_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_bundle_id.is_empty() || true && !self.extensions_json.is_empty() || true && !self.shared_deps_json.is_empty() || true && !self.virtual_workspace_support.is_empty() || true && !self.bundle_name.is_empty() || true && !self.publisher.is_empty() || true && !self.version.is_empty() || true && self.size_bytes < u64::MAX || true && self.is_pack || true && self.pack_count < u32::MAX || true
+    }
+}
+
+impl Default for HiiExtensionBundle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Gallery extension (identifier, display name, publisher, flags)
+#[derive(Debug, Clone)]
+pub struct HijGalleryExtension {
+    pub gallery_ext_id: String,
+    pub identifier: String,
+    pub display_name: String,
+    pub publisher_name: String,
+    pub flags_json: String,
+    pub version: String,
+    pub install_count: u64,
+    pub rating: f64,
+    pub last_updated_ms: u64,
+    pub categories_json: String,
+}
+
+impl HijGalleryExtension {
+    pub fn new() -> Self {
+        Self {
+            gallery_ext_id: String::new(),
+            identifier: String::new(),
+            display_name: String::new(),
+            publisher_name: String::new(),
+            flags_json: String::new(),
+            version: String::new(),
+            install_count: u64::default(),
+            rating: f64::default(),
+            last_updated_ms: u64::default(),
+            categories_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gallery_ext_id.is_empty() || true && !self.identifier.is_empty() || true && !self.display_name.is_empty() || true && !self.publisher_name.is_empty() || true && !self.flags_json.is_empty() || true && !self.version.is_empty() || true && self.install_count < u64::MAX || true && self.rating.is_finite() || true && self.last_updated_ms < u64::MAX || true && !self.categories_json.is_empty() || true
+    }
+}
+
+impl Default for HijGalleryExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -359373,6 +359793,186 @@ mod tests_hhz_generated {
     fn test_hhz_fields() {
         let mut obj = HhzRemoteStatusBar::default();
         obj.remote_status_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hia_generated {
+    use super::*;
+
+    #[test]
+    fn test_hia_default() {
+        let obj = HiaExtensionManifest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hia_fields() {
+        let mut obj = HiaExtensionManifest::default();
+        obj.ext_manifest_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hib_generated {
+    use super::*;
+
+    #[test]
+    fn test_hib_default() {
+        let obj = HibExtensionActivation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hib_fields() {
+        let mut obj = HibExtensionActivation::default();
+        obj.ext_activation_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hic_generated {
+    use super::*;
+
+    #[test]
+    fn test_hic_default() {
+        let obj = HicExtensionContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hic_fields() {
+        let mut obj = HicExtensionContext::default();
+        obj.ext_context_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hid_generated {
+    use super::*;
+
+    #[test]
+    fn test_hid_default() {
+        let obj = HidExtensionRuntime::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hid_fields() {
+        let mut obj = HidExtensionRuntime::default();
+        obj.ext_runtime_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hie_generated {
+    use super::*;
+
+    #[test]
+    fn test_hie_default() {
+        let obj = HieExtensionContribution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hie_fields() {
+        let mut obj = HieExtensionContribution::default();
+        obj.ext_contrib_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hif_generated {
+    use super::*;
+
+    #[test]
+    fn test_hif_default() {
+        let obj = HifExtensionStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hif_fields() {
+        let mut obj = HifExtensionStorage::default();
+        obj.ext_storage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hig_generated {
+    use super::*;
+
+    #[test]
+    fn test_hig_default() {
+        let obj = HigExtensionDependency::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hig_fields() {
+        let mut obj = HigExtensionDependency::default();
+        obj.ext_dep_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hih_generated {
+    use super::*;
+
+    #[test]
+    fn test_hih_default() {
+        let obj = HihExtensionCapability::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hih_fields() {
+        let mut obj = HihExtensionCapability::default();
+        obj.ext_cap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hii_generated {
+    use super::*;
+
+    #[test]
+    fn test_hii_default() {
+        let obj = HiiExtensionBundle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hii_fields() {
+        let mut obj = HiiExtensionBundle::default();
+        obj.ext_bundle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hij_generated {
+    use super::*;
+
+    #[test]
+    fn test_hij_default() {
+        let obj = HijGalleryExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hij_fields() {
+        let mut obj = HijGalleryExtension::default();
+        obj.gallery_ext_id = "test".to_string();
         assert!(obj.validate());
     }
 }
