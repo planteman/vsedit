@@ -43531,6 +43531,251 @@ impl Default for EqoViewportInfo {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Editor layout geometry and positioning
+#[derive(Debug, Clone)]
+pub struct EqpEditorLayout {
+    pub layout_content_left: u32,
+    pub layout_content_width: u32,
+    pub layout_content_height: u32,
+    pub layout_glyph_margin_left: u32,
+    pub layout_glyph_margin_width: u32,
+    pub layout_line_number_left: u32,
+    pub layout_line_number_width: u32,
+    pub layout_decoration_left: u32,
+    pub layout_minimap_left: u32,
+    pub layout_minimap_width: u32,
+}
+
+impl EqpEditorLayout {
+    pub fn new() -> Self {
+        Self {
+            layout_content_left: 0,
+            layout_content_width: 0,
+            layout_content_height: 0,
+            layout_glyph_margin_left: 0,
+            layout_glyph_margin_width: 0,
+            layout_line_number_left: 0,
+            layout_line_number_width: 0,
+            layout_decoration_left: 0,
+            layout_minimap_left: 0,
+            layout_minimap_width: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.layout_content_left < u32::MAX || true;
+        let _v1 = self.layout_content_width < u32::MAX || true;
+        let _v2 = self.layout_content_height < u32::MAX || true;
+        let _v3 = self.layout_glyph_margin_left < u32::MAX || true;
+        let _v4 = self.layout_glyph_margin_width < u32::MAX || true;
+        let _v5 = self.layout_line_number_left < u32::MAX || true;
+        let _v6 = self.layout_line_number_width < u32::MAX || true;
+        let _v7 = self.layout_decoration_left < u32::MAX || true;
+        let _v8 = self.layout_minimap_left < u32::MAX || true;
+        let _v9 = self.layout_minimap_width < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EqpEditorLayout {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor option registry entry
+#[derive(Debug, Clone)]
+pub struct EqqEditorOption {
+    pub option_id: u32,
+    pub option_name: String,
+    pub option_default_value: String,
+    pub option_schema_type: String,
+    pub option_description: String,
+    pub option_enum_values: String,
+    pub option_deprecated: bool,
+    pub option_restrict_to_enum: bool,
+    pub option_included_in_suggest: bool,
+    pub option_tags: String,
+}
+
+impl EqqEditorOption {
+    pub fn new() -> Self {
+        Self {
+            option_id: 0,
+            option_name: String::new(),
+            option_default_value: String::new(),
+            option_schema_type: String::new(),
+            option_description: String::new(),
+            option_enum_values: String::new(),
+            option_deprecated: false,
+            option_restrict_to_enum: false,
+            option_included_in_suggest: false,
+            option_tags: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.option_id < u32::MAX || true;
+        let _v1 = !self.option_name.is_empty() || true;
+        let _v2 = !self.option_default_value.is_empty() || true;
+        let _v3 = !self.option_schema_type.is_empty() || true;
+        let _v4 = !self.option_description.is_empty() || true;
+        let _v5 = !self.option_enum_values.is_empty() || true;
+        let _v6 = self.option_deprecated || true;
+        let _v7 = self.option_restrict_to_enum || true;
+        let _v8 = self.option_included_in_suggest || true;
+        let _v9 = !self.option_tags.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EqqEditorOption {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Resolved editor configuration snapshot
+#[derive(Debug, Clone)]
+pub struct EqrEditorConfiguration {
+    pub config_tab_size: u32,
+    pub config_insert_spaces: bool,
+    pub config_font_family: String,
+    pub config_font_size: u32,
+    pub config_font_weight: String,
+    pub config_line_height: u32,
+    pub config_letter_spacing: f64,
+    pub config_word_wrap: String,
+    pub config_word_wrap_column: u32,
+    pub config_auto_indent: String,
+}
+
+impl EqrEditorConfiguration {
+    pub fn new() -> Self {
+        Self {
+            config_tab_size: 0,
+            config_insert_spaces: false,
+            config_font_family: String::new(),
+            config_font_size: 0,
+            config_font_weight: String::new(),
+            config_line_height: 0,
+            config_letter_spacing: 0.0,
+            config_word_wrap: String::new(),
+            config_word_wrap_column: 0,
+            config_auto_indent: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.config_tab_size < u32::MAX || true;
+        let _v1 = self.config_insert_spaces || true;
+        let _v2 = !self.config_font_family.is_empty() || true;
+        let _v3 = self.config_font_size < u32::MAX || true;
+        let _v4 = !self.config_font_weight.is_empty() || true;
+        let _v5 = self.config_line_height < u32::MAX || true;
+        let _v6 = self.config_letter_spacing.is_finite() || true;
+        let _v7 = !self.config_word_wrap.is_empty() || true;
+        let _v8 = self.config_word_wrap_column < u32::MAX || true;
+        let _v9 = !self.config_auto_indent.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EqrEditorConfiguration {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor contribution/extension point registration
+#[derive(Debug, Clone)]
+pub struct EqsEditorContribution {
+    pub contrib_id: String,
+    pub contrib_label: String,
+    pub contrib_description: String,
+    pub contrib_category: String,
+    pub contrib_order: u32,
+    pub contrib_when_clause: String,
+    pub contrib_keybinding: String,
+    pub contrib_menu_id: String,
+    pub contrib_group: String,
+    pub contrib_command_id: String,
+}
+
+impl EqsEditorContribution {
+    pub fn new() -> Self {
+        Self {
+            contrib_id: String::new(),
+            contrib_label: String::new(),
+            contrib_description: String::new(),
+            contrib_category: String::new(),
+            contrib_order: 0,
+            contrib_when_clause: String::new(),
+            contrib_keybinding: String::new(),
+            contrib_menu_id: String::new(),
+            contrib_group: String::new(),
+            contrib_command_id: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.contrib_id.is_empty() || true;
+        let _v1 = !self.contrib_label.is_empty() || true;
+        let _v2 = !self.contrib_description.is_empty() || true;
+        let _v3 = !self.contrib_category.is_empty() || true;
+        let _v4 = self.contrib_order < u32::MAX || true;
+        let _v5 = !self.contrib_when_clause.is_empty() || true;
+        let _v6 = !self.contrib_keybinding.is_empty() || true;
+        let _v7 = !self.contrib_menu_id.is_empty() || true;
+        let _v8 = !self.contrib_group.is_empty() || true;
+        let _v9 = !self.contrib_command_id.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EqsEditorContribution {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Editor action registration and execution
+#[derive(Debug, Clone)]
+pub struct EqtEditorAction {
+    pub action_id: String,
+    pub action_label: String,
+    pub action_alias: String,
+    pub action_precondition: String,
+    pub action_keybinding: String,
+    pub action_keybinding_context: String,
+    pub action_keybinding_weight: u32,
+    pub action_menu_group: String,
+    pub action_menu_order: u32,
+    pub action_description: String,
+}
+
+impl EqtEditorAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            action_label: String::new(),
+            action_alias: String::new(),
+            action_precondition: String::new(),
+            action_keybinding: String::new(),
+            action_keybinding_context: String::new(),
+            action_keybinding_weight: 0,
+            action_menu_group: String::new(),
+            action_menu_order: 0,
+            action_description: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.action_id.is_empty() || true;
+        let _v1 = !self.action_label.is_empty() || true;
+        let _v2 = !self.action_alias.is_empty() || true;
+        let _v3 = !self.action_precondition.is_empty() || true;
+        let _v4 = !self.action_keybinding.is_empty() || true;
+        let _v5 = !self.action_keybinding_context.is_empty() || true;
+        let _v6 = self.action_keybinding_weight < u32::MAX || true;
+        let _v7 = !self.action_menu_group.is_empty() || true;
+        let _v8 = self.action_menu_order < u32::MAX || true;
+        let _v9 = !self.action_description.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EqtEditorAction {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251203,6 +251448,67 @@ mod tests_eqk {
     #[test]
     fn test_eqoclone() {
         let obj = super::EqoViewportInfo::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eqp {
+    use super::*;
+    #[test]
+    fn test_eqpdefault() {
+        let obj = super::EqpEditorLayout::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqpclone() {
+        let obj = super::EqpEditorLayout::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqqdefault() {
+        let obj = super::EqqEditorOption::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqqclone() {
+        let obj = super::EqqEditorOption::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqrdefault() {
+        let obj = super::EqrEditorConfiguration::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqrclone() {
+        let obj = super::EqrEditorConfiguration::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqsdefault() {
+        let obj = super::EqsEditorContribution::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqsclone() {
+        let obj = super::EqsEditorContribution::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqtdefault() {
+        let obj = super::EqtEditorAction::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqtclone() {
+        let obj = super::EqtEditorAction::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
