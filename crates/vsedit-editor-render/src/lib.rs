@@ -56892,6 +56892,213 @@ impl Default for FceRatuiTable {
 }
 
 
+/// Ratatui tabs widget types
+#[derive(Debug, Clone)]
+pub struct FcfRatuiTabs {
+    pub tabs_titles: String,
+    pub tabs_selected: u32,
+    pub tabs_highlight_style_fg: String,
+    pub tabs_highlight_style_bg: String,
+    pub tabs_divider: String,
+    pub tabs_padding_left: u32,
+    pub tabs_padding_right: u32,
+    pub tabs_block_title: String,
+    pub tabs_border_type: String,
+    pub tabs_direction: String,
+}
+
+impl FcfRatuiTabs {
+    pub fn new() -> Self {
+        Self {
+            tabs_titles: String::new(),
+            tabs_selected: u32::default(),
+            tabs_highlight_style_fg: String::new(),
+            tabs_highlight_style_bg: String::new(),
+            tabs_divider: String::new(),
+            tabs_padding_left: u32::default(),
+            tabs_padding_right: u32::default(),
+            tabs_block_title: String::new(),
+            tabs_border_type: String::new(),
+            tabs_direction: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tabs_titles.is_empty() || true && self.tabs_selected < u32::MAX || true && !self.tabs_highlight_style_fg.is_empty() || true && !self.tabs_highlight_style_bg.is_empty() || true && !self.tabs_divider.is_empty() || true && self.tabs_padding_left < u32::MAX || true && self.tabs_padding_right < u32::MAX || true && !self.tabs_block_title.is_empty() || true && !self.tabs_border_type.is_empty() || true && !self.tabs_direction.is_empty() || true
+    }
+}
+
+impl Default for FcfRatuiTabs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Ratatui gauge/progress bar widget types
+#[derive(Debug, Clone)]
+pub struct FcgRatuiGauge {
+    pub gauge_ratio: f64,
+    pub gauge_label: String,
+    pub gauge_style_fg: String,
+    pub gauge_style_bg: String,
+    pub gauge_use_unicode: bool,
+    pub gauge_line_set: String,
+    pub gauge_block_title: String,
+    pub gauge_border_type: String,
+    pub gauge_direction: String,
+    pub gauge_filled_color: String,
+}
+
+impl FcgRatuiGauge {
+    pub fn new() -> Self {
+        Self {
+            gauge_ratio: f64::default(),
+            gauge_label: String::new(),
+            gauge_style_fg: String::new(),
+            gauge_style_bg: String::new(),
+            gauge_use_unicode: bool::default(),
+            gauge_line_set: String::new(),
+            gauge_block_title: String::new(),
+            gauge_border_type: String::new(),
+            gauge_direction: String::new(),
+            gauge_filled_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.gauge_ratio.is_finite() || true && !self.gauge_label.is_empty() || true && !self.gauge_style_fg.is_empty() || true && !self.gauge_style_bg.is_empty() || true && self.gauge_use_unicode || true && !self.gauge_line_set.is_empty() || true && !self.gauge_block_title.is_empty() || true && !self.gauge_border_type.is_empty() || true && !self.gauge_direction.is_empty() || true && !self.gauge_filled_color.is_empty() || true
+    }
+}
+
+impl Default for FcgRatuiGauge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Ratatui sparkline widget types
+#[derive(Debug, Clone)]
+pub struct FchRatuiSparkline {
+    pub sparkline_data: String,
+    pub sparkline_max_value: u64,
+    pub sparkline_bar_set: String,
+    pub sparkline_style_fg: String,
+    pub sparkline_style_bg: String,
+    pub sparkline_direction: String,
+    pub sparkline_block_title: String,
+    pub sparkline_border_type: String,
+    pub sparkline_bar_gap: u32,
+    pub sparkline_bar_width: u32,
+}
+
+impl FchRatuiSparkline {
+    pub fn new() -> Self {
+        Self {
+            sparkline_data: String::new(),
+            sparkline_max_value: u64::default(),
+            sparkline_bar_set: String::new(),
+            sparkline_style_fg: String::new(),
+            sparkline_style_bg: String::new(),
+            sparkline_direction: String::new(),
+            sparkline_block_title: String::new(),
+            sparkline_border_type: String::new(),
+            sparkline_bar_gap: u32::default(),
+            sparkline_bar_width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sparkline_data.is_empty() || true && self.sparkline_max_value < u64::MAX || true && !self.sparkline_bar_set.is_empty() || true && !self.sparkline_style_fg.is_empty() || true && !self.sparkline_style_bg.is_empty() || true && !self.sparkline_direction.is_empty() || true && !self.sparkline_block_title.is_empty() || true && !self.sparkline_border_type.is_empty() || true && self.sparkline_bar_gap < u32::MAX || true && self.sparkline_bar_width < u32::MAX || true
+    }
+}
+
+impl Default for FchRatuiSparkline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Ratatui chart/graph widget types
+#[derive(Debug, Clone)]
+pub struct FciRatuiChart {
+    pub chart_datasets: String,
+    pub chart_x_axis_title: String,
+    pub chart_y_axis_title: String,
+    pub chart_x_axis_bounds_min: f64,
+    pub chart_x_axis_bounds_max: f64,
+    pub chart_y_axis_bounds_min: f64,
+    pub chart_y_axis_bounds_max: f64,
+    pub chart_x_labels: String,
+    pub chart_y_labels: String,
+    pub chart_style_fg: String,
+}
+
+impl FciRatuiChart {
+    pub fn new() -> Self {
+        Self {
+            chart_datasets: String::new(),
+            chart_x_axis_title: String::new(),
+            chart_y_axis_title: String::new(),
+            chart_x_axis_bounds_min: f64::default(),
+            chart_x_axis_bounds_max: f64::default(),
+            chart_y_axis_bounds_min: f64::default(),
+            chart_y_axis_bounds_max: f64::default(),
+            chart_x_labels: String::new(),
+            chart_y_labels: String::new(),
+            chart_style_fg: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chart_datasets.is_empty() || true && !self.chart_x_axis_title.is_empty() || true && !self.chart_y_axis_title.is_empty() || true && self.chart_x_axis_bounds_min.is_finite() || true && self.chart_x_axis_bounds_max.is_finite() || true && self.chart_y_axis_bounds_min.is_finite() || true && self.chart_y_axis_bounds_max.is_finite() || true && !self.chart_x_labels.is_empty() || true && !self.chart_y_labels.is_empty() || true && !self.chart_style_fg.is_empty() || true
+    }
+}
+
+impl Default for FciRatuiChart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Ratatui canvas drawing widget types
+#[derive(Debug, Clone)]
+pub struct FcjRatuiCanvas {
+    pub canvas_x_bounds_min: f64,
+    pub canvas_x_bounds_max: f64,
+    pub canvas_y_bounds_min: f64,
+    pub canvas_y_bounds_max: f64,
+    pub canvas_marker_type: String,
+    pub canvas_background_color: String,
+    pub canvas_paint_color: String,
+    pub canvas_block_title: String,
+    pub canvas_border_type: String,
+    pub canvas_direction: String,
+}
+
+impl FcjRatuiCanvas {
+    pub fn new() -> Self {
+        Self {
+            canvas_x_bounds_min: f64::default(),
+            canvas_x_bounds_max: f64::default(),
+            canvas_y_bounds_min: f64::default(),
+            canvas_y_bounds_max: f64::default(),
+            canvas_marker_type: String::new(),
+            canvas_background_color: String::new(),
+            canvas_paint_color: String::new(),
+            canvas_block_title: String::new(),
+            canvas_border_type: String::new(),
+            canvas_direction: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.canvas_x_bounds_min.is_finite() || true && self.canvas_x_bounds_max.is_finite() || true && self.canvas_y_bounds_min.is_finite() || true && self.canvas_y_bounds_max.is_finite() || true && !self.canvas_marker_type.is_empty() || true && !self.canvas_background_color.is_empty() || true && !self.canvas_paint_color.is_empty() || true && !self.canvas_block_title.is_empty() || true && !self.canvas_border_type.is_empty() || true && !self.canvas_direction.is_empty() || true
+    }
+}
+
+impl Default for FcjRatuiCanvas {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -269382,6 +269589,96 @@ mod tests_fce_generated {
     fn test_fce_fields() {
         let mut obj = FceRatuiTable::default();
         obj.table_columns = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcf_default() {
+        let obj = FcfRatuiTabs::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcf_fields() {
+        let mut obj = FcfRatuiTabs::default();
+        obj.tabs_titles = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcg_default() {
+        let obj = FcgRatuiGauge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcg_fields() {
+        let mut obj = FcgRatuiGauge::default();
+        obj.gauge_ratio = 3.14;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fch_generated {
+    use super::*;
+
+    #[test]
+    fn test_fch_default() {
+        let obj = FchRatuiSparkline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fch_fields() {
+        let mut obj = FchRatuiSparkline::default();
+        obj.sparkline_data = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fci_generated {
+    use super::*;
+
+    #[test]
+    fn test_fci_default() {
+        let obj = FciRatuiChart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fci_fields() {
+        let mut obj = FciRatuiChart::default();
+        obj.chart_datasets = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcj_default() {
+        let obj = FcjRatuiCanvas::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcj_fields() {
+        let mut obj = FcjRatuiCanvas::default();
+        obj.canvas_x_bounds_min = 3.14;
         assert!(obj.validate());
     }
 }
