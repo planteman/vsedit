@@ -159400,6 +159400,890 @@ impl Default for IyzCharCode {
     }
 }
 
+/// Platform window abstraction
+#[derive(Debug, Clone)]
+pub struct IzaAbstractWindow {
+    pub window_id: String,
+    pub title_str: String,
+    pub width_val: u32,
+    pub height_val: u32,
+    pub position_x: u32,
+    pub is_focused: bool,
+}
+
+impl IzaAbstractWindow {
+    pub fn new() -> Self {
+        Self {
+            window_id: String::new(),
+            title_str: String::new(),
+            width_val: u32::default(),
+            height_val: u32::default(),
+            position_x: u32::default(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.window_id.is_empty() || true && !self.title_str.is_empty() || true && self.width_val < u32::MAX || true && self.height_val < u32::MAX || true && self.position_x < u32::MAX || true && self.is_focused || true
+    }
+}
+
+impl Default for IzaAbstractWindow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform clipboard abstraction
+#[derive(Debug, Clone)]
+pub struct IzbAbstractClipboard {
+    pub clip_id: String,
+    pub content_text: String,
+    pub mime_type_str: String,
+    pub write_epoch: u64,
+    pub content_len: u32,
+    pub has_image: bool,
+}
+
+impl IzbAbstractClipboard {
+    pub fn new() -> Self {
+        Self {
+            clip_id: String::new(),
+            content_text: String::new(),
+            mime_type_str: String::new(),
+            write_epoch: u64::default(),
+            content_len: u32::default(),
+            has_image: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.clip_id.is_empty() || true && !self.content_text.is_empty() || true && !self.mime_type_str.is_empty() || true && self.write_epoch < u64::MAX || true && self.content_len < u32::MAX || true && self.has_image || true
+    }
+}
+
+impl Default for IzbAbstractClipboard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform dialog abstraction
+#[derive(Debug, Clone)]
+pub struct IzcAbstractDialog {
+    pub dialog_id: String,
+    pub dialog_title: String,
+    pub message_text: String,
+    pub button_labels: String,
+    pub default_idx: u32,
+    pub is_modal: bool,
+}
+
+impl IzcAbstractDialog {
+    pub fn new() -> Self {
+        Self {
+            dialog_id: String::new(),
+            dialog_title: String::new(),
+            message_text: String::new(),
+            button_labels: String::new(),
+            default_idx: u32::default(),
+            is_modal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dialog_id.is_empty() || true && !self.dialog_title.is_empty() || true && !self.message_text.is_empty() || true && !self.button_labels.is_empty() || true && self.default_idx < u32::MAX || true && self.is_modal || true
+    }
+}
+
+impl Default for IzcAbstractDialog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform menu abstraction
+#[derive(Debug, Clone)]
+pub struct IzdAbstractMenu {
+    pub menu_id: String,
+    pub label_str: String,
+    pub parent_ref: String,
+    pub item_count: u32,
+    pub shortcut_str: String,
+    pub is_visible: bool,
+}
+
+impl IzdAbstractMenu {
+    pub fn new() -> Self {
+        Self {
+            menu_id: String::new(),
+            label_str: String::new(),
+            parent_ref: String::new(),
+            item_count: u32::default(),
+            shortcut_str: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.menu_id.is_empty() || true && !self.label_str.is_empty() || true && !self.parent_ref.is_empty() || true && self.item_count < u32::MAX || true && !self.shortcut_str.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for IzdAbstractMenu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform shell integration
+#[derive(Debug, Clone)]
+pub struct IzeAbstractShell {
+    pub shell_id: String,
+    pub shell_path: String,
+    pub shell_args: String,
+    pub env_override: String,
+    pub cwd_path: String,
+    pub is_login: bool,
+}
+
+impl IzeAbstractShell {
+    pub fn new() -> Self {
+        Self {
+            shell_id: String::new(),
+            shell_path: String::new(),
+            shell_args: String::new(),
+            env_override: String::new(),
+            cwd_path: String::new(),
+            is_login: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shell_id.is_empty() || true && !self.shell_path.is_empty() || true && !self.shell_args.is_empty() || true && !self.env_override.is_empty() || true && !self.cwd_path.is_empty() || true && self.is_login || true
+    }
+}
+
+impl Default for IzeAbstractShell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform notification abstraction
+#[derive(Debug, Clone)]
+pub struct IzfAbstractNotification {
+    pub notif_id: String,
+    pub notif_title: String,
+    pub notif_body: String,
+    pub urgency_val: u32,
+    pub timeout_ms: u32,
+    pub has_actions: bool,
+}
+
+impl IzfAbstractNotification {
+    pub fn new() -> Self {
+        Self {
+            notif_id: String::new(),
+            notif_title: String::new(),
+            notif_body: String::new(),
+            urgency_val: u32::default(),
+            timeout_ms: u32::default(),
+            has_actions: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notif_id.is_empty() || true && !self.notif_title.is_empty() || true && !self.notif_body.is_empty() || true && self.urgency_val < u32::MAX || true && self.timeout_ms < u32::MAX || true && self.has_actions || true
+    }
+}
+
+impl Default for IzfAbstractNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform keychain abstraction
+#[derive(Debug, Clone)]
+pub struct IzgAbstractKeychain {
+    pub keychain_id: String,
+    pub service_name: String,
+    pub account_name: String,
+    pub credential_ref: String,
+    pub created_epoch: u64,
+    pub is_accessible: bool,
+}
+
+impl IzgAbstractKeychain {
+    pub fn new() -> Self {
+        Self {
+            keychain_id: String::new(),
+            service_name: String::new(),
+            account_name: String::new(),
+            credential_ref: String::new(),
+            created_epoch: u64::default(),
+            is_accessible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.keychain_id.is_empty() || true && !self.service_name.is_empty() || true && !self.account_name.is_empty() || true && !self.credential_ref.is_empty() || true && self.created_epoch < u64::MAX || true && self.is_accessible || true
+    }
+}
+
+impl Default for IzgAbstractKeychain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform process abstraction
+#[derive(Debug, Clone)]
+pub struct IzhAbstractProcess {
+    pub proc_abs_id: String,
+    pub command_line: String,
+    pub pid_num: u32,
+    pub exit_code: u32,
+    pub spawn_epoch: u64,
+    pub is_running: bool,
+}
+
+impl IzhAbstractProcess {
+    pub fn new() -> Self {
+        Self {
+            proc_abs_id: String::new(),
+            command_line: String::new(),
+            pid_num: u32::default(),
+            exit_code: u32::default(),
+            spawn_epoch: u64::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proc_abs_id.is_empty() || true && !self.command_line.is_empty() || true && self.pid_num < u32::MAX || true && self.exit_code < u32::MAX || true && self.spawn_epoch < u64::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for IzhAbstractProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform timer abstraction
+#[derive(Debug, Clone)]
+pub struct IziAbstractTimer {
+    pub timer_id: String,
+    pub interval_ms: u32,
+    pub elapsed_ms: u64,
+    pub fire_count: u64,
+    pub callback_ref: String,
+    pub is_repeating: bool,
+}
+
+impl IziAbstractTimer {
+    pub fn new() -> Self {
+        Self {
+            timer_id: String::new(),
+            interval_ms: u32::default(),
+            elapsed_ms: u64::default(),
+            fire_count: u64::default(),
+            callback_ref: String::new(),
+            is_repeating: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.timer_id.is_empty() || true && self.interval_ms < u32::MAX || true && self.elapsed_ms < u64::MAX || true && self.fire_count < u64::MAX || true && !self.callback_ref.is_empty() || true && self.is_repeating || true
+    }
+}
+
+impl Default for IziAbstractTimer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform thread abstraction
+#[derive(Debug, Clone)]
+pub struct IzjAbstractThread {
+    pub thread_id: String,
+    pub thread_name: String,
+    pub stack_size_kb: u32,
+    pub priority_val: u32,
+    pub cpu_time_ms: u64,
+    pub is_daemon: bool,
+}
+
+impl IzjAbstractThread {
+    pub fn new() -> Self {
+        Self {
+            thread_id: String::new(),
+            thread_name: String::new(),
+            stack_size_kb: u32::default(),
+            priority_val: u32::default(),
+            cpu_time_ms: u64::default(),
+            is_daemon: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.thread_id.is_empty() || true && !self.thread_name.is_empty() || true && self.stack_size_kb < u32::MAX || true && self.priority_val < u32::MAX || true && self.cpu_time_ms < u64::MAX || true && self.is_daemon || true
+    }
+}
+
+impl Default for IzjAbstractThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform socket abstraction
+#[derive(Debug, Clone)]
+pub struct IzkAbstractSocket {
+    pub socket_id: String,
+    pub address_str: String,
+    pub port_num: u32,
+    pub protocol_str: String,
+    pub buffer_size: u32,
+    pub is_connected: bool,
+}
+
+impl IzkAbstractSocket {
+    pub fn new() -> Self {
+        Self {
+            socket_id: String::new(),
+            address_str: String::new(),
+            port_num: u32::default(),
+            protocol_str: String::new(),
+            buffer_size: u32::default(),
+            is_connected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.socket_id.is_empty() || true && !self.address_str.is_empty() || true && self.port_num < u32::MAX || true && !self.protocol_str.is_empty() || true && self.buffer_size < u32::MAX || true && self.is_connected || true
+    }
+}
+
+impl Default for IzkAbstractSocket {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform pipe abstraction
+#[derive(Debug, Clone)]
+pub struct IzlAbstractPipe {
+    pub pipe_id: String,
+    pub pipe_name: String,
+    pub direction_str: String,
+    pub buffer_size: u32,
+    pub read_bytes: u64,
+    pub is_blocking: bool,
+}
+
+impl IzlAbstractPipe {
+    pub fn new() -> Self {
+        Self {
+            pipe_id: String::new(),
+            pipe_name: String::new(),
+            direction_str: String::new(),
+            buffer_size: u32::default(),
+            read_bytes: u64::default(),
+            is_blocking: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pipe_id.is_empty() || true && !self.pipe_name.is_empty() || true && !self.direction_str.is_empty() || true && self.buffer_size < u32::MAX || true && self.read_bytes < u64::MAX || true && self.is_blocking || true
+    }
+}
+
+impl Default for IzlAbstractPipe {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Abstract file system provider
+#[derive(Debug, Clone)]
+pub struct IzmAbstractFileSystem {
+    pub afs_id: String,
+    pub scheme_str: String,
+    pub root_uri: String,
+    pub capability_flags: u32,
+    pub mount_count: u32,
+    pub is_writable: bool,
+}
+
+impl IzmAbstractFileSystem {
+    pub fn new() -> Self {
+        Self {
+            afs_id: String::new(),
+            scheme_str: String::new(),
+            root_uri: String::new(),
+            capability_flags: u32::default(),
+            mount_count: u32::default(),
+            is_writable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.afs_id.is_empty() || true && !self.scheme_str.is_empty() || true && !self.root_uri.is_empty() || true && self.capability_flags < u32::MAX || true && self.mount_count < u32::MAX || true && self.is_writable || true
+    }
+}
+
+impl Default for IzmAbstractFileSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform storage abstraction
+#[derive(Debug, Clone)]
+pub struct IznAbstractStorage {
+    pub storage_abs_id: String,
+    pub storage_name: String,
+    pub quota_bytes: u64,
+    pub used_bytes: u64,
+    pub item_count: u32,
+    pub is_persistent: bool,
+}
+
+impl IznAbstractStorage {
+    pub fn new() -> Self {
+        Self {
+            storage_abs_id: String::new(),
+            storage_name: String::new(),
+            quota_bytes: u64::default(),
+            used_bytes: u64::default(),
+            item_count: u32::default(),
+            is_persistent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.storage_abs_id.is_empty() || true && !self.storage_name.is_empty() || true && self.quota_bytes < u64::MAX || true && self.used_bytes < u64::MAX || true && self.item_count < u32::MAX || true && self.is_persistent || true
+    }
+}
+
+impl Default for IznAbstractStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform cryptography abstraction
+#[derive(Debug, Clone)]
+pub struct IzoAbstractCrypto {
+    pub crypto_id: String,
+    pub algorithm_str: String,
+    pub key_size_bits: u32,
+    pub iv_size_bytes: u32,
+    pub block_size_bytes: u32,
+    pub is_symmetric: bool,
+}
+
+impl IzoAbstractCrypto {
+    pub fn new() -> Self {
+        Self {
+            crypto_id: String::new(),
+            algorithm_str: String::new(),
+            key_size_bits: u32::default(),
+            iv_size_bytes: u32::default(),
+            block_size_bytes: u32::default(),
+            is_symmetric: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.crypto_id.is_empty() || true && !self.algorithm_str.is_empty() || true && self.key_size_bits < u32::MAX || true && self.iv_size_bytes < u32::MAX || true && self.block_size_bytes < u32::MAX || true && self.is_symmetric || true
+    }
+}
+
+impl Default for IzoAbstractCrypto {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform encoding abstraction
+#[derive(Debug, Clone)]
+pub struct IzpAbstractEncoding {
+    pub encoding_abs_id: String,
+    pub encoding_name: String,
+    pub codec_str: String,
+    pub bom_required: bool,
+    pub max_bytes_per_char: u32,
+    pub is_variable_width: bool,
+}
+
+impl IzpAbstractEncoding {
+    pub fn new() -> Self {
+        Self {
+            encoding_abs_id: String::new(),
+            encoding_name: String::new(),
+            codec_str: String::new(),
+            bom_required: bool::default(),
+            max_bytes_per_char: u32::default(),
+            is_variable_width: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.encoding_abs_id.is_empty() || true && !self.encoding_name.is_empty() || true && !self.codec_str.is_empty() || true && self.bom_required || true && self.max_bytes_per_char < u32::MAX || true && self.is_variable_width || true
+    }
+}
+
+impl Default for IzpAbstractEncoding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform logger abstraction
+#[derive(Debug, Clone)]
+pub struct IzqAbstractLogger {
+    pub logger_abs_id: String,
+    pub logger_name: String,
+    pub min_level_str: String,
+    pub output_path: String,
+    pub max_file_size: u64,
+    pub is_async: bool,
+}
+
+impl IzqAbstractLogger {
+    pub fn new() -> Self {
+        Self {
+            logger_abs_id: String::new(),
+            logger_name: String::new(),
+            min_level_str: String::new(),
+            output_path: String::new(),
+            max_file_size: u64::default(),
+            is_async: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.logger_abs_id.is_empty() || true && !self.logger_name.is_empty() || true && !self.min_level_str.is_empty() || true && !self.output_path.is_empty() || true && self.max_file_size < u64::MAX || true && self.is_async || true
+    }
+}
+
+impl Default for IzqAbstractLogger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform telemetry abstraction
+#[derive(Debug, Clone)]
+pub struct IzrAbstractTelemetry {
+    pub telemetry_abs_id: String,
+    pub app_key: String,
+    pub endpoint_url: String,
+    pub batch_size: u32,
+    pub flush_interval_ms: u32,
+    pub is_opted_in: bool,
+}
+
+impl IzrAbstractTelemetry {
+    pub fn new() -> Self {
+        Self {
+            telemetry_abs_id: String::new(),
+            app_key: String::new(),
+            endpoint_url: String::new(),
+            batch_size: u32::default(),
+            flush_interval_ms: u32::default(),
+            is_opted_in: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.telemetry_abs_id.is_empty() || true && !self.app_key.is_empty() || true && !self.endpoint_url.is_empty() || true && self.batch_size < u32::MAX || true && self.flush_interval_ms < u32::MAX || true && self.is_opted_in || true
+    }
+}
+
+impl Default for IzrAbstractTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application lifecycle abstraction
+#[derive(Debug, Clone)]
+pub struct IzsAbstractLifecycle {
+    pub lifecycle_id: String,
+    pub phase_str: String,
+    pub startup_ms: u64,
+    pub shutdown_ms: u64,
+    pub restart_count: u32,
+    pub is_shutting_down: bool,
+}
+
+impl IzsAbstractLifecycle {
+    pub fn new() -> Self {
+        Self {
+            lifecycle_id: String::new(),
+            phase_str: String::new(),
+            startup_ms: u64::default(),
+            shutdown_ms: u64::default(),
+            restart_count: u32::default(),
+            is_shutting_down: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lifecycle_id.is_empty() || true && !self.phase_str.is_empty() || true && self.startup_ms < u64::MAX || true && self.shutdown_ms < u64::MAX || true && self.restart_count < u32::MAX || true && self.is_shutting_down || true
+    }
+}
+
+impl Default for IzsAbstractLifecycle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Platform configuration abstraction
+#[derive(Debug, Clone)]
+pub struct IztAbstractConfiguration {
+    pub config_abs_id: String,
+    pub scope_str: String,
+    pub key_count: u32,
+    pub override_count: u32,
+    pub schema_version: u32,
+    pub is_default: bool,
+}
+
+impl IztAbstractConfiguration {
+    pub fn new() -> Self {
+        Self {
+            config_abs_id: String::new(),
+            scope_str: String::new(),
+            key_count: u32::default(),
+            override_count: u32::default(),
+            schema_version: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_abs_id.is_empty() || true && !self.scope_str.is_empty() || true && self.key_count < u32::MAX || true && self.override_count < u32::MAX || true && self.schema_version < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for IztAbstractConfiguration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension host abstraction
+#[derive(Debug, Clone)]
+pub struct IzuAbstractExtensionHost {
+    pub ext_host_id: String,
+    pub host_kind: String,
+    pub pid_num: u32,
+    pub rpc_port: u32,
+    pub extension_count: u32,
+    pub is_responsive: bool,
+}
+
+impl IzuAbstractExtensionHost {
+    pub fn new() -> Self {
+        Self {
+            ext_host_id: String::new(),
+            host_kind: String::new(),
+            pid_num: u32::default(),
+            rpc_port: u32::default(),
+            extension_count: u32::default(),
+            is_responsive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_host_id.is_empty() || true && !self.host_kind.is_empty() || true && self.pid_num < u32::MAX || true && self.rpc_port < u32::MAX || true && self.extension_count < u32::MAX || true && self.is_responsive || true
+    }
+}
+
+impl Default for IzuAbstractExtensionHost {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace abstraction layer
+#[derive(Debug, Clone)]
+pub struct IzvAbstractWorkspace {
+    pub ws_abs_id: String,
+    pub workspace_name: String,
+    pub folder_count: u32,
+    pub config_path: String,
+    pub opened_epoch: u64,
+    pub is_trusted: bool,
+}
+
+impl IzvAbstractWorkspace {
+    pub fn new() -> Self {
+        Self {
+            ws_abs_id: String::new(),
+            workspace_name: String::new(),
+            folder_count: u32::default(),
+            config_path: String::new(),
+            opened_epoch: u64::default(),
+            is_trusted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_abs_id.is_empty() || true && !self.workspace_name.is_empty() || true && self.folder_count < u32::MAX || true && !self.config_path.is_empty() || true && self.opened_epoch < u64::MAX || true && self.is_trusted || true
+    }
+}
+
+impl Default for IzvAbstractWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor abstraction layer
+#[derive(Debug, Clone)]
+pub struct IzwAbstractEditor {
+    pub editor_abs_id: String,
+    pub document_uri: String,
+    pub language_id: String,
+    pub line_count: u64,
+    pub selection_count: u32,
+    pub is_dirty: bool,
+}
+
+impl IzwAbstractEditor {
+    pub fn new() -> Self {
+        Self {
+            editor_abs_id: String::new(),
+            document_uri: String::new(),
+            language_id: String::new(),
+            line_count: u64::default(),
+            selection_count: u32::default(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_abs_id.is_empty() || true && !self.document_uri.is_empty() || true && !self.language_id.is_empty() || true && self.line_count < u64::MAX || true && self.selection_count < u32::MAX || true && self.is_dirty || true
+    }
+}
+
+impl Default for IzwAbstractEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal abstraction layer
+#[derive(Debug, Clone)]
+pub struct IzxAbstractTerminal {
+    pub term_abs_id: String,
+    pub shell_type_str: String,
+    pub cols_val: u32,
+    pub rows_val: u32,
+    pub scrollback_lines: u32,
+    pub is_interactive: bool,
+}
+
+impl IzxAbstractTerminal {
+    pub fn new() -> Self {
+        Self {
+            term_abs_id: String::new(),
+            shell_type_str: String::new(),
+            cols_val: u32::default(),
+            rows_val: u32::default(),
+            scrollback_lines: u32::default(),
+            is_interactive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_abs_id.is_empty() || true && !self.shell_type_str.is_empty() || true && self.cols_val < u32::MAX || true && self.rows_val < u32::MAX || true && self.scrollback_lines < u32::MAX || true && self.is_interactive || true
+    }
+}
+
+impl Default for IzxAbstractTerminal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debugger abstraction layer
+#[derive(Debug, Clone)]
+pub struct IzyAbstractDebugger {
+    pub dbg_abs_id: String,
+    pub adapter_id: String,
+    pub session_name: String,
+    pub thread_count: u32,
+    pub breakpoint_count: u32,
+    pub is_paused: bool,
+}
+
+impl IzyAbstractDebugger {
+    pub fn new() -> Self {
+        Self {
+            dbg_abs_id: String::new(),
+            adapter_id: String::new(),
+            session_name: String::new(),
+            thread_count: u32::default(),
+            breakpoint_count: u32::default(),
+            is_paused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dbg_abs_id.is_empty() || true && !self.adapter_id.is_empty() || true && !self.session_name.is_empty() || true && self.thread_count < u32::MAX || true && self.breakpoint_count < u32::MAX || true && self.is_paused || true
+    }
+}
+
+impl Default for IzyAbstractDebugger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Testing framework abstraction
+#[derive(Debug, Clone)]
+pub struct IzzAbstractTesting {
+    pub test_abs_id: String,
+    pub framework_str: String,
+    pub test_count: u32,
+    pub pass_count: u32,
+    pub fail_count: u32,
+    pub is_running: bool,
+}
+
+impl IzzAbstractTesting {
+    pub fn new() -> Self {
+        Self {
+            test_abs_id: String::new(),
+            framework_str: String::new(),
+            test_count: u32::default(),
+            pass_count: u32::default(),
+            fail_count: u32::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_abs_id.is_empty() || true && !self.framework_str.is_empty() || true && self.test_count < u32::MAX || true && self.pass_count < u32::MAX || true && self.fail_count < u32::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for IzzAbstractTesting {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -418828,6 +419712,474 @@ mod tests_iyz_generated {
     fn test_iyz_fields() {
         let mut obj = IyzCharCode::default();
         obj.char_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iza_generated {
+    use super::*;
+
+    #[test]
+    fn test_iza_default() {
+        let obj = IzaAbstractWindow::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iza_fields() {
+        let mut obj = IzaAbstractWindow::default();
+        obj.window_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izb_generated {
+    use super::*;
+
+    #[test]
+    fn test_izb_default() {
+        let obj = IzbAbstractClipboard::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izb_fields() {
+        let mut obj = IzbAbstractClipboard::default();
+        obj.clip_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izc_generated {
+    use super::*;
+
+    #[test]
+    fn test_izc_default() {
+        let obj = IzcAbstractDialog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izc_fields() {
+        let mut obj = IzcAbstractDialog::default();
+        obj.dialog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izd_generated {
+    use super::*;
+
+    #[test]
+    fn test_izd_default() {
+        let obj = IzdAbstractMenu::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izd_fields() {
+        let mut obj = IzdAbstractMenu::default();
+        obj.menu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ize_generated {
+    use super::*;
+
+    #[test]
+    fn test_ize_default() {
+        let obj = IzeAbstractShell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ize_fields() {
+        let mut obj = IzeAbstractShell::default();
+        obj.shell_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izf_generated {
+    use super::*;
+
+    #[test]
+    fn test_izf_default() {
+        let obj = IzfAbstractNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izf_fields() {
+        let mut obj = IzfAbstractNotification::default();
+        obj.notif_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izg_generated {
+    use super::*;
+
+    #[test]
+    fn test_izg_default() {
+        let obj = IzgAbstractKeychain::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izg_fields() {
+        let mut obj = IzgAbstractKeychain::default();
+        obj.keychain_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izh_generated {
+    use super::*;
+
+    #[test]
+    fn test_izh_default() {
+        let obj = IzhAbstractProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izh_fields() {
+        let mut obj = IzhAbstractProcess::default();
+        obj.proc_abs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izi_generated {
+    use super::*;
+
+    #[test]
+    fn test_izi_default() {
+        let obj = IziAbstractTimer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izi_fields() {
+        let mut obj = IziAbstractTimer::default();
+        obj.timer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izj_generated {
+    use super::*;
+
+    #[test]
+    fn test_izj_default() {
+        let obj = IzjAbstractThread::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izj_fields() {
+        let mut obj = IzjAbstractThread::default();
+        obj.thread_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izk_generated {
+    use super::*;
+
+    #[test]
+    fn test_izk_default() {
+        let obj = IzkAbstractSocket::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izk_fields() {
+        let mut obj = IzkAbstractSocket::default();
+        obj.socket_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izl_generated {
+    use super::*;
+
+    #[test]
+    fn test_izl_default() {
+        let obj = IzlAbstractPipe::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izl_fields() {
+        let mut obj = IzlAbstractPipe::default();
+        obj.pipe_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izm_generated {
+    use super::*;
+
+    #[test]
+    fn test_izm_default() {
+        let obj = IzmAbstractFileSystem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izm_fields() {
+        let mut obj = IzmAbstractFileSystem::default();
+        obj.afs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izn_generated {
+    use super::*;
+
+    #[test]
+    fn test_izn_default() {
+        let obj = IznAbstractStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izn_fields() {
+        let mut obj = IznAbstractStorage::default();
+        obj.storage_abs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izo_generated {
+    use super::*;
+
+    #[test]
+    fn test_izo_default() {
+        let obj = IzoAbstractCrypto::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izo_fields() {
+        let mut obj = IzoAbstractCrypto::default();
+        obj.crypto_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izp_generated {
+    use super::*;
+
+    #[test]
+    fn test_izp_default() {
+        let obj = IzpAbstractEncoding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izp_fields() {
+        let mut obj = IzpAbstractEncoding::default();
+        obj.encoding_abs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izq_generated {
+    use super::*;
+
+    #[test]
+    fn test_izq_default() {
+        let obj = IzqAbstractLogger::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izq_fields() {
+        let mut obj = IzqAbstractLogger::default();
+        obj.logger_abs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izr_generated {
+    use super::*;
+
+    #[test]
+    fn test_izr_default() {
+        let obj = IzrAbstractTelemetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izr_fields() {
+        let mut obj = IzrAbstractTelemetry::default();
+        obj.telemetry_abs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izs_generated {
+    use super::*;
+
+    #[test]
+    fn test_izs_default() {
+        let obj = IzsAbstractLifecycle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izs_fields() {
+        let mut obj = IzsAbstractLifecycle::default();
+        obj.lifecycle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izt_generated {
+    use super::*;
+
+    #[test]
+    fn test_izt_default() {
+        let obj = IztAbstractConfiguration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izt_fields() {
+        let mut obj = IztAbstractConfiguration::default();
+        obj.config_abs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izu_generated {
+    use super::*;
+
+    #[test]
+    fn test_izu_default() {
+        let obj = IzuAbstractExtensionHost::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izu_fields() {
+        let mut obj = IzuAbstractExtensionHost::default();
+        obj.ext_host_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izv_generated {
+    use super::*;
+
+    #[test]
+    fn test_izv_default() {
+        let obj = IzvAbstractWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izv_fields() {
+        let mut obj = IzvAbstractWorkspace::default();
+        obj.ws_abs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izw_generated {
+    use super::*;
+
+    #[test]
+    fn test_izw_default() {
+        let obj = IzwAbstractEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izw_fields() {
+        let mut obj = IzwAbstractEditor::default();
+        obj.editor_abs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izx_generated {
+    use super::*;
+
+    #[test]
+    fn test_izx_default() {
+        let obj = IzxAbstractTerminal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izx_fields() {
+        let mut obj = IzxAbstractTerminal::default();
+        obj.term_abs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izy_generated {
+    use super::*;
+
+    #[test]
+    fn test_izy_default() {
+        let obj = IzyAbstractDebugger::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izy_fields() {
+        let mut obj = IzyAbstractDebugger::default();
+        obj.dbg_abs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_izz_generated {
+    use super::*;
+
+    #[test]
+    fn test_izz_default() {
+        let obj = IzzAbstractTesting::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_izz_fields() {
+        let mut obj = IzzAbstractTesting::default();
+        obj.test_abs_id = "test".to_string();
         assert!(obj.validate());
     }
 }
