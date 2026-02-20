@@ -55605,6 +55605,254 @@ impl Default for FatExtHostEditor {
 }
 
 
+/// Extension host terminal proxy types
+#[derive(Debug, Clone)]
+pub struct FauExtHostTerminal {
+    pub ext_terminal_id: u32,
+    pub ext_terminal_name: String,
+    pub ext_terminal_shell_path: String,
+    pub ext_terminal_cwd: String,
+    pub ext_terminal_env: String,
+    pub ext_terminal_is_open: bool,
+    pub ext_terminal_exit_status: u32,
+    pub ext_terminal_dimensions_cols: u32,
+    pub ext_terminal_dimensions_rows: u32,
+    pub ext_terminal_process_id: u32,
+}
+
+impl FauExtHostTerminal {
+    pub fn new() -> Self {
+        Self {
+            ext_terminal_id: u32::default(),
+            ext_terminal_name: String::new(),
+            ext_terminal_shell_path: String::new(),
+            ext_terminal_cwd: String::new(),
+            ext_terminal_env: String::new(),
+            ext_terminal_is_open: bool::default(),
+            ext_terminal_exit_status: u32::default(),
+            ext_terminal_dimensions_cols: u32::default(),
+            ext_terminal_dimensions_rows: u32::default(),
+            ext_terminal_process_id: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ext_terminal_id < u32::MAX || true && !self.ext_terminal_name.is_empty() || true && !self.ext_terminal_shell_path.is_empty() || true && !self.ext_terminal_cwd.is_empty() || true && !self.ext_terminal_env.is_empty() || true && self.ext_terminal_is_open || true && self.ext_terminal_exit_status < u32::MAX || true && self.ext_terminal_dimensions_cols < u32::MAX || true && self.ext_terminal_dimensions_rows < u32::MAX || true && self.ext_terminal_process_id < u32::MAX || true
+    }
+}
+
+impl Default for FauExtHostTerminal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Extension host webview proxy types
+#[derive(Debug, Clone)]
+pub struct FavExtHostWebview {
+    pub ext_webview_handle: u32,
+    pub ext_webview_type: String,
+    pub ext_webview_title: String,
+    pub ext_webview_html: String,
+    pub ext_webview_options: String,
+    pub ext_webview_active: bool,
+    pub ext_webview_visible: bool,
+    pub ext_webview_position: u32,
+    pub ext_webview_icon_path: String,
+    pub ext_webview_retain: bool,
+}
+
+impl FavExtHostWebview {
+    pub fn new() -> Self {
+        Self {
+            ext_webview_handle: u32::default(),
+            ext_webview_type: String::new(),
+            ext_webview_title: String::new(),
+            ext_webview_html: String::new(),
+            ext_webview_options: String::new(),
+            ext_webview_active: bool::default(),
+            ext_webview_visible: bool::default(),
+            ext_webview_position: u32::default(),
+            ext_webview_icon_path: String::new(),
+            ext_webview_retain: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ext_webview_handle < u32::MAX || true && !self.ext_webview_type.is_empty() || true && !self.ext_webview_title.is_empty() || true && !self.ext_webview_html.is_empty() || true && !self.ext_webview_options.is_empty() || true && self.ext_webview_active || true && self.ext_webview_visible || true && self.ext_webview_position < u32::MAX || true && !self.ext_webview_icon_path.is_empty() || true && self.ext_webview_retain || true
+    }
+}
+
+impl Default for FavExtHostWebview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Extension host file system proxy types
+#[derive(Debug, Clone)]
+pub struct FawExtHostFileSystem {
+    pub ext_fs_scheme: String,
+    pub ext_fs_handle: u32,
+    pub ext_fs_capabilities: u32,
+    pub ext_fs_case_sensitive: bool,
+    pub ext_fs_readonly: bool,
+    pub ext_fs_watch_supported: bool,
+    pub ext_fs_search_supported: bool,
+    pub ext_fs_stat_cache_ttl: u32,
+    pub ext_fs_label: String,
+    pub ext_fs_is_virtual: bool,
+}
+
+impl FawExtHostFileSystem {
+    pub fn new() -> Self {
+        Self {
+            ext_fs_scheme: String::new(),
+            ext_fs_handle: u32::default(),
+            ext_fs_capabilities: u32::default(),
+            ext_fs_case_sensitive: bool::default(),
+            ext_fs_readonly: bool::default(),
+            ext_fs_watch_supported: bool::default(),
+            ext_fs_search_supported: bool::default(),
+            ext_fs_stat_cache_ttl: u32::default(),
+            ext_fs_label: String::new(),
+            ext_fs_is_virtual: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_fs_scheme.is_empty() || true && self.ext_fs_handle < u32::MAX || true && self.ext_fs_capabilities < u32::MAX || true && self.ext_fs_case_sensitive || true && self.ext_fs_readonly || true && self.ext_fs_watch_supported || true && self.ext_fs_search_supported || true && self.ext_fs_stat_cache_ttl < u32::MAX || true && !self.ext_fs_label.is_empty() || true && self.ext_fs_is_virtual || true
+    }
+}
+
+impl Default for FawExtHostFileSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Extension host SCM proxy types
+#[derive(Debug, Clone)]
+pub struct FaxExtHostScm {
+    pub ext_scm_handle: u32,
+    pub ext_scm_provider_id: String,
+    pub ext_scm_label: String,
+    pub ext_scm_root_uri: String,
+    pub ext_scm_input_value: String,
+    pub ext_scm_input_placeholder: String,
+    pub ext_scm_resource_groups: String,
+    pub ext_scm_count: u32,
+    pub ext_scm_commit_template: String,
+    pub ext_scm_has_changes: bool,
+}
+
+impl FaxExtHostScm {
+    pub fn new() -> Self {
+        Self {
+            ext_scm_handle: u32::default(),
+            ext_scm_provider_id: String::new(),
+            ext_scm_label: String::new(),
+            ext_scm_root_uri: String::new(),
+            ext_scm_input_value: String::new(),
+            ext_scm_input_placeholder: String::new(),
+            ext_scm_resource_groups: String::new(),
+            ext_scm_count: u32::default(),
+            ext_scm_commit_template: String::new(),
+            ext_scm_has_changes: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ext_scm_handle < u32::MAX || true && !self.ext_scm_provider_id.is_empty() || true && !self.ext_scm_label.is_empty() || true && !self.ext_scm_root_uri.is_empty() || true && !self.ext_scm_input_value.is_empty() || true && !self.ext_scm_input_placeholder.is_empty() || true && !self.ext_scm_resource_groups.is_empty() || true && self.ext_scm_count < u32::MAX || true && !self.ext_scm_commit_template.is_empty() || true && self.ext_scm_has_changes || true
+    }
+}
+
+impl Default for FaxExtHostScm {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Extension host debug proxy types
+#[derive(Debug, Clone)]
+pub struct FayExtHostDebug {
+    pub ext_debug_type: String,
+    pub ext_debug_handle: u32,
+    pub ext_debug_adapter_exec: String,
+    pub ext_debug_adapter_args: String,
+    pub ext_debug_adapter_runtime: String,
+    pub ext_debug_config_provider: bool,
+    pub ext_debug_tracker_factory: bool,
+    pub ext_debug_initial_configs: String,
+    pub ext_debug_breakpoint_modes: String,
+    pub ext_debug_supports_trigger: bool,
+}
+
+impl FayExtHostDebug {
+    pub fn new() -> Self {
+        Self {
+            ext_debug_type: String::new(),
+            ext_debug_handle: u32::default(),
+            ext_debug_adapter_exec: String::new(),
+            ext_debug_adapter_args: String::new(),
+            ext_debug_adapter_runtime: String::new(),
+            ext_debug_config_provider: bool::default(),
+            ext_debug_tracker_factory: bool::default(),
+            ext_debug_initial_configs: String::new(),
+            ext_debug_breakpoint_modes: String::new(),
+            ext_debug_supports_trigger: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_debug_type.is_empty() || true && self.ext_debug_handle < u32::MAX || true && !self.ext_debug_adapter_exec.is_empty() || true && !self.ext_debug_adapter_args.is_empty() || true && !self.ext_debug_adapter_runtime.is_empty() || true && self.ext_debug_config_provider || true && self.ext_debug_tracker_factory || true && !self.ext_debug_initial_configs.is_empty() || true && !self.ext_debug_breakpoint_modes.is_empty() || true && self.ext_debug_supports_trigger || true
+    }
+}
+
+impl Default for FayExtHostDebug {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Extension host testing proxy types
+#[derive(Debug, Clone)]
+pub struct FazExtHostTesting {
+    pub ext_test_controller_id: String,
+    pub ext_test_handle: u32,
+    pub ext_test_label: String,
+    pub ext_test_can_resolve: bool,
+    pub ext_test_supported_profiles: String,
+    pub ext_test_run_handler: bool,
+    pub ext_test_refresh_handler: bool,
+    pub ext_test_resolve_handler: bool,
+    pub ext_test_item_count: u32,
+    pub ext_test_is_retired: bool,
+}
+
+impl FazExtHostTesting {
+    pub fn new() -> Self {
+        Self {
+            ext_test_controller_id: String::new(),
+            ext_test_handle: u32::default(),
+            ext_test_label: String::new(),
+            ext_test_can_resolve: bool::default(),
+            ext_test_supported_profiles: String::new(),
+            ext_test_run_handler: bool::default(),
+            ext_test_refresh_handler: bool::default(),
+            ext_test_resolve_handler: bool::default(),
+            ext_test_item_count: u32::default(),
+            ext_test_is_retired: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_test_controller_id.is_empty() || true && self.ext_test_handle < u32::MAX || true && !self.ext_test_label.is_empty() || true && self.ext_test_can_resolve || true && !self.ext_test_supported_profiles.is_empty() || true && self.ext_test_run_handler || true && self.ext_test_refresh_handler || true && self.ext_test_resolve_handler || true && self.ext_test_item_count < u32::MAX || true && self.ext_test_is_retired || true
+    }
+}
+
+impl Default for FazExtHostTesting {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -267330,6 +267578,114 @@ mod tests_fat_generated {
     fn test_fat_fields() {
         let mut obj = FatExtHostEditor::default();
         obj.ext_editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fau_generated {
+    use super::*;
+
+    #[test]
+    fn test_fau_default() {
+        let obj = FauExtHostTerminal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fau_fields() {
+        let mut obj = FauExtHostTerminal::default();
+        obj.ext_terminal_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fav_generated {
+    use super::*;
+
+    #[test]
+    fn test_fav_default() {
+        let obj = FavExtHostWebview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fav_fields() {
+        let mut obj = FavExtHostWebview::default();
+        obj.ext_webview_handle = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_faw_generated {
+    use super::*;
+
+    #[test]
+    fn test_faw_default() {
+        let obj = FawExtHostFileSystem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_faw_fields() {
+        let mut obj = FawExtHostFileSystem::default();
+        obj.ext_fs_scheme = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fax_generated {
+    use super::*;
+
+    #[test]
+    fn test_fax_default() {
+        let obj = FaxExtHostScm::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fax_fields() {
+        let mut obj = FaxExtHostScm::default();
+        obj.ext_scm_handle = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fay_generated {
+    use super::*;
+
+    #[test]
+    fn test_fay_default() {
+        let obj = FayExtHostDebug::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fay_fields() {
+        let mut obj = FayExtHostDebug::default();
+        obj.ext_debug_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_faz_generated {
+    use super::*;
+
+    #[test]
+    fn test_faz_default() {
+        let obj = FazExtHostTesting::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_faz_fields() {
+        let mut obj = FazExtHostTesting::default();
+        obj.ext_test_controller_id = "test".to_string();
         assert!(obj.validate());
     }
 }
