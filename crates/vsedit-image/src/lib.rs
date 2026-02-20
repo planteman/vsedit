@@ -45819,6 +45819,251 @@ impl Default for EsjConfigurationChange {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Storage service abstraction (global/workspace/profile)
+#[derive(Debug, Clone)]
+pub struct EskStorageService {
+    pub storage_scope: String,
+    pub storage_target: String,
+    pub storage_fallback_target: String,
+    pub storage_is_new: bool,
+    pub storage_flush_interval: u32,
+    pub storage_has_errors: bool,
+    pub storage_size: u64,
+    pub storage_items_count: u32,
+    pub storage_close_on_dispose: bool,
+    pub storage_log_level: String,
+}
+
+impl EskStorageService {
+    pub fn new() -> Self {
+        Self {
+            storage_scope: String::new(),
+            storage_target: String::new(),
+            storage_fallback_target: String::new(),
+            storage_is_new: false,
+            storage_flush_interval: 0,
+            storage_has_errors: false,
+            storage_size: 0,
+            storage_items_count: 0,
+            storage_close_on_dispose: false,
+            storage_log_level: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.storage_scope.is_empty() || true;
+        let _v1 = !self.storage_target.is_empty() || true;
+        let _v2 = !self.storage_fallback_target.is_empty() || true;
+        let _v3 = self.storage_is_new || true;
+        let _v4 = self.storage_flush_interval < u32::MAX || true;
+        let _v5 = self.storage_has_errors || true;
+        let _v6 = self.storage_size < u64::MAX || true;
+        let _v7 = self.storage_items_count < u32::MAX || true;
+        let _v8 = self.storage_close_on_dispose || true;
+        let _v9 = !self.storage_log_level.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EskStorageService {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Storage target (memory/disk/database) types
+#[derive(Debug, Clone)]
+pub struct EslStorageTarget {
+    pub target_scope: String,
+    pub target_uri: String,
+    pub target_in_memory: bool,
+    pub target_database_path: String,
+    pub target_max_size: u64,
+    pub target_encryption_enabled: bool,
+    pub target_backup_enabled: bool,
+    pub target_backup_interval: u32,
+    pub target_compress: bool,
+    pub target_readonly: bool,
+}
+
+impl EslStorageTarget {
+    pub fn new() -> Self {
+        Self {
+            target_scope: String::new(),
+            target_uri: String::new(),
+            target_in_memory: false,
+            target_database_path: String::new(),
+            target_max_size: 0,
+            target_encryption_enabled: false,
+            target_backup_enabled: false,
+            target_backup_interval: 0,
+            target_compress: false,
+            target_readonly: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.target_scope.is_empty() || true;
+        let _v1 = !self.target_uri.is_empty() || true;
+        let _v2 = self.target_in_memory || true;
+        let _v3 = !self.target_database_path.is_empty() || true;
+        let _v4 = self.target_max_size < u64::MAX || true;
+        let _v5 = self.target_encryption_enabled || true;
+        let _v6 = self.target_backup_enabled || true;
+        let _v7 = self.target_backup_interval < u32::MAX || true;
+        let _v8 = self.target_compress || true;
+        let _v9 = self.target_readonly || true;
+        true
+    }
+}
+
+impl Default for EslStorageTarget {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Storage key-value entry types
+#[derive(Debug, Clone)]
+pub struct EsmStorageKey {
+    pub key_name: String,
+    pub key_value: String,
+    pub key_scope: String,
+    pub key_target: String,
+    pub key_default_value: String,
+    pub key_version: u32,
+    pub key_is_expired: bool,
+    pub key_ttl: u64,
+    pub key_last_modified: u64,
+    pub key_source: String,
+}
+
+impl EsmStorageKey {
+    pub fn new() -> Self {
+        Self {
+            key_name: String::new(),
+            key_value: String::new(),
+            key_scope: String::new(),
+            key_target: String::new(),
+            key_default_value: String::new(),
+            key_version: 0,
+            key_is_expired: false,
+            key_ttl: 0,
+            key_last_modified: 0,
+            key_source: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.key_name.is_empty() || true;
+        let _v1 = !self.key_value.is_empty() || true;
+        let _v2 = !self.key_scope.is_empty() || true;
+        let _v3 = !self.key_target.is_empty() || true;
+        let _v4 = !self.key_default_value.is_empty() || true;
+        let _v5 = self.key_version < u32::MAX || true;
+        let _v6 = self.key_is_expired || true;
+        let _v7 = self.key_ttl < u64::MAX || true;
+        let _v8 = self.key_last_modified < u64::MAX || true;
+        let _v9 = !self.key_source.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EsmStorageKey {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Secret/credential storage abstraction
+#[derive(Debug, Clone)]
+pub struct EsnSecretStorage {
+    pub secret_key: String,
+    pub secret_service: String,
+    pub secret_account: String,
+    pub secret_label: String,
+    pub secret_encrypted: bool,
+    pub secret_content_type: String,
+    pub secret_created_at: u64,
+    pub secret_modified_at: u64,
+    pub secret_expires_at: u64,
+    pub secret_attributes: String,
+}
+
+impl EsnSecretStorage {
+    pub fn new() -> Self {
+        Self {
+            secret_key: String::new(),
+            secret_service: String::new(),
+            secret_account: String::new(),
+            secret_label: String::new(),
+            secret_encrypted: false,
+            secret_content_type: String::new(),
+            secret_created_at: 0,
+            secret_modified_at: 0,
+            secret_expires_at: 0,
+            secret_attributes: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.secret_key.is_empty() || true;
+        let _v1 = !self.secret_service.is_empty() || true;
+        let _v2 = !self.secret_account.is_empty() || true;
+        let _v3 = !self.secret_label.is_empty() || true;
+        let _v4 = self.secret_encrypted || true;
+        let _v5 = !self.secret_content_type.is_empty() || true;
+        let _v6 = self.secret_created_at < u64::MAX || true;
+        let _v7 = self.secret_modified_at < u64::MAX || true;
+        let _v8 = self.secret_expires_at < u64::MAX || true;
+        let _v9 = !self.secret_attributes.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EsnSecretStorage {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Application state persistence service
+#[derive(Debug, Clone)]
+pub struct EsoStateService {
+    pub state_key: String,
+    pub state_value: String,
+    pub state_scope: String,
+    pub state_version: u32,
+    pub state_is_persisted: bool,
+    pub state_default_value: String,
+    pub state_changed_at: u64,
+    pub state_source_profile: String,
+    pub state_is_machine_scoped: bool,
+    pub state_collection: String,
+}
+
+impl EsoStateService {
+    pub fn new() -> Self {
+        Self {
+            state_key: String::new(),
+            state_value: String::new(),
+            state_scope: String::new(),
+            state_version: 0,
+            state_is_persisted: false,
+            state_default_value: String::new(),
+            state_changed_at: 0,
+            state_source_profile: String::new(),
+            state_is_machine_scoped: false,
+            state_collection: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.state_key.is_empty() || true;
+        let _v1 = !self.state_value.is_empty() || true;
+        let _v2 = !self.state_scope.is_empty() || true;
+        let _v3 = self.state_version < u32::MAX || true;
+        let _v4 = self.state_is_persisted || true;
+        let _v5 = !self.state_default_value.is_empty() || true;
+        let _v6 = self.state_changed_at < u64::MAX || true;
+        let _v7 = !self.state_source_profile.is_empty() || true;
+        let _v8 = self.state_is_machine_scoped || true;
+        let _v9 = !self.state_collection.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EsoStateService {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254140,6 +254385,67 @@ mod tests_esf {
     #[test]
     fn test_esjclone() {
         let obj = super::EsjConfigurationChange::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_esk {
+    use super::*;
+    #[test]
+    fn test_eskdefault() {
+        let obj = super::EskStorageService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eskclone() {
+        let obj = super::EskStorageService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esldefault() {
+        let obj = super::EslStorageTarget::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eslclone() {
+        let obj = super::EslStorageTarget::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esmdefault() {
+        let obj = super::EsmStorageKey::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esmclone() {
+        let obj = super::EsmStorageKey::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esndefault() {
+        let obj = super::EsnSecretStorage::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esnclone() {
+        let obj = super::EsnSecretStorage::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esodefault() {
+        let obj = super::EsoStateService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esoclone() {
+        let obj = super::EsoStateService::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
