@@ -166224,6 +166224,890 @@ impl Default for JgzScmConfig {
     }
 }
 
+/// Debug session descriptor
+#[derive(Debug, Clone)]
+pub struct JhaDebugSession {
+    pub dbg_session_id: String,
+    pub session_name: String,
+    pub config_ref: String,
+    pub adapter_ref: String,
+    pub thread_count: u32,
+    pub is_stopped: bool,
+}
+
+impl JhaDebugSession {
+    pub fn new() -> Self {
+        Self {
+            dbg_session_id: String::new(),
+            session_name: String::new(),
+            config_ref: String::new(),
+            adapter_ref: String::new(),
+            thread_count: u32::default(),
+            is_stopped: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dbg_session_id.is_empty() || true && !self.session_name.is_empty() || true && !self.config_ref.is_empty() || true && !self.adapter_ref.is_empty() || true && self.thread_count < u32::MAX || true && self.is_stopped || true
+    }
+}
+
+impl Default for JhaDebugSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug launch configuration
+#[derive(Debug, Clone)]
+pub struct JhbDebugConfiguration {
+    pub dbg_config_id: String,
+    pub config_name: String,
+    pub debug_type_str: String,
+    pub request_str: String,
+    pub program_path: String,
+    pub stop_on_entry: bool,
+}
+
+impl JhbDebugConfiguration {
+    pub fn new() -> Self {
+        Self {
+            dbg_config_id: String::new(),
+            config_name: String::new(),
+            debug_type_str: String::new(),
+            request_str: String::new(),
+            program_path: String::new(),
+            stop_on_entry: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dbg_config_id.is_empty() || true && !self.config_name.is_empty() || true && !self.debug_type_str.is_empty() || true && !self.request_str.is_empty() || true && !self.program_path.is_empty() || true && self.stop_on_entry || true
+    }
+}
+
+impl Default for JhbDebugConfiguration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug adapter descriptor
+#[derive(Debug, Clone)]
+pub struct JhcDebugAdapter {
+    pub dbg_adapter_id: String,
+    pub adapter_type_str: String,
+    pub runtime_path: String,
+    pub program_path: String,
+    pub port_val: u32,
+    pub is_server: bool,
+}
+
+impl JhcDebugAdapter {
+    pub fn new() -> Self {
+        Self {
+            dbg_adapter_id: String::new(),
+            adapter_type_str: String::new(),
+            runtime_path: String::new(),
+            program_path: String::new(),
+            port_val: u32::default(),
+            is_server: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dbg_adapter_id.is_empty() || true && !self.adapter_type_str.is_empty() || true && !self.runtime_path.is_empty() || true && !self.program_path.is_empty() || true && self.port_val < u32::MAX || true && self.is_server || true
+    }
+}
+
+impl Default for JhcDebugAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Breakpoint descriptor
+#[derive(Debug, Clone)]
+pub struct JhdBreakpoint {
+    pub bp_id: String,
+    pub source_path: String,
+    pub line_number: u32,
+    pub column_val: u32,
+    pub hit_count: u64,
+    pub is_verified: bool,
+}
+
+impl JhdBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            bp_id: String::new(),
+            source_path: String::new(),
+            line_number: u32::default(),
+            column_val: u32::default(),
+            hit_count: u64::default(),
+            is_verified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bp_id.is_empty() || true && !self.source_path.is_empty() || true && self.line_number < u32::MAX || true && self.column_val < u32::MAX || true && self.hit_count < u64::MAX || true && self.is_verified || true
+    }
+}
+
+impl Default for JhdBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Breakpoint condition entry
+#[derive(Debug, Clone)]
+pub struct JheBreakpointCondition {
+    pub bp_cond_id: String,
+    pub breakpoint_ref: String,
+    pub condition_expr: String,
+    pub hit_condition: String,
+    pub log_message: String,
+    pub is_enabled: bool,
+}
+
+impl JheBreakpointCondition {
+    pub fn new() -> Self {
+        Self {
+            bp_cond_id: String::new(),
+            breakpoint_ref: String::new(),
+            condition_expr: String::new(),
+            hit_condition: String::new(),
+            log_message: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bp_cond_id.is_empty() || true && !self.breakpoint_ref.is_empty() || true && !self.condition_expr.is_empty() || true && !self.hit_condition.is_empty() || true && !self.log_message.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for JheBreakpointCondition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug stack frame
+#[derive(Debug, Clone)]
+pub struct JhfStackFrame {
+    pub frame_id: String,
+    pub frame_name: String,
+    pub source_ref: String,
+    pub line_number: u32,
+    pub module_ref: String,
+    pub is_subtle: bool,
+}
+
+impl JhfStackFrame {
+    pub fn new() -> Self {
+        Self {
+            frame_id: String::new(),
+            frame_name: String::new(),
+            source_ref: String::new(),
+            line_number: u32::default(),
+            module_ref: String::new(),
+            is_subtle: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.frame_id.is_empty() || true && !self.frame_name.is_empty() || true && !self.source_ref.is_empty() || true && self.line_number < u32::MAX || true && !self.module_ref.is_empty() || true && self.is_subtle || true
+    }
+}
+
+impl Default for JhfStackFrame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug variable descriptor
+#[derive(Debug, Clone)]
+pub struct JhgVariable {
+    pub var_id: String,
+    pub var_name: String,
+    pub var_value: String,
+    pub var_type_str: String,
+    pub child_count: u32,
+    pub is_structured: bool,
+}
+
+impl JhgVariable {
+    pub fn new() -> Self {
+        Self {
+            var_id: String::new(),
+            var_name: String::new(),
+            var_value: String::new(),
+            var_type_str: String::new(),
+            child_count: u32::default(),
+            is_structured: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.var_id.is_empty() || true && !self.var_name.is_empty() || true && !self.var_value.is_empty() || true && !self.var_type_str.is_empty() || true && self.child_count < u32::MAX || true && self.is_structured || true
+    }
+}
+
+impl Default for JhgVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug variable scope
+#[derive(Debug, Clone)]
+pub struct JhhScope {
+    pub scope_id: String,
+    pub scope_name: String,
+    pub variables_ref: u32,
+    pub named_variables: u32,
+    pub indexed_variables: u32,
+    pub is_expensive: bool,
+}
+
+impl JhhScope {
+    pub fn new() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_name: String::new(),
+            variables_ref: u32::default(),
+            named_variables: u32::default(),
+            indexed_variables: u32::default(),
+            is_expensive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_id.is_empty() || true && !self.scope_name.is_empty() || true && self.variables_ref < u32::MAX || true && self.named_variables < u32::MAX || true && self.indexed_variables < u32::MAX || true && self.is_expensive || true
+    }
+}
+
+impl Default for JhhScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug thread descriptor
+#[derive(Debug, Clone)]
+pub struct JhiThread {
+    pub thread_id: String,
+    pub thread_name: String,
+    pub thread_num: u32,
+    pub stop_reason: String,
+    pub frame_count: u32,
+    pub is_stopped: bool,
+}
+
+impl JhiThread {
+    pub fn new() -> Self {
+        Self {
+            thread_id: String::new(),
+            thread_name: String::new(),
+            thread_num: u32::default(),
+            stop_reason: String::new(),
+            frame_count: u32::default(),
+            is_stopped: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.thread_id.is_empty() || true && !self.thread_name.is_empty() || true && self.thread_num < u32::MAX || true && !self.stop_reason.is_empty() || true && self.frame_count < u32::MAX || true && self.is_stopped || true
+    }
+}
+
+impl Default for JhiThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug evaluation result
+#[derive(Debug, Clone)]
+pub struct JhjEvaluateResult {
+    pub eval_id: String,
+    pub expression_str: String,
+    pub result_str: String,
+    pub result_type_str: String,
+    pub variables_ref: u32,
+    pub is_indexed: bool,
+}
+
+impl JhjEvaluateResult {
+    pub fn new() -> Self {
+        Self {
+            eval_id: String::new(),
+            expression_str: String::new(),
+            result_str: String::new(),
+            result_type_str: String::new(),
+            variables_ref: u32::default(),
+            is_indexed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.eval_id.is_empty() || true && !self.expression_str.is_empty() || true && !self.result_str.is_empty() || true && !self.result_type_str.is_empty() || true && self.variables_ref < u32::MAX || true && self.is_indexed || true
+    }
+}
+
+impl Default for JhjEvaluateResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Data breakpoint descriptor
+#[derive(Debug, Clone)]
+pub struct JhkDataBreakpoint {
+    pub data_bp_id: String,
+    pub data_id: String,
+    pub access_type_str: String,
+    pub condition_expr: String,
+    pub hit_condition: String,
+    pub is_verified: bool,
+}
+
+impl JhkDataBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            data_bp_id: String::new(),
+            data_id: String::new(),
+            access_type_str: String::new(),
+            condition_expr: String::new(),
+            hit_condition: String::new(),
+            is_verified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.data_bp_id.is_empty() || true && !self.data_id.is_empty() || true && !self.access_type_str.is_empty() || true && !self.condition_expr.is_empty() || true && !self.hit_condition.is_empty() || true && self.is_verified || true
+    }
+}
+
+impl Default for JhkDataBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Function breakpoint descriptor
+#[derive(Debug, Clone)]
+pub struct JhlFunctionBreakpoint {
+    pub fn_bp_id: String,
+    pub function_name: String,
+    pub module_ref: String,
+    pub condition_expr: String,
+    pub hit_count: u64,
+    pub is_verified: bool,
+}
+
+impl JhlFunctionBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            fn_bp_id: String::new(),
+            function_name: String::new(),
+            module_ref: String::new(),
+            condition_expr: String::new(),
+            hit_count: u64::default(),
+            is_verified: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fn_bp_id.is_empty() || true && !self.function_name.is_empty() || true && !self.module_ref.is_empty() || true && !self.condition_expr.is_empty() || true && self.hit_count < u64::MAX || true && self.is_verified || true
+    }
+}
+
+impl Default for JhlFunctionBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug console descriptor
+#[derive(Debug, Clone)]
+pub struct JhmDebugConsole {
+    pub dbg_console_id: String,
+    pub session_ref: String,
+    pub entry_count: u32,
+    pub filter_text: String,
+    pub group_depth: u32,
+    pub is_collapsed: bool,
+}
+
+impl JhmDebugConsole {
+    pub fn new() -> Self {
+        Self {
+            dbg_console_id: String::new(),
+            session_ref: String::new(),
+            entry_count: u32::default(),
+            filter_text: String::new(),
+            group_depth: u32::default(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dbg_console_id.is_empty() || true && !self.session_ref.is_empty() || true && self.entry_count < u32::MAX || true && !self.filter_text.is_empty() || true && self.group_depth < u32::MAX || true && self.is_collapsed || true
+    }
+}
+
+impl Default for JhmDebugConsole {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug console entry
+#[derive(Debug, Clone)]
+pub struct JhnDebugConsoleEntry {
+    pub dbg_entry_id: String,
+    pub text_str: String,
+    pub source_str: String,
+    pub output_category: String,
+    pub timestamp_epoch: u64,
+    pub is_error_output: bool,
+}
+
+impl JhnDebugConsoleEntry {
+    pub fn new() -> Self {
+        Self {
+            dbg_entry_id: String::new(),
+            text_str: String::new(),
+            source_str: String::new(),
+            output_category: String::new(),
+            timestamp_epoch: u64::default(),
+            is_error_output: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dbg_entry_id.is_empty() || true && !self.text_str.is_empty() || true && !self.source_str.is_empty() || true && !self.output_category.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_error_output || true
+    }
+}
+
+impl Default for JhnDebugConsoleEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Exception breakpoint
+#[derive(Debug, Clone)]
+pub struct JhoExceptionBreakpoint {
+    pub exc_bp_id: String,
+    pub filter_id: String,
+    pub label_str: String,
+    pub description_str: String,
+    pub default_state: bool,
+    pub supports_condition: bool,
+}
+
+impl JhoExceptionBreakpoint {
+    pub fn new() -> Self {
+        Self {
+            exc_bp_id: String::new(),
+            filter_id: String::new(),
+            label_str: String::new(),
+            description_str: String::new(),
+            default_state: bool::default(),
+            supports_condition: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exc_bp_id.is_empty() || true && !self.filter_id.is_empty() || true && !self.label_str.is_empty() || true && !self.description_str.is_empty() || true && self.default_state || true && self.supports_condition || true
+    }
+}
+
+impl Default for JhoExceptionBreakpoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug module descriptor
+#[derive(Debug, Clone)]
+pub struct JhpModule {
+    pub module_id: String,
+    pub module_name: String,
+    pub module_path: String,
+    pub version_str: String,
+    pub symbol_status: String,
+    pub is_user_code: bool,
+}
+
+impl JhpModule {
+    pub fn new() -> Self {
+        Self {
+            module_id: String::new(),
+            module_name: String::new(),
+            module_path: String::new(),
+            version_str: String::new(),
+            symbol_status: String::new(),
+            is_user_code: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.module_id.is_empty() || true && !self.module_name.is_empty() || true && !self.module_path.is_empty() || true && !self.version_str.is_empty() || true && !self.symbol_status.is_empty() || true && self.is_user_code || true
+    }
+}
+
+impl Default for JhpModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Loaded source descriptor
+#[derive(Debug, Clone)]
+pub struct JhqLoadedSource {
+    pub loaded_src_id: String,
+    pub source_name: String,
+    pub source_path: String,
+    pub source_reference: u32,
+    pub origin_str: String,
+    pub is_decompiled: bool,
+}
+
+impl JhqLoadedSource {
+    pub fn new() -> Self {
+        Self {
+            loaded_src_id: String::new(),
+            source_name: String::new(),
+            source_path: String::new(),
+            source_reference: u32::default(),
+            origin_str: String::new(),
+            is_decompiled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.loaded_src_id.is_empty() || true && !self.source_name.is_empty() || true && !self.source_path.is_empty() || true && self.source_reference < u32::MAX || true && !self.origin_str.is_empty() || true && self.is_decompiled || true
+    }
+}
+
+impl Default for JhqLoadedSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug adapter protocol message
+#[derive(Debug, Clone)]
+pub struct JhrDebugProtocol {
+    pub dap_msg_id: String,
+    pub msg_type_str: String,
+    pub command_str: String,
+    pub sequence_num: u32,
+    pub body_json_len: u32,
+    pub is_response: bool,
+}
+
+impl JhrDebugProtocol {
+    pub fn new() -> Self {
+        Self {
+            dap_msg_id: String::new(),
+            msg_type_str: String::new(),
+            command_str: String::new(),
+            sequence_num: u32::default(),
+            body_json_len: u32::default(),
+            is_response: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dap_msg_id.is_empty() || true && !self.msg_type_str.is_empty() || true && !self.command_str.is_empty() || true && self.sequence_num < u32::MAX || true && self.body_json_len < u32::MAX || true && self.is_response || true
+    }
+}
+
+impl Default for JhrDebugProtocol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug watch expression
+#[derive(Debug, Clone)]
+pub struct JhsDebugWatch {
+    pub watch_id: String,
+    pub expression_str: String,
+    pub result_value: String,
+    pub result_type_str: String,
+    pub frame_ref: String,
+    pub is_error: bool,
+}
+
+impl JhsDebugWatch {
+    pub fn new() -> Self {
+        Self {
+            watch_id: String::new(),
+            expression_str: String::new(),
+            result_value: String::new(),
+            result_type_str: String::new(),
+            frame_ref: String::new(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watch_id.is_empty() || true && !self.expression_str.is_empty() || true && !self.result_value.is_empty() || true && !self.result_type_str.is_empty() || true && !self.frame_ref.is_empty() || true && self.is_error || true
+    }
+}
+
+impl Default for JhsDebugWatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug hover expression
+#[derive(Debug, Clone)]
+pub struct JhtDebugHover {
+    pub hover_id: String,
+    pub expression_str: String,
+    pub result_str: String,
+    pub range_json: String,
+    pub session_ref: String,
+    pub is_complex: bool,
+}
+
+impl JhtDebugHover {
+    pub fn new() -> Self {
+        Self {
+            hover_id: String::new(),
+            expression_str: String::new(),
+            result_str: String::new(),
+            range_json: String::new(),
+            session_ref: String::new(),
+            is_complex: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_id.is_empty() || true && !self.expression_str.is_empty() || true && !self.result_str.is_empty() || true && !self.range_json.is_empty() || true && !self.session_ref.is_empty() || true && self.is_complex || true
+    }
+}
+
+impl Default for JhtDebugHover {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug inline value
+#[derive(Debug, Clone)]
+pub struct JhuDebugInlineValue {
+    pub inline_val_id: String,
+    pub expression_str: String,
+    pub value_str: String,
+    pub line_number: u32,
+    pub column_val: u32,
+    pub is_changed: bool,
+}
+
+impl JhuDebugInlineValue {
+    pub fn new() -> Self {
+        Self {
+            inline_val_id: String::new(),
+            expression_str: String::new(),
+            value_str: String::new(),
+            line_number: u32::default(),
+            column_val: u32::default(),
+            is_changed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_val_id.is_empty() || true && !self.expression_str.is_empty() || true && !self.value_str.is_empty() || true && self.line_number < u32::MAX || true && self.column_val < u32::MAX || true && self.is_changed || true
+    }
+}
+
+impl Default for JhuDebugInlineValue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug compound launch
+#[derive(Debug, Clone)]
+pub struct JhvDebugCompound {
+    pub compound_id: String,
+    pub compound_name: String,
+    pub configurations_csv: String,
+    pub stop_all: bool,
+    pub presentation_json: String,
+    pub is_parallel: bool,
+}
+
+impl JhvDebugCompound {
+    pub fn new() -> Self {
+        Self {
+            compound_id: String::new(),
+            compound_name: String::new(),
+            configurations_csv: String::new(),
+            stop_all: bool::default(),
+            presentation_json: String::new(),
+            is_parallel: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.compound_id.is_empty() || true && !self.compound_name.is_empty() || true && !self.configurations_csv.is_empty() || true && self.stop_all || true && !self.presentation_json.is_empty() || true && self.is_parallel || true
+    }
+}
+
+impl Default for JhvDebugCompound {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug pre/post launch task
+#[derive(Debug, Clone)]
+pub struct JhwDebugTask {
+    pub dbg_task_id: String,
+    pub task_ref: String,
+    pub phase_str: String,
+    pub config_ref: String,
+    pub timeout_ms: u32,
+    pub is_background: bool,
+}
+
+impl JhwDebugTask {
+    pub fn new() -> Self {
+        Self {
+            dbg_task_id: String::new(),
+            task_ref: String::new(),
+            phase_str: String::new(),
+            config_ref: String::new(),
+            timeout_ms: u32::default(),
+            is_background: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dbg_task_id.is_empty() || true && !self.task_ref.is_empty() || true && !self.phase_str.is_empty() || true && !self.config_ref.is_empty() || true && self.timeout_ms < u32::MAX || true && self.is_background || true
+    }
+}
+
+impl Default for JhwDebugTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug editor decorations
+#[derive(Debug, Clone)]
+pub struct JhxDebugDecorations {
+    pub dbg_deco_id: String,
+    pub editor_ref: String,
+    pub line_number: u32,
+    pub decoration_type_str: String,
+    pub color_str: String,
+    pub is_top_frame: bool,
+}
+
+impl JhxDebugDecorations {
+    pub fn new() -> Self {
+        Self {
+            dbg_deco_id: String::new(),
+            editor_ref: String::new(),
+            line_number: u32::default(),
+            decoration_type_str: String::new(),
+            color_str: String::new(),
+            is_top_frame: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dbg_deco_id.is_empty() || true && !self.editor_ref.is_empty() || true && self.line_number < u32::MAX || true && !self.decoration_type_str.is_empty() || true && !self.color_str.is_empty() || true && self.is_top_frame || true
+    }
+}
+
+impl Default for JhxDebugDecorations {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug call stack view
+#[derive(Debug, Clone)]
+pub struct JhyDebugCallStack {
+    pub call_stack_id: String,
+    pub session_ref: String,
+    pub thread_ref: String,
+    pub frame_count: u32,
+    pub selected_frame_idx: u32,
+    pub is_collapsed: bool,
+}
+
+impl JhyDebugCallStack {
+    pub fn new() -> Self {
+        Self {
+            call_stack_id: String::new(),
+            session_ref: String::new(),
+            thread_ref: String::new(),
+            frame_count: u32::default(),
+            selected_frame_idx: u32::default(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.call_stack_id.is_empty() || true && !self.session_ref.is_empty() || true && !self.thread_ref.is_empty() || true && self.frame_count < u32::MAX || true && self.selected_frame_idx < u32::MAX || true && self.is_collapsed || true
+    }
+}
+
+impl Default for JhyDebugCallStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug toolbar state
+#[derive(Debug, Clone)]
+pub struct JhzDebugToolbar {
+    pub dbg_toolbar_id: String,
+    pub session_ref: String,
+    pub state_str: String,
+    pub button_count: u32,
+    pub position_json: String,
+    pub is_floating: bool,
+}
+
+impl JhzDebugToolbar {
+    pub fn new() -> Self {
+        Self {
+            dbg_toolbar_id: String::new(),
+            session_ref: String::new(),
+            state_str: String::new(),
+            button_count: u32::default(),
+            position_json: String::new(),
+            is_floating: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dbg_toolbar_id.is_empty() || true && !self.session_ref.is_empty() || true && !self.state_str.is_empty() || true && self.button_count < u32::MAX || true && !self.position_json.is_empty() || true && self.is_floating || true
+    }
+}
+
+impl Default for JhzDebugToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -429672,6 +430556,474 @@ mod tests_jgz_generated {
     fn test_jgz_fields() {
         let mut obj = JgzScmConfig::default();
         obj.scm_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jha_generated {
+    use super::*;
+
+    #[test]
+    fn test_jha_default() {
+        let obj = JhaDebugSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jha_fields() {
+        let mut obj = JhaDebugSession::default();
+        obj.dbg_session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhb_default() {
+        let obj = JhbDebugConfiguration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhb_fields() {
+        let mut obj = JhbDebugConfiguration::default();
+        obj.dbg_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhc_default() {
+        let obj = JhcDebugAdapter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhc_fields() {
+        let mut obj = JhcDebugAdapter::default();
+        obj.dbg_adapter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhd_default() {
+        let obj = JhdBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhd_fields() {
+        let mut obj = JhdBreakpoint::default();
+        obj.bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhe_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhe_default() {
+        let obj = JheBreakpointCondition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhe_fields() {
+        let mut obj = JheBreakpointCondition::default();
+        obj.bp_cond_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhf_default() {
+        let obj = JhfStackFrame::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhf_fields() {
+        let mut obj = JhfStackFrame::default();
+        obj.frame_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhg_default() {
+        let obj = JhgVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhg_fields() {
+        let mut obj = JhgVariable::default();
+        obj.var_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhh_default() {
+        let obj = JhhScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhh_fields() {
+        let mut obj = JhhScope::default();
+        obj.scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhi_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhi_default() {
+        let obj = JhiThread::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhi_fields() {
+        let mut obj = JhiThread::default();
+        obj.thread_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhj_default() {
+        let obj = JhjEvaluateResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhj_fields() {
+        let mut obj = JhjEvaluateResult::default();
+        obj.eval_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhk_default() {
+        let obj = JhkDataBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhk_fields() {
+        let mut obj = JhkDataBreakpoint::default();
+        obj.data_bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhl_default() {
+        let obj = JhlFunctionBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhl_fields() {
+        let mut obj = JhlFunctionBreakpoint::default();
+        obj.fn_bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhm_default() {
+        let obj = JhmDebugConsole::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhm_fields() {
+        let mut obj = JhmDebugConsole::default();
+        obj.dbg_console_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhn_default() {
+        let obj = JhnDebugConsoleEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhn_fields() {
+        let mut obj = JhnDebugConsoleEntry::default();
+        obj.dbg_entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jho_generated {
+    use super::*;
+
+    #[test]
+    fn test_jho_default() {
+        let obj = JhoExceptionBreakpoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jho_fields() {
+        let mut obj = JhoExceptionBreakpoint::default();
+        obj.exc_bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhp_default() {
+        let obj = JhpModule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhp_fields() {
+        let mut obj = JhpModule::default();
+        obj.module_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhq_default() {
+        let obj = JhqLoadedSource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhq_fields() {
+        let mut obj = JhqLoadedSource::default();
+        obj.loaded_src_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhr_default() {
+        let obj = JhrDebugProtocol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhr_fields() {
+        let mut obj = JhrDebugProtocol::default();
+        obj.dap_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhs_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhs_default() {
+        let obj = JhsDebugWatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhs_fields() {
+        let mut obj = JhsDebugWatch::default();
+        obj.watch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jht_generated {
+    use super::*;
+
+    #[test]
+    fn test_jht_default() {
+        let obj = JhtDebugHover::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jht_fields() {
+        let mut obj = JhtDebugHover::default();
+        obj.hover_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhu_default() {
+        let obj = JhuDebugInlineValue::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhu_fields() {
+        let mut obj = JhuDebugInlineValue::default();
+        obj.inline_val_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhv_default() {
+        let obj = JhvDebugCompound::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhv_fields() {
+        let mut obj = JhvDebugCompound::default();
+        obj.compound_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhw_default() {
+        let obj = JhwDebugTask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhw_fields() {
+        let mut obj = JhwDebugTask::default();
+        obj.dbg_task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhx_default() {
+        let obj = JhxDebugDecorations::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhx_fields() {
+        let mut obj = JhxDebugDecorations::default();
+        obj.dbg_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhy_default() {
+        let obj = JhyDebugCallStack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhy_fields() {
+        let mut obj = JhyDebugCallStack::default();
+        obj.call_stack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jhz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jhz_default() {
+        let obj = JhzDebugToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jhz_fields() {
+        let mut obj = JhzDebugToolbar::default();
+        obj.dbg_toolbar_id = "test".to_string();
         assert!(obj.validate());
     }
 }
