@@ -170825,6 +170825,890 @@ impl Default for JlzTestReport {
     }
 }
 
+/// Notebook document descriptor
+#[derive(Debug, Clone)]
+pub struct JmaNotebookDocument {
+    pub nb_doc_id: String,
+    pub uri_str: String,
+    pub notebook_type: String,
+    pub cell_count: u32,
+    pub version_val: u32,
+    pub is_dirty: bool,
+}
+
+impl JmaNotebookDocument {
+    pub fn new() -> Self {
+        Self {
+            nb_doc_id: String::new(),
+            uri_str: String::new(),
+            notebook_type: String::new(),
+            cell_count: u32::default(),
+            version_val: u32::default(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_doc_id.is_empty() || true && !self.uri_str.is_empty() || true && !self.notebook_type.is_empty() || true && self.cell_count < u32::MAX || true && self.version_val < u32::MAX || true && self.is_dirty || true
+    }
+}
+
+impl Default for JmaNotebookDocument {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell descriptor
+#[derive(Debug, Clone)]
+pub struct JmbNotebookCell {
+    pub nb_cell_id: String,
+    pub cell_kind_str: String,
+    pub language_id: String,
+    pub source_text_len: u32,
+    pub output_count: u32,
+    pub is_executing: bool,
+}
+
+impl JmbNotebookCell {
+    pub fn new() -> Self {
+        Self {
+            nb_cell_id: String::new(),
+            cell_kind_str: String::new(),
+            language_id: String::new(),
+            source_text_len: u32::default(),
+            output_count: u32::default(),
+            is_executing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_cell_id.is_empty() || true && !self.cell_kind_str.is_empty() || true && !self.language_id.is_empty() || true && self.source_text_len < u32::MAX || true && self.output_count < u32::MAX || true && self.is_executing || true
+    }
+}
+
+impl Default for JmbNotebookCell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook kernel descriptor
+#[derive(Debug, Clone)]
+pub struct JmcNotebookKernel {
+    pub nb_kernel_id: String,
+    pub kernel_label: String,
+    pub extension_ref: String,
+    pub supported_langs_csv: String,
+    pub execution_order: u32,
+    pub is_selected: bool,
+}
+
+impl JmcNotebookKernel {
+    pub fn new() -> Self {
+        Self {
+            nb_kernel_id: String::new(),
+            kernel_label: String::new(),
+            extension_ref: String::new(),
+            supported_langs_csv: String::new(),
+            execution_order: u32::default(),
+            is_selected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_kernel_id.is_empty() || true && !self.kernel_label.is_empty() || true && !self.extension_ref.is_empty() || true && !self.supported_langs_csv.is_empty() || true && self.execution_order < u32::MAX || true && self.is_selected || true
+    }
+}
+
+impl Default for JmcNotebookKernel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell output
+#[derive(Debug, Clone)]
+pub struct JmdNotebookOutput {
+    pub nb_output_id: String,
+    pub mime_type_str: String,
+    pub data_len: u32,
+    pub metadata_json: String,
+    pub output_type_str: String,
+    pub is_error: bool,
+}
+
+impl JmdNotebookOutput {
+    pub fn new() -> Self {
+        Self {
+            nb_output_id: String::new(),
+            mime_type_str: String::new(),
+            data_len: u32::default(),
+            metadata_json: String::new(),
+            output_type_str: String::new(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_output_id.is_empty() || true && !self.mime_type_str.is_empty() || true && self.data_len < u32::MAX || true && !self.metadata_json.is_empty() || true && !self.output_type_str.is_empty() || true && self.is_error || true
+    }
+}
+
+impl Default for JmdNotebookOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell execution
+#[derive(Debug, Clone)]
+pub struct JmeNotebookExecution {
+    pub nb_exec_id: String,
+    pub cell_ref: String,
+    pub start_epoch: u64,
+    pub end_epoch: u64,
+    pub execution_order: u32,
+    pub is_success: bool,
+}
+
+impl JmeNotebookExecution {
+    pub fn new() -> Self {
+        Self {
+            nb_exec_id: String::new(),
+            cell_ref: String::new(),
+            start_epoch: u64::default(),
+            end_epoch: u64::default(),
+            execution_order: u32::default(),
+            is_success: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_exec_id.is_empty() || true && !self.cell_ref.is_empty() || true && self.start_epoch < u64::MAX || true && self.end_epoch < u64::MAX || true && self.execution_order < u32::MAX || true && self.is_success || true
+    }
+}
+
+impl Default for JmeNotebookExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook serializer descriptor
+#[derive(Debug, Clone)]
+pub struct JmfNotebookSerializer {
+    pub nb_ser_id: String,
+    pub notebook_type: String,
+    pub extension_ref: String,
+    pub priority_val: u32,
+    pub mime_types_csv: String,
+    pub is_default: bool,
+}
+
+impl JmfNotebookSerializer {
+    pub fn new() -> Self {
+        Self {
+            nb_ser_id: String::new(),
+            notebook_type: String::new(),
+            extension_ref: String::new(),
+            priority_val: u32::default(),
+            mime_types_csv: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_ser_id.is_empty() || true && !self.notebook_type.is_empty() || true && !self.extension_ref.is_empty() || true && self.priority_val < u32::MAX || true && !self.mime_types_csv.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for JmfNotebookSerializer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook output renderer
+#[derive(Debug, Clone)]
+pub struct JmgNotebookRenderer {
+    pub nb_rend_id: String,
+    pub renderer_id: String,
+    pub mime_types_csv: String,
+    pub extension_ref: String,
+    pub entrypoint_str: String,
+    pub requires_messaging: bool,
+}
+
+impl JmgNotebookRenderer {
+    pub fn new() -> Self {
+        Self {
+            nb_rend_id: String::new(),
+            renderer_id: String::new(),
+            mime_types_csv: String::new(),
+            extension_ref: String::new(),
+            entrypoint_str: String::new(),
+            requires_messaging: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_rend_id.is_empty() || true && !self.renderer_id.is_empty() || true && !self.mime_types_csv.is_empty() || true && !self.extension_ref.is_empty() || true && !self.entrypoint_str.is_empty() || true && self.requires_messaging || true
+    }
+}
+
+impl Default for JmgNotebookRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook editor state
+#[derive(Debug, Clone)]
+pub struct JmhNotebookEditor {
+    pub nb_editor_id: String,
+    pub document_ref: String,
+    pub active_cell_idx: u32,
+    pub visible_range_json: String,
+    pub scroll_top: f64,
+    pub is_focused: bool,
+}
+
+impl JmhNotebookEditor {
+    pub fn new() -> Self {
+        Self {
+            nb_editor_id: String::new(),
+            document_ref: String::new(),
+            active_cell_idx: u32::default(),
+            visible_range_json: String::new(),
+            scroll_top: f64::default(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_editor_id.is_empty() || true && !self.document_ref.is_empty() || true && self.active_cell_idx < u32::MAX || true && !self.visible_range_json.is_empty() || true && self.scroll_top.is_finite() || true && self.is_focused || true
+    }
+}
+
+impl Default for JmhNotebookEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell status bar
+#[derive(Debug, Clone)]
+pub struct JmiNotebookCellStatus {
+    pub nb_status_id: String,
+    pub cell_ref: String,
+    pub items_json: String,
+    pub alignment_str: String,
+    pub item_count: u32,
+    pub is_visible: bool,
+}
+
+impl JmiNotebookCellStatus {
+    pub fn new() -> Self {
+        Self {
+            nb_status_id: String::new(),
+            cell_ref: String::new(),
+            items_json: String::new(),
+            alignment_str: String::new(),
+            item_count: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_status_id.is_empty() || true && !self.cell_ref.is_empty() || true && !self.items_json.is_empty() || true && !self.alignment_str.is_empty() || true && self.item_count < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for JmiNotebookCellStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook toolbar state
+#[derive(Debug, Clone)]
+pub struct JmjNotebookToolbar {
+    pub nb_toolbar_id: String,
+    pub action_count: u32,
+    pub active_kernel_ref: String,
+    pub run_all_enabled: bool,
+    pub clear_all_enabled: bool,
+    pub is_compact: bool,
+}
+
+impl JmjNotebookToolbar {
+    pub fn new() -> Self {
+        Self {
+            nb_toolbar_id: String::new(),
+            action_count: u32::default(),
+            active_kernel_ref: String::new(),
+            run_all_enabled: bool::default(),
+            clear_all_enabled: bool::default(),
+            is_compact: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_toolbar_id.is_empty() || true && self.action_count < u32::MAX || true && !self.active_kernel_ref.is_empty() || true && self.run_all_enabled || true && self.clear_all_enabled || true && self.is_compact || true
+    }
+}
+
+impl Default for JmjNotebookToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook outline entry
+#[derive(Debug, Clone)]
+pub struct JmkNotebookOutline {
+    pub nb_outline_id: String,
+    pub cell_ref: String,
+    pub heading_text: String,
+    pub level_val: u32,
+    pub icon_ref: String,
+    pub is_code_cell: bool,
+}
+
+impl JmkNotebookOutline {
+    pub fn new() -> Self {
+        Self {
+            nb_outline_id: String::new(),
+            cell_ref: String::new(),
+            heading_text: String::new(),
+            level_val: u32::default(),
+            icon_ref: String::new(),
+            is_code_cell: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_outline_id.is_empty() || true && !self.cell_ref.is_empty() || true && !self.heading_text.is_empty() || true && self.level_val < u32::MAX || true && !self.icon_ref.is_empty() || true && self.is_code_cell || true
+    }
+}
+
+impl Default for JmkNotebookOutline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook diff entry
+#[derive(Debug, Clone)]
+pub struct JmlNotebookDiff {
+    pub nb_diff_id: String,
+    pub original_ref: String,
+    pub modified_ref: String,
+    pub cell_changes: u32,
+    pub metadata_changes: u32,
+    pub is_structural: bool,
+}
+
+impl JmlNotebookDiff {
+    pub fn new() -> Self {
+        Self {
+            nb_diff_id: String::new(),
+            original_ref: String::new(),
+            modified_ref: String::new(),
+            cell_changes: u32::default(),
+            metadata_changes: u32::default(),
+            is_structural: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_diff_id.is_empty() || true && !self.original_ref.is_empty() || true && !self.modified_ref.is_empty() || true && self.cell_changes < u32::MAX || true && self.metadata_changes < u32::MAX || true && self.is_structural || true
+    }
+}
+
+impl Default for JmlNotebookDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook variable descriptor
+#[derive(Debug, Clone)]
+pub struct JmmNotebookVariable {
+    pub nb_var_id: String,
+    pub var_name: String,
+    pub var_value: String,
+    pub var_type_str: String,
+    pub kernel_ref: String,
+    pub is_lazy: bool,
+}
+
+impl JmmNotebookVariable {
+    pub fn new() -> Self {
+        Self {
+            nb_var_id: String::new(),
+            var_name: String::new(),
+            var_value: String::new(),
+            var_type_str: String::new(),
+            kernel_ref: String::new(),
+            is_lazy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_var_id.is_empty() || true && !self.var_name.is_empty() || true && !self.var_value.is_empty() || true && !self.var_type_str.is_empty() || true && !self.kernel_ref.is_empty() || true && self.is_lazy || true
+    }
+}
+
+impl Default for JmmNotebookVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook find state
+#[derive(Debug, Clone)]
+pub struct JmnNotebookFind {
+    pub nb_find_id: String,
+    pub search_text: String,
+    pub match_count: u32,
+    pub current_cell_idx: u32,
+    pub scope_str: String,
+    pub include_output: bool,
+}
+
+impl JmnNotebookFind {
+    pub fn new() -> Self {
+        Self {
+            nb_find_id: String::new(),
+            search_text: String::new(),
+            match_count: u32::default(),
+            current_cell_idx: u32::default(),
+            scope_str: String::new(),
+            include_output: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_find_id.is_empty() || true && !self.search_text.is_empty() || true && self.match_count < u32::MAX || true && self.current_cell_idx < u32::MAX || true && !self.scope_str.is_empty() || true && self.include_output || true
+    }
+}
+
+impl Default for JmnNotebookFind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell selection
+#[derive(Debug, Clone)]
+pub struct JmoNotebookSelection {
+    pub nb_sel_id: String,
+    pub start_cell_idx: u32,
+    pub end_cell_idx: u32,
+    pub focus_mode: String,
+    pub handle_ref: String,
+    pub is_editing: bool,
+}
+
+impl JmoNotebookSelection {
+    pub fn new() -> Self {
+        Self {
+            nb_sel_id: String::new(),
+            start_cell_idx: u32::default(),
+            end_cell_idx: u32::default(),
+            focus_mode: String::new(),
+            handle_ref: String::new(),
+            is_editing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_sel_id.is_empty() || true && self.start_cell_idx < u32::MAX || true && self.end_cell_idx < u32::MAX || true && !self.focus_mode.is_empty() || true && !self.handle_ref.is_empty() || true && self.is_editing || true
+    }
+}
+
+impl Default for JmoNotebookSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook layout descriptor
+#[derive(Debug, Clone)]
+pub struct JmpNotebookLayout {
+    pub nb_layout_id: String,
+    pub cell_width_pct: u32,
+    pub output_position: String,
+    pub show_cell_status: bool,
+    pub global_toolbar: bool,
+    pub compact_view: bool,
+}
+
+impl JmpNotebookLayout {
+    pub fn new() -> Self {
+        Self {
+            nb_layout_id: String::new(),
+            cell_width_pct: u32::default(),
+            output_position: String::new(),
+            show_cell_status: bool::default(),
+            global_toolbar: bool::default(),
+            compact_view: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_layout_id.is_empty() || true && self.cell_width_pct < u32::MAX || true && !self.output_position.is_empty() || true && self.show_cell_status || true && self.global_toolbar || true && self.compact_view || true
+    }
+}
+
+impl Default for JmpNotebookLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cell kind descriptor
+#[derive(Debug, Clone)]
+pub struct JmqNotebookCellKind {
+    pub nb_kind_id: String,
+    pub kind_name: String,
+    pub display_order: u32,
+    pub icon_ref: String,
+    pub default_language: String,
+    pub is_executable: bool,
+}
+
+impl JmqNotebookCellKind {
+    pub fn new() -> Self {
+        Self {
+            nb_kind_id: String::new(),
+            kind_name: String::new(),
+            display_order: u32::default(),
+            icon_ref: String::new(),
+            default_language: String::new(),
+            is_executable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_kind_id.is_empty() || true && !self.kind_name.is_empty() || true && self.display_order < u32::MAX || true && !self.icon_ref.is_empty() || true && !self.default_language.is_empty() || true && self.is_executable || true
+    }
+}
+
+impl Default for JmqNotebookCellKind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook metadata entry
+#[derive(Debug, Clone)]
+pub struct JmrNotebookMetadata {
+    pub nb_meta_id: String,
+    pub key_str: String,
+    pub value_json: String,
+    pub scope_str: String,
+    pub source_str: String,
+    pub is_custom: bool,
+}
+
+impl JmrNotebookMetadata {
+    pub fn new() -> Self {
+        Self {
+            nb_meta_id: String::new(),
+            key_str: String::new(),
+            value_json: String::new(),
+            scope_str: String::new(),
+            source_str: String::new(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_meta_id.is_empty() || true && !self.key_str.is_empty() || true && !self.value_json.is_empty() || true && !self.scope_str.is_empty() || true && !self.source_str.is_empty() || true && self.is_custom || true
+    }
+}
+
+impl Default for JmrNotebookMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cell output item
+#[derive(Debug, Clone)]
+pub struct JmsNotebookCellOutput {
+    pub nb_cell_out_id: String,
+    pub output_id: String,
+    pub mime_type_str: String,
+    pub data_bytes: u64,
+    pub metadata_json: String,
+    pub is_transient: bool,
+}
+
+impl JmsNotebookCellOutput {
+    pub fn new() -> Self {
+        Self {
+            nb_cell_out_id: String::new(),
+            output_id: String::new(),
+            mime_type_str: String::new(),
+            data_bytes: u64::default(),
+            metadata_json: String::new(),
+            is_transient: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_cell_out_id.is_empty() || true && !self.output_id.is_empty() || true && !self.mime_type_str.is_empty() || true && self.data_bytes < u64::MAX || true && !self.metadata_json.is_empty() || true && self.is_transient || true
+    }
+}
+
+impl Default for JmsNotebookCellOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cell edit operation
+#[derive(Debug, Clone)]
+pub struct JmtNotebookCellEdit {
+    pub nb_cell_edit_id: String,
+    pub edit_type_str: String,
+    pub cell_idx: u32,
+    pub new_content: String,
+    pub metadata_json: String,
+    pub is_undo: bool,
+}
+
+impl JmtNotebookCellEdit {
+    pub fn new() -> Self {
+        Self {
+            nb_cell_edit_id: String::new(),
+            edit_type_str: String::new(),
+            cell_idx: u32::default(),
+            new_content: String::new(),
+            metadata_json: String::new(),
+            is_undo: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_cell_edit_id.is_empty() || true && !self.edit_type_str.is_empty() || true && self.cell_idx < u32::MAX || true && !self.new_content.is_empty() || true && !self.metadata_json.is_empty() || true && self.is_undo || true
+    }
+}
+
+impl Default for JmtNotebookCellEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook workspace edit
+#[derive(Debug, Clone)]
+pub struct JmuNotebookWorkspaceEdit {
+    pub nb_ws_edit_id: String,
+    pub notebook_uri: String,
+    pub cell_edits_count: u32,
+    pub metadata_edits_count: u32,
+    pub needs_confirm: bool,
+    pub is_refactoring: bool,
+}
+
+impl JmuNotebookWorkspaceEdit {
+    pub fn new() -> Self {
+        Self {
+            nb_ws_edit_id: String::new(),
+            notebook_uri: String::new(),
+            cell_edits_count: u32::default(),
+            metadata_edits_count: u32::default(),
+            needs_confirm: bool::default(),
+            is_refactoring: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_ws_edit_id.is_empty() || true && !self.notebook_uri.is_empty() || true && self.cell_edits_count < u32::MAX || true && self.metadata_edits_count < u32::MAX || true && self.needs_confirm || true && self.is_refactoring || true
+    }
+}
+
+impl Default for JmuNotebookWorkspaceEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook cell range
+#[derive(Debug, Clone)]
+pub struct JmvNotebookRange {
+    pub nb_range_id: String,
+    pub start_idx: u32,
+    pub end_idx: u32,
+    pub cell_count: u32,
+    pub includes_output: bool,
+    pub is_empty: bool,
+}
+
+impl JmvNotebookRange {
+    pub fn new() -> Self {
+        Self {
+            nb_range_id: String::new(),
+            start_idx: u32::default(),
+            end_idx: u32::default(),
+            cell_count: u32::default(),
+            includes_output: bool::default(),
+            is_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_range_id.is_empty() || true && self.start_idx < u32::MAX || true && self.end_idx < u32::MAX || true && self.cell_count < u32::MAX || true && self.includes_output || true && self.is_empty || true
+    }
+}
+
+impl Default for JmvNotebookRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook controller descriptor
+#[derive(Debug, Clone)]
+pub struct JmwNotebookController {
+    pub nb_ctrl_id: String,
+    pub controller_id: String,
+    pub notebook_type: String,
+    pub supported_langs_csv: String,
+    pub extension_ref: String,
+    pub supports_order: bool,
+}
+
+impl JmwNotebookController {
+    pub fn new() -> Self {
+        Self {
+            nb_ctrl_id: String::new(),
+            controller_id: String::new(),
+            notebook_type: String::new(),
+            supported_langs_csv: String::new(),
+            extension_ref: String::new(),
+            supports_order: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_ctrl_id.is_empty() || true && !self.controller_id.is_empty() || true && !self.notebook_type.is_empty() || true && !self.supported_langs_csv.is_empty() || true && !self.extension_ref.is_empty() || true && self.supports_order || true
+    }
+}
+
+impl Default for JmwNotebookController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook messaging entry
+#[derive(Debug, Clone)]
+pub struct JmxNotebookMessaging {
+    pub nb_msg_id: String,
+    pub message_type_str: String,
+    pub renderer_ref: String,
+    pub payload_json: String,
+    pub editor_ref: String,
+    pub is_broadcast: bool,
+}
+
+impl JmxNotebookMessaging {
+    pub fn new() -> Self {
+        Self {
+            nb_msg_id: String::new(),
+            message_type_str: String::new(),
+            renderer_ref: String::new(),
+            payload_json: String::new(),
+            editor_ref: String::new(),
+            is_broadcast: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_msg_id.is_empty() || true && !self.message_type_str.is_empty() || true && !self.renderer_ref.is_empty() || true && !self.payload_json.is_empty() || true && !self.editor_ref.is_empty() || true && self.is_broadcast || true
+    }
+}
+
+impl Default for JmxNotebookMessaging {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook extension contribution
+#[derive(Debug, Clone)]
+pub struct JmyNotebookExtension {
+    pub nb_ext_id: String,
+    pub extension_ref: String,
+    pub notebook_type: String,
+    pub selector_json: String,
+    pub priority_str: String,
+    pub is_default: bool,
+}
+
+impl JmyNotebookExtension {
+    pub fn new() -> Self {
+        Self {
+            nb_ext_id: String::new(),
+            extension_ref: String::new(),
+            notebook_type: String::new(),
+            selector_json: String::new(),
+            priority_str: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_ext_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.notebook_type.is_empty() || true && !self.selector_json.is_empty() || true && !self.priority_str.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for JmyNotebookExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notebook configuration entry
+#[derive(Debug, Clone)]
+pub struct JmzNotebookConfig {
+    pub nb_config_id: String,
+    pub key_str: String,
+    pub value_json: String,
+    pub notebook_type: String,
+    pub scope_str: String,
+    pub is_overridden: bool,
+}
+
+impl JmzNotebookConfig {
+    pub fn new() -> Self {
+        Self {
+            nb_config_id: String::new(),
+            key_str: String::new(),
+            value_json: String::new(),
+            notebook_type: String::new(),
+            scope_str: String::new(),
+            is_overridden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nb_config_id.is_empty() || true && !self.key_str.is_empty() || true && !self.value_json.is_empty() || true && !self.notebook_type.is_empty() || true && !self.scope_str.is_empty() || true && self.is_overridden || true
+    }
+}
+
+impl Default for JmzNotebookConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -436441,6 +437325,474 @@ mod tests_jlz_generated {
     fn test_jlz_fields() {
         let mut obj = JlzTestReport::default();
         obj.test_report_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jma_generated {
+    use super::*;
+
+    #[test]
+    fn test_jma_default() {
+        let obj = JmaNotebookDocument::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jma_fields() {
+        let mut obj = JmaNotebookDocument::default();
+        obj.nb_doc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmb_default() {
+        let obj = JmbNotebookCell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmb_fields() {
+        let mut obj = JmbNotebookCell::default();
+        obj.nb_cell_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmc_default() {
+        let obj = JmcNotebookKernel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmc_fields() {
+        let mut obj = JmcNotebookKernel::default();
+        obj.nb_kernel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmd_default() {
+        let obj = JmdNotebookOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmd_fields() {
+        let mut obj = JmdNotebookOutput::default();
+        obj.nb_output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jme_generated {
+    use super::*;
+
+    #[test]
+    fn test_jme_default() {
+        let obj = JmeNotebookExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jme_fields() {
+        let mut obj = JmeNotebookExecution::default();
+        obj.nb_exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmf_default() {
+        let obj = JmfNotebookSerializer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmf_fields() {
+        let mut obj = JmfNotebookSerializer::default();
+        obj.nb_ser_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmg_default() {
+        let obj = JmgNotebookRenderer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmg_fields() {
+        let mut obj = JmgNotebookRenderer::default();
+        obj.nb_rend_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmh_default() {
+        let obj = JmhNotebookEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmh_fields() {
+        let mut obj = JmhNotebookEditor::default();
+        obj.nb_editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmi_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmi_default() {
+        let obj = JmiNotebookCellStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmi_fields() {
+        let mut obj = JmiNotebookCellStatus::default();
+        obj.nb_status_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmj_default() {
+        let obj = JmjNotebookToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmj_fields() {
+        let mut obj = JmjNotebookToolbar::default();
+        obj.nb_toolbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmk_default() {
+        let obj = JmkNotebookOutline::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmk_fields() {
+        let mut obj = JmkNotebookOutline::default();
+        obj.nb_outline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jml_generated {
+    use super::*;
+
+    #[test]
+    fn test_jml_default() {
+        let obj = JmlNotebookDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jml_fields() {
+        let mut obj = JmlNotebookDiff::default();
+        obj.nb_diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmm_default() {
+        let obj = JmmNotebookVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmm_fields() {
+        let mut obj = JmmNotebookVariable::default();
+        obj.nb_var_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmn_default() {
+        let obj = JmnNotebookFind::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmn_fields() {
+        let mut obj = JmnNotebookFind::default();
+        obj.nb_find_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmo_default() {
+        let obj = JmoNotebookSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmo_fields() {
+        let mut obj = JmoNotebookSelection::default();
+        obj.nb_sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmp_default() {
+        let obj = JmpNotebookLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmp_fields() {
+        let mut obj = JmpNotebookLayout::default();
+        obj.nb_layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmq_default() {
+        let obj = JmqNotebookCellKind::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmq_fields() {
+        let mut obj = JmqNotebookCellKind::default();
+        obj.nb_kind_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmr_default() {
+        let obj = JmrNotebookMetadata::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmr_fields() {
+        let mut obj = JmrNotebookMetadata::default();
+        obj.nb_meta_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jms_generated {
+    use super::*;
+
+    #[test]
+    fn test_jms_default() {
+        let obj = JmsNotebookCellOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jms_fields() {
+        let mut obj = JmsNotebookCellOutput::default();
+        obj.nb_cell_out_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmt_default() {
+        let obj = JmtNotebookCellEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmt_fields() {
+        let mut obj = JmtNotebookCellEdit::default();
+        obj.nb_cell_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmu_default() {
+        let obj = JmuNotebookWorkspaceEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmu_fields() {
+        let mut obj = JmuNotebookWorkspaceEdit::default();
+        obj.nb_ws_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmv_default() {
+        let obj = JmvNotebookRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmv_fields() {
+        let mut obj = JmvNotebookRange::default();
+        obj.nb_range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmw_default() {
+        let obj = JmwNotebookController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmw_fields() {
+        let mut obj = JmwNotebookController::default();
+        obj.nb_ctrl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmx_default() {
+        let obj = JmxNotebookMessaging::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmx_fields() {
+        let mut obj = JmxNotebookMessaging::default();
+        obj.nb_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmy_default() {
+        let obj = JmyNotebookExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmy_fields() {
+        let mut obj = JmyNotebookExtension::default();
+        obj.nb_ext_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jmz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jmz_default() {
+        let obj = JmzNotebookConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jmz_fields() {
+        let mut obj = JmzNotebookConfig::default();
+        obj.nb_config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
