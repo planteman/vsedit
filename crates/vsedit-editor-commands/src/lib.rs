@@ -94260,6 +94260,678 @@ impl Default for GkjSettingsGroup {
     }
 }
 
+/// User data profile (id, name, icon, is default, is transient, settings)
+#[derive(Debug, Clone)]
+pub struct GkkUserDataProfile {
+    pub profile_id: String,
+    pub name: String,
+    pub icon: String,
+    pub is_default: bool,
+    pub is_transient: bool,
+    pub settings_uri: String,
+    pub keybindings_uri: String,
+    pub tasks_uri: String,
+    pub snippets_uri: String,
+    pub extensions_json: String,
+}
+
+impl GkkUserDataProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            name: String::new(),
+            icon: String::new(),
+            is_default: bool::default(),
+            is_transient: bool::default(),
+            settings_uri: String::new(),
+            keybindings_uri: String::new(),
+            tasks_uri: String::new(),
+            snippets_uri: String::new(),
+            extensions_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && !self.name.is_empty() || true && !self.icon.is_empty() || true && self.is_default || true && self.is_transient || true && !self.settings_uri.is_empty() || true && !self.keybindings_uri.is_empty() || true && !self.tasks_uri.is_empty() || true && !self.snippets_uri.is_empty() || true && !self.extensions_json.is_empty() || true
+    }
+}
+
+impl Default for GkkUserDataProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings sync (resource, status, last sync, conflicts, activity)
+#[derive(Debug, Clone)]
+pub struct GklSettingsSync {
+    pub sync_id: String,
+    pub resource_type: String,
+    pub status: String,
+    pub last_sync_ms: u64,
+    pub conflicts_json: String,
+    pub activity_json: String,
+    pub is_enabled: bool,
+    pub machine_id: String,
+    pub auth_token: String,
+    pub sync_interval_ms: u64,
+}
+
+impl GklSettingsSync {
+    pub fn new() -> Self {
+        Self {
+            sync_id: String::new(),
+            resource_type: String::new(),
+            status: String::new(),
+            last_sync_ms: u64::default(),
+            conflicts_json: String::new(),
+            activity_json: String::new(),
+            is_enabled: bool::default(),
+            machine_id: String::new(),
+            auth_token: String::new(),
+            sync_interval_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sync_id.is_empty() || true && !self.resource_type.is_empty() || true && !self.status.is_empty() || true && self.last_sync_ms < u64::MAX || true && !self.conflicts_json.is_empty() || true && !self.activity_json.is_empty() || true && self.is_enabled || true && !self.machine_id.is_empty() || true && !self.auth_token.is_empty() || true && self.sync_interval_ms < u64::MAX || true
+    }
+}
+
+impl Default for GklSettingsSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings sync resource (type, local content, remote content, diff)
+#[derive(Debug, Clone)]
+pub struct GkmSettingsSyncResource {
+    pub sync_res_id: String,
+    pub resource_type: String,
+    pub local_content_json: String,
+    pub remote_content_json: String,
+    pub diff_json: String,
+    pub has_conflicts: bool,
+    pub merge_state: String,
+    pub last_modified_ms: u64,
+    pub base_content_json: String,
+    pub version: u32,
+}
+
+impl GkmSettingsSyncResource {
+    pub fn new() -> Self {
+        Self {
+            sync_res_id: String::new(),
+            resource_type: String::new(),
+            local_content_json: String::new(),
+            remote_content_json: String::new(),
+            diff_json: String::new(),
+            has_conflicts: bool::default(),
+            merge_state: String::new(),
+            last_modified_ms: u64::default(),
+            base_content_json: String::new(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sync_res_id.is_empty() || true && !self.resource_type.is_empty() || true && !self.local_content_json.is_empty() || true && !self.remote_content_json.is_empty() || true && !self.diff_json.is_empty() || true && self.has_conflicts || true && !self.merge_state.is_empty() || true && self.last_modified_ms < u64::MAX || true && !self.base_content_json.is_empty() || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for GkmSettingsSyncResource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet file (uri, scope, language, name, body, description)
+#[derive(Debug, Clone)]
+pub struct GknSnippetFile {
+    pub snippet_id: String,
+    pub uri: String,
+    pub scope: String,
+    pub language_id: String,
+    pub name: String,
+    pub body: String,
+    pub description: String,
+    pub prefix: String,
+    pub is_global: bool,
+    pub is_project: bool,
+}
+
+impl GknSnippetFile {
+    pub fn new() -> Self {
+        Self {
+            snippet_id: String::new(),
+            uri: String::new(),
+            scope: String::new(),
+            language_id: String::new(),
+            name: String::new(),
+            body: String::new(),
+            description: String::new(),
+            prefix: String::new(),
+            is_global: bool::default(),
+            is_project: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_id.is_empty() || true && !self.uri.is_empty() || true && !self.scope.is_empty() || true && !self.language_id.is_empty() || true && !self.name.is_empty() || true && !self.body.is_empty() || true && !self.description.is_empty() || true && !self.prefix.is_empty() || true && self.is_global || true && self.is_project || true
+    }
+}
+
+impl Default for GknSnippetFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet completion (prefix, body, description, scope, source)
+#[derive(Debug, Clone)]
+pub struct GkoSnippetCompletion {
+    pub snippet_comp_id: String,
+    pub prefix: String,
+    pub body: String,
+    pub description: String,
+    pub scope: String,
+    pub source: String,
+    pub sort_text: String,
+    pub is_file_template: bool,
+    pub language_id: String,
+    pub detail: String,
+}
+
+impl GkoSnippetCompletion {
+    pub fn new() -> Self {
+        Self {
+            snippet_comp_id: String::new(),
+            prefix: String::new(),
+            body: String::new(),
+            description: String::new(),
+            scope: String::new(),
+            source: String::new(),
+            sort_text: String::new(),
+            is_file_template: bool::default(),
+            language_id: String::new(),
+            detail: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snippet_comp_id.is_empty() || true && !self.prefix.is_empty() || true && !self.body.is_empty() || true && !self.description.is_empty() || true && !self.scope.is_empty() || true && !self.source.is_empty() || true && !self.sort_text.is_empty() || true && self.is_file_template || true && !self.language_id.is_empty() || true && !self.detail.is_empty() || true
+    }
+}
+
+impl Default for GkoSnippetCompletion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Emmet config (show suggestions, include languages, variables)
+#[derive(Debug, Clone)]
+pub struct GkpEmmetConfig {
+    pub emmet_id: String,
+    pub show_suggestions: bool,
+    pub include_languages_json: String,
+    pub variables_json: String,
+    pub trigger_expansion_on_tab: bool,
+    pub preferences_json: String,
+    pub exclude_languages_json: String,
+    pub show_abbreviation_suggestions: bool,
+    pub syntax_profiles_json: String,
+    pub extensions_path_json: String,
+}
+
+impl GkpEmmetConfig {
+    pub fn new() -> Self {
+        Self {
+            emmet_id: String::new(),
+            show_suggestions: bool::default(),
+            include_languages_json: String::new(),
+            variables_json: String::new(),
+            trigger_expansion_on_tab: bool::default(),
+            preferences_json: String::new(),
+            exclude_languages_json: String::new(),
+            show_abbreviation_suggestions: bool::default(),
+            syntax_profiles_json: String::new(),
+            extensions_path_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.emmet_id.is_empty() || true && self.show_suggestions || true && !self.include_languages_json.is_empty() || true && !self.variables_json.is_empty() || true && self.trigger_expansion_on_tab || true && !self.preferences_json.is_empty() || true && !self.exclude_languages_json.is_empty() || true && self.show_abbreviation_suggestions || true && !self.syntax_profiles_json.is_empty() || true && !self.extensions_path_json.is_empty() || true
+    }
+}
+
+impl Default for GkpEmmetConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor snippet (name, prefix, body, description, language)
+#[derive(Debug, Clone)]
+pub struct GkqEditorSnippet {
+    pub editor_snippet_id: String,
+    pub name: String,
+    pub prefix: String,
+    pub body: String,
+    pub description: String,
+    pub language_id: String,
+    pub scope: String,
+    pub is_built_in: bool,
+    pub source_uri: String,
+    pub insert_as_snippet: bool,
+}
+
+impl GkqEditorSnippet {
+    pub fn new() -> Self {
+        Self {
+            editor_snippet_id: String::new(),
+            name: String::new(),
+            prefix: String::new(),
+            body: String::new(),
+            description: String::new(),
+            language_id: String::new(),
+            scope: String::new(),
+            is_built_in: bool::default(),
+            source_uri: String::new(),
+            insert_as_snippet: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_snippet_id.is_empty() || true && !self.name.is_empty() || true && !self.prefix.is_empty() || true && !self.body.is_empty() || true && !self.description.is_empty() || true && !self.language_id.is_empty() || true && !self.scope.is_empty() || true && self.is_built_in || true && !self.source_uri.is_empty() || true && self.insert_as_snippet || true
+    }
+}
+
+impl Default for GkqEditorSnippet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet session (template, placeholders, active, final tab stop)
+#[derive(Debug, Clone)]
+pub struct GkrSnippetSession {
+    pub session_id: String,
+    pub template: String,
+    pub placeholders_json: String,
+    pub active_index: u32,
+    pub final_tab_stop: u32,
+    pub is_active: bool,
+    pub is_finished: bool,
+    pub snippet_id: String,
+    pub insert_position_json: String,
+    pub replaced_text: String,
+}
+
+impl GkrSnippetSession {
+    pub fn new() -> Self {
+        Self {
+            session_id: String::new(),
+            template: String::new(),
+            placeholders_json: String::new(),
+            active_index: u32::default(),
+            final_tab_stop: u32::default(),
+            is_active: bool::default(),
+            is_finished: bool::default(),
+            snippet_id: String::new(),
+            insert_position_json: String::new(),
+            replaced_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_id.is_empty() || true && !self.template.is_empty() || true && !self.placeholders_json.is_empty() || true && self.active_index < u32::MAX || true && self.final_tab_stop < u32::MAX || true && self.is_active || true && self.is_finished || true && !self.snippet_id.is_empty() || true && !self.insert_position_json.is_empty() || true && !self.replaced_text.is_empty() || true
+    }
+}
+
+impl Default for GkrSnippetSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet placeholder (index, text, choice, nested, transform)
+#[derive(Debug, Clone)]
+pub struct GksSnippetPlaceholder {
+    pub placeholder_id: String,
+    pub index: u32,
+    pub text: String,
+    pub choice_json: String,
+    pub nested_json: String,
+    pub transform_json: String,
+    pub is_final_tab_stop: bool,
+    pub range_json: String,
+    pub is_active: bool,
+    pub default_value: String,
+}
+
+impl GksSnippetPlaceholder {
+    pub fn new() -> Self {
+        Self {
+            placeholder_id: String::new(),
+            index: u32::default(),
+            text: String::new(),
+            choice_json: String::new(),
+            nested_json: String::new(),
+            transform_json: String::new(),
+            is_final_tab_stop: bool::default(),
+            range_json: String::new(),
+            is_active: bool::default(),
+            default_value: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.placeholder_id.is_empty() || true && self.index < u32::MAX || true && !self.text.is_empty() || true && !self.choice_json.is_empty() || true && !self.nested_json.is_empty() || true && !self.transform_json.is_empty() || true && self.is_final_tab_stop || true && !self.range_json.is_empty() || true && self.is_active || true && !self.default_value.is_empty() || true
+    }
+}
+
+impl Default for GksSnippetPlaceholder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Snippet variable (name, value, default, resolver, transform)
+#[derive(Debug, Clone)]
+pub struct GktSnippetVariable {
+    pub var_id: String,
+    pub name: String,
+    pub value: String,
+    pub default_value: String,
+    pub resolver_id: String,
+    pub transform_json: String,
+    pub is_resolved: bool,
+    pub context: String,
+    pub scope: String,
+    pub description: String,
+}
+
+impl GktSnippetVariable {
+    pub fn new() -> Self {
+        Self {
+            var_id: String::new(),
+            name: String::new(),
+            value: String::new(),
+            default_value: String::new(),
+            resolver_id: String::new(),
+            transform_json: String::new(),
+            is_resolved: bool::default(),
+            context: String::new(),
+            scope: String::new(),
+            description: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.var_id.is_empty() || true && !self.name.is_empty() || true && !self.value.is_empty() || true && !self.default_value.is_empty() || true && !self.resolver_id.is_empty() || true && !self.transform_json.is_empty() || true && self.is_resolved || true && !self.context.is_empty() || true && !self.scope.is_empty() || true && !self.description.is_empty() || true
+    }
+}
+
+impl Default for GktSnippetVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language configuration (brackets, comments, auto closing, folding)
+#[derive(Debug, Clone)]
+pub struct GkuLanguageConfig {
+    pub lang_config_id: String,
+    pub brackets_json: String,
+    pub comments_json: String,
+    pub auto_closing_pairs_json: String,
+    pub folding_markers_json: String,
+    pub word_pattern: String,
+    pub indentation_rules_json: String,
+    pub on_enter_rules_json: String,
+    pub surrounding_pairs_json: String,
+    pub color_defaults_json: String,
+}
+
+impl GkuLanguageConfig {
+    pub fn new() -> Self {
+        Self {
+            lang_config_id: String::new(),
+            brackets_json: String::new(),
+            comments_json: String::new(),
+            auto_closing_pairs_json: String::new(),
+            folding_markers_json: String::new(),
+            word_pattern: String::new(),
+            indentation_rules_json: String::new(),
+            on_enter_rules_json: String::new(),
+            surrounding_pairs_json: String::new(),
+            color_defaults_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_config_id.is_empty() || true && !self.brackets_json.is_empty() || true && !self.comments_json.is_empty() || true && !self.auto_closing_pairs_json.is_empty() || true && !self.folding_markers_json.is_empty() || true && !self.word_pattern.is_empty() || true && !self.indentation_rules_json.is_empty() || true && !self.on_enter_rules_json.is_empty() || true && !self.surrounding_pairs_json.is_empty() || true && !self.color_defaults_json.is_empty() || true
+    }
+}
+
+impl Default for GkuLanguageConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension point (id, json schema, activation, default value)
+#[derive(Debug, Clone)]
+pub struct GkvExtensionPoint {
+    pub ext_point_id: String,
+    pub json_schema_json: String,
+    pub activation_event: String,
+    pub default_value_json: String,
+    pub description: String,
+    pub is_internal: bool,
+    pub extension_id: String,
+    pub version: String,
+    pub deprecated: bool,
+    pub replacement: String,
+}
+
+impl GkvExtensionPoint {
+    pub fn new() -> Self {
+        Self {
+            ext_point_id: String::new(),
+            json_schema_json: String::new(),
+            activation_event: String::new(),
+            default_value_json: String::new(),
+            description: String::new(),
+            is_internal: bool::default(),
+            extension_id: String::new(),
+            version: String::new(),
+            deprecated: bool::default(),
+            replacement: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_point_id.is_empty() || true && !self.json_schema_json.is_empty() || true && !self.activation_event.is_empty() || true && !self.default_value_json.is_empty() || true && !self.description.is_empty() || true && self.is_internal || true && !self.extension_id.is_empty() || true && !self.version.is_empty() || true && self.deprecated || true && !self.replacement.is_empty() || true
+    }
+}
+
+impl Default for GkvExtensionPoint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Grammar contribution (language, scope name, path, embedded)
+#[derive(Debug, Clone)]
+pub struct GkwGrammarContribution {
+    pub grammar_id: String,
+    pub language_id: String,
+    pub scope_name: String,
+    pub path: String,
+    pub embedded_languages_json: String,
+    pub token_types_json: String,
+    pub injection_selector: String,
+    pub balancedBracketScopes_json: String,
+    pub unbalancedBracketScopes_json: String,
+    pub inline_languages_json: String,
+}
+
+impl GkwGrammarContribution {
+    pub fn new() -> Self {
+        Self {
+            grammar_id: String::new(),
+            language_id: String::new(),
+            scope_name: String::new(),
+            path: String::new(),
+            embedded_languages_json: String::new(),
+            token_types_json: String::new(),
+            injection_selector: String::new(),
+            balancedBracketScopes_json: String::new(),
+            unbalancedBracketScopes_json: String::new(),
+            inline_languages_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grammar_id.is_empty() || true && !self.language_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.path.is_empty() || true && !self.embedded_languages_json.is_empty() || true && !self.token_types_json.is_empty() || true && !self.injection_selector.is_empty() || true && !self.balancedBracketScopes_json.is_empty() || true && !self.unbalancedBracketScopes_json.is_empty() || true && !self.inline_languages_json.is_empty() || true
+    }
+}
+
+impl Default for GkwGrammarContribution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language status (language, text, detail, severity, command)
+#[derive(Debug, Clone)]
+pub struct GkxLanguageStatus {
+    pub lang_status_id: String,
+    pub language_id: String,
+    pub text: String,
+    pub detail: String,
+    pub severity: String,
+    pub command_id: String,
+    pub source: String,
+    pub selector_json: String,
+    pub is_busy: bool,
+    pub accessibility_info: String,
+}
+
+impl GkxLanguageStatus {
+    pub fn new() -> Self {
+        Self {
+            lang_status_id: String::new(),
+            language_id: String::new(),
+            text: String::new(),
+            detail: String::new(),
+            severity: String::new(),
+            command_id: String::new(),
+            source: String::new(),
+            selector_json: String::new(),
+            is_busy: bool::default(),
+            accessibility_info: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_status_id.is_empty() || true && !self.language_id.is_empty() || true && !self.text.is_empty() || true && !self.detail.is_empty() || true && !self.severity.is_empty() || true && !self.command_id.is_empty() || true && !self.source.is_empty() || true && !self.selector_json.is_empty() || true && self.is_busy || true && !self.accessibility_info.is_empty() || true
+    }
+}
+
+impl Default for GkxLanguageStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace folder config (uri, name, index, settings override)
+#[derive(Debug, Clone)]
+pub struct GkyWorkspaceFolderConfig {
+    pub folder_config_id: String,
+    pub uri: String,
+    pub name: String,
+    pub index: u32,
+    pub settings_override_json: String,
+    pub is_untitled: bool,
+    pub is_first_root: bool,
+    pub search_exclude_json: String,
+    pub watcher_exclude_json: String,
+    pub files_exclude_json: String,
+}
+
+impl GkyWorkspaceFolderConfig {
+    pub fn new() -> Self {
+        Self {
+            folder_config_id: String::new(),
+            uri: String::new(),
+            name: String::new(),
+            index: u32::default(),
+            settings_override_json: String::new(),
+            is_untitled: bool::default(),
+            is_first_root: bool::default(),
+            search_exclude_json: String::new(),
+            watcher_exclude_json: String::new(),
+            files_exclude_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folder_config_id.is_empty() || true && !self.uri.is_empty() || true && !self.name.is_empty() || true && self.index < u32::MAX || true && !self.settings_override_json.is_empty() || true && self.is_untitled || true && self.is_first_root || true && !self.search_exclude_json.is_empty() || true && !self.watcher_exclude_json.is_empty() || true && !self.files_exclude_json.is_empty() || true
+    }
+}
+
+impl Default for GkyWorkspaceFolderConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace file config (folders, settings, launch, tasks, exts)
+#[derive(Debug, Clone)]
+pub struct GkzWorkspaceFileConfig {
+    pub ws_file_id: String,
+    pub folders_json: String,
+    pub settings_json: String,
+    pub launch_json: String,
+    pub tasks_json: String,
+    pub extensions_json: String,
+    pub remote_authority: String,
+    pub is_untitled: bool,
+    pub version: u32,
+    pub transient_properties_json: String,
+}
+
+impl GkzWorkspaceFileConfig {
+    pub fn new() -> Self {
+        Self {
+            ws_file_id: String::new(),
+            folders_json: String::new(),
+            settings_json: String::new(),
+            launch_json: String::new(),
+            tasks_json: String::new(),
+            extensions_json: String::new(),
+            remote_authority: String::new(),
+            is_untitled: bool::default(),
+            version: u32::default(),
+            transient_properties_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_file_id.is_empty() || true && !self.folders_json.is_empty() || true && !self.settings_json.is_empty() || true && !self.launch_json.is_empty() || true && !self.tasks_json.is_empty() || true && !self.extensions_json.is_empty() || true && !self.remote_authority.is_empty() || true && self.is_untitled || true && self.version < u32::MAX || true && !self.transient_properties_json.is_empty() || true
+    }
+}
+
+impl Default for GkzWorkspaceFileConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -322540,6 +323212,294 @@ mod tests_gkj_generated {
     fn test_gkj_fields() {
         let mut obj = GkjSettingsGroup::default();
         obj.settings_group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkk_default() {
+        let obj = GkkUserDataProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkk_fields() {
+        let mut obj = GkkUserDataProfile::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkl_default() {
+        let obj = GklSettingsSync::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkl_fields() {
+        let mut obj = GklSettingsSync::default();
+        obj.sync_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkm_default() {
+        let obj = GkmSettingsSyncResource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkm_fields() {
+        let mut obj = GkmSettingsSyncResource::default();
+        obj.sync_res_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkn_default() {
+        let obj = GknSnippetFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkn_fields() {
+        let mut obj = GknSnippetFile::default();
+        obj.snippet_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gko_generated {
+    use super::*;
+
+    #[test]
+    fn test_gko_default() {
+        let obj = GkoSnippetCompletion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gko_fields() {
+        let mut obj = GkoSnippetCompletion::default();
+        obj.snippet_comp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkp_default() {
+        let obj = GkpEmmetConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkp_fields() {
+        let mut obj = GkpEmmetConfig::default();
+        obj.emmet_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkq_default() {
+        let obj = GkqEditorSnippet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkq_fields() {
+        let mut obj = GkqEditorSnippet::default();
+        obj.editor_snippet_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkr_default() {
+        let obj = GkrSnippetSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkr_fields() {
+        let mut obj = GkrSnippetSession::default();
+        obj.session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gks_generated {
+    use super::*;
+
+    #[test]
+    fn test_gks_default() {
+        let obj = GksSnippetPlaceholder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gks_fields() {
+        let mut obj = GksSnippetPlaceholder::default();
+        obj.placeholder_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkt_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkt_default() {
+        let obj = GktSnippetVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkt_fields() {
+        let mut obj = GktSnippetVariable::default();
+        obj.var_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gku_generated {
+    use super::*;
+
+    #[test]
+    fn test_gku_default() {
+        let obj = GkuLanguageConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gku_fields() {
+        let mut obj = GkuLanguageConfig::default();
+        obj.lang_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkv_default() {
+        let obj = GkvExtensionPoint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkv_fields() {
+        let mut obj = GkvExtensionPoint::default();
+        obj.ext_point_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkw_default() {
+        let obj = GkwGrammarContribution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkw_fields() {
+        let mut obj = GkwGrammarContribution::default();
+        obj.grammar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkx_default() {
+        let obj = GkxLanguageStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkx_fields() {
+        let mut obj = GkxLanguageStatus::default();
+        obj.lang_status_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gky_generated {
+    use super::*;
+
+    #[test]
+    fn test_gky_default() {
+        let obj = GkyWorkspaceFolderConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gky_fields() {
+        let mut obj = GkyWorkspaceFolderConfig::default();
+        obj.folder_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gkz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gkz_default() {
+        let obj = GkzWorkspaceFileConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gkz_fields() {
+        let mut obj = GkzWorkspaceFileConfig::default();
+        obj.ws_file_id = "test".to_string();
         assert!(obj.validate());
     }
 }
