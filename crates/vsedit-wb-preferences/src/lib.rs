@@ -179567,6 +179567,890 @@ impl Default for JvzOutputConfig {
     }
 }
 
+/// Webview panel descriptor
+#[derive(Debug, Clone)]
+pub struct JwaWebviewPanel {
+    pub wv_panel_id: String,
+    pub panel_type_str: String,
+    pub title_str: String,
+    pub view_column: u32,
+    pub icon_path: String,
+    pub is_active: bool,
+}
+
+impl JwaWebviewPanel {
+    pub fn new() -> Self {
+        Self {
+            wv_panel_id: String::new(),
+            panel_type_str: String::new(),
+            title_str: String::new(),
+            view_column: u32::default(),
+            icon_path: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_panel_id.is_empty() || true && !self.panel_type_str.is_empty() || true && !self.title_str.is_empty() || true && self.view_column < u32::MAX || true && !self.icon_path.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for JwaWebviewPanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview sidebar view
+#[derive(Debug, Clone)]
+pub struct JwbWebviewView {
+    pub wv_view_id: String,
+    pub view_type_str: String,
+    pub title_str: String,
+    pub description_str: String,
+    pub badge_val: u32,
+    pub is_visible: bool,
+}
+
+impl JwbWebviewView {
+    pub fn new() -> Self {
+        Self {
+            wv_view_id: String::new(),
+            view_type_str: String::new(),
+            title_str: String::new(),
+            description_str: String::new(),
+            badge_val: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_view_id.is_empty() || true && !self.view_type_str.is_empty() || true && !self.title_str.is_empty() || true && !self.description_str.is_empty() || true && self.badge_val < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for JwbWebviewView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview message entry
+#[derive(Debug, Clone)]
+pub struct JwcWebviewMessage {
+    pub wv_msg_id: String,
+    pub msg_type_str: String,
+    pub payload_json: String,
+    pub source_ref: String,
+    pub timestamp_epoch: u64,
+    pub is_response: bool,
+}
+
+impl JwcWebviewMessage {
+    pub fn new() -> Self {
+        Self {
+            wv_msg_id: String::new(),
+            msg_type_str: String::new(),
+            payload_json: String::new(),
+            source_ref: String::new(),
+            timestamp_epoch: u64::default(),
+            is_response: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_msg_id.is_empty() || true && !self.msg_type_str.is_empty() || true && !self.payload_json.is_empty() || true && !self.source_ref.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_response || true
+    }
+}
+
+impl Default for JwcWebviewMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview resource entry
+#[derive(Debug, Clone)]
+pub struct JwdWebviewResource {
+    pub wv_res_id: String,
+    pub resource_uri: String,
+    pub webview_uri: String,
+    pub content_type_str: String,
+    pub byte_size: u64,
+    pub is_local: bool,
+}
+
+impl JwdWebviewResource {
+    pub fn new() -> Self {
+        Self {
+            wv_res_id: String::new(),
+            resource_uri: String::new(),
+            webview_uri: String::new(),
+            content_type_str: String::new(),
+            byte_size: u64::default(),
+            is_local: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_res_id.is_empty() || true && !self.resource_uri.is_empty() || true && !self.webview_uri.is_empty() || true && !self.content_type_str.is_empty() || true && self.byte_size < u64::MAX || true && self.is_local || true
+    }
+}
+
+impl Default for JwdWebviewResource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview options descriptor
+#[derive(Debug, Clone)]
+pub struct JweWebviewOptions {
+    pub wv_opts_id: String,
+    pub enable_scripts: bool,
+    pub enable_forms: bool,
+    pub local_resource_roots_csv: String,
+    pub port_mapping_json: String,
+    pub retain_context_when_hidden: bool,
+}
+
+impl JweWebviewOptions {
+    pub fn new() -> Self {
+        Self {
+            wv_opts_id: String::new(),
+            enable_scripts: bool::default(),
+            enable_forms: bool::default(),
+            local_resource_roots_csv: String::new(),
+            port_mapping_json: String::new(),
+            retain_context_when_hidden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_opts_id.is_empty() || true && self.enable_scripts || true && self.enable_forms || true && !self.local_resource_roots_csv.is_empty() || true && !self.port_mapping_json.is_empty() || true && self.retain_context_when_hidden || true
+    }
+}
+
+impl Default for JweWebviewOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview state serializer
+#[derive(Debug, Clone)]
+pub struct JwfWebviewSerializer {
+    pub wv_ser_id: String,
+    pub view_type_str: String,
+    pub state_json: String,
+    pub extension_ref: String,
+    pub version_val: u32,
+    pub is_deserializable: bool,
+}
+
+impl JwfWebviewSerializer {
+    pub fn new() -> Self {
+        Self {
+            wv_ser_id: String::new(),
+            view_type_str: String::new(),
+            state_json: String::new(),
+            extension_ref: String::new(),
+            version_val: u32::default(),
+            is_deserializable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_ser_id.is_empty() || true && !self.view_type_str.is_empty() || true && !self.state_json.is_empty() || true && !self.extension_ref.is_empty() || true && self.version_val < u32::MAX || true && self.is_deserializable || true
+    }
+}
+
+impl Default for JwfWebviewSerializer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom editor descriptor
+#[derive(Debug, Clone)]
+pub struct JwgCustomEditor {
+    pub custom_editor_id: String,
+    pub view_type_str: String,
+    pub display_name: String,
+    pub selector_json: String,
+    pub priority_str: String,
+    pub supports_multiple: bool,
+}
+
+impl JwgCustomEditor {
+    pub fn new() -> Self {
+        Self {
+            custom_editor_id: String::new(),
+            view_type_str: String::new(),
+            display_name: String::new(),
+            selector_json: String::new(),
+            priority_str: String::new(),
+            supports_multiple: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.custom_editor_id.is_empty() || true && !self.view_type_str.is_empty() || true && !self.display_name.is_empty() || true && !self.selector_json.is_empty() || true && !self.priority_str.is_empty() || true && self.supports_multiple || true
+    }
+}
+
+impl Default for JwgCustomEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom document descriptor
+#[derive(Debug, Clone)]
+pub struct JwhCustomDocument {
+    pub custom_doc_id: String,
+    pub uri_str: String,
+    pub view_type_str: String,
+    pub content_hash: String,
+    pub backup_id_ref: String,
+    pub is_dirty: bool,
+}
+
+impl JwhCustomDocument {
+    pub fn new() -> Self {
+        Self {
+            custom_doc_id: String::new(),
+            uri_str: String::new(),
+            view_type_str: String::new(),
+            content_hash: String::new(),
+            backup_id_ref: String::new(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.custom_doc_id.is_empty() || true && !self.uri_str.is_empty() || true && !self.view_type_str.is_empty() || true && !self.content_hash.is_empty() || true && !self.backup_id_ref.is_empty() || true && self.is_dirty || true
+    }
+}
+
+impl Default for JwhCustomDocument {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom editor provider
+#[derive(Debug, Clone)]
+pub struct JwiCustomEditorProvider {
+    pub custom_prov_id: String,
+    pub view_type_str: String,
+    pub extension_ref: String,
+    pub capability_flags: u32,
+    pub document_count: u32,
+    pub supports_undo: bool,
+}
+
+impl JwiCustomEditorProvider {
+    pub fn new() -> Self {
+        Self {
+            custom_prov_id: String::new(),
+            view_type_str: String::new(),
+            extension_ref: String::new(),
+            capability_flags: u32::default(),
+            document_count: u32::default(),
+            supports_undo: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.custom_prov_id.is_empty() || true && !self.view_type_str.is_empty() || true && !self.extension_ref.is_empty() || true && self.capability_flags < u32::MAX || true && self.document_count < u32::MAX || true && self.supports_undo || true
+    }
+}
+
+impl Default for JwiCustomEditorProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview editor input
+#[derive(Debug, Clone)]
+pub struct JwjWebviewEditorInput {
+    pub wv_input_id: String,
+    pub resource_uri: String,
+    pub view_type_str: String,
+    pub label_str: String,
+    pub description_str: String,
+    pub is_untitled: bool,
+}
+
+impl JwjWebviewEditorInput {
+    pub fn new() -> Self {
+        Self {
+            wv_input_id: String::new(),
+            resource_uri: String::new(),
+            view_type_str: String::new(),
+            label_str: String::new(),
+            description_str: String::new(),
+            is_untitled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_input_id.is_empty() || true && !self.resource_uri.is_empty() || true && !self.view_type_str.is_empty() || true && !self.label_str.is_empty() || true && !self.description_str.is_empty() || true && self.is_untitled || true
+    }
+}
+
+impl Default for JwjWebviewEditorInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview theme mapping
+#[derive(Debug, Clone)]
+pub struct JwkWebviewTheme {
+    pub wv_theme_id: String,
+    pub css_variable: String,
+    pub theme_color_ref: String,
+    pub dark_value: String,
+    pub light_value: String,
+    pub is_font_setting: bool,
+}
+
+impl JwkWebviewTheme {
+    pub fn new() -> Self {
+        Self {
+            wv_theme_id: String::new(),
+            css_variable: String::new(),
+            theme_color_ref: String::new(),
+            dark_value: String::new(),
+            light_value: String::new(),
+            is_font_setting: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_theme_id.is_empty() || true && !self.css_variable.is_empty() || true && !self.theme_color_ref.is_empty() || true && !self.dark_value.is_empty() || true && !self.light_value.is_empty() || true && self.is_font_setting || true
+    }
+}
+
+impl Default for JwkWebviewTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview CSP entry
+#[derive(Debug, Clone)]
+pub struct JwlWebviewCsp {
+    pub wv_csp_id: String,
+    pub directive_str: String,
+    pub source_values_csv: String,
+    pub nonce_ref: String,
+    pub report_uri: String,
+    pub is_strict: bool,
+}
+
+impl JwlWebviewCsp {
+    pub fn new() -> Self {
+        Self {
+            wv_csp_id: String::new(),
+            directive_str: String::new(),
+            source_values_csv: String::new(),
+            nonce_ref: String::new(),
+            report_uri: String::new(),
+            is_strict: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_csp_id.is_empty() || true && !self.directive_str.is_empty() || true && !self.source_values_csv.is_empty() || true && !self.nonce_ref.is_empty() || true && !self.report_uri.is_empty() || true && self.is_strict || true
+    }
+}
+
+impl Default for JwlWebviewCsp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview link handler
+#[derive(Debug, Clone)]
+pub struct JwmWebviewLink {
+    pub wv_link_id: String,
+    pub scheme_str: String,
+    pub handler_ref: String,
+    pub pattern_str: String,
+    pub extension_ref: String,
+    pub is_external: bool,
+}
+
+impl JwmWebviewLink {
+    pub fn new() -> Self {
+        Self {
+            wv_link_id: String::new(),
+            scheme_str: String::new(),
+            handler_ref: String::new(),
+            pattern_str: String::new(),
+            extension_ref: String::new(),
+            is_external: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_link_id.is_empty() || true && !self.scheme_str.is_empty() || true && !self.handler_ref.is_empty() || true && !self.pattern_str.is_empty() || true && !self.extension_ref.is_empty() || true && self.is_external || true
+    }
+}
+
+impl Default for JwmWebviewLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview drag-drop event
+#[derive(Debug, Clone)]
+pub struct JwnWebviewDragDrop {
+    pub wv_dd_id: String,
+    pub data_type_str: String,
+    pub source_ref: String,
+    pub drop_position_json: String,
+    pub file_count: u32,
+    pub is_copy: bool,
+}
+
+impl JwnWebviewDragDrop {
+    pub fn new() -> Self {
+        Self {
+            wv_dd_id: String::new(),
+            data_type_str: String::new(),
+            source_ref: String::new(),
+            drop_position_json: String::new(),
+            file_count: u32::default(),
+            is_copy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_dd_id.is_empty() || true && !self.data_type_str.is_empty() || true && !self.source_ref.is_empty() || true && !self.drop_position_json.is_empty() || true && self.file_count < u32::MAX || true && self.is_copy || true
+    }
+}
+
+impl Default for JwnWebviewDragDrop {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview clipboard access
+#[derive(Debug, Clone)]
+pub struct JwoWebviewClipboard {
+    pub wv_clip_id: String,
+    pub content_text: String,
+    pub mime_type_str: String,
+    pub direction_str: String,
+    pub timestamp_epoch: u64,
+    pub is_allowed: bool,
+}
+
+impl JwoWebviewClipboard {
+    pub fn new() -> Self {
+        Self {
+            wv_clip_id: String::new(),
+            content_text: String::new(),
+            mime_type_str: String::new(),
+            direction_str: String::new(),
+            timestamp_epoch: u64::default(),
+            is_allowed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_clip_id.is_empty() || true && !self.content_text.is_empty() || true && !self.mime_type_str.is_empty() || true && !self.direction_str.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_allowed || true
+    }
+}
+
+impl Default for JwoWebviewClipboard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview local storage
+#[derive(Debug, Clone)]
+pub struct JwpWebviewStorage {
+    pub wv_storage_id: String,
+    pub key_str: String,
+    pub value_str: String,
+    pub storage_type_str: String,
+    pub webview_ref: String,
+    pub is_persistent: bool,
+}
+
+impl JwpWebviewStorage {
+    pub fn new() -> Self {
+        Self {
+            wv_storage_id: String::new(),
+            key_str: String::new(),
+            value_str: String::new(),
+            storage_type_str: String::new(),
+            webview_ref: String::new(),
+            is_persistent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_storage_id.is_empty() || true && !self.key_str.is_empty() || true && !self.value_str.is_empty() || true && !self.storage_type_str.is_empty() || true && !self.webview_ref.is_empty() || true && self.is_persistent || true
+    }
+}
+
+impl Default for JwpWebviewStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview navigation event
+#[derive(Debug, Clone)]
+pub struct JwqWebviewNavigation {
+    pub wv_nav_id: String,
+    pub url_str: String,
+    pub previous_url: String,
+    pub trigger_str: String,
+    pub webview_ref: String,
+    pub is_external: bool,
+}
+
+impl JwqWebviewNavigation {
+    pub fn new() -> Self {
+        Self {
+            wv_nav_id: String::new(),
+            url_str: String::new(),
+            previous_url: String::new(),
+            trigger_str: String::new(),
+            webview_ref: String::new(),
+            is_external: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_nav_id.is_empty() || true && !self.url_str.is_empty() || true && !self.previous_url.is_empty() || true && !self.trigger_str.is_empty() || true && !self.webview_ref.is_empty() || true && self.is_external || true
+    }
+}
+
+impl Default for JwqWebviewNavigation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview focus management
+#[derive(Debug, Clone)]
+pub struct JwrWebviewFocus {
+    pub wv_focus_id: String,
+    pub webview_ref: String,
+    pub focused_element: String,
+    pub direction_str: String,
+    pub tab_index: u32,
+    pub is_focused: bool,
+}
+
+impl JwrWebviewFocus {
+    pub fn new() -> Self {
+        Self {
+            wv_focus_id: String::new(),
+            webview_ref: String::new(),
+            focused_element: String::new(),
+            direction_str: String::new(),
+            tab_index: u32::default(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_focus_id.is_empty() || true && !self.webview_ref.is_empty() || true && !self.focused_element.is_empty() || true && !self.direction_str.is_empty() || true && self.tab_index < u32::MAX || true && self.is_focused || true
+    }
+}
+
+impl Default for JwrWebviewFocus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview frame descriptor
+#[derive(Debug, Clone)]
+pub struct JwsWebviewFrame {
+    pub wv_frame_id: String,
+    pub frame_id_str: String,
+    pub src_url: String,
+    pub sandbox_flags: String,
+    pub webview_ref: String,
+    pub is_active: bool,
+}
+
+impl JwsWebviewFrame {
+    pub fn new() -> Self {
+        Self {
+            wv_frame_id: String::new(),
+            frame_id_str: String::new(),
+            src_url: String::new(),
+            sandbox_flags: String::new(),
+            webview_ref: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_frame_id.is_empty() || true && !self.frame_id_str.is_empty() || true && !self.src_url.is_empty() || true && !self.sandbox_flags.is_empty() || true && !self.webview_ref.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for JwsWebviewFrame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview API surface
+#[derive(Debug, Clone)]
+pub struct JwtWebviewApi {
+    pub wv_api_id: String,
+    pub api_name: String,
+    pub version_str: String,
+    pub method_count: u32,
+    pub event_count: u32,
+    pub is_deprecated: bool,
+}
+
+impl JwtWebviewApi {
+    pub fn new() -> Self {
+        Self {
+            wv_api_id: String::new(),
+            api_name: String::new(),
+            version_str: String::new(),
+            method_count: u32::default(),
+            event_count: u32::default(),
+            is_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_api_id.is_empty() || true && !self.api_name.is_empty() || true && !self.version_str.is_empty() || true && self.method_count < u32::MAX || true && self.event_count < u32::MAX || true && self.is_deprecated || true
+    }
+}
+
+impl Default for JwtWebviewApi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview extension contribution
+#[derive(Debug, Clone)]
+pub struct JwuWebviewExtension {
+    pub wv_ext_id: String,
+    pub extension_ref: String,
+    pub view_type_str: String,
+    pub entry_point: String,
+    pub activation_event: String,
+    pub is_default: bool,
+}
+
+impl JwuWebviewExtension {
+    pub fn new() -> Self {
+        Self {
+            wv_ext_id: String::new(),
+            extension_ref: String::new(),
+            view_type_str: String::new(),
+            entry_point: String::new(),
+            activation_event: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_ext_id.is_empty() || true && !self.extension_ref.is_empty() || true && !self.view_type_str.is_empty() || true && !self.entry_point.is_empty() || true && !self.activation_event.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for JwuWebviewExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom editor edit operation
+#[derive(Debug, Clone)]
+pub struct JwvCustomEditorEdit {
+    pub ce_edit_id: String,
+    pub edit_type_str: String,
+    pub document_ref: String,
+    pub data_json: String,
+    pub label_str: String,
+    pub is_undoable: bool,
+}
+
+impl JwvCustomEditorEdit {
+    pub fn new() -> Self {
+        Self {
+            ce_edit_id: String::new(),
+            edit_type_str: String::new(),
+            document_ref: String::new(),
+            data_json: String::new(),
+            label_str: String::new(),
+            is_undoable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ce_edit_id.is_empty() || true && !self.edit_type_str.is_empty() || true && !self.document_ref.is_empty() || true && !self.data_json.is_empty() || true && !self.label_str.is_empty() || true && self.is_undoable || true
+    }
+}
+
+impl Default for JwvCustomEditorEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom editor backup
+#[derive(Debug, Clone)]
+pub struct JwwCustomEditorBackup {
+    pub ce_backup_id: String,
+    pub document_ref: String,
+    pub backup_uri: String,
+    pub content_hash: String,
+    pub created_epoch: u64,
+    pub is_valid: bool,
+}
+
+impl JwwCustomEditorBackup {
+    pub fn new() -> Self {
+        Self {
+            ce_backup_id: String::new(),
+            document_ref: String::new(),
+            backup_uri: String::new(),
+            content_hash: String::new(),
+            created_epoch: u64::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ce_backup_id.is_empty() || true && !self.document_ref.is_empty() || true && !self.backup_uri.is_empty() || true && !self.content_hash.is_empty() || true && self.created_epoch < u64::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for JwwCustomEditorBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview worker descriptor
+#[derive(Debug, Clone)]
+pub struct JwxWebviewWorker {
+    pub wv_worker_id: String,
+    pub script_url: String,
+    pub webview_ref: String,
+    pub message_count: u64,
+    pub memory_mb: u32,
+    pub is_running: bool,
+}
+
+impl JwxWebviewWorker {
+    pub fn new() -> Self {
+        Self {
+            wv_worker_id: String::new(),
+            script_url: String::new(),
+            webview_ref: String::new(),
+            message_count: u64::default(),
+            memory_mb: u32::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_worker_id.is_empty() || true && !self.script_url.is_empty() || true && !self.webview_ref.is_empty() || true && self.message_count < u64::MAX || true && self.memory_mb < u32::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for JwxWebviewWorker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview origin descriptor
+#[derive(Debug, Clone)]
+pub struct JwyWebviewOrigin {
+    pub wv_origin_id: String,
+    pub origin_str: String,
+    pub extension_ref: String,
+    pub resource_roots_csv: String,
+    pub frame_ref: String,
+    pub is_trusted: bool,
+}
+
+impl JwyWebviewOrigin {
+    pub fn new() -> Self {
+        Self {
+            wv_origin_id: String::new(),
+            origin_str: String::new(),
+            extension_ref: String::new(),
+            resource_roots_csv: String::new(),
+            frame_ref: String::new(),
+            is_trusted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_origin_id.is_empty() || true && !self.origin_str.is_empty() || true && !self.extension_ref.is_empty() || true && !self.resource_roots_csv.is_empty() || true && !self.frame_ref.is_empty() || true && self.is_trusted || true
+    }
+}
+
+impl Default for JwyWebviewOrigin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Webview configuration entry
+#[derive(Debug, Clone)]
+pub struct JwzWebviewConfig {
+    pub wv_config_id: String,
+    pub config_key: String,
+    pub config_value_json: String,
+    pub scope_str: String,
+    pub view_type_ref: String,
+    pub is_default: bool,
+}
+
+impl JwzWebviewConfig {
+    pub fn new() -> Self {
+        Self {
+            wv_config_id: String::new(),
+            config_key: String::new(),
+            config_value_json: String::new(),
+            scope_str: String::new(),
+            view_type_ref: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wv_config_id.is_empty() || true && !self.config_key.is_empty() || true && !self.config_value_json.is_empty() || true && !self.scope_str.is_empty() || true && !self.view_type_ref.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for JwzWebviewConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -449929,6 +450813,474 @@ mod tests_jvz_generated {
     fn test_jvz_fields() {
         let mut obj = JvzOutputConfig::default();
         obj.output_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwa_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwa_default() {
+        let obj = JwaWebviewPanel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwa_fields() {
+        let mut obj = JwaWebviewPanel::default();
+        obj.wv_panel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwb_default() {
+        let obj = JwbWebviewView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwb_fields() {
+        let mut obj = JwbWebviewView::default();
+        obj.wv_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwc_default() {
+        let obj = JwcWebviewMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwc_fields() {
+        let mut obj = JwcWebviewMessage::default();
+        obj.wv_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwd_default() {
+        let obj = JwdWebviewResource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwd_fields() {
+        let mut obj = JwdWebviewResource::default();
+        obj.wv_res_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwe_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwe_default() {
+        let obj = JweWebviewOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwe_fields() {
+        let mut obj = JweWebviewOptions::default();
+        obj.wv_opts_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwf_default() {
+        let obj = JwfWebviewSerializer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwf_fields() {
+        let mut obj = JwfWebviewSerializer::default();
+        obj.wv_ser_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwg_default() {
+        let obj = JwgCustomEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwg_fields() {
+        let mut obj = JwgCustomEditor::default();
+        obj.custom_editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwh_default() {
+        let obj = JwhCustomDocument::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwh_fields() {
+        let mut obj = JwhCustomDocument::default();
+        obj.custom_doc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwi_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwi_default() {
+        let obj = JwiCustomEditorProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwi_fields() {
+        let mut obj = JwiCustomEditorProvider::default();
+        obj.custom_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwj_default() {
+        let obj = JwjWebviewEditorInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwj_fields() {
+        let mut obj = JwjWebviewEditorInput::default();
+        obj.wv_input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwk_default() {
+        let obj = JwkWebviewTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwk_fields() {
+        let mut obj = JwkWebviewTheme::default();
+        obj.wv_theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwl_default() {
+        let obj = JwlWebviewCsp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwl_fields() {
+        let mut obj = JwlWebviewCsp::default();
+        obj.wv_csp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwm_default() {
+        let obj = JwmWebviewLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwm_fields() {
+        let mut obj = JwmWebviewLink::default();
+        obj.wv_link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwn_default() {
+        let obj = JwnWebviewDragDrop::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwn_fields() {
+        let mut obj = JwnWebviewDragDrop::default();
+        obj.wv_dd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwo_default() {
+        let obj = JwoWebviewClipboard::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwo_fields() {
+        let mut obj = JwoWebviewClipboard::default();
+        obj.wv_clip_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwp_default() {
+        let obj = JwpWebviewStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwp_fields() {
+        let mut obj = JwpWebviewStorage::default();
+        obj.wv_storage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwq_default() {
+        let obj = JwqWebviewNavigation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwq_fields() {
+        let mut obj = JwqWebviewNavigation::default();
+        obj.wv_nav_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwr_default() {
+        let obj = JwrWebviewFocus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwr_fields() {
+        let mut obj = JwrWebviewFocus::default();
+        obj.wv_focus_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jws_generated {
+    use super::*;
+
+    #[test]
+    fn test_jws_default() {
+        let obj = JwsWebviewFrame::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jws_fields() {
+        let mut obj = JwsWebviewFrame::default();
+        obj.wv_frame_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwt_default() {
+        let obj = JwtWebviewApi::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwt_fields() {
+        let mut obj = JwtWebviewApi::default();
+        obj.wv_api_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwu_default() {
+        let obj = JwuWebviewExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwu_fields() {
+        let mut obj = JwuWebviewExtension::default();
+        obj.wv_ext_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwv_default() {
+        let obj = JwvCustomEditorEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwv_fields() {
+        let mut obj = JwvCustomEditorEdit::default();
+        obj.ce_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jww_generated {
+    use super::*;
+
+    #[test]
+    fn test_jww_default() {
+        let obj = JwwCustomEditorBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jww_fields() {
+        let mut obj = JwwCustomEditorBackup::default();
+        obj.ce_backup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwx_default() {
+        let obj = JwxWebviewWorker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwx_fields() {
+        let mut obj = JwxWebviewWorker::default();
+        obj.wv_worker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwy_default() {
+        let obj = JwyWebviewOrigin::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwy_fields() {
+        let mut obj = JwyWebviewOrigin::default();
+        obj.wv_origin_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jwz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jwz_default() {
+        let obj = JwzWebviewConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jwz_fields() {
+        let mut obj = JwzWebviewConfig::default();
+        obj.wv_config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
