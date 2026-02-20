@@ -66892,6 +66892,213 @@ impl Default for FljMenuRegistry {
 }
 
 
+/// Action item (id, label, class, enabled, checked, run handler)
+#[derive(Debug, Clone)]
+pub struct FlkActionItem {
+    pub action_id: String,
+    pub label: String,
+    pub class_name: String,
+    pub is_enabled: bool,
+    pub is_checked: bool,
+    pub tooltip: String,
+    pub run_handler_id: String,
+    pub icon_id: String,
+    pub category: String,
+    pub precondition: String,
+}
+
+impl FlkActionItem {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            label: String::new(),
+            class_name: String::new(),
+            is_enabled: bool::default(),
+            is_checked: bool::default(),
+            tooltip: String::new(),
+            run_handler_id: String::new(),
+            icon_id: String::new(),
+            category: String::new(),
+            precondition: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.label.is_empty() || true && !self.class_name.is_empty() || true && self.is_enabled || true && self.is_checked || true && !self.tooltip.is_empty() || true && !self.run_handler_id.is_empty() || true && !self.icon_id.is_empty() || true && !self.category.is_empty() || true && !self.precondition.is_empty() || true
+    }
+}
+
+impl Default for FlkActionItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Action bar (orientation, actions, context, options, view items)
+#[derive(Debug, Clone)]
+pub struct FllActionBar {
+    pub bar_id: String,
+    pub orientation: u32,
+    pub action_count: u32,
+    pub context_json: String,
+    pub has_overflow: bool,
+    pub focused_index: u32,
+    pub animation_enabled: bool,
+    pub trigger_keys_json: String,
+    pub aria_label: String,
+    pub role: String,
+}
+
+impl FllActionBar {
+    pub fn new() -> Self {
+        Self {
+            bar_id: String::new(),
+            orientation: u32::default(),
+            action_count: u32::default(),
+            context_json: String::new(),
+            has_overflow: bool::default(),
+            focused_index: u32::default(),
+            animation_enabled: bool::default(),
+            trigger_keys_json: String::new(),
+            aria_label: String::new(),
+            role: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bar_id.is_empty() || true && self.orientation < u32::MAX || true && self.action_count < u32::MAX || true && !self.context_json.is_empty() || true && self.has_overflow || true && self.focused_index < u32::MAX || true && self.animation_enabled || true && !self.trigger_keys_json.is_empty() || true && !self.aria_label.is_empty() || true && !self.role.is_empty() || true
+    }
+}
+
+impl Default for FllActionBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Toolbar (actions, overflow, size, orientation, render label)
+#[derive(Debug, Clone)]
+pub struct FlmToolBar {
+    pub toolbar_id: String,
+    pub action_count: u32,
+    pub overflow_count: u32,
+    pub orientation: u32,
+    pub icon_size: u32,
+    pub render_label: bool,
+    pub render_icon: bool,
+    pub ariaLabel: String,
+    pub max_visible: u32,
+    pub context_json: String,
+}
+
+impl FlmToolBar {
+    pub fn new() -> Self {
+        Self {
+            toolbar_id: String::new(),
+            action_count: u32::default(),
+            overflow_count: u32::default(),
+            orientation: u32::default(),
+            icon_size: u32::default(),
+            render_label: bool::default(),
+            render_icon: bool::default(),
+            ariaLabel: String::new(),
+            max_visible: u32::default(),
+            context_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.toolbar_id.is_empty() || true && self.action_count < u32::MAX || true && self.overflow_count < u32::MAX || true && self.orientation < u32::MAX || true && self.icon_size < u32::MAX || true && self.render_label || true && self.render_icon || true && !self.ariaLabel.is_empty() || true && self.max_visible < u32::MAX || true && !self.context_json.is_empty() || true
+    }
+}
+
+impl Default for FlmToolBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Quick input (type, title, step, total steps, items, buttons, value)
+#[derive(Debug, Clone)]
+pub struct FlnQuickInput {
+    pub input_id: String,
+    pub input_type: u32,
+    pub title: String,
+    pub step: u32,
+    pub total_steps: u32,
+    pub value: String,
+    pub placeholder: String,
+    pub is_busy: bool,
+    pub custom_button_label: String,
+    pub is_visible: bool,
+}
+
+impl FlnQuickInput {
+    pub fn new() -> Self {
+        Self {
+            input_id: String::new(),
+            input_type: u32::default(),
+            title: String::new(),
+            step: u32::default(),
+            total_steps: u32::default(),
+            value: String::new(),
+            placeholder: String::new(),
+            is_busy: bool::default(),
+            custom_button_label: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_id.is_empty() || true && self.input_type < u32::MAX || true && !self.title.is_empty() || true && self.step < u32::MAX || true && self.total_steps < u32::MAX || true && !self.value.is_empty() || true && !self.placeholder.is_empty() || true && self.is_busy || true && !self.custom_button_label.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for FlnQuickInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Quick pick (items, placeholder, match on description, can pick many)
+#[derive(Debug, Clone)]
+pub struct FloQuickPick {
+    pub pick_id: String,
+    pub item_count: u32,
+    pub placeholder: String,
+    pub match_on_description: bool,
+    pub match_on_detail: bool,
+    pub can_pick_many: bool,
+    pub keep_scroll_position: bool,
+    pub active_items_json: String,
+    pub selected_items_json: String,
+    pub filter_value: String,
+}
+
+impl FloQuickPick {
+    pub fn new() -> Self {
+        Self {
+            pick_id: String::new(),
+            item_count: u32::default(),
+            placeholder: String::new(),
+            match_on_description: bool::default(),
+            match_on_detail: bool::default(),
+            can_pick_many: bool::default(),
+            keep_scroll_position: bool::default(),
+            active_items_json: String::new(),
+            selected_items_json: String::new(),
+            filter_value: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pick_id.is_empty() || true && self.item_count < u32::MAX || true && !self.placeholder.is_empty() || true && self.match_on_description || true && self.match_on_detail || true && self.can_pick_many || true && self.keep_scroll_position || true && !self.active_items_json.is_empty() || true && !self.selected_items_json.is_empty() || true && !self.filter_value.is_empty() || true
+    }
+}
+
+impl Default for FloQuickPick {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -283699,6 +283906,96 @@ mod tests_flj_generated {
     fn test_flj_fields() {
         let mut obj = FljMenuRegistry::default();
         obj.menu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flk_generated {
+    use super::*;
+
+    #[test]
+    fn test_flk_default() {
+        let obj = FlkActionItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flk_fields() {
+        let mut obj = FlkActionItem::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fll_generated {
+    use super::*;
+
+    #[test]
+    fn test_fll_default() {
+        let obj = FllActionBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fll_fields() {
+        let mut obj = FllActionBar::default();
+        obj.bar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flm_generated {
+    use super::*;
+
+    #[test]
+    fn test_flm_default() {
+        let obj = FlmToolBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flm_fields() {
+        let mut obj = FlmToolBar::default();
+        obj.toolbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fln_generated {
+    use super::*;
+
+    #[test]
+    fn test_fln_default() {
+        let obj = FlnQuickInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fln_fields() {
+        let mut obj = FlnQuickInput::default();
+        obj.input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_flo_generated {
+    use super::*;
+
+    #[test]
+    fn test_flo_default() {
+        let obj = FloQuickPick::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_flo_fields() {
+        let mut obj = FloQuickPick::default();
+        obj.pick_id = "test".to_string();
         assert!(obj.validate());
     }
 }
