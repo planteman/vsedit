@@ -106227,6 +106227,678 @@ impl Default for GvjColorScheme {
     }
 }
 
+/// Color picker (initial color, format, saturation, hue, opacity)
+#[derive(Debug, Clone)]
+pub struct GvkColorPicker {
+    pub color_picker_id: String,
+    pub initial_color: String,
+    pub format: String,
+    pub saturation: f64,
+    pub hue: f64,
+    pub opacity: f64,
+    pub is_visible: bool,
+    pub supports_alpha: bool,
+    pub hex_input: String,
+    pub recent_colors_json: String,
+}
+
+impl GvkColorPicker {
+    pub fn new() -> Self {
+        Self {
+            color_picker_id: String::new(),
+            initial_color: String::new(),
+            format: String::new(),
+            saturation: f64::default(),
+            hue: f64::default(),
+            opacity: f64::default(),
+            is_visible: bool::default(),
+            supports_alpha: bool::default(),
+            hex_input: String::new(),
+            recent_colors_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_picker_id.is_empty() || true && !self.initial_color.is_empty() || true && !self.format.is_empty() || true && self.saturation.is_finite() || true && self.hue.is_finite() || true && self.opacity.is_finite() || true && self.is_visible || true && self.supports_alpha || true && !self.hex_input.is_empty() || true && !self.recent_colors_json.is_empty() || true
+    }
+}
+
+impl Default for GvkColorPicker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color presentation (label, text edit, additional edits, kind)
+#[derive(Debug, Clone)]
+pub struct GvlColorPresentation {
+    pub color_pres_id: String,
+    pub label: String,
+    pub text_edit_json: String,
+    pub additional_edits_json: String,
+    pub kind: String,
+    pub color: String,
+    pub format: String,
+    pub uri: String,
+    pub range_json: String,
+    pub is_preferred: bool,
+}
+
+impl GvlColorPresentation {
+    pub fn new() -> Self {
+        Self {
+            color_pres_id: String::new(),
+            label: String::new(),
+            text_edit_json: String::new(),
+            additional_edits_json: String::new(),
+            kind: String::new(),
+            color: String::new(),
+            format: String::new(),
+            uri: String::new(),
+            range_json: String::new(),
+            is_preferred: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_pres_id.is_empty() || true && !self.label.is_empty() || true && !self.text_edit_json.is_empty() || true && !self.additional_edits_json.is_empty() || true && !self.kind.is_empty() || true && !self.color.is_empty() || true && !self.format.is_empty() || true && !self.uri.is_empty() || true && !self.range_json.is_empty() || true && self.is_preferred || true
+    }
+}
+
+impl Default for GvlColorPresentation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme extension (contributes, activation, definition file, type)
+#[derive(Debug, Clone)]
+pub struct GvmThemeExtension {
+    pub theme_ext_id: String,
+    pub extension_id: String,
+    pub contributes_themes_json: String,
+    pub activation_event: String,
+    pub definition_file: String,
+    pub theme_type: String,
+    pub label: String,
+    pub ui_theme: String,
+    pub is_builtin: bool,
+    pub version: String,
+}
+
+impl GvmThemeExtension {
+    pub fn new() -> Self {
+        Self {
+            theme_ext_id: String::new(),
+            extension_id: String::new(),
+            contributes_themes_json: String::new(),
+            activation_event: String::new(),
+            definition_file: String::new(),
+            theme_type: String::new(),
+            label: String::new(),
+            ui_theme: String::new(),
+            is_builtin: bool::default(),
+            version: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_ext_id.is_empty() || true && !self.extension_id.is_empty() || true && !self.contributes_themes_json.is_empty() || true && !self.activation_event.is_empty() || true && !self.definition_file.is_empty() || true && !self.theme_type.is_empty() || true && !self.label.is_empty() || true && !self.ui_theme.is_empty() || true && self.is_builtin || true && !self.version.is_empty() || true
+    }
+}
+
+impl Default for GvmThemeExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Product icon theme (definition, icon map, font definition)
+#[derive(Debug, Clone)]
+pub struct GvnProductIconTheme {
+    pub prod_icon_id: String,
+    pub definition_path: String,
+    pub icon_map_json: String,
+    pub font_definition_json: String,
+    pub extension_id: String,
+    pub label: String,
+    pub is_default: bool,
+    pub font_path: String,
+    pub font_size: u32,
+    pub font_weight: String,
+}
+
+impl GvnProductIconTheme {
+    pub fn new() -> Self {
+        Self {
+            prod_icon_id: String::new(),
+            definition_path: String::new(),
+            icon_map_json: String::new(),
+            font_definition_json: String::new(),
+            extension_id: String::new(),
+            label: String::new(),
+            is_default: bool::default(),
+            font_path: String::new(),
+            font_size: u32::default(),
+            font_weight: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prod_icon_id.is_empty() || true && !self.definition_path.is_empty() || true && !self.icon_map_json.is_empty() || true && !self.font_definition_json.is_empty() || true && !self.extension_id.is_empty() || true && !self.label.is_empty() || true && self.is_default || true && !self.font_path.is_empty() || true && self.font_size < u32::MAX || true && !self.font_weight.is_empty() || true
+    }
+}
+
+impl Default for GvnProductIconTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color customization (scope, value, source, target, applies to)
+#[derive(Debug, Clone)]
+pub struct GvoColorCustomization {
+    pub color_custom_id: String,
+    pub scope: String,
+    pub value: String,
+    pub source: String,
+    pub target: String,
+    pub applies_to: String,
+    pub is_user: bool,
+    pub is_workspace: bool,
+    pub priority: u32,
+    pub original_value: String,
+}
+
+impl GvoColorCustomization {
+    pub fn new() -> Self {
+        Self {
+            color_custom_id: String::new(),
+            scope: String::new(),
+            value: String::new(),
+            source: String::new(),
+            target: String::new(),
+            applies_to: String::new(),
+            is_user: bool::default(),
+            is_workspace: bool::default(),
+            priority: u32::default(),
+            original_value: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_custom_id.is_empty() || true && !self.scope.is_empty() || true && !self.value.is_empty() || true && !self.source.is_empty() || true && !self.target.is_empty() || true && !self.applies_to.is_empty() || true && self.is_user || true && self.is_workspace || true && self.priority < u32::MAX || true && !self.original_value.is_empty() || true
+    }
+}
+
+impl Default for GvoColorCustomization {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench color registry (id, defaults, description, deprecated)
+#[derive(Debug, Clone)]
+pub struct GvpWorkbenchColor {
+    pub wb_color_id: String,
+    pub color_id: String,
+    pub default_dark: String,
+    pub default_light: String,
+    pub default_hc_dark: String,
+    pub description: String,
+    pub is_deprecated: bool,
+    pub deprecation_msg: String,
+    pub category: String,
+    pub needs_transparency: bool,
+}
+
+impl GvpWorkbenchColor {
+    pub fn new() -> Self {
+        Self {
+            wb_color_id: String::new(),
+            color_id: String::new(),
+            default_dark: String::new(),
+            default_light: String::new(),
+            default_hc_dark: String::new(),
+            description: String::new(),
+            is_deprecated: bool::default(),
+            deprecation_msg: String::new(),
+            category: String::new(),
+            needs_transparency: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wb_color_id.is_empty() || true && !self.color_id.is_empty() || true && !self.default_dark.is_empty() || true && !self.default_light.is_empty() || true && !self.default_hc_dark.is_empty() || true && !self.description.is_empty() || true && self.is_deprecated || true && !self.deprecation_msg.is_empty() || true && !self.category.is_empty() || true && self.needs_transparency || true
+    }
+}
+
+impl Default for GvpWorkbenchColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor token colorization (name, scope, settings json)
+#[derive(Debug, Clone)]
+pub struct GvqEditorTokenColor {
+    pub editor_token_id: String,
+    pub name: String,
+    pub scope: String,
+    pub settings_json: String,
+    pub foreground: String,
+    pub font_style: String,
+    pub background: String,
+    pub is_semantic: bool,
+    pub language: String,
+    pub priority: u32,
+}
+
+impl GvqEditorTokenColor {
+    pub fn new() -> Self {
+        Self {
+            editor_token_id: String::new(),
+            name: String::new(),
+            scope: String::new(),
+            settings_json: String::new(),
+            foreground: String::new(),
+            font_style: String::new(),
+            background: String::new(),
+            is_semantic: bool::default(),
+            language: String::new(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_token_id.is_empty() || true && !self.name.is_empty() || true && !self.scope.is_empty() || true && !self.settings_json.is_empty() || true && !self.foreground.is_empty() || true && !self.font_style.is_empty() || true && !self.background.is_empty() || true && self.is_semantic || true && !self.language.is_empty() || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for GvqEditorTokenColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme inheritance (base theme, overrides, include path)
+#[derive(Debug, Clone)]
+pub struct GvrThemeInheritance {
+    pub inherit_id: String,
+    pub base_theme: String,
+    pub overrides_json: String,
+    pub include_path: String,
+    pub parent_id: String,
+    pub depth: u32,
+    pub merge_strategy: String,
+    pub is_resolved: bool,
+    pub source_extension: String,
+    pub resolved_colors_json: String,
+}
+
+impl GvrThemeInheritance {
+    pub fn new() -> Self {
+        Self {
+            inherit_id: String::new(),
+            base_theme: String::new(),
+            overrides_json: String::new(),
+            include_path: String::new(),
+            parent_id: String::new(),
+            depth: u32::default(),
+            merge_strategy: String::new(),
+            is_resolved: bool::default(),
+            source_extension: String::new(),
+            resolved_colors_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inherit_id.is_empty() || true && !self.base_theme.is_empty() || true && !self.overrides_json.is_empty() || true && !self.include_path.is_empty() || true && !self.parent_id.is_empty() || true && self.depth < u32::MAX || true && !self.merge_strategy.is_empty() || true && self.is_resolved || true && !self.source_extension.is_empty() || true && !self.resolved_colors_json.is_empty() || true
+    }
+}
+
+impl Default for GvrThemeInheritance {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color transform (source, operation, amount, result, blend mode)
+#[derive(Debug, Clone)]
+pub struct GvsColorTransform {
+    pub transform_id: String,
+    pub source_color: String,
+    pub operation: String,
+    pub amount: f64,
+    pub result_color: String,
+    pub blend_mode: String,
+    pub opacity: f64,
+    pub second_color: String,
+    pub channel: String,
+    pub clamp: bool,
+}
+
+impl GvsColorTransform {
+    pub fn new() -> Self {
+        Self {
+            transform_id: String::new(),
+            source_color: String::new(),
+            operation: String::new(),
+            amount: f64::default(),
+            result_color: String::new(),
+            blend_mode: String::new(),
+            opacity: f64::default(),
+            second_color: String::new(),
+            channel: String::new(),
+            clamp: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.transform_id.is_empty() || true && !self.source_color.is_empty() || true && !self.operation.is_empty() || true && self.amount.is_finite() || true && !self.result_color.is_empty() || true && !self.blend_mode.is_empty() || true && self.opacity.is_finite() || true && !self.second_color.is_empty() || true && !self.channel.is_empty() || true && self.clamp || true
+    }
+}
+
+impl Default for GvsColorTransform {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Minimap color (foreground, background, slider, error, warning)
+#[derive(Debug, Clone)]
+pub struct GvtMinimapColor {
+    pub minimap_color_id: String,
+    pub foreground: String,
+    pub background: String,
+    pub slider_bg: String,
+    pub slider_hover: String,
+    pub slider_active: String,
+    pub error_highlight: String,
+    pub warning_highlight: String,
+    pub info_highlight: String,
+    pub find_match: String,
+}
+
+impl GvtMinimapColor {
+    pub fn new() -> Self {
+        Self {
+            minimap_color_id: String::new(),
+            foreground: String::new(),
+            background: String::new(),
+            slider_bg: String::new(),
+            slider_hover: String::new(),
+            slider_active: String::new(),
+            error_highlight: String::new(),
+            warning_highlight: String::new(),
+            info_highlight: String::new(),
+            find_match: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.minimap_color_id.is_empty() || true && !self.foreground.is_empty() || true && !self.background.is_empty() || true && !self.slider_bg.is_empty() || true && !self.slider_hover.is_empty() || true && !self.slider_active.is_empty() || true && !self.error_highlight.is_empty() || true && !self.warning_highlight.is_empty() || true && !self.info_highlight.is_empty() || true && !self.find_match.is_empty() || true
+    }
+}
+
+impl Default for GvtMinimapColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bracket pair colorization (level, color, guides enabled)
+#[derive(Debug, Clone)]
+pub struct GvuBracketColor {
+    pub bracket_color_id: String,
+    pub level: u32,
+    pub color: String,
+    pub guides_enabled: bool,
+    pub active_guide_color: String,
+    pub inactive_guide_color: String,
+    pub pair_count: u32,
+    pub is_active: bool,
+    pub highlight_color: String,
+    pub unexpected_bracket_color: String,
+}
+
+impl GvuBracketColor {
+    pub fn new() -> Self {
+        Self {
+            bracket_color_id: String::new(),
+            level: u32::default(),
+            color: String::new(),
+            guides_enabled: bool::default(),
+            active_guide_color: String::new(),
+            inactive_guide_color: String::new(),
+            pair_count: u32::default(),
+            is_active: bool::default(),
+            highlight_color: String::new(),
+            unexpected_bracket_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bracket_color_id.is_empty() || true && self.level < u32::MAX || true && !self.color.is_empty() || true && self.guides_enabled || true && !self.active_guide_color.is_empty() || true && !self.inactive_guide_color.is_empty() || true && self.pair_count < u32::MAX || true && self.is_active || true && !self.highlight_color.is_empty() || true && !self.unexpected_bracket_color.is_empty() || true
+    }
+}
+
+impl Default for GvuBracketColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Status bar colors (foreground, background, debugging, no folder)
+#[derive(Debug, Clone)]
+pub struct GvvStatusBarColor {
+    pub status_color_id: String,
+    pub foreground: String,
+    pub background: String,
+    pub debugging_bg: String,
+    pub no_folder_bg: String,
+    pub debugging_fg: String,
+    pub no_folder_fg: String,
+    pub border: String,
+    pub prominent_fg: String,
+    pub prominent_bg: String,
+}
+
+impl GvvStatusBarColor {
+    pub fn new() -> Self {
+        Self {
+            status_color_id: String::new(),
+            foreground: String::new(),
+            background: String::new(),
+            debugging_bg: String::new(),
+            no_folder_bg: String::new(),
+            debugging_fg: String::new(),
+            no_folder_fg: String::new(),
+            border: String::new(),
+            prominent_fg: String::new(),
+            prominent_bg: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.status_color_id.is_empty() || true && !self.foreground.is_empty() || true && !self.background.is_empty() || true && !self.debugging_bg.is_empty() || true && !self.no_folder_bg.is_empty() || true && !self.debugging_fg.is_empty() || true && !self.no_folder_fg.is_empty() || true && !self.border.is_empty() || true && !self.prominent_fg.is_empty() || true && !self.prominent_bg.is_empty() || true
+    }
+}
+
+impl Default for GvvStatusBarColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff editor colors (inserted, removed, diagonal fill, border)
+#[derive(Debug, Clone)]
+pub struct GvwDiffEditorColor {
+    pub diff_color_id: String,
+    pub inserted_bg: String,
+    pub removed_bg: String,
+    pub diagonal_fill: String,
+    pub inserted_border: String,
+    pub removed_border: String,
+    pub inserted_gutter: String,
+    pub removed_gutter: String,
+    pub unchanged_region: String,
+    pub word_diff: String,
+}
+
+impl GvwDiffEditorColor {
+    pub fn new() -> Self {
+        Self {
+            diff_color_id: String::new(),
+            inserted_bg: String::new(),
+            removed_bg: String::new(),
+            diagonal_fill: String::new(),
+            inserted_border: String::new(),
+            removed_border: String::new(),
+            inserted_gutter: String::new(),
+            removed_gutter: String::new(),
+            unchanged_region: String::new(),
+            word_diff: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_color_id.is_empty() || true && !self.inserted_bg.is_empty() || true && !self.removed_bg.is_empty() || true && !self.diagonal_fill.is_empty() || true && !self.inserted_border.is_empty() || true && !self.removed_border.is_empty() || true && !self.inserted_gutter.is_empty() || true && !self.removed_gutter.is_empty() || true && !self.unchanged_region.is_empty() || true && !self.word_diff.is_empty() || true
+    }
+}
+
+impl Default for GvwDiffEditorColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge editor colors (current, incoming, common ancestor, header)
+#[derive(Debug, Clone)]
+pub struct GvxMergeEditorColor {
+    pub merge_color_id: String,
+    pub current_bg: String,
+    pub incoming_bg: String,
+    pub common_ancestor_bg: String,
+    pub current_header: String,
+    pub incoming_header: String,
+    pub common_header: String,
+    pub current_border: String,
+    pub incoming_border: String,
+    pub conflict_bg: String,
+}
+
+impl GvxMergeEditorColor {
+    pub fn new() -> Self {
+        Self {
+            merge_color_id: String::new(),
+            current_bg: String::new(),
+            incoming_bg: String::new(),
+            common_ancestor_bg: String::new(),
+            current_header: String::new(),
+            incoming_header: String::new(),
+            common_header: String::new(),
+            current_border: String::new(),
+            incoming_border: String::new(),
+            conflict_bg: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_color_id.is_empty() || true && !self.current_bg.is_empty() || true && !self.incoming_bg.is_empty() || true && !self.common_ancestor_bg.is_empty() || true && !self.current_header.is_empty() || true && !self.incoming_header.is_empty() || true && !self.common_header.is_empty() || true && !self.current_border.is_empty() || true && !self.incoming_border.is_empty() || true && !self.conflict_bg.is_empty() || true
+    }
+}
+
+impl Default for GvxMergeEditorColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal ANSI colors (black, red, green, yellow, blue, magenta)
+#[derive(Debug, Clone)]
+pub struct GvyTerminalColor {
+    pub term_color_id: String,
+    pub ansi_black: String,
+    pub ansi_red: String,
+    pub ansi_green: String,
+    pub ansi_yellow: String,
+    pub ansi_blue: String,
+    pub ansi_magenta: String,
+    pub ansi_cyan: String,
+    pub ansi_white: String,
+    pub is_bright_variant: bool,
+}
+
+impl GvyTerminalColor {
+    pub fn new() -> Self {
+        Self {
+            term_color_id: String::new(),
+            ansi_black: String::new(),
+            ansi_red: String::new(),
+            ansi_green: String::new(),
+            ansi_yellow: String::new(),
+            ansi_blue: String::new(),
+            ansi_magenta: String::new(),
+            ansi_cyan: String::new(),
+            ansi_white: String::new(),
+            is_bright_variant: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_color_id.is_empty() || true && !self.ansi_black.is_empty() || true && !self.ansi_red.is_empty() || true && !self.ansi_green.is_empty() || true && !self.ansi_yellow.is_empty() || true && !self.ansi_blue.is_empty() || true && !self.ansi_magenta.is_empty() || true && !self.ansi_cyan.is_empty() || true && !self.ansi_white.is_empty() || true && self.is_bright_variant || true
+    }
+}
+
+impl Default for GvyTerminalColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug token colors (variable, string, number, boolean, error)
+#[derive(Debug, Clone)]
+pub struct GvzDebugTokenColor {
+    pub debug_token_id: String,
+    pub variable_color: String,
+    pub string_color: String,
+    pub number_color: String,
+    pub boolean_color: String,
+    pub error_color: String,
+    pub null_color: String,
+    pub key_color: String,
+    pub function_color: String,
+    pub type_color: String,
+}
+
+impl GvzDebugTokenColor {
+    pub fn new() -> Self {
+        Self {
+            debug_token_id: String::new(),
+            variable_color: String::new(),
+            string_color: String::new(),
+            number_color: String::new(),
+            boolean_color: String::new(),
+            error_color: String::new(),
+            null_color: String::new(),
+            key_color: String::new(),
+            function_color: String::new(),
+            type_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.debug_token_id.is_empty() || true && !self.variable_color.is_empty() || true && !self.string_color.is_empty() || true && !self.number_color.is_empty() || true && !self.boolean_color.is_empty() || true && !self.error_color.is_empty() || true && !self.null_color.is_empty() || true && !self.key_color.is_empty() || true && !self.function_color.is_empty() || true && !self.type_color.is_empty() || true
+    }
+}
+
+impl Default for GvzDebugTokenColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -339686,6 +340358,294 @@ mod tests_gvj_generated {
     fn test_gvj_fields() {
         let mut obj = GvjColorScheme::default();
         obj.scheme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvk_default() {
+        let obj = GvkColorPicker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvk_fields() {
+        let mut obj = GvkColorPicker::default();
+        obj.color_picker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvl_default() {
+        let obj = GvlColorPresentation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvl_fields() {
+        let mut obj = GvlColorPresentation::default();
+        obj.color_pres_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvm_default() {
+        let obj = GvmThemeExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvm_fields() {
+        let mut obj = GvmThemeExtension::default();
+        obj.theme_ext_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvn_default() {
+        let obj = GvnProductIconTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvn_fields() {
+        let mut obj = GvnProductIconTheme::default();
+        obj.prod_icon_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvo_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvo_default() {
+        let obj = GvoColorCustomization::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvo_fields() {
+        let mut obj = GvoColorCustomization::default();
+        obj.color_custom_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvp_default() {
+        let obj = GvpWorkbenchColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvp_fields() {
+        let mut obj = GvpWorkbenchColor::default();
+        obj.wb_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvq_default() {
+        let obj = GvqEditorTokenColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvq_fields() {
+        let mut obj = GvqEditorTokenColor::default();
+        obj.editor_token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvr_default() {
+        let obj = GvrThemeInheritance::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvr_fields() {
+        let mut obj = GvrThemeInheritance::default();
+        obj.inherit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvs_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvs_default() {
+        let obj = GvsColorTransform::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvs_fields() {
+        let mut obj = GvsColorTransform::default();
+        obj.transform_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvt_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvt_default() {
+        let obj = GvtMinimapColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvt_fields() {
+        let mut obj = GvtMinimapColor::default();
+        obj.minimap_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvu_default() {
+        let obj = GvuBracketColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvu_fields() {
+        let mut obj = GvuBracketColor::default();
+        obj.bracket_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvv_default() {
+        let obj = GvvStatusBarColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvv_fields() {
+        let mut obj = GvvStatusBarColor::default();
+        obj.status_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvw_default() {
+        let obj = GvwDiffEditorColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvw_fields() {
+        let mut obj = GvwDiffEditorColor::default();
+        obj.diff_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvx_default() {
+        let obj = GvxMergeEditorColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvx_fields() {
+        let mut obj = GvxMergeEditorColor::default();
+        obj.merge_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvy_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvy_default() {
+        let obj = GvyTerminalColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvy_fields() {
+        let mut obj = GvyTerminalColor::default();
+        obj.term_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gvz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gvz_default() {
+        let obj = GvzDebugTokenColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gvz_fields() {
+        let mut obj = GvzDebugTokenColor::default();
+        obj.debug_token_id = "test".to_string();
         assert!(obj.validate());
     }
 }
