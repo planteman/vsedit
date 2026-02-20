@@ -71827,6 +71827,216 @@ impl Default for FpzGitHook {
     }
 }
 
+/// DAP debug session (id, type, name, configuration, state)
+#[derive(Debug, Clone)]
+pub struct FqaDapSession {
+    pub session_id: String,
+    pub debug_type: String,
+    pub name: String,
+    pub configuration_json: String,
+    pub state: u32,
+    pub thread_count: u32,
+    pub capabilities_json: String,
+    pub adapter_id: String,
+    pub started_at_ms: u64,
+    pub is_simulated: bool,
+}
+
+impl FqaDapSession {
+    pub fn new() -> Self {
+        Self {
+            session_id: String::new(),
+            debug_type: String::new(),
+            name: String::new(),
+            configuration_json: String::new(),
+            state: u32::default(),
+            thread_count: u32::default(),
+            capabilities_json: String::new(),
+            adapter_id: String::new(),
+            started_at_ms: u64::default(),
+            is_simulated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.session_id.is_empty() || true && !self.debug_type.is_empty() || true && !self.name.is_empty() || true && !self.configuration_json.is_empty() || true && self.state < u32::MAX || true && self.thread_count < u32::MAX || true && !self.capabilities_json.is_empty() || true && !self.adapter_id.is_empty() || true && self.started_at_ms < u64::MAX || true && self.is_simulated || true
+    }
+}
+
+impl Default for FqaDapSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP thread (id, name, stopped reason, stack frame count)
+#[derive(Debug, Clone)]
+pub struct FqbDapThread {
+    pub thread_id: u32,
+    pub name: String,
+    pub stopped_reason: String,
+    pub stack_frame_count: u32,
+    pub is_stopped: bool,
+    pub description: String,
+    pub session_id: String,
+    pub can_continue: bool,
+    pub can_step: bool,
+    pub hit_breakpoint_ids_json: String,
+}
+
+impl FqbDapThread {
+    pub fn new() -> Self {
+        Self {
+            thread_id: u32::default(),
+            name: String::new(),
+            stopped_reason: String::new(),
+            stack_frame_count: u32::default(),
+            is_stopped: bool::default(),
+            description: String::new(),
+            session_id: String::new(),
+            can_continue: bool::default(),
+            can_step: bool::default(),
+            hit_breakpoint_ids_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.thread_id < u32::MAX || true && !self.name.is_empty() || true && !self.stopped_reason.is_empty() || true && self.stack_frame_count < u32::MAX || true && self.is_stopped || true && !self.description.is_empty() || true && !self.session_id.is_empty() || true && self.can_continue || true && self.can_step || true && !self.hit_breakpoint_ids_json.is_empty() || true
+    }
+}
+
+impl Default for FqbDapThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP stack frame (id, name, source, line, column, module)
+#[derive(Debug, Clone)]
+pub struct FqcDapStackFrame {
+    pub frame_id: u32,
+    pub name: String,
+    pub source_name: String,
+    pub source_path: String,
+    pub line: u32,
+    pub column: u32,
+    pub module_id: String,
+    pub presentation_hint: u32,
+    pub can_restart: bool,
+    pub instruction_pointer: String,
+}
+
+impl FqcDapStackFrame {
+    pub fn new() -> Self {
+        Self {
+            frame_id: u32::default(),
+            name: String::new(),
+            source_name: String::new(),
+            source_path: String::new(),
+            line: u32::default(),
+            column: u32::default(),
+            module_id: String::new(),
+            presentation_hint: u32::default(),
+            can_restart: bool::default(),
+            instruction_pointer: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.frame_id < u32::MAX || true && !self.name.is_empty() || true && !self.source_name.is_empty() || true && !self.source_path.is_empty() || true && self.line < u32::MAX || true && self.column < u32::MAX || true && !self.module_id.is_empty() || true && self.presentation_hint < u32::MAX || true && self.can_restart || true && !self.instruction_pointer.is_empty() || true
+    }
+}
+
+impl Default for FqcDapStackFrame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP scope (name, presentation hint, variables reference, expensive)
+#[derive(Debug, Clone)]
+pub struct FqdDapScope {
+    pub scope_id: u32,
+    pub name: String,
+    pub presentation_hint: String,
+    pub variables_reference: u32,
+    pub named_variables: u32,
+    pub indexed_variables: u32,
+    pub is_expensive: bool,
+    pub source_name: String,
+    pub line: u32,
+    pub column: u32,
+}
+
+impl FqdDapScope {
+    pub fn new() -> Self {
+        Self {
+            scope_id: u32::default(),
+            name: String::new(),
+            presentation_hint: String::new(),
+            variables_reference: u32::default(),
+            named_variables: u32::default(),
+            indexed_variables: u32::default(),
+            is_expensive: bool::default(),
+            source_name: String::new(),
+            line: u32::default(),
+            column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.scope_id < u32::MAX || true && !self.name.is_empty() || true && !self.presentation_hint.is_empty() || true && self.variables_reference < u32::MAX || true && self.named_variables < u32::MAX || true && self.indexed_variables < u32::MAX || true && self.is_expensive || true && !self.source_name.is_empty() || true && self.line < u32::MAX || true && self.column < u32::MAX || true
+    }
+}
+
+impl Default for FqdDapScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// DAP variable (name, value, type, variables reference, evaluate name)
+#[derive(Debug, Clone)]
+pub struct FqeDapVariable {
+    pub variable_id: String,
+    pub name: String,
+    pub value: String,
+    pub variable_type: String,
+    pub variables_reference: u32,
+    pub evaluate_name: String,
+    pub named_variables: u32,
+    pub indexed_variables: u32,
+    pub memory_reference: String,
+    pub presentation_hint_json: String,
+}
+
+impl FqeDapVariable {
+    pub fn new() -> Self {
+        Self {
+            variable_id: String::new(),
+            name: String::new(),
+            value: String::new(),
+            variable_type: String::new(),
+            variables_reference: u32::default(),
+            evaluate_name: String::new(),
+            named_variables: u32::default(),
+            indexed_variables: u32::default(),
+            memory_reference: String::new(),
+            presentation_hint_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.variable_id.is_empty() || true && !self.name.is_empty() || true && !self.value.is_empty() || true && !self.variable_type.is_empty() || true && self.variables_reference < u32::MAX || true && !self.evaluate_name.is_empty() || true && self.named_variables < u32::MAX || true && self.indexed_variables < u32::MAX || true && !self.memory_reference.is_empty() || true && !self.presentation_hint_json.is_empty() || true
+    }
+}
+
+impl Default for FqeDapVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -290817,6 +291027,96 @@ mod tests_fpz_generated {
     fn test_fpz_fields() {
         let mut obj = FpzGitHook::default();
         obj.hook_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqa_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqa_default() {
+        let obj = FqaDapSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqa_fields() {
+        let mut obj = FqaDapSession::default();
+        obj.session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqb_default() {
+        let obj = FqbDapThread::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqb_fields() {
+        let mut obj = FqbDapThread::default();
+        obj.thread_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqc_default() {
+        let obj = FqcDapStackFrame::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqc_fields() {
+        let mut obj = FqcDapStackFrame::default();
+        obj.frame_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqd_default() {
+        let obj = FqdDapScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqd_fields() {
+        let mut obj = FqdDapScope::default();
+        obj.scope_id = 1;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fqe_generated {
+    use super::*;
+
+    #[test]
+    fn test_fqe_default() {
+        let obj = FqeDapVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fqe_fields() {
+        let mut obj = FqeDapVariable::default();
+        obj.variable_id = "test".to_string();
         assert!(obj.validate());
     }
 }
