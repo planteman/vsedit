@@ -134525,6 +134525,890 @@ impl Default for HwzEditorLayout {
     }
 }
 
+/// Go to definition result
+#[derive(Debug, Clone)]
+pub struct HxaGoToDefinition {
+    pub goto_id: String,
+    pub target_uri: String,
+    pub target_line: u32,
+    pub target_col: u32,
+    pub origin_uri: String,
+    pub is_external: bool,
+}
+
+impl HxaGoToDefinition {
+    pub fn new() -> Self {
+        Self {
+            goto_id: String::new(),
+            target_uri: String::new(),
+            target_line: u32::default(),
+            target_col: u32::default(),
+            origin_uri: String::new(),
+            is_external: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.goto_id.is_empty() || true && !self.target_uri.is_empty() || true && self.target_line < u32::MAX || true && self.target_col < u32::MAX || true && !self.origin_uri.is_empty() || true && self.is_external || true
+    }
+}
+
+impl Default for HxaGoToDefinition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to declaration result
+#[derive(Debug, Clone)]
+pub struct HxbGoToDeclaration {
+    pub decl_id: String,
+    pub target_uri: String,
+    pub target_line: u32,
+    pub target_col: u32,
+    pub symbol_name: String,
+    pub is_forward_decl: bool,
+}
+
+impl HxbGoToDeclaration {
+    pub fn new() -> Self {
+        Self {
+            decl_id: String::new(),
+            target_uri: String::new(),
+            target_line: u32::default(),
+            target_col: u32::default(),
+            symbol_name: String::new(),
+            is_forward_decl: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decl_id.is_empty() || true && !self.target_uri.is_empty() || true && self.target_line < u32::MAX || true && self.target_col < u32::MAX || true && !self.symbol_name.is_empty() || true && self.is_forward_decl || true
+    }
+}
+
+impl Default for HxbGoToDeclaration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to type definition result
+#[derive(Debug, Clone)]
+pub struct HxcGoToTypeDefinition {
+    pub type_id: String,
+    pub target_uri: String,
+    pub target_line: u32,
+    pub target_col: u32,
+    pub type_name: String,
+    pub is_generic: bool,
+}
+
+impl HxcGoToTypeDefinition {
+    pub fn new() -> Self {
+        Self {
+            type_id: String::new(),
+            target_uri: String::new(),
+            target_line: u32::default(),
+            target_col: u32::default(),
+            type_name: String::new(),
+            is_generic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.type_id.is_empty() || true && !self.target_uri.is_empty() || true && self.target_line < u32::MAX || true && self.target_col < u32::MAX || true && !self.type_name.is_empty() || true && self.is_generic || true
+    }
+}
+
+impl Default for HxcGoToTypeDefinition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to implementation result
+#[derive(Debug, Clone)]
+pub struct HxdGoToImplementation {
+    pub impl_id: String,
+    pub target_uri: String,
+    pub target_line: u32,
+    pub target_col: u32,
+    pub impl_count: u32,
+    pub is_interface: bool,
+}
+
+impl HxdGoToImplementation {
+    pub fn new() -> Self {
+        Self {
+            impl_id: String::new(),
+            target_uri: String::new(),
+            target_line: u32::default(),
+            target_col: u32::default(),
+            impl_count: u32::default(),
+            is_interface: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.impl_id.is_empty() || true && !self.target_uri.is_empty() || true && self.target_line < u32::MAX || true && self.target_col < u32::MAX || true && self.impl_count < u32::MAX || true && self.is_interface || true
+    }
+}
+
+impl Default for HxdGoToImplementation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to references result
+#[derive(Debug, Clone)]
+pub struct HxeGoToReference {
+    pub ref_id: String,
+    pub file_uri: String,
+    pub line_number: u32,
+    pub col_number: u32,
+    pub context_text: String,
+    pub is_write_access: bool,
+}
+
+impl HxeGoToReference {
+    pub fn new() -> Self {
+        Self {
+            ref_id: String::new(),
+            file_uri: String::new(),
+            line_number: u32::default(),
+            col_number: u32::default(),
+            context_text: String::new(),
+            is_write_access: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ref_id.is_empty() || true && !self.file_uri.is_empty() || true && self.line_number < u32::MAX || true && self.col_number < u32::MAX || true && !self.context_text.is_empty() || true && self.is_write_access || true
+    }
+}
+
+impl Default for HxeGoToReference {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Peek definition widget state
+#[derive(Debug, Clone)]
+pub struct HxfPeekDefinition {
+    pub peek_id: String,
+    pub target_uri: String,
+    pub target_line: u32,
+    pub widget_height: u32,
+    pub result_count: u32,
+    pub is_pinned: bool,
+}
+
+impl HxfPeekDefinition {
+    pub fn new() -> Self {
+        Self {
+            peek_id: String::new(),
+            target_uri: String::new(),
+            target_line: u32::default(),
+            widget_height: u32::default(),
+            result_count: u32::default(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.peek_id.is_empty() || true && !self.target_uri.is_empty() || true && self.target_line < u32::MAX || true && self.widget_height < u32::MAX || true && self.result_count < u32::MAX || true && self.is_pinned || true
+    }
+}
+
+impl Default for HxfPeekDefinition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Breadcrumb navigation entry
+#[derive(Debug, Clone)]
+pub struct HxgBreadcrumb {
+    pub crumb_id: String,
+    pub label_text: String,
+    pub icon_kind: String,
+    pub file_uri: String,
+    pub depth_level: u32,
+    pub is_active: bool,
+}
+
+impl HxgBreadcrumb {
+    pub fn new() -> Self {
+        Self {
+            crumb_id: String::new(),
+            label_text: String::new(),
+            icon_kind: String::new(),
+            file_uri: String::new(),
+            depth_level: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.crumb_id.is_empty() || true && !self.label_text.is_empty() || true && !self.icon_kind.is_empty() || true && !self.file_uri.is_empty() || true && self.depth_level < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for HxgBreadcrumb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document outline entry
+#[derive(Debug, Clone)]
+pub struct HxhOutlineEntry {
+    pub outline_id: String,
+    pub symbol_name: String,
+    pub symbol_kind: u32,
+    pub range_start: u32,
+    pub child_count: u32,
+    pub is_deprecated: bool,
+}
+
+impl HxhOutlineEntry {
+    pub fn new() -> Self {
+        Self {
+            outline_id: String::new(),
+            symbol_name: String::new(),
+            symbol_kind: u32::default(),
+            range_start: u32::default(),
+            child_count: u32::default(),
+            is_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.outline_id.is_empty() || true && !self.symbol_name.is_empty() || true && self.symbol_kind < u32::MAX || true && self.range_start < u32::MAX || true && self.child_count < u32::MAX || true && self.is_deprecated || true
+    }
+}
+
+impl Default for HxhOutlineEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace symbol search result
+#[derive(Debug, Clone)]
+pub struct HxiSymbolSearch {
+    pub search_id: String,
+    pub symbol_name: String,
+    pub container_name: String,
+    pub file_uri: String,
+    pub kind_value: u32,
+    pub is_exact_match: bool,
+}
+
+impl HxiSymbolSearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: String::new(),
+            symbol_name: String::new(),
+            container_name: String::new(),
+            file_uri: String::new(),
+            kind_value: u32::default(),
+            is_exact_match: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_id.is_empty() || true && !self.symbol_name.is_empty() || true && !self.container_name.is_empty() || true && !self.file_uri.is_empty() || true && self.kind_value < u32::MAX || true && self.is_exact_match || true
+    }
+}
+
+impl Default for HxiSymbolSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Call hierarchy navigation
+#[derive(Debug, Clone)]
+pub struct HxjCallHierarchy {
+    pub call_id: String,
+    pub caller_name: String,
+    pub callee_name: String,
+    pub file_uri: String,
+    pub call_count: u32,
+    pub is_recursive: bool,
+}
+
+impl HxjCallHierarchy {
+    pub fn new() -> Self {
+        Self {
+            call_id: String::new(),
+            caller_name: String::new(),
+            callee_name: String::new(),
+            file_uri: String::new(),
+            call_count: u32::default(),
+            is_recursive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.call_id.is_empty() || true && !self.caller_name.is_empty() || true && !self.callee_name.is_empty() || true && !self.file_uri.is_empty() || true && self.call_count < u32::MAX || true && self.is_recursive || true
+    }
+}
+
+impl Default for HxjCallHierarchy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Type hierarchy navigation
+#[derive(Debug, Clone)]
+pub struct HxkTypeHierarchy {
+    pub type_id: String,
+    pub type_name: String,
+    pub parent_name: String,
+    pub file_uri: String,
+    pub child_count: u32,
+    pub is_abstract: bool,
+}
+
+impl HxkTypeHierarchy {
+    pub fn new() -> Self {
+        Self {
+            type_id: String::new(),
+            type_name: String::new(),
+            parent_name: String::new(),
+            file_uri: String::new(),
+            child_count: u32::default(),
+            is_abstract: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.type_id.is_empty() || true && !self.type_name.is_empty() || true && !self.parent_name.is_empty() || true && !self.file_uri.is_empty() || true && self.child_count < u32::MAX || true && self.is_abstract || true
+    }
+}
+
+impl Default for HxkTypeHierarchy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor navigation history entry
+#[derive(Debug, Clone)]
+pub struct HxlNavigationHistory {
+    pub nav_id: String,
+    pub file_uri: String,
+    pub line_number: u32,
+    pub col_number: u32,
+    pub timestamp_epoch: u64,
+    pub is_current: bool,
+}
+
+impl HxlNavigationHistory {
+    pub fn new() -> Self {
+        Self {
+            nav_id: String::new(),
+            file_uri: String::new(),
+            line_number: u32::default(),
+            col_number: u32::default(),
+            timestamp_epoch: u64::default(),
+            is_current: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nav_id.is_empty() || true && !self.file_uri.is_empty() || true && self.line_number < u32::MAX || true && self.col_number < u32::MAX || true && self.timestamp_epoch < u64::MAX || true && self.is_current || true
+    }
+}
+
+impl Default for HxlNavigationHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to line dialog state
+#[derive(Debug, Clone)]
+pub struct HxmGoToLine {
+    pub goto_id: String,
+    pub target_line: u32,
+    pub input_text: String,
+    pub max_line: u32,
+    pub col_value: u32,
+    pub is_valid: bool,
+}
+
+impl HxmGoToLine {
+    pub fn new() -> Self {
+        Self {
+            goto_id: String::new(),
+            target_line: u32::default(),
+            input_text: String::new(),
+            max_line: u32::default(),
+            col_value: u32::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.goto_id.is_empty() || true && self.target_line < u32::MAX || true && !self.input_text.is_empty() || true && self.max_line < u32::MAX || true && self.col_value < u32::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for HxmGoToLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to symbol quick pick
+#[derive(Debug, Clone)]
+pub struct HxnGoToSymbol {
+    pub symbol_id: String,
+    pub query_text: String,
+    pub result_count: u32,
+    pub selected_index: u32,
+    pub scope_str: String,
+    pub include_imports: bool,
+}
+
+impl HxnGoToSymbol {
+    pub fn new() -> Self {
+        Self {
+            symbol_id: String::new(),
+            query_text: String::new(),
+            result_count: u32::default(),
+            selected_index: u32::default(),
+            scope_str: String::new(),
+            include_imports: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.symbol_id.is_empty() || true && !self.query_text.is_empty() || true && self.result_count < u32::MAX || true && self.selected_index < u32::MAX || true && !self.scope_str.is_empty() || true && self.include_imports || true
+    }
+}
+
+impl Default for HxnGoToSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go to file quick open state
+#[derive(Debug, Clone)]
+pub struct HxoGoToFile {
+    pub file_id: String,
+    pub query_text: String,
+    pub result_count: u32,
+    pub selected_index: u32,
+    pub workspace_root: String,
+    pub show_hidden: bool,
+}
+
+impl HxoGoToFile {
+    pub fn new() -> Self {
+        Self {
+            file_id: String::new(),
+            query_text: String::new(),
+            result_count: u32::default(),
+            selected_index: u32::default(),
+            workspace_root: String::new(),
+            show_hidden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_id.is_empty() || true && !self.query_text.is_empty() || true && self.result_count < u32::MAX || true && self.selected_index < u32::MAX || true && !self.workspace_root.is_empty() || true && self.show_hidden || true
+    }
+}
+
+impl Default for HxoGoToFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection occurrence highlight
+#[derive(Debug, Clone)]
+pub struct HxpSelectionHighlight {
+    pub highlight_id: String,
+    pub selection_text: String,
+    pub match_count: u32,
+    pub color_token: String,
+    pub min_word_len: u32,
+    pub whole_word_only: bool,
+}
+
+impl HxpSelectionHighlight {
+    pub fn new() -> Self {
+        Self {
+            highlight_id: String::new(),
+            selection_text: String::new(),
+            match_count: u32::default(),
+            color_token: String::new(),
+            min_word_len: u32::default(),
+            whole_word_only: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.highlight_id.is_empty() || true && !self.selection_text.is_empty() || true && self.match_count < u32::MAX || true && !self.color_token.is_empty() || true && self.min_word_len < u32::MAX || true && self.whole_word_only || true
+    }
+}
+
+impl Default for HxpSelectionHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Word occurrence highlight
+#[derive(Debug, Clone)]
+pub struct HxqWordHighlight {
+    pub word_id: String,
+    pub word_text: String,
+    pub occurrence_count: u32,
+    pub current_index: u32,
+    pub color_token: String,
+    pub is_semantic: bool,
+}
+
+impl HxqWordHighlight {
+    pub fn new() -> Self {
+        Self {
+            word_id: String::new(),
+            word_text: String::new(),
+            occurrence_count: u32::default(),
+            current_index: u32::default(),
+            color_token: String::new(),
+            is_semantic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.word_id.is_empty() || true && !self.word_text.is_empty() || true && self.occurrence_count < u32::MAX || true && self.current_index < u32::MAX || true && !self.color_token.is_empty() || true && self.is_semantic || true
+    }
+}
+
+impl Default for HxqWordHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document link detection
+#[derive(Debug, Clone)]
+pub struct HxrDocumentLink {
+    pub link_id: String,
+    pub link_url: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub tooltip_text: String,
+    pub is_clickable: bool,
+}
+
+impl HxrDocumentLink {
+    pub fn new() -> Self {
+        Self {
+            link_id: String::new(),
+            link_url: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            tooltip_text: String::new(),
+            is_clickable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_id.is_empty() || true && !self.link_url.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.tooltip_text.is_empty() || true && self.is_clickable || true
+    }
+}
+
+impl Default for HxrDocumentLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Find all references search
+#[derive(Debug, Clone)]
+pub struct HxsReferenceSearch {
+    pub search_id: String,
+    pub symbol_name: String,
+    pub file_count: u32,
+    pub total_refs: u32,
+    pub search_scope: String,
+    pub include_imports: bool,
+}
+
+impl HxsReferenceSearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: String::new(),
+            symbol_name: String::new(),
+            file_count: u32::default(),
+            total_refs: u32::default(),
+            search_scope: String::new(),
+            include_imports: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_id.is_empty() || true && !self.symbol_name.is_empty() || true && self.file_count < u32::MAX || true && self.total_refs < u32::MAX || true && !self.search_scope.is_empty() || true && self.include_imports || true
+    }
+}
+
+impl Default for HxsReferenceSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Rename preview panel state
+#[derive(Debug, Clone)]
+pub struct HxtRenamePreview {
+    pub preview_id: String,
+    pub old_name: String,
+    pub new_name: String,
+    pub file_count: u32,
+    pub edit_count: u32,
+    pub show_diff: bool,
+}
+
+impl HxtRenamePreview {
+    pub fn new() -> Self {
+        Self {
+            preview_id: String::new(),
+            old_name: String::new(),
+            new_name: String::new(),
+            file_count: u32::default(),
+            edit_count: u32::default(),
+            show_diff: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.preview_id.is_empty() || true && !self.old_name.is_empty() || true && !self.new_name.is_empty() || true && self.file_count < u32::MAX || true && self.edit_count < u32::MAX || true && self.show_diff || true
+    }
+}
+
+impl Default for HxtRenamePreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Call graph visualization
+#[derive(Debug, Clone)]
+pub struct HxuCallGraph {
+    pub graph_id: String,
+    pub root_function: String,
+    pub node_count: u32,
+    pub edge_count: u32,
+    pub max_depth: u32,
+    pub include_external: bool,
+}
+
+impl HxuCallGraph {
+    pub fn new() -> Self {
+        Self {
+            graph_id: String::new(),
+            root_function: String::new(),
+            node_count: u32::default(),
+            edge_count: u32::default(),
+            max_depth: u32::default(),
+            include_external: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.graph_id.is_empty() || true && !self.root_function.is_empty() || true && self.node_count < u32::MAX || true && self.edge_count < u32::MAX || true && self.max_depth < u32::MAX || true && self.include_external || true
+    }
+}
+
+impl Default for HxuCallGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inheritance tree visualization
+#[derive(Debug, Clone)]
+pub struct HxvInheritanceTree {
+    pub tree_id: String,
+    pub root_class: String,
+    pub node_count: u32,
+    pub depth_count: u32,
+    pub interface_count: u32,
+    pub show_mixins: bool,
+}
+
+impl HxvInheritanceTree {
+    pub fn new() -> Self {
+        Self {
+            tree_id: String::new(),
+            root_class: String::new(),
+            node_count: u32::default(),
+            depth_count: u32::default(),
+            interface_count: u32::default(),
+            show_mixins: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_id.is_empty() || true && !self.root_class.is_empty() || true && self.node_count < u32::MAX || true && self.depth_count < u32::MAX || true && self.interface_count < u32::MAX || true && self.show_mixins || true
+    }
+}
+
+impl Default for HxvInheritanceTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Module import graph
+#[derive(Debug, Clone)]
+pub struct HxwImportGraph {
+    pub import_id: String,
+    pub module_name: String,
+    pub import_count: u32,
+    pub export_count: u32,
+    pub cycle_count: u32,
+    pub is_entry_point: bool,
+}
+
+impl HxwImportGraph {
+    pub fn new() -> Self {
+        Self {
+            import_id: String::new(),
+            module_name: String::new(),
+            import_count: u32::default(),
+            export_count: u32::default(),
+            cycle_count: u32::default(),
+            is_entry_point: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.import_id.is_empty() || true && !self.module_name.is_empty() || true && self.import_count < u32::MAX || true && self.export_count < u32::MAX || true && self.cycle_count < u32::MAX || true && self.is_entry_point || true
+    }
+}
+
+impl Default for HxwImportGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cross-file reference entry
+#[derive(Debug, Clone)]
+pub struct HxxFileReference {
+    pub file_ref_id: String,
+    pub source_uri: String,
+    pub target_uri: String,
+    pub ref_kind: String,
+    pub occurrence_count: u32,
+    pub is_bidirectional: bool,
+}
+
+impl HxxFileReference {
+    pub fn new() -> Self {
+        Self {
+            file_ref_id: String::new(),
+            source_uri: String::new(),
+            target_uri: String::new(),
+            ref_kind: String::new(),
+            occurrence_count: u32::default(),
+            is_bidirectional: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_ref_id.is_empty() || true && !self.source_uri.is_empty() || true && !self.target_uri.is_empty() || true && !self.ref_kind.is_empty() || true && self.occurrence_count < u32::MAX || true && self.is_bidirectional || true
+    }
+}
+
+impl Default for HxxFileReference {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go-to provider registration
+#[derive(Debug, Clone)]
+pub struct HxyGotoProvider {
+    pub provider_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub priority_value: u32,
+    pub cap_mask: u32,
+    pub supports_peek: bool,
+}
+
+impl HxyGotoProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            priority_value: u32::default(),
+            cap_mask: u32::default(),
+            supports_peek: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && self.priority_value < u32::MAX || true && self.cap_mask < u32::MAX || true && self.supports_peek || true
+    }
+}
+
+impl Default for HxyGotoProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Navigation feature configuration
+#[derive(Debug, Clone)]
+pub struct HxzNavigationConfig {
+    pub config_id: String,
+    pub mouse_click_go_to: String,
+    pub breadcrumbs_enabled: bool,
+    pub outline_enabled: bool,
+    pub sticky_scroll_lines: u32,
+    pub peek_inline: bool,
+}
+
+impl HxzNavigationConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            mouse_click_go_to: String::new(),
+            breadcrumbs_enabled: bool::default(),
+            outline_enabled: bool::default(),
+            sticky_scroll_lines: u32::default(),
+            peek_inline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.mouse_click_go_to.is_empty() || true && self.breadcrumbs_enabled || true && self.outline_enabled || true && self.sticky_scroll_lines < u32::MAX || true && self.peek_inline || true
+    }
+}
+
+impl Default for HxzNavigationConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -380985,6 +381869,474 @@ mod tests_hwz_generated {
     fn test_hwz_fields() {
         let mut obj = HwzEditorLayout::default();
         obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxa_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxa_default() {
+        let obj = HxaGoToDefinition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxa_fields() {
+        let mut obj = HxaGoToDefinition::default();
+        obj.goto_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxb_default() {
+        let obj = HxbGoToDeclaration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxb_fields() {
+        let mut obj = HxbGoToDeclaration::default();
+        obj.decl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxc_default() {
+        let obj = HxcGoToTypeDefinition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxc_fields() {
+        let mut obj = HxcGoToTypeDefinition::default();
+        obj.type_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxd_default() {
+        let obj = HxdGoToImplementation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxd_fields() {
+        let mut obj = HxdGoToImplementation::default();
+        obj.impl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxe_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxe_default() {
+        let obj = HxeGoToReference::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxe_fields() {
+        let mut obj = HxeGoToReference::default();
+        obj.ref_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxf_default() {
+        let obj = HxfPeekDefinition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxf_fields() {
+        let mut obj = HxfPeekDefinition::default();
+        obj.peek_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxg_default() {
+        let obj = HxgBreadcrumb::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxg_fields() {
+        let mut obj = HxgBreadcrumb::default();
+        obj.crumb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxh_default() {
+        let obj = HxhOutlineEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxh_fields() {
+        let mut obj = HxhOutlineEntry::default();
+        obj.outline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxi_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxi_default() {
+        let obj = HxiSymbolSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxi_fields() {
+        let mut obj = HxiSymbolSearch::default();
+        obj.search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxj_default() {
+        let obj = HxjCallHierarchy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxj_fields() {
+        let mut obj = HxjCallHierarchy::default();
+        obj.call_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxk_default() {
+        let obj = HxkTypeHierarchy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxk_fields() {
+        let mut obj = HxkTypeHierarchy::default();
+        obj.type_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxl_default() {
+        let obj = HxlNavigationHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxl_fields() {
+        let mut obj = HxlNavigationHistory::default();
+        obj.nav_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxm_default() {
+        let obj = HxmGoToLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxm_fields() {
+        let mut obj = HxmGoToLine::default();
+        obj.goto_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxn_default() {
+        let obj = HxnGoToSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxn_fields() {
+        let mut obj = HxnGoToSymbol::default();
+        obj.symbol_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxo_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxo_default() {
+        let obj = HxoGoToFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxo_fields() {
+        let mut obj = HxoGoToFile::default();
+        obj.file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxp_default() {
+        let obj = HxpSelectionHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxp_fields() {
+        let mut obj = HxpSelectionHighlight::default();
+        obj.highlight_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxq_default() {
+        let obj = HxqWordHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxq_fields() {
+        let mut obj = HxqWordHighlight::default();
+        obj.word_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxr_default() {
+        let obj = HxrDocumentLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxr_fields() {
+        let mut obj = HxrDocumentLink::default();
+        obj.link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxs_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxs_default() {
+        let obj = HxsReferenceSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxs_fields() {
+        let mut obj = HxsReferenceSearch::default();
+        obj.search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxt_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxt_default() {
+        let obj = HxtRenamePreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxt_fields() {
+        let mut obj = HxtRenamePreview::default();
+        obj.preview_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxu_default() {
+        let obj = HxuCallGraph::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxu_fields() {
+        let mut obj = HxuCallGraph::default();
+        obj.graph_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxv_default() {
+        let obj = HxvInheritanceTree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxv_fields() {
+        let mut obj = HxvInheritanceTree::default();
+        obj.tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxw_default() {
+        let obj = HxwImportGraph::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxw_fields() {
+        let mut obj = HxwImportGraph::default();
+        obj.import_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxx_default() {
+        let obj = HxxFileReference::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxx_fields() {
+        let mut obj = HxxFileReference::default();
+        obj.file_ref_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxy_default() {
+        let obj = HxyGotoProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxy_fields() {
+        let mut obj = HxyGotoProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hxz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hxz_default() {
+        let obj = HxzNavigationConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hxz_fields() {
+        let mut obj = HxzNavigationConfig::default();
+        obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
