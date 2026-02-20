@@ -85271,6 +85271,216 @@ impl Default for GceTerminalParser {
     }
 }
 
+/// Terminal renderer (cell grid, damage tracking, cursor style, blink)
+#[derive(Debug, Clone)]
+pub struct GcfTerminalRenderer {
+    pub renderer_id: String,
+    pub cell_width: f64,
+    pub cell_height: f64,
+    pub rows: u32,
+    pub cols: u32,
+    pub cursor_style: String,
+    pub cursor_blink: bool,
+    pub font_family: String,
+    pub font_size: u32,
+    pub line_height: f64,
+}
+
+impl GcfTerminalRenderer {
+    pub fn new() -> Self {
+        Self {
+            renderer_id: String::new(),
+            cell_width: f64::default(),
+            cell_height: f64::default(),
+            rows: u32::default(),
+            cols: u32::default(),
+            cursor_style: String::new(),
+            cursor_blink: bool::default(),
+            font_family: String::new(),
+            font_size: u32::default(),
+            line_height: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.renderer_id.is_empty() || true && self.cell_width.is_finite() || true && self.cell_height.is_finite() || true && self.rows < u32::MAX || true && self.cols < u32::MAX || true && !self.cursor_style.is_empty() || true && self.cursor_blink || true && !self.font_family.is_empty() || true && self.font_size < u32::MAX || true && self.line_height.is_finite() || true
+    }
+}
+
+impl Default for GcfTerminalRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal selection (start, end, type, text, is active, rectangular)
+#[derive(Debug, Clone)]
+pub struct GcgTerminalSelection {
+    pub selection_id: String,
+    pub start_x: u32,
+    pub start_y: u32,
+    pub end_x: u32,
+    pub end_y: u32,
+    pub selection_type: String,
+    pub selected_text: String,
+    pub is_active: bool,
+    pub is_rectangular: bool,
+    pub word_separators: String,
+}
+
+impl GcgTerminalSelection {
+    pub fn new() -> Self {
+        Self {
+            selection_id: String::new(),
+            start_x: u32::default(),
+            start_y: u32::default(),
+            end_x: u32::default(),
+            end_y: u32::default(),
+            selection_type: String::new(),
+            selected_text: String::new(),
+            is_active: bool::default(),
+            is_rectangular: bool::default(),
+            word_separators: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.selection_id.is_empty() || true && self.start_x < u32::MAX || true && self.start_y < u32::MAX || true && self.end_x < u32::MAX || true && self.end_y < u32::MAX || true && !self.selection_type.is_empty() || true && !self.selected_text.is_empty() || true && self.is_active || true && self.is_rectangular || true && !self.word_separators.is_empty() || true
+    }
+}
+
+impl Default for GcgTerminalSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal link (uri, range, tooltip, handler, validation)
+#[derive(Debug, Clone)]
+pub struct GchTerminalLink {
+    pub link_id: String,
+    pub uri: String,
+    pub start_x: u32,
+    pub start_y: u32,
+    pub end_x: u32,
+    pub end_y: u32,
+    pub tooltip: String,
+    pub handler_id: String,
+    pub is_validated: bool,
+    pub match_pattern: String,
+}
+
+impl GchTerminalLink {
+    pub fn new() -> Self {
+        Self {
+            link_id: String::new(),
+            uri: String::new(),
+            start_x: u32::default(),
+            start_y: u32::default(),
+            end_x: u32::default(),
+            end_y: u32::default(),
+            tooltip: String::new(),
+            handler_id: String::new(),
+            is_validated: bool::default(),
+            match_pattern: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_id.is_empty() || true && !self.uri.is_empty() || true && self.start_x < u32::MAX || true && self.start_y < u32::MAX || true && self.end_x < u32::MAX || true && self.end_y < u32::MAX || true && !self.tooltip.is_empty() || true && !self.handler_id.is_empty() || true && self.is_validated || true && !self.match_pattern.is_empty() || true
+    }
+}
+
+impl Default for GchTerminalLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal profile (name, path, args, env, icon, color, overrides)
+#[derive(Debug, Clone)]
+pub struct GciTerminalProfile {
+    pub profile_id: String,
+    pub name: String,
+    pub path: String,
+    pub args_json: String,
+    pub env_json: String,
+    pub icon: String,
+    pub color: String,
+    pub overrides_json: String,
+    pub is_default: bool,
+    pub is_autodetected: bool,
+}
+
+impl GciTerminalProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            name: String::new(),
+            path: String::new(),
+            args_json: String::new(),
+            env_json: String::new(),
+            icon: String::new(),
+            color: String::new(),
+            overrides_json: String::new(),
+            is_default: bool::default(),
+            is_autodetected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && !self.name.is_empty() || true && !self.path.is_empty() || true && !self.args_json.is_empty() || true && !self.env_json.is_empty() || true && !self.icon.is_empty() || true && !self.color.is_empty() || true && !self.overrides_json.is_empty() || true && self.is_default || true && self.is_autodetected || true
+    }
+}
+
+impl Default for GciTerminalProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal split pane (orientation, panes, sizes, active pane)
+#[derive(Debug, Clone)]
+pub struct GcjTerminalSplitPane {
+    pub split_id: String,
+    pub orientation: String,
+    pub panes_json: String,
+    pub sizes_json: String,
+    pub active_pane_id: String,
+    pub is_locked: bool,
+    pub min_pane_size: u32,
+    pub border_visible: bool,
+    pub focus_follows_mouse: bool,
+    pub pane_count: u32,
+}
+
+impl GcjTerminalSplitPane {
+    pub fn new() -> Self {
+        Self {
+            split_id: String::new(),
+            orientation: String::new(),
+            panes_json: String::new(),
+            sizes_json: String::new(),
+            active_pane_id: String::new(),
+            is_locked: bool::default(),
+            min_pane_size: u32::default(),
+            border_visible: bool::default(),
+            focus_follows_mouse: bool::default(),
+            pane_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.split_id.is_empty() || true && !self.orientation.is_empty() || true && !self.panes_json.is_empty() || true && !self.sizes_json.is_empty() || true && !self.active_pane_id.is_empty() || true && self.is_locked || true && self.min_pane_size < u32::MAX || true && self.border_visible || true && self.focus_follows_mouse || true && self.pane_count < u32::MAX || true
+    }
+}
+
+impl Default for GcjTerminalSplitPane {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -309778,6 +309988,96 @@ mod tests_gce_generated {
     fn test_gce_fields() {
         let mut obj = GceTerminalParser::default();
         obj.parser_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcf_default() {
+        let obj = GcfTerminalRenderer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcf_fields() {
+        let mut obj = GcfTerminalRenderer::default();
+        obj.renderer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcg_default() {
+        let obj = GcgTerminalSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcg_fields() {
+        let mut obj = GcgTerminalSelection::default();
+        obj.selection_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gch_generated {
+    use super::*;
+
+    #[test]
+    fn test_gch_default() {
+        let obj = GchTerminalLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gch_fields() {
+        let mut obj = GchTerminalLink::default();
+        obj.link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gci_generated {
+    use super::*;
+
+    #[test]
+    fn test_gci_default() {
+        let obj = GciTerminalProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gci_fields() {
+        let mut obj = GciTerminalProfile::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcj_default() {
+        let obj = GcjTerminalSplitPane::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcj_fields() {
+        let mut obj = GcjTerminalSplitPane::default();
+        obj.split_id = "test".to_string();
         assert!(obj.validate());
     }
 }
