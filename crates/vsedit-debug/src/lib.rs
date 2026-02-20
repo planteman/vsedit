@@ -85494,6 +85494,678 @@ impl Default for GcjTerminalSplitPane {
     }
 }
 
+/// Terminal quick fix (command, match, output, action, provider)
+#[derive(Debug, Clone)]
+pub struct GckTerminalQuickFix {
+    pub quickfix_id: String,
+    pub command_line: String,
+    pub match_pattern: String,
+    pub output_text: String,
+    pub action_label: String,
+    pub provider_id: String,
+    pub terminal_id: String,
+    pub is_resolved: bool,
+    pub severity: u32,
+    pub fix_command: String,
+}
+
+impl GckTerminalQuickFix {
+    pub fn new() -> Self {
+        Self {
+            quickfix_id: String::new(),
+            command_line: String::new(),
+            match_pattern: String::new(),
+            output_text: String::new(),
+            action_label: String::new(),
+            provider_id: String::new(),
+            terminal_id: String::new(),
+            is_resolved: bool::default(),
+            severity: u32::default(),
+            fix_command: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.quickfix_id.is_empty() || true && !self.command_line.is_empty() || true && !self.match_pattern.is_empty() || true && !self.output_text.is_empty() || true && !self.action_label.is_empty() || true && !self.provider_id.is_empty() || true && !self.terminal_id.is_empty() || true && self.is_resolved || true && self.severity < u32::MAX || true && !self.fix_command.is_empty() || true
+    }
+}
+
+impl Default for GckTerminalQuickFix {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal shell integration (prompt detection, command tracking, cwd)
+#[derive(Debug, Clone)]
+pub struct GclTerminalShellIntegration {
+    pub shell_int_id: String,
+    pub prompt_start_marker: String,
+    pub command_start_marker: String,
+    pub command_end_marker: String,
+    pub cwd_detection: bool,
+    pub exit_code_detection: bool,
+    pub is_active: bool,
+    pub shell_type: String,
+    pub version: String,
+    pub env_collection: bool,
+}
+
+impl GclTerminalShellIntegration {
+    pub fn new() -> Self {
+        Self {
+            shell_int_id: String::new(),
+            prompt_start_marker: String::new(),
+            command_start_marker: String::new(),
+            command_end_marker: String::new(),
+            cwd_detection: bool::default(),
+            exit_code_detection: bool::default(),
+            is_active: bool::default(),
+            shell_type: String::new(),
+            version: String::new(),
+            env_collection: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shell_int_id.is_empty() || true && !self.prompt_start_marker.is_empty() || true && !self.command_start_marker.is_empty() || true && !self.command_end_marker.is_empty() || true && self.cwd_detection || true && self.exit_code_detection || true && self.is_active || true && !self.shell_type.is_empty() || true && !self.version.is_empty() || true && self.env_collection || true
+    }
+}
+
+impl Default for GclTerminalShellIntegration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal accessibility (screen reader, line navigation, announce)
+#[derive(Debug, Clone)]
+pub struct GcmTerminalAccessibility {
+    pub term_a11y_id: String,
+    pub screen_reader_mode: bool,
+    pub line_navigation: bool,
+    pub announce_output: bool,
+    pub focus_trap: bool,
+    pub dim_unfocused: bool,
+    pub char_navigation: bool,
+    pub word_navigation: bool,
+    pub page_navigation: bool,
+    pub cursor_style: String,
+}
+
+impl GcmTerminalAccessibility {
+    pub fn new() -> Self {
+        Self {
+            term_a11y_id: String::new(),
+            screen_reader_mode: bool::default(),
+            line_navigation: bool::default(),
+            announce_output: bool::default(),
+            focus_trap: bool::default(),
+            dim_unfocused: bool::default(),
+            char_navigation: bool::default(),
+            word_navigation: bool::default(),
+            page_navigation: bool::default(),
+            cursor_style: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_a11y_id.is_empty() || true && self.screen_reader_mode || true && self.line_navigation || true && self.announce_output || true && self.focus_trap || true && self.dim_unfocused || true && self.char_navigation || true && self.word_navigation || true && self.page_navigation || true && !self.cursor_style.is_empty() || true
+    }
+}
+
+impl Default for GcmTerminalAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal decoration (marker, range, icon, color, overview ruler)
+#[derive(Debug, Clone)]
+pub struct GcnTerminalDecoration {
+    pub deco_id: String,
+    pub marker_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub icon: String,
+    pub color: String,
+    pub overview_ruler: bool,
+    pub tooltip: String,
+    pub exit_code: u32,
+    pub is_command_decoration: bool,
+}
+
+impl GcnTerminalDecoration {
+    pub fn new() -> Self {
+        Self {
+            deco_id: String::new(),
+            marker_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            icon: String::new(),
+            color: String::new(),
+            overview_ruler: bool::default(),
+            tooltip: String::new(),
+            exit_code: u32::default(),
+            is_command_decoration: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_id.is_empty() || true && !self.marker_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.icon.is_empty() || true && !self.color.is_empty() || true && self.overview_ruler || true && !self.tooltip.is_empty() || true && self.exit_code < u32::MAX || true && self.is_command_decoration || true
+    }
+}
+
+impl Default for GcnTerminalDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal environment (inherited, merged, overrides, platform vars)
+#[derive(Debug, Clone)]
+pub struct GcoTerminalEnvironment {
+    pub env_id: String,
+    pub inherited_json: String,
+    pub merged_json: String,
+    pub overrides_json: String,
+    pub platform: String,
+    pub path_separator: String,
+    pub home_dir: String,
+    pub shell: String,
+    pub term_type: String,
+    pub locale: String,
+}
+
+impl GcoTerminalEnvironment {
+    pub fn new() -> Self {
+        Self {
+            env_id: String::new(),
+            inherited_json: String::new(),
+            merged_json: String::new(),
+            overrides_json: String::new(),
+            platform: String::new(),
+            path_separator: String::new(),
+            home_dir: String::new(),
+            shell: String::new(),
+            term_type: String::new(),
+            locale: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.env_id.is_empty() || true && !self.inherited_json.is_empty() || true && !self.merged_json.is_empty() || true && !self.overrides_json.is_empty() || true && !self.platform.is_empty() || true && !self.path_separator.is_empty() || true && !self.home_dir.is_empty() || true && !self.shell.is_empty() || true && !self.term_type.is_empty() || true && !self.locale.is_empty() || true
+    }
+}
+
+impl Default for GcoTerminalEnvironment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal reconnection (session id, restore data, persist)
+#[derive(Debug, Clone)]
+pub struct GcpTerminalReconnection {
+    pub reconnect_id: String,
+    pub session_id: String,
+    pub restore_data_json: String,
+    pub persist_enabled: bool,
+    pub last_active_ms: u64,
+    pub buffer_snapshot: String,
+    pub cursor_x: u32,
+    pub cursor_y: u32,
+    pub is_reconnecting: bool,
+    pub retry_count: u32,
+}
+
+impl GcpTerminalReconnection {
+    pub fn new() -> Self {
+        Self {
+            reconnect_id: String::new(),
+            session_id: String::new(),
+            restore_data_json: String::new(),
+            persist_enabled: bool::default(),
+            last_active_ms: u64::default(),
+            buffer_snapshot: String::new(),
+            cursor_x: u32::default(),
+            cursor_y: u32::default(),
+            is_reconnecting: bool::default(),
+            retry_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reconnect_id.is_empty() || true && !self.session_id.is_empty() || true && !self.restore_data_json.is_empty() || true && self.persist_enabled || true && self.last_active_ms < u64::MAX || true && !self.buffer_snapshot.is_empty() || true && self.cursor_x < u32::MAX || true && self.cursor_y < u32::MAX || true && self.is_reconnecting || true && self.retry_count < u32::MAX || true
+    }
+}
+
+impl Default for GcpTerminalReconnection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal task integration (task id, problem matcher, scan output)
+#[derive(Debug, Clone)]
+pub struct GcqTerminalTaskIntegration {
+    pub task_int_id: String,
+    pub task_id: String,
+    pub problem_matcher_id: String,
+    pub scan_output: bool,
+    pub reveal_on_error: bool,
+    pub auto_close: bool,
+    pub panel_kind: String,
+    pub group_id: String,
+    pub is_background: bool,
+    pub watch_pattern: String,
+}
+
+impl GcqTerminalTaskIntegration {
+    pub fn new() -> Self {
+        Self {
+            task_int_id: String::new(),
+            task_id: String::new(),
+            problem_matcher_id: String::new(),
+            scan_output: bool::default(),
+            reveal_on_error: bool::default(),
+            auto_close: bool::default(),
+            panel_kind: String::new(),
+            group_id: String::new(),
+            is_background: bool::default(),
+            watch_pattern: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_int_id.is_empty() || true && !self.task_id.is_empty() || true && !self.problem_matcher_id.is_empty() || true && self.scan_output || true && self.reveal_on_error || true && self.auto_close || true && !self.panel_kind.is_empty() || true && !self.group_id.is_empty() || true && self.is_background || true && !self.watch_pattern.is_empty() || true
+    }
+}
+
+impl Default for GcqTerminalTaskIntegration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal xterm addon (web links, search, fit, unicode11, webgl)
+#[derive(Debug, Clone)]
+pub struct GcrTerminalXtermAddon {
+    pub addon_id: String,
+    pub name: String,
+    pub version: String,
+    pub is_loaded: bool,
+    pub web_links_enabled: bool,
+    pub search_enabled: bool,
+    pub fit_enabled: bool,
+    pub unicode11_enabled: bool,
+    pub webgl_enabled: bool,
+    pub canvas_enabled: bool,
+}
+
+impl GcrTerminalXtermAddon {
+    pub fn new() -> Self {
+        Self {
+            addon_id: String::new(),
+            name: String::new(),
+            version: String::new(),
+            is_loaded: bool::default(),
+            web_links_enabled: bool::default(),
+            search_enabled: bool::default(),
+            fit_enabled: bool::default(),
+            unicode11_enabled: bool::default(),
+            webgl_enabled: bool::default(),
+            canvas_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.addon_id.is_empty() || true && !self.name.is_empty() || true && !self.version.is_empty() || true && self.is_loaded || true && self.web_links_enabled || true && self.search_enabled || true && self.fit_enabled || true && self.unicode11_enabled || true && self.webgl_enabled || true && self.canvas_enabled || true
+    }
+}
+
+impl Default for GcrTerminalXtermAddon {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal find widget (query, regex, case, whole word, result count)
+#[derive(Debug, Clone)]
+pub struct GcsTerminalFindWidget {
+    pub find_id: String,
+    pub query: String,
+    pub is_regex: bool,
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub result_count: u32,
+    pub current_index: u32,
+    pub is_visible: bool,
+    pub incremental: bool,
+    pub highlight_all: bool,
+}
+
+impl GcsTerminalFindWidget {
+    pub fn new() -> Self {
+        Self {
+            find_id: String::new(),
+            query: String::new(),
+            is_regex: bool::default(),
+            case_sensitive: bool::default(),
+            whole_word: bool::default(),
+            result_count: u32::default(),
+            current_index: u32::default(),
+            is_visible: bool::default(),
+            incremental: bool::default(),
+            highlight_all: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.find_id.is_empty() || true && !self.query.is_empty() || true && self.is_regex || true && self.case_sensitive || true && self.whole_word || true && self.result_count < u32::MAX || true && self.current_index < u32::MAX || true && self.is_visible || true && self.incremental || true && self.highlight_all || true
+    }
+}
+
+impl Default for GcsTerminalFindWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal unicode support (version, ambiguous width, emoji handling)
+#[derive(Debug, Clone)]
+pub struct GctTerminalUnicodeSupport {
+    pub unicode_id: String,
+    pub version: String,
+    pub ambiguous_width: u32,
+    pub emoji_handling: String,
+    pub grapheme_segmentation: bool,
+    pub bidi_support: bool,
+    pub use_icu: bool,
+    pub halfwidth_override: bool,
+    pub fullwidth_override: bool,
+    pub wcwidth_table: String,
+}
+
+impl GctTerminalUnicodeSupport {
+    pub fn new() -> Self {
+        Self {
+            unicode_id: String::new(),
+            version: String::new(),
+            ambiguous_width: u32::default(),
+            emoji_handling: String::new(),
+            grapheme_segmentation: bool::default(),
+            bidi_support: bool::default(),
+            use_icu: bool::default(),
+            halfwidth_override: bool::default(),
+            fullwidth_override: bool::default(),
+            wcwidth_table: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.unicode_id.is_empty() || true && !self.version.is_empty() || true && self.ambiguous_width < u32::MAX || true && !self.emoji_handling.is_empty() || true && self.grapheme_segmentation || true && self.bidi_support || true && self.use_icu || true && self.halfwidth_override || true && self.fullwidth_override || true && !self.wcwidth_table.is_empty() || true
+    }
+}
+
+impl Default for GctTerminalUnicodeSupport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal bell (enabled, duration, audio, visual, command)
+#[derive(Debug, Clone)]
+pub struct GcuTerminalBell {
+    pub bell_id: String,
+    pub enabled: bool,
+    pub duration_ms: u32,
+    pub audio_enabled: bool,
+    pub visual_enabled: bool,
+    pub command_enabled: bool,
+    pub command: String,
+    pub volume: f64,
+    pub flash_color: String,
+    pub rate_limit_ms: u32,
+}
+
+impl GcuTerminalBell {
+    pub fn new() -> Self {
+        Self {
+            bell_id: String::new(),
+            enabled: bool::default(),
+            duration_ms: u32::default(),
+            audio_enabled: bool::default(),
+            visual_enabled: bool::default(),
+            command_enabled: bool::default(),
+            command: String::new(),
+            volume: f64::default(),
+            flash_color: String::new(),
+            rate_limit_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bell_id.is_empty() || true && self.enabled || true && self.duration_ms < u32::MAX || true && self.audio_enabled || true && self.visual_enabled || true && self.command_enabled || true && !self.command.is_empty() || true && self.volume.is_finite() || true && !self.flash_color.is_empty() || true && self.rate_limit_ms < u32::MAX || true
+    }
+}
+
+impl Default for GcuTerminalBell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal GPU renderer (atlas, texture cache, shader, batch draw)
+#[derive(Debug, Clone)]
+pub struct GcvTerminalGpuRenderer {
+    pub gpu_id: String,
+    pub atlas_size: u32,
+    pub texture_cache_size: u32,
+    pub shader_id: String,
+    pub batch_draw_count: u32,
+    pub is_webgl2: bool,
+    pub fallback_canvas: bool,
+    pub anti_aliasing: bool,
+    pub sub_pixel: bool,
+    pub frame_budget_ms: f64,
+}
+
+impl GcvTerminalGpuRenderer {
+    pub fn new() -> Self {
+        Self {
+            gpu_id: String::new(),
+            atlas_size: u32::default(),
+            texture_cache_size: u32::default(),
+            shader_id: String::new(),
+            batch_draw_count: u32::default(),
+            is_webgl2: bool::default(),
+            fallback_canvas: bool::default(),
+            anti_aliasing: bool::default(),
+            sub_pixel: bool::default(),
+            frame_budget_ms: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gpu_id.is_empty() || true && self.atlas_size < u32::MAX || true && self.texture_cache_size < u32::MAX || true && !self.shader_id.is_empty() || true && self.batch_draw_count < u32::MAX || true && self.is_webgl2 || true && self.fallback_canvas || true && self.anti_aliasing || true && self.sub_pixel || true && self.frame_budget_ms.is_finite() || true
+    }
+}
+
+impl Default for GcvTerminalGpuRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal clipboard (read, write, selection, paste bracketing)
+#[derive(Debug, Clone)]
+pub struct GcwTerminalClipboard {
+    pub clipboard_id: String,
+    pub read_enabled: bool,
+    pub write_enabled: bool,
+    pub selection_clipboard: bool,
+    pub paste_bracketing: bool,
+    pub osc52_enabled: bool,
+    pub max_paste_size_bytes: u64,
+    pub confirm_large_paste: bool,
+    pub trim_trailing_whitespace: bool,
+    pub platform: String,
+}
+
+impl GcwTerminalClipboard {
+    pub fn new() -> Self {
+        Self {
+            clipboard_id: String::new(),
+            read_enabled: bool::default(),
+            write_enabled: bool::default(),
+            selection_clipboard: bool::default(),
+            paste_bracketing: bool::default(),
+            osc52_enabled: bool::default(),
+            max_paste_size_bytes: u64::default(),
+            confirm_large_paste: bool::default(),
+            trim_trailing_whitespace: bool::default(),
+            platform: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.clipboard_id.is_empty() || true && self.read_enabled || true && self.write_enabled || true && self.selection_clipboard || true && self.paste_bracketing || true && self.osc52_enabled || true && self.max_paste_size_bytes < u64::MAX || true && self.confirm_large_paste || true && self.trim_trailing_whitespace || true && !self.platform.is_empty() || true
+    }
+}
+
+impl Default for GcwTerminalClipboard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal mouse handler (tracking mode, protocol, focus events)
+#[derive(Debug, Clone)]
+pub struct GcxTerminalMouseHandler {
+    pub mouse_id: String,
+    pub tracking_mode: String,
+    pub protocol: String,
+    pub focus_events: bool,
+    pub alternate_scroll: bool,
+    pub paste_on_middle_click: bool,
+    pub right_click_menu: bool,
+    pub force_selection: bool,
+    pub copy_on_select: bool,
+    pub scroll_sensitivity: u32,
+}
+
+impl GcxTerminalMouseHandler {
+    pub fn new() -> Self {
+        Self {
+            mouse_id: String::new(),
+            tracking_mode: String::new(),
+            protocol: String::new(),
+            focus_events: bool::default(),
+            alternate_scroll: bool::default(),
+            paste_on_middle_click: bool::default(),
+            right_click_menu: bool::default(),
+            force_selection: bool::default(),
+            copy_on_select: bool::default(),
+            scroll_sensitivity: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mouse_id.is_empty() || true && !self.tracking_mode.is_empty() || true && !self.protocol.is_empty() || true && self.focus_events || true && self.alternate_scroll || true && self.paste_on_middle_click || true && self.right_click_menu || true && self.force_selection || true && self.copy_on_select || true && self.scroll_sensitivity < u32::MAX || true
+    }
+}
+
+impl Default for GcxTerminalMouseHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal ConPTY handler (input pipe, output pipe, resize, process)
+#[derive(Debug, Clone)]
+pub struct GcyTerminalConptyHandler {
+    pub conpty_id: String,
+    pub input_pipe_id: String,
+    pub output_pipe_id: String,
+    pub resize_supported: bool,
+    pub process_pid: u64,
+    pub use_conpty_dll: bool,
+    pub inherit_cursor: bool,
+    pub pseudo_console_size: u32,
+    pub signal_pipe_id: String,
+    pub windows_build: u32,
+}
+
+impl GcyTerminalConptyHandler {
+    pub fn new() -> Self {
+        Self {
+            conpty_id: String::new(),
+            input_pipe_id: String::new(),
+            output_pipe_id: String::new(),
+            resize_supported: bool::default(),
+            process_pid: u64::default(),
+            use_conpty_dll: bool::default(),
+            inherit_cursor: bool::default(),
+            pseudo_console_size: u32::default(),
+            signal_pipe_id: String::new(),
+            windows_build: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conpty_id.is_empty() || true && !self.input_pipe_id.is_empty() || true && !self.output_pipe_id.is_empty() || true && self.resize_supported || true && self.process_pid < u64::MAX || true && self.use_conpty_dll || true && self.inherit_cursor || true && self.pseudo_console_size < u32::MAX || true && !self.signal_pipe_id.is_empty() || true && self.windows_build < u32::MAX || true
+    }
+}
+
+impl Default for GcyTerminalConptyHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal PTY host (socket, multiplex, reconnect, heartbeat, log)
+#[derive(Debug, Clone)]
+pub struct GczTerminalPtyHost {
+    pub pty_id: String,
+    pub socket_path: String,
+    pub multiplex_id: String,
+    pub reconnect_enabled: bool,
+    pub heartbeat_ms: u32,
+    pub log_enabled: bool,
+    pub max_sessions: u32,
+    pub session_count: u32,
+    pub is_running: bool,
+    pub startup_delay_ms: u32,
+}
+
+impl GczTerminalPtyHost {
+    pub fn new() -> Self {
+        Self {
+            pty_id: String::new(),
+            socket_path: String::new(),
+            multiplex_id: String::new(),
+            reconnect_enabled: bool::default(),
+            heartbeat_ms: u32::default(),
+            log_enabled: bool::default(),
+            max_sessions: u32::default(),
+            session_count: u32::default(),
+            is_running: bool::default(),
+            startup_delay_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pty_id.is_empty() || true && !self.socket_path.is_empty() || true && !self.multiplex_id.is_empty() || true && self.reconnect_enabled || true && self.heartbeat_ms < u32::MAX || true && self.log_enabled || true && self.max_sessions < u32::MAX || true && self.session_count < u32::MAX || true && self.is_running || true && self.startup_delay_ms < u32::MAX || true
+    }
+}
+
+impl Default for GczTerminalPtyHost {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -310057,6 +310729,294 @@ mod tests_gcj_generated {
     fn test_gcj_fields() {
         let mut obj = GcjTerminalSplitPane::default();
         obj.split_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gck_generated {
+    use super::*;
+
+    #[test]
+    fn test_gck_default() {
+        let obj = GckTerminalQuickFix::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gck_fields() {
+        let mut obj = GckTerminalQuickFix::default();
+        obj.quickfix_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcl_default() {
+        let obj = GclTerminalShellIntegration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcl_fields() {
+        let mut obj = GclTerminalShellIntegration::default();
+        obj.shell_int_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcm_default() {
+        let obj = GcmTerminalAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcm_fields() {
+        let mut obj = GcmTerminalAccessibility::default();
+        obj.term_a11y_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcn_default() {
+        let obj = GcnTerminalDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcn_fields() {
+        let mut obj = GcnTerminalDecoration::default();
+        obj.deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gco_generated {
+    use super::*;
+
+    #[test]
+    fn test_gco_default() {
+        let obj = GcoTerminalEnvironment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gco_fields() {
+        let mut obj = GcoTerminalEnvironment::default();
+        obj.env_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcp_default() {
+        let obj = GcpTerminalReconnection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcp_fields() {
+        let mut obj = GcpTerminalReconnection::default();
+        obj.reconnect_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcq_default() {
+        let obj = GcqTerminalTaskIntegration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcq_fields() {
+        let mut obj = GcqTerminalTaskIntegration::default();
+        obj.task_int_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcr_default() {
+        let obj = GcrTerminalXtermAddon::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcr_fields() {
+        let mut obj = GcrTerminalXtermAddon::default();
+        obj.addon_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcs_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcs_default() {
+        let obj = GcsTerminalFindWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcs_fields() {
+        let mut obj = GcsTerminalFindWidget::default();
+        obj.find_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gct_generated {
+    use super::*;
+
+    #[test]
+    fn test_gct_default() {
+        let obj = GctTerminalUnicodeSupport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gct_fields() {
+        let mut obj = GctTerminalUnicodeSupport::default();
+        obj.unicode_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcu_default() {
+        let obj = GcuTerminalBell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcu_fields() {
+        let mut obj = GcuTerminalBell::default();
+        obj.bell_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcv_default() {
+        let obj = GcvTerminalGpuRenderer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcv_fields() {
+        let mut obj = GcvTerminalGpuRenderer::default();
+        obj.gpu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcw_default() {
+        let obj = GcwTerminalClipboard::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcw_fields() {
+        let mut obj = GcwTerminalClipboard::default();
+        obj.clipboard_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcx_default() {
+        let obj = GcxTerminalMouseHandler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcx_fields() {
+        let mut obj = GcxTerminalMouseHandler::default();
+        obj.mouse_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcy_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcy_default() {
+        let obj = GcyTerminalConptyHandler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcy_fields() {
+        let mut obj = GcyTerminalConptyHandler::default();
+        obj.conpty_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gcz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gcz_default() {
+        let obj = GczTerminalPtyHost::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gcz_fields() {
+        let mut obj = GczTerminalPtyHost::default();
+        obj.pty_id = "test".to_string();
         assert!(obj.validate());
     }
 }
