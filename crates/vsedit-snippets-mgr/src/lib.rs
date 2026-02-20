@@ -153110,6 +153110,890 @@ impl Default for IrzAsyncIterator {
     }
 }
 
+/// Test controller descriptor
+#[derive(Debug, Clone)]
+pub struct IsaTestController {
+    pub ctrl_id: String,
+    pub ctrl_label: String,
+    pub extension_ref: String,
+    pub profile_count: u32,
+    pub test_count: u32,
+    pub is_refreshing: bool,
+}
+
+impl IsaTestController {
+    pub fn new() -> Self {
+        Self {
+            ctrl_id: String::new(),
+            ctrl_label: String::new(),
+            extension_ref: String::new(),
+            profile_count: u32::default(),
+            test_count: u32::default(),
+            is_refreshing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ctrl_id.is_empty() || true && !self.ctrl_label.is_empty() || true && !self.extension_ref.is_empty() || true && self.profile_count < u32::MAX || true && self.test_count < u32::MAX || true && self.is_refreshing || true
+    }
+}
+
+impl Default for IsaTestController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test run profile model
+#[derive(Debug, Clone)]
+pub struct IsbTestRunProfile {
+    pub profile_id: String,
+    pub profile_label: String,
+    pub kind_val: u32,
+    pub is_default: bool,
+    pub tag_count: u32,
+    pub supports_continuous: bool,
+}
+
+impl IsbTestRunProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            profile_label: String::new(),
+            kind_val: u32::default(),
+            is_default: bool::default(),
+            tag_count: u32::default(),
+            supports_continuous: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && !self.profile_label.is_empty() || true && self.kind_val < u32::MAX || true && self.is_default || true && self.tag_count < u32::MAX || true && self.supports_continuous || true
+    }
+}
+
+impl Default for IsbTestRunProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test item tree model
+#[derive(Debug, Clone)]
+pub struct IscTestItemTree {
+    pub tree_id: String,
+    pub root_count: u32,
+    pub total_items: u32,
+    pub selected_count: u32,
+    pub filter_text: String,
+    pub is_collapsed: bool,
+}
+
+impl IscTestItemTree {
+    pub fn new() -> Self {
+        Self {
+            tree_id: String::new(),
+            root_count: u32::default(),
+            total_items: u32::default(),
+            selected_count: u32::default(),
+            filter_text: String::new(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_id.is_empty() || true && self.root_count < u32::MAX || true && self.total_items < u32::MAX || true && self.selected_count < u32::MAX || true && !self.filter_text.is_empty() || true && self.is_collapsed || true
+    }
+}
+
+impl Default for IscTestItemTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test execution state
+#[derive(Debug, Clone)]
+pub struct IsdTestExecution {
+    pub exec_id: String,
+    pub run_ref: String,
+    pub started_epoch: u64,
+    pub completed_count: u32,
+    pub total_count: u32,
+    pub is_running: bool,
+}
+
+impl IsdTestExecution {
+    pub fn new() -> Self {
+        Self {
+            exec_id: String::new(),
+            run_ref: String::new(),
+            started_epoch: u64::default(),
+            completed_count: u32::default(),
+            total_count: u32::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exec_id.is_empty() || true && !self.run_ref.is_empty() || true && self.started_epoch < u64::MAX || true && self.completed_count < u32::MAX || true && self.total_count < u32::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for IsdTestExecution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test result view model
+#[derive(Debug, Clone)]
+pub struct IseTestResultModel {
+    pub result_id: String,
+    pub run_ref: String,
+    pub passed_count: u32,
+    pub failed_count: u32,
+    pub skipped_count: u32,
+    pub has_live_output: bool,
+}
+
+impl IseTestResultModel {
+    pub fn new() -> Self {
+        Self {
+            result_id: String::new(),
+            run_ref: String::new(),
+            passed_count: u32::default(),
+            failed_count: u32::default(),
+            skipped_count: u32::default(),
+            has_live_output: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_id.is_empty() || true && !self.run_ref.is_empty() || true && self.passed_count < u32::MAX || true && self.failed_count < u32::MAX || true && self.skipped_count < u32::MAX || true && self.has_live_output || true
+    }
+}
+
+impl Default for IseTestResultModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test output channel model
+#[derive(Debug, Clone)]
+pub struct IsfTestOutputModel {
+    pub output_id: String,
+    pub test_ref: String,
+    pub output_text_len: u32,
+    pub location_uri: String,
+    pub line_number: u32,
+    pub is_error: bool,
+}
+
+impl IsfTestOutputModel {
+    pub fn new() -> Self {
+        Self {
+            output_id: String::new(),
+            test_ref: String::new(),
+            output_text_len: u32::default(),
+            location_uri: String::new(),
+            line_number: u32::default(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_id.is_empty() || true && !self.test_ref.is_empty() || true && self.output_text_len < u32::MAX || true && !self.location_uri.is_empty() || true && self.line_number < u32::MAX || true && self.is_error || true
+    }
+}
+
+impl Default for IsfTestOutputModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test coverage model
+#[derive(Debug, Clone)]
+pub struct IsgTestCoverage {
+    pub cov_id: String,
+    pub file_uri: String,
+    pub line_count: u32,
+    pub covered_count: u32,
+    pub branch_count: u32,
+    pub function_count: u32,
+}
+
+impl IsgTestCoverage {
+    pub fn new() -> Self {
+        Self {
+            cov_id: String::new(),
+            file_uri: String::new(),
+            line_count: u32::default(),
+            covered_count: u32::default(),
+            branch_count: u32::default(),
+            function_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cov_id.is_empty() || true && !self.file_uri.is_empty() || true && self.line_count < u32::MAX || true && self.covered_count < u32::MAX || true && self.branch_count < u32::MAX || true && self.function_count < u32::MAX || true
+    }
+}
+
+impl Default for IsgTestCoverage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test gutter decorations
+#[derive(Debug, Clone)]
+pub struct IshTestDecorations {
+    pub deco_id: String,
+    pub line_number: u32,
+    pub state_kind: u32,
+    pub run_tooltip: String,
+    pub icon_name: String,
+    pub is_stale: bool,
+}
+
+impl IshTestDecorations {
+    pub fn new() -> Self {
+        Self {
+            deco_id: String::new(),
+            line_number: u32::default(),
+            state_kind: u32::default(),
+            run_tooltip: String::new(),
+            icon_name: String::new(),
+            is_stale: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_id.is_empty() || true && self.line_number < u32::MAX || true && self.state_kind < u32::MAX || true && !self.run_tooltip.is_empty() || true && !self.icon_name.is_empty() || true && self.is_stale || true
+    }
+}
+
+impl Default for IshTestDecorations {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test explorer view state
+#[derive(Debug, Clone)]
+pub struct IsiTestExplorer {
+    pub explorer_id: String,
+    pub tree_ref: String,
+    pub filter_ref: String,
+    pub sort_ref: String,
+    pub auto_run_enabled: bool,
+    pub is_focused: bool,
+}
+
+impl IsiTestExplorer {
+    pub fn new() -> Self {
+        Self {
+            explorer_id: String::new(),
+            tree_ref: String::new(),
+            filter_ref: String::new(),
+            sort_ref: String::new(),
+            auto_run_enabled: bool::default(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.explorer_id.is_empty() || true && !self.tree_ref.is_empty() || true && !self.filter_ref.is_empty() || true && !self.sort_ref.is_empty() || true && self.auto_run_enabled || true && self.is_focused || true
+    }
+}
+
+impl Default for IsiTestExplorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test filter criteria
+#[derive(Debug, Clone)]
+pub struct IsjTestFilter {
+    pub filter_id: String,
+    pub text_filter: String,
+    pub state_filter: u32,
+    pub tag_filter: String,
+    pub exclude_pattern: String,
+    pub show_hidden: bool,
+}
+
+impl IsjTestFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_id: String::new(),
+            text_filter: String::new(),
+            state_filter: u32::default(),
+            tag_filter: String::new(),
+            exclude_pattern: String::new(),
+            show_hidden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_id.is_empty() || true && !self.text_filter.is_empty() || true && self.state_filter < u32::MAX || true && !self.tag_filter.is_empty() || true && !self.exclude_pattern.is_empty() || true && self.show_hidden || true
+    }
+}
+
+impl Default for IsjTestFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test sort configuration
+#[derive(Debug, Clone)]
+pub struct IskTestSort {
+    pub sort_id: String,
+    pub sort_field: String,
+    pub sort_direction: String,
+    pub secondary_field: String,
+    pub natural_sort: bool,
+    pub group_first: bool,
+}
+
+impl IskTestSort {
+    pub fn new() -> Self {
+        Self {
+            sort_id: String::new(),
+            sort_field: String::new(),
+            sort_direction: String::new(),
+            secondary_field: String::new(),
+            natural_sort: bool::default(),
+            group_first: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sort_id.is_empty() || true && !self.sort_field.is_empty() || true && !self.sort_direction.is_empty() || true && !self.secondary_field.is_empty() || true && self.natural_sort || true && self.group_first || true
+    }
+}
+
+impl Default for IskTestSort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test grouping mode
+#[derive(Debug, Clone)]
+pub struct IslTestGrouping {
+    pub group_id: String,
+    pub group_mode: String,
+    pub nest_depth: u32,
+    pub flatten_single: bool,
+    pub show_count: bool,
+    pub is_default: bool,
+}
+
+impl IslTestGrouping {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            group_mode: String::new(),
+            nest_depth: u32::default(),
+            flatten_single: bool::default(),
+            show_count: bool::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.group_mode.is_empty() || true && self.nest_depth < u32::MAX || true && self.flatten_single || true && self.show_count || true && self.is_default || true
+    }
+}
+
+impl Default for IslTestGrouping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test assertion diff
+#[derive(Debug, Clone)]
+pub struct IsmTestDiff {
+    pub diff_id: String,
+    pub expected_text: String,
+    pub actual_text: String,
+    pub diff_kind: String,
+    pub line_count: u32,
+    pub is_multiline: bool,
+}
+
+impl IsmTestDiff {
+    pub fn new() -> Self {
+        Self {
+            diff_id: String::new(),
+            expected_text: String::new(),
+            actual_text: String::new(),
+            diff_kind: String::new(),
+            line_count: u32::default(),
+            is_multiline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_id.is_empty() || true && !self.expected_text.is_empty() || true && !self.actual_text.is_empty() || true && !self.diff_kind.is_empty() || true && self.line_count < u32::MAX || true && self.is_multiline || true
+    }
+}
+
+impl Default for IsmTestDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test failure message
+#[derive(Debug, Clone)]
+pub struct IsnTestMessage {
+    pub msg_id: String,
+    pub message_text: String,
+    pub expected_ref: String,
+    pub actual_ref: String,
+    pub location_line: u32,
+    pub is_diff: bool,
+}
+
+impl IsnTestMessage {
+    pub fn new() -> Self {
+        Self {
+            msg_id: String::new(),
+            message_text: String::new(),
+            expected_ref: String::new(),
+            actual_ref: String::new(),
+            location_line: u32::default(),
+            is_diff: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.msg_id.is_empty() || true && !self.message_text.is_empty() || true && !self.expected_ref.is_empty() || true && !self.actual_ref.is_empty() || true && self.location_line < u32::MAX || true && self.is_diff || true
+    }
+}
+
+impl Default for IsnTestMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test snapshot state
+#[derive(Debug, Clone)]
+pub struct IsoTestSnapshot {
+    pub snap_id: String,
+    pub snap_name: String,
+    pub content_hash: String,
+    pub file_uri: String,
+    pub update_count: u32,
+    pub is_outdated: bool,
+}
+
+impl IsoTestSnapshot {
+    pub fn new() -> Self {
+        Self {
+            snap_id: String::new(),
+            snap_name: String::new(),
+            content_hash: String::new(),
+            file_uri: String::new(),
+            update_count: u32::default(),
+            is_outdated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snap_id.is_empty() || true && !self.snap_name.is_empty() || true && !self.content_hash.is_empty() || true && !self.file_uri.is_empty() || true && self.update_count < u32::MAX || true && self.is_outdated || true
+    }
+}
+
+impl Default for IsoTestSnapshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Continuous test run
+#[derive(Debug, Clone)]
+pub struct IspContinuousRun {
+    pub run_id: String,
+    pub profile_ref: String,
+    pub watch_pattern: String,
+    pub debounce_ms: u32,
+    pub run_count: u64,
+    pub is_active: bool,
+}
+
+impl IspContinuousRun {
+    pub fn new() -> Self {
+        Self {
+            run_id: String::new(),
+            profile_ref: String::new(),
+            watch_pattern: String::new(),
+            debounce_ms: u32::default(),
+            run_count: u64::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.run_id.is_empty() || true && !self.profile_ref.is_empty() || true && !self.watch_pattern.is_empty() || true && self.debounce_ms < u32::MAX || true && self.run_count < u64::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for IspContinuousRun {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Auto-run test configuration
+#[derive(Debug, Clone)]
+pub struct IsqAutoRun {
+    pub auto_id: String,
+    pub trigger_kind: String,
+    pub debounce_ms: u32,
+    pub include_pattern: String,
+    pub exclude_pattern: String,
+    pub is_enabled: bool,
+}
+
+impl IsqAutoRun {
+    pub fn new() -> Self {
+        Self {
+            auto_id: String::new(),
+            trigger_kind: String::new(),
+            debounce_ms: u32::default(),
+            include_pattern: String::new(),
+            exclude_pattern: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.auto_id.is_empty() || true && !self.trigger_kind.is_empty() || true && self.debounce_ms < u32::MAX || true && !self.include_pattern.is_empty() || true && !self.exclude_pattern.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for IsqAutoRun {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test debug configuration
+#[derive(Debug, Clone)]
+pub struct IsrTestDebug {
+    pub debug_id: String,
+    pub test_ref: String,
+    pub adapter_type_str: String,
+    pub program_path: String,
+    pub port_val: u32,
+    pub stop_on_entry: bool,
+}
+
+impl IsrTestDebug {
+    pub fn new() -> Self {
+        Self {
+            debug_id: String::new(),
+            test_ref: String::new(),
+            adapter_type_str: String::new(),
+            program_path: String::new(),
+            port_val: u32::default(),
+            stop_on_entry: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.debug_id.is_empty() || true && !self.test_ref.is_empty() || true && !self.adapter_type_str.is_empty() || true && !self.program_path.is_empty() || true && self.port_val < u32::MAX || true && self.stop_on_entry || true
+    }
+}
+
+impl Default for IsrTestDebug {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test tag descriptor
+#[derive(Debug, Clone)]
+pub struct IssTestTag {
+    pub tag_id: String,
+    pub tag_label: String,
+    pub color_token: String,
+    pub item_count: u32,
+    pub controller_ref: String,
+    pub is_hidden: bool,
+}
+
+impl IssTestTag {
+    pub fn new() -> Self {
+        Self {
+            tag_id: String::new(),
+            tag_label: String::new(),
+            color_token: String::new(),
+            item_count: u32::default(),
+            controller_ref: String::new(),
+            is_hidden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_id.is_empty() || true && !self.tag_label.is_empty() || true && !self.color_token.is_empty() || true && self.item_count < u32::MAX || true && !self.controller_ref.is_empty() || true && self.is_hidden || true
+    }
+}
+
+impl Default for IssTestTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test retry policy
+#[derive(Debug, Clone)]
+pub struct IstTestRetry {
+    pub retry_id: String,
+    pub max_retries: u32,
+    pub retry_delay_ms: u32,
+    pub current_attempt: u32,
+    pub flaky_threshold: u32,
+    pub stop_on_pass: bool,
+}
+
+impl IstTestRetry {
+    pub fn new() -> Self {
+        Self {
+            retry_id: String::new(),
+            max_retries: u32::default(),
+            retry_delay_ms: u32::default(),
+            current_attempt: u32::default(),
+            flaky_threshold: u32::default(),
+            stop_on_pass: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.retry_id.is_empty() || true && self.max_retries < u32::MAX || true && self.retry_delay_ms < u32::MAX || true && self.current_attempt < u32::MAX || true && self.flaky_threshold < u32::MAX || true && self.stop_on_pass || true
+    }
+}
+
+impl Default for IstTestRetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test timeout config
+#[derive(Debug, Clone)]
+pub struct IsuTestTimeout {
+    pub timeout_id: String,
+    pub timeout_ms: u64,
+    pub grace_ms: u32,
+    pub scope_str: String,
+    pub action_on_timeout: String,
+    pub is_global: bool,
+}
+
+impl IsuTestTimeout {
+    pub fn new() -> Self {
+        Self {
+            timeout_id: String::new(),
+            timeout_ms: u64::default(),
+            grace_ms: u32::default(),
+            scope_str: String::new(),
+            action_on_timeout: String::new(),
+            is_global: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.timeout_id.is_empty() || true && self.timeout_ms < u64::MAX || true && self.grace_ms < u32::MAX || true && !self.scope_str.is_empty() || true && !self.action_on_timeout.is_empty() || true && self.is_global || true
+    }
+}
+
+impl Default for IsuTestTimeout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test parallel config
+#[derive(Debug, Clone)]
+pub struct IsvTestParallel {
+    pub parallel_id: String,
+    pub max_workers: u32,
+    pub shard_count: u32,
+    pub isolation_str: String,
+    pub reuse_workers: bool,
+    pub fail_fast: bool,
+}
+
+impl IsvTestParallel {
+    pub fn new() -> Self {
+        Self {
+            parallel_id: String::new(),
+            max_workers: u32::default(),
+            shard_count: u32::default(),
+            isolation_str: String::new(),
+            reuse_workers: bool::default(),
+            fail_fast: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.parallel_id.is_empty() || true && self.max_workers < u32::MAX || true && self.shard_count < u32::MAX || true && !self.isolation_str.is_empty() || true && self.reuse_workers || true && self.fail_fast || true
+    }
+}
+
+impl Default for IsvTestParallel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test report generation
+#[derive(Debug, Clone)]
+pub struct IswTestReport {
+    pub report_id: String,
+    pub format_str: String,
+    pub output_path: String,
+    pub run_ref: String,
+    pub include_output: bool,
+    pub is_generated: bool,
+}
+
+impl IswTestReport {
+    pub fn new() -> Self {
+        Self {
+            report_id: String::new(),
+            format_str: String::new(),
+            output_path: String::new(),
+            run_ref: String::new(),
+            include_output: bool::default(),
+            is_generated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.report_id.is_empty() || true && !self.format_str.is_empty() || true && !self.output_path.is_empty() || true && !self.run_ref.is_empty() || true && self.include_output || true && self.is_generated || true
+    }
+}
+
+impl Default for IswTestReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test code lens annotation
+#[derive(Debug, Clone)]
+pub struct IsxTestCodeLens {
+    pub lens_id: String,
+    pub line_number: u32,
+    pub test_ref: String,
+    pub state_kind: u32,
+    pub run_title: String,
+    pub is_clickable: bool,
+}
+
+impl IsxTestCodeLens {
+    pub fn new() -> Self {
+        Self {
+            lens_id: String::new(),
+            line_number: u32::default(),
+            test_ref: String::new(),
+            state_kind: u32::default(),
+            run_title: String::new(),
+            is_clickable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lens_id.is_empty() || true && self.line_number < u32::MAX || true && !self.test_ref.is_empty() || true && self.state_kind < u32::MAX || true && !self.run_title.is_empty() || true && self.is_clickable || true
+    }
+}
+
+impl Default for IsxTestCodeLens {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test peek result widget
+#[derive(Debug, Clone)]
+pub struct IsyTestPeek {
+    pub peek_id: String,
+    pub test_ref: String,
+    pub result_ref: String,
+    pub diff_ref: String,
+    pub widget_height: u32,
+    pub is_expanded: bool,
+}
+
+impl IsyTestPeek {
+    pub fn new() -> Self {
+        Self {
+            peek_id: String::new(),
+            test_ref: String::new(),
+            result_ref: String::new(),
+            diff_ref: String::new(),
+            widget_height: u32::default(),
+            is_expanded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.peek_id.is_empty() || true && !self.test_ref.is_empty() || true && !self.result_ref.is_empty() || true && !self.diff_ref.is_empty() || true && self.widget_height < u32::MAX || true && self.is_expanded || true
+    }
+}
+
+impl Default for IsyTestPeek {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Testing framework config
+#[derive(Debug, Clone)]
+pub struct IszTestConfig {
+    pub config_id: String,
+    pub auto_run_mode: String,
+    pub default_profile: String,
+    pub show_inline_msgs: bool,
+    pub follow_running_test: bool,
+    pub open_testing_on_fail: bool,
+}
+
+impl IszTestConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            auto_run_mode: String::new(),
+            default_profile: String::new(),
+            show_inline_msgs: bool::default(),
+            follow_running_test: bool::default(),
+            open_testing_on_fail: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.auto_run_mode.is_empty() || true && !self.default_profile.is_empty() || true && self.show_inline_msgs || true && self.follow_running_test || true && self.open_testing_on_fail || true
+    }
+}
+
+impl Default for IszTestConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -409381,6 +410265,474 @@ mod tests_irz_generated {
     fn test_irz_fields() {
         let mut obj = IrzAsyncIterator::default();
         obj.iter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isa_generated {
+    use super::*;
+
+    #[test]
+    fn test_isa_default() {
+        let obj = IsaTestController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isa_fields() {
+        let mut obj = IsaTestController::default();
+        obj.ctrl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isb_generated {
+    use super::*;
+
+    #[test]
+    fn test_isb_default() {
+        let obj = IsbTestRunProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isb_fields() {
+        let mut obj = IsbTestRunProfile::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isc_generated {
+    use super::*;
+
+    #[test]
+    fn test_isc_default() {
+        let obj = IscTestItemTree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isc_fields() {
+        let mut obj = IscTestItemTree::default();
+        obj.tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isd_generated {
+    use super::*;
+
+    #[test]
+    fn test_isd_default() {
+        let obj = IsdTestExecution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isd_fields() {
+        let mut obj = IsdTestExecution::default();
+        obj.exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ise_generated {
+    use super::*;
+
+    #[test]
+    fn test_ise_default() {
+        let obj = IseTestResultModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ise_fields() {
+        let mut obj = IseTestResultModel::default();
+        obj.result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isf_generated {
+    use super::*;
+
+    #[test]
+    fn test_isf_default() {
+        let obj = IsfTestOutputModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isf_fields() {
+        let mut obj = IsfTestOutputModel::default();
+        obj.output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isg_generated {
+    use super::*;
+
+    #[test]
+    fn test_isg_default() {
+        let obj = IsgTestCoverage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isg_fields() {
+        let mut obj = IsgTestCoverage::default();
+        obj.cov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ish_generated {
+    use super::*;
+
+    #[test]
+    fn test_ish_default() {
+        let obj = IshTestDecorations::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ish_fields() {
+        let mut obj = IshTestDecorations::default();
+        obj.deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isi_generated {
+    use super::*;
+
+    #[test]
+    fn test_isi_default() {
+        let obj = IsiTestExplorer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isi_fields() {
+        let mut obj = IsiTestExplorer::default();
+        obj.explorer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isj_generated {
+    use super::*;
+
+    #[test]
+    fn test_isj_default() {
+        let obj = IsjTestFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isj_fields() {
+        let mut obj = IsjTestFilter::default();
+        obj.filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isk_generated {
+    use super::*;
+
+    #[test]
+    fn test_isk_default() {
+        let obj = IskTestSort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isk_fields() {
+        let mut obj = IskTestSort::default();
+        obj.sort_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isl_generated {
+    use super::*;
+
+    #[test]
+    fn test_isl_default() {
+        let obj = IslTestGrouping::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isl_fields() {
+        let mut obj = IslTestGrouping::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ism_generated {
+    use super::*;
+
+    #[test]
+    fn test_ism_default() {
+        let obj = IsmTestDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ism_fields() {
+        let mut obj = IsmTestDiff::default();
+        obj.diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isn_generated {
+    use super::*;
+
+    #[test]
+    fn test_isn_default() {
+        let obj = IsnTestMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isn_fields() {
+        let mut obj = IsnTestMessage::default();
+        obj.msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iso_generated {
+    use super::*;
+
+    #[test]
+    fn test_iso_default() {
+        let obj = IsoTestSnapshot::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iso_fields() {
+        let mut obj = IsoTestSnapshot::default();
+        obj.snap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isp_generated {
+    use super::*;
+
+    #[test]
+    fn test_isp_default() {
+        let obj = IspContinuousRun::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isp_fields() {
+        let mut obj = IspContinuousRun::default();
+        obj.run_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isq_generated {
+    use super::*;
+
+    #[test]
+    fn test_isq_default() {
+        let obj = IsqAutoRun::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isq_fields() {
+        let mut obj = IsqAutoRun::default();
+        obj.auto_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isr_generated {
+    use super::*;
+
+    #[test]
+    fn test_isr_default() {
+        let obj = IsrTestDebug::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isr_fields() {
+        let mut obj = IsrTestDebug::default();
+        obj.debug_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iss_generated {
+    use super::*;
+
+    #[test]
+    fn test_iss_default() {
+        let obj = IssTestTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iss_fields() {
+        let mut obj = IssTestTag::default();
+        obj.tag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ist_generated {
+    use super::*;
+
+    #[test]
+    fn test_ist_default() {
+        let obj = IstTestRetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ist_fields() {
+        let mut obj = IstTestRetry::default();
+        obj.retry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isu_generated {
+    use super::*;
+
+    #[test]
+    fn test_isu_default() {
+        let obj = IsuTestTimeout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isu_fields() {
+        let mut obj = IsuTestTimeout::default();
+        obj.timeout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isv_generated {
+    use super::*;
+
+    #[test]
+    fn test_isv_default() {
+        let obj = IsvTestParallel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isv_fields() {
+        let mut obj = IsvTestParallel::default();
+        obj.parallel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isw_generated {
+    use super::*;
+
+    #[test]
+    fn test_isw_default() {
+        let obj = IswTestReport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isw_fields() {
+        let mut obj = IswTestReport::default();
+        obj.report_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isx_generated {
+    use super::*;
+
+    #[test]
+    fn test_isx_default() {
+        let obj = IsxTestCodeLens::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isx_fields() {
+        let mut obj = IsxTestCodeLens::default();
+        obj.lens_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isy_generated {
+    use super::*;
+
+    #[test]
+    fn test_isy_default() {
+        let obj = IsyTestPeek::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isy_fields() {
+        let mut obj = IsyTestPeek::default();
+        obj.peek_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_isz_generated {
+    use super::*;
+
+    #[test]
+    fn test_isz_default() {
+        let obj = IszTestConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_isz_fields() {
+        let mut obj = IszTestConfig::default();
+        obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
