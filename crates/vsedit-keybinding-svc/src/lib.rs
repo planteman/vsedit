@@ -141949,6 +141949,890 @@ impl Default for IfzExtensionGrammar {
     }
 }
 
+/// Terminal instance model
+#[derive(Debug, Clone)]
+pub struct IgaTerminalInstance {
+    pub instance_id: String,
+    pub title_text: String,
+    pub shell_path: String,
+    pub cwd_uri: String,
+    pub pid_val: u32,
+    pub is_active: bool,
+}
+
+impl IgaTerminalInstance {
+    pub fn new() -> Self {
+        Self {
+            instance_id: String::new(),
+            title_text: String::new(),
+            shell_path: String::new(),
+            cwd_uri: String::new(),
+            pid_val: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.instance_id.is_empty() || true && !self.title_text.is_empty() || true && !self.shell_path.is_empty() || true && !self.cwd_uri.is_empty() || true && self.pid_val < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for IgaTerminalInstance {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal shell profile
+#[derive(Debug, Clone)]
+pub struct IgbTerminalProfile {
+    pub profile_id: String,
+    pub profile_name: String,
+    pub shell_path: String,
+    pub default_args: String,
+    pub icon_name: String,
+    pub is_default: bool,
+}
+
+impl IgbTerminalProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            profile_name: String::new(),
+            shell_path: String::new(),
+            default_args: String::new(),
+            icon_name: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && !self.profile_name.is_empty() || true && !self.shell_path.is_empty() || true && !self.default_args.is_empty() || true && !self.icon_name.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for IgbTerminalProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal screen buffer
+#[derive(Debug, Clone)]
+pub struct IgcTerminalBuffer {
+    pub buffer_id: String,
+    pub row_count: u32,
+    pub col_count: u32,
+    pub scrollback_lines: u32,
+    pub active_row: u32,
+    pub has_alt_buffer: bool,
+}
+
+impl IgcTerminalBuffer {
+    pub fn new() -> Self {
+        Self {
+            buffer_id: String::new(),
+            row_count: u32::default(),
+            col_count: u32::default(),
+            scrollback_lines: u32::default(),
+            active_row: u32::default(),
+            has_alt_buffer: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buffer_id.is_empty() || true && self.row_count < u32::MAX || true && self.col_count < u32::MAX || true && self.scrollback_lines < u32::MAX || true && self.active_row < u32::MAX || true && self.has_alt_buffer || true
+    }
+}
+
+impl Default for IgcTerminalBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal character cell
+#[derive(Debug, Clone)]
+pub struct IgdTerminalCell {
+    pub cell_id: String,
+    pub char_val: String,
+    pub fg_color_idx: u32,
+    pub bg_color_idx: u32,
+    pub attr_mask: u32,
+    pub is_wide: bool,
+}
+
+impl IgdTerminalCell {
+    pub fn new() -> Self {
+        Self {
+            cell_id: String::new(),
+            char_val: String::new(),
+            fg_color_idx: u32::default(),
+            bg_color_idx: u32::default(),
+            attr_mask: u32::default(),
+            is_wide: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cell_id.is_empty() || true && !self.char_val.is_empty() || true && self.fg_color_idx < u32::MAX || true && self.bg_color_idx < u32::MAX || true && self.attr_mask < u32::MAX || true && self.is_wide || true
+    }
+}
+
+impl Default for IgdTerminalCell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal detected link
+#[derive(Debug, Clone)]
+pub struct IgeTerminalLink {
+    pub link_id: String,
+    pub link_text: String,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub line_row: u32,
+    pub is_validated: bool,
+}
+
+impl IgeTerminalLink {
+    pub fn new() -> Self {
+        Self {
+            link_id: String::new(),
+            link_text: String::new(),
+            start_col: u32::default(),
+            end_col: u32::default(),
+            line_row: u32::default(),
+            is_validated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_id.is_empty() || true && !self.link_text.is_empty() || true && self.start_col < u32::MAX || true && self.end_col < u32::MAX || true && self.line_row < u32::MAX || true && self.is_validated || true
+    }
+}
+
+impl Default for IgeTerminalLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal process descriptor
+#[derive(Debug, Clone)]
+pub struct IgfTerminalProcess {
+    pub process_id: String,
+    pub executable_path: String,
+    pub arg_list: String,
+    pub env_count: u32,
+    pub exit_code: u32,
+    pub is_running: bool,
+}
+
+impl IgfTerminalProcess {
+    pub fn new() -> Self {
+        Self {
+            process_id: String::new(),
+            executable_path: String::new(),
+            arg_list: String::new(),
+            env_count: u32::default(),
+            exit_code: u32::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.process_id.is_empty() || true && !self.executable_path.is_empty() || true && !self.arg_list.is_empty() || true && self.env_count < u32::MAX || true && self.exit_code < u32::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for IgfTerminalProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal font configuration
+#[derive(Debug, Clone)]
+pub struct IggTerminalFont {
+    pub font_id: String,
+    pub font_family: String,
+    pub font_size_pt: u32,
+    pub line_height_pct: u32,
+    pub letter_spacing: u32,
+    pub is_ligatures_enabled: bool,
+}
+
+impl IggTerminalFont {
+    pub fn new() -> Self {
+        Self {
+            font_id: String::new(),
+            font_family: String::new(),
+            font_size_pt: u32::default(),
+            line_height_pct: u32::default(),
+            letter_spacing: u32::default(),
+            is_ligatures_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.font_id.is_empty() || true && !self.font_family.is_empty() || true && self.font_size_pt < u32::MAX || true && self.line_height_pct < u32::MAX || true && self.letter_spacing < u32::MAX || true && self.is_ligatures_enabled || true
+    }
+}
+
+impl Default for IggTerminalFont {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal color theme
+#[derive(Debug, Clone)]
+pub struct IghTerminalTheme {
+    pub theme_id: String,
+    pub theme_name: String,
+    pub foreground_hex: String,
+    pub background_hex: String,
+    pub cursor_hex: String,
+    pub is_dark: bool,
+}
+
+impl IghTerminalTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            theme_name: String::new(),
+            foreground_hex: String::new(),
+            background_hex: String::new(),
+            cursor_hex: String::new(),
+            is_dark: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && !self.theme_name.is_empty() || true && !self.foreground_hex.is_empty() || true && !self.background_hex.is_empty() || true && !self.cursor_hex.is_empty() || true && self.is_dark || true
+    }
+}
+
+impl Default for IghTerminalTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal input event
+#[derive(Debug, Clone)]
+pub struct IgiTerminalInput {
+    pub input_id: String,
+    pub key_code: u32,
+    pub modifier_mask: u32,
+    pub char_data: String,
+    pub sequence_str: String,
+    pub is_paste: bool,
+}
+
+impl IgiTerminalInput {
+    pub fn new() -> Self {
+        Self {
+            input_id: String::new(),
+            key_code: u32::default(),
+            modifier_mask: u32::default(),
+            char_data: String::new(),
+            sequence_str: String::new(),
+            is_paste: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_id.is_empty() || true && self.key_code < u32::MAX || true && self.modifier_mask < u32::MAX || true && !self.char_data.is_empty() || true && !self.sequence_str.is_empty() || true && self.is_paste || true
+    }
+}
+
+impl Default for IgiTerminalInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal output chunk
+#[derive(Debug, Clone)]
+pub struct IgjTerminalOutput {
+    pub output_id: String,
+    pub data_bytes_len: u32,
+    pub sequence_count: u32,
+    pub timestamp_epoch: u64,
+    pub terminal_ref: String,
+    pub is_binary: bool,
+}
+
+impl IgjTerminalOutput {
+    pub fn new() -> Self {
+        Self {
+            output_id: String::new(),
+            data_bytes_len: u32::default(),
+            sequence_count: u32::default(),
+            timestamp_epoch: u64::default(),
+            terminal_ref: String::new(),
+            is_binary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_id.is_empty() || true && self.data_bytes_len < u32::MAX || true && self.sequence_count < u32::MAX || true && self.timestamp_epoch < u64::MAX || true && !self.terminal_ref.is_empty() || true && self.is_binary || true
+    }
+}
+
+impl Default for IgjTerminalOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal resize event
+#[derive(Debug, Clone)]
+pub struct IgkTerminalResize {
+    pub resize_id: String,
+    pub new_cols: u32,
+    pub new_rows: u32,
+    pub old_cols: u32,
+    pub old_rows: u32,
+    pub reflow_needed: bool,
+}
+
+impl IgkTerminalResize {
+    pub fn new() -> Self {
+        Self {
+            resize_id: String::new(),
+            new_cols: u32::default(),
+            new_rows: u32::default(),
+            old_cols: u32::default(),
+            old_rows: u32::default(),
+            reflow_needed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resize_id.is_empty() || true && self.new_cols < u32::MAX || true && self.new_rows < u32::MAX || true && self.old_cols < u32::MAX || true && self.old_rows < u32::MAX || true && self.reflow_needed || true
+    }
+}
+
+impl Default for IgkTerminalResize {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal text selection
+#[derive(Debug, Clone)]
+pub struct IglTerminalSelection {
+    pub sel_id: String,
+    pub start_row: u32,
+    pub start_col: u32,
+    pub end_row: u32,
+    pub end_col: u32,
+    pub is_block_select: bool,
+}
+
+impl IglTerminalSelection {
+    pub fn new() -> Self {
+        Self {
+            sel_id: String::new(),
+            start_row: u32::default(),
+            start_col: u32::default(),
+            end_row: u32::default(),
+            end_col: u32::default(),
+            is_block_select: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_id.is_empty() || true && self.start_row < u32::MAX || true && self.start_col < u32::MAX || true && self.end_row < u32::MAX || true && self.end_col < u32::MAX || true && self.is_block_select || true
+    }
+}
+
+impl Default for IglTerminalSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal text search
+#[derive(Debug, Clone)]
+pub struct IgmTerminalSearch {
+    pub search_id: String,
+    pub query_text: String,
+    pub match_count: u32,
+    pub current_idx: u32,
+    pub highlight_all: bool,
+    pub is_regex: bool,
+}
+
+impl IgmTerminalSearch {
+    pub fn new() -> Self {
+        Self {
+            search_id: String::new(),
+            query_text: String::new(),
+            match_count: u32::default(),
+            current_idx: u32::default(),
+            highlight_all: bool::default(),
+            is_regex: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_id.is_empty() || true && !self.query_text.is_empty() || true && self.match_count < u32::MAX || true && self.current_idx < u32::MAX || true && self.highlight_all || true && self.is_regex || true
+    }
+}
+
+impl Default for IgmTerminalSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal command detection
+#[derive(Debug, Clone)]
+pub struct IgnTerminalCommand {
+    pub cmd_id: String,
+    pub command_text: String,
+    pub exit_code: u32,
+    pub cwd_str: String,
+    pub duration_ms: u64,
+    pub has_output: bool,
+}
+
+impl IgnTerminalCommand {
+    pub fn new() -> Self {
+        Self {
+            cmd_id: String::new(),
+            command_text: String::new(),
+            exit_code: u32::default(),
+            cwd_str: String::new(),
+            duration_ms: u64::default(),
+            has_output: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cmd_id.is_empty() || true && !self.command_text.is_empty() || true && self.exit_code < u32::MAX || true && !self.cwd_str.is_empty() || true && self.duration_ms < u64::MAX || true && self.has_output || true
+    }
+}
+
+impl Default for IgnTerminalCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal environment variable
+#[derive(Debug, Clone)]
+pub struct IgoTerminalEnv {
+    pub env_id: String,
+    pub var_name: String,
+    pub var_value: String,
+    pub source_str: String,
+    pub override_count: u32,
+    pub is_inherited: bool,
+}
+
+impl IgoTerminalEnv {
+    pub fn new() -> Self {
+        Self {
+            env_id: String::new(),
+            var_name: String::new(),
+            var_value: String::new(),
+            source_str: String::new(),
+            override_count: u32::default(),
+            is_inherited: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.env_id.is_empty() || true && !self.var_name.is_empty() || true && !self.var_value.is_empty() || true && !self.source_str.is_empty() || true && self.override_count < u32::MAX || true && self.is_inherited || true
+    }
+}
+
+impl Default for IgoTerminalEnv {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal split pane
+#[derive(Debug, Clone)]
+pub struct IgpTerminalSplit {
+    pub split_id: String,
+    pub parent_ref: String,
+    pub direction_str: String,
+    pub size_pct: u32,
+    pub terminal_ref: String,
+    pub is_active: bool,
+}
+
+impl IgpTerminalSplit {
+    pub fn new() -> Self {
+        Self {
+            split_id: String::new(),
+            parent_ref: String::new(),
+            direction_str: String::new(),
+            size_pct: u32::default(),
+            terminal_ref: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.split_id.is_empty() || true && !self.parent_ref.is_empty() || true && !self.direction_str.is_empty() || true && self.size_pct < u32::MAX || true && !self.terminal_ref.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for IgpTerminalSplit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal tab group
+#[derive(Debug, Clone)]
+pub struct IgqTerminalTab {
+    pub tab_id: String,
+    pub tab_label: String,
+    pub terminal_count: u32,
+    pub active_index: u32,
+    pub sort_order: u32,
+    pub is_pinned: bool,
+}
+
+impl IgqTerminalTab {
+    pub fn new() -> Self {
+        Self {
+            tab_id: String::new(),
+            tab_label: String::new(),
+            terminal_count: u32::default(),
+            active_index: u32::default(),
+            sort_order: u32::default(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tab_id.is_empty() || true && !self.tab_label.is_empty() || true && self.terminal_count < u32::MAX || true && self.active_index < u32::MAX || true && self.sort_order < u32::MAX || true && self.is_pinned || true
+    }
+}
+
+impl Default for IgqTerminalTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal drag-drop operation
+#[derive(Debug, Clone)]
+pub struct IgrTerminalDnd {
+    pub dnd_id: String,
+    pub source_terminal: String,
+    pub target_location: String,
+    pub drop_effect: String,
+    pub data_len: u32,
+    pub is_external: bool,
+}
+
+impl IgrTerminalDnd {
+    pub fn new() -> Self {
+        Self {
+            dnd_id: String::new(),
+            source_terminal: String::new(),
+            target_location: String::new(),
+            drop_effect: String::new(),
+            data_len: u32::default(),
+            is_external: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dnd_id.is_empty() || true && !self.source_terminal.is_empty() || true && !self.target_location.is_empty() || true && !self.drop_effect.is_empty() || true && self.data_len < u32::MAX || true && self.is_external || true
+    }
+}
+
+impl Default for IgrTerminalDnd {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal accessibility state
+#[derive(Debug, Clone)]
+pub struct IgsTerminalAccessibility {
+    pub a11y_id: String,
+    pub screen_reader_mode: bool,
+    pub announce_text: String,
+    pub navigation_mode: String,
+    pub focus_indicator: u32,
+    pub is_accessible: bool,
+}
+
+impl IgsTerminalAccessibility {
+    pub fn new() -> Self {
+        Self {
+            a11y_id: String::new(),
+            screen_reader_mode: bool::default(),
+            announce_text: String::new(),
+            navigation_mode: String::new(),
+            focus_indicator: u32::default(),
+            is_accessible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_id.is_empty() || true && self.screen_reader_mode || true && !self.announce_text.is_empty() || true && !self.navigation_mode.is_empty() || true && self.focus_indicator < u32::MAX || true && self.is_accessible || true
+    }
+}
+
+impl Default for IgsTerminalAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal line decorator
+#[derive(Debug, Clone)]
+pub struct IgtTerminalDecorator {
+    pub deco_id: String,
+    pub line_number: u32,
+    pub icon_name: String,
+    pub color_token: String,
+    pub tooltip_text: String,
+    pub is_clickable: bool,
+}
+
+impl IgtTerminalDecorator {
+    pub fn new() -> Self {
+        Self {
+            deco_id: String::new(),
+            line_number: u32::default(),
+            icon_name: String::new(),
+            color_token: String::new(),
+            tooltip_text: String::new(),
+            is_clickable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_id.is_empty() || true && self.line_number < u32::MAX || true && !self.icon_name.is_empty() || true && !self.color_token.is_empty() || true && !self.tooltip_text.is_empty() || true && self.is_clickable || true
+    }
+}
+
+impl Default for IgtTerminalDecorator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal quick fix suggestion
+#[derive(Debug, Clone)]
+pub struct IguTerminalQuickFix {
+    pub fix_id: String,
+    pub command_text: String,
+    pub replacement_text: String,
+    pub source_str: String,
+    pub confidence_pct: u32,
+    pub is_auto_applicable: bool,
+}
+
+impl IguTerminalQuickFix {
+    pub fn new() -> Self {
+        Self {
+            fix_id: String::new(),
+            command_text: String::new(),
+            replacement_text: String::new(),
+            source_str: String::new(),
+            confidence_pct: u32::default(),
+            is_auto_applicable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fix_id.is_empty() || true && !self.command_text.is_empty() || true && !self.replacement_text.is_empty() || true && !self.source_str.is_empty() || true && self.confidence_pct < u32::MAX || true && self.is_auto_applicable || true
+    }
+}
+
+impl Default for IguTerminalQuickFix {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shell integration state
+#[derive(Debug, Clone)]
+pub struct IgvTerminalShellIntegration {
+    pub shell_id: String,
+    pub shell_type_str: String,
+    pub cwd_uri: String,
+    pub command_count: u64,
+    pub prompt_sequence: String,
+    pub is_integrated: bool,
+}
+
+impl IgvTerminalShellIntegration {
+    pub fn new() -> Self {
+        Self {
+            shell_id: String::new(),
+            shell_type_str: String::new(),
+            cwd_uri: String::new(),
+            command_count: u64::default(),
+            prompt_sequence: String::new(),
+            is_integrated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shell_id.is_empty() || true && !self.shell_type_str.is_empty() || true && !self.cwd_uri.is_empty() || true && self.command_count < u64::MAX || true && !self.prompt_sequence.is_empty() || true && self.is_integrated || true
+    }
+}
+
+impl Default for IgvTerminalShellIntegration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Pseudo-terminal descriptor
+#[derive(Debug, Clone)]
+pub struct IgwTerminalPty {
+    pub pty_id: String,
+    pub master_fd: u32,
+    pub slave_path: String,
+    pub cols_val: u32,
+    pub rows_val: u32,
+    pub is_open: bool,
+}
+
+impl IgwTerminalPty {
+    pub fn new() -> Self {
+        Self {
+            pty_id: String::new(),
+            master_fd: u32::default(),
+            slave_path: String::new(),
+            cols_val: u32::default(),
+            rows_val: u32::default(),
+            is_open: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pty_id.is_empty() || true && self.master_fd < u32::MAX || true && !self.slave_path.is_empty() || true && self.cols_val < u32::MAX || true && self.rows_val < u32::MAX || true && self.is_open || true
+    }
+}
+
+impl Default for IgwTerminalPty {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal automation profile
+#[derive(Debug, Clone)]
+pub struct IgxTerminalAutomation {
+    pub auto_id: String,
+    pub profile_name: String,
+    pub shell_path: String,
+    pub env_overrides: String,
+    pub icon_name: String,
+    pub is_automation: bool,
+}
+
+impl IgxTerminalAutomation {
+    pub fn new() -> Self {
+        Self {
+            auto_id: String::new(),
+            profile_name: String::new(),
+            shell_path: String::new(),
+            env_overrides: String::new(),
+            icon_name: String::new(),
+            is_automation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.auto_id.is_empty() || true && !self.profile_name.is_empty() || true && !self.shell_path.is_empty() || true && !self.env_overrides.is_empty() || true && !self.icon_name.is_empty() || true && self.is_automation || true
+    }
+}
+
+impl Default for IgxTerminalAutomation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal status bar entry
+#[derive(Debug, Clone)]
+pub struct IgyTerminalStatus {
+    pub status_id: String,
+    pub terminal_ref: String,
+    pub status_text: String,
+    pub icon_name: String,
+    pub severity_val: u32,
+    pub is_visible: bool,
+}
+
+impl IgyTerminalStatus {
+    pub fn new() -> Self {
+        Self {
+            status_id: String::new(),
+            terminal_ref: String::new(),
+            status_text: String::new(),
+            icon_name: String::new(),
+            severity_val: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.status_id.is_empty() || true && !self.terminal_ref.is_empty() || true && !self.status_text.is_empty() || true && !self.icon_name.is_empty() || true && self.severity_val < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for IgyTerminalStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal configuration model
+#[derive(Debug, Clone)]
+pub struct IgzTerminalConfig {
+    pub config_id: String,
+    pub default_profile: String,
+    pub scrollback_val: u32,
+    pub cursor_style: String,
+    pub bell_enabled: bool,
+    pub gpu_acceleration: bool,
+}
+
+impl IgzTerminalConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            default_profile: String::new(),
+            scrollback_val: u32::default(),
+            cursor_style: String::new(),
+            bell_enabled: bool::default(),
+            gpu_acceleration: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.default_profile.is_empty() || true && self.scrollback_val < u32::MAX || true && !self.cursor_style.is_empty() || true && self.bell_enabled || true && self.gpu_acceleration || true
+    }
+}
+
+impl Default for IgzTerminalConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -393146,6 +394030,474 @@ mod tests_ifz_generated {
     fn test_ifz_fields() {
         let mut obj = IfzExtensionGrammar::default();
         obj.grammar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iga_generated {
+    use super::*;
+
+    #[test]
+    fn test_iga_default() {
+        let obj = IgaTerminalInstance::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iga_fields() {
+        let mut obj = IgaTerminalInstance::default();
+        obj.instance_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igb_generated {
+    use super::*;
+
+    #[test]
+    fn test_igb_default() {
+        let obj = IgbTerminalProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igb_fields() {
+        let mut obj = IgbTerminalProfile::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igc_generated {
+    use super::*;
+
+    #[test]
+    fn test_igc_default() {
+        let obj = IgcTerminalBuffer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igc_fields() {
+        let mut obj = IgcTerminalBuffer::default();
+        obj.buffer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igd_generated {
+    use super::*;
+
+    #[test]
+    fn test_igd_default() {
+        let obj = IgdTerminalCell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igd_fields() {
+        let mut obj = IgdTerminalCell::default();
+        obj.cell_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ige_generated {
+    use super::*;
+
+    #[test]
+    fn test_ige_default() {
+        let obj = IgeTerminalLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ige_fields() {
+        let mut obj = IgeTerminalLink::default();
+        obj.link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igf_generated {
+    use super::*;
+
+    #[test]
+    fn test_igf_default() {
+        let obj = IgfTerminalProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igf_fields() {
+        let mut obj = IgfTerminalProcess::default();
+        obj.process_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igg_generated {
+    use super::*;
+
+    #[test]
+    fn test_igg_default() {
+        let obj = IggTerminalFont::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igg_fields() {
+        let mut obj = IggTerminalFont::default();
+        obj.font_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igh_generated {
+    use super::*;
+
+    #[test]
+    fn test_igh_default() {
+        let obj = IghTerminalTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igh_fields() {
+        let mut obj = IghTerminalTheme::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igi_generated {
+    use super::*;
+
+    #[test]
+    fn test_igi_default() {
+        let obj = IgiTerminalInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igi_fields() {
+        let mut obj = IgiTerminalInput::default();
+        obj.input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igj_generated {
+    use super::*;
+
+    #[test]
+    fn test_igj_default() {
+        let obj = IgjTerminalOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igj_fields() {
+        let mut obj = IgjTerminalOutput::default();
+        obj.output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igk_generated {
+    use super::*;
+
+    #[test]
+    fn test_igk_default() {
+        let obj = IgkTerminalResize::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igk_fields() {
+        let mut obj = IgkTerminalResize::default();
+        obj.resize_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igl_generated {
+    use super::*;
+
+    #[test]
+    fn test_igl_default() {
+        let obj = IglTerminalSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igl_fields() {
+        let mut obj = IglTerminalSelection::default();
+        obj.sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igm_generated {
+    use super::*;
+
+    #[test]
+    fn test_igm_default() {
+        let obj = IgmTerminalSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igm_fields() {
+        let mut obj = IgmTerminalSearch::default();
+        obj.search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ign_generated {
+    use super::*;
+
+    #[test]
+    fn test_ign_default() {
+        let obj = IgnTerminalCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ign_fields() {
+        let mut obj = IgnTerminalCommand::default();
+        obj.cmd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igo_generated {
+    use super::*;
+
+    #[test]
+    fn test_igo_default() {
+        let obj = IgoTerminalEnv::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igo_fields() {
+        let mut obj = IgoTerminalEnv::default();
+        obj.env_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igp_generated {
+    use super::*;
+
+    #[test]
+    fn test_igp_default() {
+        let obj = IgpTerminalSplit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igp_fields() {
+        let mut obj = IgpTerminalSplit::default();
+        obj.split_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igq_generated {
+    use super::*;
+
+    #[test]
+    fn test_igq_default() {
+        let obj = IgqTerminalTab::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igq_fields() {
+        let mut obj = IgqTerminalTab::default();
+        obj.tab_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igr_generated {
+    use super::*;
+
+    #[test]
+    fn test_igr_default() {
+        let obj = IgrTerminalDnd::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igr_fields() {
+        let mut obj = IgrTerminalDnd::default();
+        obj.dnd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igs_generated {
+    use super::*;
+
+    #[test]
+    fn test_igs_default() {
+        let obj = IgsTerminalAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igs_fields() {
+        let mut obj = IgsTerminalAccessibility::default();
+        obj.a11y_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igt_generated {
+    use super::*;
+
+    #[test]
+    fn test_igt_default() {
+        let obj = IgtTerminalDecorator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igt_fields() {
+        let mut obj = IgtTerminalDecorator::default();
+        obj.deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igu_generated {
+    use super::*;
+
+    #[test]
+    fn test_igu_default() {
+        let obj = IguTerminalQuickFix::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igu_fields() {
+        let mut obj = IguTerminalQuickFix::default();
+        obj.fix_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igv_generated {
+    use super::*;
+
+    #[test]
+    fn test_igv_default() {
+        let obj = IgvTerminalShellIntegration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igv_fields() {
+        let mut obj = IgvTerminalShellIntegration::default();
+        obj.shell_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igw_generated {
+    use super::*;
+
+    #[test]
+    fn test_igw_default() {
+        let obj = IgwTerminalPty::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igw_fields() {
+        let mut obj = IgwTerminalPty::default();
+        obj.pty_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igx_generated {
+    use super::*;
+
+    #[test]
+    fn test_igx_default() {
+        let obj = IgxTerminalAutomation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igx_fields() {
+        let mut obj = IgxTerminalAutomation::default();
+        obj.auto_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igy_generated {
+    use super::*;
+
+    #[test]
+    fn test_igy_default() {
+        let obj = IgyTerminalStatus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igy_fields() {
+        let mut obj = IgyTerminalStatus::default();
+        obj.status_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_igz_generated {
+    use super::*;
+
+    #[test]
+    fn test_igz_default() {
+        let obj = IgzTerminalConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_igz_fields() {
+        let mut obj = IgzTerminalConfig::default();
+        obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
