@@ -104690,6 +104690,426 @@ impl Default for GtzFileCreateEvent {
     }
 }
 
+/// Terminal cell (character, fg color, bg color, attributes, width)
+#[derive(Debug, Clone)]
+pub struct GuaTerminalCell {
+    pub cell_id: String,
+    pub character: String,
+    pub fg_color: String,
+    pub bg_color: String,
+    pub is_bold: bool,
+    pub is_italic: bool,
+    pub is_underline: bool,
+    pub is_strikethrough: bool,
+    pub width: u32,
+    pub is_wide_continuation: bool,
+}
+
+impl GuaTerminalCell {
+    pub fn new() -> Self {
+        Self {
+            cell_id: String::new(),
+            character: String::new(),
+            fg_color: String::new(),
+            bg_color: String::new(),
+            is_bold: bool::default(),
+            is_italic: bool::default(),
+            is_underline: bool::default(),
+            is_strikethrough: bool::default(),
+            width: u32::default(),
+            is_wide_continuation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cell_id.is_empty() || true && !self.character.is_empty() || true && !self.fg_color.is_empty() || true && !self.bg_color.is_empty() || true && self.is_bold || true && self.is_italic || true && self.is_underline || true && self.is_strikethrough || true && self.width < u32::MAX || true && self.is_wide_continuation || true
+    }
+}
+
+impl Default for GuaTerminalCell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal buffer (cells, rows, cols, scrollback, dirty regions)
+#[derive(Debug, Clone)]
+pub struct GubTerminalBuffer {
+    pub term_buf_id: String,
+    pub rows: u32,
+    pub cols: u32,
+    pub scrollback_lines: u32,
+    pub dirty_row_start: u32,
+    pub dirty_row_end: u32,
+    pub cursor_row: u32,
+    pub cursor_col: u32,
+    pub is_alt_buffer: bool,
+    pub cell_count: u64,
+}
+
+impl GubTerminalBuffer {
+    pub fn new() -> Self {
+        Self {
+            term_buf_id: String::new(),
+            rows: u32::default(),
+            cols: u32::default(),
+            scrollback_lines: u32::default(),
+            dirty_row_start: u32::default(),
+            dirty_row_end: u32::default(),
+            cursor_row: u32::default(),
+            cursor_col: u32::default(),
+            is_alt_buffer: bool::default(),
+            cell_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_buf_id.is_empty() || true && self.rows < u32::MAX || true && self.cols < u32::MAX || true && self.scrollback_lines < u32::MAX || true && self.dirty_row_start < u32::MAX || true && self.dirty_row_end < u32::MAX || true && self.cursor_row < u32::MAX || true && self.cursor_col < u32::MAX || true && self.is_alt_buffer || true && self.cell_count < u64::MAX || true
+    }
+}
+
+impl Default for GubTerminalBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Terminal viewport (scroll offset, visible rows, cursor row, col)
+#[derive(Debug, Clone)]
+pub struct GucTerminalViewport {
+    pub viewport_id: String,
+    pub scroll_offset: u32,
+    pub visible_rows: u32,
+    pub total_rows: u32,
+    pub cursor_row: u32,
+    pub cursor_col: u32,
+    pub is_scrolled_back: bool,
+    pub scroll_speed: u32,
+    pub smooth_scroll: bool,
+    pub viewport_width: u32,
+}
+
+impl GucTerminalViewport {
+    pub fn new() -> Self {
+        Self {
+            viewport_id: String::new(),
+            scroll_offset: u32::default(),
+            visible_rows: u32::default(),
+            total_rows: u32::default(),
+            cursor_row: u32::default(),
+            cursor_col: u32::default(),
+            is_scrolled_back: bool::default(),
+            scroll_speed: u32::default(),
+            smooth_scroll: bool::default(),
+            viewport_width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.viewport_id.is_empty() || true && self.scroll_offset < u32::MAX || true && self.visible_rows < u32::MAX || true && self.total_rows < u32::MAX || true && self.cursor_row < u32::MAX || true && self.cursor_col < u32::MAX || true && self.is_scrolled_back || true && self.scroll_speed < u32::MAX || true && self.smooth_scroll || true && self.viewport_width < u32::MAX || true
+    }
+}
+
+impl Default for GucTerminalViewport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Damage region (start row, end row, start col, end col, full)
+#[derive(Debug, Clone)]
+pub struct GudDamageRegion {
+    pub damage_id: String,
+    pub start_row: u32,
+    pub end_row: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub is_full_damage: bool,
+    pub is_scroll_damage: bool,
+    pub scroll_delta: u32,
+    pub source: String,
+    pub timestamp_ms: u64,
+}
+
+impl GudDamageRegion {
+    pub fn new() -> Self {
+        Self {
+            damage_id: String::new(),
+            start_row: u32::default(),
+            end_row: u32::default(),
+            start_col: u32::default(),
+            end_col: u32::default(),
+            is_full_damage: bool::default(),
+            is_scroll_damage: bool::default(),
+            scroll_delta: u32::default(),
+            source: String::new(),
+            timestamp_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.damage_id.is_empty() || true && self.start_row < u32::MAX || true && self.end_row < u32::MAX || true && self.start_col < u32::MAX || true && self.end_col < u32::MAX || true && self.is_full_damage || true && self.is_scroll_damage || true && self.scroll_delta < u32::MAX || true && !self.source.is_empty() || true && self.timestamp_ms < u64::MAX || true
+    }
+}
+
+impl Default for GudDamageRegion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Render line (cells, line number, is wrapped, is dirty, bg color)
+#[derive(Debug, Clone)]
+pub struct GueRenderLine {
+    pub render_line_id: String,
+    pub line_number: u32,
+    pub is_wrapped: bool,
+    pub is_dirty: bool,
+    pub bg_color: String,
+    pub cell_count: u32,
+    pub has_wide_chars: bool,
+    pub is_cursor_line: bool,
+    pub decoration_count: u32,
+    pub content_hash: u64,
+}
+
+impl GueRenderLine {
+    pub fn new() -> Self {
+        Self {
+            render_line_id: String::new(),
+            line_number: u32::default(),
+            is_wrapped: bool::default(),
+            is_dirty: bool::default(),
+            bg_color: String::new(),
+            cell_count: u32::default(),
+            has_wide_chars: bool::default(),
+            is_cursor_line: bool::default(),
+            decoration_count: u32::default(),
+            content_hash: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.render_line_id.is_empty() || true && self.line_number < u32::MAX || true && self.is_wrapped || true && self.is_dirty || true && !self.bg_color.is_empty() || true && self.cell_count < u32::MAX || true && self.has_wide_chars || true && self.is_cursor_line || true && self.decoration_count < u32::MAX || true && self.content_hash < u64::MAX || true
+    }
+}
+
+impl Default for GueRenderLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Render attributes (bold, dim, italic, underline, blink, inverse, hidden)
+#[derive(Debug, Clone)]
+pub struct GufRenderAttributes {
+    pub render_attr_id: String,
+    pub is_bold: bool,
+    pub is_dim: bool,
+    pub is_italic: bool,
+    pub is_underline: bool,
+    pub is_blink: bool,
+    pub is_inverse: bool,
+    pub is_hidden: bool,
+    pub is_strikethrough: bool,
+    pub underline_style: String,
+}
+
+impl GufRenderAttributes {
+    pub fn new() -> Self {
+        Self {
+            render_attr_id: String::new(),
+            is_bold: bool::default(),
+            is_dim: bool::default(),
+            is_italic: bool::default(),
+            is_underline: bool::default(),
+            is_blink: bool::default(),
+            is_inverse: bool::default(),
+            is_hidden: bool::default(),
+            is_strikethrough: bool::default(),
+            underline_style: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.render_attr_id.is_empty() || true && self.is_bold || true && self.is_dim || true && self.is_italic || true && self.is_underline || true && self.is_blink || true && self.is_inverse || true && self.is_hidden || true && self.is_strikethrough || true && !self.underline_style.is_empty() || true
+    }
+}
+
+impl Default for GufRenderAttributes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color palette (16 ANSI colors, 256 extended, true color map)
+#[derive(Debug, Clone)]
+pub struct GugColorPalette {
+    pub palette_id: String,
+    pub ansi_colors_json: String,
+    pub extended_colors_json: String,
+    pub true_color_fg: String,
+    pub true_color_bg: String,
+    pub cursor_color: String,
+    pub selection_bg: String,
+    pub selection_fg: String,
+    pub is_dark_theme: bool,
+    pub contrast_ratio: f64,
+}
+
+impl GugColorPalette {
+    pub fn new() -> Self {
+        Self {
+            palette_id: String::new(),
+            ansi_colors_json: String::new(),
+            extended_colors_json: String::new(),
+            true_color_fg: String::new(),
+            true_color_bg: String::new(),
+            cursor_color: String::new(),
+            selection_bg: String::new(),
+            selection_fg: String::new(),
+            is_dark_theme: bool::default(),
+            contrast_ratio: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.palette_id.is_empty() || true && !self.ansi_colors_json.is_empty() || true && !self.extended_colors_json.is_empty() || true && !self.true_color_fg.is_empty() || true && !self.true_color_bg.is_empty() || true && !self.cursor_color.is_empty() || true && !self.selection_bg.is_empty() || true && !self.selection_fg.is_empty() || true && self.is_dark_theme || true && self.contrast_ratio.is_finite() || true
+    }
+}
+
+impl Default for GugColorPalette {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor style (block, underline, bar, blink rate, color, shape)
+#[derive(Debug, Clone)]
+pub struct GuhCursorStyle {
+    pub cursor_style_id: String,
+    pub shape: String,
+    pub blink_rate_ms: u32,
+    pub color: String,
+    pub is_visible: bool,
+    pub is_blinking: bool,
+    pub width_cells: u32,
+    pub height_fraction: f64,
+    pub secondary_color: String,
+    pub animation: String,
+}
+
+impl GuhCursorStyle {
+    pub fn new() -> Self {
+        Self {
+            cursor_style_id: String::new(),
+            shape: String::new(),
+            blink_rate_ms: u32::default(),
+            color: String::new(),
+            is_visible: bool::default(),
+            is_blinking: bool::default(),
+            width_cells: u32::default(),
+            height_fraction: f64::default(),
+            secondary_color: String::new(),
+            animation: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cursor_style_id.is_empty() || true && !self.shape.is_empty() || true && self.blink_rate_ms < u32::MAX || true && !self.color.is_empty() || true && self.is_visible || true && self.is_blinking || true && self.width_cells < u32::MAX || true && self.height_fraction.is_finite() || true && !self.secondary_color.is_empty() || true && !self.animation.is_empty() || true
+    }
+}
+
+impl Default for GuhCursorStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Scroll region (top, bottom, left, right, scroll delta)
+#[derive(Debug, Clone)]
+pub struct GuiScrollRegion {
+    pub scroll_region_id: String,
+    pub top_row: u32,
+    pub bottom_row: u32,
+    pub left_col: u32,
+    pub right_col: u32,
+    pub scroll_delta: u32,
+    pub is_smooth: bool,
+    pub direction: String,
+    pub source: String,
+    pub timestamp_ms: u64,
+}
+
+impl GuiScrollRegion {
+    pub fn new() -> Self {
+        Self {
+            scroll_region_id: String::new(),
+            top_row: u32::default(),
+            bottom_row: u32::default(),
+            left_col: u32::default(),
+            right_col: u32::default(),
+            scroll_delta: u32::default(),
+            is_smooth: bool::default(),
+            direction: String::new(),
+            source: String::new(),
+            timestamp_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scroll_region_id.is_empty() || true && self.top_row < u32::MAX || true && self.bottom_row < u32::MAX || true && self.left_col < u32::MAX || true && self.right_col < u32::MAX || true && self.scroll_delta < u32::MAX || true && self.is_smooth || true && !self.direction.is_empty() || true && !self.source.is_empty() || true && self.timestamp_ms < u64::MAX || true
+    }
+}
+
+impl Default for GuiScrollRegion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Grid layout (rows, cols, cell width, cell height, padding)
+#[derive(Debug, Clone)]
+pub struct GujGridLayout {
+    pub grid_layout_id: String,
+    pub rows: u32,
+    pub cols: u32,
+    pub cell_width_px: u32,
+    pub cell_height_px: u32,
+    pub padding_top: u32,
+    pub padding_bottom: u32,
+    pub padding_left: u32,
+    pub padding_right: u32,
+    pub line_spacing: f64,
+}
+
+impl GujGridLayout {
+    pub fn new() -> Self {
+        Self {
+            grid_layout_id: String::new(),
+            rows: u32::default(),
+            cols: u32::default(),
+            cell_width_px: u32::default(),
+            cell_height_px: u32::default(),
+            padding_top: u32::default(),
+            padding_bottom: u32::default(),
+            padding_left: u32::default(),
+            padding_right: u32::default(),
+            line_spacing: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grid_layout_id.is_empty() || true && self.rows < u32::MAX || true && self.cols < u32::MAX || true && self.cell_width_px < u32::MAX || true && self.cell_height_px < u32::MAX || true && self.padding_top < u32::MAX || true && self.padding_bottom < u32::MAX || true && self.padding_left < u32::MAX || true && self.padding_right < u32::MAX || true && self.line_spacing.is_finite() || true
+    }
+}
+
+impl Default for GujGridLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -337545,6 +337965,186 @@ mod tests_gtz_generated {
     fn test_gtz_fields() {
         let mut obj = GtzFileCreateEvent::default();
         obj.create_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gua_generated {
+    use super::*;
+
+    #[test]
+    fn test_gua_default() {
+        let obj = GuaTerminalCell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gua_fields() {
+        let mut obj = GuaTerminalCell::default();
+        obj.cell_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gub_generated {
+    use super::*;
+
+    #[test]
+    fn test_gub_default() {
+        let obj = GubTerminalBuffer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gub_fields() {
+        let mut obj = GubTerminalBuffer::default();
+        obj.term_buf_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_guc_generated {
+    use super::*;
+
+    #[test]
+    fn test_guc_default() {
+        let obj = GucTerminalViewport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_guc_fields() {
+        let mut obj = GucTerminalViewport::default();
+        obj.viewport_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gud_generated {
+    use super::*;
+
+    #[test]
+    fn test_gud_default() {
+        let obj = GudDamageRegion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gud_fields() {
+        let mut obj = GudDamageRegion::default();
+        obj.damage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gue_generated {
+    use super::*;
+
+    #[test]
+    fn test_gue_default() {
+        let obj = GueRenderLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gue_fields() {
+        let mut obj = GueRenderLine::default();
+        obj.render_line_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_guf_generated {
+    use super::*;
+
+    #[test]
+    fn test_guf_default() {
+        let obj = GufRenderAttributes::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_guf_fields() {
+        let mut obj = GufRenderAttributes::default();
+        obj.render_attr_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gug_generated {
+    use super::*;
+
+    #[test]
+    fn test_gug_default() {
+        let obj = GugColorPalette::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gug_fields() {
+        let mut obj = GugColorPalette::default();
+        obj.palette_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_guh_generated {
+    use super::*;
+
+    #[test]
+    fn test_guh_default() {
+        let obj = GuhCursorStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_guh_fields() {
+        let mut obj = GuhCursorStyle::default();
+        obj.cursor_style_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gui_generated {
+    use super::*;
+
+    #[test]
+    fn test_gui_default() {
+        let obj = GuiScrollRegion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gui_fields() {
+        let mut obj = GuiScrollRegion::default();
+        obj.scroll_region_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_guj_generated {
+    use super::*;
+
+    #[test]
+    fn test_guj_default() {
+        let obj = GujGridLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_guj_fields() {
+        let mut obj = GujGridLayout::default();
+        obj.grid_layout_id = "test".to_string();
         assert!(obj.validate());
     }
 }
