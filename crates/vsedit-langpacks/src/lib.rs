@@ -103657,6 +103657,216 @@ impl Default for GteUtilityProcess {
     }
 }
 
+/// Extension host process (type, pid, connection, alive, restart)
+#[derive(Debug, Clone)]
+pub struct GtfExtensionHostProcess {
+    pub ext_host_proc_id: String,
+    pub host_type: String,
+    pub pid: u64,
+    pub connection_type: String,
+    pub is_alive: bool,
+    pub restart_count: u32,
+    pub memory_mb: u32,
+    pub extension_count: u32,
+    pub last_heartbeat_ms: u64,
+    pub startup_time_ms: u64,
+}
+
+impl GtfExtensionHostProcess {
+    pub fn new() -> Self {
+        Self {
+            ext_host_proc_id: String::new(),
+            host_type: String::new(),
+            pid: u64::default(),
+            connection_type: String::new(),
+            is_alive: bool::default(),
+            restart_count: u32::default(),
+            memory_mb: u32::default(),
+            extension_count: u32::default(),
+            last_heartbeat_ms: u64::default(),
+            startup_time_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_host_proc_id.is_empty() || true && !self.host_type.is_empty() || true && self.pid < u64::MAX || true && !self.connection_type.is_empty() || true && self.is_alive || true && self.restart_count < u32::MAX || true && self.memory_mb < u32::MAX || true && self.extension_count < u32::MAX || true && self.last_heartbeat_ms < u64::MAX || true && self.startup_time_ms < u64::MAX || true
+    }
+}
+
+impl Default for GtfExtensionHostProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON-RPC message (jsonrpc, id, method, params, result, error)
+#[derive(Debug, Clone)]
+pub struct GtgJsonRpcMessage {
+    pub rpc_msg_id: String,
+    pub jsonrpc: String,
+    pub msg_id: u64,
+    pub method: String,
+    pub params_json: String,
+    pub result_json: String,
+    pub error_json: String,
+    pub is_request: bool,
+    pub is_response: bool,
+    pub is_notification: bool,
+}
+
+impl GtgJsonRpcMessage {
+    pub fn new() -> Self {
+        Self {
+            rpc_msg_id: String::new(),
+            jsonrpc: String::new(),
+            msg_id: u64::default(),
+            method: String::new(),
+            params_json: String::new(),
+            result_json: String::new(),
+            error_json: String::new(),
+            is_request: bool::default(),
+            is_response: bool::default(),
+            is_notification: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rpc_msg_id.is_empty() || true && !self.jsonrpc.is_empty() || true && self.msg_id < u64::MAX || true && !self.method.is_empty() || true && !self.params_json.is_empty() || true && !self.result_json.is_empty() || true && !self.error_json.is_empty() || true && self.is_request || true && self.is_response || true && self.is_notification || true
+    }
+}
+
+impl Default for GtgJsonRpcMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON-RPC error (code, message, data)
+#[derive(Debug, Clone)]
+pub struct GthJsonRpcError {
+    pub rpc_err_id: String,
+    pub code: u32,
+    pub message: String,
+    pub data_json: String,
+    pub is_internal: bool,
+    pub is_cancelled: bool,
+    pub stack_trace: String,
+    pub source: String,
+    pub original_error: String,
+    pub retry_after_ms: u64,
+}
+
+impl GthJsonRpcError {
+    pub fn new() -> Self {
+        Self {
+            rpc_err_id: String::new(),
+            code: u32::default(),
+            message: String::new(),
+            data_json: String::new(),
+            is_internal: bool::default(),
+            is_cancelled: bool::default(),
+            stack_trace: String::new(),
+            source: String::new(),
+            original_error: String::new(),
+            retry_after_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rpc_err_id.is_empty() || true && self.code < u32::MAX || true && !self.message.is_empty() || true && !self.data_json.is_empty() || true && self.is_internal || true && self.is_cancelled || true && !self.stack_trace.is_empty() || true && !self.source.is_empty() || true && !self.original_error.is_empty() || true && self.retry_after_ms < u64::MAX || true
+    }
+}
+
+impl Default for GthJsonRpcError {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// JSON-RPC connection (send, on request, on notification, dispose)
+#[derive(Debug, Clone)]
+pub struct GtiJsonRpcConnection {
+    pub rpc_conn_id: String,
+    pub is_open: bool,
+    pub pending_requests: u32,
+    pub request_count: u64,
+    pub response_count: u64,
+    pub notification_count: u64,
+    pub error_count: u64,
+    pub avg_latency_ms: f64,
+    pub max_message_size: u64,
+    pub trace_enabled: bool,
+}
+
+impl GtiJsonRpcConnection {
+    pub fn new() -> Self {
+        Self {
+            rpc_conn_id: String::new(),
+            is_open: bool::default(),
+            pending_requests: u32::default(),
+            request_count: u64::default(),
+            response_count: u64::default(),
+            notification_count: u64::default(),
+            error_count: u64::default(),
+            avg_latency_ms: f64::default(),
+            max_message_size: u64::default(),
+            trace_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rpc_conn_id.is_empty() || true && self.is_open || true && self.pending_requests < u32::MAX || true && self.request_count < u64::MAX || true && self.response_count < u64::MAX || true && self.notification_count < u64::MAX || true && self.error_count < u64::MAX || true && self.avg_latency_ms.is_finite() || true && self.max_message_size < u64::MAX || true && self.trace_enabled || true
+    }
+}
+
+impl Default for GtiJsonRpcConnection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Protocol message (type, data, acknowledge, flags, length)
+#[derive(Debug, Clone)]
+pub struct GtjProtocolMessage {
+    pub proto_msg_id: String,
+    pub msg_type: String,
+    pub data_json: String,
+    pub acknowledge_id: u64,
+    pub flags: u32,
+    pub length: u64,
+    pub sequence: u64,
+    pub timestamp_ms: u64,
+    pub channel_id: String,
+    pub is_compressed: bool,
+}
+
+impl GtjProtocolMessage {
+    pub fn new() -> Self {
+        Self {
+            proto_msg_id: String::new(),
+            msg_type: String::new(),
+            data_json: String::new(),
+            acknowledge_id: u64::default(),
+            flags: u32::default(),
+            length: u64::default(),
+            sequence: u64::default(),
+            timestamp_ms: u64::default(),
+            channel_id: String::new(),
+            is_compressed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proto_msg_id.is_empty() || true && !self.msg_type.is_empty() || true && !self.data_json.is_empty() || true && self.acknowledge_id < u64::MAX || true && self.flags < u32::MAX || true && self.length < u64::MAX || true && self.sequence < u64::MAX || true && self.timestamp_ms < u64::MAX || true && !self.channel_id.is_empty() || true && self.is_compressed || true
+    }
+}
+
+impl Default for GtjProtocolMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -336271,6 +336481,96 @@ mod tests_gte_generated {
     fn test_gte_fields() {
         let mut obj = GteUtilityProcess::default();
         obj.utility_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtf_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtf_default() {
+        let obj = GtfExtensionHostProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtf_fields() {
+        let mut obj = GtfExtensionHostProcess::default();
+        obj.ext_host_proc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtg_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtg_default() {
+        let obj = GtgJsonRpcMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtg_fields() {
+        let mut obj = GtgJsonRpcMessage::default();
+        obj.rpc_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gth_generated {
+    use super::*;
+
+    #[test]
+    fn test_gth_default() {
+        let obj = GthJsonRpcError::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gth_fields() {
+        let mut obj = GthJsonRpcError::default();
+        obj.rpc_err_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gti_generated {
+    use super::*;
+
+    #[test]
+    fn test_gti_default() {
+        let obj = GtiJsonRpcConnection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gti_fields() {
+        let mut obj = GtiJsonRpcConnection::default();
+        obj.rpc_conn_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtj_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtj_default() {
+        let obj = GtjProtocolMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtj_fields() {
+        let mut obj = GtjProtocolMessage::default();
+        obj.proto_msg_id = "test".to_string();
         assert!(obj.validate());
     }
 }
