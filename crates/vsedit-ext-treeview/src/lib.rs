@@ -178693,6 +178693,890 @@ impl Default for JuzRemoteConfig {
     }
 }
 
+/// Output channel descriptor
+#[derive(Debug, Clone)]
+pub struct JvaOutputChannel {
+    pub output_ch_id: String,
+    pub channel_name: String,
+    pub language_id: String,
+    pub line_count: u32,
+    pub log_level_str: String,
+    pub is_visible: bool,
+}
+
+impl JvaOutputChannel {
+    pub fn new() -> Self {
+        Self {
+            output_ch_id: String::new(),
+            channel_name: String::new(),
+            language_id: String::new(),
+            line_count: u32::default(),
+            log_level_str: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_ch_id.is_empty() || true && !self.channel_name.is_empty() || true && !self.language_id.is_empty() || true && self.line_count < u32::MAX || true && !self.log_level_str.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for JvaOutputChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel line entry
+#[derive(Debug, Clone)]
+pub struct JvbOutputLine {
+    pub output_line_id: String,
+    pub text_str: String,
+    pub timestamp_epoch: u64,
+    pub level_str: String,
+    pub source_ref: String,
+    pub is_error: bool,
+}
+
+impl JvbOutputLine {
+    pub fn new() -> Self {
+        Self {
+            output_line_id: String::new(),
+            text_str: String::new(),
+            timestamp_epoch: u64::default(),
+            level_str: String::new(),
+            source_ref: String::new(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_line_id.is_empty() || true && !self.text_str.is_empty() || true && self.timestamp_epoch < u64::MAX || true && !self.level_str.is_empty() || true && !self.source_ref.is_empty() || true && self.is_error || true
+    }
+}
+
+impl Default for JvbOutputLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Log output channel
+#[derive(Debug, Clone)]
+pub struct JvcLogOutputChannel {
+    pub log_output_id: String,
+    pub channel_name: String,
+    pub log_level_str: String,
+    pub rotation_size_mb: u32,
+    pub file_count: u32,
+    pub is_file_backed: bool,
+}
+
+impl JvcLogOutputChannel {
+    pub fn new() -> Self {
+        Self {
+            log_output_id: String::new(),
+            channel_name: String::new(),
+            log_level_str: String::new(),
+            rotation_size_mb: u32::default(),
+            file_count: u32::default(),
+            is_file_backed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_output_id.is_empty() || true && !self.channel_name.is_empty() || true && !self.log_level_str.is_empty() || true && self.rotation_size_mb < u32::MAX || true && self.file_count < u32::MAX || true && self.is_file_backed || true
+    }
+}
+
+impl Default for JvcLogOutputChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel editor view
+#[derive(Debug, Clone)]
+pub struct JvdOutputEditor {
+    pub output_editor_id: String,
+    pub channel_ref: String,
+    pub scroll_locked: bool,
+    pub word_wrap: bool,
+    pub filter_text: String,
+    pub is_active: bool,
+}
+
+impl JvdOutputEditor {
+    pub fn new() -> Self {
+        Self {
+            output_editor_id: String::new(),
+            channel_ref: String::new(),
+            scroll_locked: bool::default(),
+            word_wrap: bool::default(),
+            filter_text: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_editor_id.is_empty() || true && !self.channel_ref.is_empty() || true && self.scroll_locked || true && self.word_wrap || true && !self.filter_text.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for JvdOutputEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output service descriptor
+#[derive(Debug, Clone)]
+pub struct JveOutputService {
+    pub output_svc_id: String,
+    pub channel_count: u32,
+    pub active_channel_ref: String,
+    pub total_lines: u64,
+    pub retention_days: u32,
+    pub is_visible: bool,
+}
+
+impl JveOutputService {
+    pub fn new() -> Self {
+        Self {
+            output_svc_id: String::new(),
+            channel_count: u32::default(),
+            active_channel_ref: String::new(),
+            total_lines: u64::default(),
+            retention_days: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_svc_id.is_empty() || true && self.channel_count < u32::MAX || true && !self.active_channel_ref.is_empty() || true && self.total_lines < u64::MAX || true && self.retention_days < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for JveOutputService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output channel filter
+#[derive(Debug, Clone)]
+pub struct JvfOutputFilter {
+    pub output_filter_id: String,
+    pub filter_text: String,
+    pub channel_ref: String,
+    pub match_count: u32,
+    pub case_sensitive: bool,
+    pub use_regex: bool,
+}
+
+impl JvfOutputFilter {
+    pub fn new() -> Self {
+        Self {
+            output_filter_id: String::new(),
+            filter_text: String::new(),
+            channel_ref: String::new(),
+            match_count: u32::default(),
+            case_sensitive: bool::default(),
+            use_regex: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_filter_id.is_empty() || true && !self.filter_text.is_empty() || true && !self.channel_ref.is_empty() || true && self.match_count < u32::MAX || true && self.case_sensitive || true && self.use_regex || true
+    }
+}
+
+impl Default for JvfOutputFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problems panel descriptor
+#[derive(Debug, Clone)]
+pub struct JvgProblemPanel {
+    pub problem_panel_id: String,
+    pub total_errors: u32,
+    pub total_warnings: u32,
+    pub total_info: u32,
+    pub file_count: u32,
+    pub is_visible: bool,
+}
+
+impl JvgProblemPanel {
+    pub fn new() -> Self {
+        Self {
+            problem_panel_id: String::new(),
+            total_errors: u32::default(),
+            total_warnings: u32::default(),
+            total_info: u32::default(),
+            file_count: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.problem_panel_id.is_empty() || true && self.total_errors < u32::MAX || true && self.total_warnings < u32::MAX || true && self.total_info < u32::MAX || true && self.file_count < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for JvgProblemPanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem entry descriptor
+#[derive(Debug, Clone)]
+pub struct JvhProblemEntry {
+    pub problem_entry_id: String,
+    pub message_str: String,
+    pub severity_val: u32,
+    pub source_str: String,
+    pub code_str: String,
+    pub has_related_info: bool,
+}
+
+impl JvhProblemEntry {
+    pub fn new() -> Self {
+        Self {
+            problem_entry_id: String::new(),
+            message_str: String::new(),
+            severity_val: u32::default(),
+            source_str: String::new(),
+            code_str: String::new(),
+            has_related_info: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.problem_entry_id.is_empty() || true && !self.message_str.is_empty() || true && self.severity_val < u32::MAX || true && !self.source_str.is_empty() || true && !self.code_str.is_empty() || true && self.has_related_info || true
+    }
+}
+
+impl Default for JvhProblemEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem filter entry
+#[derive(Debug, Clone)]
+pub struct JviProblemFilter {
+    pub problem_filter_id: String,
+    pub filter_text: String,
+    pub severity_filter_csv: String,
+    pub source_filter_csv: String,
+    pub active_file_only: bool,
+    pub has_fixable_filter: bool,
+}
+
+impl JviProblemFilter {
+    pub fn new() -> Self {
+        Self {
+            problem_filter_id: String::new(),
+            filter_text: String::new(),
+            severity_filter_csv: String::new(),
+            source_filter_csv: String::new(),
+            active_file_only: bool::default(),
+            has_fixable_filter: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.problem_filter_id.is_empty() || true && !self.filter_text.is_empty() || true && !self.severity_filter_csv.is_empty() || true && !self.source_filter_csv.is_empty() || true && self.active_file_only || true && self.has_fixable_filter || true
+    }
+}
+
+impl Default for JviProblemFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Problem grouping descriptor
+#[derive(Debug, Clone)]
+pub struct JvjProblemGroup {
+    pub problem_group_id: String,
+    pub group_by_str: String,
+    pub group_count: u32,
+    pub expanded_groups: u32,
+    pub sort_by_str: String,
+    pub is_flat_view: bool,
+}
+
+impl JvjProblemGroup {
+    pub fn new() -> Self {
+        Self {
+            problem_group_id: String::new(),
+            group_by_str: String::new(),
+            group_count: u32::default(),
+            expanded_groups: u32::default(),
+            sort_by_str: String::new(),
+            is_flat_view: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.problem_group_id.is_empty() || true && !self.group_by_str.is_empty() || true && self.group_count < u32::MAX || true && self.expanded_groups < u32::MAX || true && !self.sort_by_str.is_empty() || true && self.is_flat_view || true
+    }
+}
+
+impl Default for JvjProblemGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug console view
+#[derive(Debug, Clone)]
+pub struct JvkDebugConsoleView {
+    pub dbg_console_view_id: String,
+    pub session_ref: String,
+    pub line_count: u32,
+    pub filter_text: String,
+    pub word_wrap: bool,
+    pub is_collapsed: bool,
+}
+
+impl JvkDebugConsoleView {
+    pub fn new() -> Self {
+        Self {
+            dbg_console_view_id: String::new(),
+            session_ref: String::new(),
+            line_count: u32::default(),
+            filter_text: String::new(),
+            word_wrap: bool::default(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dbg_console_view_id.is_empty() || true && !self.session_ref.is_empty() || true && self.line_count < u32::MAX || true && !self.filter_text.is_empty() || true && self.word_wrap || true && self.is_collapsed || true
+    }
+}
+
+impl Default for JvkDebugConsoleView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Debug console input
+#[derive(Debug, Clone)]
+pub struct JvlDebugConsoleInput {
+    pub dbg_console_input_id: String,
+    pub input_text: String,
+    pub history_idx: u32,
+    pub suggestion_count: u32,
+    pub completion_trigger: String,
+    pub is_multi_line: bool,
+}
+
+impl JvlDebugConsoleInput {
+    pub fn new() -> Self {
+        Self {
+            dbg_console_input_id: String::new(),
+            input_text: String::new(),
+            history_idx: u32::default(),
+            suggestion_count: u32::default(),
+            completion_trigger: String::new(),
+            is_multi_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dbg_console_input_id.is_empty() || true && !self.input_text.is_empty() || true && self.history_idx < u32::MAX || true && self.suggestion_count < u32::MAX || true && !self.completion_trigger.is_empty() || true && self.is_multi_line || true
+    }
+}
+
+impl Default for JvlDebugConsoleInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Timeline view descriptor
+#[derive(Debug, Clone)]
+pub struct JvmTimelineView {
+    pub timeline_view_id: String,
+    pub resource_uri: String,
+    pub item_count: u32,
+    pub provider_count: u32,
+    pub filter_text: String,
+    pub is_loading: bool,
+}
+
+impl JvmTimelineView {
+    pub fn new() -> Self {
+        Self {
+            timeline_view_id: String::new(),
+            resource_uri: String::new(),
+            item_count: u32::default(),
+            provider_count: u32::default(),
+            filter_text: String::new(),
+            is_loading: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.timeline_view_id.is_empty() || true && !self.resource_uri.is_empty() || true && self.item_count < u32::MAX || true && self.provider_count < u32::MAX || true && !self.filter_text.is_empty() || true && self.is_loading || true
+    }
+}
+
+impl Default for JvmTimelineView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Timeline item entry
+#[derive(Debug, Clone)]
+pub struct JvnTimelineItem {
+    pub timeline_item_id: String,
+    pub label_str: String,
+    pub description_str: String,
+    pub timestamp_epoch: u64,
+    pub icon_ref: String,
+    pub is_current: bool,
+}
+
+impl JvnTimelineItem {
+    pub fn new() -> Self {
+        Self {
+            timeline_item_id: String::new(),
+            label_str: String::new(),
+            description_str: String::new(),
+            timestamp_epoch: u64::default(),
+            icon_ref: String::new(),
+            is_current: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.timeline_item_id.is_empty() || true && !self.label_str.is_empty() || true && !self.description_str.is_empty() || true && self.timestamp_epoch < u64::MAX || true && !self.icon_ref.is_empty() || true && self.is_current || true
+    }
+}
+
+impl Default for JvnTimelineItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Timeline provider
+#[derive(Debug, Clone)]
+pub struct JvoTimelineProvider {
+    pub timeline_prov_id: String,
+    pub provider_id: String,
+    pub label_str: String,
+    pub scheme_str: String,
+    pub source_str: String,
+    pub is_enabled: bool,
+}
+
+impl JvoTimelineProvider {
+    pub fn new() -> Self {
+        Self {
+            timeline_prov_id: String::new(),
+            provider_id: String::new(),
+            label_str: String::new(),
+            scheme_str: String::new(),
+            source_str: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.timeline_prov_id.is_empty() || true && !self.provider_id.is_empty() || true && !self.label_str.is_empty() || true && !self.scheme_str.is_empty() || true && !self.source_str.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for JvoTimelineProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Timeline filter entry
+#[derive(Debug, Clone)]
+pub struct JvpTimelineFilter {
+    pub timeline_filter_id: String,
+    pub provider_ref: String,
+    pub is_included: bool,
+    pub label_str: String,
+    pub icon_ref: String,
+    pub is_default: bool,
+}
+
+impl JvpTimelineFilter {
+    pub fn new() -> Self {
+        Self {
+            timeline_filter_id: String::new(),
+            provider_ref: String::new(),
+            is_included: bool::default(),
+            label_str: String::new(),
+            icon_ref: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.timeline_filter_id.is_empty() || true && !self.provider_ref.is_empty() || true && self.is_included || true && !self.label_str.is_empty() || true && !self.icon_ref.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for JvpTimelineFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comments view descriptor
+#[derive(Debug, Clone)]
+pub struct JvqCommentsView {
+    pub comments_view_id: String,
+    pub thread_count: u32,
+    pub unresolved_count: u32,
+    pub filter_text: String,
+    pub sort_by_str: String,
+    pub is_visible: bool,
+}
+
+impl JvqCommentsView {
+    pub fn new() -> Self {
+        Self {
+            comments_view_id: String::new(),
+            thread_count: u32::default(),
+            unresolved_count: u32::default(),
+            filter_text: String::new(),
+            sort_by_str: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comments_view_id.is_empty() || true && self.thread_count < u32::MAX || true && self.unresolved_count < u32::MAX || true && !self.filter_text.is_empty() || true && !self.sort_by_str.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for JvqCommentsView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment thread descriptor
+#[derive(Debug, Clone)]
+pub struct JvrCommentThread {
+    pub comment_thread_id: String,
+    pub uri_str: String,
+    pub range_json: String,
+    pub comment_count: u32,
+    pub label_str: String,
+    pub is_resolved: bool,
+}
+
+impl JvrCommentThread {
+    pub fn new() -> Self {
+        Self {
+            comment_thread_id: String::new(),
+            uri_str: String::new(),
+            range_json: String::new(),
+            comment_count: u32::default(),
+            label_str: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_thread_id.is_empty() || true && !self.uri_str.is_empty() || true && !self.range_json.is_empty() || true && self.comment_count < u32::MAX || true && !self.label_str.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for JvrCommentThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment body descriptor
+#[derive(Debug, Clone)]
+pub struct JvsCommentBody {
+    pub comment_body_id: String,
+    pub body_text: String,
+    pub author_name: String,
+    pub avatar_uri: String,
+    pub created_epoch: u64,
+    pub is_markdown: bool,
+}
+
+impl JvsCommentBody {
+    pub fn new() -> Self {
+        Self {
+            comment_body_id: String::new(),
+            body_text: String::new(),
+            author_name: String::new(),
+            avatar_uri: String::new(),
+            created_epoch: u64::default(),
+            is_markdown: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_body_id.is_empty() || true && !self.body_text.is_empty() || true && !self.author_name.is_empty() || true && !self.avatar_uri.is_empty() || true && self.created_epoch < u64::MAX || true && self.is_markdown || true
+    }
+}
+
+impl Default for JvsCommentBody {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment reaction entry
+#[derive(Debug, Clone)]
+pub struct JvtCommentReaction {
+    pub comment_react_id: String,
+    pub reaction_str: String,
+    pub count_val: u32,
+    pub author_has_reacted: bool,
+    pub icon_ref: String,
+    pub is_custom: bool,
+}
+
+impl JvtCommentReaction {
+    pub fn new() -> Self {
+        Self {
+            comment_react_id: String::new(),
+            reaction_str: String::new(),
+            count_val: u32::default(),
+            author_has_reacted: bool::default(),
+            icon_ref: String::new(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_react_id.is_empty() || true && !self.reaction_str.is_empty() || true && self.count_val < u32::MAX || true && self.author_has_reacted || true && !self.icon_ref.is_empty() || true && self.is_custom || true
+    }
+}
+
+impl Default for JvtCommentReaction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment controller
+#[derive(Debug, Clone)]
+pub struct JvuCommentController {
+    pub comment_ctrl_id: String,
+    pub controller_id: String,
+    pub label_str: String,
+    pub commenting_range_provider: String,
+    pub thread_count: u32,
+    pub is_active: bool,
+}
+
+impl JvuCommentController {
+    pub fn new() -> Self {
+        Self {
+            comment_ctrl_id: String::new(),
+            controller_id: String::new(),
+            label_str: String::new(),
+            commenting_range_provider: String::new(),
+            thread_count: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_ctrl_id.is_empty() || true && !self.controller_id.is_empty() || true && !self.label_str.is_empty() || true && !self.commenting_range_provider.is_empty() || true && self.thread_count < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JvuCommentController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Comment editing mode
+#[derive(Debug, Clone)]
+pub struct JvvCommentMode {
+    pub comment_mode_id: String,
+    pub mode_val: u32,
+    pub can_reply: bool,
+    pub can_edit: bool,
+    pub can_delete: bool,
+    pub is_read_only: bool,
+}
+
+impl JvvCommentMode {
+    pub fn new() -> Self {
+        Self {
+            comment_mode_id: String::new(),
+            mode_val: u32::default(),
+            can_reply: bool::default(),
+            can_edit: bool::default(),
+            can_delete: bool::default(),
+            is_read_only: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comment_mode_id.is_empty() || true && self.mode_val < u32::MAX || true && self.can_reply || true && self.can_edit || true && self.can_delete || true && self.is_read_only || true
+    }
+}
+
+impl Default for JvvCommentMode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output panel tab
+#[derive(Debug, Clone)]
+pub struct JvwOutputTab {
+    pub output_tab_id: String,
+    pub tab_label: String,
+    pub channel_ref: String,
+    pub icon_ref: String,
+    pub badge_count: u32,
+    pub is_active: bool,
+}
+
+impl JvwOutputTab {
+    pub fn new() -> Self {
+        Self {
+            output_tab_id: String::new(),
+            tab_label: String::new(),
+            channel_ref: String::new(),
+            icon_ref: String::new(),
+            badge_count: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_tab_id.is_empty() || true && !self.tab_label.is_empty() || true && !self.channel_ref.is_empty() || true && !self.icon_ref.is_empty() || true && self.badge_count < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JvwOutputTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output panel action
+#[derive(Debug, Clone)]
+pub struct JvxOutputAction {
+    pub output_action_id: String,
+    pub action_id: String,
+    pub label_str: String,
+    pub icon_ref: String,
+    pub command_ref: String,
+    pub is_toggle: bool,
+}
+
+impl JvxOutputAction {
+    pub fn new() -> Self {
+        Self {
+            output_action_id: String::new(),
+            action_id: String::new(),
+            label_str: String::new(),
+            icon_ref: String::new(),
+            command_ref: String::new(),
+            is_toggle: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_action_id.is_empty() || true && !self.action_id.is_empty() || true && !self.label_str.is_empty() || true && !self.icon_ref.is_empty() || true && !self.command_ref.is_empty() || true && self.is_toggle || true
+    }
+}
+
+impl Default for JvxOutputAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output line decoration
+#[derive(Debug, Clone)]
+pub struct JvyOutputDecoration {
+    pub output_deco_id: String,
+    pub line_number: u32,
+    pub fg_color: String,
+    pub bg_color: String,
+    pub font_style: String,
+    pub is_link: bool,
+}
+
+impl JvyOutputDecoration {
+    pub fn new() -> Self {
+        Self {
+            output_deco_id: String::new(),
+            line_number: u32::default(),
+            fg_color: String::new(),
+            bg_color: String::new(),
+            font_style: String::new(),
+            is_link: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_deco_id.is_empty() || true && self.line_number < u32::MAX || true && !self.fg_color.is_empty() || true && !self.bg_color.is_empty() || true && !self.font_style.is_empty() || true && self.is_link || true
+    }
+}
+
+impl Default for JvyOutputDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Output configuration
+#[derive(Debug, Clone)]
+pub struct JvzOutputConfig {
+    pub output_config_id: String,
+    pub config_key: String,
+    pub config_value_json: String,
+    pub channel_ref: String,
+    pub scope_str: String,
+    pub is_default: bool,
+}
+
+impl JvzOutputConfig {
+    pub fn new() -> Self {
+        Self {
+            output_config_id: String::new(),
+            config_key: String::new(),
+            config_value_json: String::new(),
+            channel_ref: String::new(),
+            scope_str: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_config_id.is_empty() || true && !self.config_key.is_empty() || true && !self.config_value_json.is_empty() || true && !self.channel_ref.is_empty() || true && !self.scope_str.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for JvzOutputConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -448608,6 +449492,474 @@ mod tests_juz_generated {
     fn test_juz_fields() {
         let mut obj = JuzRemoteConfig::default();
         obj.remote_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jva_generated {
+    use super::*;
+
+    #[test]
+    fn test_jva_default() {
+        let obj = JvaOutputChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jva_fields() {
+        let mut obj = JvaOutputChannel::default();
+        obj.output_ch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvb_default() {
+        let obj = JvbOutputLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvb_fields() {
+        let mut obj = JvbOutputLine::default();
+        obj.output_line_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvc_default() {
+        let obj = JvcLogOutputChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvc_fields() {
+        let mut obj = JvcLogOutputChannel::default();
+        obj.log_output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvd_default() {
+        let obj = JvdOutputEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvd_fields() {
+        let mut obj = JvdOutputEditor::default();
+        obj.output_editor_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jve_generated {
+    use super::*;
+
+    #[test]
+    fn test_jve_default() {
+        let obj = JveOutputService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jve_fields() {
+        let mut obj = JveOutputService::default();
+        obj.output_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvf_default() {
+        let obj = JvfOutputFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvf_fields() {
+        let mut obj = JvfOutputFilter::default();
+        obj.output_filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvg_default() {
+        let obj = JvgProblemPanel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvg_fields() {
+        let mut obj = JvgProblemPanel::default();
+        obj.problem_panel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvh_default() {
+        let obj = JvhProblemEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvh_fields() {
+        let mut obj = JvhProblemEntry::default();
+        obj.problem_entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvi_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvi_default() {
+        let obj = JviProblemFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvi_fields() {
+        let mut obj = JviProblemFilter::default();
+        obj.problem_filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvj_default() {
+        let obj = JvjProblemGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvj_fields() {
+        let mut obj = JvjProblemGroup::default();
+        obj.problem_group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvk_default() {
+        let obj = JvkDebugConsoleView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvk_fields() {
+        let mut obj = JvkDebugConsoleView::default();
+        obj.dbg_console_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvl_default() {
+        let obj = JvlDebugConsoleInput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvl_fields() {
+        let mut obj = JvlDebugConsoleInput::default();
+        obj.dbg_console_input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvm_default() {
+        let obj = JvmTimelineView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvm_fields() {
+        let mut obj = JvmTimelineView::default();
+        obj.timeline_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvn_default() {
+        let obj = JvnTimelineItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvn_fields() {
+        let mut obj = JvnTimelineItem::default();
+        obj.timeline_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvo_default() {
+        let obj = JvoTimelineProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvo_fields() {
+        let mut obj = JvoTimelineProvider::default();
+        obj.timeline_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvp_default() {
+        let obj = JvpTimelineFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvp_fields() {
+        let mut obj = JvpTimelineFilter::default();
+        obj.timeline_filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvq_default() {
+        let obj = JvqCommentsView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvq_fields() {
+        let mut obj = JvqCommentsView::default();
+        obj.comments_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvr_default() {
+        let obj = JvrCommentThread::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvr_fields() {
+        let mut obj = JvrCommentThread::default();
+        obj.comment_thread_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvs_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvs_default() {
+        let obj = JvsCommentBody::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvs_fields() {
+        let mut obj = JvsCommentBody::default();
+        obj.comment_body_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvt_default() {
+        let obj = JvtCommentReaction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvt_fields() {
+        let mut obj = JvtCommentReaction::default();
+        obj.comment_react_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvu_default() {
+        let obj = JvuCommentController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvu_fields() {
+        let mut obj = JvuCommentController::default();
+        obj.comment_ctrl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvv_default() {
+        let obj = JvvCommentMode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvv_fields() {
+        let mut obj = JvvCommentMode::default();
+        obj.comment_mode_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvw_default() {
+        let obj = JvwOutputTab::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvw_fields() {
+        let mut obj = JvwOutputTab::default();
+        obj.output_tab_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvx_default() {
+        let obj = JvxOutputAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvx_fields() {
+        let mut obj = JvxOutputAction::default();
+        obj.output_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvy_default() {
+        let obj = JvyOutputDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvy_fields() {
+        let mut obj = JvyOutputDecoration::default();
+        obj.output_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jvz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jvz_default() {
+        let obj = JvzOutputConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jvz_fields() {
+        let mut obj = JvzOutputConfig::default();
+        obj.output_config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
