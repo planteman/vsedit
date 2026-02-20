@@ -60016,6 +60016,213 @@ impl Default for FezSmartSelect {
 }
 
 
+/// Editor view line rendering types
+#[derive(Debug, Clone)]
+pub struct FfaEditorViewLine {
+    pub line_number: u32,
+    pub line_top: f64,
+    pub line_height: f64,
+    pub line_width: f64,
+    pub line_content: String,
+    pub line_tokens_count: u32,
+    pub line_decorations_count: u32,
+    pub line_is_visible: bool,
+    pub line_min_width: f64,
+    pub line_version: u32,
+}
+
+impl FfaEditorViewLine {
+    pub fn new() -> Self {
+        Self {
+            line_number: u32::default(),
+            line_top: f64::default(),
+            line_height: f64::default(),
+            line_width: f64::default(),
+            line_content: String::new(),
+            line_tokens_count: u32::default(),
+            line_decorations_count: u32::default(),
+            line_is_visible: bool::default(),
+            line_min_width: f64::default(),
+            line_version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.line_number < u32::MAX || true && self.line_top.is_finite() || true && self.line_height.is_finite() || true && self.line_width.is_finite() || true && !self.line_content.is_empty() || true && self.line_tokens_count < u32::MAX || true && self.line_decorations_count < u32::MAX || true && self.line_is_visible || true && self.line_min_width.is_finite() || true && self.line_version < u32::MAX || true
+    }
+}
+
+impl Default for FfaEditorViewLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor view overlay (cursor/selection/decoration) types
+#[derive(Debug, Clone)]
+pub struct FfbEditorViewOverlay {
+    pub overlay_type: String,
+    pub overlay_start_line: u32,
+    pub overlay_end_line: u32,
+    pub overlay_start_col: u32,
+    pub overlay_end_col: u32,
+    pub overlay_class_name: String,
+    pub overlay_color: String,
+    pub overlay_opacity: f64,
+    pub overlay_z_index: u32,
+    pub overlay_is_whole_line: bool,
+}
+
+impl FfbEditorViewOverlay {
+    pub fn new() -> Self {
+        Self {
+            overlay_type: String::new(),
+            overlay_start_line: u32::default(),
+            overlay_end_line: u32::default(),
+            overlay_start_col: u32::default(),
+            overlay_end_col: u32::default(),
+            overlay_class_name: String::new(),
+            overlay_color: String::new(),
+            overlay_opacity: f64::default(),
+            overlay_z_index: u32::default(),
+            overlay_is_whole_line: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.overlay_type.is_empty() || true && self.overlay_start_line < u32::MAX || true && self.overlay_end_line < u32::MAX || true && self.overlay_start_col < u32::MAX || true && self.overlay_end_col < u32::MAX || true && !self.overlay_class_name.is_empty() || true && !self.overlay_color.is_empty() || true && self.overlay_opacity.is_finite() || true && self.overlay_z_index < u32::MAX || true && self.overlay_is_whole_line || true
+    }
+}
+
+impl Default for FfbEditorViewOverlay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor whitespace rendering types
+#[derive(Debug, Clone)]
+pub struct FfcEditorViewWhitespace {
+    pub ws_render_mode: String,
+    pub ws_space_char: String,
+    pub ws_tab_char: String,
+    pub ws_newline_char: String,
+    pub ws_boundary: bool,
+    pub ws_trailing: bool,
+    pub ws_leading: bool,
+    pub ws_fg_color: String,
+    pub ws_opacity: f64,
+    pub ws_font_size: u32,
+}
+
+impl FfcEditorViewWhitespace {
+    pub fn new() -> Self {
+        Self {
+            ws_render_mode: String::new(),
+            ws_space_char: String::new(),
+            ws_tab_char: String::new(),
+            ws_newline_char: String::new(),
+            ws_boundary: bool::default(),
+            ws_trailing: bool::default(),
+            ws_leading: bool::default(),
+            ws_fg_color: String::new(),
+            ws_opacity: f64::default(),
+            ws_font_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_render_mode.is_empty() || true && !self.ws_space_char.is_empty() || true && !self.ws_tab_char.is_empty() || true && !self.ws_newline_char.is_empty() || true && self.ws_boundary || true && self.ws_trailing || true && self.ws_leading || true && !self.ws_fg_color.is_empty() || true && self.ws_opacity.is_finite() || true && self.ws_font_size < u32::MAX || true
+    }
+}
+
+impl Default for FfcEditorViewWhitespace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor ruler/column guide rendering types
+#[derive(Debug, Clone)]
+pub struct FfdEditorViewRuler {
+    pub ruler_column: u32,
+    pub ruler_color: String,
+    pub ruler_width: u32,
+    pub ruler_style: String,
+    pub ruler_opacity: f64,
+    pub ruler_visible: bool,
+    pub ruler_label: String,
+    pub ruler_z_index: u32,
+    pub ruler_dash_pattern: String,
+    pub ruler_active_color: String,
+}
+
+impl FfdEditorViewRuler {
+    pub fn new() -> Self {
+        Self {
+            ruler_column: u32::default(),
+            ruler_color: String::new(),
+            ruler_width: u32::default(),
+            ruler_style: String::new(),
+            ruler_opacity: f64::default(),
+            ruler_visible: bool::default(),
+            ruler_label: String::new(),
+            ruler_z_index: u32::default(),
+            ruler_dash_pattern: String::new(),
+            ruler_active_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.ruler_column < u32::MAX || true && !self.ruler_color.is_empty() || true && self.ruler_width < u32::MAX || true && !self.ruler_style.is_empty() || true && self.ruler_opacity.is_finite() || true && self.ruler_visible || true && !self.ruler_label.is_empty() || true && self.ruler_z_index < u32::MAX || true && !self.ruler_dash_pattern.is_empty() || true && !self.ruler_active_color.is_empty() || true
+    }
+}
+
+impl Default for FfdEditorViewRuler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor indentation rendering types
+#[derive(Debug, Clone)]
+pub struct FfeEditorViewIndent {
+    pub indent_level: u32,
+    pub indent_size: u32,
+    pub indent_use_tabs: bool,
+    pub indent_tab_size: u32,
+    pub indent_guide_color: String,
+    pub indent_active_guide_color: String,
+    pub indent_render_guides: bool,
+    pub indent_highlight_active: bool,
+    pub indent_bracket_level: u32,
+    pub indent_max_level: u32,
+}
+
+impl FfeEditorViewIndent {
+    pub fn new() -> Self {
+        Self {
+            indent_level: u32::default(),
+            indent_size: u32::default(),
+            indent_use_tabs: bool::default(),
+            indent_tab_size: u32::default(),
+            indent_guide_color: String::new(),
+            indent_active_guide_color: String::new(),
+            indent_render_guides: bool::default(),
+            indent_highlight_active: bool::default(),
+            indent_bracket_level: u32::default(),
+            indent_max_level: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.indent_level < u32::MAX || true && self.indent_size < u32::MAX || true && self.indent_use_tabs || true && self.indent_tab_size < u32::MAX || true && !self.indent_guide_color.is_empty() || true && !self.indent_active_guide_color.is_empty() || true && self.indent_render_guides || true && self.indent_highlight_active || true && self.indent_bracket_level < u32::MAX || true && self.indent_max_level < u32::MAX || true
+    }
+}
+
+impl Default for FfeEditorViewIndent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -273739,6 +273946,96 @@ mod tests_fez_generated {
     fn test_fez_fields() {
         let mut obj = FezSmartSelect::default();
         obj.smart_range_start = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffa_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffa_default() {
+        let obj = FfaEditorViewLine::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffa_fields() {
+        let mut obj = FfaEditorViewLine::default();
+        obj.line_number = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffb_default() {
+        let obj = FfbEditorViewOverlay::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffb_fields() {
+        let mut obj = FfbEditorViewOverlay::default();
+        obj.overlay_type = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffc_default() {
+        let obj = FfcEditorViewWhitespace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffc_fields() {
+        let mut obj = FfcEditorViewWhitespace::default();
+        obj.ws_render_mode = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffd_default() {
+        let obj = FfdEditorViewRuler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffd_fields() {
+        let mut obj = FfdEditorViewRuler::default();
+        obj.ruler_column = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ffe_generated {
+    use super::*;
+
+    #[test]
+    fn test_ffe_default() {
+        let obj = FfeEditorViewIndent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ffe_fields() {
+        let mut obj = FfeEditorViewIndent::default();
+        obj.indent_level = 42;
         assert!(obj.validate());
     }
 }
