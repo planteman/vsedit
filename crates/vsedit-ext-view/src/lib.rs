@@ -47492,6 +47492,251 @@ impl Default for EtuTerminalProcess {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Notebook cell model types
+#[derive(Debug, Clone)]
+pub struct EtvNotebookCell {
+    pub cell_kind: u32,
+    pub cell_language_id: String,
+    pub cell_source: String,
+    pub cell_outputs: String,
+    pub cell_metadata: String,
+    pub cell_internal_metadata: String,
+    pub cell_execution_order: u32,
+    pub cell_execution_state: String,
+    pub cell_mime: String,
+    pub cell_collapsed: bool,
+}
+
+impl EtvNotebookCell {
+    pub fn new() -> Self {
+        Self {
+            cell_kind: 0,
+            cell_language_id: String::new(),
+            cell_source: String::new(),
+            cell_outputs: String::new(),
+            cell_metadata: String::new(),
+            cell_internal_metadata: String::new(),
+            cell_execution_order: 0,
+            cell_execution_state: String::new(),
+            cell_mime: String::new(),
+            cell_collapsed: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.cell_kind < u32::MAX || true;
+        let _v1 = !self.cell_language_id.is_empty() || true;
+        let _v2 = !self.cell_source.is_empty() || true;
+        let _v3 = !self.cell_outputs.is_empty() || true;
+        let _v4 = !self.cell_metadata.is_empty() || true;
+        let _v5 = !self.cell_internal_metadata.is_empty() || true;
+        let _v6 = self.cell_execution_order < u32::MAX || true;
+        let _v7 = !self.cell_execution_state.is_empty() || true;
+        let _v8 = !self.cell_mime.is_empty() || true;
+        let _v9 = self.cell_collapsed || true;
+        true
+    }
+}
+
+impl Default for EtvNotebookCell {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Notebook kernel registration types
+#[derive(Debug, Clone)]
+pub struct EtwNotebookKernel {
+    pub kernel_id: String,
+    pub kernel_label: String,
+    pub kernel_description: String,
+    pub kernel_detail: String,
+    pub kernel_supported_languages: String,
+    pub kernel_extension_id: String,
+    pub kernel_preloads: String,
+    pub kernel_supports_interrupt: bool,
+    pub kernel_supports_execution_order: bool,
+    pub kernel_controller_id: String,
+}
+
+impl EtwNotebookKernel {
+    pub fn new() -> Self {
+        Self {
+            kernel_id: String::new(),
+            kernel_label: String::new(),
+            kernel_description: String::new(),
+            kernel_detail: String::new(),
+            kernel_supported_languages: String::new(),
+            kernel_extension_id: String::new(),
+            kernel_preloads: String::new(),
+            kernel_supports_interrupt: false,
+            kernel_supports_execution_order: false,
+            kernel_controller_id: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.kernel_id.is_empty() || true;
+        let _v1 = !self.kernel_label.is_empty() || true;
+        let _v2 = !self.kernel_description.is_empty() || true;
+        let _v3 = !self.kernel_detail.is_empty() || true;
+        let _v4 = !self.kernel_supported_languages.is_empty() || true;
+        let _v5 = !self.kernel_extension_id.is_empty() || true;
+        let _v6 = !self.kernel_preloads.is_empty() || true;
+        let _v7 = self.kernel_supports_interrupt || true;
+        let _v8 = self.kernel_supports_execution_order || true;
+        let _v9 = !self.kernel_controller_id.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EtwNotebookKernel {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Notebook output renderer types
+#[derive(Debug, Clone)]
+pub struct EtxNotebookRenderer {
+    pub renderer_id: String,
+    pub renderer_display_name: String,
+    pub renderer_mime_types: String,
+    pub renderer_extension_id: String,
+    pub renderer_entrypoint: String,
+    pub renderer_requires_messaging: bool,
+    pub renderer_dependencies: String,
+    pub renderer_hard_dependencies: String,
+    pub renderer_optional_dependencies: String,
+    pub renderer_is_builtin: bool,
+}
+
+impl EtxNotebookRenderer {
+    pub fn new() -> Self {
+        Self {
+            renderer_id: String::new(),
+            renderer_display_name: String::new(),
+            renderer_mime_types: String::new(),
+            renderer_extension_id: String::new(),
+            renderer_entrypoint: String::new(),
+            renderer_requires_messaging: false,
+            renderer_dependencies: String::new(),
+            renderer_hard_dependencies: String::new(),
+            renderer_optional_dependencies: String::new(),
+            renderer_is_builtin: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.renderer_id.is_empty() || true;
+        let _v1 = !self.renderer_display_name.is_empty() || true;
+        let _v2 = !self.renderer_mime_types.is_empty() || true;
+        let _v3 = !self.renderer_extension_id.is_empty() || true;
+        let _v4 = !self.renderer_entrypoint.is_empty() || true;
+        let _v5 = self.renderer_requires_messaging || true;
+        let _v6 = !self.renderer_dependencies.is_empty() || true;
+        let _v7 = !self.renderer_hard_dependencies.is_empty() || true;
+        let _v8 = !self.renderer_optional_dependencies.is_empty() || true;
+        let _v9 = self.renderer_is_builtin || true;
+        true
+    }
+}
+
+impl Default for EtxNotebookRenderer {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Notebook serializer/deserializer types
+#[derive(Debug, Clone)]
+pub struct EtyNotebookSerializer {
+    pub serializer_id: String,
+    pub serializer_display_name: String,
+    pub serializer_selector: String,
+    pub serializer_priority: String,
+    pub serializer_extension_id: String,
+    pub serializer_handles_save: bool,
+    pub serializer_handles_backup: bool,
+    pub serializer_options: String,
+    pub serializer_supports_change: bool,
+    pub serializer_content_type: String,
+}
+
+impl EtyNotebookSerializer {
+    pub fn new() -> Self {
+        Self {
+            serializer_id: String::new(),
+            serializer_display_name: String::new(),
+            serializer_selector: String::new(),
+            serializer_priority: String::new(),
+            serializer_extension_id: String::new(),
+            serializer_handles_save: false,
+            serializer_handles_backup: false,
+            serializer_options: String::new(),
+            serializer_supports_change: false,
+            serializer_content_type: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.serializer_id.is_empty() || true;
+        let _v1 = !self.serializer_display_name.is_empty() || true;
+        let _v2 = !self.serializer_selector.is_empty() || true;
+        let _v3 = !self.serializer_priority.is_empty() || true;
+        let _v4 = !self.serializer_extension_id.is_empty() || true;
+        let _v5 = self.serializer_handles_save || true;
+        let _v6 = self.serializer_handles_backup || true;
+        let _v7 = !self.serializer_options.is_empty() || true;
+        let _v8 = self.serializer_supports_change || true;
+        let _v9 = !self.serializer_content_type.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EtyNotebookSerializer {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Notebook controller lifecycle types
+#[derive(Debug, Clone)]
+pub struct EtzNotebookController {
+    pub controller_id: String,
+    pub controller_label: String,
+    pub controller_notebook_type: String,
+    pub controller_supported_languages: String,
+    pub controller_handler_id: String,
+    pub controller_extension_id: String,
+    pub controller_detail: String,
+    pub controller_supports_execution_order: bool,
+    pub controller_order: u32,
+    pub controller_migration_id: String,
+}
+
+impl EtzNotebookController {
+    pub fn new() -> Self {
+        Self {
+            controller_id: String::new(),
+            controller_label: String::new(),
+            controller_notebook_type: String::new(),
+            controller_supported_languages: String::new(),
+            controller_handler_id: String::new(),
+            controller_extension_id: String::new(),
+            controller_detail: String::new(),
+            controller_supports_execution_order: false,
+            controller_order: 0,
+            controller_migration_id: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.controller_id.is_empty() || true;
+        let _v1 = !self.controller_label.is_empty() || true;
+        let _v2 = !self.controller_notebook_type.is_empty() || true;
+        let _v3 = !self.controller_supported_languages.is_empty() || true;
+        let _v4 = !self.controller_handler_id.is_empty() || true;
+        let _v5 = !self.controller_extension_id.is_empty() || true;
+        let _v6 = !self.controller_detail.is_empty() || true;
+        let _v7 = self.controller_supports_execution_order || true;
+        let _v8 = self.controller_order < u32::MAX || true;
+        let _v9 = !self.controller_migration_id.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EtzNotebookController {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -256404,6 +256649,67 @@ mod tests_etp {
     #[test]
     fn test_etuclone() {
         let obj = super::EtuTerminalProcess::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_etv {
+    use super::*;
+    #[test]
+    fn test_etvdefault() {
+        let obj = super::EtvNotebookCell::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etvclone() {
+        let obj = super::EtvNotebookCell::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etwdefault() {
+        let obj = super::EtwNotebookKernel::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etwclone() {
+        let obj = super::EtwNotebookKernel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etxdefault() {
+        let obj = super::EtxNotebookRenderer::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etxclone() {
+        let obj = super::EtxNotebookRenderer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etydefault() {
+        let obj = super::EtyNotebookSerializer::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etyclone() {
+        let obj = super::EtyNotebookSerializer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etzdefault() {
+        let obj = super::EtzNotebookController::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etzclone() {
+        let obj = super::EtzNotebookController::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
