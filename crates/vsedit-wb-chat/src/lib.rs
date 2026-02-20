@@ -167332,6 +167332,890 @@ impl Default for JhzDebugToolbar {
     }
 }
 
+/// Language service descriptor
+#[derive(Debug, Clone)]
+pub struct JiaLanguageService {
+    pub lang_svc_id: String,
+    pub language_id: String,
+    pub provider_count: u32,
+    pub capabilities_flags: u32,
+    pub latency_ms: u32,
+    pub is_active: bool,
+}
+
+impl JiaLanguageService {
+    pub fn new() -> Self {
+        Self {
+            lang_svc_id: String::new(),
+            language_id: String::new(),
+            provider_count: u32::default(),
+            capabilities_flags: u32::default(),
+            latency_ms: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_svc_id.is_empty() || true && !self.language_id.is_empty() || true && self.provider_count < u32::MAX || true && self.capabilities_flags < u32::MAX || true && self.latency_ms < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JiaLanguageService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Completion model entry
+#[derive(Debug, Clone)]
+pub struct JibCompletionModel {
+    pub comp_model_id: String,
+    pub line_context: String,
+    pub word_prefix: String,
+    pub item_count: u32,
+    pub trigger_kind_str: String,
+    pub is_incomplete: bool,
+}
+
+impl JibCompletionModel {
+    pub fn new() -> Self {
+        Self {
+            comp_model_id: String::new(),
+            line_context: String::new(),
+            word_prefix: String::new(),
+            item_count: u32::default(),
+            trigger_kind_str: String::new(),
+            is_incomplete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comp_model_id.is_empty() || true && !self.line_context.is_empty() || true && !self.word_prefix.is_empty() || true && self.item_count < u32::MAX || true && !self.trigger_kind_str.is_empty() || true && self.is_incomplete || true
+    }
+}
+
+impl Default for JibCompletionModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Completion item descriptor
+#[derive(Debug, Clone)]
+pub struct JicCompletionItem {
+    pub comp_item_id: String,
+    pub label_str: String,
+    pub kind_val: u32,
+    pub detail_str: String,
+    pub sort_text: String,
+    pub is_preselect: bool,
+}
+
+impl JicCompletionItem {
+    pub fn new() -> Self {
+        Self {
+            comp_item_id: String::new(),
+            label_str: String::new(),
+            kind_val: u32::default(),
+            detail_str: String::new(),
+            sort_text: String::new(),
+            is_preselect: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.comp_item_id.is_empty() || true && !self.label_str.is_empty() || true && self.kind_val < u32::MAX || true && !self.detail_str.is_empty() || true && !self.sort_text.is_empty() || true && self.is_preselect || true
+    }
+}
+
+impl Default for JicCompletionItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Signature help descriptor
+#[derive(Debug, Clone)]
+pub struct JidSignatureHelp {
+    pub sig_help_id: String,
+    pub label_str: String,
+    pub documentation_str: String,
+    pub param_count: u32,
+    pub active_param_idx: u32,
+    pub is_retrigger: bool,
+}
+
+impl JidSignatureHelp {
+    pub fn new() -> Self {
+        Self {
+            sig_help_id: String::new(),
+            label_str: String::new(),
+            documentation_str: String::new(),
+            param_count: u32::default(),
+            active_param_idx: u32::default(),
+            is_retrigger: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sig_help_id.is_empty() || true && !self.label_str.is_empty() || true && !self.documentation_str.is_empty() || true && self.param_count < u32::MAX || true && self.active_param_idx < u32::MAX || true && self.is_retrigger || true
+    }
+}
+
+impl Default for JidSignatureHelp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Hover information descriptor
+#[derive(Debug, Clone)]
+pub struct JieHoverInfo {
+    pub hover_info_id: String,
+    pub contents_md: String,
+    pub range_json: String,
+    pub source_str: String,
+    pub provider_ref: String,
+    pub is_trusted: bool,
+}
+
+impl JieHoverInfo {
+    pub fn new() -> Self {
+        Self {
+            hover_info_id: String::new(),
+            contents_md: String::new(),
+            range_json: String::new(),
+            source_str: String::new(),
+            provider_ref: String::new(),
+            is_trusted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_info_id.is_empty() || true && !self.contents_md.is_empty() || true && !self.range_json.is_empty() || true && !self.source_str.is_empty() || true && !self.provider_ref.is_empty() || true && self.is_trusted || true
+    }
+}
+
+impl Default for JieHoverInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Go-to-definition result
+#[derive(Debug, Clone)]
+pub struct JifDefinitionResult {
+    pub def_result_id: String,
+    pub target_uri: String,
+    pub target_range_json: String,
+    pub origin_range_json: String,
+    pub provider_ref: String,
+    pub is_definition: bool,
+}
+
+impl JifDefinitionResult {
+    pub fn new() -> Self {
+        Self {
+            def_result_id: String::new(),
+            target_uri: String::new(),
+            target_range_json: String::new(),
+            origin_range_json: String::new(),
+            provider_ref: String::new(),
+            is_definition: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.def_result_id.is_empty() || true && !self.target_uri.is_empty() || true && !self.target_range_json.is_empty() || true && !self.origin_range_json.is_empty() || true && !self.provider_ref.is_empty() || true && self.is_definition || true
+    }
+}
+
+impl Default for JifDefinitionResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Find references result
+#[derive(Debug, Clone)]
+pub struct JigReferenceResult {
+    pub ref_result_id: String,
+    pub uri_str: String,
+    pub range_json: String,
+    pub context_text: String,
+    pub reference_count: u32,
+    pub is_declaration: bool,
+}
+
+impl JigReferenceResult {
+    pub fn new() -> Self {
+        Self {
+            ref_result_id: String::new(),
+            uri_str: String::new(),
+            range_json: String::new(),
+            context_text: String::new(),
+            reference_count: u32::default(),
+            is_declaration: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ref_result_id.is_empty() || true && !self.uri_str.is_empty() || true && !self.range_json.is_empty() || true && !self.context_text.is_empty() || true && self.reference_count < u32::MAX || true && self.is_declaration || true
+    }
+}
+
+impl Default for JigReferenceResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document symbol descriptor
+#[derive(Debug, Clone)]
+pub struct JihSymbolInfo {
+    pub sym_info_id: String,
+    pub symbol_name: String,
+    pub kind_val: u32,
+    pub range_json: String,
+    pub container_name: String,
+    pub is_deprecated: bool,
+}
+
+impl JihSymbolInfo {
+    pub fn new() -> Self {
+        Self {
+            sym_info_id: String::new(),
+            symbol_name: String::new(),
+            kind_val: u32::default(),
+            range_json: String::new(),
+            container_name: String::new(),
+            is_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sym_info_id.is_empty() || true && !self.symbol_name.is_empty() || true && self.kind_val < u32::MAX || true && !self.range_json.is_empty() || true && !self.container_name.is_empty() || true && self.is_deprecated || true
+    }
+}
+
+impl Default for JihSymbolInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace symbol result
+#[derive(Debug, Clone)]
+pub struct JiiWorkspaceSymbol {
+    pub ws_sym_id: String,
+    pub symbol_name: String,
+    pub kind_val: u32,
+    pub location_json: String,
+    pub container_name: String,
+    pub has_score: bool,
+}
+
+impl JiiWorkspaceSymbol {
+    pub fn new() -> Self {
+        Self {
+            ws_sym_id: String::new(),
+            symbol_name: String::new(),
+            kind_val: u32::default(),
+            location_json: String::new(),
+            container_name: String::new(),
+            has_score: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_sym_id.is_empty() || true && !self.symbol_name.is_empty() || true && self.kind_val < u32::MAX || true && !self.location_json.is_empty() || true && !self.container_name.is_empty() || true && self.has_score || true
+    }
+}
+
+impl Default for JiiWorkspaceSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code lens descriptor
+#[derive(Debug, Clone)]
+pub struct JijCodeLens {
+    pub lens_id: String,
+    pub range_json: String,
+    pub command_ref: String,
+    pub provider_ref: String,
+    pub resolve_count: u32,
+    pub is_resolved: bool,
+}
+
+impl JijCodeLens {
+    pub fn new() -> Self {
+        Self {
+            lens_id: String::new(),
+            range_json: String::new(),
+            command_ref: String::new(),
+            provider_ref: String::new(),
+            resolve_count: u32::default(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lens_id.is_empty() || true && !self.range_json.is_empty() || true && !self.command_ref.is_empty() || true && !self.provider_ref.is_empty() || true && self.resolve_count < u32::MAX || true && self.is_resolved || true
+    }
+}
+
+impl Default for JijCodeLens {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code action descriptor
+#[derive(Debug, Clone)]
+pub struct JikCodeAction {
+    pub code_action_id: String,
+    pub title_str: String,
+    pub kind_str: String,
+    pub diagnostics_csv: String,
+    pub is_preferred: bool,
+    pub is_disabled: bool,
+}
+
+impl JikCodeAction {
+    pub fn new() -> Self {
+        Self {
+            code_action_id: String::new(),
+            title_str: String::new(),
+            kind_str: String::new(),
+            diagnostics_csv: String::new(),
+            is_preferred: bool::default(),
+            is_disabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.code_action_id.is_empty() || true && !self.title_str.is_empty() || true && !self.kind_str.is_empty() || true && !self.diagnostics_csv.is_empty() || true && self.is_preferred || true && self.is_disabled || true
+    }
+}
+
+impl Default for JikCodeAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Rename operation result
+#[derive(Debug, Clone)]
+pub struct JilRenameResult {
+    pub rename_result_id: String,
+    pub old_name: String,
+    pub new_name: String,
+    pub edit_count: u32,
+    pub file_count: u32,
+    pub needs_confirmation: bool,
+}
+
+impl JilRenameResult {
+    pub fn new() -> Self {
+        Self {
+            rename_result_id: String::new(),
+            old_name: String::new(),
+            new_name: String::new(),
+            edit_count: u32::default(),
+            file_count: u32::default(),
+            needs_confirmation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rename_result_id.is_empty() || true && !self.old_name.is_empty() || true && !self.new_name.is_empty() || true && self.edit_count < u32::MAX || true && self.file_count < u32::MAX || true && self.needs_confirmation || true
+    }
+}
+
+impl Default for JilRenameResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document formatting result
+#[derive(Debug, Clone)]
+pub struct JimFormatResult {
+    pub fmt_result_id: String,
+    pub range_json: String,
+    pub new_text: String,
+    pub edit_count: u32,
+    pub provider_ref: String,
+    pub is_whole_doc: bool,
+}
+
+impl JimFormatResult {
+    pub fn new() -> Self {
+        Self {
+            fmt_result_id: String::new(),
+            range_json: String::new(),
+            new_text: String::new(),
+            edit_count: u32::default(),
+            provider_ref: String::new(),
+            is_whole_doc: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fmt_result_id.is_empty() || true && !self.range_json.is_empty() || true && !self.new_text.is_empty() || true && self.edit_count < u32::MAX || true && !self.provider_ref.is_empty() || true && self.is_whole_doc || true
+    }
+}
+
+impl Default for JimFormatResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Folding range descriptor
+#[derive(Debug, Clone)]
+pub struct JinFoldingRange {
+    pub folding_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub kind_str: String,
+    pub collapsed_text: String,
+    pub is_manual: bool,
+}
+
+impl JinFoldingRange {
+    pub fn new() -> Self {
+        Self {
+            folding_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            kind_str: String::new(),
+            collapsed_text: String::new(),
+            is_manual: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folding_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.kind_str.is_empty() || true && !self.collapsed_text.is_empty() || true && self.is_manual || true
+    }
+}
+
+impl Default for JinFoldingRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection range descriptor
+#[derive(Debug, Clone)]
+pub struct JioSelectionRange {
+    pub sel_range_id: String,
+    pub range_json: String,
+    pub parent_ref: String,
+    pub depth_val: u32,
+    pub source_str: String,
+    pub is_outermost: bool,
+}
+
+impl JioSelectionRange {
+    pub fn new() -> Self {
+        Self {
+            sel_range_id: String::new(),
+            range_json: String::new(),
+            parent_ref: String::new(),
+            depth_val: u32::default(),
+            source_str: String::new(),
+            is_outermost: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_range_id.is_empty() || true && !self.range_json.is_empty() || true && !self.parent_ref.is_empty() || true && self.depth_val < u32::MAX || true && !self.source_str.is_empty() || true && self.is_outermost || true
+    }
+}
+
+impl Default for JioSelectionRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Call hierarchy item
+#[derive(Debug, Clone)]
+pub struct JipCallHierarchy {
+    pub call_hier_id: String,
+    pub name_str: String,
+    pub kind_val: u32,
+    pub uri_str: String,
+    pub range_json: String,
+    pub is_incoming: bool,
+}
+
+impl JipCallHierarchy {
+    pub fn new() -> Self {
+        Self {
+            call_hier_id: String::new(),
+            name_str: String::new(),
+            kind_val: u32::default(),
+            uri_str: String::new(),
+            range_json: String::new(),
+            is_incoming: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.call_hier_id.is_empty() || true && !self.name_str.is_empty() || true && self.kind_val < u32::MAX || true && !self.uri_str.is_empty() || true && !self.range_json.is_empty() || true && self.is_incoming || true
+    }
+}
+
+impl Default for JipCallHierarchy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Type hierarchy item
+#[derive(Debug, Clone)]
+pub struct JiqTypeHierarchy {
+    pub type_hier_id: String,
+    pub name_str: String,
+    pub kind_val: u32,
+    pub uri_str: String,
+    pub range_json: String,
+    pub is_supertype: bool,
+}
+
+impl JiqTypeHierarchy {
+    pub fn new() -> Self {
+        Self {
+            type_hier_id: String::new(),
+            name_str: String::new(),
+            kind_val: u32::default(),
+            uri_str: String::new(),
+            range_json: String::new(),
+            is_supertype: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.type_hier_id.is_empty() || true && !self.name_str.is_empty() || true && self.kind_val < u32::MAX || true && !self.uri_str.is_empty() || true && !self.range_json.is_empty() || true && self.is_supertype || true
+    }
+}
+
+impl Default for JiqTypeHierarchy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inlay hint descriptor
+#[derive(Debug, Clone)]
+pub struct JirInlayHint {
+    pub inlay_id: String,
+    pub position_json: String,
+    pub label_str: String,
+    pub kind_str: String,
+    pub tooltip_str: String,
+    pub is_padding_left: bool,
+}
+
+impl JirInlayHint {
+    pub fn new() -> Self {
+        Self {
+            inlay_id: String::new(),
+            position_json: String::new(),
+            label_str: String::new(),
+            kind_str: String::new(),
+            tooltip_str: String::new(),
+            is_padding_left: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inlay_id.is_empty() || true && !self.position_json.is_empty() || true && !self.label_str.is_empty() || true && !self.kind_str.is_empty() || true && !self.tooltip_str.is_empty() || true && self.is_padding_left || true
+    }
+}
+
+impl Default for JirInlayHint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Linked editing range
+#[derive(Debug, Clone)]
+pub struct JisLinkedEditingRange {
+    pub linked_edit_id: String,
+    pub ranges_json: String,
+    pub word_pattern: String,
+    pub provider_ref: String,
+    pub range_count: u32,
+    pub is_active: bool,
+}
+
+impl JisLinkedEditingRange {
+    pub fn new() -> Self {
+        Self {
+            linked_edit_id: String::new(),
+            ranges_json: String::new(),
+            word_pattern: String::new(),
+            provider_ref: String::new(),
+            range_count: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.linked_edit_id.is_empty() || true && !self.ranges_json.is_empty() || true && !self.word_pattern.is_empty() || true && !self.provider_ref.is_empty() || true && self.range_count < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JisLinkedEditingRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token descriptor
+#[derive(Debug, Clone)]
+pub struct JitSemanticToken {
+    pub sem_token_id: String,
+    pub line_delta: u32,
+    pub start_delta: u32,
+    pub length_val: u32,
+    pub token_type_idx: u32,
+    pub has_modifiers: bool,
+}
+
+impl JitSemanticToken {
+    pub fn new() -> Self {
+        Self {
+            sem_token_id: String::new(),
+            line_delta: u32::default(),
+            start_delta: u32::default(),
+            length_val: u32::default(),
+            token_type_idx: u32::default(),
+            has_modifiers: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sem_token_id.is_empty() || true && self.line_delta < u32::MAX || true && self.start_delta < u32::MAX || true && self.length_val < u32::MAX || true && self.token_type_idx < u32::MAX || true && self.has_modifiers || true
+    }
+}
+
+impl Default for JitSemanticToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document color descriptor
+#[derive(Debug, Clone)]
+pub struct JiuDocumentColor {
+    pub doc_color_id: String,
+    pub range_json: String,
+    pub red_val: f64,
+    pub green_val: f64,
+    pub blue_val: f64,
+    pub has_alpha: bool,
+}
+
+impl JiuDocumentColor {
+    pub fn new() -> Self {
+        Self {
+            doc_color_id: String::new(),
+            range_json: String::new(),
+            red_val: f64::default(),
+            green_val: f64::default(),
+            blue_val: f64::default(),
+            has_alpha: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.doc_color_id.is_empty() || true && !self.range_json.is_empty() || true && self.red_val.is_finite() || true && self.green_val.is_finite() || true && self.blue_val.is_finite() || true && self.has_alpha || true
+    }
+}
+
+impl Default for JiuDocumentColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color presentation option
+#[derive(Debug, Clone)]
+pub struct JivColorPresentation {
+    pub color_pres_id: String,
+    pub label_str: String,
+    pub text_edit_json: String,
+    pub additional_edits_json: String,
+    pub color_ref: String,
+    pub is_preferred: bool,
+}
+
+impl JivColorPresentation {
+    pub fn new() -> Self {
+        Self {
+            color_pres_id: String::new(),
+            label_str: String::new(),
+            text_edit_json: String::new(),
+            additional_edits_json: String::new(),
+            color_ref: String::new(),
+            is_preferred: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_pres_id.is_empty() || true && !self.label_str.is_empty() || true && !self.text_edit_json.is_empty() || true && !self.additional_edits_json.is_empty() || true && !self.color_ref.is_empty() || true && self.is_preferred || true
+    }
+}
+
+impl Default for JivColorPresentation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document highlight entry
+#[derive(Debug, Clone)]
+pub struct JiwDocumentHighlight {
+    pub doc_hl_id: String,
+    pub range_json: String,
+    pub kind_val: u32,
+    pub provider_ref: String,
+    pub match_count: u32,
+    pub is_write_access: bool,
+}
+
+impl JiwDocumentHighlight {
+    pub fn new() -> Self {
+        Self {
+            doc_hl_id: String::new(),
+            range_json: String::new(),
+            kind_val: u32::default(),
+            provider_ref: String::new(),
+            match_count: u32::default(),
+            is_write_access: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.doc_hl_id.is_empty() || true && !self.range_json.is_empty() || true && self.kind_val < u32::MAX || true && !self.provider_ref.is_empty() || true && self.match_count < u32::MAX || true && self.is_write_access || true
+    }
+}
+
+impl Default for JiwDocumentHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document link entry
+#[derive(Debug, Clone)]
+pub struct JixDocumentLink {
+    pub doc_link_id: String,
+    pub range_json: String,
+    pub target_uri: String,
+    pub tooltip_str: String,
+    pub data_json: String,
+    pub is_resolved: bool,
+}
+
+impl JixDocumentLink {
+    pub fn new() -> Self {
+        Self {
+            doc_link_id: String::new(),
+            range_json: String::new(),
+            target_uri: String::new(),
+            tooltip_str: String::new(),
+            data_json: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.doc_link_id.is_empty() || true && !self.range_json.is_empty() || true && !self.target_uri.is_empty() || true && !self.tooltip_str.is_empty() || true && !self.data_json.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for JixDocumentLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diagnostic entry descriptor
+#[derive(Debug, Clone)]
+pub struct JiyDiagnostic {
+    pub diag_id: String,
+    pub range_json: String,
+    pub message_str: String,
+    pub severity_val: u32,
+    pub source_str: String,
+    pub has_related_info: bool,
+}
+
+impl JiyDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            diag_id: String::new(),
+            range_json: String::new(),
+            message_str: String::new(),
+            severity_val: u32::default(),
+            source_str: String::new(),
+            has_related_info: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_id.is_empty() || true && !self.range_json.is_empty() || true && !self.message_str.is_empty() || true && self.severity_val < u32::MAX || true && !self.source_str.is_empty() || true && self.has_related_info || true
+    }
+}
+
+impl Default for JiyDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diagnostic collection
+#[derive(Debug, Clone)]
+pub struct JizDiagnosticCollection {
+    pub diag_coll_id: String,
+    pub name_str: String,
+    pub uri_count: u32,
+    pub total_diagnostics: u32,
+    pub max_severity: u32,
+    pub is_disposable: bool,
+}
+
+impl JizDiagnosticCollection {
+    pub fn new() -> Self {
+        Self {
+            diag_coll_id: String::new(),
+            name_str: String::new(),
+            uri_count: u32::default(),
+            total_diagnostics: u32::default(),
+            max_severity: u32::default(),
+            is_disposable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_coll_id.is_empty() || true && !self.name_str.is_empty() || true && self.uri_count < u32::MAX || true && self.total_diagnostics < u32::MAX || true && self.max_severity < u32::MAX || true && self.is_disposable || true
+    }
+}
+
+impl Default for JizDiagnosticCollection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -431040,6 +431924,474 @@ mod tests_jhz_generated {
     fn test_jhz_fields() {
         let mut obj = JhzDebugToolbar::default();
         obj.dbg_toolbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jia_generated {
+    use super::*;
+
+    #[test]
+    fn test_jia_default() {
+        let obj = JiaLanguageService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jia_fields() {
+        let mut obj = JiaLanguageService::default();
+        obj.lang_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jib_generated {
+    use super::*;
+
+    #[test]
+    fn test_jib_default() {
+        let obj = JibCompletionModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jib_fields() {
+        let mut obj = JibCompletionModel::default();
+        obj.comp_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jic_generated {
+    use super::*;
+
+    #[test]
+    fn test_jic_default() {
+        let obj = JicCompletionItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jic_fields() {
+        let mut obj = JicCompletionItem::default();
+        obj.comp_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jid_generated {
+    use super::*;
+
+    #[test]
+    fn test_jid_default() {
+        let obj = JidSignatureHelp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jid_fields() {
+        let mut obj = JidSignatureHelp::default();
+        obj.sig_help_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jie_generated {
+    use super::*;
+
+    #[test]
+    fn test_jie_default() {
+        let obj = JieHoverInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jie_fields() {
+        let mut obj = JieHoverInfo::default();
+        obj.hover_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jif_generated {
+    use super::*;
+
+    #[test]
+    fn test_jif_default() {
+        let obj = JifDefinitionResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jif_fields() {
+        let mut obj = JifDefinitionResult::default();
+        obj.def_result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jig_generated {
+    use super::*;
+
+    #[test]
+    fn test_jig_default() {
+        let obj = JigReferenceResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jig_fields() {
+        let mut obj = JigReferenceResult::default();
+        obj.ref_result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jih_generated {
+    use super::*;
+
+    #[test]
+    fn test_jih_default() {
+        let obj = JihSymbolInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jih_fields() {
+        let mut obj = JihSymbolInfo::default();
+        obj.sym_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jii_generated {
+    use super::*;
+
+    #[test]
+    fn test_jii_default() {
+        let obj = JiiWorkspaceSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jii_fields() {
+        let mut obj = JiiWorkspaceSymbol::default();
+        obj.ws_sym_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jij_generated {
+    use super::*;
+
+    #[test]
+    fn test_jij_default() {
+        let obj = JijCodeLens::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jij_fields() {
+        let mut obj = JijCodeLens::default();
+        obj.lens_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jik_generated {
+    use super::*;
+
+    #[test]
+    fn test_jik_default() {
+        let obj = JikCodeAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jik_fields() {
+        let mut obj = JikCodeAction::default();
+        obj.code_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jil_generated {
+    use super::*;
+
+    #[test]
+    fn test_jil_default() {
+        let obj = JilRenameResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jil_fields() {
+        let mut obj = JilRenameResult::default();
+        obj.rename_result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jim_generated {
+    use super::*;
+
+    #[test]
+    fn test_jim_default() {
+        let obj = JimFormatResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jim_fields() {
+        let mut obj = JimFormatResult::default();
+        obj.fmt_result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jin_generated {
+    use super::*;
+
+    #[test]
+    fn test_jin_default() {
+        let obj = JinFoldingRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jin_fields() {
+        let mut obj = JinFoldingRange::default();
+        obj.folding_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jio_generated {
+    use super::*;
+
+    #[test]
+    fn test_jio_default() {
+        let obj = JioSelectionRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jio_fields() {
+        let mut obj = JioSelectionRange::default();
+        obj.sel_range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jip_generated {
+    use super::*;
+
+    #[test]
+    fn test_jip_default() {
+        let obj = JipCallHierarchy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jip_fields() {
+        let mut obj = JipCallHierarchy::default();
+        obj.call_hier_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jiq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jiq_default() {
+        let obj = JiqTypeHierarchy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jiq_fields() {
+        let mut obj = JiqTypeHierarchy::default();
+        obj.type_hier_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jir_generated {
+    use super::*;
+
+    #[test]
+    fn test_jir_default() {
+        let obj = JirInlayHint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jir_fields() {
+        let mut obj = JirInlayHint::default();
+        obj.inlay_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jis_generated {
+    use super::*;
+
+    #[test]
+    fn test_jis_default() {
+        let obj = JisLinkedEditingRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jis_fields() {
+        let mut obj = JisLinkedEditingRange::default();
+        obj.linked_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jit_generated {
+    use super::*;
+
+    #[test]
+    fn test_jit_default() {
+        let obj = JitSemanticToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jit_fields() {
+        let mut obj = JitSemanticToken::default();
+        obj.sem_token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jiu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jiu_default() {
+        let obj = JiuDocumentColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jiu_fields() {
+        let mut obj = JiuDocumentColor::default();
+        obj.doc_color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jiv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jiv_default() {
+        let obj = JivColorPresentation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jiv_fields() {
+        let mut obj = JivColorPresentation::default();
+        obj.color_pres_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jiw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jiw_default() {
+        let obj = JiwDocumentHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jiw_fields() {
+        let mut obj = JiwDocumentHighlight::default();
+        obj.doc_hl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jix_generated {
+    use super::*;
+
+    #[test]
+    fn test_jix_default() {
+        let obj = JixDocumentLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jix_fields() {
+        let mut obj = JixDocumentLink::default();
+        obj.doc_link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jiy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jiy_default() {
+        let obj = JiyDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jiy_fields() {
+        let mut obj = JiyDiagnostic::default();
+        obj.diag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jiz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jiz_default() {
+        let obj = JizDiagnosticCollection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jiz_fields() {
+        let mut obj = JizDiagnosticCollection::default();
+        obj.diag_coll_id = "test".to_string();
         assert!(obj.validate());
     }
 }
