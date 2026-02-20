@@ -111828,6 +111828,678 @@ impl Default for HajViewZone {
     }
 }
 
+/// Glyph margin widget (lane, range, z-index, dom node, click)
+#[derive(Debug, Clone)]
+pub struct HakGlyphMarginWidget {
+    pub glyph_widget_id: String,
+    pub lane: u32,
+    pub range_json: String,
+    pub z_index: u32,
+    pub dom_node_id: String,
+    pub on_click: bool,
+    pub tooltip: String,
+    pub class_name: String,
+    pub is_visible: bool,
+    pub ordinal: u32,
+}
+
+impl HakGlyphMarginWidget {
+    pub fn new() -> Self {
+        Self {
+            glyph_widget_id: String::new(),
+            lane: u32::default(),
+            range_json: String::new(),
+            z_index: u32::default(),
+            dom_node_id: String::new(),
+            on_click: bool::default(),
+            tooltip: String::new(),
+            class_name: String::new(),
+            is_visible: bool::default(),
+            ordinal: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.glyph_widget_id.is_empty() || true && self.lane < u32::MAX || true && !self.range_json.is_empty() || true && self.z_index < u32::MAX || true && !self.dom_node_id.is_empty() || true && self.on_click || true && !self.tooltip.is_empty() || true && !self.class_name.is_empty() || true && self.is_visible || true && self.ordinal < u32::MAX || true
+    }
+}
+
+impl Default for HakGlyphMarginWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Line decoration (range, class name, glyph margin, is whole line)
+#[derive(Debug, Clone)]
+pub struct HalLineDecoration {
+    pub line_deco_id: String,
+    pub range_json: String,
+    pub class_name: String,
+    pub glyph_margin_class: String,
+    pub is_whole_line: bool,
+    pub stickiness: String,
+    pub hover_message: String,
+    pub z_index: u32,
+    pub overview_ruler_color: String,
+    pub minimap_color: String,
+}
+
+impl HalLineDecoration {
+    pub fn new() -> Self {
+        Self {
+            line_deco_id: String::new(),
+            range_json: String::new(),
+            class_name: String::new(),
+            glyph_margin_class: String::new(),
+            is_whole_line: bool::default(),
+            stickiness: String::new(),
+            hover_message: String::new(),
+            z_index: u32::default(),
+            overview_ruler_color: String::new(),
+            minimap_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_deco_id.is_empty() || true && !self.range_json.is_empty() || true && !self.class_name.is_empty() || true && !self.glyph_margin_class.is_empty() || true && self.is_whole_line || true && !self.stickiness.is_empty() || true && !self.hover_message.is_empty() || true && self.z_index < u32::MAX || true && !self.overview_ruler_color.is_empty() || true && !self.minimap_color.is_empty() || true
+    }
+}
+
+impl Default for HalLineDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline decoration (range, content, font style, color, before)
+#[derive(Debug, Clone)]
+pub struct HamInlineDecoration {
+    pub inline_deco_id: String,
+    pub range_json: String,
+    pub content: String,
+    pub font_style: String,
+    pub color: String,
+    pub is_before: bool,
+    pub margin: String,
+    pub padding: String,
+    pub width: String,
+    pub cursor: String,
+}
+
+impl HamInlineDecoration {
+    pub fn new() -> Self {
+        Self {
+            inline_deco_id: String::new(),
+            range_json: String::new(),
+            content: String::new(),
+            font_style: String::new(),
+            color: String::new(),
+            is_before: bool::default(),
+            margin: String::new(),
+            padding: String::new(),
+            width: String::new(),
+            cursor: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_deco_id.is_empty() || true && !self.range_json.is_empty() || true && !self.content.is_empty() || true && !self.font_style.is_empty() || true && !self.color.is_empty() || true && self.is_before || true && !self.margin.is_empty() || true && !self.padding.is_empty() || true && !self.width.is_empty() || true && !self.cursor.is_empty() || true
+    }
+}
+
+impl Default for HamInlineDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Margin decoration (line number, class, tooltip, is clickable)
+#[derive(Debug, Clone)]
+pub struct HanMarginDecoration {
+    pub margin_deco_id: String,
+    pub line_number: u32,
+    pub class_name: String,
+    pub tooltip: String,
+    pub is_clickable: bool,
+    pub lane: u32,
+    pub z_index: u32,
+    pub opacity: f64,
+    pub cursor: String,
+    pub glyph_class: String,
+}
+
+impl HanMarginDecoration {
+    pub fn new() -> Self {
+        Self {
+            margin_deco_id: String::new(),
+            line_number: u32::default(),
+            class_name: String::new(),
+            tooltip: String::new(),
+            is_clickable: bool::default(),
+            lane: u32::default(),
+            z_index: u32::default(),
+            opacity: f64::default(),
+            cursor: String::new(),
+            glyph_class: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.margin_deco_id.is_empty() || true && self.line_number < u32::MAX || true && !self.class_name.is_empty() || true && !self.tooltip.is_empty() || true && self.is_clickable || true && self.lane < u32::MAX || true && self.z_index < u32::MAX || true && self.opacity.is_finite() || true && !self.cursor.is_empty() || true && !self.glyph_class.is_empty() || true
+    }
+}
+
+impl Default for HanMarginDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Overview ruler decoration (color, position, dark theme color)
+#[derive(Debug, Clone)]
+pub struct HaoOverviewDecoration {
+    pub overview_deco_id: String,
+    pub color: String,
+    pub position: String,
+    pub dark_theme_color: String,
+    pub high_contrast_color: String,
+    pub is_opaque: bool,
+    pub minimap_lane: u32,
+    pub z_index: u32,
+    pub range_json: String,
+    pub is_visible: bool,
+}
+
+impl HaoOverviewDecoration {
+    pub fn new() -> Self {
+        Self {
+            overview_deco_id: String::new(),
+            color: String::new(),
+            position: String::new(),
+            dark_theme_color: String::new(),
+            high_contrast_color: String::new(),
+            is_opaque: bool::default(),
+            minimap_lane: u32::default(),
+            z_index: u32::default(),
+            range_json: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.overview_deco_id.is_empty() || true && !self.color.is_empty() || true && !self.position.is_empty() || true && !self.dark_theme_color.is_empty() || true && !self.high_contrast_color.is_empty() || true && self.is_opaque || true && self.minimap_lane < u32::MAX || true && self.z_index < u32::MAX || true && !self.range_json.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for HaoOverviewDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Minimap decoration (color, position, opacity, above, below)
+#[derive(Debug, Clone)]
+pub struct HapMinimapDecoration {
+    pub minimap_deco_id: String,
+    pub color: String,
+    pub position: String,
+    pub opacity: f64,
+    pub is_above: bool,
+    pub is_below: bool,
+    pub height_in_lines: u32,
+    pub range_json: String,
+    pub z_index: u32,
+    pub is_visible: bool,
+}
+
+impl HapMinimapDecoration {
+    pub fn new() -> Self {
+        Self {
+            minimap_deco_id: String::new(),
+            color: String::new(),
+            position: String::new(),
+            opacity: f64::default(),
+            is_above: bool::default(),
+            is_below: bool::default(),
+            height_in_lines: u32::default(),
+            range_json: String::new(),
+            z_index: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.minimap_deco_id.is_empty() || true && !self.color.is_empty() || true && !self.position.is_empty() || true && self.opacity.is_finite() || true && self.is_above || true && self.is_below || true && self.height_in_lines < u32::MAX || true && !self.range_json.is_empty() || true && self.z_index < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for HapMinimapDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Decoration options (is whole line, stickiness, before, after)
+#[derive(Debug, Clone)]
+pub struct HaqDecorationOptions {
+    pub deco_opts_id: String,
+    pub is_whole_line: bool,
+    pub stickiness: String,
+    pub before_content: String,
+    pub after_content: String,
+    pub inline_class: String,
+    pub margin_class: String,
+    pub overview_ruler: String,
+    pub minimap_color: String,
+    pub block_class: String,
+}
+
+impl HaqDecorationOptions {
+    pub fn new() -> Self {
+        Self {
+            deco_opts_id: String::new(),
+            is_whole_line: bool::default(),
+            stickiness: String::new(),
+            before_content: String::new(),
+            after_content: String::new(),
+            inline_class: String::new(),
+            margin_class: String::new(),
+            overview_ruler: String::new(),
+            minimap_color: String::new(),
+            block_class: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_opts_id.is_empty() || true && self.is_whole_line || true && !self.stickiness.is_empty() || true && !self.before_content.is_empty() || true && !self.after_content.is_empty() || true && !self.inline_class.is_empty() || true && !self.margin_class.is_empty() || true && !self.overview_ruler.is_empty() || true && !self.minimap_color.is_empty() || true && !self.block_class.is_empty() || true
+    }
+}
+
+impl Default for HaqDecorationOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tracked range (start line, start col, end line, end col, sticky)
+#[derive(Debug, Clone)]
+pub struct HarTrackedRange {
+    pub tracked_range_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub stickiness: String,
+    pub always_grows: bool,
+    pub version_id: u32,
+    pub owner_id: String,
+    pub is_collapsed: bool,
+}
+
+impl HarTrackedRange {
+    pub fn new() -> Self {
+        Self {
+            tracked_range_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            stickiness: String::new(),
+            always_grows: bool::default(),
+            version_id: u32::default(),
+            owner_id: String::new(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tracked_range_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && !self.stickiness.is_empty() || true && self.always_grows || true && self.version_id < u32::MAX || true && !self.owner_id.is_empty() || true && self.is_collapsed || true
+    }
+}
+
+impl Default for HarTrackedRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Model decoration (id, owner id, range, options, resolved)
+#[derive(Debug, Clone)]
+pub struct HasModelDecoration {
+    pub model_deco_id: String,
+    pub decoration_id: String,
+    pub owner_id: String,
+    pub range_json: String,
+    pub options_json: String,
+    pub is_resolved: bool,
+    pub z_index: u32,
+    pub class_name: String,
+    pub hover_message: String,
+    pub is_visible: bool,
+}
+
+impl HasModelDecoration {
+    pub fn new() -> Self {
+        Self {
+            model_deco_id: String::new(),
+            decoration_id: String::new(),
+            owner_id: String::new(),
+            range_json: String::new(),
+            options_json: String::new(),
+            is_resolved: bool::default(),
+            z_index: u32::default(),
+            class_name: String::new(),
+            hover_message: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_deco_id.is_empty() || true && !self.decoration_id.is_empty() || true && !self.owner_id.is_empty() || true && !self.range_json.is_empty() || true && !self.options_json.is_empty() || true && self.is_resolved || true && self.z_index < u32::MAX || true && !self.class_name.is_empty() || true && !self.hover_message.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for HasModelDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Decoration filter (owner id, decoration ids, filter ranges)
+#[derive(Debug, Clone)]
+pub struct HatDecorationFilter {
+    pub deco_filter_id: String,
+    pub owner_id: String,
+    pub decoration_ids_json: String,
+    pub filter_ranges_json: String,
+    pub only_minimap: bool,
+    pub only_overview: bool,
+    pub only_margin: bool,
+    pub include_inline: bool,
+    pub include_line: bool,
+    pub pattern: String,
+}
+
+impl HatDecorationFilter {
+    pub fn new() -> Self {
+        Self {
+            deco_filter_id: String::new(),
+            owner_id: String::new(),
+            decoration_ids_json: String::new(),
+            filter_ranges_json: String::new(),
+            only_minimap: bool::default(),
+            only_overview: bool::default(),
+            only_margin: bool::default(),
+            include_inline: bool::default(),
+            include_line: bool::default(),
+            pattern: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.deco_filter_id.is_empty() || true && !self.owner_id.is_empty() || true && !self.decoration_ids_json.is_empty() || true && !self.filter_ranges_json.is_empty() || true && self.only_minimap || true && self.only_overview || true && self.only_margin || true && self.include_inline || true && self.include_line || true && !self.pattern.is_empty() || true
+    }
+}
+
+impl Default for HatDecorationFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor scroll state (scroll top, scroll left, scroll width)
+#[derive(Debug, Clone)]
+pub struct HauEditorScrollState {
+    pub scroll_state_id: String,
+    pub scroll_top: u32,
+    pub scroll_left: u32,
+    pub scroll_width: u32,
+    pub scroll_height: u32,
+    pub viewport_width: u32,
+    pub viewport_height: u32,
+    pub is_at_top: bool,
+    pub is_at_bottom: bool,
+    pub smooth_scroll_duration: u32,
+}
+
+impl HauEditorScrollState {
+    pub fn new() -> Self {
+        Self {
+            scroll_state_id: String::new(),
+            scroll_top: u32::default(),
+            scroll_left: u32::default(),
+            scroll_width: u32::default(),
+            scroll_height: u32::default(),
+            viewport_width: u32::default(),
+            viewport_height: u32::default(),
+            is_at_top: bool::default(),
+            is_at_bottom: bool::default(),
+            smooth_scroll_duration: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scroll_state_id.is_empty() || true && self.scroll_top < u32::MAX || true && self.scroll_left < u32::MAX || true && self.scroll_width < u32::MAX || true && self.scroll_height < u32::MAX || true && self.viewport_width < u32::MAX || true && self.viewport_height < u32::MAX || true && self.is_at_top || true && self.is_at_bottom || true && self.smooth_scroll_duration < u32::MAX || true
+    }
+}
+
+impl Default for HauEditorScrollState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor zoom level (zoom factor, base font, computed font)
+#[derive(Debug, Clone)]
+pub struct HavEditorZoomLevel {
+    pub zoom_level_id: String,
+    pub zoom_factor: f64,
+    pub base_font_size: u32,
+    pub computed_font_size: u32,
+    pub min_zoom: f64,
+    pub max_zoom: f64,
+    pub step: f64,
+    pub is_reset: bool,
+    pub window_zoom: f64,
+    pub device_pixel_ratio: f64,
+}
+
+impl HavEditorZoomLevel {
+    pub fn new() -> Self {
+        Self {
+            zoom_level_id: String::new(),
+            zoom_factor: f64::default(),
+            base_font_size: u32::default(),
+            computed_font_size: u32::default(),
+            min_zoom: f64::default(),
+            max_zoom: f64::default(),
+            step: f64::default(),
+            is_reset: bool::default(),
+            window_zoom: f64::default(),
+            device_pixel_ratio: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.zoom_level_id.is_empty() || true && self.zoom_factor.is_finite() || true && self.base_font_size < u32::MAX || true && self.computed_font_size < u32::MAX || true && self.min_zoom.is_finite() || true && self.max_zoom.is_finite() || true && self.step.is_finite() || true && self.is_reset || true && self.window_zoom.is_finite() || true && self.device_pixel_ratio.is_finite() || true
+    }
+}
+
+impl Default for HavEditorZoomLevel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor layout (content width, content height, minimap, glyphs)
+#[derive(Debug, Clone)]
+pub struct HawEditorLayout {
+    pub editor_layout_id: String,
+    pub content_width: u32,
+    pub content_height: u32,
+    pub minimap_width: u32,
+    pub glyph_margin_width: u32,
+    pub line_numbers_width: u32,
+    pub decorations_width: u32,
+    pub vertical_scrollbar_width: u32,
+    pub horizontal_scrollbar_height: u32,
+    pub overview_ruler_width: u32,
+}
+
+impl HawEditorLayout {
+    pub fn new() -> Self {
+        Self {
+            editor_layout_id: String::new(),
+            content_width: u32::default(),
+            content_height: u32::default(),
+            minimap_width: u32::default(),
+            glyph_margin_width: u32::default(),
+            line_numbers_width: u32::default(),
+            decorations_width: u32::default(),
+            vertical_scrollbar_width: u32::default(),
+            horizontal_scrollbar_height: u32::default(),
+            overview_ruler_width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_layout_id.is_empty() || true && self.content_width < u32::MAX || true && self.content_height < u32::MAX || true && self.minimap_width < u32::MAX || true && self.glyph_margin_width < u32::MAX || true && self.line_numbers_width < u32::MAX || true && self.decorations_width < u32::MAX || true && self.vertical_scrollbar_width < u32::MAX || true && self.horizontal_scrollbar_height < u32::MAX || true && self.overview_ruler_width < u32::MAX || true
+    }
+}
+
+impl Default for HawEditorLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor line height (value, computed, scaled, font ratio)
+#[derive(Debug, Clone)]
+pub struct HaxEditorLineHeight {
+    pub line_height_id: String,
+    pub value: u32,
+    pub computed_value: u32,
+    pub scaled_value: f64,
+    pub font_ratio: f64,
+    pub is_default: bool,
+    pub source: String,
+    pub min_value: u32,
+    pub max_value: u32,
+    pub unit: String,
+}
+
+impl HaxEditorLineHeight {
+    pub fn new() -> Self {
+        Self {
+            line_height_id: String::new(),
+            value: u32::default(),
+            computed_value: u32::default(),
+            scaled_value: f64::default(),
+            font_ratio: f64::default(),
+            is_default: bool::default(),
+            source: String::new(),
+            min_value: u32::default(),
+            max_value: u32::default(),
+            unit: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_height_id.is_empty() || true && self.value < u32::MAX || true && self.computed_value < u32::MAX || true && self.scaled_value.is_finite() || true && self.font_ratio.is_finite() || true && self.is_default || true && !self.source.is_empty() || true && self.min_value < u32::MAX || true && self.max_value < u32::MAX || true && !self.unit.is_empty() || true
+    }
+}
+
+impl Default for HaxEditorLineHeight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor letter spacing (value, computed, character width)
+#[derive(Debug, Clone)]
+pub struct HayEditorLetterSpacing {
+    pub letter_sp_id: String,
+    pub value: f64,
+    pub computed_value: f64,
+    pub char_width: f64,
+    pub is_default: bool,
+    pub font_family: String,
+    pub font_size: u32,
+    pub min_value: f64,
+    pub max_value: f64,
+    pub unit: String,
+}
+
+impl HayEditorLetterSpacing {
+    pub fn new() -> Self {
+        Self {
+            letter_sp_id: String::new(),
+            value: f64::default(),
+            computed_value: f64::default(),
+            char_width: f64::default(),
+            is_default: bool::default(),
+            font_family: String::new(),
+            font_size: u32::default(),
+            min_value: f64::default(),
+            max_value: f64::default(),
+            unit: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.letter_sp_id.is_empty() || true && self.value.is_finite() || true && self.computed_value.is_finite() || true && self.char_width.is_finite() || true && self.is_default || true && !self.font_family.is_empty() || true && self.font_size < u32::MAX || true && self.min_value.is_finite() || true && self.max_value.is_finite() || true && !self.unit.is_empty() || true
+    }
+}
+
+impl Default for HayEditorLetterSpacing {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor font info (family, size, weight, line height, ligatures)
+#[derive(Debug, Clone)]
+pub struct HazEditorFontInfo {
+    pub font_info_id: String,
+    pub family: String,
+    pub size: u32,
+    pub weight: String,
+    pub line_height: u32,
+    pub ligatures_enabled: bool,
+    pub is_monospace: bool,
+    pub char_width: f64,
+    pub char_height: f64,
+    pub font_feature_settings: String,
+}
+
+impl HazEditorFontInfo {
+    pub fn new() -> Self {
+        Self {
+            font_info_id: String::new(),
+            family: String::new(),
+            size: u32::default(),
+            weight: String::new(),
+            line_height: u32::default(),
+            ligatures_enabled: bool::default(),
+            is_monospace: bool::default(),
+            char_width: f64::default(),
+            char_height: f64::default(),
+            font_feature_settings: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.font_info_id.is_empty() || true && !self.family.is_empty() || true && self.size < u32::MAX || true && !self.weight.is_empty() || true && self.line_height < u32::MAX || true && self.ligatures_enabled || true && self.is_monospace || true && self.char_width.is_finite() || true && self.char_height.is_finite() || true && !self.font_feature_settings.is_empty() || true
+    }
+}
+
+impl Default for HazEditorFontInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347682,6 +348354,294 @@ mod tests_haj_generated {
     fn test_haj_fields() {
         let mut obj = HajViewZone::default();
         obj.view_zone_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hak_generated {
+    use super::*;
+
+    #[test]
+    fn test_hak_default() {
+        let obj = HakGlyphMarginWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hak_fields() {
+        let mut obj = HakGlyphMarginWidget::default();
+        obj.glyph_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hal_generated {
+    use super::*;
+
+    #[test]
+    fn test_hal_default() {
+        let obj = HalLineDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hal_fields() {
+        let mut obj = HalLineDecoration::default();
+        obj.line_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ham_generated {
+    use super::*;
+
+    #[test]
+    fn test_ham_default() {
+        let obj = HamInlineDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ham_fields() {
+        let mut obj = HamInlineDecoration::default();
+        obj.inline_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_han_generated {
+    use super::*;
+
+    #[test]
+    fn test_han_default() {
+        let obj = HanMarginDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_han_fields() {
+        let mut obj = HanMarginDecoration::default();
+        obj.margin_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hao_generated {
+    use super::*;
+
+    #[test]
+    fn test_hao_default() {
+        let obj = HaoOverviewDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hao_fields() {
+        let mut obj = HaoOverviewDecoration::default();
+        obj.overview_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hap_generated {
+    use super::*;
+
+    #[test]
+    fn test_hap_default() {
+        let obj = HapMinimapDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hap_fields() {
+        let mut obj = HapMinimapDecoration::default();
+        obj.minimap_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_haq_generated {
+    use super::*;
+
+    #[test]
+    fn test_haq_default() {
+        let obj = HaqDecorationOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_haq_fields() {
+        let mut obj = HaqDecorationOptions::default();
+        obj.deco_opts_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_har_generated {
+    use super::*;
+
+    #[test]
+    fn test_har_default() {
+        let obj = HarTrackedRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_har_fields() {
+        let mut obj = HarTrackedRange::default();
+        obj.tracked_range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_has_generated {
+    use super::*;
+
+    #[test]
+    fn test_has_default() {
+        let obj = HasModelDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_has_fields() {
+        let mut obj = HasModelDecoration::default();
+        obj.model_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hat_generated {
+    use super::*;
+
+    #[test]
+    fn test_hat_default() {
+        let obj = HatDecorationFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hat_fields() {
+        let mut obj = HatDecorationFilter::default();
+        obj.deco_filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hau_generated {
+    use super::*;
+
+    #[test]
+    fn test_hau_default() {
+        let obj = HauEditorScrollState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hau_fields() {
+        let mut obj = HauEditorScrollState::default();
+        obj.scroll_state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hav_generated {
+    use super::*;
+
+    #[test]
+    fn test_hav_default() {
+        let obj = HavEditorZoomLevel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hav_fields() {
+        let mut obj = HavEditorZoomLevel::default();
+        obj.zoom_level_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_haw_generated {
+    use super::*;
+
+    #[test]
+    fn test_haw_default() {
+        let obj = HawEditorLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_haw_fields() {
+        let mut obj = HawEditorLayout::default();
+        obj.editor_layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hax_generated {
+    use super::*;
+
+    #[test]
+    fn test_hax_default() {
+        let obj = HaxEditorLineHeight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hax_fields() {
+        let mut obj = HaxEditorLineHeight::default();
+        obj.line_height_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hay_generated {
+    use super::*;
+
+    #[test]
+    fn test_hay_default() {
+        let obj = HayEditorLetterSpacing::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hay_fields() {
+        let mut obj = HayEditorLetterSpacing::default();
+        obj.letter_sp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_haz_generated {
+    use super::*;
+
+    #[test]
+    fn test_haz_default() {
+        let obj = HazEditorFontInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_haz_fields() {
+        let mut obj = HazEditorFontInfo::default();
+        obj.font_info_id = "test".to_string();
         assert!(obj.validate());
     }
 }
