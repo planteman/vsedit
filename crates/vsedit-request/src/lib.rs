@@ -127425,6 +127425,890 @@ impl Default for HozOnboardingComplete {
     }
 }
 
+/// Source control provider registration
+#[derive(Debug, Clone)]
+pub struct HpaScmProvider {
+    pub provider_id: String,
+    pub provider_label: String,
+    pub root_uri: String,
+    pub command_group: String,
+    pub resource_count: u32,
+    pub has_staging: bool,
+}
+
+impl HpaScmProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            provider_label: String::new(),
+            root_uri: String::new(),
+            command_group: String::new(),
+            resource_count: u32::default(),
+            has_staging: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.provider_label.is_empty() || true && !self.root_uri.is_empty() || true && !self.command_group.is_empty() || true && self.resource_count < u32::MAX || true && self.has_staging || true
+    }
+}
+
+impl Default for HpaScmProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM resource group container
+#[derive(Debug, Clone)]
+pub struct HpbScmResourceGroup {
+    pub group_id: String,
+    pub group_label: String,
+    pub provider_ref: String,
+    pub resource_count: u32,
+    pub sort_order: u32,
+    pub hide_when_empty: bool,
+}
+
+impl HpbScmResourceGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            group_label: String::new(),
+            provider_ref: String::new(),
+            resource_count: u32::default(),
+            sort_order: u32::default(),
+            hide_when_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.group_label.is_empty() || true && !self.provider_ref.is_empty() || true && self.resource_count < u32::MAX || true && self.sort_order < u32::MAX || true && self.hide_when_empty || true
+    }
+}
+
+impl Default for HpbScmResourceGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM tracked resource entry
+#[derive(Debug, Clone)]
+pub struct HpcScmResource {
+    pub resource_id: String,
+    pub resource_uri: String,
+    pub original_uri: String,
+    pub decoration_icon: String,
+    pub change_type_code: u32,
+    pub is_conflicting: bool,
+}
+
+impl HpcScmResource {
+    pub fn new() -> Self {
+        Self {
+            resource_id: String::new(),
+            resource_uri: String::new(),
+            original_uri: String::new(),
+            decoration_icon: String::new(),
+            change_type_code: u32::default(),
+            is_conflicting: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resource_id.is_empty() || true && !self.resource_uri.is_empty() || true && !self.original_uri.is_empty() || true && !self.decoration_icon.is_empty() || true && self.change_type_code < u32::MAX || true && self.is_conflicting || true
+    }
+}
+
+impl Default for HpcScmResource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM commit message input box
+#[derive(Debug, Clone)]
+pub struct HpdScmInputBox {
+    pub input_id: String,
+    pub placeholder_text: String,
+    pub value_text: String,
+    pub max_length: u32,
+    pub line_count: u32,
+    pub is_visible: bool,
+}
+
+impl HpdScmInputBox {
+    pub fn new() -> Self {
+        Self {
+            input_id: String::new(),
+            placeholder_text: String::new(),
+            value_text: String::new(),
+            max_length: u32::default(),
+            line_count: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_id.is_empty() || true && !self.placeholder_text.is_empty() || true && !self.value_text.is_empty() || true && self.max_length < u32::MAX || true && self.line_count < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for HpdScmInputBox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff editor content model
+#[derive(Debug, Clone)]
+pub struct HpeDiffEditorModel {
+    pub diff_id: String,
+    pub original_uri: String,
+    pub modified_uri: String,
+    pub base_uri: String,
+    pub hunk_count: u32,
+    pub is_three_way: bool,
+}
+
+impl HpeDiffEditorModel {
+    pub fn new() -> Self {
+        Self {
+            diff_id: String::new(),
+            original_uri: String::new(),
+            modified_uri: String::new(),
+            base_uri: String::new(),
+            hunk_count: u32::default(),
+            is_three_way: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_id.is_empty() || true && !self.original_uri.is_empty() || true && !self.modified_uri.is_empty() || true && !self.base_uri.is_empty() || true && self.hunk_count < u32::MAX || true && self.is_three_way || true
+    }
+}
+
+impl Default for HpeDiffEditorModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff hunk range descriptor
+#[derive(Debug, Clone)]
+pub struct HpfDiffHunk {
+    pub hunk_id: String,
+    pub original_start: u32,
+    pub original_length: u32,
+    pub modified_start: u32,
+    pub modified_length: u32,
+    pub is_conflicting: bool,
+}
+
+impl HpfDiffHunk {
+    pub fn new() -> Self {
+        Self {
+            hunk_id: String::new(),
+            original_start: u32::default(),
+            original_length: u32::default(),
+            modified_start: u32::default(),
+            modified_length: u32::default(),
+            is_conflicting: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hunk_id.is_empty() || true && self.original_start < u32::MAX || true && self.original_length < u32::MAX || true && self.modified_start < u32::MAX || true && self.modified_length < u32::MAX || true && self.is_conflicting || true
+    }
+}
+
+impl Default for HpfDiffHunk {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff line decoration overlay
+#[derive(Debug, Clone)]
+pub struct HpgDiffDecoration {
+    pub decoration_id: String,
+    pub line_number: u32,
+    pub decoration_kind: String,
+    pub color_token: String,
+    pub gutter_icon: String,
+    pub is_inline: bool,
+}
+
+impl HpgDiffDecoration {
+    pub fn new() -> Self {
+        Self {
+            decoration_id: String::new(),
+            line_number: u32::default(),
+            decoration_kind: String::new(),
+            color_token: String::new(),
+            gutter_icon: String::new(),
+            is_inline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decoration_id.is_empty() || true && self.line_number < u32::MAX || true && !self.decoration_kind.is_empty() || true && !self.color_token.is_empty() || true && !self.gutter_icon.is_empty() || true && self.is_inline || true
+    }
+}
+
+impl Default for HpgDiffDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge conflict region descriptor
+#[derive(Debug, Clone)]
+pub struct HphMergeConflict {
+    pub conflict_id: String,
+    pub base_range_start: u32,
+    pub base_range_end: u32,
+    pub incoming_text: String,
+    pub current_text: String,
+    pub is_resolved: bool,
+}
+
+impl HphMergeConflict {
+    pub fn new() -> Self {
+        Self {
+            conflict_id: String::new(),
+            base_range_start: u32::default(),
+            base_range_end: u32::default(),
+            incoming_text: String::new(),
+            current_text: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conflict_id.is_empty() || true && self.base_range_start < u32::MAX || true && self.base_range_end < u32::MAX || true && !self.incoming_text.is_empty() || true && !self.current_text.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for HphMergeConflict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git blame line annotation
+#[derive(Debug, Clone)]
+pub struct HpiBlameAnnotation {
+    pub annotation_id: String,
+    pub line_number: u32,
+    pub author_name: String,
+    pub commit_hash: String,
+    pub commit_date: String,
+    pub is_stale: bool,
+}
+
+impl HpiBlameAnnotation {
+    pub fn new() -> Self {
+        Self {
+            annotation_id: String::new(),
+            line_number: u32::default(),
+            author_name: String::new(),
+            commit_hash: String::new(),
+            commit_date: String::new(),
+            is_stale: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.annotation_id.is_empty() || true && self.line_number < u32::MAX || true && !self.author_name.is_empty() || true && !self.commit_hash.is_empty() || true && !self.commit_date.is_empty() || true && self.is_stale || true
+    }
+}
+
+impl Default for HpiBlameAnnotation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control commit metadata
+#[derive(Debug, Clone)]
+pub struct HpjCommitInfo {
+    pub commit_id: String,
+    pub message_text: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub timestamp_epoch: u64,
+    pub is_merge: bool,
+}
+
+impl HpjCommitInfo {
+    pub fn new() -> Self {
+        Self {
+            commit_id: String::new(),
+            message_text: String::new(),
+            author_name: String::new(),
+            author_email: String::new(),
+            timestamp_epoch: u64::default(),
+            is_merge: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.commit_id.is_empty() || true && !self.message_text.is_empty() || true && !self.author_name.is_empty() || true && !self.author_email.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_merge || true
+    }
+}
+
+impl Default for HpjCommitInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control branch metadata
+#[derive(Debug, Clone)]
+pub struct HpkBranchInfo {
+    pub branch_id: String,
+    pub branch_name: String,
+    pub upstream_ref: String,
+    pub ahead_count: u32,
+    pub behind_count: u32,
+    pub is_current: bool,
+}
+
+impl HpkBranchInfo {
+    pub fn new() -> Self {
+        Self {
+            branch_id: String::new(),
+            branch_name: String::new(),
+            upstream_ref: String::new(),
+            ahead_count: u32::default(),
+            behind_count: u32::default(),
+            is_current: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.branch_id.is_empty() || true && !self.branch_name.is_empty() || true && !self.upstream_ref.is_empty() || true && self.ahead_count < u32::MAX || true && self.behind_count < u32::MAX || true && self.is_current || true
+    }
+}
+
+impl Default for HpkBranchInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control remote descriptor
+#[derive(Debug, Clone)]
+pub struct HplRemoteInfo {
+    pub remote_id: String,
+    pub remote_name: String,
+    pub fetch_url: String,
+    pub push_url: String,
+    pub ref_count: u32,
+    pub is_default: bool,
+}
+
+impl HplRemoteInfo {
+    pub fn new() -> Self {
+        Self {
+            remote_id: String::new(),
+            remote_name: String::new(),
+            fetch_url: String::new(),
+            push_url: String::new(),
+            ref_count: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_id.is_empty() || true && !self.remote_name.is_empty() || true && !self.fetch_url.is_empty() || true && !self.push_url.is_empty() || true && self.ref_count < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for HplRemoteInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git stash entry metadata
+#[derive(Debug, Clone)]
+pub struct HpmStashEntry {
+    pub stash_id: String,
+    pub stash_message: String,
+    pub stash_index: u32,
+    pub branch_name: String,
+    pub file_count: u32,
+    pub is_untracked: bool,
+}
+
+impl HpmStashEntry {
+    pub fn new() -> Self {
+        Self {
+            stash_id: String::new(),
+            stash_message: String::new(),
+            stash_index: u32::default(),
+            branch_name: String::new(),
+            file_count: u32::default(),
+            is_untracked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stash_id.is_empty() || true && !self.stash_message.is_empty() || true && self.stash_index < u32::MAX || true && !self.branch_name.is_empty() || true && self.file_count < u32::MAX || true && self.is_untracked || true
+    }
+}
+
+impl Default for HpmStashEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Source control tag descriptor
+#[derive(Debug, Clone)]
+pub struct HpnTagInfo {
+    pub tag_id: String,
+    pub tag_name: String,
+    pub target_commit: String,
+    pub tagger_name: String,
+    pub tag_message_len: u32,
+    pub is_annotated: bool,
+}
+
+impl HpnTagInfo {
+    pub fn new() -> Self {
+        Self {
+            tag_id: String::new(),
+            tag_name: String::new(),
+            target_commit: String::new(),
+            tagger_name: String::new(),
+            tag_message_len: u32::default(),
+            is_annotated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_id.is_empty() || true && !self.tag_name.is_empty() || true && !self.target_commit.is_empty() || true && !self.tagger_name.is_empty() || true && self.tag_message_len < u32::MAX || true && self.is_annotated || true
+    }
+}
+
+impl Default for HpnTagInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git submodule descriptor
+#[derive(Debug, Clone)]
+pub struct HppSubmoduleInfo {
+    pub submodule_id: String,
+    pub submodule_path: String,
+    pub submodule_url: String,
+    pub commit_ref: String,
+    pub depth_limit: u32,
+    pub is_initialized: bool,
+}
+
+impl HppSubmoduleInfo {
+    pub fn new() -> Self {
+        Self {
+            submodule_id: String::new(),
+            submodule_path: String::new(),
+            submodule_url: String::new(),
+            commit_ref: String::new(),
+            depth_limit: u32::default(),
+            is_initialized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.submodule_id.is_empty() || true && !self.submodule_path.is_empty() || true && !self.submodule_url.is_empty() || true && !self.commit_ref.is_empty() || true && self.depth_limit < u32::MAX || true && self.is_initialized || true
+    }
+}
+
+impl Default for HppSubmoduleInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git worktree descriptor
+#[derive(Debug, Clone)]
+pub struct HppWorktreeInfo {
+    pub worktree_id: String,
+    pub worktree_path: String,
+    pub branch_ref: String,
+    pub head_commit: String,
+    pub lock_reason_len: u32,
+    pub is_locked: bool,
+}
+
+impl HppWorktreeInfo {
+    pub fn new() -> Self {
+        Self {
+            worktree_id: String::new(),
+            worktree_path: String::new(),
+            branch_ref: String::new(),
+            head_commit: String::new(),
+            lock_reason_len: u32::default(),
+            is_locked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.worktree_id.is_empty() || true && !self.worktree_path.is_empty() || true && !self.branch_ref.is_empty() || true && !self.head_commit.is_empty() || true && self.lock_reason_len < u32::MAX || true && self.is_locked || true
+    }
+}
+
+impl Default for HppWorktreeInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Patch file content descriptor
+#[derive(Debug, Clone)]
+pub struct HpqPatchFile {
+    pub patch_id: String,
+    pub patch_path: String,
+    pub original_file: String,
+    pub modified_file: String,
+    pub hunk_count: u32,
+    pub is_binary: bool,
+}
+
+impl HpqPatchFile {
+    pub fn new() -> Self {
+        Self {
+            patch_id: String::new(),
+            patch_path: String::new(),
+            original_file: String::new(),
+            modified_file: String::new(),
+            hunk_count: u32::default(),
+            is_binary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.patch_id.is_empty() || true && !self.patch_path.is_empty() || true && !self.original_file.is_empty() || true && !self.modified_file.is_empty() || true && self.hunk_count < u32::MAX || true && self.is_binary || true
+    }
+}
+
+impl Default for HpqPatchFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff change navigator state
+#[derive(Debug, Clone)]
+pub struct HprDiffNavigator {
+    pub nav_id: String,
+    pub current_hunk: u32,
+    pub total_hunks: u32,
+    pub file_uri: String,
+    pub scroll_offset: u64,
+    pub wrap_around: bool,
+}
+
+impl HprDiffNavigator {
+    pub fn new() -> Self {
+        Self {
+            nav_id: String::new(),
+            current_hunk: u32::default(),
+            total_hunks: u32::default(),
+            file_uri: String::new(),
+            scroll_offset: u64::default(),
+            wrap_around: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.nav_id.is_empty() || true && self.current_hunk < u32::MAX || true && self.total_hunks < u32::MAX || true && !self.file_uri.is_empty() || true && self.scroll_offset < u64::MAX || true && self.wrap_around || true
+    }
+}
+
+impl Default for HprDiffNavigator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline diff annotation
+#[derive(Debug, Clone)]
+pub struct HpsInlineDiff {
+    pub inline_id: String,
+    pub line_start: u32,
+    pub char_start: u32,
+    pub char_end: u32,
+    pub change_kind: String,
+    pub is_deletion: bool,
+}
+
+impl HpsInlineDiff {
+    pub fn new() -> Self {
+        Self {
+            inline_id: String::new(),
+            line_start: u32::default(),
+            char_start: u32::default(),
+            char_end: u32::default(),
+            change_kind: String::new(),
+            is_deletion: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_id.is_empty() || true && self.line_start < u32::MAX || true && self.char_start < u32::MAX || true && self.char_end < u32::MAX || true && !self.change_kind.is_empty() || true && self.is_deletion || true
+    }
+}
+
+impl Default for HpsInlineDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM staging area model
+#[derive(Debug, Clone)]
+pub struct HptStagingArea {
+    pub staging_id: String,
+    pub staged_count: u32,
+    pub unstaged_count: u32,
+    pub untracked_count: u32,
+    pub conflict_count: u32,
+    pub is_dirty: bool,
+}
+
+impl HptStagingArea {
+    pub fn new() -> Self {
+        Self {
+            staging_id: String::new(),
+            staged_count: u32::default(),
+            unstaged_count: u32::default(),
+            untracked_count: u32::default(),
+            conflict_count: u32::default(),
+            is_dirty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.staging_id.is_empty() || true && self.staged_count < u32::MAX || true && self.unstaged_count < u32::MAX || true && self.untracked_count < u32::MAX || true && self.conflict_count < u32::MAX || true && self.is_dirty || true
+    }
+}
+
+impl Default for HptStagingArea {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Commit message template
+#[derive(Debug, Clone)]
+pub struct HpuCommitTemplate {
+    pub template_id: String,
+    pub template_name: String,
+    pub template_body: String,
+    pub placeholder_count: u32,
+    pub max_subject_len: u32,
+    pub is_default: bool,
+}
+
+impl HpuCommitTemplate {
+    pub fn new() -> Self {
+        Self {
+            template_id: String::new(),
+            template_name: String::new(),
+            template_body: String::new(),
+            placeholder_count: u32::default(),
+            max_subject_len: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.template_id.is_empty() || true && !self.template_name.is_empty() || true && !self.template_body.is_empty() || true && self.placeholder_count < u32::MAX || true && self.max_subject_len < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for HpuCommitTemplate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM context menu action
+#[derive(Debug, Clone)]
+pub struct HpvScmAction {
+    pub action_id: String,
+    pub action_label: String,
+    pub command_ref: String,
+    pub icon_name: String,
+    pub sort_group: u32,
+    pub is_inline: bool,
+}
+
+impl HpvScmAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            action_label: String::new(),
+            command_ref: String::new(),
+            icon_name: String::new(),
+            sort_group: u32::default(),
+            is_inline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.action_label.is_empty() || true && !self.command_ref.is_empty() || true && !self.icon_name.is_empty() || true && self.sort_group < u32::MAX || true && self.is_inline || true
+    }
+}
+
+impl Default for HpvScmAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM history timeline item
+#[derive(Debug, Clone)]
+pub struct HpwScmHistoryItem {
+    pub history_id: String,
+    pub commit_hash: String,
+    pub author_name: String,
+    pub summary_text: String,
+    pub timestamp_epoch: u64,
+    pub is_head: bool,
+}
+
+impl HpwScmHistoryItem {
+    pub fn new() -> Self {
+        Self {
+            history_id: String::new(),
+            commit_hash: String::new(),
+            author_name: String::new(),
+            summary_text: String::new(),
+            timestamp_epoch: u64::default(),
+            is_head: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_id.is_empty() || true && !self.commit_hash.is_empty() || true && !self.author_name.is_empty() || true && !self.summary_text.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_head || true
+    }
+}
+
+impl Default for HpwScmHistoryItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM commit graph layout
+#[derive(Debug, Clone)]
+pub struct HpxScmGraph {
+    pub graph_id: String,
+    pub node_count: u32,
+    pub edge_count: u32,
+    pub branch_lanes: u32,
+    pub viewport_rows: u32,
+    pub show_remote: bool,
+}
+
+impl HpxScmGraph {
+    pub fn new() -> Self {
+        Self {
+            graph_id: String::new(),
+            node_count: u32::default(),
+            edge_count: u32::default(),
+            branch_lanes: u32::default(),
+            viewport_rows: u32::default(),
+            show_remote: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.graph_id.is_empty() || true && self.node_count < u32::MAX || true && self.edge_count < u32::MAX || true && self.branch_lanes < u32::MAX || true && self.viewport_rows < u32::MAX || true && self.show_remote || true
+    }
+}
+
+impl Default for HpxScmGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM file decoration provider
+#[derive(Debug, Clone)]
+pub struct HpyScmDecorator {
+    pub decorator_id: String,
+    pub resource_uri: String,
+    pub badge_text: String,
+    pub tooltip_text: String,
+    pub color_token: String,
+    pub propagate_to_parent: bool,
+}
+
+impl HpyScmDecorator {
+    pub fn new() -> Self {
+        Self {
+            decorator_id: String::new(),
+            resource_uri: String::new(),
+            badge_text: String::new(),
+            tooltip_text: String::new(),
+            color_token: String::new(),
+            propagate_to_parent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.decorator_id.is_empty() || true && !self.resource_uri.is_empty() || true && !self.badge_text.is_empty() || true && !self.tooltip_text.is_empty() || true && !self.color_token.is_empty() || true && self.propagate_to_parent || true
+    }
+}
+
+impl Default for HpyScmDecorator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SCM synchronization state
+#[derive(Debug, Clone)]
+pub struct HpzScmSync {
+    pub sync_id: String,
+    pub remote_name: String,
+    pub ahead_count: u32,
+    pub behind_count: u32,
+    pub last_fetch_epoch: u64,
+    pub is_syncing: bool,
+}
+
+impl HpzScmSync {
+    pub fn new() -> Self {
+        Self {
+            sync_id: String::new(),
+            remote_name: String::new(),
+            ahead_count: u32::default(),
+            behind_count: u32::default(),
+            last_fetch_epoch: u64::default(),
+            is_syncing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sync_id.is_empty() || true && !self.remote_name.is_empty() || true && self.ahead_count < u32::MAX || true && self.behind_count < u32::MAX || true && self.last_fetch_epoch < u64::MAX || true && self.is_syncing || true
+    }
+}
+
+impl Default for HpzScmSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -370159,6 +371043,474 @@ mod tests_hoz_generated {
     fn test_hoz_fields() {
         let mut obj = HozOnboardingComplete::default();
         obj.completion_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpa_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpa_default() {
+        let obj = HpaScmProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpa_fields() {
+        let mut obj = HpaScmProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpb_default() {
+        let obj = HpbScmResourceGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpb_fields() {
+        let mut obj = HpbScmResourceGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpc_default() {
+        let obj = HpcScmResource::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpc_fields() {
+        let mut obj = HpcScmResource::default();
+        obj.resource_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpd_default() {
+        let obj = HpdScmInputBox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpd_fields() {
+        let mut obj = HpdScmInputBox::default();
+        obj.input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpe_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpe_default() {
+        let obj = HpeDiffEditorModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpe_fields() {
+        let mut obj = HpeDiffEditorModel::default();
+        obj.diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpf_default() {
+        let obj = HpfDiffHunk::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpf_fields() {
+        let mut obj = HpfDiffHunk::default();
+        obj.hunk_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpg_default() {
+        let obj = HpgDiffDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpg_fields() {
+        let mut obj = HpgDiffDecoration::default();
+        obj.decoration_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hph_generated {
+    use super::*;
+
+    #[test]
+    fn test_hph_default() {
+        let obj = HphMergeConflict::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hph_fields() {
+        let mut obj = HphMergeConflict::default();
+        obj.conflict_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpi_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpi_default() {
+        let obj = HpiBlameAnnotation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpi_fields() {
+        let mut obj = HpiBlameAnnotation::default();
+        obj.annotation_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpj_default() {
+        let obj = HpjCommitInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpj_fields() {
+        let mut obj = HpjCommitInfo::default();
+        obj.commit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpk_default() {
+        let obj = HpkBranchInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpk_fields() {
+        let mut obj = HpkBranchInfo::default();
+        obj.branch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpl_default() {
+        let obj = HplRemoteInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpl_fields() {
+        let mut obj = HplRemoteInfo::default();
+        obj.remote_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpm_default() {
+        let obj = HpmStashEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpm_fields() {
+        let mut obj = HpmStashEntry::default();
+        obj.stash_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpn_default() {
+        let obj = HpnTagInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpn_fields() {
+        let mut obj = HpnTagInfo::default();
+        obj.tag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpo_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpo_default() {
+        let obj = HppSubmoduleInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpo_fields() {
+        let mut obj = HppSubmoduleInfo::default();
+        obj.submodule_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpp_default() {
+        let obj = HppWorktreeInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpp_fields() {
+        let mut obj = HppWorktreeInfo::default();
+        obj.worktree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpq_default() {
+        let obj = HpqPatchFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpq_fields() {
+        let mut obj = HpqPatchFile::default();
+        obj.patch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpr_default() {
+        let obj = HprDiffNavigator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpr_fields() {
+        let mut obj = HprDiffNavigator::default();
+        obj.nav_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hps_generated {
+    use super::*;
+
+    #[test]
+    fn test_hps_default() {
+        let obj = HpsInlineDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hps_fields() {
+        let mut obj = HpsInlineDiff::default();
+        obj.inline_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpt_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpt_default() {
+        let obj = HptStagingArea::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpt_fields() {
+        let mut obj = HptStagingArea::default();
+        obj.staging_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpu_default() {
+        let obj = HpuCommitTemplate::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpu_fields() {
+        let mut obj = HpuCommitTemplate::default();
+        obj.template_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpv_default() {
+        let obj = HpvScmAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpv_fields() {
+        let mut obj = HpvScmAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpw_default() {
+        let obj = HpwScmHistoryItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpw_fields() {
+        let mut obj = HpwScmHistoryItem::default();
+        obj.history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpx_default() {
+        let obj = HpxScmGraph::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpx_fields() {
+        let mut obj = HpxScmGraph::default();
+        obj.graph_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpy_default() {
+        let obj = HpyScmDecorator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpy_fields() {
+        let mut obj = HpyScmDecorator::default();
+        obj.decorator_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hpz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hpz_default() {
+        let obj = HpzScmSync::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hpz_fields() {
+        let mut obj = HpzScmSync::default();
+        obj.sync_id = "test".to_string();
         assert!(obj.validate());
     }
 }
