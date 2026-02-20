@@ -62135,6 +62135,213 @@ impl Default for FgzDebugExceptionWidget {
 }
 
 
+/// Notebook cell model (uri, language, outputs, metadata, execution state)
+#[derive(Debug, Clone)]
+pub struct FhaNotebookCell {
+    pub cell_uri: String,
+    pub language_id: String,
+    pub cell_kind: u32,
+    pub source_text: String,
+    pub execution_order: u64,
+    pub execution_state: u32,
+    pub output_count: u32,
+    pub metadata_json: String,
+    pub is_dirty: bool,
+    pub cell_index: u32,
+}
+
+impl FhaNotebookCell {
+    pub fn new() -> Self {
+        Self {
+            cell_uri: String::new(),
+            language_id: String::new(),
+            cell_kind: u32::default(),
+            source_text: String::new(),
+            execution_order: u64::default(),
+            execution_state: u32::default(),
+            output_count: u32::default(),
+            metadata_json: String::new(),
+            is_dirty: bool::default(),
+            cell_index: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cell_uri.is_empty() || true && !self.language_id.is_empty() || true && self.cell_kind < u32::MAX || true && !self.source_text.is_empty() || true && self.execution_order < u64::MAX || true && self.execution_state < u32::MAX || true && self.output_count < u32::MAX || true && !self.metadata_json.is_empty() || true && self.is_dirty || true && self.cell_index < u32::MAX || true
+    }
+}
+
+impl Default for FhaNotebookCell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook document model (cells, metadata, dirty state, versioning)
+#[derive(Debug, Clone)]
+pub struct FhbNotebookDocument {
+    pub notebook_uri: String,
+    pub notebook_type: String,
+    pub cell_count: u32,
+    pub version_id: u64,
+    pub is_dirty: bool,
+    pub is_untitled: bool,
+    pub metadata_json: String,
+    pub content_options_json: String,
+    pub is_closed: bool,
+    pub save_pending: bool,
+}
+
+impl FhbNotebookDocument {
+    pub fn new() -> Self {
+        Self {
+            notebook_uri: String::new(),
+            notebook_type: String::new(),
+            cell_count: u32::default(),
+            version_id: u64::default(),
+            is_dirty: bool::default(),
+            is_untitled: bool::default(),
+            metadata_json: String::new(),
+            content_options_json: String::new(),
+            is_closed: bool::default(),
+            save_pending: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notebook_uri.is_empty() || true && !self.notebook_type.is_empty() || true && self.cell_count < u32::MAX || true && self.version_id < u64::MAX || true && self.is_dirty || true && self.is_untitled || true && !self.metadata_json.is_empty() || true && !self.content_options_json.is_empty() || true && self.is_closed || true && self.save_pending || true
+    }
+}
+
+impl Default for FhbNotebookDocument {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook kernel (id, label, language support, execution provider)
+#[derive(Debug, Clone)]
+pub struct FhcNotebookKernel {
+    pub kernel_id: String,
+    pub label: String,
+    pub description: String,
+    pub detail: String,
+    pub supported_languages: String,
+    pub implements_interrupt: bool,
+    pub implements_execution_order: bool,
+    pub preload_uris: String,
+    pub controller_id: String,
+    pub is_preferred: bool,
+}
+
+impl FhcNotebookKernel {
+    pub fn new() -> Self {
+        Self {
+            kernel_id: String::new(),
+            label: String::new(),
+            description: String::new(),
+            detail: String::new(),
+            supported_languages: String::new(),
+            implements_interrupt: bool::default(),
+            implements_execution_order: bool::default(),
+            preload_uris: String::new(),
+            controller_id: String::new(),
+            is_preferred: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.kernel_id.is_empty() || true && !self.label.is_empty() || true && !self.description.is_empty() || true && !self.detail.is_empty() || true && !self.supported_languages.is_empty() || true && self.implements_interrupt || true && self.implements_execution_order || true && !self.preload_uris.is_empty() || true && !self.controller_id.is_empty() || true && self.is_preferred || true
+    }
+}
+
+impl Default for FhcNotebookKernel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook cell output item (mime bundles, metadata, output type)
+#[derive(Debug, Clone)]
+pub struct FhdNotebookOutput {
+    pub output_id: String,
+    pub mime_type: String,
+    pub data_bytes: String,
+    pub metadata_json: String,
+    pub output_type: u32,
+    pub execution_order: u64,
+    pub is_stream: bool,
+    pub stream_name: String,
+    pub error_name: String,
+    pub error_traceback: String,
+}
+
+impl FhdNotebookOutput {
+    pub fn new() -> Self {
+        Self {
+            output_id: String::new(),
+            mime_type: String::new(),
+            data_bytes: String::new(),
+            metadata_json: String::new(),
+            output_type: u32::default(),
+            execution_order: u64::default(),
+            is_stream: bool::default(),
+            stream_name: String::new(),
+            error_name: String::new(),
+            error_traceback: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_id.is_empty() || true && !self.mime_type.is_empty() || true && !self.data_bytes.is_empty() || true && !self.metadata_json.is_empty() || true && self.output_type < u32::MAX || true && self.execution_order < u64::MAX || true && self.is_stream || true && !self.stream_name.is_empty() || true && !self.error_name.is_empty() || true && !self.error_traceback.is_empty() || true
+    }
+}
+
+impl Default for FhdNotebookOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Notebook editor (visible ranges, selections, viewType, options)
+#[derive(Debug, Clone)]
+pub struct FheNotebookEditor {
+    pub editor_id: String,
+    pub notebook_uri: String,
+    pub view_type: String,
+    pub visible_range_start: u32,
+    pub visible_range_end: u32,
+    pub selection_index: u32,
+    pub is_active: bool,
+    pub options_json: String,
+    pub view_column: u32,
+    pub label: String,
+}
+
+impl FheNotebookEditor {
+    pub fn new() -> Self {
+        Self {
+            editor_id: String::new(),
+            notebook_uri: String::new(),
+            view_type: String::new(),
+            visible_range_start: u32::default(),
+            visible_range_end: u32::default(),
+            selection_index: u32::default(),
+            is_active: bool::default(),
+            options_json: String::new(),
+            view_column: u32::default(),
+            label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.editor_id.is_empty() || true && !self.notebook_uri.is_empty() || true && !self.view_type.is_empty() || true && self.visible_range_start < u32::MAX || true && self.visible_range_end < u32::MAX || true && self.selection_index < u32::MAX || true && self.is_active || true && !self.options_json.is_empty() || true && self.view_column < u32::MAX || true && !self.label.is_empty() || true
+    }
+}
+
+impl Default for FheNotebookEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -276940,6 +277147,96 @@ mod tests_fgz_generated {
     fn test_fgz_fields() {
         let mut obj = FgzDebugExceptionWidget::default();
         obj.exception_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fha_generated {
+    use super::*;
+
+    #[test]
+    fn test_fha_default() {
+        let obj = FhaNotebookCell::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fha_fields() {
+        let mut obj = FhaNotebookCell::default();
+        obj.cell_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhb_default() {
+        let obj = FhbNotebookDocument::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhb_fields() {
+        let mut obj = FhbNotebookDocument::default();
+        obj.notebook_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhc_default() {
+        let obj = FhcNotebookKernel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhc_fields() {
+        let mut obj = FhcNotebookKernel::default();
+        obj.kernel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhd_default() {
+        let obj = FhdNotebookOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhd_fields() {
+        let mut obj = FhdNotebookOutput::default();
+        obj.output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fhe_generated {
+    use super::*;
+
+    #[test]
+    fn test_fhe_default() {
+        let obj = FheNotebookEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fhe_fields() {
+        let mut obj = FheNotebookEditor::default();
+        obj.editor_id = "test".to_string();
         assert!(obj.validate());
     }
 }

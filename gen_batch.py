@@ -49,7 +49,7 @@ for fpath in files:
             else:
                 validate_parts.append("true")
         validate_body = " && ".join(validate_parts)
-        type_block = f"""{doc}
+        type_block = f"""/// {doc}
 #[derive(Debug, Clone)]
 pub struct {struct_name} {{
 {field_defs}
