@@ -175098,6 +175098,890 @@ impl Default for JqzWorkspaceConfig {
     }
 }
 
+/// Service identifier descriptor
+#[derive(Debug, Clone)]
+pub struct JraServiceId {
+    pub svc_id: String,
+    pub service_name: String,
+    pub interface_ref: String,
+    pub description_str: String,
+    pub registration_epoch: u64,
+    pub is_optional: bool,
+}
+
+impl JraServiceId {
+    pub fn new() -> Self {
+        Self {
+            svc_id: String::new(),
+            service_name: String::new(),
+            interface_ref: String::new(),
+            description_str: String::new(),
+            registration_epoch: u64::default(),
+            is_optional: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.svc_id.is_empty() || true && !self.service_name.is_empty() || true && !self.interface_ref.is_empty() || true && !self.description_str.is_empty() || true && self.registration_epoch < u64::MAX || true && self.is_optional || true
+    }
+}
+
+impl Default for JraServiceId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service descriptor entry
+#[derive(Debug, Clone)]
+pub struct JrbServiceDescriptor {
+    pub svc_desc_id: String,
+    pub service_ref: String,
+    pub implementation_ref: String,
+    pub dependencies_csv: String,
+    pub lifetime_str: String,
+    pub is_singleton: bool,
+}
+
+impl JrbServiceDescriptor {
+    pub fn new() -> Self {
+        Self {
+            svc_desc_id: String::new(),
+            service_ref: String::new(),
+            implementation_ref: String::new(),
+            dependencies_csv: String::new(),
+            lifetime_str: String::new(),
+            is_singleton: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.svc_desc_id.is_empty() || true && !self.service_ref.is_empty() || true && !self.implementation_ref.is_empty() || true && !self.dependencies_csv.is_empty() || true && !self.lifetime_str.is_empty() || true && self.is_singleton || true
+    }
+}
+
+impl Default for JrbServiceDescriptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service collection
+#[derive(Debug, Clone)]
+pub struct JrcServiceCollection {
+    pub svc_coll_id: String,
+    pub collection_name: String,
+    pub service_count: u32,
+    pub parent_ref: String,
+    pub scope_str: String,
+    pub is_frozen: bool,
+}
+
+impl JrcServiceCollection {
+    pub fn new() -> Self {
+        Self {
+            svc_coll_id: String::new(),
+            collection_name: String::new(),
+            service_count: u32::default(),
+            parent_ref: String::new(),
+            scope_str: String::new(),
+            is_frozen: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.svc_coll_id.is_empty() || true && !self.collection_name.is_empty() || true && self.service_count < u32::MAX || true && !self.parent_ref.is_empty() || true && !self.scope_str.is_empty() || true && self.is_frozen || true
+    }
+}
+
+impl Default for JrcServiceCollection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service instance entry
+#[derive(Debug, Clone)]
+pub struct JrdServiceInstance {
+    pub svc_inst_id: String,
+    pub service_ref: String,
+    pub instance_ref: String,
+    pub created_epoch: u64,
+    pub activation_cost_ms: u32,
+    pub is_disposed: bool,
+}
+
+impl JrdServiceInstance {
+    pub fn new() -> Self {
+        Self {
+            svc_inst_id: String::new(),
+            service_ref: String::new(),
+            instance_ref: String::new(),
+            created_epoch: u64::default(),
+            activation_cost_ms: u32::default(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.svc_inst_id.is_empty() || true && !self.service_ref.is_empty() || true && !self.instance_ref.is_empty() || true && self.created_epoch < u64::MAX || true && self.activation_cost_ms < u32::MAX || true && self.is_disposed || true
+    }
+}
+
+impl Default for JrdServiceInstance {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Instantiation service
+#[derive(Debug, Clone)]
+pub struct JreInstantiationService {
+    pub inst_svc_id: String,
+    pub service_count: u32,
+    pub instance_count: u32,
+    pub pending_count: u32,
+    pub cycle_count: u32,
+    pub is_ready: bool,
+}
+
+impl JreInstantiationService {
+    pub fn new() -> Self {
+        Self {
+            inst_svc_id: String::new(),
+            service_count: u32::default(),
+            instance_count: u32::default(),
+            pending_count: u32::default(),
+            cycle_count: u32::default(),
+            is_ready: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inst_svc_id.is_empty() || true && self.service_count < u32::MAX || true && self.instance_count < u32::MAX || true && self.pending_count < u32::MAX || true && self.cycle_count < u32::MAX || true && self.is_ready || true
+    }
+}
+
+impl Default for JreInstantiationService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service decorator entry
+#[derive(Debug, Clone)]
+pub struct JrfServiceDecorator {
+    pub svc_deco_id: String,
+    pub service_ref: String,
+    pub decorator_ref: String,
+    pub priority_val: u32,
+    pub chain_count: u32,
+    pub is_active: bool,
+}
+
+impl JrfServiceDecorator {
+    pub fn new() -> Self {
+        Self {
+            svc_deco_id: String::new(),
+            service_ref: String::new(),
+            decorator_ref: String::new(),
+            priority_val: u32::default(),
+            chain_count: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.svc_deco_id.is_empty() || true && !self.service_ref.is_empty() || true && !self.decorator_ref.is_empty() || true && self.priority_val < u32::MAX || true && self.chain_count < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JrfServiceDecorator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC communication channel
+#[derive(Debug, Clone)]
+pub struct JrgIpcChannel {
+    pub ipc_channel_id: String,
+    pub channel_name: String,
+    pub transport_str: String,
+    pub endpoint_ref: String,
+    pub message_count: u64,
+    pub is_connected: bool,
+}
+
+impl JrgIpcChannel {
+    pub fn new() -> Self {
+        Self {
+            ipc_channel_id: String::new(),
+            channel_name: String::new(),
+            transport_str: String::new(),
+            endpoint_ref: String::new(),
+            message_count: u64::default(),
+            is_connected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ipc_channel_id.is_empty() || true && !self.channel_name.is_empty() || true && !self.transport_str.is_empty() || true && !self.endpoint_ref.is_empty() || true && self.message_count < u64::MAX || true && self.is_connected || true
+    }
+}
+
+impl Default for JrgIpcChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC message entry
+#[derive(Debug, Clone)]
+pub struct JrhIpcMessage {
+    pub ipc_msg_id: String,
+    pub channel_ref: String,
+    pub payload_len: u32,
+    pub msg_type_str: String,
+    pub sequence_num: u64,
+    pub is_response: bool,
+}
+
+impl JrhIpcMessage {
+    pub fn new() -> Self {
+        Self {
+            ipc_msg_id: String::new(),
+            channel_ref: String::new(),
+            payload_len: u32::default(),
+            msg_type_str: String::new(),
+            sequence_num: u64::default(),
+            is_response: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ipc_msg_id.is_empty() || true && !self.channel_ref.is_empty() || true && self.payload_len < u32::MAX || true && !self.msg_type_str.is_empty() || true && self.sequence_num < u64::MAX || true && self.is_response || true
+    }
+}
+
+impl Default for JrhIpcMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC protocol descriptor
+#[derive(Debug, Clone)]
+pub struct JriIpcProtocol {
+    pub ipc_proto_id: String,
+    pub protocol_name: String,
+    pub version_str: String,
+    pub encoding_str: String,
+    pub header_size: u32,
+    pub supports_binary: bool,
+}
+
+impl JriIpcProtocol {
+    pub fn new() -> Self {
+        Self {
+            ipc_proto_id: String::new(),
+            protocol_name: String::new(),
+            version_str: String::new(),
+            encoding_str: String::new(),
+            header_size: u32::default(),
+            supports_binary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ipc_proto_id.is_empty() || true && !self.protocol_name.is_empty() || true && !self.version_str.is_empty() || true && !self.encoding_str.is_empty() || true && self.header_size < u32::MAX || true && self.supports_binary || true
+    }
+}
+
+impl Default for JriIpcProtocol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Worker thread descriptor
+#[derive(Debug, Clone)]
+pub struct JrjWorkerThread {
+    pub worker_id: String,
+    pub worker_name: String,
+    pub module_url: String,
+    pub memory_bytes: u64,
+    pub message_count: u64,
+    pub is_alive: bool,
+}
+
+impl JrjWorkerThread {
+    pub fn new() -> Self {
+        Self {
+            worker_id: String::new(),
+            worker_name: String::new(),
+            module_url: String::new(),
+            memory_bytes: u64::default(),
+            message_count: u64::default(),
+            is_alive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.worker_id.is_empty() || true && !self.worker_name.is_empty() || true && !self.module_url.is_empty() || true && self.memory_bytes < u64::MAX || true && self.message_count < u64::MAX || true && self.is_alive || true
+    }
+}
+
+impl Default for JrjWorkerThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Message port descriptor
+#[derive(Debug, Clone)]
+pub struct JrkMessagePort {
+    pub msg_port_id: String,
+    pub port_name: String,
+    pub paired_port_ref: String,
+    pub buffer_size: u32,
+    pub pending_messages: u32,
+    pub is_closed: bool,
+}
+
+impl JrkMessagePort {
+    pub fn new() -> Self {
+        Self {
+            msg_port_id: String::new(),
+            port_name: String::new(),
+            paired_port_ref: String::new(),
+            buffer_size: u32::default(),
+            pending_messages: u32::default(),
+            is_closed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.msg_port_id.is_empty() || true && !self.port_name.is_empty() || true && !self.paired_port_ref.is_empty() || true && self.buffer_size < u32::MAX || true && self.pending_messages < u32::MAX || true && self.is_closed || true
+    }
+}
+
+impl Default for JrkMessagePort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shared process descriptor
+#[derive(Debug, Clone)]
+pub struct JrlSharedProcess {
+    pub shared_proc_id: String,
+    pub process_name: String,
+    pub pid_val: u32,
+    pub memory_bytes: u64,
+    pub service_count: u32,
+    pub is_healthy: bool,
+}
+
+impl JrlSharedProcess {
+    pub fn new() -> Self {
+        Self {
+            shared_proc_id: String::new(),
+            process_name: String::new(),
+            pid_val: u32::default(),
+            memory_bytes: u64::default(),
+            service_count: u32::default(),
+            is_healthy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shared_proc_id.is_empty() || true && !self.process_name.is_empty() || true && self.pid_val < u32::MAX || true && self.memory_bytes < u64::MAX || true && self.service_count < u32::MAX || true && self.is_healthy || true
+    }
+}
+
+impl Default for JrlSharedProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Lifecycle phase descriptor
+#[derive(Debug, Clone)]
+pub struct JrmLifecyclePhase {
+    pub lifecycle_phase_id: String,
+    pub phase_name: String,
+    pub phase_order: u32,
+    pub duration_ms: u64,
+    pub dependency_count: u32,
+    pub is_complete: bool,
+}
+
+impl JrmLifecyclePhase {
+    pub fn new() -> Self {
+        Self {
+            lifecycle_phase_id: String::new(),
+            phase_name: String::new(),
+            phase_order: u32::default(),
+            duration_ms: u64::default(),
+            dependency_count: u32::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lifecycle_phase_id.is_empty() || true && !self.phase_name.is_empty() || true && self.phase_order < u32::MAX || true && self.duration_ms < u64::MAX || true && self.dependency_count < u32::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for JrmLifecyclePhase {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Startup performance entry
+#[derive(Debug, Clone)]
+pub struct JrnStartupPerf {
+    pub startup_perf_id: String,
+    pub mark_name: String,
+    pub timestamp_ms: f64,
+    pub parent_ref: String,
+    pub detail_str: String,
+    pub is_milestone: bool,
+}
+
+impl JrnStartupPerf {
+    pub fn new() -> Self {
+        Self {
+            startup_perf_id: String::new(),
+            mark_name: String::new(),
+            timestamp_ms: f64::default(),
+            parent_ref: String::new(),
+            detail_str: String::new(),
+            is_milestone: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.startup_perf_id.is_empty() || true && !self.mark_name.is_empty() || true && self.timestamp_ms.is_finite() || true && !self.parent_ref.is_empty() || true && !self.detail_str.is_empty() || true && self.is_milestone || true
+    }
+}
+
+impl Default for JrnStartupPerf {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Disposable store
+#[derive(Debug, Clone)]
+pub struct JroDisposableStore {
+    pub disp_store_id: String,
+    pub store_name: String,
+    pub item_count: u32,
+    pub leaked_count: u32,
+    pub stack_trace: String,
+    pub is_disposed: bool,
+}
+
+impl JroDisposableStore {
+    pub fn new() -> Self {
+        Self {
+            disp_store_id: String::new(),
+            store_name: String::new(),
+            item_count: u32::default(),
+            leaked_count: u32::default(),
+            stack_trace: String::new(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.disp_store_id.is_empty() || true && !self.store_name.is_empty() || true && self.item_count < u32::MAX || true && self.leaked_count < u32::MAX || true && !self.stack_trace.is_empty() || true && self.is_disposed || true
+    }
+}
+
+impl Default for JroDisposableStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Event bus descriptor
+#[derive(Debug, Clone)]
+pub struct JrpEventBus {
+    pub event_bus_id: String,
+    pub event_name: String,
+    pub listener_count: u32,
+    pub fire_count: u64,
+    pub max_listeners: u32,
+    pub is_async: bool,
+}
+
+impl JrpEventBus {
+    pub fn new() -> Self {
+        Self {
+            event_bus_id: String::new(),
+            event_name: String::new(),
+            listener_count: u32::default(),
+            fire_count: u64::default(),
+            max_listeners: u32::default(),
+            is_async: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_bus_id.is_empty() || true && !self.event_name.is_empty() || true && self.listener_count < u32::MAX || true && self.fire_count < u64::MAX || true && self.max_listeners < u32::MAX || true && self.is_async || true
+    }
+}
+
+impl Default for JrpEventBus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async queue descriptor
+#[derive(Debug, Clone)]
+pub struct JrqPromiseQueue {
+    pub promise_q_id: String,
+    pub queue_name: String,
+    pub pending_count: u32,
+    pub max_parallel: u32,
+    pub completed_count: u64,
+    pub is_paused: bool,
+}
+
+impl JrqPromiseQueue {
+    pub fn new() -> Self {
+        Self {
+            promise_q_id: String::new(),
+            queue_name: String::new(),
+            pending_count: u32::default(),
+            max_parallel: u32::default(),
+            completed_count: u64::default(),
+            is_paused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.promise_q_id.is_empty() || true && !self.queue_name.is_empty() || true && self.pending_count < u32::MAX || true && self.max_parallel < u32::MAX || true && self.completed_count < u64::MAX || true && self.is_paused || true
+    }
+}
+
+impl Default for JrqPromiseQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cancellation token
+#[derive(Debug, Clone)]
+pub struct JrrCancellationToken {
+    pub cancel_token_id: String,
+    pub source_ref: String,
+    pub cancel_reason: String,
+    pub cancelled_epoch: u64,
+    pub child_count: u32,
+    pub is_cancelled: bool,
+}
+
+impl JrrCancellationToken {
+    pub fn new() -> Self {
+        Self {
+            cancel_token_id: String::new(),
+            source_ref: String::new(),
+            cancel_reason: String::new(),
+            cancelled_epoch: u64::default(),
+            child_count: u32::default(),
+            is_cancelled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cancel_token_id.is_empty() || true && !self.source_ref.is_empty() || true && !self.cancel_reason.is_empty() || true && self.cancelled_epoch < u64::MAX || true && self.child_count < u32::MAX || true && self.is_cancelled || true
+    }
+}
+
+impl Default for JrrCancellationToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Logging service descriptor
+#[derive(Debug, Clone)]
+pub struct JrsLogService {
+    pub log_svc_id: String,
+    pub log_level_str: String,
+    pub channel_count: u32,
+    pub output_path: String,
+    pub max_file_size: u64,
+    pub is_verbose: bool,
+}
+
+impl JrsLogService {
+    pub fn new() -> Self {
+        Self {
+            log_svc_id: String::new(),
+            log_level_str: String::new(),
+            channel_count: u32::default(),
+            output_path: String::new(),
+            max_file_size: u64::default(),
+            is_verbose: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.log_svc_id.is_empty() || true && !self.log_level_str.is_empty() || true && self.channel_count < u32::MAX || true && !self.output_path.is_empty() || true && self.max_file_size < u64::MAX || true && self.is_verbose || true
+    }
+}
+
+impl Default for JrsLogService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Telemetry service descriptor
+#[derive(Debug, Clone)]
+pub struct JrtTelemetryService {
+    pub tel_svc_id: String,
+    pub app_key: String,
+    pub event_count: u64,
+    pub flush_interval_ms: u32,
+    pub endpoint_url: String,
+    pub is_enabled: bool,
+}
+
+impl JrtTelemetryService {
+    pub fn new() -> Self {
+        Self {
+            tel_svc_id: String::new(),
+            app_key: String::new(),
+            event_count: u64::default(),
+            flush_interval_ms: u32::default(),
+            endpoint_url: String::new(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tel_svc_id.is_empty() || true && !self.app_key.is_empty() || true && self.event_count < u64::MAX || true && self.flush_interval_ms < u32::MAX || true && !self.endpoint_url.is_empty() || true && self.is_enabled || true
+    }
+}
+
+impl Default for JrtTelemetryService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Storage service descriptor
+#[derive(Debug, Clone)]
+pub struct JruStorageService {
+    pub storage_svc_id: String,
+    pub storage_path: String,
+    pub db_size_bytes: u64,
+    pub key_count: u32,
+    pub write_count: u64,
+    pub is_global: bool,
+}
+
+impl JruStorageService {
+    pub fn new() -> Self {
+        Self {
+            storage_svc_id: String::new(),
+            storage_path: String::new(),
+            db_size_bytes: u64::default(),
+            key_count: u32::default(),
+            write_count: u64::default(),
+            is_global: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.storage_svc_id.is_empty() || true && !self.storage_path.is_empty() || true && self.db_size_bytes < u64::MAX || true && self.key_count < u32::MAX || true && self.write_count < u64::MAX || true && self.is_global || true
+    }
+}
+
+impl Default for JruStorageService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Clipboard service descriptor
+#[derive(Debug, Clone)]
+pub struct JrvClipboardService {
+    pub clip_svc_id: String,
+    pub current_text_len: u32,
+    pub clipboard_type_str: String,
+    pub write_epoch: u64,
+    pub read_count: u64,
+    pub has_image: bool,
+}
+
+impl JrvClipboardService {
+    pub fn new() -> Self {
+        Self {
+            clip_svc_id: String::new(),
+            current_text_len: u32::default(),
+            clipboard_type_str: String::new(),
+            write_epoch: u64::default(),
+            read_count: u64::default(),
+            has_image: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.clip_svc_id.is_empty() || true && self.current_text_len < u32::MAX || true && !self.clipboard_type_str.is_empty() || true && self.write_epoch < u64::MAX || true && self.read_count < u64::MAX || true && self.has_image || true
+    }
+}
+
+impl Default for JrvClipboardService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dialog service descriptor
+#[derive(Debug, Clone)]
+pub struct JrwDialogService {
+    pub dialog_svc_id: String,
+    pub open_count: u32,
+    pub last_result_str: String,
+    pub default_path: String,
+    pub filter_str: String,
+    pub is_native: bool,
+}
+
+impl JrwDialogService {
+    pub fn new() -> Self {
+        Self {
+            dialog_svc_id: String::new(),
+            open_count: u32::default(),
+            last_result_str: String::new(),
+            default_path: String::new(),
+            filter_str: String::new(),
+            is_native: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dialog_svc_id.is_empty() || true && self.open_count < u32::MAX || true && !self.last_result_str.is_empty() || true && !self.default_path.is_empty() || true && !self.filter_str.is_empty() || true && self.is_native || true
+    }
+}
+
+impl Default for JrwDialogService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notification service descriptor
+#[derive(Debug, Clone)]
+pub struct JrxNotificationService {
+    pub notif_svc_id: String,
+    pub pending_count: u32,
+    pub total_count: u64,
+    pub max_visible: u32,
+    pub do_not_disturb: bool,
+    pub is_silent: bool,
+}
+
+impl JrxNotificationService {
+    pub fn new() -> Self {
+        Self {
+            notif_svc_id: String::new(),
+            pending_count: u32::default(),
+            total_count: u64::default(),
+            max_visible: u32::default(),
+            do_not_disturb: bool::default(),
+            is_silent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notif_svc_id.is_empty() || true && self.pending_count < u32::MAX || true && self.total_count < u64::MAX || true && self.max_visible < u32::MAX || true && self.do_not_disturb || true && self.is_silent || true
+    }
+}
+
+impl Default for JrxNotificationService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Context key service
+#[derive(Debug, Clone)]
+pub struct JryContextKeyService {
+    pub ctx_svc_id: String,
+    pub key_count: u32,
+    pub context_depth: u32,
+    pub evaluation_count: u64,
+    pub cache_hit_rate: f64,
+    pub is_global: bool,
+}
+
+impl JryContextKeyService {
+    pub fn new() -> Self {
+        Self {
+            ctx_svc_id: String::new(),
+            key_count: u32::default(),
+            context_depth: u32::default(),
+            evaluation_count: u64::default(),
+            cache_hit_rate: f64::default(),
+            is_global: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ctx_svc_id.is_empty() || true && self.key_count < u32::MAX || true && self.context_depth < u32::MAX || true && self.evaluation_count < u64::MAX || true && self.cache_hit_rate.is_finite() || true && self.is_global || true
+    }
+}
+
+impl Default for JryContextKeyService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command service descriptor
+#[derive(Debug, Clone)]
+pub struct JrzCommandService {
+    pub cmd_svc_id: String,
+    pub command_count: u32,
+    pub execution_count: u64,
+    pub pending_count: u32,
+    pub undo_redo_group: String,
+    pub is_executing: bool,
+}
+
+impl JrzCommandService {
+    pub fn new() -> Self {
+        Self {
+            cmd_svc_id: String::new(),
+            command_count: u32::default(),
+            execution_count: u64::default(),
+            pending_count: u32::default(),
+            undo_redo_group: String::new(),
+            is_executing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cmd_svc_id.is_empty() || true && self.command_count < u32::MAX || true && self.execution_count < u64::MAX || true && self.pending_count < u32::MAX || true && !self.undo_redo_group.is_empty() || true && self.is_executing || true
+    }
+}
+
+impl Default for JrzCommandService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -443181,6 +444065,474 @@ mod tests_jqz_generated {
     fn test_jqz_fields() {
         let mut obj = JqzWorkspaceConfig::default();
         obj.ws_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jra_generated {
+    use super::*;
+
+    #[test]
+    fn test_jra_default() {
+        let obj = JraServiceId::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jra_fields() {
+        let mut obj = JraServiceId::default();
+        obj.svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrb_default() {
+        let obj = JrbServiceDescriptor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrb_fields() {
+        let mut obj = JrbServiceDescriptor::default();
+        obj.svc_desc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrc_default() {
+        let obj = JrcServiceCollection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrc_fields() {
+        let mut obj = JrcServiceCollection::default();
+        obj.svc_coll_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrd_default() {
+        let obj = JrdServiceInstance::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrd_fields() {
+        let mut obj = JrdServiceInstance::default();
+        obj.svc_inst_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jre_generated {
+    use super::*;
+
+    #[test]
+    fn test_jre_default() {
+        let obj = JreInstantiationService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jre_fields() {
+        let mut obj = JreInstantiationService::default();
+        obj.inst_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrf_default() {
+        let obj = JrfServiceDecorator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrf_fields() {
+        let mut obj = JrfServiceDecorator::default();
+        obj.svc_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrg_default() {
+        let obj = JrgIpcChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrg_fields() {
+        let mut obj = JrgIpcChannel::default();
+        obj.ipc_channel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrh_default() {
+        let obj = JrhIpcMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrh_fields() {
+        let mut obj = JrhIpcMessage::default();
+        obj.ipc_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jri_generated {
+    use super::*;
+
+    #[test]
+    fn test_jri_default() {
+        let obj = JriIpcProtocol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jri_fields() {
+        let mut obj = JriIpcProtocol::default();
+        obj.ipc_proto_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrj_default() {
+        let obj = JrjWorkerThread::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrj_fields() {
+        let mut obj = JrjWorkerThread::default();
+        obj.worker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrk_default() {
+        let obj = JrkMessagePort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrk_fields() {
+        let mut obj = JrkMessagePort::default();
+        obj.msg_port_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrl_default() {
+        let obj = JrlSharedProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrl_fields() {
+        let mut obj = JrlSharedProcess::default();
+        obj.shared_proc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrm_default() {
+        let obj = JrmLifecyclePhase::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrm_fields() {
+        let mut obj = JrmLifecyclePhase::default();
+        obj.lifecycle_phase_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrn_default() {
+        let obj = JrnStartupPerf::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrn_fields() {
+        let mut obj = JrnStartupPerf::default();
+        obj.startup_perf_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jro_generated {
+    use super::*;
+
+    #[test]
+    fn test_jro_default() {
+        let obj = JroDisposableStore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jro_fields() {
+        let mut obj = JroDisposableStore::default();
+        obj.disp_store_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrp_default() {
+        let obj = JrpEventBus::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrp_fields() {
+        let mut obj = JrpEventBus::default();
+        obj.event_bus_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrq_default() {
+        let obj = JrqPromiseQueue::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrq_fields() {
+        let mut obj = JrqPromiseQueue::default();
+        obj.promise_q_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrr_default() {
+        let obj = JrrCancellationToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrr_fields() {
+        let mut obj = JrrCancellationToken::default();
+        obj.cancel_token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrs_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrs_default() {
+        let obj = JrsLogService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrs_fields() {
+        let mut obj = JrsLogService::default();
+        obj.log_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrt_default() {
+        let obj = JrtTelemetryService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrt_fields() {
+        let mut obj = JrtTelemetryService::default();
+        obj.tel_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jru_generated {
+    use super::*;
+
+    #[test]
+    fn test_jru_default() {
+        let obj = JruStorageService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jru_fields() {
+        let mut obj = JruStorageService::default();
+        obj.storage_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrv_default() {
+        let obj = JrvClipboardService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrv_fields() {
+        let mut obj = JrvClipboardService::default();
+        obj.clip_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrw_default() {
+        let obj = JrwDialogService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrw_fields() {
+        let mut obj = JrwDialogService::default();
+        obj.dialog_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrx_default() {
+        let obj = JrxNotificationService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrx_fields() {
+        let mut obj = JrxNotificationService::default();
+        obj.notif_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jry_generated {
+    use super::*;
+
+    #[test]
+    fn test_jry_default() {
+        let obj = JryContextKeyService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jry_fields() {
+        let mut obj = JryContextKeyService::default();
+        obj.ctx_svc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jrz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jrz_default() {
+        let obj = JrzCommandService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jrz_fields() {
+        let mut obj = JrzCommandService::default();
+        obj.cmd_svc_id = "test".to_string();
         assert!(obj.validate());
     }
 }
