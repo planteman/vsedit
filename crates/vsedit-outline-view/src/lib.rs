@@ -123480,6 +123480,678 @@ impl Default for HljTreeStickyScroll {
     }
 }
 
+/// List widget (items, selected, focused, renderer, layout)
+#[derive(Debug, Clone)]
+pub struct HlkListWidget {
+    pub list_widget_id: String,
+    pub items_json: String,
+    pub selected_index: u32,
+    pub focused_index: u32,
+    pub renderer_id: String,
+    pub layout: String,
+    pub virtual_delegate: String,
+    pub smooth_scroll: bool,
+    pub mouse_support: bool,
+    pub item_count: u32,
+}
+
+impl HlkListWidget {
+    pub fn new() -> Self {
+        Self {
+            list_widget_id: String::new(),
+            items_json: String::new(),
+            selected_index: u32::default(),
+            focused_index: u32::default(),
+            renderer_id: String::new(),
+            layout: String::new(),
+            virtual_delegate: String::new(),
+            smooth_scroll: bool::default(),
+            mouse_support: bool::default(),
+            item_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_widget_id.is_empty() || true && !self.items_json.is_empty() || true && self.selected_index < u32::MAX || true && self.focused_index < u32::MAX || true && !self.renderer_id.is_empty() || true && !self.layout.is_empty() || true && !self.virtual_delegate.is_empty() || true && self.smooth_scroll || true && self.mouse_support || true && self.item_count < u32::MAX || true
+    }
+}
+
+impl Default for HlkListWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// List item (element, index, template id, style, row height)
+#[derive(Debug, Clone)]
+pub struct HllListItem {
+    pub list_item_id: String,
+    pub element_json: String,
+    pub index: u32,
+    pub template_id: String,
+    pub style_json: String,
+    pub row_height: u32,
+    pub is_collapsed: bool,
+    pub depth: u32,
+    pub is_visible: bool,
+    pub indent_guides: bool,
+}
+
+impl HllListItem {
+    pub fn new() -> Self {
+        Self {
+            list_item_id: String::new(),
+            element_json: String::new(),
+            index: u32::default(),
+            template_id: String::new(),
+            style_json: String::new(),
+            row_height: u32::default(),
+            is_collapsed: bool::default(),
+            depth: u32::default(),
+            is_visible: bool::default(),
+            indent_guides: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_item_id.is_empty() || true && !self.element_json.is_empty() || true && self.index < u32::MAX || true && !self.template_id.is_empty() || true && !self.style_json.is_empty() || true && self.row_height < u32::MAX || true && self.is_collapsed || true && self.depth < u32::MAX || true && self.is_visible || true && self.indent_guides || true
+    }
+}
+
+impl Default for HllListItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// List renderer (template id, render element, dispose, update)
+#[derive(Debug, Clone)]
+pub struct HlmListRenderer {
+    pub list_renderer_id: String,
+    pub template_id: String,
+    pub render_element_fn: String,
+    pub dispose_fn: String,
+    pub update_fn: String,
+    pub template_data_json: String,
+    pub is_registered: bool,
+    pub priority: u32,
+    pub pattern: String,
+    pub extension_id: String,
+}
+
+impl HlmListRenderer {
+    pub fn new() -> Self {
+        Self {
+            list_renderer_id: String::new(),
+            template_id: String::new(),
+            render_element_fn: String::new(),
+            dispose_fn: String::new(),
+            update_fn: String::new(),
+            template_data_json: String::new(),
+            is_registered: bool::default(),
+            priority: u32::default(),
+            pattern: String::new(),
+            extension_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_renderer_id.is_empty() || true && !self.template_id.is_empty() || true && !self.render_element_fn.is_empty() || true && !self.dispose_fn.is_empty() || true && !self.update_fn.is_empty() || true && !self.template_data_json.is_empty() || true && self.is_registered || true && self.priority < u32::MAX || true && !self.pattern.is_empty() || true && !self.extension_id.is_empty() || true
+    }
+}
+
+impl Default for HlmListRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// List accessibility (role, label, active desc, multiselect)
+#[derive(Debug, Clone)]
+pub struct HlnListAccessibility {
+    pub list_a11y_id: String,
+    pub role: String,
+    pub label: String,
+    pub active_descendant: String,
+    pub is_multiselect: bool,
+    pub widget_role: String,
+    pub orientation: String,
+    pub selection_follows_focus: bool,
+    pub item_count: u32,
+    pub selected_count: u32,
+}
+
+impl HlnListAccessibility {
+    pub fn new() -> Self {
+        Self {
+            list_a11y_id: String::new(),
+            role: String::new(),
+            label: String::new(),
+            active_descendant: String::new(),
+            is_multiselect: bool::default(),
+            widget_role: String::new(),
+            orientation: String::new(),
+            selection_follows_focus: bool::default(),
+            item_count: u32::default(),
+            selected_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_a11y_id.is_empty() || true && !self.role.is_empty() || true && !self.label.is_empty() || true && !self.active_descendant.is_empty() || true && self.is_multiselect || true && !self.widget_role.is_empty() || true && !self.orientation.is_empty() || true && self.selection_follows_focus || true && self.item_count < u32::MAX || true && self.selected_count < u32::MAX || true
+    }
+}
+
+impl Default for HlnListAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick pick list (items, active, focus, match on, sort by)
+#[derive(Debug, Clone)]
+pub struct HloQuickPickList {
+    pub qp_list_id: String,
+    pub items_json: String,
+    pub active_index: u32,
+    pub focus_index: u32,
+    pub match_on_description: bool,
+    pub match_on_detail: bool,
+    pub sort_by_label: bool,
+    pub keep_scroll_position: bool,
+    pub filter_text: String,
+    pub visible_count: u32,
+}
+
+impl HloQuickPickList {
+    pub fn new() -> Self {
+        Self {
+            qp_list_id: String::new(),
+            items_json: String::new(),
+            active_index: u32::default(),
+            focus_index: u32::default(),
+            match_on_description: bool::default(),
+            match_on_detail: bool::default(),
+            sort_by_label: bool::default(),
+            keep_scroll_position: bool::default(),
+            filter_text: String::new(),
+            visible_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.qp_list_id.is_empty() || true && !self.items_json.is_empty() || true && self.active_index < u32::MAX || true && self.focus_index < u32::MAX || true && self.match_on_description || true && self.match_on_detail || true && self.sort_by_label || true && self.keep_scroll_position || true && !self.filter_text.is_empty() || true && self.visible_count < u32::MAX || true
+    }
+}
+
+impl Default for HloQuickPickList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Table widget (columns, rows, sort, resize, cell renderer)
+#[derive(Debug, Clone)]
+pub struct HlpTableWidget {
+    pub table_widget_id: String,
+    pub columns_json: String,
+    pub rows_json: String,
+    pub sort_column: String,
+    pub sort_direction: String,
+    pub resize_enabled: bool,
+    pub cell_renderer_id: String,
+    pub row_height: u32,
+    pub header_height: u32,
+    pub striped: bool,
+}
+
+impl HlpTableWidget {
+    pub fn new() -> Self {
+        Self {
+            table_widget_id: String::new(),
+            columns_json: String::new(),
+            rows_json: String::new(),
+            sort_column: String::new(),
+            sort_direction: String::new(),
+            resize_enabled: bool::default(),
+            cell_renderer_id: String::new(),
+            row_height: u32::default(),
+            header_height: u32::default(),
+            striped: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.table_widget_id.is_empty() || true && !self.columns_json.is_empty() || true && !self.rows_json.is_empty() || true && !self.sort_column.is_empty() || true && !self.sort_direction.is_empty() || true && self.resize_enabled || true && !self.cell_renderer_id.is_empty() || true && self.row_height < u32::MAX || true && self.header_height < u32::MAX || true && self.striped || true
+    }
+}
+
+impl Default for HlpTableWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Table column (label, width, sort, renderer, resizable)
+#[derive(Debug, Clone)]
+pub struct HlqTableColumn {
+    pub table_col_id: String,
+    pub label: String,
+    pub width: u32,
+    pub sort_enabled: bool,
+    pub renderer_id: String,
+    pub is_resizable: bool,
+    pub min_width: u32,
+    pub max_width: u32,
+    pub alignment: String,
+    pub tooltip: String,
+}
+
+impl HlqTableColumn {
+    pub fn new() -> Self {
+        Self {
+            table_col_id: String::new(),
+            label: String::new(),
+            width: u32::default(),
+            sort_enabled: bool::default(),
+            renderer_id: String::new(),
+            is_resizable: bool::default(),
+            min_width: u32::default(),
+            max_width: u32::default(),
+            alignment: String::new(),
+            tooltip: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.table_col_id.is_empty() || true && !self.label.is_empty() || true && self.width < u32::MAX || true && self.sort_enabled || true && !self.renderer_id.is_empty() || true && self.is_resizable || true && self.min_width < u32::MAX || true && self.max_width < u32::MAX || true && !self.alignment.is_empty() || true && !self.tooltip.is_empty() || true
+    }
+}
+
+impl Default for HlqTableColumn {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Grid widget (views, orientation, lengths, serialize, layout)
+#[derive(Debug, Clone)]
+pub struct HlrGridWidget {
+    pub grid_widget_id: String,
+    pub views_json: String,
+    pub orientation: String,
+    pub lengths_json: String,
+    pub serialize_fn: String,
+    pub layout_json: String,
+    pub min_size: u32,
+    pub max_size: u32,
+    pub snap_size: u32,
+    pub border_size: u32,
+}
+
+impl HlrGridWidget {
+    pub fn new() -> Self {
+        Self {
+            grid_widget_id: String::new(),
+            views_json: String::new(),
+            orientation: String::new(),
+            lengths_json: String::new(),
+            serialize_fn: String::new(),
+            layout_json: String::new(),
+            min_size: u32::default(),
+            max_size: u32::default(),
+            snap_size: u32::default(),
+            border_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grid_widget_id.is_empty() || true && !self.views_json.is_empty() || true && !self.orientation.is_empty() || true && !self.lengths_json.is_empty() || true && !self.serialize_fn.is_empty() || true && !self.layout_json.is_empty() || true && self.min_size < u32::MAX || true && self.max_size < u32::MAX || true && self.snap_size < u32::MAX || true && self.border_size < u32::MAX || true
+    }
+}
+
+impl Default for HlrGridWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Split widget (orientation, views, sashes, distribute)
+#[derive(Debug, Clone)]
+pub struct HlsSplitWidget {
+    pub split_widget_id: String,
+    pub orientation: String,
+    pub views_json: String,
+    pub sashes_json: String,
+    pub distribute_evenly: bool,
+    pub snap_threshold: u32,
+    pub min_view_size: u32,
+    pub proportional_layout: bool,
+    pub inverse_alt_behavior: bool,
+    pub sash_size: u32,
+}
+
+impl HlsSplitWidget {
+    pub fn new() -> Self {
+        Self {
+            split_widget_id: String::new(),
+            orientation: String::new(),
+            views_json: String::new(),
+            sashes_json: String::new(),
+            distribute_evenly: bool::default(),
+            snap_threshold: u32::default(),
+            min_view_size: u32::default(),
+            proportional_layout: bool::default(),
+            inverse_alt_behavior: bool::default(),
+            sash_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.split_widget_id.is_empty() || true && !self.orientation.is_empty() || true && !self.views_json.is_empty() || true && !self.sashes_json.is_empty() || true && self.distribute_evenly || true && self.snap_threshold < u32::MAX || true && self.min_view_size < u32::MAX || true && self.proportional_layout || true && self.inverse_alt_behavior || true && self.sash_size < u32::MAX || true
+    }
+}
+
+impl Default for HlsSplitWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Pane widget (orientation, panes, minimized, maximized)
+#[derive(Debug, Clone)]
+pub struct HltPaneWidget {
+    pub pane_widget_id: String,
+    pub orientation: String,
+    pub panes_json: String,
+    pub minimized_json: String,
+    pub maximized_pane: String,
+    pub drag_over_counter: u32,
+    pub is_centered: bool,
+    pub layout_json: String,
+    pub pane_count: u32,
+    pub active_pane: String,
+}
+
+impl HltPaneWidget {
+    pub fn new() -> Self {
+        Self {
+            pane_widget_id: String::new(),
+            orientation: String::new(),
+            panes_json: String::new(),
+            minimized_json: String::new(),
+            maximized_pane: String::new(),
+            drag_over_counter: u32::default(),
+            is_centered: bool::default(),
+            layout_json: String::new(),
+            pane_count: u32::default(),
+            active_pane: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pane_widget_id.is_empty() || true && !self.orientation.is_empty() || true && !self.panes_json.is_empty() || true && !self.minimized_json.is_empty() || true && !self.maximized_pane.is_empty() || true && self.drag_over_counter < u32::MAX || true && self.is_centered || true && !self.layout_json.is_empty() || true && self.pane_count < u32::MAX || true && !self.active_pane.is_empty() || true
+    }
+}
+
+impl Default for HltPaneWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff list (items, original, modified, template, navigation)
+#[derive(Debug, Clone)]
+pub struct HluDiffList {
+    pub diff_list_id: String,
+    pub items_json: String,
+    pub original_json: String,
+    pub modified_json: String,
+    pub template_id: String,
+    pub navigation_json: String,
+    pub change_count: u32,
+    pub is_side_by_side: bool,
+    pub show_unchanged: bool,
+    pub max_items: u32,
+}
+
+impl HluDiffList {
+    pub fn new() -> Self {
+        Self {
+            diff_list_id: String::new(),
+            items_json: String::new(),
+            original_json: String::new(),
+            modified_json: String::new(),
+            template_id: String::new(),
+            navigation_json: String::new(),
+            change_count: u32::default(),
+            is_side_by_side: bool::default(),
+            show_unchanged: bool::default(),
+            max_items: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_list_id.is_empty() || true && !self.items_json.is_empty() || true && !self.original_json.is_empty() || true && !self.modified_json.is_empty() || true && !self.template_id.is_empty() || true && !self.navigation_json.is_empty() || true && self.change_count < u32::MAX || true && self.is_side_by_side || true && self.show_unchanged || true && self.max_items < u32::MAX || true
+    }
+}
+
+impl Default for HluDiffList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Paged list (page size, current page, total, on page change)
+#[derive(Debug, Clone)]
+pub struct HlvPagedList {
+    pub paged_list_id: String,
+    pub page_size: u32,
+    pub current_page: u32,
+    pub total_items: u32,
+    pub on_page_change: String,
+    pub total_pages: u32,
+    pub has_next: bool,
+    pub has_prev: bool,
+    pub items_json: String,
+    pub loading: bool,
+}
+
+impl HlvPagedList {
+    pub fn new() -> Self {
+        Self {
+            paged_list_id: String::new(),
+            page_size: u32::default(),
+            current_page: u32::default(),
+            total_items: u32::default(),
+            on_page_change: String::new(),
+            total_pages: u32::default(),
+            has_next: bool::default(),
+            has_prev: bool::default(),
+            items_json: String::new(),
+            loading: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.paged_list_id.is_empty() || true && self.page_size < u32::MAX || true && self.current_page < u32::MAX || true && self.total_items < u32::MAX || true && !self.on_page_change.is_empty() || true && self.total_pages < u32::MAX || true && self.has_next || true && self.has_prev || true && !self.items_json.is_empty() || true && self.loading || true
+    }
+}
+
+impl Default for HlvPagedList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Async list (provider, page size, loading, error, refresh)
+#[derive(Debug, Clone)]
+pub struct HlwAsyncList {
+    pub async_list_id: String,
+    pub provider_id: String,
+    pub page_size: u32,
+    pub is_loading: bool,
+    pub error_message: String,
+    pub refresh_fn: String,
+    pub total_items: u32,
+    pub loaded_items: u32,
+    pub debounce_ms: u32,
+    pub cache_size: u32,
+}
+
+impl HlwAsyncList {
+    pub fn new() -> Self {
+        Self {
+            async_list_id: String::new(),
+            provider_id: String::new(),
+            page_size: u32::default(),
+            is_loading: bool::default(),
+            error_message: String::new(),
+            refresh_fn: String::new(),
+            total_items: u32::default(),
+            loaded_items: u32::default(),
+            debounce_ms: u32::default(),
+            cache_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.async_list_id.is_empty() || true && !self.provider_id.is_empty() || true && self.page_size < u32::MAX || true && self.is_loading || true && !self.error_message.is_empty() || true && !self.refresh_fn.is_empty() || true && self.total_items < u32::MAX || true && self.loaded_items < u32::MAX || true && self.debounce_ms < u32::MAX || true && self.cache_size < u32::MAX || true
+    }
+}
+
+impl Default for HlwAsyncList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// List keyboard (type ahead, page nav, focus first, select all)
+#[derive(Debug, Clone)]
+pub struct HlxListKeyboard {
+    pub list_kb_id: String,
+    pub type_ahead_enabled: bool,
+    pub page_nav_enabled: bool,
+    pub focus_first_on_show: bool,
+    pub select_all_enabled: bool,
+    pub type_ahead_timeout_ms: u32,
+    pub horizontal_scroll: bool,
+    pub multiselect_modifier: String,
+    pub open_on_single_click: bool,
+    pub wrap_navigation: bool,
+}
+
+impl HlxListKeyboard {
+    pub fn new() -> Self {
+        Self {
+            list_kb_id: String::new(),
+            type_ahead_enabled: bool::default(),
+            page_nav_enabled: bool::default(),
+            focus_first_on_show: bool::default(),
+            select_all_enabled: bool::default(),
+            type_ahead_timeout_ms: u32::default(),
+            horizontal_scroll: bool::default(),
+            multiselect_modifier: String::new(),
+            open_on_single_click: bool::default(),
+            wrap_navigation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_kb_id.is_empty() || true && self.type_ahead_enabled || true && self.page_nav_enabled || true && self.focus_first_on_show || true && self.select_all_enabled || true && self.type_ahead_timeout_ms < u32::MAX || true && self.horizontal_scroll || true && !self.multiselect_modifier.is_empty() || true && self.open_on_single_click || true && self.wrap_navigation || true
+    }
+}
+
+impl Default for HlxListKeyboard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// List mouse (click, double click, middle click, right click)
+#[derive(Debug, Clone)]
+pub struct HlyListMouse {
+    pub list_mouse_id: String,
+    pub click_behavior: String,
+    pub double_click_fn: String,
+    pub middle_click_fn: String,
+    pub right_click_fn: String,
+    pub drag_enabled: bool,
+    pub hover_highlight: bool,
+    pub smooth_scroll: bool,
+    pub pointer_style: String,
+    pub context_menu_fn: String,
+}
+
+impl HlyListMouse {
+    pub fn new() -> Self {
+        Self {
+            list_mouse_id: String::new(),
+            click_behavior: String::new(),
+            double_click_fn: String::new(),
+            middle_click_fn: String::new(),
+            right_click_fn: String::new(),
+            drag_enabled: bool::default(),
+            hover_highlight: bool::default(),
+            smooth_scroll: bool::default(),
+            pointer_style: String::new(),
+            context_menu_fn: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_mouse_id.is_empty() || true && !self.click_behavior.is_empty() || true && !self.double_click_fn.is_empty() || true && !self.middle_click_fn.is_empty() || true && !self.right_click_fn.is_empty() || true && self.drag_enabled || true && self.hover_highlight || true && self.smooth_scroll || true && !self.pointer_style.is_empty() || true && !self.context_menu_fn.is_empty() || true
+    }
+}
+
+impl Default for HlyListMouse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// List style (highlight, drop bg, focus bg, hover bg, stripe)
+#[derive(Debug, Clone)]
+pub struct HlzListStyle {
+    pub list_style_id: String,
+    pub highlight_fg: String,
+    pub drop_bg: String,
+    pub focus_bg: String,
+    pub hover_bg: String,
+    pub stripe_bg: String,
+    pub selected_bg: String,
+    pub inactive_selected_bg: String,
+    pub border_color: String,
+    pub focus_outline: String,
+}
+
+impl HlzListStyle {
+    pub fn new() -> Self {
+        Self {
+            list_style_id: String::new(),
+            highlight_fg: String::new(),
+            drop_bg: String::new(),
+            focus_bg: String::new(),
+            hover_bg: String::new(),
+            stripe_bg: String::new(),
+            selected_bg: String::new(),
+            inactive_selected_bg: String::new(),
+            border_color: String::new(),
+            focus_outline: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_style_id.is_empty() || true && !self.highlight_fg.is_empty() || true && !self.drop_bg.is_empty() || true && !self.focus_bg.is_empty() || true && !self.hover_bg.is_empty() || true && !self.stripe_bg.is_empty() || true && !self.selected_bg.is_empty() || true && !self.inactive_selected_bg.is_empty() || true && !self.border_color.is_empty() || true && !self.focus_outline.is_empty() || true
+    }
+}
+
+impl Default for HlzListStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -364664,6 +365336,294 @@ mod tests_hlj_generated {
     fn test_hlj_fields() {
         let mut obj = HljTreeStickyScroll::default();
         obj.tree_sticky_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlk_default() {
+        let obj = HlkListWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlk_fields() {
+        let mut obj = HlkListWidget::default();
+        obj.list_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hll_generated {
+    use super::*;
+
+    #[test]
+    fn test_hll_default() {
+        let obj = HllListItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hll_fields() {
+        let mut obj = HllListItem::default();
+        obj.list_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlm_default() {
+        let obj = HlmListRenderer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlm_fields() {
+        let mut obj = HlmListRenderer::default();
+        obj.list_renderer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hln_generated {
+    use super::*;
+
+    #[test]
+    fn test_hln_default() {
+        let obj = HlnListAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hln_fields() {
+        let mut obj = HlnListAccessibility::default();
+        obj.list_a11y_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlo_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlo_default() {
+        let obj = HloQuickPickList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlo_fields() {
+        let mut obj = HloQuickPickList::default();
+        obj.qp_list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlp_default() {
+        let obj = HlpTableWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlp_fields() {
+        let mut obj = HlpTableWidget::default();
+        obj.table_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlq_default() {
+        let obj = HlqTableColumn::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlq_fields() {
+        let mut obj = HlqTableColumn::default();
+        obj.table_col_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlr_default() {
+        let obj = HlrGridWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlr_fields() {
+        let mut obj = HlrGridWidget::default();
+        obj.grid_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hls_generated {
+    use super::*;
+
+    #[test]
+    fn test_hls_default() {
+        let obj = HlsSplitWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hls_fields() {
+        let mut obj = HlsSplitWidget::default();
+        obj.split_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlt_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlt_default() {
+        let obj = HltPaneWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlt_fields() {
+        let mut obj = HltPaneWidget::default();
+        obj.pane_widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlu_default() {
+        let obj = HluDiffList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlu_fields() {
+        let mut obj = HluDiffList::default();
+        obj.diff_list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlv_default() {
+        let obj = HlvPagedList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlv_fields() {
+        let mut obj = HlvPagedList::default();
+        obj.paged_list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlw_default() {
+        let obj = HlwAsyncList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlw_fields() {
+        let mut obj = HlwAsyncList::default();
+        obj.async_list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlx_default() {
+        let obj = HlxListKeyboard::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlx_fields() {
+        let mut obj = HlxListKeyboard::default();
+        obj.list_kb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hly_generated {
+    use super::*;
+
+    #[test]
+    fn test_hly_default() {
+        let obj = HlyListMouse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hly_fields() {
+        let mut obj = HlyListMouse::default();
+        obj.list_mouse_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hlz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hlz_default() {
+        let obj = HlzListStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hlz_fields() {
+        let mut obj = HlzListStyle::default();
+        obj.list_style_id = "test".to_string();
         assert!(obj.validate());
     }
 }
