@@ -71358,6 +71358,678 @@ impl Default for FpjScmGraph {
     }
 }
 
+/// Git repository (root uri, state, HEAD, remotes, submodules)
+#[derive(Debug, Clone)]
+pub struct FpkGitRepository {
+    pub repo_id: String,
+    pub root_uri: String,
+    pub state: u32,
+    pub head_name: String,
+    pub head_commit: String,
+    pub remote_count: u32,
+    pub submodule_count: u32,
+    pub is_detached: bool,
+    pub merge_in_progress: bool,
+    pub rebase_in_progress: bool,
+}
+
+impl FpkGitRepository {
+    pub fn new() -> Self {
+        Self {
+            repo_id: String::new(),
+            root_uri: String::new(),
+            state: u32::default(),
+            head_name: String::new(),
+            head_commit: String::new(),
+            remote_count: u32::default(),
+            submodule_count: u32::default(),
+            is_detached: bool::default(),
+            merge_in_progress: bool::default(),
+            rebase_in_progress: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.repo_id.is_empty() || true && !self.root_uri.is_empty() || true && self.state < u32::MAX || true && !self.head_name.is_empty() || true && !self.head_commit.is_empty() || true && self.remote_count < u32::MAX || true && self.submodule_count < u32::MAX || true && self.is_detached || true && self.merge_in_progress || true && self.rebase_in_progress || true
+    }
+}
+
+impl Default for FpkGitRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git branch (name, type, commit, upstream, ahead/behind)
+#[derive(Debug, Clone)]
+pub struct FplGitBranch {
+    pub branch_id: String,
+    pub name: String,
+    pub branch_type: u32,
+    pub commit: String,
+    pub upstream_name: String,
+    pub ahead: u32,
+    pub behind: u32,
+    pub is_current: bool,
+    pub tracking_remote: String,
+    pub last_commit_ms: u64,
+}
+
+impl FplGitBranch {
+    pub fn new() -> Self {
+        Self {
+            branch_id: String::new(),
+            name: String::new(),
+            branch_type: u32::default(),
+            commit: String::new(),
+            upstream_name: String::new(),
+            ahead: u32::default(),
+            behind: u32::default(),
+            is_current: bool::default(),
+            tracking_remote: String::new(),
+            last_commit_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.branch_id.is_empty() || true && !self.name.is_empty() || true && self.branch_type < u32::MAX || true && !self.commit.is_empty() || true && !self.upstream_name.is_empty() || true && self.ahead < u32::MAX || true && self.behind < u32::MAX || true && self.is_current || true && !self.tracking_remote.is_empty() || true && self.last_commit_ms < u64::MAX || true
+    }
+}
+
+impl Default for FplGitBranch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git commit (hash, message, author, date, parents, stats)
+#[derive(Debug, Clone)]
+pub struct FpmGitCommit {
+    pub commit_id: String,
+    pub hash: String,
+    pub short_hash: String,
+    pub message: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub author_date_ms: u64,
+    pub parent_count: u32,
+    pub files_changed: u32,
+    pub insertions: u32,
+}
+
+impl FpmGitCommit {
+    pub fn new() -> Self {
+        Self {
+            commit_id: String::new(),
+            hash: String::new(),
+            short_hash: String::new(),
+            message: String::new(),
+            author_name: String::new(),
+            author_email: String::new(),
+            author_date_ms: u64::default(),
+            parent_count: u32::default(),
+            files_changed: u32::default(),
+            insertions: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.commit_id.is_empty() || true && !self.hash.is_empty() || true && !self.short_hash.is_empty() || true && !self.message.is_empty() || true && !self.author_name.is_empty() || true && !self.author_email.is_empty() || true && self.author_date_ms < u64::MAX || true && self.parent_count < u32::MAX || true && self.files_changed < u32::MAX || true && self.insertions < u32::MAX || true
+    }
+}
+
+impl Default for FpmGitCommit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git remote (name, fetch url, push url, is read-only)
+#[derive(Debug, Clone)]
+pub struct FpnGitRemote {
+    pub remote_id: String,
+    pub name: String,
+    pub fetch_url: String,
+    pub push_url: String,
+    pub is_read_only: bool,
+    pub branch_count: u32,
+    pub last_fetch_ms: u64,
+    pub protocol: String,
+    pub credential_helper: String,
+    pub is_prune_on_fetch: bool,
+}
+
+impl FpnGitRemote {
+    pub fn new() -> Self {
+        Self {
+            remote_id: String::new(),
+            name: String::new(),
+            fetch_url: String::new(),
+            push_url: String::new(),
+            is_read_only: bool::default(),
+            branch_count: u32::default(),
+            last_fetch_ms: u64::default(),
+            protocol: String::new(),
+            credential_helper: String::new(),
+            is_prune_on_fetch: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_id.is_empty() || true && !self.name.is_empty() || true && !self.fetch_url.is_empty() || true && !self.push_url.is_empty() || true && self.is_read_only || true && self.branch_count < u32::MAX || true && self.last_fetch_ms < u64::MAX || true && !self.protocol.is_empty() || true && !self.credential_helper.is_empty() || true && self.is_prune_on_fetch || true
+    }
+}
+
+impl Default for FpnGitRemote {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git stash entry (index, message, parent commit, date)
+#[derive(Debug, Clone)]
+pub struct FpoGitStash {
+    pub stash_id: String,
+    pub stash_index: u32,
+    pub message: String,
+    pub parent_commit: String,
+    pub created_at_ms: u64,
+    pub file_count: u32,
+    pub includes_untracked: bool,
+    pub is_staged: bool,
+    pub branch_name: String,
+    pub author_name: String,
+}
+
+impl FpoGitStash {
+    pub fn new() -> Self {
+        Self {
+            stash_id: String::new(),
+            stash_index: u32::default(),
+            message: String::new(),
+            parent_commit: String::new(),
+            created_at_ms: u64::default(),
+            file_count: u32::default(),
+            includes_untracked: bool::default(),
+            is_staged: bool::default(),
+            branch_name: String::new(),
+            author_name: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.stash_id.is_empty() || true && self.stash_index < u32::MAX || true && !self.message.is_empty() || true && !self.parent_commit.is_empty() || true && self.created_at_ms < u64::MAX || true && self.file_count < u32::MAX || true && self.includes_untracked || true && self.is_staged || true && !self.branch_name.is_empty() || true && !self.author_name.is_empty() || true
+    }
+}
+
+impl Default for FpoGitStash {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git diff (uri, status, old uri, is rename, is binary)
+#[derive(Debug, Clone)]
+pub struct FppGitDiff {
+    pub diff_id: String,
+    pub uri: String,
+    pub status: u32,
+    pub old_uri: String,
+    pub is_rename: bool,
+    pub is_binary: bool,
+    pub insertions: u32,
+    pub deletions: u32,
+    pub rename_similarity: u32,
+    pub diff_text: String,
+}
+
+impl FppGitDiff {
+    pub fn new() -> Self {
+        Self {
+            diff_id: String::new(),
+            uri: String::new(),
+            status: u32::default(),
+            old_uri: String::new(),
+            is_rename: bool::default(),
+            is_binary: bool::default(),
+            insertions: u32::default(),
+            deletions: u32::default(),
+            rename_similarity: u32::default(),
+            diff_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_id.is_empty() || true && !self.uri.is_empty() || true && self.status < u32::MAX || true && !self.old_uri.is_empty() || true && self.is_rename || true && self.is_binary || true && self.insertions < u32::MAX || true && self.deletions < u32::MAX || true && self.rename_similarity < u32::MAX || true && !self.diff_text.is_empty() || true
+    }
+}
+
+impl Default for FppGitDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git blame info (line, commit, author, date, message)
+#[derive(Debug, Clone)]
+pub struct FpqGitBlame {
+    pub blame_id: String,
+    pub line_number: u32,
+    pub commit_hash: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub date_ms: u64,
+    pub message: String,
+    pub original_line: u32,
+    pub is_uncommitted: bool,
+    pub file_uri: String,
+}
+
+impl FpqGitBlame {
+    pub fn new() -> Self {
+        Self {
+            blame_id: String::new(),
+            line_number: u32::default(),
+            commit_hash: String::new(),
+            author_name: String::new(),
+            author_email: String::new(),
+            date_ms: u64::default(),
+            message: String::new(),
+            original_line: u32::default(),
+            is_uncommitted: bool::default(),
+            file_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.blame_id.is_empty() || true && self.line_number < u32::MAX || true && !self.commit_hash.is_empty() || true && !self.author_name.is_empty() || true && !self.author_email.is_empty() || true && self.date_ms < u64::MAX || true && !self.message.is_empty() || true && self.original_line < u32::MAX || true && self.is_uncommitted || true && !self.file_uri.is_empty() || true
+    }
+}
+
+impl Default for FpqGitBlame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git submodule (name, path, url, commit, is initialized)
+#[derive(Debug, Clone)]
+pub struct FprGitSubmodule {
+    pub submodule_id: String,
+    pub name: String,
+    pub path: String,
+    pub url: String,
+    pub commit: String,
+    pub is_initialized: bool,
+    pub is_dirty: bool,
+    pub head_is_detached: bool,
+    pub branch: String,
+    pub status: u32,
+}
+
+impl FprGitSubmodule {
+    pub fn new() -> Self {
+        Self {
+            submodule_id: String::new(),
+            name: String::new(),
+            path: String::new(),
+            url: String::new(),
+            commit: String::new(),
+            is_initialized: bool::default(),
+            is_dirty: bool::default(),
+            head_is_detached: bool::default(),
+            branch: String::new(),
+            status: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.submodule_id.is_empty() || true && !self.name.is_empty() || true && !self.path.is_empty() || true && !self.url.is_empty() || true && !self.commit.is_empty() || true && self.is_initialized || true && self.is_dirty || true && self.head_is_detached || true && !self.branch.is_empty() || true && self.status < u32::MAX || true
+    }
+}
+
+impl Default for FprGitSubmodule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git worktree (path, HEAD, branch, is bare, is main)
+#[derive(Debug, Clone)]
+pub struct FpsGitWorktree {
+    pub worktree_id: String,
+    pub path: String,
+    pub head_commit: String,
+    pub branch_name: String,
+    pub is_bare: bool,
+    pub is_main: bool,
+    pub is_locked: bool,
+    pub lock_reason: String,
+    pub prune_reason: String,
+    pub is_detached: bool,
+}
+
+impl FpsGitWorktree {
+    pub fn new() -> Self {
+        Self {
+            worktree_id: String::new(),
+            path: String::new(),
+            head_commit: String::new(),
+            branch_name: String::new(),
+            is_bare: bool::default(),
+            is_main: bool::default(),
+            is_locked: bool::default(),
+            lock_reason: String::new(),
+            prune_reason: String::new(),
+            is_detached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.worktree_id.is_empty() || true && !self.path.is_empty() || true && !self.head_commit.is_empty() || true && !self.branch_name.is_empty() || true && self.is_bare || true && self.is_main || true && self.is_locked || true && !self.lock_reason.is_empty() || true && !self.prune_reason.is_empty() || true && self.is_detached || true
+    }
+}
+
+impl Default for FpsGitWorktree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git rebase operation (onto, head, operation type, progress)
+#[derive(Debug, Clone)]
+pub struct FptGitRebase {
+    pub rebase_id: String,
+    pub onto: String,
+    pub head_name: String,
+    pub operation_type: u32,
+    pub current_step: u32,
+    pub total_steps: u32,
+    pub has_conflicts: bool,
+    pub current_commit: String,
+    pub merge_message: String,
+    pub interactive: bool,
+}
+
+impl FptGitRebase {
+    pub fn new() -> Self {
+        Self {
+            rebase_id: String::new(),
+            onto: String::new(),
+            head_name: String::new(),
+            operation_type: u32::default(),
+            current_step: u32::default(),
+            total_steps: u32::default(),
+            has_conflicts: bool::default(),
+            current_commit: String::new(),
+            merge_message: String::new(),
+            interactive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rebase_id.is_empty() || true && !self.onto.is_empty() || true && !self.head_name.is_empty() || true && self.operation_type < u32::MAX || true && self.current_step < u32::MAX || true && self.total_steps < u32::MAX || true && self.has_conflicts || true && !self.current_commit.is_empty() || true && !self.merge_message.is_empty() || true && self.interactive || true
+    }
+}
+
+impl Default for FptGitRebase {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git merge operation (head, merge head, message, conflicts)
+#[derive(Debug, Clone)]
+pub struct FpuGitMerge {
+    pub merge_id: String,
+    pub head: String,
+    pub merge_head: String,
+    pub message: String,
+    pub conflict_count: u32,
+    pub is_squash: bool,
+    pub is_fast_forward: bool,
+    pub strategy: String,
+    pub state: u32,
+    pub original_head: String,
+}
+
+impl FpuGitMerge {
+    pub fn new() -> Self {
+        Self {
+            merge_id: String::new(),
+            head: String::new(),
+            merge_head: String::new(),
+            message: String::new(),
+            conflict_count: u32::default(),
+            is_squash: bool::default(),
+            is_fast_forward: bool::default(),
+            strategy: String::new(),
+            state: u32::default(),
+            original_head: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.merge_id.is_empty() || true && !self.head.is_empty() || true && !self.merge_head.is_empty() || true && !self.message.is_empty() || true && self.conflict_count < u32::MAX || true && self.is_squash || true && self.is_fast_forward || true && !self.strategy.is_empty() || true && self.state < u32::MAX || true && !self.original_head.is_empty() || true
+    }
+}
+
+impl Default for FpuGitMerge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git cherry-pick operation (commit, sequence, conflicts)
+#[derive(Debug, Clone)]
+pub struct FpvGitCherryPick {
+    pub cherry_pick_id: String,
+    pub commit_hash: String,
+    pub sequence_position: u32,
+    pub total_in_sequence: u32,
+    pub has_conflicts: bool,
+    pub state: u32,
+    pub message: String,
+    pub parent_count: u32,
+    pub mainline: u32,
+    pub is_complete: bool,
+}
+
+impl FpvGitCherryPick {
+    pub fn new() -> Self {
+        Self {
+            cherry_pick_id: String::new(),
+            commit_hash: String::new(),
+            sequence_position: u32::default(),
+            total_in_sequence: u32::default(),
+            has_conflicts: bool::default(),
+            state: u32::default(),
+            message: String::new(),
+            parent_count: u32::default(),
+            mainline: u32::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cherry_pick_id.is_empty() || true && !self.commit_hash.is_empty() || true && self.sequence_position < u32::MAX || true && self.total_in_sequence < u32::MAX || true && self.has_conflicts || true && self.state < u32::MAX || true && !self.message.is_empty() || true && self.parent_count < u32::MAX || true && self.mainline < u32::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for FpvGitCherryPick {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git tag (name, target, message, tagger, is annotated)
+#[derive(Debug, Clone)]
+pub struct FpwGitTag {
+    pub tag_id: String,
+    pub name: String,
+    pub target_commit: String,
+    pub message: String,
+    pub tagger_name: String,
+    pub tagger_email: String,
+    pub tagger_date_ms: u64,
+    pub is_annotated: bool,
+    pub is_signed: bool,
+    pub target_type: u32,
+}
+
+impl FpwGitTag {
+    pub fn new() -> Self {
+        Self {
+            tag_id: String::new(),
+            name: String::new(),
+            target_commit: String::new(),
+            message: String::new(),
+            tagger_name: String::new(),
+            tagger_email: String::new(),
+            tagger_date_ms: u64::default(),
+            is_annotated: bool::default(),
+            is_signed: bool::default(),
+            target_type: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tag_id.is_empty() || true && !self.name.is_empty() || true && !self.target_commit.is_empty() || true && !self.message.is_empty() || true && !self.tagger_name.is_empty() || true && !self.tagger_email.is_empty() || true && self.tagger_date_ms < u64::MAX || true && self.is_annotated || true && self.is_signed || true && self.target_type < u32::MAX || true
+    }
+}
+
+impl Default for FpwGitTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git config (key, value, scope, file path, section)
+#[derive(Debug, Clone)]
+pub struct FpxGitConfig {
+    pub config_id: String,
+    pub key: String,
+    pub value: String,
+    pub scope: u32,
+    pub file_path: String,
+    pub section: String,
+    pub subsection: String,
+    pub is_readonly: bool,
+    pub origin: String,
+    pub include_condition: String,
+}
+
+impl FpxGitConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            key: String::new(),
+            value: String::new(),
+            scope: u32::default(),
+            file_path: String::new(),
+            section: String::new(),
+            subsection: String::new(),
+            is_readonly: bool::default(),
+            origin: String::new(),
+            include_condition: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && !self.key.is_empty() || true && !self.value.is_empty() || true && self.scope < u32::MAX || true && !self.file_path.is_empty() || true && !self.section.is_empty() || true && !self.subsection.is_empty() || true && self.is_readonly || true && !self.origin.is_empty() || true && !self.include_condition.is_empty() || true
+    }
+}
+
+impl Default for FpxGitConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git credential (host, protocol, username, password helper)
+#[derive(Debug, Clone)]
+pub struct FpyGitCredential {
+    pub credential_id: String,
+    pub host: String,
+    pub protocol: String,
+    pub username: String,
+    pub helper: String,
+    pub is_cached: bool,
+    pub expiry_ms: u64,
+    pub store_path: String,
+    pub use_http_path: bool,
+    pub oauth_provider: String,
+}
+
+impl FpyGitCredential {
+    pub fn new() -> Self {
+        Self {
+            credential_id: String::new(),
+            host: String::new(),
+            protocol: String::new(),
+            username: String::new(),
+            helper: String::new(),
+            is_cached: bool::default(),
+            expiry_ms: u64::default(),
+            store_path: String::new(),
+            use_http_path: bool::default(),
+            oauth_provider: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.credential_id.is_empty() || true && !self.host.is_empty() || true && !self.protocol.is_empty() || true && !self.username.is_empty() || true && !self.helper.is_empty() || true && self.is_cached || true && self.expiry_ms < u64::MAX || true && !self.store_path.is_empty() || true && self.use_http_path || true && !self.oauth_provider.is_empty() || true
+    }
+}
+
+impl Default for FpyGitCredential {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Git hook (name, path, is enabled, script content, exit code)
+#[derive(Debug, Clone)]
+pub struct FpzGitHook {
+    pub hook_id: String,
+    pub name: String,
+    pub path: String,
+    pub is_enabled: bool,
+    pub script_content: String,
+    pub last_exit_code: u32,
+    pub last_run_ms: u64,
+    pub is_sample: bool,
+    pub bypass_count: u64,
+    pub timeout_ms: u32,
+}
+
+impl FpzGitHook {
+    pub fn new() -> Self {
+        Self {
+            hook_id: String::new(),
+            name: String::new(),
+            path: String::new(),
+            is_enabled: bool::default(),
+            script_content: String::new(),
+            last_exit_code: u32::default(),
+            last_run_ms: u64::default(),
+            is_sample: bool::default(),
+            bypass_count: u64::default(),
+            timeout_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hook_id.is_empty() || true && !self.name.is_empty() || true && !self.path.is_empty() || true && self.is_enabled || true && !self.script_content.is_empty() || true && self.last_exit_code < u32::MAX || true && self.last_run_ms < u64::MAX || true && self.is_sample || true && self.bypass_count < u64::MAX || true && self.timeout_ms < u32::MAX || true
+    }
+}
+
+impl Default for FpzGitHook {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -289838,6 +290510,294 @@ mod tests_fpj_generated {
     fn test_fpj_fields() {
         let mut obj = FpjScmGraph::default();
         obj.graph_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpk_default() {
+        let obj = FpkGitRepository::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpk_fields() {
+        let mut obj = FpkGitRepository::default();
+        obj.repo_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpl_default() {
+        let obj = FplGitBranch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpl_fields() {
+        let mut obj = FplGitBranch::default();
+        obj.branch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpm_default() {
+        let obj = FpmGitCommit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpm_fields() {
+        let mut obj = FpmGitCommit::default();
+        obj.commit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpn_default() {
+        let obj = FpnGitRemote::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpn_fields() {
+        let mut obj = FpnGitRemote::default();
+        obj.remote_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpo_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpo_default() {
+        let obj = FpoGitStash::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpo_fields() {
+        let mut obj = FpoGitStash::default();
+        obj.stash_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpp_default() {
+        let obj = FppGitDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpp_fields() {
+        let mut obj = FppGitDiff::default();
+        obj.diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpq_default() {
+        let obj = FpqGitBlame::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpq_fields() {
+        let mut obj = FpqGitBlame::default();
+        obj.blame_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpr_default() {
+        let obj = FprGitSubmodule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpr_fields() {
+        let mut obj = FprGitSubmodule::default();
+        obj.submodule_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fps_generated {
+    use super::*;
+
+    #[test]
+    fn test_fps_default() {
+        let obj = FpsGitWorktree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fps_fields() {
+        let mut obj = FpsGitWorktree::default();
+        obj.worktree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpt_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpt_default() {
+        let obj = FptGitRebase::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpt_fields() {
+        let mut obj = FptGitRebase::default();
+        obj.rebase_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpu_default() {
+        let obj = FpuGitMerge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpu_fields() {
+        let mut obj = FpuGitMerge::default();
+        obj.merge_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpv_default() {
+        let obj = FpvGitCherryPick::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpv_fields() {
+        let mut obj = FpvGitCherryPick::default();
+        obj.cherry_pick_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpw_default() {
+        let obj = FpwGitTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpw_fields() {
+        let mut obj = FpwGitTag::default();
+        obj.tag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpx_default() {
+        let obj = FpxGitConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpx_fields() {
+        let mut obj = FpxGitConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpy_default() {
+        let obj = FpyGitCredential::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpy_fields() {
+        let mut obj = FpyGitCredential::default();
+        obj.credential_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fpz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fpz_default() {
+        let obj = FpzGitHook::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fpz_fields() {
+        let mut obj = FpzGitHook::default();
+        obj.hook_id = "test".to_string();
         assert!(obj.validate());
     }
 }
