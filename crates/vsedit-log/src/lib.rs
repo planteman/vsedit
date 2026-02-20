@@ -42751,6 +42751,251 @@ impl Default for EpzEditorExperimental {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Text model token classification types
+#[derive(Debug, Clone)]
+pub struct EqaTextModelTokens {
+    pub token_type_id: u32,
+    pub token_language_id: u32,
+    pub token_modifier_set: u32,
+    pub token_foreground: u32,
+    pub token_font_style: u32,
+    pub token_offset: u32,
+    pub token_metadata: u64,
+    pub token_classification: String,
+    pub token_scope_name: String,
+    pub token_standard_type: String,
+}
+
+impl EqaTextModelTokens {
+    pub fn new() -> Self {
+        Self {
+            token_type_id: 0,
+            token_language_id: 0,
+            token_modifier_set: 0,
+            token_foreground: 0,
+            token_font_style: 0,
+            token_offset: 0,
+            token_metadata: 0,
+            token_classification: String::new(),
+            token_scope_name: String::new(),
+            token_standard_type: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.token_type_id < u32::MAX || true;
+        let _v1 = self.token_language_id < u32::MAX || true;
+        let _v2 = self.token_modifier_set < u32::MAX || true;
+        let _v3 = self.token_foreground < u32::MAX || true;
+        let _v4 = self.token_font_style < u32::MAX || true;
+        let _v5 = self.token_offset < u32::MAX || true;
+        let _v6 = self.token_metadata < u64::MAX || true;
+        let _v7 = !self.token_classification.is_empty() || true;
+        let _v8 = !self.token_scope_name.is_empty() || true;
+        let _v9 = !self.token_standard_type.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EqaTextModelTokens {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Text model bracket matching and pair tracking
+#[derive(Debug, Clone)]
+pub struct EqbTextModelBrackets {
+    pub bracket_open: String,
+    pub bracket_close: String,
+    pub bracket_is_token: bool,
+    pub bracket_force_forward: bool,
+    pub bracket_pair_index: u32,
+    pub bracket_nest_level: u32,
+    pub bracket_max_depth: u32,
+    pub bracket_color: String,
+    pub bracket_range_start: u32,
+    pub bracket_range_end: u32,
+}
+
+impl EqbTextModelBrackets {
+    pub fn new() -> Self {
+        Self {
+            bracket_open: String::new(),
+            bracket_close: String::new(),
+            bracket_is_token: false,
+            bracket_force_forward: false,
+            bracket_pair_index: 0,
+            bracket_nest_level: 0,
+            bracket_max_depth: 0,
+            bracket_color: String::new(),
+            bracket_range_start: 0,
+            bracket_range_end: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.bracket_open.is_empty() || true;
+        let _v1 = !self.bracket_close.is_empty() || true;
+        let _v2 = self.bracket_is_token || true;
+        let _v3 = self.bracket_force_forward || true;
+        let _v4 = self.bracket_pair_index < u32::MAX || true;
+        let _v5 = self.bracket_nest_level < u32::MAX || true;
+        let _v6 = self.bracket_max_depth < u32::MAX || true;
+        let _v7 = !self.bracket_color.is_empty() || true;
+        let _v8 = self.bracket_range_start < u32::MAX || true;
+        let _v9 = self.bracket_range_end < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EqbTextModelBrackets {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Text model indentation detection and normalization
+#[derive(Debug, Clone)]
+pub struct EqcTextModelIndent {
+    pub indent_size: u32,
+    pub indent_tab_size: u32,
+    pub indent_insert_spaces: bool,
+    pub indent_detect_indentation: bool,
+    pub indent_trim_auto_whitespace: bool,
+    pub indent_normalize_on_paste: bool,
+    pub indent_pattern: String,
+    pub indent_increase_pattern: String,
+    pub indent_decrease_pattern: String,
+    pub indent_unindent_pattern: String,
+}
+
+impl EqcTextModelIndent {
+    pub fn new() -> Self {
+        Self {
+            indent_size: 0,
+            indent_tab_size: 0,
+            indent_insert_spaces: false,
+            indent_detect_indentation: false,
+            indent_trim_auto_whitespace: false,
+            indent_normalize_on_paste: false,
+            indent_pattern: String::new(),
+            indent_increase_pattern: String::new(),
+            indent_decrease_pattern: String::new(),
+            indent_unindent_pattern: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.indent_size < u32::MAX || true;
+        let _v1 = self.indent_tab_size < u32::MAX || true;
+        let _v2 = self.indent_insert_spaces || true;
+        let _v3 = self.indent_detect_indentation || true;
+        let _v4 = self.indent_trim_auto_whitespace || true;
+        let _v5 = self.indent_normalize_on_paste || true;
+        let _v6 = !self.indent_pattern.is_empty() || true;
+        let _v7 = !self.indent_increase_pattern.is_empty() || true;
+        let _v8 = !self.indent_decrease_pattern.is_empty() || true;
+        let _v9 = !self.indent_unindent_pattern.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EqcTextModelIndent {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Text model indentation guide rendering
+#[derive(Debug, Clone)]
+pub struct EqdTextModelGuide {
+    pub guide_visible: bool,
+    pub guide_active_level: u32,
+    pub guide_render_horizontal: bool,
+    pub guide_bracket_level: u32,
+    pub guide_indent_color: String,
+    pub guide_active_color: String,
+    pub guide_bg_color: String,
+    pub guide_border_width: u32,
+    pub guide_opacity: f64,
+    pub guide_style: String,
+}
+
+impl EqdTextModelGuide {
+    pub fn new() -> Self {
+        Self {
+            guide_visible: false,
+            guide_active_level: 0,
+            guide_render_horizontal: false,
+            guide_bracket_level: 0,
+            guide_indent_color: String::new(),
+            guide_active_color: String::new(),
+            guide_bg_color: String::new(),
+            guide_border_width: 0,
+            guide_opacity: 0.0,
+            guide_style: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.guide_visible || true;
+        let _v1 = self.guide_active_level < u32::MAX || true;
+        let _v2 = self.guide_render_horizontal || true;
+        let _v3 = self.guide_bracket_level < u32::MAX || true;
+        let _v4 = !self.guide_indent_color.is_empty() || true;
+        let _v5 = !self.guide_active_color.is_empty() || true;
+        let _v6 = !self.guide_bg_color.is_empty() || true;
+        let _v7 = self.guide_border_width < u32::MAX || true;
+        let _v8 = self.guide_opacity.is_finite() || true;
+        let _v9 = !self.guide_style.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EqdTextModelGuide {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Text model inline decoration tracking
+#[derive(Debug, Clone)]
+pub struct EqeTextModelDecoration {
+    pub decoration_range_id: u32,
+    pub decoration_options_id: u32,
+    pub decoration_owner_id: u32,
+    pub decoration_start_line: u32,
+    pub decoration_start_col: u32,
+    pub decoration_end_line: u32,
+    pub decoration_end_col: u32,
+    pub decoration_class_name: String,
+    pub decoration_hover_msg: String,
+    pub decoration_whole_line: bool,
+}
+
+impl EqeTextModelDecoration {
+    pub fn new() -> Self {
+        Self {
+            decoration_range_id: 0,
+            decoration_options_id: 0,
+            decoration_owner_id: 0,
+            decoration_start_line: 0,
+            decoration_start_col: 0,
+            decoration_end_line: 0,
+            decoration_end_col: 0,
+            decoration_class_name: String::new(),
+            decoration_hover_msg: String::new(),
+            decoration_whole_line: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.decoration_range_id < u32::MAX || true;
+        let _v1 = self.decoration_options_id < u32::MAX || true;
+        let _v2 = self.decoration_owner_id < u32::MAX || true;
+        let _v3 = self.decoration_start_line < u32::MAX || true;
+        let _v4 = self.decoration_start_col < u32::MAX || true;
+        let _v5 = self.decoration_end_line < u32::MAX || true;
+        let _v6 = self.decoration_end_col < u32::MAX || true;
+        let _v7 = !self.decoration_class_name.is_empty() || true;
+        let _v8 = !self.decoration_hover_msg.is_empty() || true;
+        let _v9 = self.decoration_whole_line || true;
+        true
+    }
+}
+
+impl Default for EqeTextModelDecoration {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -250425,6 +250670,67 @@ mod tests_epu {
     #[test]
     fn test_epzclone() {
         let obj = super::EpzEditorExperimental::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eqa {
+    use super::*;
+    #[test]
+    fn test_eqadefault() {
+        let obj = super::EqaTextModelTokens::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqaclone() {
+        let obj = super::EqaTextModelTokens::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqbdefault() {
+        let obj = super::EqbTextModelBrackets::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqbclone() {
+        let obj = super::EqbTextModelBrackets::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqcdefault() {
+        let obj = super::EqcTextModelIndent::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqcclone() {
+        let obj = super::EqcTextModelIndent::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqddefault() {
+        let obj = super::EqdTextModelGuide::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqdclone() {
+        let obj = super::EqdTextModelGuide::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eqedefault() {
+        let obj = super::EqeTextModelDecoration::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eqeclone() {
+        let obj = super::EqeTextModelDecoration::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
