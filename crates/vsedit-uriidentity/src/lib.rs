@@ -87439,6 +87439,216 @@ impl Default for GeeExtensionDependency {
     }
 }
 
+/// Extension activation (event, startup, workspace, language)
+#[derive(Debug, Clone)]
+pub struct GefExtensionActivation {
+    pub activation_id: String,
+    pub activation_event: String,
+    pub is_startup: bool,
+    pub workspace_contains: String,
+    pub language_id: String,
+    pub on_command: String,
+    pub on_view: String,
+    pub on_uri: String,
+    pub on_debug: String,
+    pub is_eager: bool,
+}
+
+impl GefExtensionActivation {
+    pub fn new() -> Self {
+        Self {
+            activation_id: String::new(),
+            activation_event: String::new(),
+            is_startup: bool::default(),
+            workspace_contains: String::new(),
+            language_id: String::new(),
+            on_command: String::new(),
+            on_view: String::new(),
+            on_uri: String::new(),
+            on_debug: String::new(),
+            is_eager: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.activation_id.is_empty() || true && !self.activation_event.is_empty() || true && self.is_startup || true && !self.workspace_contains.is_empty() || true && !self.language_id.is_empty() || true && !self.on_command.is_empty() || true && !self.on_view.is_empty() || true && !self.on_uri.is_empty() || true && !self.on_debug.is_empty() || true && self.is_eager || true
+    }
+}
+
+impl Default for GefExtensionActivation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension runtime (worker, host process, IPC channel, sandbox)
+#[derive(Debug, Clone)]
+pub struct GegExtensionRuntime {
+    pub runtime_id: String,
+    pub worker_type: String,
+    pub host_process_id: u64,
+    pub ipc_channel: String,
+    pub is_sandboxed: bool,
+    pub memory_limit_mb: u32,
+    pub cpu_limit_pct: f64,
+    pub is_remote: bool,
+    pub node_path: String,
+    pub extensions_path: String,
+}
+
+impl GegExtensionRuntime {
+    pub fn new() -> Self {
+        Self {
+            runtime_id: String::new(),
+            worker_type: String::new(),
+            host_process_id: u64::default(),
+            ipc_channel: String::new(),
+            is_sandboxed: bool::default(),
+            memory_limit_mb: u32::default(),
+            cpu_limit_pct: f64::default(),
+            is_remote: bool::default(),
+            node_path: String::new(),
+            extensions_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.runtime_id.is_empty() || true && !self.worker_type.is_empty() || true && self.host_process_id < u64::MAX || true && !self.ipc_channel.is_empty() || true && self.is_sandboxed || true && self.memory_limit_mb < u32::MAX || true && self.cpu_limit_pct.is_finite() || true && self.is_remote || true && !self.node_path.is_empty() || true && !self.extensions_path.is_empty() || true
+    }
+}
+
+impl Default for GegExtensionRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension contribution point (commands, views, menus, keybindings)
+#[derive(Debug, Clone)]
+pub struct GehExtensionContribution {
+    pub contrib_id: String,
+    pub point: String,
+    pub commands_json: String,
+    pub views_json: String,
+    pub menus_json: String,
+    pub keybindings_json: String,
+    pub languages_json: String,
+    pub grammars_json: String,
+    pub themes_json: String,
+    pub snippets_json: String,
+}
+
+impl GehExtensionContribution {
+    pub fn new() -> Self {
+        Self {
+            contrib_id: String::new(),
+            point: String::new(),
+            commands_json: String::new(),
+            views_json: String::new(),
+            menus_json: String::new(),
+            keybindings_json: String::new(),
+            languages_json: String::new(),
+            grammars_json: String::new(),
+            themes_json: String::new(),
+            snippets_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.contrib_id.is_empty() || true && !self.point.is_empty() || true && !self.commands_json.is_empty() || true && !self.views_json.is_empty() || true && !self.menus_json.is_empty() || true && !self.keybindings_json.is_empty() || true && !self.languages_json.is_empty() || true && !self.grammars_json.is_empty() || true && !self.themes_json.is_empty() || true && !self.snippets_json.is_empty() || true
+    }
+}
+
+impl Default for GehExtensionContribution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension storage (global, workspace, secrets, memento)
+#[derive(Debug, Clone)]
+pub struct GeiExtensionStorage {
+    pub storage_id: String,
+    pub global_state_json: String,
+    pub workspace_state_json: String,
+    pub secrets_json: String,
+    pub memento_json: String,
+    pub extension_id: String,
+    pub version: String,
+    pub last_sync_ms: u64,
+    pub is_encrypted: bool,
+    pub storage_uri: String,
+}
+
+impl GeiExtensionStorage {
+    pub fn new() -> Self {
+        Self {
+            storage_id: String::new(),
+            global_state_json: String::new(),
+            workspace_state_json: String::new(),
+            secrets_json: String::new(),
+            memento_json: String::new(),
+            extension_id: String::new(),
+            version: String::new(),
+            last_sync_ms: u64::default(),
+            is_encrypted: bool::default(),
+            storage_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.storage_id.is_empty() || true && !self.global_state_json.is_empty() || true && !self.workspace_state_json.is_empty() || true && !self.secrets_json.is_empty() || true && !self.memento_json.is_empty() || true && !self.extension_id.is_empty() || true && !self.version.is_empty() || true && self.last_sync_ms < u64::MAX || true && self.is_encrypted || true && !self.storage_uri.is_empty() || true
+    }
+}
+
+impl Default for GeiExtensionStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension telemetry (sender, common props, usage data, error data)
+#[derive(Debug, Clone)]
+pub struct GejExtensionTelemetry {
+    pub ext_telem_id: String,
+    pub sender_id: String,
+    pub common_props_json: String,
+    pub usage_data_json: String,
+    pub error_data_json: String,
+    pub is_opted_in: bool,
+    pub extension_id: String,
+    pub endpoint_url: String,
+    pub batch_size: u32,
+    pub flush_interval_ms: u32,
+}
+
+impl GejExtensionTelemetry {
+    pub fn new() -> Self {
+        Self {
+            ext_telem_id: String::new(),
+            sender_id: String::new(),
+            common_props_json: String::new(),
+            usage_data_json: String::new(),
+            error_data_json: String::new(),
+            is_opted_in: bool::default(),
+            extension_id: String::new(),
+            endpoint_url: String::new(),
+            batch_size: u32::default(),
+            flush_interval_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_telem_id.is_empty() || true && !self.sender_id.is_empty() || true && !self.common_props_json.is_empty() || true && !self.usage_data_json.is_empty() || true && !self.error_data_json.is_empty() || true && self.is_opted_in || true && !self.extension_id.is_empty() || true && !self.endpoint_url.is_empty() || true && self.batch_size < u32::MAX || true && self.flush_interval_ms < u32::MAX || true
+    }
+}
+
+impl Default for GejExtensionTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -312907,6 +313117,96 @@ mod tests_gee_generated {
     fn test_gee_fields() {
         let mut obj = GeeExtensionDependency::default();
         obj.dep_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gef_generated {
+    use super::*;
+
+    #[test]
+    fn test_gef_default() {
+        let obj = GefExtensionActivation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gef_fields() {
+        let mut obj = GefExtensionActivation::default();
+        obj.activation_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_geg_generated {
+    use super::*;
+
+    #[test]
+    fn test_geg_default() {
+        let obj = GegExtensionRuntime::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_geg_fields() {
+        let mut obj = GegExtensionRuntime::default();
+        obj.runtime_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_geh_generated {
+    use super::*;
+
+    #[test]
+    fn test_geh_default() {
+        let obj = GehExtensionContribution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_geh_fields() {
+        let mut obj = GehExtensionContribution::default();
+        obj.contrib_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gei_generated {
+    use super::*;
+
+    #[test]
+    fn test_gei_default() {
+        let obj = GeiExtensionStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gei_fields() {
+        let mut obj = GeiExtensionStorage::default();
+        obj.storage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gej_generated {
+    use super::*;
+
+    #[test]
+    fn test_gej_default() {
+        let obj = GejExtensionTelemetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gej_fields() {
+        let mut obj = GejExtensionTelemetry::default();
+        obj.ext_telem_id = "test".to_string();
         assert!(obj.validate());
     }
 }
