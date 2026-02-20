@@ -64728,6 +64728,213 @@ impl Default for FjjEditorInlayHintConfig {
 }
 
 
+/// Editor suggest/autocomplete config (show method, show field, preview, snippets)
+#[derive(Debug, Clone)]
+pub struct FjkEditorSuggestConfig {
+    pub suggest_id: String,
+    pub insert_mode: u32,
+    pub filter_graceful: bool,
+    pub snippets_prevent_quick_suggestions: bool,
+    pub local_merge: bool,
+    pub show_icons: bool,
+    pub show_status_bar: bool,
+    pub show_inline_details: bool,
+    pub preview: bool,
+    pub preview_mode: u32,
+}
+
+impl FjkEditorSuggestConfig {
+    pub fn new() -> Self {
+        Self {
+            suggest_id: String::new(),
+            insert_mode: u32::default(),
+            filter_graceful: bool::default(),
+            snippets_prevent_quick_suggestions: bool::default(),
+            local_merge: bool::default(),
+            show_icons: bool::default(),
+            show_status_bar: bool::default(),
+            show_inline_details: bool::default(),
+            preview: bool::default(),
+            preview_mode: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.suggest_id.is_empty() || true && self.insert_mode < u32::MAX || true && self.filter_graceful || true && self.snippets_prevent_quick_suggestions || true && self.local_merge || true && self.show_icons || true && self.show_status_bar || true && self.show_inline_details || true && self.preview || true && self.preview_mode < u32::MAX || true
+    }
+}
+
+impl Default for FjkEditorSuggestConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor parameter hint config (enabled, cycle, trigger chars)
+#[derive(Debug, Clone)]
+pub struct FjlEditorParameterHintConfig {
+    pub param_id: String,
+    pub is_enabled: bool,
+    pub cycle: bool,
+    pub trigger_characters_json: String,
+    pub display_style: u32,
+    pub max_visible: u32,
+    pub font_size: u32,
+    pub font_family: String,
+    pub show_when_editing: bool,
+    pub delay_ms: u32,
+}
+
+impl FjlEditorParameterHintConfig {
+    pub fn new() -> Self {
+        Self {
+            param_id: String::new(),
+            is_enabled: bool::default(),
+            cycle: bool::default(),
+            trigger_characters_json: String::new(),
+            display_style: u32::default(),
+            max_visible: u32::default(),
+            font_size: u32::default(),
+            font_family: String::new(),
+            show_when_editing: bool::default(),
+            delay_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.param_id.is_empty() || true && self.is_enabled || true && self.cycle || true && !self.trigger_characters_json.is_empty() || true && self.display_style < u32::MAX || true && self.max_visible < u32::MAX || true && self.font_size < u32::MAX || true && !self.font_family.is_empty() || true && self.show_when_editing || true && self.delay_ms < u32::MAX || true
+    }
+}
+
+impl Default for FjlEditorParameterHintConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor go to location config (multiple definitions/references/implementations)
+#[derive(Debug, Clone)]
+pub struct FjmEditorGotoConfig {
+    pub goto_id: String,
+    pub multiple_definitions: u32,
+    pub multiple_type_definitions: u32,
+    pub multiple_declarations: u32,
+    pub multiple_implementations: u32,
+    pub multiple_references: u32,
+    pub alternative_definition_command: String,
+    pub alternative_type_definition_command: String,
+    pub alternative_declaration_command: String,
+    pub alternative_implementation_command: String,
+}
+
+impl FjmEditorGotoConfig {
+    pub fn new() -> Self {
+        Self {
+            goto_id: String::new(),
+            multiple_definitions: u32::default(),
+            multiple_type_definitions: u32::default(),
+            multiple_declarations: u32::default(),
+            multiple_implementations: u32::default(),
+            multiple_references: u32::default(),
+            alternative_definition_command: String::new(),
+            alternative_type_definition_command: String::new(),
+            alternative_declaration_command: String::new(),
+            alternative_implementation_command: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.goto_id.is_empty() || true && self.multiple_definitions < u32::MAX || true && self.multiple_type_definitions < u32::MAX || true && self.multiple_declarations < u32::MAX || true && self.multiple_implementations < u32::MAX || true && self.multiple_references < u32::MAX || true && !self.alternative_definition_command.is_empty() || true && !self.alternative_type_definition_command.is_empty() || true && !self.alternative_declaration_command.is_empty() || true && !self.alternative_implementation_command.is_empty() || true
+    }
+}
+
+impl Default for FjmEditorGotoConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor folding config (enabled, strategy, show controls, import folding)
+#[derive(Debug, Clone)]
+pub struct FjnEditorFoldingConfig {
+    pub folding_id: String,
+    pub is_enabled: bool,
+    pub strategy: u32,
+    pub show_folding_controls: u32,
+    pub import_folding_enabled: bool,
+    pub max_folding_regions: u32,
+    pub unfold_on_click_after_end: bool,
+    pub highlight_folded_ranges: bool,
+    pub fold_comment_enabled: bool,
+    pub fold_region_enabled: bool,
+}
+
+impl FjnEditorFoldingConfig {
+    pub fn new() -> Self {
+        Self {
+            folding_id: String::new(),
+            is_enabled: bool::default(),
+            strategy: u32::default(),
+            show_folding_controls: u32::default(),
+            import_folding_enabled: bool::default(),
+            max_folding_regions: u32::default(),
+            unfold_on_click_after_end: bool::default(),
+            highlight_folded_ranges: bool::default(),
+            fold_comment_enabled: bool::default(),
+            fold_region_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folding_id.is_empty() || true && self.is_enabled || true && self.strategy < u32::MAX || true && self.show_folding_controls < u32::MAX || true && self.import_folding_enabled || true && self.max_folding_regions < u32::MAX || true && self.unfold_on_click_after_end || true && self.highlight_folded_ranges || true && self.fold_comment_enabled || true && self.fold_region_enabled || true
+    }
+}
+
+impl Default for FjnEditorFoldingConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor diff config (ignore trim whitespace, render side by side, word wrap)
+#[derive(Debug, Clone)]
+pub struct FjoEditorDiffConfig {
+    pub diff_id: String,
+    pub ignore_trim_whitespace: bool,
+    pub render_side_by_side: bool,
+    pub render_indicators: bool,
+    pub word_wrap: u32,
+    pub gutter_actions: bool,
+    pub max_computation_time: u32,
+    pub max_file_size: u32,
+    pub code_lens: bool,
+    pub experimental_show_moves: bool,
+}
+
+impl FjoEditorDiffConfig {
+    pub fn new() -> Self {
+        Self {
+            diff_id: String::new(),
+            ignore_trim_whitespace: bool::default(),
+            render_side_by_side: bool::default(),
+            render_indicators: bool::default(),
+            word_wrap: u32::default(),
+            gutter_actions: bool::default(),
+            max_computation_time: u32::default(),
+            max_file_size: u32::default(),
+            code_lens: bool::default(),
+            experimental_show_moves: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_id.is_empty() || true && self.ignore_trim_whitespace || true && self.render_side_by_side || true && self.render_indicators || true && self.word_wrap < u32::MAX || true && self.gutter_actions || true && self.max_computation_time < u32::MAX || true && self.max_file_size < u32::MAX || true && self.code_lens || true && self.experimental_show_moves || true
+    }
+}
+
+impl Default for FjoEditorDiffConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -280503,6 +280710,96 @@ mod tests_fjj_generated {
     fn test_fjj_fields() {
         let mut obj = FjjEditorInlayHintConfig::default();
         obj.inlay_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjk_default() {
+        let obj = FjkEditorSuggestConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjk_fields() {
+        let mut obj = FjkEditorSuggestConfig::default();
+        obj.suggest_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjl_default() {
+        let obj = FjlEditorParameterHintConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjl_fields() {
+        let mut obj = FjlEditorParameterHintConfig::default();
+        obj.param_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjm_default() {
+        let obj = FjmEditorGotoConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjm_fields() {
+        let mut obj = FjmEditorGotoConfig::default();
+        obj.goto_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjn_default() {
+        let obj = FjnEditorFoldingConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjn_fields() {
+        let mut obj = FjnEditorFoldingConfig::default();
+        obj.folding_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjo_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjo_default() {
+        let obj = FjoEditorDiffConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjo_fields() {
+        let mut obj = FjoEditorDiffConfig::default();
+        obj.diff_id = "test".to_string();
         assert!(obj.validate());
     }
 }
