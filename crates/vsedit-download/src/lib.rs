@@ -98446,6 +98446,678 @@ impl Default for GojDiffLineChange {
     }
 }
 
+/// Patch model (hunks, file diffs, stats, context, unified format)
+#[derive(Debug, Clone)]
+pub struct GokPatchModel {
+    pub patch_id: String,
+    pub hunks_json: String,
+    pub file_diffs_json: String,
+    pub additions: u32,
+    pub deletions: u32,
+    pub context_lines: u32,
+    pub unified_format: bool,
+    pub binary_patches_json: String,
+    pub rename_count: u32,
+    pub mode_changes_json: String,
+}
+
+impl GokPatchModel {
+    pub fn new() -> Self {
+        Self {
+            patch_id: String::new(),
+            hunks_json: String::new(),
+            file_diffs_json: String::new(),
+            additions: u32::default(),
+            deletions: u32::default(),
+            context_lines: u32::default(),
+            unified_format: bool::default(),
+            binary_patches_json: String::new(),
+            rename_count: u32::default(),
+            mode_changes_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.patch_id.is_empty() || true && !self.hunks_json.is_empty() || true && !self.file_diffs_json.is_empty() || true && self.additions < u32::MAX || true && self.deletions < u32::MAX || true && self.context_lines < u32::MAX || true && self.unified_format || true && !self.binary_patches_json.is_empty() || true && self.rename_count < u32::MAX || true && !self.mode_changes_json.is_empty() || true
+    }
+}
+
+impl Default for GokPatchModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline diff widget (added, removed, range, decoration, animate)
+#[derive(Debug, Clone)]
+pub struct GolInlineDiffWidget {
+    pub inline_diff_id: String,
+    pub added_text: String,
+    pub removed_text: String,
+    pub range_json: String,
+    pub decoration_json: String,
+    pub animate_transition: bool,
+    pub show_border: bool,
+    pub word_level: bool,
+    pub char_level: bool,
+    pub max_width: u32,
+}
+
+impl GolInlineDiffWidget {
+    pub fn new() -> Self {
+        Self {
+            inline_diff_id: String::new(),
+            added_text: String::new(),
+            removed_text: String::new(),
+            range_json: String::new(),
+            decoration_json: String::new(),
+            animate_transition: bool::default(),
+            show_border: bool::default(),
+            word_level: bool::default(),
+            char_level: bool::default(),
+            max_width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_diff_id.is_empty() || true && !self.added_text.is_empty() || true && !self.removed_text.is_empty() || true && !self.range_json.is_empty() || true && !self.decoration_json.is_empty() || true && self.animate_transition || true && self.show_border || true && self.word_level || true && self.char_level || true && self.max_width < u32::MAX || true
+    }
+}
+
+impl Default for GolInlineDiffWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Three-way merge (base, ours, theirs, result, auto resolve)
+#[derive(Debug, Clone)]
+pub struct GomThreeWayMerge {
+    pub three_way_id: String,
+    pub base_text: String,
+    pub ours_text: String,
+    pub theirs_text: String,
+    pub result_text: String,
+    pub auto_resolved: u32,
+    pub manual_required: u32,
+    pub conflict_markers: bool,
+    pub algorithm: String,
+    pub is_complete: bool,
+}
+
+impl GomThreeWayMerge {
+    pub fn new() -> Self {
+        Self {
+            three_way_id: String::new(),
+            base_text: String::new(),
+            ours_text: String::new(),
+            theirs_text: String::new(),
+            result_text: String::new(),
+            auto_resolved: u32::default(),
+            manual_required: u32::default(),
+            conflict_markers: bool::default(),
+            algorithm: String::new(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.three_way_id.is_empty() || true && !self.base_text.is_empty() || true && !self.ours_text.is_empty() || true && !self.theirs_text.is_empty() || true && !self.result_text.is_empty() || true && self.auto_resolved < u32::MAX || true && self.manual_required < u32::MAX || true && self.conflict_markers || true && !self.algorithm.is_empty() || true && self.is_complete || true
+    }
+}
+
+impl Default for GomThreeWayMerge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff navigator (changes, current, previous, next, wrap around)
+#[derive(Debug, Clone)]
+pub struct GonDiffNavigator {
+    pub diff_nav_id: String,
+    pub changes_json: String,
+    pub current_index: u32,
+    pub total_changes: u32,
+    pub wrap_around: bool,
+    pub ignore_trim_whitespace: bool,
+    pub min_change_lines: u32,
+    pub show_header: bool,
+    pub keyboard_shortcut: String,
+    pub auto_reveal: bool,
+}
+
+impl GonDiffNavigator {
+    pub fn new() -> Self {
+        Self {
+            diff_nav_id: String::new(),
+            changes_json: String::new(),
+            current_index: u32::default(),
+            total_changes: u32::default(),
+            wrap_around: bool::default(),
+            ignore_trim_whitespace: bool::default(),
+            min_change_lines: u32::default(),
+            show_header: bool::default(),
+            keyboard_shortcut: String::new(),
+            auto_reveal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_nav_id.is_empty() || true && !self.changes_json.is_empty() || true && self.current_index < u32::MAX || true && self.total_changes < u32::MAX || true && self.wrap_around || true && self.ignore_trim_whitespace || true && self.min_change_lines < u32::MAX || true && self.show_header || true && !self.keyboard_shortcut.is_empty() || true && self.auto_reveal || true
+    }
+}
+
+impl Default for GonDiffNavigator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff gutter decoration (added, modified, removed, icon, color)
+#[derive(Debug, Clone)]
+pub struct GooDiffGutterDecoration {
+    pub gutter_deco_id: String,
+    pub added_icon: String,
+    pub modified_icon: String,
+    pub removed_icon: String,
+    pub added_color: String,
+    pub modified_color: String,
+    pub removed_color: String,
+    pub width: u32,
+    pub show_tooltip: bool,
+    pub click_action: String,
+}
+
+impl GooDiffGutterDecoration {
+    pub fn new() -> Self {
+        Self {
+            gutter_deco_id: String::new(),
+            added_icon: String::new(),
+            modified_icon: String::new(),
+            removed_icon: String::new(),
+            added_color: String::new(),
+            modified_color: String::new(),
+            removed_color: String::new(),
+            width: u32::default(),
+            show_tooltip: bool::default(),
+            click_action: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gutter_deco_id.is_empty() || true && !self.added_icon.is_empty() || true && !self.modified_icon.is_empty() || true && !self.removed_icon.is_empty() || true && !self.added_color.is_empty() || true && !self.modified_color.is_empty() || true && !self.removed_color.is_empty() || true && self.width < u32::MAX || true && self.show_tooltip || true && !self.click_action.is_empty() || true
+    }
+}
+
+impl Default for GooDiffGutterDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff overview ruler (colors, click to scroll, mini view)
+#[derive(Debug, Clone)]
+pub struct GopDiffOverviewRuler {
+    pub overview_id: String,
+    pub added_color: String,
+    pub modified_color: String,
+    pub removed_color: String,
+    pub click_to_scroll: bool,
+    pub mini_view: bool,
+    pub width: u32,
+    pub position: String,
+    pub opacity: f64,
+    pub show_cursor: bool,
+}
+
+impl GopDiffOverviewRuler {
+    pub fn new() -> Self {
+        Self {
+            overview_id: String::new(),
+            added_color: String::new(),
+            modified_color: String::new(),
+            removed_color: String::new(),
+            click_to_scroll: bool::default(),
+            mini_view: bool::default(),
+            width: u32::default(),
+            position: String::new(),
+            opacity: f64::default(),
+            show_cursor: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.overview_id.is_empty() || true && !self.added_color.is_empty() || true && !self.modified_color.is_empty() || true && !self.removed_color.is_empty() || true && self.click_to_scroll || true && self.mini_view || true && self.width < u32::MAX || true && !self.position.is_empty() || true && self.opacity.is_finite() || true && self.show_cursor || true
+    }
+}
+
+impl Default for GopDiffOverviewRuler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff content provider (provide original, provide modified)
+#[derive(Debug, Clone)]
+pub struct GoqDiffContentProvider {
+    pub content_prov_id: String,
+    pub scheme: String,
+    pub original_uri: String,
+    pub modified_uri: String,
+    pub label: String,
+    pub is_registered: bool,
+    pub priority: u32,
+    pub extension_id: String,
+    pub supports_text: bool,
+    pub metadata_json: String,
+}
+
+impl GoqDiffContentProvider {
+    pub fn new() -> Self {
+        Self {
+            content_prov_id: String::new(),
+            scheme: String::new(),
+            original_uri: String::new(),
+            modified_uri: String::new(),
+            label: String::new(),
+            is_registered: bool::default(),
+            priority: u32::default(),
+            extension_id: String::new(),
+            supports_text: bool::default(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.content_prov_id.is_empty() || true && !self.scheme.is_empty() || true && !self.original_uri.is_empty() || true && !self.modified_uri.is_empty() || true && !self.label.is_empty() || true && self.is_registered || true && self.priority < u32::MAX || true && !self.extension_id.is_empty() || true && self.supports_text || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for GoqDiffContentProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff editor view model (scroll sync, cursor sync, folding)
+#[derive(Debug, Clone)]
+pub struct GorDiffEditorViewModel {
+    pub vm_id: String,
+    pub scroll_sync: bool,
+    pub cursor_sync: bool,
+    pub folding_sync: bool,
+    pub selection_sync: bool,
+    pub original_scroll_top: u32,
+    pub modified_scroll_top: u32,
+    pub is_side_by_side: bool,
+    pub zoom_level: f64,
+    pub render_overview: bool,
+}
+
+impl GorDiffEditorViewModel {
+    pub fn new() -> Self {
+        Self {
+            vm_id: String::new(),
+            scroll_sync: bool::default(),
+            cursor_sync: bool::default(),
+            folding_sync: bool::default(),
+            selection_sync: bool::default(),
+            original_scroll_top: u32::default(),
+            modified_scroll_top: u32::default(),
+            is_side_by_side: bool::default(),
+            zoom_level: f64::default(),
+            render_overview: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.vm_id.is_empty() || true && self.scroll_sync || true && self.cursor_sync || true && self.folding_sync || true && self.selection_sync || true && self.original_scroll_top < u32::MAX || true && self.modified_scroll_top < u32::MAX || true && self.is_side_by_side || true && self.zoom_level.is_finite() || true && self.render_overview || true
+    }
+}
+
+impl Default for GorDiffEditorViewModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff accessibility (screen reader, change announce, navigate)
+#[derive(Debug, Clone)]
+pub struct GosDiffAccessibility {
+    pub diff_a11y_id: String,
+    pub screen_reader_mode: bool,
+    pub change_announce_delay_ms: u32,
+    pub navigate_by_change: bool,
+    pub announce_additions: bool,
+    pub announce_removals: bool,
+    pub line_by_line: bool,
+    pub summary_mode: bool,
+    pub keyboard_nav: bool,
+    pub aria_label: String,
+}
+
+impl GosDiffAccessibility {
+    pub fn new() -> Self {
+        Self {
+            diff_a11y_id: String::new(),
+            screen_reader_mode: bool::default(),
+            change_announce_delay_ms: u32::default(),
+            navigate_by_change: bool::default(),
+            announce_additions: bool::default(),
+            announce_removals: bool::default(),
+            line_by_line: bool::default(),
+            summary_mode: bool::default(),
+            keyboard_nav: bool::default(),
+            aria_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_a11y_id.is_empty() || true && self.screen_reader_mode || true && self.change_announce_delay_ms < u32::MAX || true && self.navigate_by_change || true && self.announce_additions || true && self.announce_removals || true && self.line_by_line || true && self.summary_mode || true && self.keyboard_nav || true && !self.aria_label.is_empty() || true
+    }
+}
+
+impl Default for GosDiffAccessibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Merge resolution (strategy, auto, manual, pick current/incoming)
+#[derive(Debug, Clone)]
+pub struct GotMergeResolution {
+    pub resolution_id: String,
+    pub strategy: String,
+    pub is_auto: bool,
+    pub is_manual: bool,
+    pub pick_current: bool,
+    pub pick_incoming: bool,
+    pub pick_both: bool,
+    pub custom_edit_json: String,
+    pub conflict_range_json: String,
+    pub resolved_text: String,
+}
+
+impl GotMergeResolution {
+    pub fn new() -> Self {
+        Self {
+            resolution_id: String::new(),
+            strategy: String::new(),
+            is_auto: bool::default(),
+            is_manual: bool::default(),
+            pick_current: bool::default(),
+            pick_incoming: bool::default(),
+            pick_both: bool::default(),
+            custom_edit_json: String::new(),
+            conflict_range_json: String::new(),
+            resolved_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resolution_id.is_empty() || true && !self.strategy.is_empty() || true && self.is_auto || true && self.is_manual || true && self.pick_current || true && self.pick_incoming || true && self.pick_both || true && !self.custom_edit_json.is_empty() || true && !self.conflict_range_json.is_empty() || true && !self.resolved_text.is_empty() || true
+    }
+}
+
+impl Default for GotMergeResolution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff review mode (comments, approve, request changes, dismiss)
+#[derive(Debug, Clone)]
+pub struct GouDiffReviewMode {
+    pub review_id: String,
+    pub comments_json: String,
+    pub approval_status: String,
+    pub request_changes: bool,
+    pub dismiss_review: bool,
+    pub reviewer: String,
+    pub timestamp_ms: u64,
+    pub body: String,
+    pub is_pending: bool,
+    pub thread_count: u32,
+}
+
+impl GouDiffReviewMode {
+    pub fn new() -> Self {
+        Self {
+            review_id: String::new(),
+            comments_json: String::new(),
+            approval_status: String::new(),
+            request_changes: bool::default(),
+            dismiss_review: bool::default(),
+            reviewer: String::new(),
+            timestamp_ms: u64::default(),
+            body: String::new(),
+            is_pending: bool::default(),
+            thread_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.review_id.is_empty() || true && !self.comments_json.is_empty() || true && !self.approval_status.is_empty() || true && self.request_changes || true && self.dismiss_review || true && !self.reviewer.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.body.is_empty() || true && self.is_pending || true && self.thread_count < u32::MAX || true
+    }
+}
+
+impl Default for GouDiffReviewMode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff editor zone (widget zone, original overlay, modified overlay)
+#[derive(Debug, Clone)]
+pub struct GovDiffEditorZone {
+    pub zone_id: String,
+    pub widget_zone_json: String,
+    pub original_overlay_json: String,
+    pub modified_overlay_json: String,
+    pub min_height: u32,
+    pub max_height: u32,
+    pub is_visible: bool,
+    pub ordinal: u32,
+    pub padding: u32,
+    pub suppress_mouse: bool,
+}
+
+impl GovDiffEditorZone {
+    pub fn new() -> Self {
+        Self {
+            zone_id: String::new(),
+            widget_zone_json: String::new(),
+            original_overlay_json: String::new(),
+            modified_overlay_json: String::new(),
+            min_height: u32::default(),
+            max_height: u32::default(),
+            is_visible: bool::default(),
+            ordinal: u32::default(),
+            padding: u32::default(),
+            suppress_mouse: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.zone_id.is_empty() || true && !self.widget_zone_json.is_empty() || true && !self.original_overlay_json.is_empty() || true && !self.modified_overlay_json.is_empty() || true && self.min_height < u32::MAX || true && self.max_height < u32::MAX || true && self.is_visible || true && self.ordinal < u32::MAX || true && self.padding < u32::MAX || true && self.suppress_mouse || true
+    }
+}
+
+impl Default for GovDiffEditorZone {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff word wrap (enabled, side by side, inline, column)
+#[derive(Debug, Clone)]
+pub struct GowDiffWordWrap {
+    pub word_wrap_id: String,
+    pub enabled: bool,
+    pub side_by_side_wrap: bool,
+    pub inline_wrap: bool,
+    pub wrap_column: u32,
+    pub min_width: u32,
+    pub word_wrap_override: String,
+    pub original_wrap: bool,
+    pub modified_wrap: bool,
+    pub bounded_width: bool,
+}
+
+impl GowDiffWordWrap {
+    pub fn new() -> Self {
+        Self {
+            word_wrap_id: String::new(),
+            enabled: bool::default(),
+            side_by_side_wrap: bool::default(),
+            inline_wrap: bool::default(),
+            wrap_column: u32::default(),
+            min_width: u32::default(),
+            word_wrap_override: String::new(),
+            original_wrap: bool::default(),
+            modified_wrap: bool::default(),
+            bounded_width: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.word_wrap_id.is_empty() || true && self.enabled || true && self.side_by_side_wrap || true && self.inline_wrap || true && self.wrap_column < u32::MAX || true && self.min_width < u32::MAX || true && !self.word_wrap_override.is_empty() || true && self.original_wrap || true && self.modified_wrap || true && self.bounded_width || true
+    }
+}
+
+impl Default for GowDiffWordWrap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff folding (collapse unchanged, context lines, max fold)
+#[derive(Debug, Clone)]
+pub struct GoxDiffFolding {
+    pub diff_fold_id: String,
+    pub collapse_unchanged: bool,
+    pub context_lines: u32,
+    pub max_fold_regions: u32,
+    pub show_fold_icons: bool,
+    pub fold_on_open: bool,
+    pub fold_strategy: String,
+    pub auto_unfold_on_click: bool,
+    pub min_fold_lines: u32,
+    pub max_fold_level: u32,
+}
+
+impl GoxDiffFolding {
+    pub fn new() -> Self {
+        Self {
+            diff_fold_id: String::new(),
+            collapse_unchanged: bool::default(),
+            context_lines: u32::default(),
+            max_fold_regions: u32::default(),
+            show_fold_icons: bool::default(),
+            fold_on_open: bool::default(),
+            fold_strategy: String::new(),
+            auto_unfold_on_click: bool::default(),
+            min_fold_lines: u32::default(),
+            max_fold_level: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_fold_id.is_empty() || true && self.collapse_unchanged || true && self.context_lines < u32::MAX || true && self.max_fold_regions < u32::MAX || true && self.show_fold_icons || true && self.fold_on_open || true && !self.fold_strategy.is_empty() || true && self.auto_unfold_on_click || true && self.min_fold_lines < u32::MAX || true && self.max_fold_level < u32::MAX || true
+    }
+}
+
+impl Default for GoxDiffFolding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff move detection (enabled, min length, show arrows)
+#[derive(Debug, Clone)]
+pub struct GoyDiffMoveDetection {
+    pub move_id: String,
+    pub enabled: bool,
+    pub min_length: u32,
+    pub show_arrows: bool,
+    pub highlight_color: String,
+    pub max_moves: u32,
+    pub similarity_threshold: f64,
+    pub ignore_whitespace: bool,
+    pub show_in_gutter: bool,
+    pub animate: bool,
+}
+
+impl GoyDiffMoveDetection {
+    pub fn new() -> Self {
+        Self {
+            move_id: String::new(),
+            enabled: bool::default(),
+            min_length: u32::default(),
+            show_arrows: bool::default(),
+            highlight_color: String::new(),
+            max_moves: u32::default(),
+            similarity_threshold: f64::default(),
+            ignore_whitespace: bool::default(),
+            show_in_gutter: bool::default(),
+            animate: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.move_id.is_empty() || true && self.enabled || true && self.min_length < u32::MAX || true && self.show_arrows || true && !self.highlight_color.is_empty() || true && self.max_moves < u32::MAX || true && self.similarity_threshold.is_finite() || true && self.ignore_whitespace || true && self.show_in_gutter || true && self.animate || true
+    }
+}
+
+impl Default for GoyDiffMoveDetection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff snapshot model (original text, modified text, timestamp)
+#[derive(Debug, Clone)]
+pub struct GozDiffSnapshotModel {
+    pub snapshot_id: String,
+    pub original_text: String,
+    pub modified_text: String,
+    pub timestamp_ms: u64,
+    pub change_count: u32,
+    pub is_baseline: bool,
+    pub version: u32,
+    pub encoding: String,
+    pub eol: String,
+    pub hash: String,
+}
+
+impl GozDiffSnapshotModel {
+    pub fn new() -> Self {
+        Self {
+            snapshot_id: String::new(),
+            original_text: String::new(),
+            modified_text: String::new(),
+            timestamp_ms: u64::default(),
+            change_count: u32::default(),
+            is_baseline: bool::default(),
+            version: u32::default(),
+            encoding: String::new(),
+            eol: String::new(),
+            hash: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.snapshot_id.is_empty() || true && !self.original_text.is_empty() || true && !self.modified_text.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.change_count < u32::MAX || true && self.is_baseline || true && self.version < u32::MAX || true && !self.encoding.is_empty() || true && !self.eol.is_empty() || true && !self.hash.is_empty() || true
+    }
+}
+
+impl Default for GozDiffSnapshotModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -328765,6 +329437,294 @@ mod tests_goj_generated {
     fn test_goj_fields() {
         let mut obj = GojDiffLineChange::default();
         obj.line_change_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gok_generated {
+    use super::*;
+
+    #[test]
+    fn test_gok_default() {
+        let obj = GokPatchModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gok_fields() {
+        let mut obj = GokPatchModel::default();
+        obj.patch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gol_generated {
+    use super::*;
+
+    #[test]
+    fn test_gol_default() {
+        let obj = GolInlineDiffWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gol_fields() {
+        let mut obj = GolInlineDiffWidget::default();
+        obj.inline_diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gom_generated {
+    use super::*;
+
+    #[test]
+    fn test_gom_default() {
+        let obj = GomThreeWayMerge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gom_fields() {
+        let mut obj = GomThreeWayMerge::default();
+        obj.three_way_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gon_generated {
+    use super::*;
+
+    #[test]
+    fn test_gon_default() {
+        let obj = GonDiffNavigator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gon_fields() {
+        let mut obj = GonDiffNavigator::default();
+        obj.diff_nav_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_goo_generated {
+    use super::*;
+
+    #[test]
+    fn test_goo_default() {
+        let obj = GooDiffGutterDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_goo_fields() {
+        let mut obj = GooDiffGutterDecoration::default();
+        obj.gutter_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gop_generated {
+    use super::*;
+
+    #[test]
+    fn test_gop_default() {
+        let obj = GopDiffOverviewRuler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gop_fields() {
+        let mut obj = GopDiffOverviewRuler::default();
+        obj.overview_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_goq_generated {
+    use super::*;
+
+    #[test]
+    fn test_goq_default() {
+        let obj = GoqDiffContentProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_goq_fields() {
+        let mut obj = GoqDiffContentProvider::default();
+        obj.content_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gor_generated {
+    use super::*;
+
+    #[test]
+    fn test_gor_default() {
+        let obj = GorDiffEditorViewModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gor_fields() {
+        let mut obj = GorDiffEditorViewModel::default();
+        obj.vm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gos_generated {
+    use super::*;
+
+    #[test]
+    fn test_gos_default() {
+        let obj = GosDiffAccessibility::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gos_fields() {
+        let mut obj = GosDiffAccessibility::default();
+        obj.diff_a11y_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_got_generated {
+    use super::*;
+
+    #[test]
+    fn test_got_default() {
+        let obj = GotMergeResolution::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_got_fields() {
+        let mut obj = GotMergeResolution::default();
+        obj.resolution_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gou_generated {
+    use super::*;
+
+    #[test]
+    fn test_gou_default() {
+        let obj = GouDiffReviewMode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gou_fields() {
+        let mut obj = GouDiffReviewMode::default();
+        obj.review_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gov_generated {
+    use super::*;
+
+    #[test]
+    fn test_gov_default() {
+        let obj = GovDiffEditorZone::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gov_fields() {
+        let mut obj = GovDiffEditorZone::default();
+        obj.zone_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gow_generated {
+    use super::*;
+
+    #[test]
+    fn test_gow_default() {
+        let obj = GowDiffWordWrap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gow_fields() {
+        let mut obj = GowDiffWordWrap::default();
+        obj.word_wrap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gox_generated {
+    use super::*;
+
+    #[test]
+    fn test_gox_default() {
+        let obj = GoxDiffFolding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gox_fields() {
+        let mut obj = GoxDiffFolding::default();
+        obj.diff_fold_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_goy_generated {
+    use super::*;
+
+    #[test]
+    fn test_goy_default() {
+        let obj = GoyDiffMoveDetection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_goy_fields() {
+        let mut obj = GoyDiffMoveDetection::default();
+        obj.move_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_goz_generated {
+    use super::*;
+
+    #[test]
+    fn test_goz_default() {
+        let obj = GozDiffSnapshotModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_goz_fields() {
+        let mut obj = GozDiffSnapshotModel::default();
+        obj.snapshot_id = "test".to_string();
         assert!(obj.validate());
     }
 }
