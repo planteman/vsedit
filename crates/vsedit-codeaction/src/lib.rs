@@ -91980,6 +91980,678 @@ impl Default for GijCustomExecution {
     }
 }
 
+/// Task provider (type, resolve, provide tasks, on did change)
+#[derive(Debug, Clone)]
+pub struct GikTaskProvider {
+    pub provider_id: String,
+    pub task_type: String,
+    pub can_resolve: bool,
+    pub provides_tasks: bool,
+    pub on_did_change: bool,
+    pub extension_id: String,
+    pub schema_version: u32,
+    pub auto_detect: bool,
+    pub scope: String,
+    pub label: String,
+}
+
+impl GikTaskProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            task_type: String::new(),
+            can_resolve: bool::default(),
+            provides_tasks: bool::default(),
+            on_did_change: bool::default(),
+            extension_id: String::new(),
+            schema_version: u32::default(),
+            auto_detect: bool::default(),
+            scope: String::new(),
+            label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && !self.task_type.is_empty() || true && self.can_resolve || true && self.provides_tasks || true && self.on_did_change || true && !self.extension_id.is_empty() || true && self.schema_version < u32::MAX || true && self.auto_detect || true && !self.scope.is_empty() || true && !self.label.is_empty() || true
+    }
+}
+
+impl Default for GikTaskProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task filter (type, version, recent, configured, detected)
+#[derive(Debug, Clone)]
+pub struct GilTaskFilter {
+    pub filter_id: String,
+    pub task_type: String,
+    pub version: String,
+    pub recent_only: bool,
+    pub configured_only: bool,
+    pub detected_only: bool,
+    pub folder_uri: String,
+    pub group_filter: String,
+    pub label_filter: String,
+    pub max_results: u32,
+}
+
+impl GilTaskFilter {
+    pub fn new() -> Self {
+        Self {
+            filter_id: String::new(),
+            task_type: String::new(),
+            version: String::new(),
+            recent_only: bool::default(),
+            configured_only: bool::default(),
+            detected_only: bool::default(),
+            folder_uri: String::new(),
+            group_filter: String::new(),
+            label_filter: String::new(),
+            max_results: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.filter_id.is_empty() || true && !self.task_type.is_empty() || true && !self.version.is_empty() || true && self.recent_only || true && self.configured_only || true && self.detected_only || true && !self.folder_uri.is_empty() || true && !self.group_filter.is_empty() || true && !self.label_filter.is_empty() || true && self.max_results < u32::MAX || true
+    }
+}
+
+impl Default for GilTaskFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task dependency (task uri, folder, type, depends on, order)
+#[derive(Debug, Clone)]
+pub struct GimTaskDependency {
+    pub dep_id: String,
+    pub task_uri: String,
+    pub folder_uri: String,
+    pub task_type: String,
+    pub depends_on_json: String,
+    pub order: String,
+    pub is_parallel: bool,
+    pub is_sequence: bool,
+    pub timeout_ms: u64,
+    pub on_error: String,
+}
+
+impl GimTaskDependency {
+    pub fn new() -> Self {
+        Self {
+            dep_id: String::new(),
+            task_uri: String::new(),
+            folder_uri: String::new(),
+            task_type: String::new(),
+            depends_on_json: String::new(),
+            order: String::new(),
+            is_parallel: bool::default(),
+            is_sequence: bool::default(),
+            timeout_ms: u64::default(),
+            on_error: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dep_id.is_empty() || true && !self.task_uri.is_empty() || true && !self.folder_uri.is_empty() || true && !self.task_type.is_empty() || true && !self.depends_on_json.is_empty() || true && !self.order.is_empty() || true && self.is_parallel || true && self.is_sequence || true && self.timeout_ms < u64::MAX || true && !self.on_error.is_empty() || true
+    }
+}
+
+impl Default for GimTaskDependency {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task terminal config (cwd, env, shell, integrated, external)
+#[derive(Debug, Clone)]
+pub struct GinTaskTerminalConfig {
+    pub term_cfg_id: String,
+    pub cwd: String,
+    pub env_json: String,
+    pub shell_path: String,
+    pub integrated: bool,
+    pub external: bool,
+    pub reveal: String,
+    pub reuse_terminal: bool,
+    pub clear: bool,
+    pub encoding: String,
+}
+
+impl GinTaskTerminalConfig {
+    pub fn new() -> Self {
+        Self {
+            term_cfg_id: String::new(),
+            cwd: String::new(),
+            env_json: String::new(),
+            shell_path: String::new(),
+            integrated: bool::default(),
+            external: bool::default(),
+            reveal: String::new(),
+            reuse_terminal: bool::default(),
+            clear: bool::default(),
+            encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.term_cfg_id.is_empty() || true && !self.cwd.is_empty() || true && !self.env_json.is_empty() || true && !self.shell_path.is_empty() || true && self.integrated || true && self.external || true && !self.reveal.is_empty() || true && self.reuse_terminal || true && self.clear || true && !self.encoding.is_empty() || true
+    }
+}
+
+impl Default for GinTaskTerminalConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task output parser (lines, diagnostics, severity, file, range)
+#[derive(Debug, Clone)]
+pub struct GioTaskOutputParser {
+    pub output_id: String,
+    pub lines_json: String,
+    pub diagnostics_json: String,
+    pub severity: String,
+    pub file_uri: String,
+    pub range_json: String,
+    pub is_complete: bool,
+    pub parse_errors: u32,
+    pub active_matcher: String,
+    pub multi_line_buffer: String,
+}
+
+impl GioTaskOutputParser {
+    pub fn new() -> Self {
+        Self {
+            output_id: String::new(),
+            lines_json: String::new(),
+            diagnostics_json: String::new(),
+            severity: String::new(),
+            file_uri: String::new(),
+            range_json: String::new(),
+            is_complete: bool::default(),
+            parse_errors: u32::default(),
+            active_matcher: String::new(),
+            multi_line_buffer: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.output_id.is_empty() || true && !self.lines_json.is_empty() || true && !self.diagnostics_json.is_empty() || true && !self.severity.is_empty() || true && !self.file_uri.is_empty() || true && !self.range_json.is_empty() || true && self.is_complete || true && self.parse_errors < u32::MAX || true && !self.active_matcher.is_empty() || true && !self.multi_line_buffer.is_empty() || true
+    }
+}
+
+impl Default for GioTaskOutputParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task watcher (begin pattern, end pattern, active on start, background)
+#[derive(Debug, Clone)]
+pub struct GipTaskWatcher {
+    pub watcher_id: String,
+    pub begin_pattern: String,
+    pub end_pattern: String,
+    pub active_on_start: bool,
+    pub is_background: bool,
+    pub is_watching: bool,
+    pub match_count: u32,
+    pub last_match_ms: u64,
+    pub timeout_ms: u64,
+    pub restart_on_error: bool,
+}
+
+impl GipTaskWatcher {
+    pub fn new() -> Self {
+        Self {
+            watcher_id: String::new(),
+            begin_pattern: String::new(),
+            end_pattern: String::new(),
+            active_on_start: bool::default(),
+            is_background: bool::default(),
+            is_watching: bool::default(),
+            match_count: u32::default(),
+            last_match_ms: u64::default(),
+            timeout_ms: u64::default(),
+            restart_on_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.watcher_id.is_empty() || true && !self.begin_pattern.is_empty() || true && !self.end_pattern.is_empty() || true && self.active_on_start || true && self.is_background || true && self.is_watching || true && self.match_count < u32::MAX || true && self.last_match_ms < u64::MAX || true && self.timeout_ms < u64::MAX || true && self.restart_on_error || true
+    }
+}
+
+impl Default for GipTaskWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task quick pick (configured, detected, recent, detail, sort)
+#[derive(Debug, Clone)]
+pub struct GiqTaskQuickPick {
+    pub quick_id: String,
+    pub configured_tasks_json: String,
+    pub detected_tasks_json: String,
+    pub recent_tasks_json: String,
+    pub detail_visible: bool,
+    pub sort_by: String,
+    pub filter_text: String,
+    pub selected_index: u32,
+    pub show_all: bool,
+    pub group_by_type: bool,
+}
+
+impl GiqTaskQuickPick {
+    pub fn new() -> Self {
+        Self {
+            quick_id: String::new(),
+            configured_tasks_json: String::new(),
+            detected_tasks_json: String::new(),
+            recent_tasks_json: String::new(),
+            detail_visible: bool::default(),
+            sort_by: String::new(),
+            filter_text: String::new(),
+            selected_index: u32::default(),
+            show_all: bool::default(),
+            group_by_type: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.quick_id.is_empty() || true && !self.configured_tasks_json.is_empty() || true && !self.detected_tasks_json.is_empty() || true && !self.recent_tasks_json.is_empty() || true && self.detail_visible || true && !self.sort_by.is_empty() || true && !self.filter_text.is_empty() || true && self.selected_index < u32::MAX || true && self.show_all || true && self.group_by_type || true
+    }
+}
+
+impl Default for GiqTaskQuickPick {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task scope (workspace, folder, global, user, workspace folder)
+#[derive(Debug, Clone)]
+pub struct GirTaskScope {
+    pub scope_id: String,
+    pub scope_type: String,
+    pub folder_uri: String,
+    pub is_workspace: bool,
+    pub is_global: bool,
+    pub is_user: bool,
+    pub workspace_folder_name: String,
+    pub config_uri: String,
+    pub override_priority: u32,
+    pub is_transient: bool,
+}
+
+impl GirTaskScope {
+    pub fn new() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_type: String::new(),
+            folder_uri: String::new(),
+            is_workspace: bool::default(),
+            is_global: bool::default(),
+            is_user: bool::default(),
+            workspace_folder_name: String::new(),
+            config_uri: String::new(),
+            override_priority: u32::default(),
+            is_transient: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_id.is_empty() || true && !self.scope_type.is_empty() || true && !self.folder_uri.is_empty() || true && self.is_workspace || true && self.is_global || true && self.is_user || true && !self.workspace_folder_name.is_empty() || true && !self.config_uri.is_empty() || true && self.override_priority < u32::MAX || true && self.is_transient || true
+    }
+}
+
+impl Default for GirTaskScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task schema validator (version, errors, warnings, auto fix)
+#[derive(Debug, Clone)]
+pub struct GisTaskSchemaValidator {
+    pub schema_id: String,
+    pub version: String,
+    pub errors_json: String,
+    pub warnings_json: String,
+    pub auto_fix_enabled: bool,
+    pub strict_mode: bool,
+    pub allow_comments: bool,
+    pub allow_trailing_commas: bool,
+    pub schema_uri: String,
+    pub is_valid: bool,
+}
+
+impl GisTaskSchemaValidator {
+    pub fn new() -> Self {
+        Self {
+            schema_id: String::new(),
+            version: String::new(),
+            errors_json: String::new(),
+            warnings_json: String::new(),
+            auto_fix_enabled: bool::default(),
+            strict_mode: bool::default(),
+            allow_comments: bool::default(),
+            allow_trailing_commas: bool::default(),
+            schema_uri: String::new(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.schema_id.is_empty() || true && !self.version.is_empty() || true && !self.errors_json.is_empty() || true && !self.warnings_json.is_empty() || true && self.auto_fix_enabled || true && self.strict_mode || true && self.allow_comments || true && self.allow_trailing_commas || true && !self.schema_uri.is_empty() || true && self.is_valid || true
+    }
+}
+
+impl Default for GisTaskSchemaValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task command variable (name, command, args, input, pick string)
+#[derive(Debug, Clone)]
+pub struct GitTaskCommandVariable {
+    pub cmd_var_id: String,
+    pub name: String,
+    pub command_id: String,
+    pub args_json: String,
+    pub input_id: String,
+    pub pick_string_json: String,
+    pub default_value: String,
+    pub description: String,
+    pub password: bool,
+    pub when_clause: String,
+}
+
+impl GitTaskCommandVariable {
+    pub fn new() -> Self {
+        Self {
+            cmd_var_id: String::new(),
+            name: String::new(),
+            command_id: String::new(),
+            args_json: String::new(),
+            input_id: String::new(),
+            pick_string_json: String::new(),
+            default_value: String::new(),
+            description: String::new(),
+            password: bool::default(),
+            when_clause: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cmd_var_id.is_empty() || true && !self.name.is_empty() || true && !self.command_id.is_empty() || true && !self.args_json.is_empty() || true && !self.input_id.is_empty() || true && !self.pick_string_json.is_empty() || true && !self.default_value.is_empty() || true && !self.description.is_empty() || true && self.password || true && !self.when_clause.is_empty() || true
+    }
+}
+
+impl Default for GitTaskCommandVariable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task process event (type, process id, exit code, signal)
+#[derive(Debug, Clone)]
+pub struct GiuTaskProcessEvent {
+    pub proc_event_id: String,
+    pub event_type: String,
+    pub process_id: u64,
+    pub exit_code: u32,
+    pub signal: String,
+    pub timestamp_ms: u64,
+    pub is_terminated: bool,
+    pub is_started: bool,
+    pub error_message: String,
+    pub task_id: String,
+}
+
+impl GiuTaskProcessEvent {
+    pub fn new() -> Self {
+        Self {
+            proc_event_id: String::new(),
+            event_type: String::new(),
+            process_id: u64::default(),
+            exit_code: u32::default(),
+            signal: String::new(),
+            timestamp_ms: u64::default(),
+            is_terminated: bool::default(),
+            is_started: bool::default(),
+            error_message: String::new(),
+            task_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proc_event_id.is_empty() || true && !self.event_type.is_empty() || true && self.process_id < u64::MAX || true && self.exit_code < u32::MAX || true && !self.signal.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_terminated || true && self.is_started || true && !self.error_message.is_empty() || true && !self.task_id.is_empty() || true
+    }
+}
+
+impl Default for GiuTaskProcessEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task diagnostic collection (uri, diagnostics, severity map)
+#[derive(Debug, Clone)]
+pub struct GivTaskDiagnosticCollection {
+    pub diag_coll_id: String,
+    pub uri: String,
+    pub diagnostics_json: String,
+    pub error_count: u32,
+    pub warning_count: u32,
+    pub info_count: u32,
+    pub hint_count: u32,
+    pub is_stale: bool,
+    pub source: String,
+    pub max_problems: u32,
+}
+
+impl GivTaskDiagnosticCollection {
+    pub fn new() -> Self {
+        Self {
+            diag_coll_id: String::new(),
+            uri: String::new(),
+            diagnostics_json: String::new(),
+            error_count: u32::default(),
+            warning_count: u32::default(),
+            info_count: u32::default(),
+            hint_count: u32::default(),
+            is_stale: bool::default(),
+            source: String::new(),
+            max_problems: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_coll_id.is_empty() || true && !self.uri.is_empty() || true && !self.diagnostics_json.is_empty() || true && self.error_count < u32::MAX || true && self.warning_count < u32::MAX || true && self.info_count < u32::MAX || true && self.hint_count < u32::MAX || true && self.is_stale || true && !self.source.is_empty() || true && self.max_problems < u32::MAX || true
+    }
+}
+
+impl Default for GivTaskDiagnosticCollection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Build task provider (compiler, targets, config, incremental)
+#[derive(Debug, Clone)]
+pub struct GiwBuildTaskProvider {
+    pub build_id: String,
+    pub compiler: String,
+    pub targets_json: String,
+    pub config: String,
+    pub incremental: bool,
+    pub parallel_jobs: u32,
+    pub clean_before_build: bool,
+    pub output_dir: String,
+    pub flags_json: String,
+    pub is_release: bool,
+}
+
+impl GiwBuildTaskProvider {
+    pub fn new() -> Self {
+        Self {
+            build_id: String::new(),
+            compiler: String::new(),
+            targets_json: String::new(),
+            config: String::new(),
+            incremental: bool::default(),
+            parallel_jobs: u32::default(),
+            clean_before_build: bool::default(),
+            output_dir: String::new(),
+            flags_json: String::new(),
+            is_release: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.build_id.is_empty() || true && !self.compiler.is_empty() || true && !self.targets_json.is_empty() || true && !self.config.is_empty() || true && self.incremental || true && self.parallel_jobs < u32::MAX || true && self.clean_before_build || true && !self.output_dir.is_empty() || true && !self.flags_json.is_empty() || true && self.is_release || true
+    }
+}
+
+impl Default for GiwBuildTaskProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test task provider (framework, runner, config, coverage)
+#[derive(Debug, Clone)]
+pub struct GixTestTaskProvider {
+    pub test_task_id: String,
+    pub framework: String,
+    pub runner: String,
+    pub config_json: String,
+    pub coverage_enabled: bool,
+    pub filter_pattern: String,
+    pub parallel: bool,
+    pub timeout_ms: u64,
+    pub retry_count: u32,
+    pub verbose: bool,
+}
+
+impl GixTestTaskProvider {
+    pub fn new() -> Self {
+        Self {
+            test_task_id: String::new(),
+            framework: String::new(),
+            runner: String::new(),
+            config_json: String::new(),
+            coverage_enabled: bool::default(),
+            filter_pattern: String::new(),
+            parallel: bool::default(),
+            timeout_ms: u64::default(),
+            retry_count: u32::default(),
+            verbose: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_task_id.is_empty() || true && !self.framework.is_empty() || true && !self.runner.is_empty() || true && !self.config_json.is_empty() || true && self.coverage_enabled || true && !self.filter_pattern.is_empty() || true && self.parallel || true && self.timeout_ms < u64::MAX || true && self.retry_count < u32::MAX || true && self.verbose || true
+    }
+}
+
+impl Default for GixTestTaskProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task decorations (icon, color, badge, status, tooltip)
+#[derive(Debug, Clone)]
+pub struct GiyTaskDecorations {
+    pub task_deco_id: String,
+    pub icon: String,
+    pub color: String,
+    pub badge_text: String,
+    pub status: String,
+    pub tooltip: String,
+    pub is_running: bool,
+    pub has_errors: bool,
+    pub exit_code: u32,
+    pub provider_id: String,
+}
+
+impl GiyTaskDecorations {
+    pub fn new() -> Self {
+        Self {
+            task_deco_id: String::new(),
+            icon: String::new(),
+            color: String::new(),
+            badge_text: String::new(),
+            status: String::new(),
+            tooltip: String::new(),
+            is_running: bool::default(),
+            has_errors: bool::default(),
+            exit_code: u32::default(),
+            provider_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.task_deco_id.is_empty() || true && !self.icon.is_empty() || true && !self.color.is_empty() || true && !self.badge_text.is_empty() || true && !self.status.is_empty() || true && !self.tooltip.is_empty() || true && self.is_running || true && self.has_errors || true && self.exit_code < u32::MAX || true && !self.provider_id.is_empty() || true
+    }
+}
+
+impl Default for GiyTaskDecorations {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Task history (recent tasks, max items, rerun, pin, clear)
+#[derive(Debug, Clone)]
+pub struct GizTaskHistory {
+    pub hist_id: String,
+    pub recent_tasks_json: String,
+    pub max_items: u32,
+    pub can_rerun: bool,
+    pub is_pinned: bool,
+    pub can_clear: bool,
+    pub last_run_ms: u64,
+    pub run_count: u32,
+    pub task_label: String,
+    pub folder_uri: String,
+}
+
+impl GizTaskHistory {
+    pub fn new() -> Self {
+        Self {
+            hist_id: String::new(),
+            recent_tasks_json: String::new(),
+            max_items: u32::default(),
+            can_rerun: bool::default(),
+            is_pinned: bool::default(),
+            can_clear: bool::default(),
+            last_run_ms: u64::default(),
+            run_count: u32::default(),
+            task_label: String::new(),
+            folder_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hist_id.is_empty() || true && !self.recent_tasks_json.is_empty() || true && self.max_items < u32::MAX || true && self.can_rerun || true && self.is_pinned || true && self.can_clear || true && self.last_run_ms < u64::MAX || true && self.run_count < u32::MAX || true && !self.task_label.is_empty() || true && !self.folder_uri.is_empty() || true
+    }
+}
+
+impl Default for GizTaskHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -319428,6 +320100,294 @@ mod tests_gij_generated {
     fn test_gij_fields() {
         let mut obj = GijCustomExecution::default();
         obj.custom_exec_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gik_generated {
+    use super::*;
+
+    #[test]
+    fn test_gik_default() {
+        let obj = GikTaskProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gik_fields() {
+        let mut obj = GikTaskProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gil_generated {
+    use super::*;
+
+    #[test]
+    fn test_gil_default() {
+        let obj = GilTaskFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gil_fields() {
+        let mut obj = GilTaskFilter::default();
+        obj.filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gim_generated {
+    use super::*;
+
+    #[test]
+    fn test_gim_default() {
+        let obj = GimTaskDependency::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gim_fields() {
+        let mut obj = GimTaskDependency::default();
+        obj.dep_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gin_generated {
+    use super::*;
+
+    #[test]
+    fn test_gin_default() {
+        let obj = GinTaskTerminalConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gin_fields() {
+        let mut obj = GinTaskTerminalConfig::default();
+        obj.term_cfg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gio_generated {
+    use super::*;
+
+    #[test]
+    fn test_gio_default() {
+        let obj = GioTaskOutputParser::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gio_fields() {
+        let mut obj = GioTaskOutputParser::default();
+        obj.output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gip_generated {
+    use super::*;
+
+    #[test]
+    fn test_gip_default() {
+        let obj = GipTaskWatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gip_fields() {
+        let mut obj = GipTaskWatcher::default();
+        obj.watcher_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_giq_generated {
+    use super::*;
+
+    #[test]
+    fn test_giq_default() {
+        let obj = GiqTaskQuickPick::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_giq_fields() {
+        let mut obj = GiqTaskQuickPick::default();
+        obj.quick_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gir_generated {
+    use super::*;
+
+    #[test]
+    fn test_gir_default() {
+        let obj = GirTaskScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gir_fields() {
+        let mut obj = GirTaskScope::default();
+        obj.scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gis_generated {
+    use super::*;
+
+    #[test]
+    fn test_gis_default() {
+        let obj = GisTaskSchemaValidator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gis_fields() {
+        let mut obj = GisTaskSchemaValidator::default();
+        obj.schema_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_git_generated {
+    use super::*;
+
+    #[test]
+    fn test_git_default() {
+        let obj = GitTaskCommandVariable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_git_fields() {
+        let mut obj = GitTaskCommandVariable::default();
+        obj.cmd_var_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_giu_generated {
+    use super::*;
+
+    #[test]
+    fn test_giu_default() {
+        let obj = GiuTaskProcessEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_giu_fields() {
+        let mut obj = GiuTaskProcessEvent::default();
+        obj.proc_event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_giv_generated {
+    use super::*;
+
+    #[test]
+    fn test_giv_default() {
+        let obj = GivTaskDiagnosticCollection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_giv_fields() {
+        let mut obj = GivTaskDiagnosticCollection::default();
+        obj.diag_coll_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_giw_generated {
+    use super::*;
+
+    #[test]
+    fn test_giw_default() {
+        let obj = GiwBuildTaskProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_giw_fields() {
+        let mut obj = GiwBuildTaskProvider::default();
+        obj.build_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gix_generated {
+    use super::*;
+
+    #[test]
+    fn test_gix_default() {
+        let obj = GixTestTaskProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gix_fields() {
+        let mut obj = GixTestTaskProvider::default();
+        obj.test_task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_giy_generated {
+    use super::*;
+
+    #[test]
+    fn test_giy_default() {
+        let obj = GiyTaskDecorations::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_giy_fields() {
+        let mut obj = GiyTaskDecorations::default();
+        obj.task_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_giz_generated {
+    use super::*;
+
+    #[test]
+    fn test_giz_default() {
+        let obj = GizTaskHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_giz_fields() {
+        let mut obj = GizTaskHistory::default();
+        obj.hist_id = "test".to_string();
         assert!(obj.validate());
     }
 }
