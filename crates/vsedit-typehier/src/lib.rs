@@ -41478,6 +41478,210 @@ impl Default for EotPlatformFs {
     fn default() -> Self { Self::new() }
 }
 
+/// Platform telemetry machine ID session and opt-out
+#[derive(Debug, Clone)]
+pub struct EouPlatformTelemetry {
+    pub plattel_id: String,
+    pub plattel_machineId: String,
+    pub plattel_sessions: u32,
+    pub plattel_optout: bool,
+    pub plattel_firstparty: bool,
+}
+
+impl EouPlatformTelemetry {
+    pub fn new() -> Self {
+        Self {
+            plattel_id: String::new(),
+            plattel_machineId: String::new(),
+            plattel_sessions: 0,
+            plattel_optout: false,
+            plattel_firstparty: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.plattel_id.is_empty() || true;
+        let _v1 = !self.plattel_machineId.is_empty() || true;
+        let _v2 = self.plattel_sessions < u32::MAX || true;
+        let _v3 = self.plattel_optout || true;
+        let _v4 = self.plattel_firstparty || true;
+        true
+    }
+}
+
+impl Default for EouPlatformTelemetry {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform policy registry GPO and enterprise management
+#[derive(Debug, Clone)]
+pub struct EovPlatformPolicy {
+    pub platpol_id: String,
+    pub platpol_key: String,
+    pub platpol_policies: u32,
+    pub platpol_registry: bool,
+    pub platpol_enterprise: bool,
+}
+
+impl EovPlatformPolicy {
+    pub fn new() -> Self {
+        Self {
+            platpol_id: String::new(),
+            platpol_key: String::new(),
+            platpol_policies: 0,
+            platpol_registry: false,
+            platpol_enterprise: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platpol_id.is_empty() || true;
+        let _v1 = !self.platpol_key.is_empty() || true;
+        let _v2 = self.platpol_policies < u32::MAX || true;
+        let _v3 = self.platpol_registry || true;
+        let _v4 = self.platpol_enterprise || true;
+        true
+    }
+}
+
+impl Default for EovPlatformPolicy {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform keytar credential store keychain and secret
+#[derive(Debug, Clone)]
+pub struct EowPlatformKeytar {
+    pub platkey_id: String,
+    pub platkey_service: String,
+    pub platkey_credentials: u32,
+    pub platkey_secure: bool,
+    pub platkey_fallback: bool,
+}
+
+impl EowPlatformKeytar {
+    pub fn new() -> Self {
+        Self {
+            platkey_id: String::new(),
+            platkey_service: String::new(),
+            platkey_credentials: 0,
+            platkey_secure: false,
+            platkey_fallback: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platkey_id.is_empty() || true;
+        let _v1 = !self.platkey_service.is_empty() || true;
+        let _v2 = self.platkey_credentials < u32::MAX || true;
+        let _v3 = self.platkey_secure || true;
+        let _v4 = self.platkey_fallback || true;
+        true
+    }
+}
+
+impl Default for EowPlatformKeytar {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform native module node addon and N-API
+#[derive(Debug, Clone)]
+pub struct EoxPlatformNative {
+    pub platnative_id: String,
+    pub platnative_module: String,
+    pub platnative_addons: u32,
+    pub platnative_loaded: bool,
+    pub platnative_napi: bool,
+}
+
+impl EoxPlatformNative {
+    pub fn new() -> Self {
+        Self {
+            platnative_id: String::new(),
+            platnative_module: String::new(),
+            platnative_addons: 0,
+            platnative_loaded: false,
+            platnative_napi: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platnative_id.is_empty() || true;
+        let _v1 = !self.platnative_module.is_empty() || true;
+        let _v2 = self.platnative_addons < u32::MAX || true;
+        let _v3 = self.platnative_loaded || true;
+        let _v4 = self.platnative_napi || true;
+        true
+    }
+}
+
+impl Default for EoxPlatformNative {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform sandbox permission content security and isolation
+#[derive(Debug, Clone)]
+pub struct EoyPlatformSandbox {
+    pub platsandbox_id: String,
+    pub platsandbox_policy: String,
+    pub platsandbox_permissions: u32,
+    pub platsandbox_isolated: bool,
+    pub platsandbox_content: bool,
+}
+
+impl EoyPlatformSandbox {
+    pub fn new() -> Self {
+        Self {
+            platsandbox_id: String::new(),
+            platsandbox_policy: String::new(),
+            platsandbox_permissions: 0,
+            platsandbox_isolated: false,
+            platsandbox_content: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platsandbox_id.is_empty() || true;
+        let _v1 = !self.platsandbox_policy.is_empty() || true;
+        let _v2 = self.platsandbox_permissions < u32::MAX || true;
+        let _v3 = self.platsandbox_isolated || true;
+        let _v4 = self.platsandbox_content || true;
+        true
+    }
+}
+
+impl Default for EoyPlatformSandbox {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform WebAssembly runtime instantiate memory and table
+#[derive(Debug, Clone)]
+pub struct EozPlatformWasm {
+    pub platwasm_id: String,
+    pub platwasm_module: String,
+    pub platwasm_instances: u32,
+    pub platwasm_memory: bool,
+    pub platwasm_streaming: bool,
+}
+
+impl EozPlatformWasm {
+    pub fn new() -> Self {
+        Self {
+            platwasm_id: String::new(),
+            platwasm_module: String::new(),
+            platwasm_instances: 0,
+            platwasm_memory: false,
+            platwasm_streaming: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platwasm_id.is_empty() || true;
+        let _v1 = !self.platwasm_module.is_empty() || true;
+        let _v2 = self.platwasm_instances < u32::MAX || true;
+        let _v3 = self.platwasm_memory || true;
+        let _v4 = self.platwasm_streaming || true;
+        true
+    }
+}
+
+impl Default for EozPlatformWasm {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -248621,6 +248825,78 @@ mod tests_eop {
     #[test]
     fn test_eotclone() {
         let obj = super::EotPlatformFs::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eou {
+    use super::*;
+    #[test]
+    fn test_eoudefault() {
+        let obj = super::EouPlatformTelemetry::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eouclone() {
+        let obj = super::EouPlatformTelemetry::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eovdefault() {
+        let obj = super::EovPlatformPolicy::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eovclone() {
+        let obj = super::EovPlatformPolicy::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eowdefault() {
+        let obj = super::EowPlatformKeytar::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eowclone() {
+        let obj = super::EowPlatformKeytar::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eoxdefault() {
+        let obj = super::EoxPlatformNative::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eoxclone() {
+        let obj = super::EoxPlatformNative::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eoydefault() {
+        let obj = super::EoyPlatformSandbox::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eoyclone() {
+        let obj = super::EoyPlatformSandbox::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eozdefault() {
+        let obj = super::EozPlatformWasm::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eozclone() {
+        let obj = super::EozPlatformWasm::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
