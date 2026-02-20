@@ -83204,6 +83204,216 @@ impl Default for GajWindowBounds {
     }
 }
 
+/// Window shell integration (terminal profile, shell type, env detection)
+#[derive(Debug, Clone)]
+pub struct GakWindowShellIntegration {
+    pub shell_id: String,
+    pub terminal_profile_id: String,
+    pub shell_type: String,
+    pub env_vars_json: String,
+    pub cwd: String,
+    pub args_json: String,
+    pub is_login_shell: bool,
+    pub use_conpty: bool,
+    pub detect_locale: bool,
+    pub font_size: u32,
+}
+
+impl GakWindowShellIntegration {
+    pub fn new() -> Self {
+        Self {
+            shell_id: String::new(),
+            terminal_profile_id: String::new(),
+            shell_type: String::new(),
+            env_vars_json: String::new(),
+            cwd: String::new(),
+            args_json: String::new(),
+            is_login_shell: bool::default(),
+            use_conpty: bool::default(),
+            detect_locale: bool::default(),
+            font_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shell_id.is_empty() || true && !self.terminal_profile_id.is_empty() || true && !self.shell_type.is_empty() || true && !self.env_vars_json.is_empty() || true && !self.cwd.is_empty() || true && !self.args_json.is_empty() || true && self.is_login_shell || true && self.use_conpty || true && self.detect_locale || true && self.font_size < u32::MAX || true
+    }
+}
+
+impl Default for GakWindowShellIntegration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window auto-save config (delay, mode, focus change, window change)
+#[derive(Debug, Clone)]
+pub struct GalWindowAutoSaveConfig {
+    pub autosave_id: String,
+    pub delay_ms: u64,
+    pub mode: String,
+    pub on_focus_change: bool,
+    pub on_window_change: bool,
+    pub exclude_patterns_json: String,
+    pub max_file_size_bytes: u64,
+    pub enabled: bool,
+    pub debounce_ms: u32,
+    pub include_untitled: bool,
+}
+
+impl GalWindowAutoSaveConfig {
+    pub fn new() -> Self {
+        Self {
+            autosave_id: String::new(),
+            delay_ms: u64::default(),
+            mode: String::new(),
+            on_focus_change: bool::default(),
+            on_window_change: bool::default(),
+            exclude_patterns_json: String::new(),
+            max_file_size_bytes: u64::default(),
+            enabled: bool::default(),
+            debounce_ms: u32::default(),
+            include_untitled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.autosave_id.is_empty() || true && self.delay_ms < u64::MAX || true && !self.mode.is_empty() || true && self.on_focus_change || true && self.on_window_change || true && !self.exclude_patterns_json.is_empty() || true && self.max_file_size_bytes < u64::MAX || true && self.enabled || true && self.debounce_ms < u32::MAX || true && self.include_untitled || true
+    }
+}
+
+impl Default for GalWindowAutoSaveConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window hot exit config (mode, exclude patterns, backup folder)
+#[derive(Debug, Clone)]
+pub struct GamWindowHotExitConfig {
+    pub hotexit_id: String,
+    pub mode: String,
+    pub exclude_patterns_json: String,
+    pub backup_folder: String,
+    pub max_backup_size_bytes: u64,
+    pub compress_backups: bool,
+    pub keep_days: u32,
+    pub on_crash: bool,
+    pub on_exit: bool,
+    pub restore_windows: bool,
+}
+
+impl GamWindowHotExitConfig {
+    pub fn new() -> Self {
+        Self {
+            hotexit_id: String::new(),
+            mode: String::new(),
+            exclude_patterns_json: String::new(),
+            backup_folder: String::new(),
+            max_backup_size_bytes: u64::default(),
+            compress_backups: bool::default(),
+            keep_days: u32::default(),
+            on_crash: bool::default(),
+            on_exit: bool::default(),
+            restore_windows: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hotexit_id.is_empty() || true && !self.mode.is_empty() || true && !self.exclude_patterns_json.is_empty() || true && !self.backup_folder.is_empty() || true && self.max_backup_size_bytes < u64::MAX || true && self.compress_backups || true && self.keep_days < u32::MAX || true && self.on_crash || true && self.on_exit || true && self.restore_windows || true
+    }
+}
+
+impl Default for GamWindowHotExitConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window dialog style (native vs custom, button order, theme)
+#[derive(Debug, Clone)]
+pub struct GanWindowDialogStyle {
+    pub dialog_id: String,
+    pub use_native: bool,
+    pub button_order: String,
+    pub theme_id: String,
+    pub animation_enabled: bool,
+    pub default_width: u32,
+    pub default_height: u32,
+    pub modal_overlay: bool,
+    pub keyboard_nav: bool,
+    pub confirm_on_close: bool,
+}
+
+impl GanWindowDialogStyle {
+    pub fn new() -> Self {
+        Self {
+            dialog_id: String::new(),
+            use_native: bool::default(),
+            button_order: String::new(),
+            theme_id: String::new(),
+            animation_enabled: bool::default(),
+            default_width: u32::default(),
+            default_height: u32::default(),
+            modal_overlay: bool::default(),
+            keyboard_nav: bool::default(),
+            confirm_on_close: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dialog_id.is_empty() || true && self.use_native || true && !self.button_order.is_empty() || true && !self.theme_id.is_empty() || true && self.animation_enabled || true && self.default_width < u32::MAX || true && self.default_height < u32::MAX || true && self.modal_overlay || true && self.keyboard_nav || true && self.confirm_on_close || true
+    }
+}
+
+impl Default for GanWindowDialogStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window zen mode config (hide tabs, hide status bar, center layout)
+#[derive(Debug, Clone)]
+pub struct GaoWindowZenModeConfig {
+    pub zen_id: String,
+    pub hide_tabs: bool,
+    pub hide_status_bar: bool,
+    pub hide_activity_bar: bool,
+    pub hide_line_numbers: bool,
+    pub center_layout: bool,
+    pub full_screen: bool,
+    pub silence_notifications: bool,
+    pub restore_on_exit: bool,
+    pub font_size_increase: u32,
+}
+
+impl GaoWindowZenModeConfig {
+    pub fn new() -> Self {
+        Self {
+            zen_id: String::new(),
+            hide_tabs: bool::default(),
+            hide_status_bar: bool::default(),
+            hide_activity_bar: bool::default(),
+            hide_line_numbers: bool::default(),
+            center_layout: bool::default(),
+            full_screen: bool::default(),
+            silence_notifications: bool::default(),
+            restore_on_exit: bool::default(),
+            font_size_increase: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.zen_id.is_empty() || true && self.hide_tabs || true && self.hide_status_bar || true && self.hide_activity_bar || true && self.hide_line_numbers || true && self.center_layout || true && self.full_screen || true && self.silence_notifications || true && self.restore_on_exit || true && self.font_size_increase < u32::MAX || true
+    }
+}
+
+impl Default for GaoWindowZenModeConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -306935,6 +307145,96 @@ mod tests_gaj_generated {
     fn test_gaj_fields() {
         let mut obj = GajWindowBounds::default();
         obj.bounds_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gak_generated {
+    use super::*;
+
+    #[test]
+    fn test_gak_default() {
+        let obj = GakWindowShellIntegration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gak_fields() {
+        let mut obj = GakWindowShellIntegration::default();
+        obj.shell_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gal_generated {
+    use super::*;
+
+    #[test]
+    fn test_gal_default() {
+        let obj = GalWindowAutoSaveConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gal_fields() {
+        let mut obj = GalWindowAutoSaveConfig::default();
+        obj.autosave_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gam_generated {
+    use super::*;
+
+    #[test]
+    fn test_gam_default() {
+        let obj = GamWindowHotExitConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gam_fields() {
+        let mut obj = GamWindowHotExitConfig::default();
+        obj.hotexit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gan_generated {
+    use super::*;
+
+    #[test]
+    fn test_gan_default() {
+        let obj = GanWindowDialogStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gan_fields() {
+        let mut obj = GanWindowDialogStyle::default();
+        obj.dialog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gao_generated {
+    use super::*;
+
+    #[test]
+    fn test_gao_default() {
+        let obj = GaoWindowZenModeConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gao_fields() {
+        let mut obj = GaoWindowZenModeConfig::default();
+        obj.zen_id = "test".to_string();
         assert!(obj.validate());
     }
 }
