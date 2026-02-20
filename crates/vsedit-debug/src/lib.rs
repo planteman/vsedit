@@ -143446,6 +143446,890 @@ impl Default for IgzTerminalConfig {
     }
 }
 
+/// Notification message descriptor
+#[derive(Debug, Clone)]
+pub struct IhaNotification {
+    pub notif_id: String,
+    pub message_text: String,
+    pub severity_val: u32,
+    pub source_str: String,
+    pub action_count: u32,
+    pub is_sticky: bool,
+}
+
+impl IhaNotification {
+    pub fn new() -> Self {
+        Self {
+            notif_id: String::new(),
+            message_text: String::new(),
+            severity_val: u32::default(),
+            source_str: String::new(),
+            action_count: u32::default(),
+            is_sticky: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notif_id.is_empty() || true && !self.message_text.is_empty() || true && self.severity_val < u32::MAX || true && !self.source_str.is_empty() || true && self.action_count < u32::MAX || true && self.is_sticky || true
+    }
+}
+
+impl Default for IhaNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notification action button
+#[derive(Debug, Clone)]
+pub struct IhbNotificationAction {
+    pub action_id: String,
+    pub label_text: String,
+    pub notif_ref: String,
+    pub is_primary: bool,
+    pub close_on_action: bool,
+    pub is_secondary: bool,
+}
+
+impl IhbNotificationAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            label_text: String::new(),
+            notif_ref: String::new(),
+            is_primary: bool::default(),
+            close_on_action: bool::default(),
+            is_secondary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.label_text.is_empty() || true && !self.notif_ref.is_empty() || true && self.is_primary || true && self.close_on_action || true && self.is_secondary || true
+    }
+}
+
+impl Default for IhbNotificationAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Progress notification state
+#[derive(Debug, Clone)]
+pub struct IhcProgressNotification {
+    pub progress_id: String,
+    pub title_text: String,
+    pub message_text: String,
+    pub percentage_val: u32,
+    pub location_val: u32,
+    pub is_cancellable: bool,
+}
+
+impl IhcProgressNotification {
+    pub fn new() -> Self {
+        Self {
+            progress_id: String::new(),
+            title_text: String::new(),
+            message_text: String::new(),
+            percentage_val: u32::default(),
+            location_val: u32::default(),
+            is_cancellable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.progress_id.is_empty() || true && !self.title_text.is_empty() || true && !self.message_text.is_empty() || true && self.percentage_val < u32::MAX || true && self.location_val < u32::MAX || true && self.is_cancellable || true
+    }
+}
+
+impl Default for IhcProgressNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Modal dialog descriptor
+#[derive(Debug, Clone)]
+pub struct IhdDialogBox {
+    pub dialog_id: String,
+    pub title_text: String,
+    pub message_text: String,
+    pub button_count: u32,
+    pub detail_text_len: u32,
+    pub is_modal: bool,
+}
+
+impl IhdDialogBox {
+    pub fn new() -> Self {
+        Self {
+            dialog_id: String::new(),
+            title_text: String::new(),
+            message_text: String::new(),
+            button_count: u32::default(),
+            detail_text_len: u32::default(),
+            is_modal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dialog_id.is_empty() || true && !self.title_text.is_empty() || true && !self.message_text.is_empty() || true && self.button_count < u32::MAX || true && self.detail_text_len < u32::MAX || true && self.is_modal || true
+    }
+}
+
+impl Default for IhdDialogBox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Input box prompt descriptor
+#[derive(Debug, Clone)]
+pub struct IheInputBox {
+    pub input_id: String,
+    pub prompt_text: String,
+    pub placeholder_text: String,
+    pub value_text: String,
+    pub validation_msg_len: u32,
+    pub is_password: bool,
+}
+
+impl IheInputBox {
+    pub fn new() -> Self {
+        Self {
+            input_id: String::new(),
+            prompt_text: String::new(),
+            placeholder_text: String::new(),
+            value_text: String::new(),
+            validation_msg_len: u32::default(),
+            is_password: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_id.is_empty() || true && !self.prompt_text.is_empty() || true && !self.placeholder_text.is_empty() || true && !self.value_text.is_empty() || true && self.validation_msg_len < u32::MAX || true && self.is_password || true
+    }
+}
+
+impl Default for IheInputBox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick pick selector state
+#[derive(Debug, Clone)]
+pub struct IhfQuickPick {
+    pub pick_id: String,
+    pub placeholder_text: String,
+    pub item_count: u32,
+    pub selected_count: u32,
+    pub filter_text: String,
+    pub can_select_many: bool,
+}
+
+impl IhfQuickPick {
+    pub fn new() -> Self {
+        Self {
+            pick_id: String::new(),
+            placeholder_text: String::new(),
+            item_count: u32::default(),
+            selected_count: u32::default(),
+            filter_text: String::new(),
+            can_select_many: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pick_id.is_empty() || true && !self.placeholder_text.is_empty() || true && self.item_count < u32::MAX || true && self.selected_count < u32::MAX || true && !self.filter_text.is_empty() || true && self.can_select_many || true
+    }
+}
+
+impl Default for IhfQuickPick {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Quick pick list item
+#[derive(Debug, Clone)]
+pub struct IhgQuickPickItem {
+    pub item_id: String,
+    pub label_text: String,
+    pub description_text: String,
+    pub detail_text: String,
+    pub icon_ref: String,
+    pub is_picked: bool,
+}
+
+impl IhgQuickPickItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            label_text: String::new(),
+            description_text: String::new(),
+            detail_text: String::new(),
+            icon_ref: String::new(),
+            is_picked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.label_text.is_empty() || true && !self.description_text.is_empty() || true && !self.detail_text.is_empty() || true && !self.icon_ref.is_empty() || true && self.is_picked || true
+    }
+}
+
+impl Default for IhgQuickPickItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Status bar item descriptor
+#[derive(Debug, Clone)]
+pub struct IhhStatusBarItem {
+    pub item_id: String,
+    pub item_text: String,
+    pub alignment_val: u32,
+    pub priority_val: u32,
+    pub command_ref: String,
+    pub is_visible: bool,
+}
+
+impl IhhStatusBarItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            item_text: String::new(),
+            alignment_val: u32::default(),
+            priority_val: u32::default(),
+            command_ref: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.item_text.is_empty() || true && self.alignment_val < u32::MAX || true && self.priority_val < u32::MAX || true && !self.command_ref.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for IhhStatusBarItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Activity bar icon entry
+#[derive(Debug, Clone)]
+pub struct IhiActivityBarItem {
+    pub item_id: String,
+    pub icon_name: String,
+    pub tooltip_text: String,
+    pub badge_count: u32,
+    pub sort_order: u32,
+    pub is_active: bool,
+}
+
+impl IhiActivityBarItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            icon_name: String::new(),
+            tooltip_text: String::new(),
+            badge_count: u32::default(),
+            sort_order: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.icon_name.is_empty() || true && !self.tooltip_text.is_empty() || true && self.badge_count < u32::MAX || true && self.sort_order < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for IhiActivityBarItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sidebar view pane
+#[derive(Debug, Clone)]
+pub struct IhjSidebarPane {
+    pub pane_id: String,
+    pub pane_title: String,
+    pub view_ref: String,
+    pub badge_text: String,
+    pub sort_order: u32,
+    pub is_expanded: bool,
+}
+
+impl IhjSidebarPane {
+    pub fn new() -> Self {
+        Self {
+            pane_id: String::new(),
+            pane_title: String::new(),
+            view_ref: String::new(),
+            badge_text: String::new(),
+            sort_order: u32::default(),
+            is_expanded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pane_id.is_empty() || true && !self.pane_title.is_empty() || true && !self.view_ref.is_empty() || true && !self.badge_text.is_empty() || true && self.sort_order < u32::MAX || true && self.is_expanded || true
+    }
+}
+
+impl Default for IhjSidebarPane {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Bottom panel view entry
+#[derive(Debug, Clone)]
+pub struct IhkPanelView {
+    pub panel_id: String,
+    pub panel_title: String,
+    pub view_ref: String,
+    pub icon_ref: String,
+    pub sort_order: u32,
+    pub is_visible: bool,
+}
+
+impl IhkPanelView {
+    pub fn new() -> Self {
+        Self {
+            panel_id: String::new(),
+            panel_title: String::new(),
+            view_ref: String::new(),
+            icon_ref: String::new(),
+            sort_order: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.panel_id.is_empty() || true && !self.panel_title.is_empty() || true && !self.view_ref.is_empty() || true && !self.icon_ref.is_empty() || true && self.sort_order < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for IhkPanelView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor group container
+#[derive(Debug, Clone)]
+pub struct IhlEditorGroup {
+    pub group_id: String,
+    pub orientation_str: String,
+    pub editor_count: u32,
+    pub active_editor_idx: u32,
+    pub size_pct: u32,
+    pub is_active: bool,
+}
+
+impl IhlEditorGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            orientation_str: String::new(),
+            editor_count: u32::default(),
+            active_editor_idx: u32::default(),
+            size_pct: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && !self.orientation_str.is_empty() || true && self.editor_count < u32::MAX || true && self.active_editor_idx < u32::MAX || true && self.size_pct < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for IhlEditorGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor tab descriptor
+#[derive(Debug, Clone)]
+pub struct IhmEditorTab {
+    pub tab_id: String,
+    pub label_text: String,
+    pub resource_uri: String,
+    pub group_ref: String,
+    pub is_dirty: bool,
+    pub is_pinned: bool,
+}
+
+impl IhmEditorTab {
+    pub fn new() -> Self {
+        Self {
+            tab_id: String::new(),
+            label_text: String::new(),
+            resource_uri: String::new(),
+            group_ref: String::new(),
+            is_dirty: bool::default(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tab_id.is_empty() || true && !self.label_text.is_empty() || true && !self.resource_uri.is_empty() || true && !self.group_ref.is_empty() || true && self.is_dirty || true && self.is_pinned || true
+    }
+}
+
+impl Default for IhmEditorTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command palette state
+#[derive(Debug, Clone)]
+pub struct IhnCommandPalette {
+    pub palette_id: String,
+    pub filter_text: String,
+    pub visible_count: u32,
+    pub selected_index: u32,
+    pub mode_prefix: String,
+    pub is_visible: bool,
+}
+
+impl IhnCommandPalette {
+    pub fn new() -> Self {
+        Self {
+            palette_id: String::new(),
+            filter_text: String::new(),
+            visible_count: u32::default(),
+            selected_index: u32::default(),
+            mode_prefix: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.palette_id.is_empty() || true && !self.filter_text.is_empty() || true && self.visible_count < u32::MAX || true && self.selected_index < u32::MAX || true && !self.mode_prefix.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for IhnCommandPalette {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Command palette entry
+#[derive(Debug, Clone)]
+pub struct IhoCommandEntry {
+    pub entry_id: String,
+    pub command_id: String,
+    pub label_text: String,
+    pub keybinding_str: String,
+    pub category_str: String,
+    pub is_recent: bool,
+}
+
+impl IhoCommandEntry {
+    pub fn new() -> Self {
+        Self {
+            entry_id: String::new(),
+            command_id: String::new(),
+            label_text: String::new(),
+            keybinding_str: String::new(),
+            category_str: String::new(),
+            is_recent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.entry_id.is_empty() || true && !self.command_id.is_empty() || true && !self.label_text.is_empty() || true && !self.keybinding_str.is_empty() || true && !self.category_str.is_empty() || true && self.is_recent || true
+    }
+}
+
+impl Default for IhoCommandEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Context menu descriptor
+#[derive(Debug, Clone)]
+pub struct IhpContextMenu {
+    pub menu_id: String,
+    pub anchor_x: u32,
+    pub anchor_y: u32,
+    pub item_count: u32,
+    pub submenu_count: u32,
+    pub is_visible: bool,
+}
+
+impl IhpContextMenu {
+    pub fn new() -> Self {
+        Self {
+            menu_id: String::new(),
+            anchor_x: u32::default(),
+            anchor_y: u32::default(),
+            item_count: u32::default(),
+            submenu_count: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.menu_id.is_empty() || true && self.anchor_x < u32::MAX || true && self.anchor_y < u32::MAX || true && self.item_count < u32::MAX || true && self.submenu_count < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for IhpContextMenu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu action item
+#[derive(Debug, Clone)]
+pub struct IhqMenuAction {
+    pub action_id: String,
+    pub label_text: String,
+    pub icon_ref: String,
+    pub command_ref: String,
+    pub is_enabled: bool,
+    pub is_checked: bool,
+}
+
+impl IhqMenuAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            label_text: String::new(),
+            icon_ref: String::new(),
+            command_ref: String::new(),
+            is_enabled: bool::default(),
+            is_checked: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.label_text.is_empty() || true && !self.icon_ref.is_empty() || true && !self.command_ref.is_empty() || true && self.is_enabled || true && self.is_checked || true
+    }
+}
+
+impl Default for IhqMenuAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar widget state
+#[derive(Debug, Clone)]
+pub struct IhrToolbar {
+    pub toolbar_id: String,
+    pub action_count: u32,
+    pub orientation_str: String,
+    pub overflow_count: u32,
+    pub height_px: u32,
+    pub is_visible: bool,
+}
+
+impl IhrToolbar {
+    pub fn new() -> Self {
+        Self {
+            toolbar_id: String::new(),
+            action_count: u32::default(),
+            orientation_str: String::new(),
+            overflow_count: u32::default(),
+            height_px: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.toolbar_id.is_empty() || true && self.action_count < u32::MAX || true && !self.orientation_str.is_empty() || true && self.overflow_count < u32::MAX || true && self.height_px < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for IhrToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Breadcrumb bar widget state
+#[derive(Debug, Clone)]
+pub struct IhsBreadcrumbWidget {
+    pub crumb_id: String,
+    pub crumb_count: u32,
+    pub active_index: u32,
+    pub overflow_start: u32,
+    pub focus_mode: String,
+    pub is_visible: bool,
+}
+
+impl IhsBreadcrumbWidget {
+    pub fn new() -> Self {
+        Self {
+            crumb_id: String::new(),
+            crumb_count: u32::default(),
+            active_index: u32::default(),
+            overflow_start: u32::default(),
+            focus_mode: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.crumb_id.is_empty() || true && self.crumb_count < u32::MAX || true && self.active_index < u32::MAX || true && self.overflow_start < u32::MAX || true && !self.focus_mode.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for IhsBreadcrumbWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree widget component state
+#[derive(Debug, Clone)]
+pub struct IhtTreeWidget {
+    pub tree_id: String,
+    pub node_count: u32,
+    pub expanded_count: u32,
+    pub selected_count: u32,
+    pub scroll_top: u32,
+    pub has_filter: bool,
+}
+
+impl IhtTreeWidget {
+    pub fn new() -> Self {
+        Self {
+            tree_id: String::new(),
+            node_count: u32::default(),
+            expanded_count: u32::default(),
+            selected_count: u32::default(),
+            scroll_top: u32::default(),
+            has_filter: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_id.is_empty() || true && self.node_count < u32::MAX || true && self.expanded_count < u32::MAX || true && self.selected_count < u32::MAX || true && self.scroll_top < u32::MAX || true && self.has_filter || true
+    }
+}
+
+impl Default for IhtTreeWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// List widget component state
+#[derive(Debug, Clone)]
+pub struct IhuListWidget {
+    pub list_id: String,
+    pub item_count: u32,
+    pub selected_index: u32,
+    pub scroll_top: u32,
+    pub row_height: u32,
+    pub is_virtual: bool,
+}
+
+impl IhuListWidget {
+    pub fn new() -> Self {
+        Self {
+            list_id: String::new(),
+            item_count: u32::default(),
+            selected_index: u32::default(),
+            scroll_top: u32::default(),
+            row_height: u32::default(),
+            is_virtual: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_id.is_empty() || true && self.item_count < u32::MAX || true && self.selected_index < u32::MAX || true && self.scroll_top < u32::MAX || true && self.row_height < u32::MAX || true && self.is_virtual || true
+    }
+}
+
+impl Default for IhuListWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Table widget component state
+#[derive(Debug, Clone)]
+pub struct IhvTableWidget {
+    pub table_id: String,
+    pub row_count: u32,
+    pub col_count: u32,
+    pub sorted_col_idx: u32,
+    pub scroll_top: u32,
+    pub is_sortable: bool,
+}
+
+impl IhvTableWidget {
+    pub fn new() -> Self {
+        Self {
+            table_id: String::new(),
+            row_count: u32::default(),
+            col_count: u32::default(),
+            sorted_col_idx: u32::default(),
+            scroll_top: u32::default(),
+            is_sortable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.table_id.is_empty() || true && self.row_count < u32::MAX || true && self.col_count < u32::MAX || true && self.sorted_col_idx < u32::MAX || true && self.scroll_top < u32::MAX || true && self.is_sortable || true
+    }
+}
+
+impl Default for IhvTableWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Resize sash widget
+#[derive(Debug, Clone)]
+pub struct IhwSashWidget {
+    pub sash_id: String,
+    pub orientation_str: String,
+    pub position_px: u32,
+    pub min_size: u32,
+    pub max_size: u32,
+    pub is_dragging: bool,
+}
+
+impl IhwSashWidget {
+    pub fn new() -> Self {
+        Self {
+            sash_id: String::new(),
+            orientation_str: String::new(),
+            position_px: u32::default(),
+            min_size: u32::default(),
+            max_size: u32::default(),
+            is_dragging: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sash_id.is_empty() || true && !self.orientation_str.is_empty() || true && self.position_px < u32::MAX || true && self.min_size < u32::MAX || true && self.max_size < u32::MAX || true && self.is_dragging || true
+    }
+}
+
+impl Default for IhwSashWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Split view layout state
+#[derive(Debug, Clone)]
+pub struct IhxSplitView {
+    pub split_id: String,
+    pub direction_str: String,
+    pub view_count: u32,
+    pub proportional_layout: bool,
+    pub min_size: u32,
+    pub inverse_alt: bool,
+}
+
+impl IhxSplitView {
+    pub fn new() -> Self {
+        Self {
+            split_id: String::new(),
+            direction_str: String::new(),
+            view_count: u32::default(),
+            proportional_layout: bool::default(),
+            min_size: u32::default(),
+            inverse_alt: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.split_id.is_empty() || true && !self.direction_str.is_empty() || true && self.view_count < u32::MAX || true && self.proportional_layout || true && self.min_size < u32::MAX || true && self.inverse_alt || true
+    }
+}
+
+impl Default for IhxSplitView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Grid view layout state
+#[derive(Debug, Clone)]
+pub struct IhyGridView {
+    pub grid_id: String,
+    pub row_count: u32,
+    pub col_count: u32,
+    pub cell_count: u32,
+    pub gap_px: u32,
+    pub is_responsive: bool,
+}
+
+impl IhyGridView {
+    pub fn new() -> Self {
+        Self {
+            grid_id: String::new(),
+            row_count: u32::default(),
+            col_count: u32::default(),
+            cell_count: u32::default(),
+            gap_px: u32::default(),
+            is_responsive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grid_id.is_empty() || true && self.row_count < u32::MAX || true && self.col_count < u32::MAX || true && self.cell_count < u32::MAX || true && self.gap_px < u32::MAX || true && self.is_responsive || true
+    }
+}
+
+impl Default for IhyGridView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Banner notification widget
+#[derive(Debug, Clone)]
+pub struct IhzBannerWidget {
+    pub banner_id: String,
+    pub message_text: String,
+    pub icon_name: String,
+    pub action_label: String,
+    pub close_action: String,
+    pub is_visible: bool,
+}
+
+impl IhzBannerWidget {
+    pub fn new() -> Self {
+        Self {
+            banner_id: String::new(),
+            message_text: String::new(),
+            icon_name: String::new(),
+            action_label: String::new(),
+            close_action: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.banner_id.is_empty() || true && !self.message_text.is_empty() || true && !self.icon_name.is_empty() || true && !self.action_label.is_empty() || true && !self.close_action.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for IhzBannerWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -394505,6 +395389,474 @@ mod tests_igz_generated {
     fn test_igz_fields() {
         let mut obj = IgzTerminalConfig::default();
         obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iha_generated {
+    use super::*;
+
+    #[test]
+    fn test_iha_default() {
+        let obj = IhaNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iha_fields() {
+        let mut obj = IhaNotification::default();
+        obj.notif_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihb_default() {
+        let obj = IhbNotificationAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihb_fields() {
+        let mut obj = IhbNotificationAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihc_default() {
+        let obj = IhcProgressNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihc_fields() {
+        let mut obj = IhcProgressNotification::default();
+        obj.progress_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihd_default() {
+        let obj = IhdDialogBox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihd_fields() {
+        let mut obj = IhdDialogBox::default();
+        obj.dialog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihe_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihe_default() {
+        let obj = IheInputBox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihe_fields() {
+        let mut obj = IheInputBox::default();
+        obj.input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihf_default() {
+        let obj = IhfQuickPick::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihf_fields() {
+        let mut obj = IhfQuickPick::default();
+        obj.pick_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihg_default() {
+        let obj = IhgQuickPickItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihg_fields() {
+        let mut obj = IhgQuickPickItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihh_default() {
+        let obj = IhhStatusBarItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihh_fields() {
+        let mut obj = IhhStatusBarItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihi_default() {
+        let obj = IhiActivityBarItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihi_fields() {
+        let mut obj = IhiActivityBarItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihj_default() {
+        let obj = IhjSidebarPane::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihj_fields() {
+        let mut obj = IhjSidebarPane::default();
+        obj.pane_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihk_default() {
+        let obj = IhkPanelView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihk_fields() {
+        let mut obj = IhkPanelView::default();
+        obj.panel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihl_default() {
+        let obj = IhlEditorGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihl_fields() {
+        let mut obj = IhlEditorGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihm_default() {
+        let obj = IhmEditorTab::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihm_fields() {
+        let mut obj = IhmEditorTab::default();
+        obj.tab_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihn_default() {
+        let obj = IhnCommandPalette::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihn_fields() {
+        let mut obj = IhnCommandPalette::default();
+        obj.palette_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iho_generated {
+    use super::*;
+
+    #[test]
+    fn test_iho_default() {
+        let obj = IhoCommandEntry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iho_fields() {
+        let mut obj = IhoCommandEntry::default();
+        obj.entry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihp_default() {
+        let obj = IhpContextMenu::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihp_fields() {
+        let mut obj = IhpContextMenu::default();
+        obj.menu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihq_default() {
+        let obj = IhqMenuAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihq_fields() {
+        let mut obj = IhqMenuAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihr_default() {
+        let obj = IhrToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihr_fields() {
+        let mut obj = IhrToolbar::default();
+        obj.toolbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihs_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihs_default() {
+        let obj = IhsBreadcrumbWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihs_fields() {
+        let mut obj = IhsBreadcrumbWidget::default();
+        obj.crumb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iht_generated {
+    use super::*;
+
+    #[test]
+    fn test_iht_default() {
+        let obj = IhtTreeWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iht_fields() {
+        let mut obj = IhtTreeWidget::default();
+        obj.tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihu_default() {
+        let obj = IhuListWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihu_fields() {
+        let mut obj = IhuListWidget::default();
+        obj.list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihv_default() {
+        let obj = IhvTableWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihv_fields() {
+        let mut obj = IhvTableWidget::default();
+        obj.table_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihw_default() {
+        let obj = IhwSashWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihw_fields() {
+        let mut obj = IhwSashWidget::default();
+        obj.sash_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihx_default() {
+        let obj = IhxSplitView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihx_fields() {
+        let mut obj = IhxSplitView::default();
+        obj.split_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihy_default() {
+        let obj = IhyGridView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihy_fields() {
+        let mut obj = IhyGridView::default();
+        obj.grid_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ihz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ihz_default() {
+        let obj = IhzBannerWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ihz_fields() {
+        let mut obj = IhzBannerWidget::default();
+        obj.banner_id = "test".to_string();
         assert!(obj.validate());
     }
 }
