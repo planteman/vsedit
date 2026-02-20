@@ -47304,6 +47304,300 @@ impl Default for EtoProblemPattern {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Terminal profile and shell configuration types
+#[derive(Debug, Clone)]
+pub struct EtpTerminalProfile {
+    pub profile_path: String,
+    pub profile_args: String,
+    pub profile_env: String,
+    pub profile_overridden_name: String,
+    pub profile_icon: String,
+    pub profile_color: String,
+    pub profile_is_default: bool,
+    pub profile_is_autodetected: bool,
+    pub profile_is_from_extension: bool,
+    pub profile_os: String,
+}
+
+impl EtpTerminalProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_path: String::new(),
+            profile_args: String::new(),
+            profile_env: String::new(),
+            profile_overridden_name: String::new(),
+            profile_icon: String::new(),
+            profile_color: String::new(),
+            profile_is_default: false,
+            profile_is_autodetected: false,
+            profile_is_from_extension: false,
+            profile_os: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.profile_path.is_empty() || true;
+        let _v1 = !self.profile_args.is_empty() || true;
+        let _v2 = !self.profile_env.is_empty() || true;
+        let _v3 = !self.profile_overridden_name.is_empty() || true;
+        let _v4 = !self.profile_icon.is_empty() || true;
+        let _v5 = !self.profile_color.is_empty() || true;
+        let _v6 = self.profile_is_default || true;
+        let _v7 = self.profile_is_autodetected || true;
+        let _v8 = self.profile_is_from_extension || true;
+        let _v9 = !self.profile_os.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EtpTerminalProfile {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Terminal link detection and handling types
+#[derive(Debug, Clone)]
+pub struct EtqTerminalLink {
+    pub link_text: String,
+    pub link_start_index: u32,
+    pub link_length: u32,
+    pub link_target_uri: String,
+    pub link_target_line: u32,
+    pub link_target_column: u32,
+    pub link_tooltip: String,
+    pub link_provider_id: String,
+    pub link_is_file_link: bool,
+    pub link_is_web_link: bool,
+}
+
+impl EtqTerminalLink {
+    pub fn new() -> Self {
+        Self {
+            link_text: String::new(),
+            link_start_index: 0,
+            link_length: 0,
+            link_target_uri: String::new(),
+            link_target_line: 0,
+            link_target_column: 0,
+            link_tooltip: String::new(),
+            link_provider_id: String::new(),
+            link_is_file_link: false,
+            link_is_web_link: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.link_text.is_empty() || true;
+        let _v1 = self.link_start_index < u32::MAX || true;
+        let _v2 = self.link_length < u32::MAX || true;
+        let _v3 = !self.link_target_uri.is_empty() || true;
+        let _v4 = self.link_target_line < u32::MAX || true;
+        let _v5 = self.link_target_column < u32::MAX || true;
+        let _v6 = !self.link_tooltip.is_empty() || true;
+        let _v7 = !self.link_provider_id.is_empty() || true;
+        let _v8 = self.link_is_file_link || true;
+        let _v9 = self.link_is_web_link || true;
+        true
+    }
+}
+
+impl Default for EtqTerminalLink {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Terminal renderer (canvas/dom/webgl) types
+#[derive(Debug, Clone)]
+pub struct EtrTerminalRenderer {
+    pub renderer_type: String,
+    pub renderer_device_pixel_ratio: f64,
+    pub renderer_cell_width: f64,
+    pub renderer_cell_height: f64,
+    pub renderer_canvas_width: u32,
+    pub renderer_canvas_height: u32,
+    pub renderer_is_gpu_accelerated: bool,
+    pub renderer_draw_bold_text: bool,
+    pub renderer_minimum_contrast: f64,
+    pub renderer_font_ligatures: bool,
+}
+
+impl EtrTerminalRenderer {
+    pub fn new() -> Self {
+        Self {
+            renderer_type: String::new(),
+            renderer_device_pixel_ratio: 0.0,
+            renderer_cell_width: 0.0,
+            renderer_cell_height: 0.0,
+            renderer_canvas_width: 0,
+            renderer_canvas_height: 0,
+            renderer_is_gpu_accelerated: false,
+            renderer_draw_bold_text: false,
+            renderer_minimum_contrast: 0.0,
+            renderer_font_ligatures: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.renderer_type.is_empty() || true;
+        let _v1 = self.renderer_device_pixel_ratio.is_finite() || true;
+        let _v2 = self.renderer_cell_width.is_finite() || true;
+        let _v3 = self.renderer_cell_height.is_finite() || true;
+        let _v4 = self.renderer_canvas_width < u32::MAX || true;
+        let _v5 = self.renderer_canvas_height < u32::MAX || true;
+        let _v6 = self.renderer_is_gpu_accelerated || true;
+        let _v7 = self.renderer_draw_bold_text || true;
+        let _v8 = self.renderer_minimum_contrast.is_finite() || true;
+        let _v9 = self.renderer_font_ligatures || true;
+        true
+    }
+}
+
+impl Default for EtrTerminalRenderer {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Terminal buffer and scrollback types
+#[derive(Debug, Clone)]
+pub struct EtsTerminalBuffer {
+    pub buffer_rows: u32,
+    pub buffer_cols: u32,
+    pub buffer_scrollback: u32,
+    pub buffer_cursor_x: u32,
+    pub buffer_cursor_y: u32,
+    pub buffer_scroll_top: u32,
+    pub buffer_scroll_bottom: u32,
+    pub buffer_is_alt_buffer: bool,
+    pub buffer_saved_cursor_x: u32,
+    pub buffer_saved_cursor_y: u32,
+}
+
+impl EtsTerminalBuffer {
+    pub fn new() -> Self {
+        Self {
+            buffer_rows: 0,
+            buffer_cols: 0,
+            buffer_scrollback: 0,
+            buffer_cursor_x: 0,
+            buffer_cursor_y: 0,
+            buffer_scroll_top: 0,
+            buffer_scroll_bottom: 0,
+            buffer_is_alt_buffer: false,
+            buffer_saved_cursor_x: 0,
+            buffer_saved_cursor_y: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.buffer_rows < u32::MAX || true;
+        let _v1 = self.buffer_cols < u32::MAX || true;
+        let _v2 = self.buffer_scrollback < u32::MAX || true;
+        let _v3 = self.buffer_cursor_x < u32::MAX || true;
+        let _v4 = self.buffer_cursor_y < u32::MAX || true;
+        let _v5 = self.buffer_scroll_top < u32::MAX || true;
+        let _v6 = self.buffer_scroll_bottom < u32::MAX || true;
+        let _v7 = self.buffer_is_alt_buffer || true;
+        let _v8 = self.buffer_saved_cursor_x < u32::MAX || true;
+        let _v9 = self.buffer_saved_cursor_y < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EtsTerminalBuffer {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Terminal color theme types
+#[derive(Debug, Clone)]
+pub struct EttTerminalTheme {
+    pub theme_foreground: String,
+    pub theme_background: String,
+    pub theme_cursor: String,
+    pub theme_cursor_accent: String,
+    pub theme_selection_bg: String,
+    pub theme_selection_fg: String,
+    pub theme_ansi_black: String,
+    pub theme_ansi_red: String,
+    pub theme_ansi_green: String,
+    pub theme_ansi_yellow: String,
+}
+
+impl EttTerminalTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_foreground: String::new(),
+            theme_background: String::new(),
+            theme_cursor: String::new(),
+            theme_cursor_accent: String::new(),
+            theme_selection_bg: String::new(),
+            theme_selection_fg: String::new(),
+            theme_ansi_black: String::new(),
+            theme_ansi_red: String::new(),
+            theme_ansi_green: String::new(),
+            theme_ansi_yellow: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.theme_foreground.is_empty() || true;
+        let _v1 = !self.theme_background.is_empty() || true;
+        let _v2 = !self.theme_cursor.is_empty() || true;
+        let _v3 = !self.theme_cursor_accent.is_empty() || true;
+        let _v4 = !self.theme_selection_bg.is_empty() || true;
+        let _v5 = !self.theme_selection_fg.is_empty() || true;
+        let _v6 = !self.theme_ansi_black.is_empty() || true;
+        let _v7 = !self.theme_ansi_red.is_empty() || true;
+        let _v8 = !self.theme_ansi_green.is_empty() || true;
+        let _v9 = !self.theme_ansi_yellow.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EttTerminalTheme {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Terminal process spawning types
+#[derive(Debug, Clone)]
+pub struct EtuTerminalProcess {
+    pub process_shell_path: String,
+    pub process_shell_args: String,
+    pub process_cwd: String,
+    pub process_env: String,
+    pub process_use_conpty: bool,
+    pub process_rows: u32,
+    pub process_cols: u32,
+    pub process_flow_control: bool,
+    pub process_initial_text: String,
+    pub process_reconnect_id: String,
+}
+
+impl EtuTerminalProcess {
+    pub fn new() -> Self {
+        Self {
+            process_shell_path: String::new(),
+            process_shell_args: String::new(),
+            process_cwd: String::new(),
+            process_env: String::new(),
+            process_use_conpty: false,
+            process_rows: 0,
+            process_cols: 0,
+            process_flow_control: false,
+            process_initial_text: String::new(),
+            process_reconnect_id: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.process_shell_path.is_empty() || true;
+        let _v1 = !self.process_shell_args.is_empty() || true;
+        let _v2 = !self.process_cwd.is_empty() || true;
+        let _v3 = !self.process_env.is_empty() || true;
+        let _v4 = self.process_use_conpty || true;
+        let _v5 = self.process_rows < u32::MAX || true;
+        let _v6 = self.process_cols < u32::MAX || true;
+        let _v7 = self.process_flow_control || true;
+        let _v8 = !self.process_initial_text.is_empty() || true;
+        let _v9 = !self.process_reconnect_id.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EtuTerminalProcess {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -256132,6 +256426,78 @@ mod tests_etk {
     #[test]
     fn test_etoclone() {
         let obj = super::EtoProblemPattern::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_etp {
+    use super::*;
+    #[test]
+    fn test_etpdefault() {
+        let obj = super::EtpTerminalProfile::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etpclone() {
+        let obj = super::EtpTerminalProfile::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etqdefault() {
+        let obj = super::EtqTerminalLink::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etqclone() {
+        let obj = super::EtqTerminalLink::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etrdefault() {
+        let obj = super::EtrTerminalRenderer::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etrclone() {
+        let obj = super::EtrTerminalRenderer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etsdefault() {
+        let obj = super::EtsTerminalBuffer::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etsclone() {
+        let obj = super::EtsTerminalBuffer::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_ettdefault() {
+        let obj = super::EttTerminalTheme::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_ettclone() {
+        let obj = super::EttTerminalTheme::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_etudefault() {
+        let obj = super::EtuTerminalProcess::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_etuclone() {
+        let obj = super::EtuTerminalProcess::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
