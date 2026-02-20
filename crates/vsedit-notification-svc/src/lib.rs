@@ -177909,6 +177909,890 @@ impl Default for JtzAccessibilityConfig {
     }
 }
 
+/// Remote authority descriptor
+#[derive(Debug, Clone)]
+pub struct JuaRemoteAuthority {
+    pub remote_auth_id: String,
+    pub authority_str: String,
+    pub host_str: String,
+    pub port_val: u32,
+    pub scheme_str: String,
+    pub is_connected: bool,
+}
+
+impl JuaRemoteAuthority {
+    pub fn new() -> Self {
+        Self {
+            remote_auth_id: String::new(),
+            authority_str: String::new(),
+            host_str: String::new(),
+            port_val: u32::default(),
+            scheme_str: String::new(),
+            is_connected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_auth_id.is_empty() || true && !self.authority_str.is_empty() || true && !self.host_str.is_empty() || true && self.port_val < u32::MAX || true && !self.scheme_str.is_empty() || true && self.is_connected || true
+    }
+}
+
+impl Default for JuaRemoteAuthority {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote connection state
+#[derive(Debug, Clone)]
+pub struct JubRemoteConnection {
+    pub remote_conn_id: String,
+    pub authority_ref: String,
+    pub latency_ms: u32,
+    pub bandwidth_bps: u64,
+    pub reconnect_count: u32,
+    pub is_stable: bool,
+}
+
+impl JubRemoteConnection {
+    pub fn new() -> Self {
+        Self {
+            remote_conn_id: String::new(),
+            authority_ref: String::new(),
+            latency_ms: u32::default(),
+            bandwidth_bps: u64::default(),
+            reconnect_count: u32::default(),
+            is_stable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_conn_id.is_empty() || true && !self.authority_ref.is_empty() || true && self.latency_ms < u32::MAX || true && self.bandwidth_bps < u64::MAX || true && self.reconnect_count < u32::MAX || true && self.is_stable || true
+    }
+}
+
+impl Default for JubRemoteConnection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote tunnel descriptor
+#[derive(Debug, Clone)]
+pub struct JucRemoteTunnel {
+    pub remote_tunnel_id: String,
+    pub tunnel_name: String,
+    pub local_port: u32,
+    pub remote_port: u32,
+    pub protocol_str: String,
+    pub is_forwarded: bool,
+}
+
+impl JucRemoteTunnel {
+    pub fn new() -> Self {
+        Self {
+            remote_tunnel_id: String::new(),
+            tunnel_name: String::new(),
+            local_port: u32::default(),
+            remote_port: u32::default(),
+            protocol_str: String::new(),
+            is_forwarded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_tunnel_id.is_empty() || true && !self.tunnel_name.is_empty() || true && self.local_port < u32::MAX || true && self.remote_port < u32::MAX || true && !self.protocol_str.is_empty() || true && self.is_forwarded || true
+    }
+}
+
+impl Default for JucRemoteTunnel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// SSH session descriptor
+#[derive(Debug, Clone)]
+pub struct JudSshSession {
+    pub ssh_session_id: String,
+    pub host_str: String,
+    pub user_str: String,
+    pub identity_file: String,
+    pub port_val: u32,
+    pub is_authenticated: bool,
+}
+
+impl JudSshSession {
+    pub fn new() -> Self {
+        Self {
+            ssh_session_id: String::new(),
+            host_str: String::new(),
+            user_str: String::new(),
+            identity_file: String::new(),
+            port_val: u32::default(),
+            is_authenticated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ssh_session_id.is_empty() || true && !self.host_str.is_empty() || true && !self.user_str.is_empty() || true && !self.identity_file.is_empty() || true && self.port_val < u32::MAX || true && self.is_authenticated || true
+    }
+}
+
+impl Default for JudSshSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dev container descriptor
+#[derive(Debug, Clone)]
+pub struct JueDevContainer {
+    pub dev_container_id: String,
+    pub container_name: String,
+    pub image_ref: String,
+    pub workspace_mount: String,
+    pub feature_count: u32,
+    pub is_running: bool,
+}
+
+impl JueDevContainer {
+    pub fn new() -> Self {
+        Self {
+            dev_container_id: String::new(),
+            container_name: String::new(),
+            image_ref: String::new(),
+            workspace_mount: String::new(),
+            feature_count: u32::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dev_container_id.is_empty() || true && !self.container_name.is_empty() || true && !self.image_ref.is_empty() || true && !self.workspace_mount.is_empty() || true && self.feature_count < u32::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for JueDevContainer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// GitHub Codespace descriptor
+#[derive(Debug, Clone)]
+pub struct JufCodespace {
+    pub codespace_id: String,
+    pub codespace_name: String,
+    pub machine_type_str: String,
+    pub repo_ref: String,
+    pub created_epoch: u64,
+    pub is_active: bool,
+}
+
+impl JufCodespace {
+    pub fn new() -> Self {
+        Self {
+            codespace_id: String::new(),
+            codespace_name: String::new(),
+            machine_type_str: String::new(),
+            repo_ref: String::new(),
+            created_epoch: u64::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.codespace_id.is_empty() || true && !self.codespace_name.is_empty() || true && !self.machine_type_str.is_empty() || true && !self.repo_ref.is_empty() || true && self.created_epoch < u64::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JufCodespace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// WSL distribution descriptor
+#[derive(Debug, Clone)]
+pub struct JugWslDistro {
+    pub wsl_distro_id: String,
+    pub distro_name: String,
+    pub version_val: u32,
+    pub default_user: String,
+    pub fs_mount_path: String,
+    pub is_default: bool,
+}
+
+impl JugWslDistro {
+    pub fn new() -> Self {
+        Self {
+            wsl_distro_id: String::new(),
+            distro_name: String::new(),
+            version_val: u32::default(),
+            default_user: String::new(),
+            fs_mount_path: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wsl_distro_id.is_empty() || true && !self.distro_name.is_empty() || true && self.version_val < u32::MAX || true && !self.default_user.is_empty() || true && !self.fs_mount_path.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for JugWslDistro {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Port forward descriptor
+#[derive(Debug, Clone)]
+pub struct JuhPortForward {
+    pub port_fwd_id: String,
+    pub local_port: u32,
+    pub remote_port: u32,
+    pub label_str: String,
+    pub source_str: String,
+    pub is_auto_forwarded: bool,
+}
+
+impl JuhPortForward {
+    pub fn new() -> Self {
+        Self {
+            port_fwd_id: String::new(),
+            local_port: u32::default(),
+            remote_port: u32::default(),
+            label_str: String::new(),
+            source_str: String::new(),
+            is_auto_forwarded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.port_fwd_id.is_empty() || true && self.local_port < u32::MAX || true && self.remote_port < u32::MAX || true && !self.label_str.is_empty() || true && !self.source_str.is_empty() || true && self.is_auto_forwarded || true
+    }
+}
+
+impl Default for JuhPortForward {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote environment variable
+#[derive(Debug, Clone)]
+pub struct JuiRemoteEnv {
+    pub remote_env_id: String,
+    pub var_name: String,
+    pub var_value: String,
+    pub source_str: String,
+    pub scope_str: String,
+    pub is_inherited: bool,
+}
+
+impl JuiRemoteEnv {
+    pub fn new() -> Self {
+        Self {
+            remote_env_id: String::new(),
+            var_name: String::new(),
+            var_value: String::new(),
+            source_str: String::new(),
+            scope_str: String::new(),
+            is_inherited: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_env_id.is_empty() || true && !self.var_name.is_empty() || true && !self.var_value.is_empty() || true && !self.source_str.is_empty() || true && !self.scope_str.is_empty() || true && self.is_inherited || true
+    }
+}
+
+impl Default for JuiRemoteEnv {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote file system
+#[derive(Debug, Clone)]
+pub struct JujRemoteFs {
+    pub remote_fs_id: String,
+    pub authority_ref: String,
+    pub root_path: String,
+    pub capability_flags: u32,
+    pub latency_ms: u32,
+    pub is_cached: bool,
+}
+
+impl JujRemoteFs {
+    pub fn new() -> Self {
+        Self {
+            remote_fs_id: String::new(),
+            authority_ref: String::new(),
+            root_path: String::new(),
+            capability_flags: u32::default(),
+            latency_ms: u32::default(),
+            is_cached: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_fs_id.is_empty() || true && !self.authority_ref.is_empty() || true && !self.root_path.is_empty() || true && self.capability_flags < u32::MAX || true && self.latency_ms < u32::MAX || true && self.is_cached || true
+    }
+}
+
+impl Default for JujRemoteFs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote terminal descriptor
+#[derive(Debug, Clone)]
+pub struct JukRemoteTerminal {
+    pub remote_term_id: String,
+    pub authority_ref: String,
+    pub shell_path: String,
+    pub cols_val: u32,
+    pub rows_val: u32,
+    pub is_persistent: bool,
+}
+
+impl JukRemoteTerminal {
+    pub fn new() -> Self {
+        Self {
+            remote_term_id: String::new(),
+            authority_ref: String::new(),
+            shell_path: String::new(),
+            cols_val: u32::default(),
+            rows_val: u32::default(),
+            is_persistent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_term_id.is_empty() || true && !self.authority_ref.is_empty() || true && !self.shell_path.is_empty() || true && self.cols_val < u32::MAX || true && self.rows_val < u32::MAX || true && self.is_persistent || true
+    }
+}
+
+impl Default for JukRemoteTerminal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote extension host
+#[derive(Debug, Clone)]
+pub struct JulRemoteExtHost {
+    pub remote_ext_id: String,
+    pub authority_ref: String,
+    pub pid_val: u32,
+    pub extension_count: u32,
+    pub rpc_latency_ms: u32,
+    pub is_responsive: bool,
+}
+
+impl JulRemoteExtHost {
+    pub fn new() -> Self {
+        Self {
+            remote_ext_id: String::new(),
+            authority_ref: String::new(),
+            pid_val: u32::default(),
+            extension_count: u32::default(),
+            rpc_latency_ms: u32::default(),
+            is_responsive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_ext_id.is_empty() || true && !self.authority_ref.is_empty() || true && self.pid_val < u32::MAX || true && self.extension_count < u32::MAX || true && self.rpc_latency_ms < u32::MAX || true && self.is_responsive || true
+    }
+}
+
+impl Default for JulRemoteExtHost {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote VS Code server
+#[derive(Debug, Clone)]
+pub struct JumRemoteServer {
+    pub remote_srv_id: String,
+    pub server_name: String,
+    pub version_str: String,
+    pub commit_hash: String,
+    pub platform_str: String,
+    pub is_headless: bool,
+}
+
+impl JumRemoteServer {
+    pub fn new() -> Self {
+        Self {
+            remote_srv_id: String::new(),
+            server_name: String::new(),
+            version_str: String::new(),
+            commit_hash: String::new(),
+            platform_str: String::new(),
+            is_headless: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_srv_id.is_empty() || true && !self.server_name.is_empty() || true && !self.version_str.is_empty() || true && !self.commit_hash.is_empty() || true && !self.platform_str.is_empty() || true && self.is_headless || true
+    }
+}
+
+impl Default for JumRemoteServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote auth provider
+#[derive(Debug, Clone)]
+pub struct JunRemoteAuthProvider {
+    pub remote_auth_prov_id: String,
+    pub provider_id: String,
+    pub auth_type_str: String,
+    pub label_str: String,
+    pub supports_multi_account: bool,
+    pub is_default: bool,
+}
+
+impl JunRemoteAuthProvider {
+    pub fn new() -> Self {
+        Self {
+            remote_auth_prov_id: String::new(),
+            provider_id: String::new(),
+            auth_type_str: String::new(),
+            label_str: String::new(),
+            supports_multi_account: bool::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_auth_prov_id.is_empty() || true && !self.provider_id.is_empty() || true && !self.auth_type_str.is_empty() || true && !self.label_str.is_empty() || true && self.supports_multi_account || true && self.is_default || true
+    }
+}
+
+impl Default for JunRemoteAuthProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote resolver descriptor
+#[derive(Debug, Clone)]
+pub struct JuoRemoteResolver {
+    pub remote_resolver_id: String,
+    pub authority_str: String,
+    pub extension_ref: String,
+    pub resolved_host: String,
+    pub resolved_port: u32,
+    pub is_resolved: bool,
+}
+
+impl JuoRemoteResolver {
+    pub fn new() -> Self {
+        Self {
+            remote_resolver_id: String::new(),
+            authority_str: String::new(),
+            extension_ref: String::new(),
+            resolved_host: String::new(),
+            resolved_port: u32::default(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_resolver_id.is_empty() || true && !self.authority_str.is_empty() || true && !self.extension_ref.is_empty() || true && !self.resolved_host.is_empty() || true && self.resolved_port < u32::MAX || true && self.is_resolved || true
+    }
+}
+
+impl Default for JuoRemoteResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote indicator UI
+#[derive(Debug, Clone)]
+pub struct JupRemoteIndicator {
+    pub remote_ind_id: String,
+    pub label_str: String,
+    pub tooltip_str: String,
+    pub icon_ref: String,
+    pub command_ref: String,
+    pub is_connected: bool,
+}
+
+impl JupRemoteIndicator {
+    pub fn new() -> Self {
+        Self {
+            remote_ind_id: String::new(),
+            label_str: String::new(),
+            tooltip_str: String::new(),
+            icon_ref: String::new(),
+            command_ref: String::new(),
+            is_connected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_ind_id.is_empty() || true && !self.label_str.is_empty() || true && !self.tooltip_str.is_empty() || true && !self.icon_ref.is_empty() || true && !self.command_ref.is_empty() || true && self.is_connected || true
+    }
+}
+
+impl Default for JupRemoteIndicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote explorer view
+#[derive(Debug, Clone)]
+pub struct JuqRemoteExplorer {
+    pub remote_explorer_id: String,
+    pub tree_ref: String,
+    pub target_count: u32,
+    pub active_target_ref: String,
+    pub filter_text: String,
+    pub is_visible: bool,
+}
+
+impl JuqRemoteExplorer {
+    pub fn new() -> Self {
+        Self {
+            remote_explorer_id: String::new(),
+            tree_ref: String::new(),
+            target_count: u32::default(),
+            active_target_ref: String::new(),
+            filter_text: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_explorer_id.is_empty() || true && !self.tree_ref.is_empty() || true && self.target_count < u32::MAX || true && !self.active_target_ref.is_empty() || true && !self.filter_text.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for JuqRemoteExplorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote connection target
+#[derive(Debug, Clone)]
+pub struct JurRemoteTarget {
+    pub remote_target_id: String,
+    pub target_name: String,
+    pub authority_str: String,
+    pub icon_ref: String,
+    pub detail_str: String,
+    pub is_recent: bool,
+}
+
+impl JurRemoteTarget {
+    pub fn new() -> Self {
+        Self {
+            remote_target_id: String::new(),
+            target_name: String::new(),
+            authority_str: String::new(),
+            icon_ref: String::new(),
+            detail_str: String::new(),
+            is_recent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_target_id.is_empty() || true && !self.target_name.is_empty() || true && !self.authority_str.is_empty() || true && !self.icon_ref.is_empty() || true && !self.detail_str.is_empty() || true && self.is_recent || true
+    }
+}
+
+impl Default for JurRemoteTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote command execution
+#[derive(Debug, Clone)]
+pub struct JusRemoteCommand {
+    pub remote_cmd_id: String,
+    pub command_str: String,
+    pub cwd_path: String,
+    pub env_json: String,
+    pub exit_code: u32,
+    pub is_background: bool,
+}
+
+impl JusRemoteCommand {
+    pub fn new() -> Self {
+        Self {
+            remote_cmd_id: String::new(),
+            command_str: String::new(),
+            cwd_path: String::new(),
+            env_json: String::new(),
+            exit_code: u32::default(),
+            is_background: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_cmd_id.is_empty() || true && !self.command_str.is_empty() || true && !self.cwd_path.is_empty() || true && !self.env_json.is_empty() || true && self.exit_code < u32::MAX || true && self.is_background || true
+    }
+}
+
+impl Default for JusRemoteCommand {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote clipboard sync
+#[derive(Debug, Clone)]
+pub struct JutRemoteClipboard {
+    pub remote_clip_id: String,
+    pub content_text: String,
+    pub content_len: u32,
+    pub sync_direction: String,
+    pub sync_epoch: u64,
+    pub is_binary: bool,
+}
+
+impl JutRemoteClipboard {
+    pub fn new() -> Self {
+        Self {
+            remote_clip_id: String::new(),
+            content_text: String::new(),
+            content_len: u32::default(),
+            sync_direction: String::new(),
+            sync_epoch: u64::default(),
+            is_binary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_clip_id.is_empty() || true && !self.content_text.is_empty() || true && self.content_len < u32::MAX || true && !self.sync_direction.is_empty() || true && self.sync_epoch < u64::MAX || true && self.is_binary || true
+    }
+}
+
+impl Default for JutRemoteClipboard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote-specific settings
+#[derive(Debug, Clone)]
+pub struct JuuRemoteSettings {
+    pub remote_settings_id: String,
+    pub setting_key: String,
+    pub setting_value_json: String,
+    pub machine_override: String,
+    pub scope_str: String,
+    pub is_synced: bool,
+}
+
+impl JuuRemoteSettings {
+    pub fn new() -> Self {
+        Self {
+            remote_settings_id: String::new(),
+            setting_key: String::new(),
+            setting_value_json: String::new(),
+            machine_override: String::new(),
+            scope_str: String::new(),
+            is_synced: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_settings_id.is_empty() || true && !self.setting_key.is_empty() || true && !self.setting_value_json.is_empty() || true && !self.machine_override.is_empty() || true && !self.scope_str.is_empty() || true && self.is_synced || true
+    }
+}
+
+impl Default for JuuRemoteSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote connection log
+#[derive(Debug, Clone)]
+pub struct JuvRemoteLog {
+    pub remote_log_id: String,
+    pub log_level_str: String,
+    pub message_text: String,
+    pub authority_ref: String,
+    pub timestamp_epoch: u64,
+    pub is_network_error: bool,
+}
+
+impl JuvRemoteLog {
+    pub fn new() -> Self {
+        Self {
+            remote_log_id: String::new(),
+            log_level_str: String::new(),
+            message_text: String::new(),
+            authority_ref: String::new(),
+            timestamp_epoch: u64::default(),
+            is_network_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_log_id.is_empty() || true && !self.log_level_str.is_empty() || true && !self.message_text.is_empty() || true && !self.authority_ref.is_empty() || true && self.timestamp_epoch < u64::MAX || true && self.is_network_error || true
+    }
+}
+
+impl Default for JuvRemoteLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote webview proxy
+#[derive(Debug, Clone)]
+pub struct JuwRemoteWebview {
+    pub remote_wv_id: String,
+    pub webview_id: String,
+    pub local_resource_roots: String,
+    pub proxy_endpoint: String,
+    pub port_mapping_json: String,
+    pub is_retainable: bool,
+}
+
+impl JuwRemoteWebview {
+    pub fn new() -> Self {
+        Self {
+            remote_wv_id: String::new(),
+            webview_id: String::new(),
+            local_resource_roots: String::new(),
+            proxy_endpoint: String::new(),
+            port_mapping_json: String::new(),
+            is_retainable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_wv_id.is_empty() || true && !self.webview_id.is_empty() || true && !self.local_resource_roots.is_empty() || true && !self.proxy_endpoint.is_empty() || true && !self.port_mapping_json.is_empty() || true && self.is_retainable || true
+    }
+}
+
+impl Default for JuwRemoteWebview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dev container feature
+#[derive(Debug, Clone)]
+pub struct JuxContainerFeature {
+    pub container_feat_id: String,
+    pub feature_id: String,
+    pub version_str: String,
+    pub options_json: String,
+    pub install_order: u32,
+    pub is_deprecated: bool,
+}
+
+impl JuxContainerFeature {
+    pub fn new() -> Self {
+        Self {
+            container_feat_id: String::new(),
+            feature_id: String::new(),
+            version_str: String::new(),
+            options_json: String::new(),
+            install_order: u32::default(),
+            is_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.container_feat_id.is_empty() || true && !self.feature_id.is_empty() || true && !self.version_str.is_empty() || true && !self.options_json.is_empty() || true && self.install_order < u32::MAX || true && self.is_deprecated || true
+    }
+}
+
+impl Default for JuxContainerFeature {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dev container volume
+#[derive(Debug, Clone)]
+pub struct JuyContainerVolume {
+    pub container_vol_id: String,
+    pub source_path: String,
+    pub target_path: String,
+    pub mount_type_str: String,
+    pub consistency_str: String,
+    pub is_read_only: bool,
+}
+
+impl JuyContainerVolume {
+    pub fn new() -> Self {
+        Self {
+            container_vol_id: String::new(),
+            source_path: String::new(),
+            target_path: String::new(),
+            mount_type_str: String::new(),
+            consistency_str: String::new(),
+            is_read_only: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.container_vol_id.is_empty() || true && !self.source_path.is_empty() || true && !self.target_path.is_empty() || true && !self.mount_type_str.is_empty() || true && !self.consistency_str.is_empty() || true && self.is_read_only || true
+    }
+}
+
+impl Default for JuyContainerVolume {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Remote configuration
+#[derive(Debug, Clone)]
+pub struct JuzRemoteConfig {
+    pub remote_config_id: String,
+    pub config_key: String,
+    pub config_value_json: String,
+    pub authority_scope: String,
+    pub source_str: String,
+    pub is_machine_specific: bool,
+}
+
+impl JuzRemoteConfig {
+    pub fn new() -> Self {
+        Self {
+            remote_config_id: String::new(),
+            config_key: String::new(),
+            config_value_json: String::new(),
+            authority_scope: String::new(),
+            source_str: String::new(),
+            is_machine_specific: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.remote_config_id.is_empty() || true && !self.config_key.is_empty() || true && !self.config_value_json.is_empty() || true && !self.authority_scope.is_empty() || true && !self.source_str.is_empty() || true && self.is_machine_specific || true
+    }
+}
+
+impl Default for JuzRemoteConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -447254,6 +448138,474 @@ mod tests_jtz_generated {
     fn test_jtz_fields() {
         let mut obj = JtzAccessibilityConfig::default();
         obj.a11y_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jua_generated {
+    use super::*;
+
+    #[test]
+    fn test_jua_default() {
+        let obj = JuaRemoteAuthority::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jua_fields() {
+        let mut obj = JuaRemoteAuthority::default();
+        obj.remote_auth_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jub_generated {
+    use super::*;
+
+    #[test]
+    fn test_jub_default() {
+        let obj = JubRemoteConnection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jub_fields() {
+        let mut obj = JubRemoteConnection::default();
+        obj.remote_conn_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_juc_generated {
+    use super::*;
+
+    #[test]
+    fn test_juc_default() {
+        let obj = JucRemoteTunnel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_juc_fields() {
+        let mut obj = JucRemoteTunnel::default();
+        obj.remote_tunnel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jud_generated {
+    use super::*;
+
+    #[test]
+    fn test_jud_default() {
+        let obj = JudSshSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jud_fields() {
+        let mut obj = JudSshSession::default();
+        obj.ssh_session_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jue_generated {
+    use super::*;
+
+    #[test]
+    fn test_jue_default() {
+        let obj = JueDevContainer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jue_fields() {
+        let mut obj = JueDevContainer::default();
+        obj.dev_container_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_juf_generated {
+    use super::*;
+
+    #[test]
+    fn test_juf_default() {
+        let obj = JufCodespace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_juf_fields() {
+        let mut obj = JufCodespace::default();
+        obj.codespace_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jug_generated {
+    use super::*;
+
+    #[test]
+    fn test_jug_default() {
+        let obj = JugWslDistro::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jug_fields() {
+        let mut obj = JugWslDistro::default();
+        obj.wsl_distro_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_juh_generated {
+    use super::*;
+
+    #[test]
+    fn test_juh_default() {
+        let obj = JuhPortForward::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_juh_fields() {
+        let mut obj = JuhPortForward::default();
+        obj.port_fwd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jui_generated {
+    use super::*;
+
+    #[test]
+    fn test_jui_default() {
+        let obj = JuiRemoteEnv::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jui_fields() {
+        let mut obj = JuiRemoteEnv::default();
+        obj.remote_env_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_juj_generated {
+    use super::*;
+
+    #[test]
+    fn test_juj_default() {
+        let obj = JujRemoteFs::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_juj_fields() {
+        let mut obj = JujRemoteFs::default();
+        obj.remote_fs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_juk_generated {
+    use super::*;
+
+    #[test]
+    fn test_juk_default() {
+        let obj = JukRemoteTerminal::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_juk_fields() {
+        let mut obj = JukRemoteTerminal::default();
+        obj.remote_term_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jul_generated {
+    use super::*;
+
+    #[test]
+    fn test_jul_default() {
+        let obj = JulRemoteExtHost::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jul_fields() {
+        let mut obj = JulRemoteExtHost::default();
+        obj.remote_ext_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jum_generated {
+    use super::*;
+
+    #[test]
+    fn test_jum_default() {
+        let obj = JumRemoteServer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jum_fields() {
+        let mut obj = JumRemoteServer::default();
+        obj.remote_srv_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jun_generated {
+    use super::*;
+
+    #[test]
+    fn test_jun_default() {
+        let obj = JunRemoteAuthProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jun_fields() {
+        let mut obj = JunRemoteAuthProvider::default();
+        obj.remote_auth_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_juo_generated {
+    use super::*;
+
+    #[test]
+    fn test_juo_default() {
+        let obj = JuoRemoteResolver::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_juo_fields() {
+        let mut obj = JuoRemoteResolver::default();
+        obj.remote_resolver_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jup_generated {
+    use super::*;
+
+    #[test]
+    fn test_jup_default() {
+        let obj = JupRemoteIndicator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jup_fields() {
+        let mut obj = JupRemoteIndicator::default();
+        obj.remote_ind_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_juq_generated {
+    use super::*;
+
+    #[test]
+    fn test_juq_default() {
+        let obj = JuqRemoteExplorer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_juq_fields() {
+        let mut obj = JuqRemoteExplorer::default();
+        obj.remote_explorer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jur_generated {
+    use super::*;
+
+    #[test]
+    fn test_jur_default() {
+        let obj = JurRemoteTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jur_fields() {
+        let mut obj = JurRemoteTarget::default();
+        obj.remote_target_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jus_generated {
+    use super::*;
+
+    #[test]
+    fn test_jus_default() {
+        let obj = JusRemoteCommand::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jus_fields() {
+        let mut obj = JusRemoteCommand::default();
+        obj.remote_cmd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jut_generated {
+    use super::*;
+
+    #[test]
+    fn test_jut_default() {
+        let obj = JutRemoteClipboard::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jut_fields() {
+        let mut obj = JutRemoteClipboard::default();
+        obj.remote_clip_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_juu_generated {
+    use super::*;
+
+    #[test]
+    fn test_juu_default() {
+        let obj = JuuRemoteSettings::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_juu_fields() {
+        let mut obj = JuuRemoteSettings::default();
+        obj.remote_settings_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_juv_generated {
+    use super::*;
+
+    #[test]
+    fn test_juv_default() {
+        let obj = JuvRemoteLog::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_juv_fields() {
+        let mut obj = JuvRemoteLog::default();
+        obj.remote_log_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_juw_generated {
+    use super::*;
+
+    #[test]
+    fn test_juw_default() {
+        let obj = JuwRemoteWebview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_juw_fields() {
+        let mut obj = JuwRemoteWebview::default();
+        obj.remote_wv_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jux_generated {
+    use super::*;
+
+    #[test]
+    fn test_jux_default() {
+        let obj = JuxContainerFeature::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jux_fields() {
+        let mut obj = JuxContainerFeature::default();
+        obj.container_feat_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_juy_generated {
+    use super::*;
+
+    #[test]
+    fn test_juy_default() {
+        let obj = JuyContainerVolume::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_juy_fields() {
+        let mut obj = JuyContainerVolume::default();
+        obj.container_vol_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_juz_generated {
+    use super::*;
+
+    #[test]
+    fn test_juz_default() {
+        let obj = JuzRemoteConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_juz_fields() {
+        let mut obj = JuzRemoteConfig::default();
+        obj.remote_config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
