@@ -53106,6 +53106,459 @@ impl Default for EyoInputBox {
 }
 
 
+/// Select box/dropdown widget types
+#[derive(Debug, Clone)]
+pub struct EypSelectBox {
+    pub select_options: String,
+    pub select_index: u32,
+    pub select_disabled: bool,
+    pub select_tooltip: String,
+    pub select_width: u32,
+    pub select_bg_color: String,
+    pub select_fg_color: String,
+    pub select_border_color: String,
+    pub select_focus_border_color: String,
+    pub select_max_visible: u32,
+}
+
+impl EypSelectBox {
+    pub fn new() -> Self {
+        Self {
+            select_options: String::new(),
+            select_index: u32::default(),
+            select_disabled: bool::default(),
+            select_tooltip: String::new(),
+            select_width: u32::default(),
+            select_bg_color: String::new(),
+            select_fg_color: String::new(),
+            select_border_color: String::new(),
+            select_focus_border_color: String::new(),
+            select_max_visible: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.select_options.is_empty() || true && self.select_index < u32::MAX || true && self.select_disabled || true && !self.select_tooltip.is_empty() || true && self.select_width < u32::MAX || true && !self.select_bg_color.is_empty() || true && !self.select_fg_color.is_empty() || true && !self.select_border_color.is_empty() || true && !self.select_focus_border_color.is_empty() || true && self.select_max_visible < u32::MAX || true
+    }
+}
+
+impl Default for EypSelectBox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Checkbox widget types
+#[derive(Debug, Clone)]
+pub struct EyqCheckbox {
+    pub checkbox_checked: bool,
+    pub checkbox_label: String,
+    pub checkbox_title: String,
+    pub checkbox_disabled: bool,
+    pub checkbox_indeterminate: bool,
+    pub checkbox_color: String,
+    pub checkbox_border_color: String,
+    pub checkbox_icon: String,
+    pub checkbox_focus_indicator: String,
+    pub checkbox_size: u32,
+}
+
+impl EyqCheckbox {
+    pub fn new() -> Self {
+        Self {
+            checkbox_checked: bool::default(),
+            checkbox_label: String::new(),
+            checkbox_title: String::new(),
+            checkbox_disabled: bool::default(),
+            checkbox_indeterminate: bool::default(),
+            checkbox_color: String::new(),
+            checkbox_border_color: String::new(),
+            checkbox_icon: String::new(),
+            checkbox_focus_indicator: String::new(),
+            checkbox_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.checkbox_checked || true && !self.checkbox_label.is_empty() || true && !self.checkbox_title.is_empty() || true && self.checkbox_disabled || true && self.checkbox_indeterminate || true && !self.checkbox_color.is_empty() || true && !self.checkbox_border_color.is_empty() || true && !self.checkbox_icon.is_empty() || true && !self.checkbox_focus_indicator.is_empty() || true && self.checkbox_size < u32::MAX || true
+    }
+}
+
+impl Default for EyqCheckbox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Toggle switch widget types
+#[derive(Debug, Clone)]
+pub struct EyrToggle {
+    pub toggle_on: bool,
+    pub toggle_label: String,
+    pub toggle_disabled: bool,
+    pub toggle_on_color: String,
+    pub toggle_off_color: String,
+    pub toggle_thumb_color: String,
+    pub toggle_width: u32,
+    pub toggle_height: u32,
+    pub toggle_border_radius: u32,
+    pub toggle_animation: bool,
+}
+
+impl EyrToggle {
+    pub fn new() -> Self {
+        Self {
+            toggle_on: bool::default(),
+            toggle_label: String::new(),
+            toggle_disabled: bool::default(),
+            toggle_on_color: String::new(),
+            toggle_off_color: String::new(),
+            toggle_thumb_color: String::new(),
+            toggle_width: u32::default(),
+            toggle_height: u32::default(),
+            toggle_border_radius: u32::default(),
+            toggle_animation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.toggle_on || true && !self.toggle_label.is_empty() || true && self.toggle_disabled || true && !self.toggle_on_color.is_empty() || true && !self.toggle_off_color.is_empty() || true && !self.toggle_thumb_color.is_empty() || true && self.toggle_width < u32::MAX || true && self.toggle_height < u32::MAX || true && self.toggle_border_radius < u32::MAX || true && self.toggle_animation || true
+    }
+}
+
+impl Default for EyrToggle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Button widget types
+#[derive(Debug, Clone)]
+pub struct EysButton {
+    pub button_label: String,
+    pub button_icon: String,
+    pub button_tooltip: String,
+    pub button_disabled: bool,
+    pub button_secondary: bool,
+    pub button_bg_color: String,
+    pub button_fg_color: String,
+    pub button_border_color: String,
+    pub button_hover_bg_color: String,
+    pub button_width: u32,
+}
+
+impl EysButton {
+    pub fn new() -> Self {
+        Self {
+            button_label: String::new(),
+            button_icon: String::new(),
+            button_tooltip: String::new(),
+            button_disabled: bool::default(),
+            button_secondary: bool::default(),
+            button_bg_color: String::new(),
+            button_fg_color: String::new(),
+            button_border_color: String::new(),
+            button_hover_bg_color: String::new(),
+            button_width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.button_label.is_empty() || true && !self.button_icon.is_empty() || true && !self.button_tooltip.is_empty() || true && self.button_disabled || true && self.button_secondary || true && !self.button_bg_color.is_empty() || true && !self.button_fg_color.is_empty() || true && !self.button_border_color.is_empty() || true && !self.button_hover_bg_color.is_empty() || true && self.button_width < u32::MAX || true
+    }
+}
+
+impl Default for EysButton {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Dropdown/combo-box widget types
+#[derive(Debug, Clone)]
+pub struct EytDropdown {
+    pub dropdown_value: String,
+    pub dropdown_items: String,
+    pub dropdown_placeholder: String,
+    pub dropdown_disabled: bool,
+    pub dropdown_max_visible: u32,
+    pub dropdown_width: u32,
+    pub dropdown_bg_color: String,
+    pub dropdown_fg_color: String,
+    pub dropdown_border_color: String,
+    pub dropdown_focus_color: String,
+}
+
+impl EytDropdown {
+    pub fn new() -> Self {
+        Self {
+            dropdown_value: String::new(),
+            dropdown_items: String::new(),
+            dropdown_placeholder: String::new(),
+            dropdown_disabled: bool::default(),
+            dropdown_max_visible: u32::default(),
+            dropdown_width: u32::default(),
+            dropdown_bg_color: String::new(),
+            dropdown_fg_color: String::new(),
+            dropdown_border_color: String::new(),
+            dropdown_focus_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dropdown_value.is_empty() || true && !self.dropdown_items.is_empty() || true && !self.dropdown_placeholder.is_empty() || true && self.dropdown_disabled || true && self.dropdown_max_visible < u32::MAX || true && self.dropdown_width < u32::MAX || true && !self.dropdown_bg_color.is_empty() || true && !self.dropdown_fg_color.is_empty() || true && !self.dropdown_border_color.is_empty() || true && !self.dropdown_focus_color.is_empty() || true
+    }
+}
+
+impl Default for EytDropdown {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Slider/range widget types
+#[derive(Debug, Clone)]
+pub struct EyuSlider {
+    pub slider_value: f64,
+    pub slider_min: f64,
+    pub slider_max: f64,
+    pub slider_step: f64,
+    pub slider_disabled: bool,
+    pub slider_width: u32,
+    pub slider_track_color: String,
+    pub slider_thumb_color: String,
+    pub slider_active_color: String,
+    pub slider_label_format: String,
+}
+
+impl EyuSlider {
+    pub fn new() -> Self {
+        Self {
+            slider_value: f64::default(),
+            slider_min: f64::default(),
+            slider_max: f64::default(),
+            slider_step: f64::default(),
+            slider_disabled: bool::default(),
+            slider_width: u32::default(),
+            slider_track_color: String::new(),
+            slider_thumb_color: String::new(),
+            slider_active_color: String::new(),
+            slider_label_format: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.slider_value.is_finite() || true && self.slider_min.is_finite() || true && self.slider_max.is_finite() || true && self.slider_step.is_finite() || true && self.slider_disabled || true && self.slider_width < u32::MAX || true && !self.slider_track_color.is_empty() || true && !self.slider_thumb_color.is_empty() || true && !self.slider_active_color.is_empty() || true && !self.slider_label_format.is_empty() || true
+    }
+}
+
+impl Default for EyuSlider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Multi-line text area widget types
+#[derive(Debug, Clone)]
+pub struct EyvTextArea {
+    pub textarea_value: String,
+    pub textarea_placeholder: String,
+    pub textarea_rows: u32,
+    pub textarea_cols: u32,
+    pub textarea_readonly: bool,
+    pub textarea_disabled: bool,
+    pub textarea_max_length: u32,
+    pub textarea_word_wrap: bool,
+    pub textarea_bg_color: String,
+    pub textarea_border_color: String,
+}
+
+impl EyvTextArea {
+    pub fn new() -> Self {
+        Self {
+            textarea_value: String::new(),
+            textarea_placeholder: String::new(),
+            textarea_rows: u32::default(),
+            textarea_cols: u32::default(),
+            textarea_readonly: bool::default(),
+            textarea_disabled: bool::default(),
+            textarea_max_length: u32::default(),
+            textarea_word_wrap: bool::default(),
+            textarea_bg_color: String::new(),
+            textarea_border_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.textarea_value.is_empty() || true && !self.textarea_placeholder.is_empty() || true && self.textarea_rows < u32::MAX || true && self.textarea_cols < u32::MAX || true && self.textarea_readonly || true && self.textarea_disabled || true && self.textarea_max_length < u32::MAX || true && self.textarea_word_wrap || true && !self.textarea_bg_color.is_empty() || true && !self.textarea_border_color.is_empty() || true
+    }
+}
+
+impl Default for EyvTextArea {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Highlighted label (fuzzy match) widget types
+#[derive(Debug, Clone)]
+pub struct EywHighlightedLabel {
+    pub highlight_text: String,
+    pub highlight_matches: String,
+    pub highlight_color: String,
+    pub highlight_bg_color: String,
+    pub highlight_font_weight: String,
+    pub highlight_escape_new_lines: bool,
+    pub highlight_is_case_sensitive: bool,
+    pub highlight_label_class: String,
+    pub highlight_title: String,
+    pub highlight_max_length: u32,
+}
+
+impl EywHighlightedLabel {
+    pub fn new() -> Self {
+        Self {
+            highlight_text: String::new(),
+            highlight_matches: String::new(),
+            highlight_color: String::new(),
+            highlight_bg_color: String::new(),
+            highlight_font_weight: String::new(),
+            highlight_escape_new_lines: bool::default(),
+            highlight_is_case_sensitive: bool::default(),
+            highlight_label_class: String::new(),
+            highlight_title: String::new(),
+            highlight_max_length: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.highlight_text.is_empty() || true && !self.highlight_matches.is_empty() || true && !self.highlight_color.is_empty() || true && !self.highlight_bg_color.is_empty() || true && !self.highlight_font_weight.is_empty() || true && self.highlight_escape_new_lines || true && self.highlight_is_case_sensitive || true && !self.highlight_label_class.is_empty() || true && !self.highlight_title.is_empty() || true && self.highlight_max_length < u32::MAX || true
+    }
+}
+
+impl Default for EywHighlightedLabel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Action bar widget types
+#[derive(Debug, Clone)]
+pub struct EyxActionBar {
+    pub action_bar_id: String,
+    pub action_bar_actions_count: u32,
+    pub action_bar_orientation: String,
+    pub action_bar_animated: bool,
+    pub action_bar_has_overflow: bool,
+    pub action_bar_trigger_keys: String,
+    pub action_bar_focus_on_hover: bool,
+    pub action_bar_min_width: u32,
+    pub action_bar_bg_color: String,
+    pub action_bar_border_color: String,
+}
+
+impl EyxActionBar {
+    pub fn new() -> Self {
+        Self {
+            action_bar_id: String::new(),
+            action_bar_actions_count: u32::default(),
+            action_bar_orientation: String::new(),
+            action_bar_animated: bool::default(),
+            action_bar_has_overflow: bool::default(),
+            action_bar_trigger_keys: String::new(),
+            action_bar_focus_on_hover: bool::default(),
+            action_bar_min_width: u32::default(),
+            action_bar_bg_color: String::new(),
+            action_bar_border_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_bar_id.is_empty() || true && self.action_bar_actions_count < u32::MAX || true && !self.action_bar_orientation.is_empty() || true && self.action_bar_animated || true && self.action_bar_has_overflow || true && !self.action_bar_trigger_keys.is_empty() || true && self.action_bar_focus_on_hover || true && self.action_bar_min_width < u32::MAX || true && !self.action_bar_bg_color.is_empty() || true && !self.action_bar_border_color.is_empty() || true
+    }
+}
+
+impl Default for EyxActionBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Keybinding label display widget types
+#[derive(Debug, Clone)]
+pub struct EyyKeybindingLabel {
+    pub keybinding_label: String,
+    pub keybinding_os: String,
+    pub keybinding_parts_count: u32,
+    pub keybinding_is_chord: bool,
+    pub keybinding_display_label: String,
+    pub keybinding_aria_label: String,
+    pub keybinding_electron_accel: String,
+    pub keybinding_user_settings_label: String,
+    pub keybinding_font_size: u32,
+    pub keybinding_opacity: f64,
+}
+
+impl EyyKeybindingLabel {
+    pub fn new() -> Self {
+        Self {
+            keybinding_label: String::new(),
+            keybinding_os: String::new(),
+            keybinding_parts_count: u32::default(),
+            keybinding_is_chord: bool::default(),
+            keybinding_display_label: String::new(),
+            keybinding_aria_label: String::new(),
+            keybinding_electron_accel: String::new(),
+            keybinding_user_settings_label: String::new(),
+            keybinding_font_size: u32::default(),
+            keybinding_opacity: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.keybinding_label.is_empty() || true && !self.keybinding_os.is_empty() || true && self.keybinding_parts_count < u32::MAX || true && self.keybinding_is_chord || true && !self.keybinding_display_label.is_empty() || true && !self.keybinding_aria_label.is_empty() || true && !self.keybinding_electron_accel.is_empty() || true && !self.keybinding_user_settings_label.is_empty() || true && self.keybinding_font_size < u32::MAX || true && self.keybinding_opacity.is_finite() || true
+    }
+}
+
+impl Default for EyyKeybindingLabel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Hover widget/tooltip types
+#[derive(Debug, Clone)]
+pub struct EyzHoverWidget {
+    pub hover_content: String,
+    pub hover_target_x: u32,
+    pub hover_target_y: u32,
+    pub hover_position: String,
+    pub hover_show_pointer: bool,
+    pub hover_max_width: u32,
+    pub hover_max_height: u32,
+    pub hover_fade_in_delay: u32,
+    pub hover_hide_on_key: bool,
+    pub hover_lock_on_hover: bool,
+}
+
+impl EyzHoverWidget {
+    pub fn new() -> Self {
+        Self {
+            hover_content: String::new(),
+            hover_target_x: u32::default(),
+            hover_target_y: u32::default(),
+            hover_position: String::new(),
+            hover_show_pointer: bool::default(),
+            hover_max_width: u32::default(),
+            hover_max_height: u32::default(),
+            hover_fade_in_delay: u32::default(),
+            hover_hide_on_key: bool::default(),
+            hover_lock_on_hover: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_content.is_empty() || true && self.hover_target_x < u32::MAX || true && self.hover_target_y < u32::MAX || true && !self.hover_position.is_empty() || true && self.hover_show_pointer || true && self.hover_max_width < u32::MAX || true && self.hover_max_height < u32::MAX || true && self.hover_fade_in_delay < u32::MAX || true && self.hover_hide_on_key || true && self.hover_lock_on_hover || true
+    }
+}
+
+impl Default for EyzHoverWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263820,6 +264273,204 @@ mod tests_eyo_generated {
     fn test_eyo_fields() {
         let mut obj = EyoInputBox::default();
         obj.input_value = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyp_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyp_default() {
+        let obj = EypSelectBox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyp_fields() {
+        let mut obj = EypSelectBox::default();
+        obj.select_options = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyq_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyq_default() {
+        let obj = EyqCheckbox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyq_fields() {
+        let mut obj = EyqCheckbox::default();
+        obj.checkbox_checked = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyr_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyr_default() {
+        let obj = EyrToggle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyr_fields() {
+        let mut obj = EyrToggle::default();
+        obj.toggle_on = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eys_generated {
+    use super::*;
+
+    #[test]
+    fn test_eys_default() {
+        let obj = EysButton::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eys_fields() {
+        let mut obj = EysButton::default();
+        obj.button_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyt_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyt_default() {
+        let obj = EytDropdown::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyt_fields() {
+        let mut obj = EytDropdown::default();
+        obj.dropdown_value = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyu_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyu_default() {
+        let obj = EyuSlider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyu_fields() {
+        let mut obj = EyuSlider::default();
+        obj.slider_value = 3.14;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyv_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyv_default() {
+        let obj = EyvTextArea::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyv_fields() {
+        let mut obj = EyvTextArea::default();
+        obj.textarea_value = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyw_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyw_default() {
+        let obj = EywHighlightedLabel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyw_fields() {
+        let mut obj = EywHighlightedLabel::default();
+        obj.highlight_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyx_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyx_default() {
+        let obj = EyxActionBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyx_fields() {
+        let mut obj = EyxActionBar::default();
+        obj.action_bar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyy_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyy_default() {
+        let obj = EyyKeybindingLabel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyy_fields() {
+        let mut obj = EyyKeybindingLabel::default();
+        obj.keybinding_label = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_eyz_generated {
+    use super::*;
+
+    #[test]
+    fn test_eyz_default() {
+        let obj = EyzHoverWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_eyz_fields() {
+        let mut obj = EyzHoverWidget::default();
+        obj.hover_content = "test".to_string();
         assert!(obj.validate());
     }
 }
