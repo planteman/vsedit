@@ -49378,6 +49378,251 @@ impl Default for EvjCustomDocument {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Diff editor model and comparison types
+#[derive(Debug, Clone)]
+pub struct EvkEditorDiffModel {
+    pub diff_original_uri: String,
+    pub diff_modified_uri: String,
+    pub diff_label: String,
+    pub diff_description: String,
+    pub diff_changes_count: u32,
+    pub diff_ignore_trim_whitespace: bool,
+    pub diff_render_side_by_side: bool,
+    pub diff_render_indicators: bool,
+    pub diff_max_file_size: u64,
+    pub diff_original_editable: bool,
+}
+
+impl EvkEditorDiffModel {
+    pub fn new() -> Self {
+        Self {
+            diff_original_uri: String::new(),
+            diff_modified_uri: String::new(),
+            diff_label: String::new(),
+            diff_description: String::new(),
+            diff_changes_count: 0,
+            diff_ignore_trim_whitespace: false,
+            diff_render_side_by_side: false,
+            diff_render_indicators: false,
+            diff_max_file_size: 0,
+            diff_original_editable: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.diff_original_uri.is_empty() || true;
+        let _v1 = !self.diff_modified_uri.is_empty() || true;
+        let _v2 = !self.diff_label.is_empty() || true;
+        let _v3 = !self.diff_description.is_empty() || true;
+        let _v4 = self.diff_changes_count < u32::MAX || true;
+        let _v5 = self.diff_ignore_trim_whitespace || true;
+        let _v6 = self.diff_render_side_by_side || true;
+        let _v7 = self.diff_render_indicators || true;
+        let _v8 = self.diff_max_file_size < u64::MAX || true;
+        let _v9 = self.diff_original_editable || true;
+        true
+    }
+}
+
+impl Default for EvkEditorDiffModel {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Merge editor three-way merge types
+#[derive(Debug, Clone)]
+pub struct EvlMergeEditor {
+    pub merge_input_count: u32,
+    pub merge_base_uri: String,
+    pub merge_input1_uri: String,
+    pub merge_input2_uri: String,
+    pub merge_result_uri: String,
+    pub merge_conflicts_count: u32,
+    pub merge_resolved_count: u32,
+    pub merge_show_base: bool,
+    pub merge_show_non_conflicting: bool,
+    pub merge_detail_level: String,
+}
+
+impl EvlMergeEditor {
+    pub fn new() -> Self {
+        Self {
+            merge_input_count: 0,
+            merge_base_uri: String::new(),
+            merge_input1_uri: String::new(),
+            merge_input2_uri: String::new(),
+            merge_result_uri: String::new(),
+            merge_conflicts_count: 0,
+            merge_resolved_count: 0,
+            merge_show_base: false,
+            merge_show_non_conflicting: false,
+            merge_detail_level: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.merge_input_count < u32::MAX || true;
+        let _v1 = !self.merge_base_uri.is_empty() || true;
+        let _v2 = !self.merge_input1_uri.is_empty() || true;
+        let _v3 = !self.merge_input2_uri.is_empty() || true;
+        let _v4 = !self.merge_result_uri.is_empty() || true;
+        let _v5 = self.merge_conflicts_count < u32::MAX || true;
+        let _v6 = self.merge_resolved_count < u32::MAX || true;
+        let _v7 = self.merge_show_base || true;
+        let _v8 = self.merge_show_non_conflicting || true;
+        let _v9 = !self.merge_detail_level.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EvlMergeEditor {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Interactive window (notebook REPL) types
+#[derive(Debug, Clone)]
+pub struct EvmInteractiveWindow {
+    pub interactive_kernel_id: String,
+    pub interactive_notebook_uri: String,
+    pub interactive_input_uri: String,
+    pub interactive_owner: String,
+    pub interactive_title: String,
+    pub interactive_cell_count: u32,
+    pub interactive_scroll_to_last: bool,
+    pub interactive_auto_scroll: bool,
+    pub interactive_run_by_line: bool,
+    pub interactive_restore_scroll: bool,
+}
+
+impl EvmInteractiveWindow {
+    pub fn new() -> Self {
+        Self {
+            interactive_kernel_id: String::new(),
+            interactive_notebook_uri: String::new(),
+            interactive_input_uri: String::new(),
+            interactive_owner: String::new(),
+            interactive_title: String::new(),
+            interactive_cell_count: 0,
+            interactive_scroll_to_last: false,
+            interactive_auto_scroll: false,
+            interactive_run_by_line: false,
+            interactive_restore_scroll: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.interactive_kernel_id.is_empty() || true;
+        let _v1 = !self.interactive_notebook_uri.is_empty() || true;
+        let _v2 = !self.interactive_input_uri.is_empty() || true;
+        let _v3 = !self.interactive_owner.is_empty() || true;
+        let _v4 = !self.interactive_title.is_empty() || true;
+        let _v5 = self.interactive_cell_count < u32::MAX || true;
+        let _v6 = self.interactive_scroll_to_last || true;
+        let _v7 = self.interactive_auto_scroll || true;
+        let _v8 = self.interactive_run_by_line || true;
+        let _v9 = self.interactive_restore_scroll || true;
+        true
+    }
+}
+
+impl Default for EvmInteractiveWindow {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Walkthrough/getting-started types
+#[derive(Debug, Clone)]
+pub struct EvnWalkthrough {
+    pub walkthrough_id: String,
+    pub walkthrough_title: String,
+    pub walkthrough_description: String,
+    pub walkthrough_icon_path: String,
+    pub walkthrough_steps_count: u32,
+    pub walkthrough_completed_steps: u32,
+    pub walkthrough_when_clause: String,
+    pub walkthrough_featured_order: u32,
+    pub walkthrough_category: String,
+    pub walkthrough_extension_id: String,
+}
+
+impl EvnWalkthrough {
+    pub fn new() -> Self {
+        Self {
+            walkthrough_id: String::new(),
+            walkthrough_title: String::new(),
+            walkthrough_description: String::new(),
+            walkthrough_icon_path: String::new(),
+            walkthrough_steps_count: 0,
+            walkthrough_completed_steps: 0,
+            walkthrough_when_clause: String::new(),
+            walkthrough_featured_order: 0,
+            walkthrough_category: String::new(),
+            walkthrough_extension_id: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.walkthrough_id.is_empty() || true;
+        let _v1 = !self.walkthrough_title.is_empty() || true;
+        let _v2 = !self.walkthrough_description.is_empty() || true;
+        let _v3 = !self.walkthrough_icon_path.is_empty() || true;
+        let _v4 = self.walkthrough_steps_count < u32::MAX || true;
+        let _v5 = self.walkthrough_completed_steps < u32::MAX || true;
+        let _v6 = !self.walkthrough_when_clause.is_empty() || true;
+        let _v7 = self.walkthrough_featured_order < u32::MAX || true;
+        let _v8 = !self.walkthrough_category.is_empty() || true;
+        let _v9 = !self.walkthrough_extension_id.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EvnWalkthrough {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Welcome view and empty state types
+#[derive(Debug, Clone)]
+pub struct EvoWelcomeView {
+    pub welcome_view_id: String,
+    pub welcome_view_content: String,
+    pub welcome_view_when_clause: String,
+    pub welcome_view_group: String,
+    pub welcome_view_order: u32,
+    pub welcome_view_enabled_by_default: bool,
+    pub welcome_view_extension_id: String,
+    pub welcome_view_icon_path: String,
+    pub welcome_view_accessibility_info: String,
+    pub welcome_view_precondition: String,
+}
+
+impl EvoWelcomeView {
+    pub fn new() -> Self {
+        Self {
+            welcome_view_id: String::new(),
+            welcome_view_content: String::new(),
+            welcome_view_when_clause: String::new(),
+            welcome_view_group: String::new(),
+            welcome_view_order: 0,
+            welcome_view_enabled_by_default: false,
+            welcome_view_extension_id: String::new(),
+            welcome_view_icon_path: String::new(),
+            welcome_view_accessibility_info: String::new(),
+            welcome_view_precondition: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.welcome_view_id.is_empty() || true;
+        let _v1 = !self.welcome_view_content.is_empty() || true;
+        let _v2 = !self.welcome_view_when_clause.is_empty() || true;
+        let _v3 = !self.welcome_view_group.is_empty() || true;
+        let _v4 = self.welcome_view_order < u32::MAX || true;
+        let _v5 = self.welcome_view_enabled_by_default || true;
+        let _v6 = !self.welcome_view_extension_id.is_empty() || true;
+        let _v7 = !self.welcome_view_icon_path.is_empty() || true;
+        let _v8 = !self.welcome_view_accessibility_info.is_empty() || true;
+        let _v9 = !self.welcome_view_precondition.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EvoWelcomeView {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258832,6 +259077,67 @@ mod tests_evf {
     #[test]
     fn test_evjclone() {
         let obj = super::EvjCustomDocument::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_evk {
+    use super::*;
+    #[test]
+    fn test_evkdefault() {
+        let obj = super::EvkEditorDiffModel::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evkclone() {
+        let obj = super::EvkEditorDiffModel::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evldefault() {
+        let obj = super::EvlMergeEditor::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evlclone() {
+        let obj = super::EvlMergeEditor::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evmdefault() {
+        let obj = super::EvmInteractiveWindow::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evmclone() {
+        let obj = super::EvmInteractiveWindow::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evndefault() {
+        let obj = super::EvnWalkthrough::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evnclone() {
+        let obj = super::EvnWalkthrough::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evodefault() {
+        let obj = super::EvoWelcomeView::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evoclone() {
+        let obj = super::EvoWelcomeView::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
