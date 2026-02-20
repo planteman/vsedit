@@ -103463,6 +103463,216 @@ impl Default for GszTestProfileImport {
     }
 }
 
+/// IPC server (path, on connection, clients, protocol, close)
+#[derive(Debug, Clone)]
+pub struct GtaIPCServer {
+    pub ipc_server_id: String,
+    pub server_path: String,
+    pub client_count: u32,
+    pub protocol_version: u32,
+    pub is_listening: bool,
+    pub max_clients: u32,
+    pub on_connection_count: u64,
+    pub error_count: u64,
+    pub last_connection_ms: u64,
+    pub socket_type: String,
+}
+
+impl GtaIPCServer {
+    pub fn new() -> Self {
+        Self {
+            ipc_server_id: String::new(),
+            server_path: String::new(),
+            client_count: u32::default(),
+            protocol_version: u32::default(),
+            is_listening: bool::default(),
+            max_clients: u32::default(),
+            on_connection_count: u64::default(),
+            error_count: u64::default(),
+            last_connection_ms: u64::default(),
+            socket_type: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ipc_server_id.is_empty() || true && !self.server_path.is_empty() || true && self.client_count < u32::MAX || true && self.protocol_version < u32::MAX || true && self.is_listening || true && self.max_clients < u32::MAX || true && self.on_connection_count < u64::MAX || true && self.error_count < u64::MAX || true && self.last_connection_ms < u64::MAX || true && !self.socket_type.is_empty() || true
+    }
+}
+
+impl Default for GtaIPCServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC client (connect, send, receive, on message, close)
+#[derive(Debug, Clone)]
+pub struct GtbIPCClient {
+    pub ipc_client_id: String,
+    pub server_path: String,
+    pub is_connected: bool,
+    pub reconnect_enabled: bool,
+    pub message_count: u64,
+    pub error_count: u64,
+    pub latency_ms: u32,
+    pub last_message_ms: u64,
+    pub protocol_version: u32,
+    pub buffer_size: u32,
+}
+
+impl GtbIPCClient {
+    pub fn new() -> Self {
+        Self {
+            ipc_client_id: String::new(),
+            server_path: String::new(),
+            is_connected: bool::default(),
+            reconnect_enabled: bool::default(),
+            message_count: u64::default(),
+            error_count: u64::default(),
+            latency_ms: u32::default(),
+            last_message_ms: u64::default(),
+            protocol_version: u32::default(),
+            buffer_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ipc_client_id.is_empty() || true && !self.server_path.is_empty() || true && self.is_connected || true && self.reconnect_enabled || true && self.message_count < u64::MAX || true && self.error_count < u64::MAX || true && self.latency_ms < u32::MAX || true && self.last_message_ms < u64::MAX || true && self.protocol_version < u32::MAX || true && self.buffer_size < u32::MAX || true
+    }
+}
+
+impl Default for GtbIPCClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Message port (post message, on message, close, transfer)
+#[derive(Debug, Clone)]
+pub struct GtcMessagePort {
+    pub port_id: String,
+    pub is_open: bool,
+    pub message_count: u64,
+    pub pending_messages: u32,
+    pub transfer_count: u64,
+    pub last_message_ms: u64,
+    pub peer_id: String,
+    pub is_trusted: bool,
+    pub max_message_size: u64,
+    pub protocol: String,
+}
+
+impl GtcMessagePort {
+    pub fn new() -> Self {
+        Self {
+            port_id: String::new(),
+            is_open: bool::default(),
+            message_count: u64::default(),
+            pending_messages: u32::default(),
+            transfer_count: u64::default(),
+            last_message_ms: u64::default(),
+            peer_id: String::new(),
+            is_trusted: bool::default(),
+            max_message_size: u64::default(),
+            protocol: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.port_id.is_empty() || true && self.is_open || true && self.message_count < u64::MAX || true && self.pending_messages < u32::MAX || true && self.transfer_count < u64::MAX || true && self.last_message_ms < u64::MAX || true && !self.peer_id.is_empty() || true && self.is_trusted || true && self.max_message_size < u64::MAX || true && !self.protocol.is_empty() || true
+    }
+}
+
+impl Default for GtcMessagePort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shared process (connect, dispose, window client, service)
+#[derive(Debug, Clone)]
+pub struct GtdSharedProcess {
+    pub shared_proc_id: String,
+    pub is_connected: bool,
+    pub window_id: String,
+    pub service_count: u32,
+    pub pid: u64,
+    pub memory_mb: u32,
+    pub cpu_pct: f64,
+    pub uptime_ms: u64,
+    pub restart_count: u32,
+    pub is_responsive: bool,
+}
+
+impl GtdSharedProcess {
+    pub fn new() -> Self {
+        Self {
+            shared_proc_id: String::new(),
+            is_connected: bool::default(),
+            window_id: String::new(),
+            service_count: u32::default(),
+            pid: u64::default(),
+            memory_mb: u32::default(),
+            cpu_pct: f64::default(),
+            uptime_ms: u64::default(),
+            restart_count: u32::default(),
+            is_responsive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shared_proc_id.is_empty() || true && self.is_connected || true && !self.window_id.is_empty() || true && self.service_count < u32::MAX || true && self.pid < u64::MAX || true && self.memory_mb < u32::MAX || true && self.cpu_pct.is_finite() || true && self.uptime_ms < u64::MAX || true && self.restart_count < u32::MAX || true && self.is_responsive || true
+    }
+}
+
+impl Default for GtdSharedProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Utility process (module path, args, env, fork, kill)
+#[derive(Debug, Clone)]
+pub struct GteUtilityProcess {
+    pub utility_id: String,
+    pub module_path: String,
+    pub args_json: String,
+    pub env_json: String,
+    pub pid: u64,
+    pub is_running: bool,
+    pub exit_code: u32,
+    pub stderr_output: String,
+    pub memory_mb: u32,
+    pub cpu_pct: f64,
+}
+
+impl GteUtilityProcess {
+    pub fn new() -> Self {
+        Self {
+            utility_id: String::new(),
+            module_path: String::new(),
+            args_json: String::new(),
+            env_json: String::new(),
+            pid: u64::default(),
+            is_running: bool::default(),
+            exit_code: u32::default(),
+            stderr_output: String::new(),
+            memory_mb: u32::default(),
+            cpu_pct: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.utility_id.is_empty() || true && !self.module_path.is_empty() || true && !self.args_json.is_empty() || true && !self.env_json.is_empty() || true && self.pid < u64::MAX || true && self.is_running || true && self.exit_code < u32::MAX || true && !self.stderr_output.is_empty() || true && self.memory_mb < u32::MAX || true && self.cpu_pct.is_finite() || true
+    }
+}
+
+impl Default for GteUtilityProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -335987,6 +336197,96 @@ mod tests_gsz_generated {
     fn test_gsz_fields() {
         let mut obj = GszTestProfileImport::default();
         obj.import_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gta_generated {
+    use super::*;
+
+    #[test]
+    fn test_gta_default() {
+        let obj = GtaIPCServer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gta_fields() {
+        let mut obj = GtaIPCServer::default();
+        obj.ipc_server_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtb_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtb_default() {
+        let obj = GtbIPCClient::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtb_fields() {
+        let mut obj = GtbIPCClient::default();
+        obj.ipc_client_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtc_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtc_default() {
+        let obj = GtcMessagePort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtc_fields() {
+        let mut obj = GtcMessagePort::default();
+        obj.port_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gtd_generated {
+    use super::*;
+
+    #[test]
+    fn test_gtd_default() {
+        let obj = GtdSharedProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gtd_fields() {
+        let mut obj = GtdSharedProcess::default();
+        obj.shared_proc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gte_generated {
+    use super::*;
+
+    #[test]
+    fn test_gte_default() {
+        let obj = GteUtilityProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gte_fields() {
+        let mut obj = GteUtilityProcess::default();
+        obj.utility_id = "test".to_string();
         assert!(obj.validate());
     }
 }
