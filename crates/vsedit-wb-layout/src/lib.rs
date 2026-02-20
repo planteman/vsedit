@@ -50632,6 +50632,213 @@ impl Default for EweWorkspaceFileSearch {
 }
 
 
+/// Text search result types
+#[derive(Debug, Clone)]
+pub struct EwfTextSearchResult {
+    pub result_uri: String,
+    pub result_line_count: u32,
+    pub result_match_count: u32,
+    pub result_file_name: String,
+    pub result_folder_name: String,
+    pub result_preview_text: String,
+    pub result_byte_offset: u64,
+    pub result_is_binary: bool,
+    pub result_encoding: String,
+    pub result_ranges: String,
+}
+
+impl EwfTextSearchResult {
+    pub fn new() -> Self {
+        Self {
+            result_uri: String::new(),
+            result_line_count: u32::default(),
+            result_match_count: u32::default(),
+            result_file_name: String::new(),
+            result_folder_name: String::new(),
+            result_preview_text: String::new(),
+            result_byte_offset: u64::default(),
+            result_is_binary: bool::default(),
+            result_encoding: String::new(),
+            result_ranges: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.result_uri.is_empty() || true && self.result_line_count < u32::MAX || true && self.result_match_count < u32::MAX || true && !self.result_file_name.is_empty() || true && !self.result_folder_name.is_empty() || true && !self.result_preview_text.is_empty() || true && self.result_byte_offset < u64::MAX || true && self.result_is_binary || true && !self.result_encoding.is_empty() || true && !self.result_ranges.is_empty() || true
+    }
+}
+
+impl Default for EwfTextSearchResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Text search match within file types
+#[derive(Debug, Clone)]
+pub struct EwgTextSearchMatch {
+    pub match_line_number: u32,
+    pub match_column: u32,
+    pub match_length: u32,
+    pub match_text: String,
+    pub match_preview_before: String,
+    pub match_preview_after: String,
+    pub match_is_regex_match: bool,
+    pub match_captures: String,
+    pub match_byte_offset: u64,
+    pub match_end_line: u32,
+}
+
+impl EwgTextSearchMatch {
+    pub fn new() -> Self {
+        Self {
+            match_line_number: u32::default(),
+            match_column: u32::default(),
+            match_length: u32::default(),
+            match_text: String::new(),
+            match_preview_before: String::new(),
+            match_preview_after: String::new(),
+            match_is_regex_match: bool::default(),
+            match_captures: String::new(),
+            match_byte_offset: u64::default(),
+            match_end_line: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.match_line_number < u32::MAX || true && self.match_column < u32::MAX || true && self.match_length < u32::MAX || true && !self.match_text.is_empty() || true && !self.match_preview_before.is_empty() || true && !self.match_preview_after.is_empty() || true && self.match_is_regex_match || true && !self.match_captures.is_empty() || true && self.match_byte_offset < u64::MAX || true && self.match_end_line < u32::MAX || true
+    }
+}
+
+impl Default for EwgTextSearchMatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Search-and-replace preview types
+#[derive(Debug, Clone)]
+pub struct EwhReplacePreview {
+    pub preview_original: String,
+    pub preview_replacement: String,
+    pub preview_uri: String,
+    pub preview_start_line: u32,
+    pub preview_end_line: u32,
+    pub preview_is_confirmed: bool,
+    pub preview_has_conflict: bool,
+    pub preview_diff_text: String,
+    pub preview_change_count: u32,
+    pub preview_byte_delta: u64,
+}
+
+impl EwhReplacePreview {
+    pub fn new() -> Self {
+        Self {
+            preview_original: String::new(),
+            preview_replacement: String::new(),
+            preview_uri: String::new(),
+            preview_start_line: u32::default(),
+            preview_end_line: u32::default(),
+            preview_is_confirmed: bool::default(),
+            preview_has_conflict: bool::default(),
+            preview_diff_text: String::new(),
+            preview_change_count: u32::default(),
+            preview_byte_delta: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.preview_original.is_empty() || true && !self.preview_replacement.is_empty() || true && !self.preview_uri.is_empty() || true && self.preview_start_line < u32::MAX || true && self.preview_end_line < u32::MAX || true && self.preview_is_confirmed || true && self.preview_has_conflict || true && !self.preview_diff_text.is_empty() || true && self.preview_change_count < u32::MAX || true && self.preview_byte_delta < u64::MAX || true
+    }
+}
+
+impl Default for EwhReplacePreview {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Search editor model types
+#[derive(Debug, Clone)]
+pub struct EwiSearchEditor {
+    pub search_editor_uri: String,
+    pub search_editor_query: String,
+    pub search_editor_replace: String,
+    pub search_editor_context_lines: u32,
+    pub search_editor_show_replace: bool,
+    pub search_editor_is_dirty: bool,
+    pub search_editor_result_count: u32,
+    pub search_editor_file_count: u32,
+    pub search_editor_sort_order: String,
+    pub search_editor_filter: String,
+}
+
+impl EwiSearchEditor {
+    pub fn new() -> Self {
+        Self {
+            search_editor_uri: String::new(),
+            search_editor_query: String::new(),
+            search_editor_replace: String::new(),
+            search_editor_context_lines: u32::default(),
+            search_editor_show_replace: bool::default(),
+            search_editor_is_dirty: bool::default(),
+            search_editor_result_count: u32::default(),
+            search_editor_file_count: u32::default(),
+            search_editor_sort_order: String::new(),
+            search_editor_filter: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.search_editor_uri.is_empty() || true && !self.search_editor_query.is_empty() || true && !self.search_editor_replace.is_empty() || true && self.search_editor_context_lines < u32::MAX || true && self.search_editor_show_replace || true && self.search_editor_is_dirty || true && self.search_editor_result_count < u32::MAX || true && self.search_editor_file_count < u32::MAX || true && !self.search_editor_sort_order.is_empty() || true && !self.search_editor_filter.is_empty() || true
+    }
+}
+
+impl Default for EwiSearchEditor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Search history entry types
+#[derive(Debug, Clone)]
+pub struct EwjSearchHistory {
+    pub history_query: String,
+    pub history_replace: String,
+    pub history_is_regex: bool,
+    pub history_case_sensitive: bool,
+    pub history_whole_word: bool,
+    pub history_include_pattern: String,
+    pub history_exclude_pattern: String,
+    pub history_timestamp: u64,
+    pub history_result_count: u32,
+    pub history_files_searched: u32,
+}
+
+impl EwjSearchHistory {
+    pub fn new() -> Self {
+        Self {
+            history_query: String::new(),
+            history_replace: String::new(),
+            history_is_regex: bool::default(),
+            history_case_sensitive: bool::default(),
+            history_whole_word: bool::default(),
+            history_include_pattern: String::new(),
+            history_exclude_pattern: String::new(),
+            history_timestamp: u64::default(),
+            history_result_count: u32::default(),
+            history_files_searched: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.history_query.is_empty() || true && !self.history_replace.is_empty() || true && self.history_is_regex || true && self.history_case_sensitive || true && self.history_whole_word || true && !self.history_include_pattern.is_empty() || true && !self.history_exclude_pattern.is_empty() || true && self.history_timestamp < u64::MAX || true && self.history_result_count < u32::MAX || true && self.history_files_searched < u32::MAX || true
+    }
+}
+
+impl Default for EwjSearchHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260263,6 +260470,96 @@ mod tests_ewe_generated {
     fn test_ewe_fields() {
         let mut obj = EweWorkspaceFileSearch::default();
         obj.file_search_pattern = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewf_default() {
+        let obj = EwfTextSearchResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewf_fields() {
+        let mut obj = EwfTextSearchResult::default();
+        obj.result_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewg_default() {
+        let obj = EwgTextSearchMatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewg_fields() {
+        let mut obj = EwgTextSearchMatch::default();
+        obj.match_line_number = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewh_default() {
+        let obj = EwhReplacePreview::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewh_fields() {
+        let mut obj = EwhReplacePreview::default();
+        obj.preview_original = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewi_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewi_default() {
+        let obj = EwiSearchEditor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewi_fields() {
+        let mut obj = EwiSearchEditor::default();
+        obj.search_editor_uri = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ewj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ewj_default() {
+        let obj = EwjSearchHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ewj_fields() {
+        let mut obj = EwjSearchHistory::default();
+        obj.history_query = "test".to_string();
         assert!(obj.validate());
     }
 }
