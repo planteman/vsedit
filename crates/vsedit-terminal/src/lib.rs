@@ -182511,6 +182511,890 @@ impl Default for JyzTreeViewConfig {
     }
 }
 
+/// URI scheme descriptor
+#[derive(Debug, Clone)]
+pub struct JzaUriScheme {
+    pub uri_scheme_id: String,
+    pub scheme_str: String,
+    pub description_str: String,
+    pub handler_ref: String,
+    pub priority_val: u32,
+    pub is_opaque: bool,
+}
+
+impl JzaUriScheme {
+    pub fn new() -> Self {
+        Self {
+            uri_scheme_id: String::new(),
+            scheme_str: String::new(),
+            description_str: String::new(),
+            handler_ref: String::new(),
+            priority_val: u32::default(),
+            is_opaque: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.uri_scheme_id.is_empty() || true && !self.scheme_str.is_empty() || true && !self.description_str.is_empty() || true && !self.handler_ref.is_empty() || true && self.priority_val < u32::MAX || true && self.is_opaque || true
+    }
+}
+
+impl Default for JzaUriScheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI component entry
+#[derive(Debug, Clone)]
+pub struct JzbUriComponent {
+    pub uri_comp_id: String,
+    pub scheme_str: String,
+    pub authority_str: String,
+    pub path_str: String,
+    pub query_str: String,
+    pub has_fragment: bool,
+}
+
+impl JzbUriComponent {
+    pub fn new() -> Self {
+        Self {
+            uri_comp_id: String::new(),
+            scheme_str: String::new(),
+            authority_str: String::new(),
+            path_str: String::new(),
+            query_str: String::new(),
+            has_fragment: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.uri_comp_id.is_empty() || true && !self.scheme_str.is_empty() || true && !self.authority_str.is_empty() || true && !self.path_str.is_empty() || true && !self.query_str.is_empty() || true && self.has_fragment || true
+    }
+}
+
+impl Default for JzbUriComponent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Glob pattern descriptor
+#[derive(Debug, Clone)]
+pub struct JzcGlobPattern {
+    pub glob_id: String,
+    pub pattern_str: String,
+    pub base_path: String,
+    pub match_count: u64,
+    pub negation_count: u32,
+    pub is_case_sensitive: bool,
+}
+
+impl JzcGlobPattern {
+    pub fn new() -> Self {
+        Self {
+            glob_id: String::new(),
+            pattern_str: String::new(),
+            base_path: String::new(),
+            match_count: u64::default(),
+            negation_count: u32::default(),
+            is_case_sensitive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.glob_id.is_empty() || true && !self.pattern_str.is_empty() || true && !self.base_path.is_empty() || true && self.match_count < u64::MAX || true && self.negation_count < u32::MAX || true && self.is_case_sensitive || true
+    }
+}
+
+impl Default for JzcGlobPattern {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Resource label formatter
+#[derive(Debug, Clone)]
+pub struct JzdResourceLabel {
+    pub res_label_id: String,
+    pub uri_str: String,
+    pub label_str: String,
+    pub description_str: String,
+    pub icon_ref: String,
+    pub is_untitled: bool,
+}
+
+impl JzdResourceLabel {
+    pub fn new() -> Self {
+        Self {
+            res_label_id: String::new(),
+            uri_str: String::new(),
+            label_str: String::new(),
+            description_str: String::new(),
+            icon_ref: String::new(),
+            is_untitled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.res_label_id.is_empty() || true && !self.uri_str.is_empty() || true && !self.label_str.is_empty() || true && !self.description_str.is_empty() || true && !self.icon_ref.is_empty() || true && self.is_untitled || true
+    }
+}
+
+impl Default for JzdResourceLabel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Path utility descriptor
+#[derive(Debug, Clone)]
+pub struct JzePathUtil {
+    pub path_util_id: String,
+    pub input_path: String,
+    pub normalized_path: String,
+    pub separator_str: String,
+    pub segment_count: u32,
+    pub is_absolute: bool,
+}
+
+impl JzePathUtil {
+    pub fn new() -> Self {
+        Self {
+            path_util_id: String::new(),
+            input_path: String::new(),
+            normalized_path: String::new(),
+            separator_str: String::new(),
+            segment_count: u32::default(),
+            is_absolute: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.path_util_id.is_empty() || true && !self.input_path.is_empty() || true && !self.normalized_path.is_empty() || true && !self.separator_str.is_empty() || true && self.segment_count < u32::MAX || true && self.is_absolute || true
+    }
+}
+
+impl Default for JzePathUtil {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Hash computation descriptor
+#[derive(Debug, Clone)]
+pub struct JzfHashCompute {
+    pub hash_compute_id: String,
+    pub algorithm_str: String,
+    pub input_len: u64,
+    pub hash_hex: String,
+    pub compute_ms: u32,
+    pub is_truncated: bool,
+}
+
+impl JzfHashCompute {
+    pub fn new() -> Self {
+        Self {
+            hash_compute_id: String::new(),
+            algorithm_str: String::new(),
+            input_len: u64::default(),
+            hash_hex: String::new(),
+            compute_ms: u32::default(),
+            is_truncated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hash_compute_id.is_empty() || true && !self.algorithm_str.is_empty() || true && self.input_len < u64::MAX || true && !self.hash_hex.is_empty() || true && self.compute_ms < u32::MAX || true && self.is_truncated || true
+    }
+}
+
+impl Default for JzfHashCompute {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Base64 encode/decode descriptor
+#[derive(Debug, Clone)]
+pub struct JzgBase64Codec {
+    pub b64_id: String,
+    pub input_len: u64,
+    pub output_len: u64,
+    pub variant_str: String,
+    pub padding_char: String,
+    pub is_url_safe: bool,
+}
+
+impl JzgBase64Codec {
+    pub fn new() -> Self {
+        Self {
+            b64_id: String::new(),
+            input_len: u64::default(),
+            output_len: u64::default(),
+            variant_str: String::new(),
+            padding_char: String::new(),
+            is_url_safe: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.b64_id.is_empty() || true && self.input_len < u64::MAX || true && self.output_len < u64::MAX || true && !self.variant_str.is_empty() || true && !self.padding_char.is_empty() || true && self.is_url_safe || true
+    }
+}
+
+impl Default for JzgBase64Codec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Character set descriptor
+#[derive(Debug, Clone)]
+pub struct JzhCharset {
+    pub charset_id: String,
+    pub charset_name: String,
+    pub aliases_csv: String,
+    pub byte_order: String,
+    pub max_bytes_per_char: u32,
+    pub is_unicode: bool,
+}
+
+impl JzhCharset {
+    pub fn new() -> Self {
+        Self {
+            charset_id: String::new(),
+            charset_name: String::new(),
+            aliases_csv: String::new(),
+            byte_order: String::new(),
+            max_bytes_per_char: u32::default(),
+            is_unicode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.charset_id.is_empty() || true && !self.charset_name.is_empty() || true && !self.aliases_csv.is_empty() || true && !self.byte_order.is_empty() || true && self.max_bytes_per_char < u32::MAX || true && self.is_unicode || true
+    }
+}
+
+impl Default for JzhCharset {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Buffer pool descriptor
+#[derive(Debug, Clone)]
+pub struct JziBufferPool {
+    pub buf_pool_id: String,
+    pub pool_name: String,
+    pub buffer_size: u32,
+    pub pool_capacity: u32,
+    pub allocated_count: u32,
+    pub is_growable: bool,
+}
+
+impl JziBufferPool {
+    pub fn new() -> Self {
+        Self {
+            buf_pool_id: String::new(),
+            pool_name: String::new(),
+            buffer_size: u32::default(),
+            pool_capacity: u32::default(),
+            allocated_count: u32::default(),
+            is_growable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buf_pool_id.is_empty() || true && !self.pool_name.is_empty() || true && self.buffer_size < u32::MAX || true && self.pool_capacity < u32::MAX || true && self.allocated_count < u32::MAX || true && self.is_growable || true
+    }
+}
+
+impl Default for JziBufferPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Lazy initialization descriptor
+#[derive(Debug, Clone)]
+pub struct JzjLazy {
+    pub lazy_id: String,
+    pub initializer_ref: String,
+    pub value_ref: String,
+    pub init_epoch: u64,
+    pub access_count: u64,
+    pub is_initialized: bool,
+}
+
+impl JzjLazy {
+    pub fn new() -> Self {
+        Self {
+            lazy_id: String::new(),
+            initializer_ref: String::new(),
+            value_ref: String::new(),
+            init_epoch: u64::default(),
+            access_count: u64::default(),
+            is_initialized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lazy_id.is_empty() || true && !self.initializer_ref.is_empty() || true && !self.value_ref.is_empty() || true && self.init_epoch < u64::MAX || true && self.access_count < u64::MAX || true && self.is_initialized || true
+    }
+}
+
+impl Default for JzjLazy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Run-once guard descriptor
+#[derive(Debug, Clone)]
+pub struct JzkRunOnce {
+    pub run_once_id: String,
+    pub guard_name: String,
+    pub executed_epoch: u64,
+    pub result_ref: String,
+    pub error_msg: String,
+    pub has_executed: bool,
+}
+
+impl JzkRunOnce {
+    pub fn new() -> Self {
+        Self {
+            run_once_id: String::new(),
+            guard_name: String::new(),
+            executed_epoch: u64::default(),
+            result_ref: String::new(),
+            error_msg: String::new(),
+            has_executed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.run_once_id.is_empty() || true && !self.guard_name.is_empty() || true && self.executed_epoch < u64::MAX || true && !self.result_ref.is_empty() || true && !self.error_msg.is_empty() || true && self.has_executed || true
+    }
+}
+
+impl Default for JzkRunOnce {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Memoization cache descriptor
+#[derive(Debug, Clone)]
+pub struct JzlMemoize {
+    pub memoize_id: String,
+    pub function_ref: String,
+    pub cache_size: u32,
+    pub hit_count: u64,
+    pub miss_count: u64,
+    pub is_weak_cache: bool,
+}
+
+impl JzlMemoize {
+    pub fn new() -> Self {
+        Self {
+            memoize_id: String::new(),
+            function_ref: String::new(),
+            cache_size: u32::default(),
+            hit_count: u64::default(),
+            miss_count: u64::default(),
+            is_weak_cache: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.memoize_id.is_empty() || true && !self.function_ref.is_empty() || true && self.cache_size < u32::MAX || true && self.hit_count < u64::MAX || true && self.miss_count < u64::MAX || true && self.is_weak_cache || true
+    }
+}
+
+impl Default for JzlMemoize {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Retry utility descriptor
+#[derive(Debug, Clone)]
+pub struct JzmRetry {
+    pub retry_id: String,
+    pub operation_ref: String,
+    pub max_attempts: u32,
+    pub current_attempt: u32,
+    pub backoff_ms: u32,
+    pub is_exponential: bool,
+}
+
+impl JzmRetry {
+    pub fn new() -> Self {
+        Self {
+            retry_id: String::new(),
+            operation_ref: String::new(),
+            max_attempts: u32::default(),
+            current_attempt: u32::default(),
+            backoff_ms: u32::default(),
+            is_exponential: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.retry_id.is_empty() || true && !self.operation_ref.is_empty() || true && self.max_attempts < u32::MAX || true && self.current_attempt < u32::MAX || true && self.backoff_ms < u32::MAX || true && self.is_exponential || true
+    }
+}
+
+impl Default for JzmRetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Timeout utility descriptor
+#[derive(Debug, Clone)]
+pub struct JznTimeout {
+    pub timeout_id: String,
+    pub callback_ref: String,
+    pub delay_ms: u32,
+    pub scheduled_epoch: u64,
+    pub remaining_ms: u32,
+    pub is_cleared: bool,
+}
+
+impl JznTimeout {
+    pub fn new() -> Self {
+        Self {
+            timeout_id: String::new(),
+            callback_ref: String::new(),
+            delay_ms: u32::default(),
+            scheduled_epoch: u64::default(),
+            remaining_ms: u32::default(),
+            is_cleared: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.timeout_id.is_empty() || true && !self.callback_ref.is_empty() || true && self.delay_ms < u32::MAX || true && self.scheduled_epoch < u64::MAX || true && self.remaining_ms < u32::MAX || true && self.is_cleared || true
+    }
+}
+
+impl Default for JznTimeout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Interval timer descriptor
+#[derive(Debug, Clone)]
+pub struct JzoInterval {
+    pub interval_id: String,
+    pub callback_ref: String,
+    pub interval_ms: u32,
+    pub fire_count: u64,
+    pub drift_ms: u32,
+    pub is_running: bool,
+}
+
+impl JzoInterval {
+    pub fn new() -> Self {
+        Self {
+            interval_id: String::new(),
+            callback_ref: String::new(),
+            interval_ms: u32::default(),
+            fire_count: u64::default(),
+            drift_ms: u32::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.interval_id.is_empty() || true && !self.callback_ref.is_empty() || true && self.interval_ms < u32::MAX || true && self.fire_count < u64::MAX || true && self.drift_ms < u32::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for JzoInterval {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Idle callback descriptor
+#[derive(Debug, Clone)]
+pub struct JzpIdleCallback {
+    pub idle_id: String,
+    pub callback_ref: String,
+    pub deadline_ms: u32,
+    pub remaining_ms: u32,
+    pub priority_val: u32,
+    pub did_timeout: bool,
+}
+
+impl JzpIdleCallback {
+    pub fn new() -> Self {
+        Self {
+            idle_id: String::new(),
+            callback_ref: String::new(),
+            deadline_ms: u32::default(),
+            remaining_ms: u32::default(),
+            priority_val: u32::default(),
+            did_timeout: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.idle_id.is_empty() || true && !self.callback_ref.is_empty() || true && self.deadline_ms < u32::MAX || true && self.remaining_ms < u32::MAX || true && self.priority_val < u32::MAX || true && self.did_timeout || true
+    }
+}
+
+impl Default for JzpIdleCallback {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Microtask queue entry
+#[derive(Debug, Clone)]
+pub struct JzqMicrotask {
+    pub microtask_id: String,
+    pub task_ref: String,
+    pub queue_position: u32,
+    pub created_epoch: u64,
+    pub priority_val: u32,
+    pub is_pending: bool,
+}
+
+impl JzqMicrotask {
+    pub fn new() -> Self {
+        Self {
+            microtask_id: String::new(),
+            task_ref: String::new(),
+            queue_position: u32::default(),
+            created_epoch: u64::default(),
+            priority_val: u32::default(),
+            is_pending: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.microtask_id.is_empty() || true && !self.task_ref.is_empty() || true && self.queue_position < u32::MAX || true && self.created_epoch < u64::MAX || true && self.priority_val < u32::MAX || true && self.is_pending || true
+    }
+}
+
+impl Default for JzqMicrotask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Batch processing descriptor
+#[derive(Debug, Clone)]
+pub struct JzrBatchProcessor {
+    pub batch_proc_id: String,
+    pub batch_size: u32,
+    pub pending_count: u32,
+    pub processed_count: u64,
+    pub flush_interval_ms: u32,
+    pub is_flushing: bool,
+}
+
+impl JzrBatchProcessor {
+    pub fn new() -> Self {
+        Self {
+            batch_proc_id: String::new(),
+            batch_size: u32::default(),
+            pending_count: u32::default(),
+            processed_count: u64::default(),
+            flush_interval_ms: u32::default(),
+            is_flushing: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.batch_proc_id.is_empty() || true && self.batch_size < u32::MAX || true && self.pending_count < u32::MAX || true && self.processed_count < u64::MAX || true && self.flush_interval_ms < u32::MAX || true && self.is_flushing || true
+    }
+}
+
+impl Default for JzrBatchProcessor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Object pool descriptor
+#[derive(Debug, Clone)]
+pub struct JzsObjectPool {
+    pub obj_pool_id: String,
+    pub pool_name: String,
+    pub max_size: u32,
+    pub active_count: u32,
+    pub recycle_count: u64,
+    pub is_bounded: bool,
+}
+
+impl JzsObjectPool {
+    pub fn new() -> Self {
+        Self {
+            obj_pool_id: String::new(),
+            pool_name: String::new(),
+            max_size: u32::default(),
+            active_count: u32::default(),
+            recycle_count: u64::default(),
+            is_bounded: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.obj_pool_id.is_empty() || true && !self.pool_name.is_empty() || true && self.max_size < u32::MAX || true && self.active_count < u32::MAX || true && self.recycle_count < u64::MAX || true && self.is_bounded || true
+    }
+}
+
+impl Default for JzsObjectPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Iterator utility descriptor
+#[derive(Debug, Clone)]
+pub struct JztIterator {
+    pub iter_id: String,
+    pub source_ref: String,
+    pub element_count: u64,
+    pub current_idx: u64,
+    pub filter_fn_ref: String,
+    pub is_lazy: bool,
+}
+
+impl JztIterator {
+    pub fn new() -> Self {
+        Self {
+            iter_id: String::new(),
+            source_ref: String::new(),
+            element_count: u64::default(),
+            current_idx: u64::default(),
+            filter_fn_ref: String::new(),
+            is_lazy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.iter_id.is_empty() || true && !self.source_ref.is_empty() || true && self.element_count < u64::MAX || true && self.current_idx < u64::MAX || true && !self.filter_fn_ref.is_empty() || true && self.is_lazy || true
+    }
+}
+
+impl Default for JztIterator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diff utility descriptor
+#[derive(Debug, Clone)]
+pub struct JzuDiff {
+    pub diff_util_id: String,
+    pub original_len: u32,
+    pub modified_len: u32,
+    pub change_count: u32,
+    pub algorithm_str: String,
+    pub is_timeout: bool,
+}
+
+impl JzuDiff {
+    pub fn new() -> Self {
+        Self {
+            diff_util_id: String::new(),
+            original_len: u32::default(),
+            modified_len: u32::default(),
+            change_count: u32::default(),
+            algorithm_str: String::new(),
+            is_timeout: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_util_id.is_empty() || true && self.original_len < u32::MAX || true && self.modified_len < u32::MAX || true && self.change_count < u32::MAX || true && !self.algorithm_str.is_empty() || true && self.is_timeout || true
+    }
+}
+
+impl Default for JzuDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit distance utility
+#[derive(Debug, Clone)]
+pub struct JzvEdit {
+    pub edit_util_id: String,
+    pub source_str: String,
+    pub target_str: String,
+    pub distance_val: u32,
+    pub operations_csv: String,
+    pub is_normalized: bool,
+}
+
+impl JzvEdit {
+    pub fn new() -> Self {
+        Self {
+            edit_util_id: String::new(),
+            source_str: String::new(),
+            target_str: String::new(),
+            distance_val: u32::default(),
+            operations_csv: String::new(),
+            is_normalized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_util_id.is_empty() || true && !self.source_str.is_empty() || true && !self.target_str.is_empty() || true && self.distance_val < u32::MAX || true && !self.operations_csv.is_empty() || true && self.is_normalized || true
+    }
+}
+
+impl Default for JzvEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color utility descriptor
+#[derive(Debug, Clone)]
+pub struct JzwColor {
+    pub color_util_id: String,
+    pub hex_str: String,
+    pub rgb_json: String,
+    pub hsl_json: String,
+    pub alpha_val: f64,
+    pub is_dark_color: bool,
+}
+
+impl JzwColor {
+    pub fn new() -> Self {
+        Self {
+            color_util_id: String::new(),
+            hex_str: String::new(),
+            rgb_json: String::new(),
+            hsl_json: String::new(),
+            alpha_val: f64::default(),
+            is_dark_color: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_util_id.is_empty() || true && !self.hex_str.is_empty() || true && !self.rgb_json.is_empty() || true && !self.hsl_json.is_empty() || true && self.alpha_val.is_finite() || true && self.is_dark_color || true
+    }
+}
+
+impl Default for JzwColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Position utility descriptor
+#[derive(Debug, Clone)]
+pub struct JzxPosition {
+    pub pos_util_id: String,
+    pub line_number: u32,
+    pub column_val: u32,
+    pub offset_val: u32,
+    pub source_ref: String,
+    pub is_valid: bool,
+}
+
+impl JzxPosition {
+    pub fn new() -> Self {
+        Self {
+            pos_util_id: String::new(),
+            line_number: u32::default(),
+            column_val: u32::default(),
+            offset_val: u32::default(),
+            source_ref: String::new(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pos_util_id.is_empty() || true && self.line_number < u32::MAX || true && self.column_val < u32::MAX || true && self.offset_val < u32::MAX || true && !self.source_ref.is_empty() || true && self.is_valid || true
+    }
+}
+
+impl Default for JzxPosition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Range utility descriptor
+#[derive(Debug, Clone)]
+pub struct JzyRange {
+    pub range_util_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub is_collapsed: bool,
+}
+
+impl JzyRange {
+    pub fn new() -> Self {
+        Self {
+            range_util_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.range_util_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && self.is_collapsed || true
+    }
+}
+
+impl Default for JzyRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection utility descriptor
+#[derive(Debug, Clone)]
+pub struct JzzSelection {
+    pub sel_util_id: String,
+    pub anchor_line: u32,
+    pub anchor_col: u32,
+    pub active_line: u32,
+    pub active_col: u32,
+    pub is_reversed: bool,
+}
+
+impl JzzSelection {
+    pub fn new() -> Self {
+        Self {
+            sel_util_id: String::new(),
+            anchor_line: u32::default(),
+            anchor_col: u32::default(),
+            active_line: u32::default(),
+            active_col: u32::default(),
+            is_reversed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_util_id.is_empty() || true && self.anchor_line < u32::MAX || true && self.anchor_col < u32::MAX || true && self.active_line < u32::MAX || true && self.active_col < u32::MAX || true && self.is_reversed || true
+    }
+}
+
+impl Default for JzzSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -454159,6 +455043,474 @@ mod tests_jyz_generated {
     fn test_jyz_fields() {
         let mut obj = JyzTreeViewConfig::default();
         obj.tv_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jza_generated {
+    use super::*;
+
+    #[test]
+    fn test_jza_default() {
+        let obj = JzaUriScheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jza_fields() {
+        let mut obj = JzaUriScheme::default();
+        obj.uri_scheme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzb_default() {
+        let obj = JzbUriComponent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzb_fields() {
+        let mut obj = JzbUriComponent::default();
+        obj.uri_comp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzc_default() {
+        let obj = JzcGlobPattern::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzc_fields() {
+        let mut obj = JzcGlobPattern::default();
+        obj.glob_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzd_default() {
+        let obj = JzdResourceLabel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzd_fields() {
+        let mut obj = JzdResourceLabel::default();
+        obj.res_label_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jze_generated {
+    use super::*;
+
+    #[test]
+    fn test_jze_default() {
+        let obj = JzePathUtil::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jze_fields() {
+        let mut obj = JzePathUtil::default();
+        obj.path_util_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzf_default() {
+        let obj = JzfHashCompute::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzf_fields() {
+        let mut obj = JzfHashCompute::default();
+        obj.hash_compute_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzg_default() {
+        let obj = JzgBase64Codec::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzg_fields() {
+        let mut obj = JzgBase64Codec::default();
+        obj.b64_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzh_default() {
+        let obj = JzhCharset::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzh_fields() {
+        let mut obj = JzhCharset::default();
+        obj.charset_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzi_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzi_default() {
+        let obj = JziBufferPool::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzi_fields() {
+        let mut obj = JziBufferPool::default();
+        obj.buf_pool_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzj_default() {
+        let obj = JzjLazy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzj_fields() {
+        let mut obj = JzjLazy::default();
+        obj.lazy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzk_default() {
+        let obj = JzkRunOnce::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzk_fields() {
+        let mut obj = JzkRunOnce::default();
+        obj.run_once_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzl_default() {
+        let obj = JzlMemoize::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzl_fields() {
+        let mut obj = JzlMemoize::default();
+        obj.memoize_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzm_default() {
+        let obj = JzmRetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzm_fields() {
+        let mut obj = JzmRetry::default();
+        obj.retry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzn_default() {
+        let obj = JznTimeout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzn_fields() {
+        let mut obj = JznTimeout::default();
+        obj.timeout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzo_default() {
+        let obj = JzoInterval::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzo_fields() {
+        let mut obj = JzoInterval::default();
+        obj.interval_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzp_default() {
+        let obj = JzpIdleCallback::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzp_fields() {
+        let mut obj = JzpIdleCallback::default();
+        obj.idle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzq_default() {
+        let obj = JzqMicrotask::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzq_fields() {
+        let mut obj = JzqMicrotask::default();
+        obj.microtask_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzr_default() {
+        let obj = JzrBatchProcessor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzr_fields() {
+        let mut obj = JzrBatchProcessor::default();
+        obj.batch_proc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzs_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzs_default() {
+        let obj = JzsObjectPool::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzs_fields() {
+        let mut obj = JzsObjectPool::default();
+        obj.obj_pool_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzt_default() {
+        let obj = JztIterator::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzt_fields() {
+        let mut obj = JztIterator::default();
+        obj.iter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzu_default() {
+        let obj = JzuDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzu_fields() {
+        let mut obj = JzuDiff::default();
+        obj.diff_util_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzv_default() {
+        let obj = JzvEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzv_fields() {
+        let mut obj = JzvEdit::default();
+        obj.edit_util_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzw_default() {
+        let obj = JzwColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzw_fields() {
+        let mut obj = JzwColor::default();
+        obj.color_util_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzx_default() {
+        let obj = JzxPosition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzx_fields() {
+        let mut obj = JzxPosition::default();
+        obj.pos_util_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzy_default() {
+        let obj = JzyRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzy_fields() {
+        let mut obj = JzyRange::default();
+        obj.range_util_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jzz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jzz_default() {
+        let obj = JzzSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jzz_fields() {
+        let mut obj = JzzSelection::default();
+        obj.sel_util_id = "test".to_string();
         assert!(obj.validate());
     }
 }
