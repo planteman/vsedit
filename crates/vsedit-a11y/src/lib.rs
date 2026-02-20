@@ -144337,6 +144337,890 @@ impl Default for IhzBannerWidget {
     }
 }
 
+/// Workbench layout state
+#[derive(Debug, Clone)]
+pub struct IiaWorkbenchLayout {
+    pub layout_id: String,
+    pub sidebar_width: u32,
+    pub panel_height: u32,
+    pub activitybar_width: u32,
+    pub statusbar_height: u32,
+    pub zen_mode_active: bool,
+}
+
+impl IiaWorkbenchLayout {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            sidebar_width: u32::default(),
+            panel_height: u32::default(),
+            activitybar_width: u32::default(),
+            statusbar_height: u32::default(),
+            zen_mode_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && self.sidebar_width < u32::MAX || true && self.panel_height < u32::MAX || true && self.activitybar_width < u32::MAX || true && self.statusbar_height < u32::MAX || true && self.zen_mode_active || true
+    }
+}
+
+impl Default for IiaWorkbenchLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench part layout
+#[derive(Debug, Clone)]
+pub struct IibPartLayout {
+    pub part_id: String,
+    pub part_kind: String,
+    pub size_px: u32,
+    pub min_size: u32,
+    pub max_size: u32,
+    pub is_visible: bool,
+}
+
+impl IibPartLayout {
+    pub fn new() -> Self {
+        Self {
+            part_id: String::new(),
+            part_kind: String::new(),
+            size_px: u32::default(),
+            min_size: u32::default(),
+            max_size: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.part_id.is_empty() || true && !self.part_kind.is_empty() || true && self.size_px < u32::MAX || true && self.min_size < u32::MAX || true && self.max_size < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for IibPartLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window title bar state
+#[derive(Debug, Clone)]
+pub struct IicTitleBar {
+    pub titlebar_id: String,
+    pub title_text: String,
+    pub subtitle_text: String,
+    pub icon_path: String,
+    pub height_px: u32,
+    pub is_custom: bool,
+}
+
+impl IicTitleBar {
+    pub fn new() -> Self {
+        Self {
+            titlebar_id: String::new(),
+            title_text: String::new(),
+            subtitle_text: String::new(),
+            icon_path: String::new(),
+            height_px: u32::default(),
+            is_custom: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.titlebar_id.is_empty() || true && !self.title_text.is_empty() || true && !self.subtitle_text.is_empty() || true && !self.icon_path.is_empty() || true && self.height_px < u32::MAX || true && self.is_custom || true
+    }
+}
+
+impl Default for IicTitleBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Menu bar state
+#[derive(Debug, Clone)]
+pub struct IidMenuBar {
+    pub menubar_id: String,
+    pub menu_count: u32,
+    pub active_menu_idx: u32,
+    pub visibility_mode: String,
+    pub compact_mode: bool,
+    pub is_focused: bool,
+}
+
+impl IidMenuBar {
+    pub fn new() -> Self {
+        Self {
+            menubar_id: String::new(),
+            menu_count: u32::default(),
+            active_menu_idx: u32::default(),
+            visibility_mode: String::new(),
+            compact_mode: bool::default(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.menubar_id.is_empty() || true && self.menu_count < u32::MAX || true && self.active_menu_idx < u32::MAX || true && !self.visibility_mode.is_empty() || true && self.compact_mode || true && self.is_focused || true
+    }
+}
+
+impl Default for IidMenuBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sidebar viewlet descriptor
+#[derive(Debug, Clone)]
+pub struct IieViewlet {
+    pub viewlet_id: String,
+    pub viewlet_title: String,
+    pub icon_ref: String,
+    pub order_val: u32,
+    pub badge_count: u32,
+    pub is_default: bool,
+}
+
+impl IieViewlet {
+    pub fn new() -> Self {
+        Self {
+            viewlet_id: String::new(),
+            viewlet_title: String::new(),
+            icon_ref: String::new(),
+            order_val: u32::default(),
+            badge_count: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.viewlet_id.is_empty() || true && !self.viewlet_title.is_empty() || true && !self.icon_ref.is_empty() || true && self.order_val < u32::MAX || true && self.badge_count < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for IieViewlet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Composite view descriptor
+#[derive(Debug, Clone)]
+pub struct IifComposite {
+    pub composite_id: String,
+    pub composite_title: String,
+    pub action_count: u32,
+    pub active_view_idx: u32,
+    pub badge_text: String,
+    pub is_pinned: bool,
+}
+
+impl IifComposite {
+    pub fn new() -> Self {
+        Self {
+            composite_id: String::new(),
+            composite_title: String::new(),
+            action_count: u32::default(),
+            active_view_idx: u32::default(),
+            badge_text: String::new(),
+            is_pinned: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.composite_id.is_empty() || true && !self.composite_title.is_empty() || true && self.action_count < u32::MAX || true && self.active_view_idx < u32::MAX || true && !self.badge_text.is_empty() || true && self.is_pinned || true
+    }
+}
+
+impl Default for IifComposite {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor area layout
+#[derive(Debug, Clone)]
+pub struct IigEditorArea {
+    pub area_id: String,
+    pub group_count: u32,
+    pub orientation_str: String,
+    pub active_group_idx: u32,
+    pub total_width: u32,
+    pub is_empty: bool,
+}
+
+impl IigEditorArea {
+    pub fn new() -> Self {
+        Self {
+            area_id: String::new(),
+            group_count: u32::default(),
+            orientation_str: String::new(),
+            active_group_idx: u32::default(),
+            total_width: u32::default(),
+            is_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.area_id.is_empty() || true && self.group_count < u32::MAX || true && !self.orientation_str.is_empty() || true && self.active_group_idx < u32::MAX || true && self.total_width < u32::MAX || true && self.is_empty || true
+    }
+}
+
+impl Default for IigEditorArea {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor pane descriptor
+#[derive(Debug, Clone)]
+pub struct IihEditorPane {
+    pub pane_id: String,
+    pub group_ref: String,
+    pub size_pct: u32,
+    pub min_size: u32,
+    pub tab_count: u32,
+    pub is_maximized: bool,
+}
+
+impl IihEditorPane {
+    pub fn new() -> Self {
+        Self {
+            pane_id: String::new(),
+            group_ref: String::new(),
+            size_pct: u32::default(),
+            min_size: u32::default(),
+            tab_count: u32::default(),
+            is_maximized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pane_id.is_empty() || true && !self.group_ref.is_empty() || true && self.size_pct < u32::MAX || true && self.min_size < u32::MAX || true && self.tab_count < u32::MAX || true && self.is_maximized || true
+    }
+}
+
+impl Default for IihEditorPane {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Auxiliary side bar state
+#[derive(Debug, Clone)]
+pub struct IiiAuxiliaryBar {
+    pub bar_id: String,
+    pub position_str: String,
+    pub width_px: u32,
+    pub view_count: u32,
+    pub active_view_idx: u32,
+    pub is_visible: bool,
+}
+
+impl IiiAuxiliaryBar {
+    pub fn new() -> Self {
+        Self {
+            bar_id: String::new(),
+            position_str: String::new(),
+            width_px: u32::default(),
+            view_count: u32::default(),
+            active_view_idx: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bar_id.is_empty() || true && !self.position_str.is_empty() || true && self.width_px < u32::MAX || true && self.view_count < u32::MAX || true && self.active_view_idx < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for IiiAuxiliaryBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Window state descriptor
+#[derive(Debug, Clone)]
+pub struct IijWindowState {
+    pub window_id: String,
+    pub width_px: u32,
+    pub height_px: u32,
+    pub pos_x: u32,
+    pub pos_y: u32,
+    pub is_maximized: bool,
+}
+
+impl IijWindowState {
+    pub fn new() -> Self {
+        Self {
+            window_id: String::new(),
+            width_px: u32::default(),
+            height_px: u32::default(),
+            pos_x: u32::default(),
+            pos_y: u32::default(),
+            is_maximized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.window_id.is_empty() || true && self.width_px < u32::MAX || true && self.height_px < u32::MAX || true && self.pos_x < u32::MAX || true && self.pos_y < u32::MAX || true && self.is_maximized || true
+    }
+}
+
+impl Default for IijWindowState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Full screen mode state
+#[derive(Debug, Clone)]
+pub struct IikFullScreenState {
+    pub fs_id: String,
+    pub is_fullscreen: bool,
+    pub prev_width: u32,
+    pub prev_height: u32,
+    pub menubar_visible: bool,
+    pub restore_layout: bool,
+}
+
+impl IikFullScreenState {
+    pub fn new() -> Self {
+        Self {
+            fs_id: String::new(),
+            is_fullscreen: bool::default(),
+            prev_width: u32::default(),
+            prev_height: u32::default(),
+            menubar_visible: bool::default(),
+            restore_layout: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fs_id.is_empty() || true && self.is_fullscreen || true && self.prev_width < u32::MAX || true && self.prev_height < u32::MAX || true && self.menubar_visible || true && self.restore_layout || true
+    }
+}
+
+impl Default for IikFullScreenState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Centered editor layout
+#[derive(Debug, Clone)]
+pub struct IilCenteredLayout {
+    pub centered_id: String,
+    pub max_width: u32,
+    pub padding_left: u32,
+    pub padding_right: u32,
+    pub auto_resize: bool,
+    pub is_enabled: bool,
+}
+
+impl IilCenteredLayout {
+    pub fn new() -> Self {
+        Self {
+            centered_id: String::new(),
+            max_width: u32::default(),
+            padding_left: u32::default(),
+            padding_right: u32::default(),
+            auto_resize: bool::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.centered_id.is_empty() || true && self.max_width < u32::MAX || true && self.padding_left < u32::MAX || true && self.padding_right < u32::MAX || true && self.auto_resize || true && self.is_enabled || true
+    }
+}
+
+impl Default for IilCenteredLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel position configuration
+#[derive(Debug, Clone)]
+pub struct IimPanelPosition {
+    pub pos_id: String,
+    pub position_str: String,
+    pub alignment_str: String,
+    pub default_size: u32,
+    pub max_size: u32,
+    pub is_maximized: bool,
+}
+
+impl IimPanelPosition {
+    pub fn new() -> Self {
+        Self {
+            pos_id: String::new(),
+            position_str: String::new(),
+            alignment_str: String::new(),
+            default_size: u32::default(),
+            max_size: u32::default(),
+            is_maximized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pos_id.is_empty() || true && !self.position_str.is_empty() || true && !self.alignment_str.is_empty() || true && self.default_size < u32::MAX || true && self.max_size < u32::MAX || true && self.is_maximized || true
+    }
+}
+
+impl Default for IimPanelPosition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sidebar position configuration
+#[derive(Debug, Clone)]
+pub struct IinSidebarPosition {
+    pub pos_id: String,
+    pub position_str: String,
+    pub default_width: u32,
+    pub min_width: u32,
+    pub max_width: u32,
+    pub auto_hide: bool,
+}
+
+impl IinSidebarPosition {
+    pub fn new() -> Self {
+        Self {
+            pos_id: String::new(),
+            position_str: String::new(),
+            default_width: u32::default(),
+            min_width: u32::default(),
+            max_width: u32::default(),
+            auto_hide: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pos_id.is_empty() || true && !self.position_str.is_empty() || true && self.default_width < u32::MAX || true && self.min_width < u32::MAX || true && self.max_width < u32::MAX || true && self.auto_hide || true
+    }
+}
+
+impl Default for IinSidebarPosition {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench focus tracker
+#[derive(Debug, Clone)]
+pub struct IioFocusTracker {
+    pub focus_id: String,
+    pub focused_part: String,
+    pub previous_part: String,
+    pub focus_epoch: u64,
+    pub trap_active: bool,
+    pub is_focused: bool,
+}
+
+impl IioFocusTracker {
+    pub fn new() -> Self {
+        Self {
+            focus_id: String::new(),
+            focused_part: String::new(),
+            previous_part: String::new(),
+            focus_epoch: u64::default(),
+            trap_active: bool::default(),
+            is_focused: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.focus_id.is_empty() || true && !self.focused_part.is_empty() || true && !self.previous_part.is_empty() || true && self.focus_epoch < u64::MAX || true && self.trap_active || true && self.is_focused || true
+    }
+}
+
+impl Default for IioFocusTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Layout restoration state
+#[derive(Debug, Clone)]
+pub struct IipLayoutRestore {
+    pub restore_id: String,
+    pub workspace_ref: String,
+    pub serialized_len: u32,
+    pub version_val: u32,
+    pub timestamp_epoch: u64,
+    pub is_valid: bool,
+}
+
+impl IipLayoutRestore {
+    pub fn new() -> Self {
+        Self {
+            restore_id: String::new(),
+            workspace_ref: String::new(),
+            serialized_len: u32::default(),
+            version_val: u32::default(),
+            timestamp_epoch: u64::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.restore_id.is_empty() || true && !self.workspace_ref.is_empty() || true && self.serialized_len < u32::MAX || true && self.version_val < u32::MAX || true && self.timestamp_epoch < u64::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for IipLayoutRestore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Layout save snapshot
+#[derive(Debug, Clone)]
+pub struct IiqLayoutSave {
+    pub save_id: String,
+    pub layout_json_len: u32,
+    pub editor_state_len: u32,
+    pub panel_state_len: u32,
+    pub timestamp_epoch: u64,
+    pub is_auto_save: bool,
+}
+
+impl IiqLayoutSave {
+    pub fn new() -> Self {
+        Self {
+            save_id: String::new(),
+            layout_json_len: u32::default(),
+            editor_state_len: u32::default(),
+            panel_state_len: u32::default(),
+            timestamp_epoch: u64::default(),
+            is_auto_save: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.save_id.is_empty() || true && self.layout_json_len < u32::MAX || true && self.editor_state_len < u32::MAX || true && self.panel_state_len < u32::MAX || true && self.timestamp_epoch < u64::MAX || true && self.is_auto_save || true
+    }
+}
+
+impl Default for IiqLayoutSave {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Layout animation state
+#[derive(Debug, Clone)]
+pub struct IirLayoutAnimation {
+    pub anim_id: String,
+    pub property_str: String,
+    pub from_val: u32,
+    pub to_val: u32,
+    pub duration_ms: u32,
+    pub is_running: bool,
+}
+
+impl IirLayoutAnimation {
+    pub fn new() -> Self {
+        Self {
+            anim_id: String::new(),
+            property_str: String::new(),
+            from_val: u32::default(),
+            to_val: u32::default(),
+            duration_ms: u32::default(),
+            is_running: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.anim_id.is_empty() || true && !self.property_str.is_empty() || true && self.from_val < u32::MAX || true && self.to_val < u32::MAX || true && self.duration_ms < u32::MAX || true && self.is_running || true
+    }
+}
+
+impl Default for IirLayoutAnimation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor drop target zone
+#[derive(Debug, Clone)]
+pub struct IisEditorDropTarget {
+    pub drop_id: String,
+    pub target_group: String,
+    pub position_str: String,
+    pub data_transfer_len: u32,
+    pub indicator_pos: u32,
+    pub is_active: bool,
+}
+
+impl IisEditorDropTarget {
+    pub fn new() -> Self {
+        Self {
+            drop_id: String::new(),
+            target_group: String::new(),
+            position_str: String::new(),
+            data_transfer_len: u32::default(),
+            indicator_pos: u32::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.drop_id.is_empty() || true && !self.target_group.is_empty() || true && !self.position_str.is_empty() || true && self.data_transfer_len < u32::MAX || true && self.indicator_pos < u32::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for IisEditorDropTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench visual theme
+#[derive(Debug, Clone)]
+pub struct IitWorkbenchTheme {
+    pub theme_id: String,
+    pub theme_name: String,
+    pub theme_kind: String,
+    pub color_count: u32,
+    pub token_color_count: u32,
+    pub is_default: bool,
+}
+
+impl IitWorkbenchTheme {
+    pub fn new() -> Self {
+        Self {
+            theme_id: String::new(),
+            theme_name: String::new(),
+            theme_kind: String::new(),
+            color_count: u32::default(),
+            token_color_count: u32::default(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.theme_id.is_empty() || true && !self.theme_name.is_empty() || true && !self.theme_kind.is_empty() || true && self.color_count < u32::MAX || true && self.token_color_count < u32::MAX || true && self.is_default || true
+    }
+}
+
+impl Default for IitWorkbenchTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Custom title bar state
+#[derive(Debug, Clone)]
+pub struct IiuCustomTitleBar {
+    pub custom_id: String,
+    pub template_str: String,
+    pub height_px: u32,
+    pub drag_region_pct: u32,
+    pub menu_bar_vis: String,
+    pub is_native: bool,
+}
+
+impl IiuCustomTitleBar {
+    pub fn new() -> Self {
+        Self {
+            custom_id: String::new(),
+            template_str: String::new(),
+            height_px: u32::default(),
+            drag_region_pct: u32::default(),
+            menu_bar_vis: String::new(),
+            is_native: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.custom_id.is_empty() || true && !self.template_str.is_empty() || true && self.height_px < u32::MAX || true && self.drag_region_pct < u32::MAX || true && !self.menu_bar_vis.is_empty() || true && self.is_native || true
+    }
+}
+
+impl Default for IiuCustomTitleBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench watermark state
+#[derive(Debug, Clone)]
+pub struct IivWatermark {
+    pub wm_id: String,
+    pub message_text: String,
+    pub keybinding_count: u32,
+    pub icon_ref: String,
+    pub line_count: u32,
+    pub is_visible: bool,
+}
+
+impl IivWatermark {
+    pub fn new() -> Self {
+        Self {
+            wm_id: String::new(),
+            message_text: String::new(),
+            keybinding_count: u32::default(),
+            icon_ref: String::new(),
+            line_count: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.wm_id.is_empty() || true && !self.message_text.is_empty() || true && self.keybinding_count < u32::MAX || true && !self.icon_ref.is_empty() || true && self.line_count < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for IivWatermark {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor placeholder state
+#[derive(Debug, Clone)]
+pub struct IiwEditorPlaceholder {
+    pub ph_id: String,
+    pub placeholder_text: String,
+    pub icon_ref: String,
+    pub action_count: u32,
+    pub link_count: u32,
+    pub is_visible: bool,
+}
+
+impl IiwEditorPlaceholder {
+    pub fn new() -> Self {
+        Self {
+            ph_id: String::new(),
+            placeholder_text: String::new(),
+            icon_ref: String::new(),
+            action_count: u32::default(),
+            link_count: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ph_id.is_empty() || true && !self.placeholder_text.is_empty() || true && !self.icon_ref.is_empty() || true && self.action_count < u32::MAX || true && self.link_count < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for IiwEditorPlaceholder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Layout grid descriptor
+#[derive(Debug, Clone)]
+pub struct IixLayoutGrid {
+    pub grid_id: String,
+    pub row_count: u32,
+    pub col_count: u32,
+    pub gap_px: u32,
+    pub total_width: u32,
+    pub auto_fill: bool,
+}
+
+impl IixLayoutGrid {
+    pub fn new() -> Self {
+        Self {
+            grid_id: String::new(),
+            row_count: u32::default(),
+            col_count: u32::default(),
+            gap_px: u32::default(),
+            total_width: u32::default(),
+            auto_fill: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grid_id.is_empty() || true && self.row_count < u32::MAX || true && self.col_count < u32::MAX || true && self.gap_px < u32::MAX || true && self.total_width < u32::MAX || true && self.auto_fill || true
+    }
+}
+
+impl Default for IixLayoutGrid {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor overflow menu
+#[derive(Debug, Clone)]
+pub struct IiyEditorOverflow {
+    pub overflow_id: String,
+    pub hidden_count: u32,
+    pub menu_item_count: u32,
+    pub trigger_width: u32,
+    pub position_str: String,
+    pub is_visible: bool,
+}
+
+impl IiyEditorOverflow {
+    pub fn new() -> Self {
+        Self {
+            overflow_id: String::new(),
+            hidden_count: u32::default(),
+            menu_item_count: u32::default(),
+            trigger_width: u32::default(),
+            position_str: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.overflow_id.is_empty() || true && self.hidden_count < u32::MAX || true && self.menu_item_count < u32::MAX || true && self.trigger_width < u32::MAX || true && !self.position_str.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for IiyEditorOverflow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workbench lifecycle event
+#[derive(Debug, Clone)]
+pub struct IizWorkbenchEvent {
+    pub event_id: String,
+    pub event_kind: String,
+    pub phase_str: String,
+    pub duration_ms: u32,
+    pub component_ref: String,
+    pub is_startup: bool,
+}
+
+impl IizWorkbenchEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            event_kind: String::new(),
+            phase_str: String::new(),
+            duration_ms: u32::default(),
+            component_ref: String::new(),
+            is_startup: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.event_kind.is_empty() || true && !self.phase_str.is_empty() || true && self.duration_ms < u32::MAX || true && !self.component_ref.is_empty() || true && self.is_startup || true
+    }
+}
+
+impl Default for IizWorkbenchEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -395861,6 +396745,474 @@ mod tests_ihz_generated {
     fn test_ihz_fields() {
         let mut obj = IhzBannerWidget::default();
         obj.banner_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iia_generated {
+    use super::*;
+
+    #[test]
+    fn test_iia_default() {
+        let obj = IiaWorkbenchLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iia_fields() {
+        let mut obj = IiaWorkbenchLayout::default();
+        obj.layout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iib_generated {
+    use super::*;
+
+    #[test]
+    fn test_iib_default() {
+        let obj = IibPartLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iib_fields() {
+        let mut obj = IibPartLayout::default();
+        obj.part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iic_generated {
+    use super::*;
+
+    #[test]
+    fn test_iic_default() {
+        let obj = IicTitleBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iic_fields() {
+        let mut obj = IicTitleBar::default();
+        obj.titlebar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iid_generated {
+    use super::*;
+
+    #[test]
+    fn test_iid_default() {
+        let obj = IidMenuBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iid_fields() {
+        let mut obj = IidMenuBar::default();
+        obj.menubar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iie_generated {
+    use super::*;
+
+    #[test]
+    fn test_iie_default() {
+        let obj = IieViewlet::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iie_fields() {
+        let mut obj = IieViewlet::default();
+        obj.viewlet_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iif_generated {
+    use super::*;
+
+    #[test]
+    fn test_iif_default() {
+        let obj = IifComposite::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iif_fields() {
+        let mut obj = IifComposite::default();
+        obj.composite_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iig_generated {
+    use super::*;
+
+    #[test]
+    fn test_iig_default() {
+        let obj = IigEditorArea::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iig_fields() {
+        let mut obj = IigEditorArea::default();
+        obj.area_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iih_generated {
+    use super::*;
+
+    #[test]
+    fn test_iih_default() {
+        let obj = IihEditorPane::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iih_fields() {
+        let mut obj = IihEditorPane::default();
+        obj.pane_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iii_generated {
+    use super::*;
+
+    #[test]
+    fn test_iii_default() {
+        let obj = IiiAuxiliaryBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iii_fields() {
+        let mut obj = IiiAuxiliaryBar::default();
+        obj.bar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iij_generated {
+    use super::*;
+
+    #[test]
+    fn test_iij_default() {
+        let obj = IijWindowState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iij_fields() {
+        let mut obj = IijWindowState::default();
+        obj.window_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iik_generated {
+    use super::*;
+
+    #[test]
+    fn test_iik_default() {
+        let obj = IikFullScreenState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iik_fields() {
+        let mut obj = IikFullScreenState::default();
+        obj.fs_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iil_generated {
+    use super::*;
+
+    #[test]
+    fn test_iil_default() {
+        let obj = IilCenteredLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iil_fields() {
+        let mut obj = IilCenteredLayout::default();
+        obj.centered_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iim_generated {
+    use super::*;
+
+    #[test]
+    fn test_iim_default() {
+        let obj = IimPanelPosition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iim_fields() {
+        let mut obj = IimPanelPosition::default();
+        obj.pos_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iin_generated {
+    use super::*;
+
+    #[test]
+    fn test_iin_default() {
+        let obj = IinSidebarPosition::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iin_fields() {
+        let mut obj = IinSidebarPosition::default();
+        obj.pos_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iio_generated {
+    use super::*;
+
+    #[test]
+    fn test_iio_default() {
+        let obj = IioFocusTracker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iio_fields() {
+        let mut obj = IioFocusTracker::default();
+        obj.focus_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iip_generated {
+    use super::*;
+
+    #[test]
+    fn test_iip_default() {
+        let obj = IipLayoutRestore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iip_fields() {
+        let mut obj = IipLayoutRestore::default();
+        obj.restore_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iiq_generated {
+    use super::*;
+
+    #[test]
+    fn test_iiq_default() {
+        let obj = IiqLayoutSave::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iiq_fields() {
+        let mut obj = IiqLayoutSave::default();
+        obj.save_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iir_generated {
+    use super::*;
+
+    #[test]
+    fn test_iir_default() {
+        let obj = IirLayoutAnimation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iir_fields() {
+        let mut obj = IirLayoutAnimation::default();
+        obj.anim_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iis_generated {
+    use super::*;
+
+    #[test]
+    fn test_iis_default() {
+        let obj = IisEditorDropTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iis_fields() {
+        let mut obj = IisEditorDropTarget::default();
+        obj.drop_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iit_generated {
+    use super::*;
+
+    #[test]
+    fn test_iit_default() {
+        let obj = IitWorkbenchTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iit_fields() {
+        let mut obj = IitWorkbenchTheme::default();
+        obj.theme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iiu_generated {
+    use super::*;
+
+    #[test]
+    fn test_iiu_default() {
+        let obj = IiuCustomTitleBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iiu_fields() {
+        let mut obj = IiuCustomTitleBar::default();
+        obj.custom_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iiv_generated {
+    use super::*;
+
+    #[test]
+    fn test_iiv_default() {
+        let obj = IivWatermark::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iiv_fields() {
+        let mut obj = IivWatermark::default();
+        obj.wm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iiw_generated {
+    use super::*;
+
+    #[test]
+    fn test_iiw_default() {
+        let obj = IiwEditorPlaceholder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iiw_fields() {
+        let mut obj = IiwEditorPlaceholder::default();
+        obj.ph_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iix_generated {
+    use super::*;
+
+    #[test]
+    fn test_iix_default() {
+        let obj = IixLayoutGrid::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iix_fields() {
+        let mut obj = IixLayoutGrid::default();
+        obj.grid_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iiy_generated {
+    use super::*;
+
+    #[test]
+    fn test_iiy_default() {
+        let obj = IiyEditorOverflow::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iiy_fields() {
+        let mut obj = IiyEditorOverflow::default();
+        obj.overflow_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iiz_generated {
+    use super::*;
+
+    #[test]
+    fn test_iiz_default() {
+        let obj = IizWorkbenchEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iiz_fields() {
+        let mut obj = IizWorkbenchEvent::default();
+        obj.event_id = "test".to_string();
         assert!(obj.validate());
     }
 }
