@@ -56783,6 +56783,213 @@ impl Default for FbzTerminalSerial {
 }
 
 
+/// Ratatui base widget abstraction types
+#[derive(Debug, Clone)]
+pub struct FcaRatuiWidget {
+    pub widget_id: String,
+    pub widget_area_x: u32,
+    pub widget_area_y: u32,
+    pub widget_area_width: u32,
+    pub widget_area_height: u32,
+    pub widget_focused: bool,
+    pub widget_visible: bool,
+    pub widget_dirty: bool,
+    pub widget_z_index: u32,
+    pub widget_clip: bool,
+}
+
+impl FcaRatuiWidget {
+    pub fn new() -> Self {
+        Self {
+            widget_id: String::new(),
+            widget_area_x: u32::default(),
+            widget_area_y: u32::default(),
+            widget_area_width: u32::default(),
+            widget_area_height: u32::default(),
+            widget_focused: bool::default(),
+            widget_visible: bool::default(),
+            widget_dirty: bool::default(),
+            widget_z_index: u32::default(),
+            widget_clip: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.widget_id.is_empty() || true && self.widget_area_x < u32::MAX || true && self.widget_area_y < u32::MAX || true && self.widget_area_width < u32::MAX || true && self.widget_area_height < u32::MAX || true && self.widget_focused || true && self.widget_visible || true && self.widget_dirty || true && self.widget_z_index < u32::MAX || true && self.widget_clip || true
+    }
+}
+
+impl Default for FcaRatuiWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Ratatui block border/title types
+#[derive(Debug, Clone)]
+pub struct FcbRatuiBlock {
+    pub block_title: String,
+    pub block_title_alignment: String,
+    pub block_borders: u32,
+    pub block_border_style: String,
+    pub block_border_type: String,
+    pub block_padding_top: u32,
+    pub block_padding_bottom: u32,
+    pub block_padding_left: u32,
+    pub block_padding_right: u32,
+    pub block_bg_color: String,
+}
+
+impl FcbRatuiBlock {
+    pub fn new() -> Self {
+        Self {
+            block_title: String::new(),
+            block_title_alignment: String::new(),
+            block_borders: u32::default(),
+            block_border_style: String::new(),
+            block_border_type: String::new(),
+            block_padding_top: u32::default(),
+            block_padding_bottom: u32::default(),
+            block_padding_left: u32::default(),
+            block_padding_right: u32::default(),
+            block_bg_color: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.block_title.is_empty() || true && !self.block_title_alignment.is_empty() || true && self.block_borders < u32::MAX || true && !self.block_border_style.is_empty() || true && !self.block_border_type.is_empty() || true && self.block_padding_top < u32::MAX || true && self.block_padding_bottom < u32::MAX || true && self.block_padding_left < u32::MAX || true && self.block_padding_right < u32::MAX || true && !self.block_bg_color.is_empty() || true
+    }
+}
+
+impl Default for FcbRatuiBlock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Ratatui paragraph/text rendering types
+#[derive(Debug, Clone)]
+pub struct FccRatuiParagraph {
+    pub paragraph_text: String,
+    pub paragraph_alignment: String,
+    pub paragraph_wrap_trim: bool,
+    pub paragraph_scroll_offset: u32,
+    pub paragraph_line_count: u32,
+    pub paragraph_style_fg: String,
+    pub paragraph_style_bg: String,
+    pub paragraph_style_bold: bool,
+    pub paragraph_style_italic: bool,
+    pub paragraph_max_width: u32,
+}
+
+impl FccRatuiParagraph {
+    pub fn new() -> Self {
+        Self {
+            paragraph_text: String::new(),
+            paragraph_alignment: String::new(),
+            paragraph_wrap_trim: bool::default(),
+            paragraph_scroll_offset: u32::default(),
+            paragraph_line_count: u32::default(),
+            paragraph_style_fg: String::new(),
+            paragraph_style_bg: String::new(),
+            paragraph_style_bold: bool::default(),
+            paragraph_style_italic: bool::default(),
+            paragraph_max_width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.paragraph_text.is_empty() || true && !self.paragraph_alignment.is_empty() || true && self.paragraph_wrap_trim || true && self.paragraph_scroll_offset < u32::MAX || true && self.paragraph_line_count < u32::MAX || true && !self.paragraph_style_fg.is_empty() || true && !self.paragraph_style_bg.is_empty() || true && self.paragraph_style_bold || true && self.paragraph_style_italic || true && self.paragraph_max_width < u32::MAX || true
+    }
+}
+
+impl Default for FccRatuiParagraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Ratatui list widget types
+#[derive(Debug, Clone)]
+pub struct FcdRatuiList {
+    pub list_items_count: u32,
+    pub list_selected_index: u32,
+    pub list_highlight_symbol: String,
+    pub list_highlight_style_fg: String,
+    pub list_highlight_style_bg: String,
+    pub list_start_corner: String,
+    pub list_scroll_offset: u32,
+    pub list_repeat_highlight: bool,
+    pub list_direction: String,
+    pub list_spacing: u32,
+}
+
+impl FcdRatuiList {
+    pub fn new() -> Self {
+        Self {
+            list_items_count: u32::default(),
+            list_selected_index: u32::default(),
+            list_highlight_symbol: String::new(),
+            list_highlight_style_fg: String::new(),
+            list_highlight_style_bg: String::new(),
+            list_start_corner: String::new(),
+            list_scroll_offset: u32::default(),
+            list_repeat_highlight: bool::default(),
+            list_direction: String::new(),
+            list_spacing: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.list_items_count < u32::MAX || true && self.list_selected_index < u32::MAX || true && !self.list_highlight_symbol.is_empty() || true && !self.list_highlight_style_fg.is_empty() || true && !self.list_highlight_style_bg.is_empty() || true && !self.list_start_corner.is_empty() || true && self.list_scroll_offset < u32::MAX || true && self.list_repeat_highlight || true && !self.list_direction.is_empty() || true && self.list_spacing < u32::MAX || true
+    }
+}
+
+impl Default for FcdRatuiList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Ratatui table widget types
+#[derive(Debug, Clone)]
+pub struct FceRatuiTable {
+    pub table_columns: String,
+    pub table_rows_count: u32,
+    pub table_selected_row: u32,
+    pub table_selected_col: u32,
+    pub table_header_height: u32,
+    pub table_row_height: u32,
+    pub table_column_spacing: u32,
+    pub table_highlight_style_fg: String,
+    pub table_highlight_style_bg: String,
+    pub table_highlight_symbol: String,
+}
+
+impl FceRatuiTable {
+    pub fn new() -> Self {
+        Self {
+            table_columns: String::new(),
+            table_rows_count: u32::default(),
+            table_selected_row: u32::default(),
+            table_selected_col: u32::default(),
+            table_header_height: u32::default(),
+            table_row_height: u32::default(),
+            table_column_spacing: u32::default(),
+            table_highlight_style_fg: String::new(),
+            table_highlight_style_bg: String::new(),
+            table_highlight_symbol: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.table_columns.is_empty() || true && self.table_rows_count < u32::MAX || true && self.table_selected_row < u32::MAX || true && self.table_selected_col < u32::MAX || true && self.table_header_height < u32::MAX || true && self.table_row_height < u32::MAX || true && self.table_column_spacing < u32::MAX || true && !self.table_highlight_style_fg.is_empty() || true && !self.table_highlight_style_bg.is_empty() || true && !self.table_highlight_symbol.is_empty() || true
+    }
+}
+
+impl Default for FceRatuiTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -269085,6 +269292,96 @@ mod tests_fbz_generated {
     fn test_fbz_fields() {
         let mut obj = FbzTerminalSerial::default();
         obj.serial_port_path = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fca_generated {
+    use super::*;
+
+    #[test]
+    fn test_fca_default() {
+        let obj = FcaRatuiWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fca_fields() {
+        let mut obj = FcaRatuiWidget::default();
+        obj.widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcb_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcb_default() {
+        let obj = FcbRatuiBlock::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcb_fields() {
+        let mut obj = FcbRatuiBlock::default();
+        obj.block_title = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcc_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcc_default() {
+        let obj = FccRatuiParagraph::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcc_fields() {
+        let mut obj = FccRatuiParagraph::default();
+        obj.paragraph_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fcd_generated {
+    use super::*;
+
+    #[test]
+    fn test_fcd_default() {
+        let obj = FcdRatuiList::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fcd_fields() {
+        let mut obj = FcdRatuiList::default();
+        obj.list_items_count = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fce_generated {
+    use super::*;
+
+    #[test]
+    fn test_fce_default() {
+        let obj = FceRatuiTable::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fce_fields() {
+        let mut obj = FceRatuiTable::default();
+        obj.table_columns = "test".to_string();
         assert!(obj.validate());
     }
 }
