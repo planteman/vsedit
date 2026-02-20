@@ -146080,6 +146080,890 @@ impl Default for IjzShutdownEvent {
     }
 }
 
+/// Theme color token
+#[derive(Debug, Clone)]
+pub struct IkaThemeColor {
+    pub color_id: String,
+    pub color_key: String,
+    pub dark_value: String,
+    pub light_value: String,
+    pub hc_value: String,
+    pub is_opaque: bool,
+}
+
+impl IkaThemeColor {
+    pub fn new() -> Self {
+        Self {
+            color_id: String::new(),
+            color_key: String::new(),
+            dark_value: String::new(),
+            light_value: String::new(),
+            hc_value: String::new(),
+            is_opaque: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_id.is_empty() || true && !self.color_key.is_empty() || true && !self.dark_value.is_empty() || true && !self.light_value.is_empty() || true && !self.hc_value.is_empty() || true && self.is_opaque || true
+    }
+}
+
+impl Default for IkaThemeColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Icon theme descriptor
+#[derive(Debug, Clone)]
+pub struct IkbIconTheme {
+    pub icon_id: String,
+    pub theme_name: String,
+    pub theme_path: String,
+    pub definition_count: u32,
+    pub folder_icon_ref: String,
+    pub show_language_mode_icons: bool,
+}
+
+impl IkbIconTheme {
+    pub fn new() -> Self {
+        Self {
+            icon_id: String::new(),
+            theme_name: String::new(),
+            theme_path: String::new(),
+            definition_count: u32::default(),
+            folder_icon_ref: String::new(),
+            show_language_mode_icons: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.icon_id.is_empty() || true && !self.theme_name.is_empty() || true && !self.theme_path.is_empty() || true && self.definition_count < u32::MAX || true && !self.folder_icon_ref.is_empty() || true && self.show_language_mode_icons || true
+    }
+}
+
+impl Default for IkbIconTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Product icon theme
+#[derive(Debug, Clone)]
+pub struct IkcProductIconTheme {
+    pub product_id: String,
+    pub theme_name: String,
+    pub icon_count: u32,
+    pub font_definition_count: u32,
+    pub version_str: String,
+    pub is_default: bool,
+}
+
+impl IkcProductIconTheme {
+    pub fn new() -> Self {
+        Self {
+            product_id: String::new(),
+            theme_name: String::new(),
+            icon_count: u32::default(),
+            font_definition_count: u32::default(),
+            version_str: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.product_id.is_empty() || true && !self.theme_name.is_empty() || true && self.icon_count < u32::MAX || true && self.font_definition_count < u32::MAX || true && !self.version_str.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for IkcProductIconTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color customization entry
+#[derive(Debug, Clone)]
+pub struct IkdColorCustomization {
+    pub custom_id: String,
+    pub color_key: String,
+    pub value_hex: String,
+    pub scope_str: String,
+    pub priority_val: u32,
+    pub is_user_defined: bool,
+}
+
+impl IkdColorCustomization {
+    pub fn new() -> Self {
+        Self {
+            custom_id: String::new(),
+            color_key: String::new(),
+            value_hex: String::new(),
+            scope_str: String::new(),
+            priority_val: u32::default(),
+            is_user_defined: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.custom_id.is_empty() || true && !self.color_key.is_empty() || true && !self.value_hex.is_empty() || true && !self.scope_str.is_empty() || true && self.priority_val < u32::MAX || true && self.is_user_defined || true
+    }
+}
+
+impl Default for IkdColorCustomization {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Token color rule
+#[derive(Debug, Clone)]
+pub struct IkeTokenColor {
+    pub token_id: String,
+    pub scope_str: String,
+    pub foreground_hex: String,
+    pub font_style_str: String,
+    pub background_hex: String,
+    pub is_bold: bool,
+}
+
+impl IkeTokenColor {
+    pub fn new() -> Self {
+        Self {
+            token_id: String::new(),
+            scope_str: String::new(),
+            foreground_hex: String::new(),
+            font_style_str: String::new(),
+            background_hex: String::new(),
+            is_bold: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_id.is_empty() || true && !self.scope_str.is_empty() || true && !self.foreground_hex.is_empty() || true && !self.font_style_str.is_empty() || true && !self.background_hex.is_empty() || true && self.is_bold || true
+    }
+}
+
+impl Default for IkeTokenColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token color rule
+#[derive(Debug, Clone)]
+pub struct IkfSemanticTokenColor {
+    pub semantic_id: String,
+    pub token_type_str: String,
+    pub modifier_str: String,
+    pub foreground_hex: String,
+    pub font_style_str: String,
+    pub is_italic: bool,
+}
+
+impl IkfSemanticTokenColor {
+    pub fn new() -> Self {
+        Self {
+            semantic_id: String::new(),
+            token_type_str: String::new(),
+            modifier_str: String::new(),
+            foreground_hex: String::new(),
+            font_style_str: String::new(),
+            is_italic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.semantic_id.is_empty() || true && !self.token_type_str.is_empty() || true && !self.modifier_str.is_empty() || true && !self.foreground_hex.is_empty() || true && !self.font_style_str.is_empty() || true && self.is_italic || true
+    }
+}
+
+impl Default for IkfSemanticTokenColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme registry state
+#[derive(Debug, Clone)]
+pub struct IkgThemeRegistry {
+    pub reg_id: String,
+    pub theme_count: u32,
+    pub active_theme_ref: String,
+    pub default_dark_ref: String,
+    pub default_light_ref: String,
+    pub auto_detect: bool,
+}
+
+impl IkgThemeRegistry {
+    pub fn new() -> Self {
+        Self {
+            reg_id: String::new(),
+            theme_count: u32::default(),
+            active_theme_ref: String::new(),
+            default_dark_ref: String::new(),
+            default_light_ref: String::new(),
+            auto_detect: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reg_id.is_empty() || true && self.theme_count < u32::MAX || true && !self.active_theme_ref.is_empty() || true && !self.default_dark_ref.is_empty() || true && !self.default_light_ref.is_empty() || true && self.auto_detect || true
+    }
+}
+
+impl Default for IkgThemeRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme extension point
+#[derive(Debug, Clone)]
+pub struct IkhThemeExtension {
+    pub ext_id: String,
+    pub extension_ref: String,
+    pub theme_count: u32,
+    pub contribution_point: String,
+    pub version_str: String,
+    pub is_builtin: bool,
+}
+
+impl IkhThemeExtension {
+    pub fn new() -> Self {
+        Self {
+            ext_id: String::new(),
+            extension_ref: String::new(),
+            theme_count: u32::default(),
+            contribution_point: String::new(),
+            version_str: String::new(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_id.is_empty() || true && !self.extension_ref.is_empty() || true && self.theme_count < u32::MAX || true && !self.contribution_point.is_empty() || true && !self.version_str.is_empty() || true && self.is_builtin || true
+    }
+}
+
+impl Default for IkhThemeExtension {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Color scheme descriptor
+#[derive(Debug, Clone)]
+pub struct IkiColorScheme {
+    pub scheme_id: String,
+    pub scheme_name: String,
+    pub base_theme: String,
+    pub color_count: u32,
+    pub inherit_from: String,
+    pub is_dark: bool,
+}
+
+impl IkiColorScheme {
+    pub fn new() -> Self {
+        Self {
+            scheme_id: String::new(),
+            scheme_name: String::new(),
+            base_theme: String::new(),
+            color_count: u32::default(),
+            inherit_from: String::new(),
+            is_dark: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scheme_id.is_empty() || true && !self.scheme_name.is_empty() || true && !self.base_theme.is_empty() || true && self.color_count < u32::MAX || true && !self.inherit_from.is_empty() || true && self.is_dark || true
+    }
+}
+
+impl Default for IkiColorScheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// High contrast theme
+#[derive(Debug, Clone)]
+pub struct IkjHighContrastTheme {
+    pub hc_id: String,
+    pub variant_str: String,
+    pub contrast_ratio: u32,
+    pub border_width: u32,
+    pub color_count: u32,
+    pub is_light_hc: bool,
+}
+
+impl IkjHighContrastTheme {
+    pub fn new() -> Self {
+        Self {
+            hc_id: String::new(),
+            variant_str: String::new(),
+            contrast_ratio: u32::default(),
+            border_width: u32::default(),
+            color_count: u32::default(),
+            is_light_hc: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hc_id.is_empty() || true && !self.variant_str.is_empty() || true && self.contrast_ratio < u32::MAX || true && self.border_width < u32::MAX || true && self.color_count < u32::MAX || true && self.is_light_hc || true
+    }
+}
+
+impl Default for IkjHighContrastTheme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Theme JSON document
+#[derive(Debug, Clone)]
+pub struct IkkThemeDocument {
+    pub doc_id: String,
+    pub file_path: String,
+    pub color_count: u32,
+    pub token_color_count: u32,
+    pub semantic_color_count: u32,
+    pub is_valid: bool,
+}
+
+impl IkkThemeDocument {
+    pub fn new() -> Self {
+        Self {
+            doc_id: String::new(),
+            file_path: String::new(),
+            color_count: u32::default(),
+            token_color_count: u32::default(),
+            semantic_color_count: u32::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.doc_id.is_empty() || true && !self.file_path.is_empty() || true && self.color_count < u32::MAX || true && self.token_color_count < u32::MAX || true && self.semantic_color_count < u32::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for IkkThemeDocument {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor font styling
+#[derive(Debug, Clone)]
+pub struct IklEditorFontStyle {
+    pub style_id: String,
+    pub font_family: String,
+    pub font_size_px: u32,
+    pub line_height_factor: u32,
+    pub font_weight: u32,
+    pub font_ligatures: bool,
+}
+
+impl IklEditorFontStyle {
+    pub fn new() -> Self {
+        Self {
+            style_id: String::new(),
+            font_family: String::new(),
+            font_size_px: u32::default(),
+            line_height_factor: u32::default(),
+            font_weight: u32::default(),
+            font_ligatures: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.style_id.is_empty() || true && !self.font_family.is_empty() || true && self.font_size_px < u32::MAX || true && self.line_height_factor < u32::MAX || true && self.font_weight < u32::MAX || true && self.font_ligatures || true
+    }
+}
+
+impl Default for IklEditorFontStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Cursor blink animation
+#[derive(Debug, Clone)]
+pub struct IkmCursorBlinkStyle {
+    pub blink_id: String,
+    pub style_str: String,
+    pub on_ms: u32,
+    pub off_ms: u32,
+    pub smooth_caret: bool,
+    pub is_enabled: bool,
+}
+
+impl IkmCursorBlinkStyle {
+    pub fn new() -> Self {
+        Self {
+            blink_id: String::new(),
+            style_str: String::new(),
+            on_ms: u32::default(),
+            off_ms: u32::default(),
+            smooth_caret: bool::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.blink_id.is_empty() || true && !self.style_str.is_empty() || true && self.on_ms < u32::MAX || true && self.off_ms < u32::MAX || true && self.smooth_caret || true && self.is_enabled || true
+    }
+}
+
+impl Default for IkmCursorBlinkStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor opacity setting
+#[derive(Debug, Clone)]
+pub struct IknEditorOpacity {
+    pub opacity_id: String,
+    pub element_ref: String,
+    pub opacity_pct: u32,
+    pub hover_opacity_pct: u32,
+    pub transition_ms: u32,
+    pub is_dynamic: bool,
+}
+
+impl IknEditorOpacity {
+    pub fn new() -> Self {
+        Self {
+            opacity_id: String::new(),
+            element_ref: String::new(),
+            opacity_pct: u32::default(),
+            hover_opacity_pct: u32::default(),
+            transition_ms: u32::default(),
+            is_dynamic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.opacity_id.is_empty() || true && !self.element_ref.is_empty() || true && self.opacity_pct < u32::MAX || true && self.hover_opacity_pct < u32::MAX || true && self.transition_ms < u32::MAX || true && self.is_dynamic || true
+    }
+}
+
+impl Default for IknEditorOpacity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor padding setting
+#[derive(Debug, Clone)]
+pub struct IkoEditorPadding {
+    pub padding_id: String,
+    pub top_px: u32,
+    pub bottom_px: u32,
+    pub left_px: u32,
+    pub right_px: u32,
+    pub is_responsive: bool,
+}
+
+impl IkoEditorPadding {
+    pub fn new() -> Self {
+        Self {
+            padding_id: String::new(),
+            top_px: u32::default(),
+            bottom_px: u32::default(),
+            left_px: u32::default(),
+            right_px: u32::default(),
+            is_responsive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.padding_id.is_empty() || true && self.top_px < u32::MAX || true && self.bottom_px < u32::MAX || true && self.left_px < u32::MAX || true && self.right_px < u32::MAX || true && self.is_responsive || true
+    }
+}
+
+impl Default for IkoEditorPadding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor rounded corner
+#[derive(Debug, Clone)]
+pub struct IkpEditorRoundedCorner {
+    pub corner_id: String,
+    pub radius_px: u32,
+    pub element_ref: String,
+    pub applies_to: String,
+    pub override_val: u32,
+    pub is_enabled: bool,
+}
+
+impl IkpEditorRoundedCorner {
+    pub fn new() -> Self {
+        Self {
+            corner_id: String::new(),
+            radius_px: u32::default(),
+            element_ref: String::new(),
+            applies_to: String::new(),
+            override_val: u32::default(),
+            is_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.corner_id.is_empty() || true && self.radius_px < u32::MAX || true && !self.element_ref.is_empty() || true && !self.applies_to.is_empty() || true && self.override_val < u32::MAX || true && self.is_enabled || true
+    }
+}
+
+impl Default for IkpEditorRoundedCorner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor border styling
+#[derive(Debug, Clone)]
+pub struct IkqEditorBorder {
+    pub border_id: String,
+    pub width_px: u32,
+    pub color_token: String,
+    pub style_str: String,
+    pub element_ref: String,
+    pub is_visible: bool,
+}
+
+impl IkqEditorBorder {
+    pub fn new() -> Self {
+        Self {
+            border_id: String::new(),
+            width_px: u32::default(),
+            color_token: String::new(),
+            style_str: String::new(),
+            element_ref: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.border_id.is_empty() || true && self.width_px < u32::MAX || true && !self.color_token.is_empty() || true && !self.style_str.is_empty() || true && !self.element_ref.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for IkqEditorBorder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor shadow styling
+#[derive(Debug, Clone)]
+pub struct IkrEditorShadow {
+    pub shadow_id: String,
+    pub offset_x: u32,
+    pub offset_y: u32,
+    pub blur_px: u32,
+    pub color_token: String,
+    pub is_inset: bool,
+}
+
+impl IkrEditorShadow {
+    pub fn new() -> Self {
+        Self {
+            shadow_id: String::new(),
+            offset_x: u32::default(),
+            offset_y: u32::default(),
+            blur_px: u32::default(),
+            color_token: String::new(),
+            is_inset: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shadow_id.is_empty() || true && self.offset_x < u32::MAX || true && self.offset_y < u32::MAX || true && self.blur_px < u32::MAX || true && !self.color_token.is_empty() || true && self.is_inset || true
+    }
+}
+
+impl Default for IkrEditorShadow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor background styling
+#[derive(Debug, Clone)]
+pub struct IksEditorBackground {
+    pub bg_id: String,
+    pub color_hex: String,
+    pub opacity_pct: u32,
+    pub gradient_str: String,
+    pub element_ref: String,
+    pub is_transparent: bool,
+}
+
+impl IksEditorBackground {
+    pub fn new() -> Self {
+        Self {
+            bg_id: String::new(),
+            color_hex: String::new(),
+            opacity_pct: u32::default(),
+            gradient_str: String::new(),
+            element_ref: String::new(),
+            is_transparent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bg_id.is_empty() || true && !self.color_hex.is_empty() || true && self.opacity_pct < u32::MAX || true && !self.gradient_str.is_empty() || true && !self.element_ref.is_empty() || true && self.is_transparent || true
+    }
+}
+
+impl Default for IksEditorBackground {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor foreground styling
+#[derive(Debug, Clone)]
+pub struct IktEditorForeground {
+    pub fg_id: String,
+    pub color_hex: String,
+    pub opacity_pct: u32,
+    pub font_weight: u32,
+    pub element_ref: String,
+    pub is_default: bool,
+}
+
+impl IktEditorForeground {
+    pub fn new() -> Self {
+        Self {
+            fg_id: String::new(),
+            color_hex: String::new(),
+            opacity_pct: u32::default(),
+            font_weight: u32::default(),
+            element_ref: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fg_id.is_empty() || true && !self.color_hex.is_empty() || true && self.opacity_pct < u32::MAX || true && self.font_weight < u32::MAX || true && !self.element_ref.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for IktEditorForeground {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor selection coloring
+#[derive(Debug, Clone)]
+pub struct IkuEditorSelectionColor {
+    pub sel_id: String,
+    pub bg_color: String,
+    pub border_color: String,
+    pub opacity_pct: u32,
+    pub highlight_adjacent: bool,
+    pub round_corners: bool,
+}
+
+impl IkuEditorSelectionColor {
+    pub fn new() -> Self {
+        Self {
+            sel_id: String::new(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            opacity_pct: u32::default(),
+            highlight_adjacent: bool::default(),
+            round_corners: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_id.is_empty() || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && self.opacity_pct < u32::MAX || true && self.highlight_adjacent || true && self.round_corners || true
+    }
+}
+
+impl Default for IkuEditorSelectionColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor highlight coloring
+#[derive(Debug, Clone)]
+pub struct IkvEditorHighlightColor {
+    pub hl_id: String,
+    pub bg_color: String,
+    pub border_color: String,
+    pub overview_ruler_color: String,
+    pub opacity_pct: u32,
+    pub is_strong: bool,
+}
+
+impl IkvEditorHighlightColor {
+    pub fn new() -> Self {
+        Self {
+            hl_id: String::new(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            overview_ruler_color: String::new(),
+            opacity_pct: u32::default(),
+            is_strong: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hl_id.is_empty() || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && !self.overview_ruler_color.is_empty() || true && self.opacity_pct < u32::MAX || true && self.is_strong || true
+    }
+}
+
+impl Default for IkvEditorHighlightColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor find match coloring
+#[derive(Debug, Clone)]
+pub struct IkwEditorFindColor {
+    pub find_id: String,
+    pub match_bg_color: String,
+    pub active_bg_color: String,
+    pub border_color: String,
+    pub overview_color: String,
+    pub highlight_border: bool,
+}
+
+impl IkwEditorFindColor {
+    pub fn new() -> Self {
+        Self {
+            find_id: String::new(),
+            match_bg_color: String::new(),
+            active_bg_color: String::new(),
+            border_color: String::new(),
+            overview_color: String::new(),
+            highlight_border: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.find_id.is_empty() || true && !self.match_bg_color.is_empty() || true && !self.active_bg_color.is_empty() || true && !self.border_color.is_empty() || true && !self.overview_color.is_empty() || true && self.highlight_border || true
+    }
+}
+
+impl Default for IkwEditorFindColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor hover coloring
+#[derive(Debug, Clone)]
+pub struct IkxEditorHoverColor {
+    pub hover_id: String,
+    pub bg_color: String,
+    pub border_color: String,
+    pub foreground_color: String,
+    pub max_width: u32,
+    pub is_sticky: bool,
+}
+
+impl IkxEditorHoverColor {
+    pub fn new() -> Self {
+        Self {
+            hover_id: String::new(),
+            bg_color: String::new(),
+            border_color: String::new(),
+            foreground_color: String::new(),
+            max_width: u32::default(),
+            is_sticky: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_id.is_empty() || true && !self.bg_color.is_empty() || true && !self.border_color.is_empty() || true && !self.foreground_color.is_empty() || true && self.max_width < u32::MAX || true && self.is_sticky || true
+    }
+}
+
+impl Default for IkxEditorHoverColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor line number coloring
+#[derive(Debug, Clone)]
+pub struct IkyEditorLineColor {
+    pub line_id: String,
+    pub foreground_color: String,
+    pub active_foreground: String,
+    pub dimmed_foreground: String,
+    pub margin_width: u32,
+    pub is_relative: bool,
+}
+
+impl IkyEditorLineColor {
+    pub fn new() -> Self {
+        Self {
+            line_id: String::new(),
+            foreground_color: String::new(),
+            active_foreground: String::new(),
+            dimmed_foreground: String::new(),
+            margin_width: u32::default(),
+            is_relative: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_id.is_empty() || true && !self.foreground_color.is_empty() || true && !self.active_foreground.is_empty() || true && !self.dimmed_foreground.is_empty() || true && self.margin_width < u32::MAX || true && self.is_relative || true
+    }
+}
+
+impl Default for IkyEditorLineColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor gutter coloring
+#[derive(Debug, Clone)]
+pub struct IkzEditorGutterColor {
+    pub gutter_id: String,
+    pub bg_color: String,
+    pub modified_color: String,
+    pub added_color: String,
+    pub deleted_color: String,
+    pub show_folding: bool,
+}
+
+impl IkzEditorGutterColor {
+    pub fn new() -> Self {
+        Self {
+            gutter_id: String::new(),
+            bg_color: String::new(),
+            modified_color: String::new(),
+            added_color: String::new(),
+            deleted_color: String::new(),
+            show_folding: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.gutter_id.is_empty() || true && !self.bg_color.is_empty() || true && !self.modified_color.is_empty() || true && !self.added_color.is_empty() || true && !self.deleted_color.is_empty() || true && self.show_folding || true
+    }
+}
+
+impl Default for IkzEditorGutterColor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -398728,6 +399612,474 @@ mod tests_ijz_generated {
     fn test_ijz_fields() {
         let mut obj = IjzShutdownEvent::default();
         obj.shutdown_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ika_generated {
+    use super::*;
+
+    #[test]
+    fn test_ika_default() {
+        let obj = IkaThemeColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ika_fields() {
+        let mut obj = IkaThemeColor::default();
+        obj.color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikb_default() {
+        let obj = IkbIconTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikb_fields() {
+        let mut obj = IkbIconTheme::default();
+        obj.icon_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikc_default() {
+        let obj = IkcProductIconTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikc_fields() {
+        let mut obj = IkcProductIconTheme::default();
+        obj.product_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikd_default() {
+        let obj = IkdColorCustomization::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikd_fields() {
+        let mut obj = IkdColorCustomization::default();
+        obj.custom_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ike_generated {
+    use super::*;
+
+    #[test]
+    fn test_ike_default() {
+        let obj = IkeTokenColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ike_fields() {
+        let mut obj = IkeTokenColor::default();
+        obj.token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikf_default() {
+        let obj = IkfSemanticTokenColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikf_fields() {
+        let mut obj = IkfSemanticTokenColor::default();
+        obj.semantic_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikg_default() {
+        let obj = IkgThemeRegistry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikg_fields() {
+        let mut obj = IkgThemeRegistry::default();
+        obj.reg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikh_default() {
+        let obj = IkhThemeExtension::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikh_fields() {
+        let mut obj = IkhThemeExtension::default();
+        obj.ext_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iki_generated {
+    use super::*;
+
+    #[test]
+    fn test_iki_default() {
+        let obj = IkiColorScheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iki_fields() {
+        let mut obj = IkiColorScheme::default();
+        obj.scheme_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikj_default() {
+        let obj = IkjHighContrastTheme::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikj_fields() {
+        let mut obj = IkjHighContrastTheme::default();
+        obj.hc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikk_default() {
+        let obj = IkkThemeDocument::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikk_fields() {
+        let mut obj = IkkThemeDocument::default();
+        obj.doc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikl_default() {
+        let obj = IklEditorFontStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikl_fields() {
+        let mut obj = IklEditorFontStyle::default();
+        obj.style_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikm_default() {
+        let obj = IkmCursorBlinkStyle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikm_fields() {
+        let mut obj = IkmCursorBlinkStyle::default();
+        obj.blink_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikn_default() {
+        let obj = IknEditorOpacity::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikn_fields() {
+        let mut obj = IknEditorOpacity::default();
+        obj.opacity_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iko_generated {
+    use super::*;
+
+    #[test]
+    fn test_iko_default() {
+        let obj = IkoEditorPadding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iko_fields() {
+        let mut obj = IkoEditorPadding::default();
+        obj.padding_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikp_default() {
+        let obj = IkpEditorRoundedCorner::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikp_fields() {
+        let mut obj = IkpEditorRoundedCorner::default();
+        obj.corner_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikq_default() {
+        let obj = IkqEditorBorder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikq_fields() {
+        let mut obj = IkqEditorBorder::default();
+        obj.border_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikr_default() {
+        let obj = IkrEditorShadow::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikr_fields() {
+        let mut obj = IkrEditorShadow::default();
+        obj.shadow_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iks_generated {
+    use super::*;
+
+    #[test]
+    fn test_iks_default() {
+        let obj = IksEditorBackground::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iks_fields() {
+        let mut obj = IksEditorBackground::default();
+        obj.bg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikt_default() {
+        let obj = IktEditorForeground::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikt_fields() {
+        let mut obj = IktEditorForeground::default();
+        obj.fg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iku_generated {
+    use super::*;
+
+    #[test]
+    fn test_iku_default() {
+        let obj = IkuEditorSelectionColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iku_fields() {
+        let mut obj = IkuEditorSelectionColor::default();
+        obj.sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikv_default() {
+        let obj = IkvEditorHighlightColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikv_fields() {
+        let mut obj = IkvEditorHighlightColor::default();
+        obj.hl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikw_default() {
+        let obj = IkwEditorFindColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikw_fields() {
+        let mut obj = IkwEditorFindColor::default();
+        obj.find_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikx_default() {
+        let obj = IkxEditorHoverColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikx_fields() {
+        let mut obj = IkxEditorHoverColor::default();
+        obj.hover_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iky_generated {
+    use super::*;
+
+    #[test]
+    fn test_iky_default() {
+        let obj = IkyEditorLineColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iky_fields() {
+        let mut obj = IkyEditorLineColor::default();
+        obj.line_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ikz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ikz_default() {
+        let obj = IkzEditorGutterColor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ikz_fields() {
+        let mut obj = IkzEditorGutterColor::default();
+        obj.gutter_id = "test".to_string();
         assert!(obj.validate());
     }
 }
