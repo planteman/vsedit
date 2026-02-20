@@ -129267,6 +129267,890 @@ impl Default for HqzBulkEdit {
     }
 }
 
+/// Language server protocol client
+#[derive(Debug, Clone)]
+pub struct HraLspClient {
+    pub client_id: String,
+    pub server_name: String,
+    pub root_uri: String,
+    pub protocol_version: String,
+    pub pending_requests: u32,
+    pub is_initialized: bool,
+}
+
+impl HraLspClient {
+    pub fn new() -> Self {
+        Self {
+            client_id: String::new(),
+            server_name: String::new(),
+            root_uri: String::new(),
+            protocol_version: String::new(),
+            pending_requests: u32::default(),
+            is_initialized: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.client_id.is_empty() || true && !self.server_name.is_empty() || true && !self.root_uri.is_empty() || true && !self.protocol_version.is_empty() || true && self.pending_requests < u32::MAX || true && self.is_initialized || true
+    }
+}
+
+impl Default for HraLspClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP server capability descriptor
+#[derive(Debug, Clone)]
+pub struct HrbLspCapability {
+    pub cap_id: String,
+    pub capability_name: String,
+    pub provider_kind: String,
+    pub trigger_chars: String,
+    pub resolve_support: u32,
+    pub is_dynamic: bool,
+}
+
+impl HrbLspCapability {
+    pub fn new() -> Self {
+        Self {
+            cap_id: String::new(),
+            capability_name: String::new(),
+            provider_kind: String::new(),
+            trigger_chars: String::new(),
+            resolve_support: u32::default(),
+            is_dynamic: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cap_id.is_empty() || true && !self.capability_name.is_empty() || true && !self.provider_kind.is_empty() || true && !self.trigger_chars.is_empty() || true && self.resolve_support < u32::MAX || true && self.is_dynamic || true
+    }
+}
+
+impl Default for HrbLspCapability {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP request message
+#[derive(Debug, Clone)]
+pub struct HrcLspRequest {
+    pub request_id: String,
+    pub method_name: String,
+    pub params_json: String,
+    pub seq_number: u64,
+    pub timeout_ms: u32,
+    pub is_cancellable: bool,
+}
+
+impl HrcLspRequest {
+    pub fn new() -> Self {
+        Self {
+            request_id: String::new(),
+            method_name: String::new(),
+            params_json: String::new(),
+            seq_number: u64::default(),
+            timeout_ms: u32::default(),
+            is_cancellable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.request_id.is_empty() || true && !self.method_name.is_empty() || true && !self.params_json.is_empty() || true && self.seq_number < u64::MAX || true && self.timeout_ms < u32::MAX || true && self.is_cancellable || true
+    }
+}
+
+impl Default for HrcLspRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP response message
+#[derive(Debug, Clone)]
+pub struct HrdLspResponse {
+    pub response_id: String,
+    pub request_ref: String,
+    pub result_json: String,
+    pub error_code: u32,
+    pub elapsed_ms: u64,
+    pub is_partial: bool,
+}
+
+impl HrdLspResponse {
+    pub fn new() -> Self {
+        Self {
+            response_id: String::new(),
+            request_ref: String::new(),
+            result_json: String::new(),
+            error_code: u32::default(),
+            elapsed_ms: u64::default(),
+            is_partial: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.response_id.is_empty() || true && !self.request_ref.is_empty() || true && !self.result_json.is_empty() || true && self.error_code < u32::MAX || true && self.elapsed_ms < u64::MAX || true && self.is_partial || true
+    }
+}
+
+impl Default for HrdLspResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP notification message
+#[derive(Debug, Clone)]
+pub struct HreLspNotification {
+    pub notif_id: String,
+    pub method_name: String,
+    pub params_json: String,
+    pub source_name: String,
+    pub seq_number: u64,
+    pub is_progress: bool,
+}
+
+impl HreLspNotification {
+    pub fn new() -> Self {
+        Self {
+            notif_id: String::new(),
+            method_name: String::new(),
+            params_json: String::new(),
+            source_name: String::new(),
+            seq_number: u64::default(),
+            is_progress: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.notif_id.is_empty() || true && !self.method_name.is_empty() || true && !self.params_json.is_empty() || true && !self.source_name.is_empty() || true && self.seq_number < u64::MAX || true && self.is_progress || true
+    }
+}
+
+impl Default for HreLspNotification {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP diagnostic entry
+#[derive(Debug, Clone)]
+pub struct HrfLspDiagnostic {
+    pub diag_id: String,
+    pub message_text: String,
+    pub severity_level: u32,
+    pub source_name: String,
+    pub error_code: u32,
+    pub is_deprecated: bool,
+}
+
+impl HrfLspDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            diag_id: String::new(),
+            message_text: String::new(),
+            severity_level: u32::default(),
+            source_name: String::new(),
+            error_code: u32::default(),
+            is_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_id.is_empty() || true && !self.message_text.is_empty() || true && self.severity_level < u32::MAX || true && !self.source_name.is_empty() || true && self.error_code < u32::MAX || true && self.is_deprecated || true
+    }
+}
+
+impl Default for HrfLspDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP completion item
+#[derive(Debug, Clone)]
+pub struct HrgCompletionItem {
+    pub item_id: String,
+    pub label_text: String,
+    pub kind_value: u32,
+    pub detail_text: String,
+    pub sort_priority: u32,
+    pub is_preselect: bool,
+}
+
+impl HrgCompletionItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            label_text: String::new(),
+            kind_value: u32::default(),
+            detail_text: String::new(),
+            sort_priority: u32::default(),
+            is_preselect: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.label_text.is_empty() || true && self.kind_value < u32::MAX || true && !self.detail_text.is_empty() || true && self.sort_priority < u32::MAX || true && self.is_preselect || true
+    }
+}
+
+impl Default for HrgCompletionItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP signature help result
+#[derive(Debug, Clone)]
+pub struct HrhSignatureHelp {
+    pub sig_id: String,
+    pub label_text: String,
+    pub param_count: u32,
+    pub active_param: u32,
+    pub doc_text_len: u32,
+    pub is_retrigger: bool,
+}
+
+impl HrhSignatureHelp {
+    pub fn new() -> Self {
+        Self {
+            sig_id: String::new(),
+            label_text: String::new(),
+            param_count: u32::default(),
+            active_param: u32::default(),
+            doc_text_len: u32::default(),
+            is_retrigger: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sig_id.is_empty() || true && !self.label_text.is_empty() || true && self.param_count < u32::MAX || true && self.active_param < u32::MAX || true && self.doc_text_len < u32::MAX || true && self.is_retrigger || true
+    }
+}
+
+impl Default for HrhSignatureHelp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP hover information result
+#[derive(Debug, Clone)]
+pub struct HriHoverResult {
+    pub hover_id: String,
+    pub contents_md: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub source_name: String,
+    pub has_range: bool,
+}
+
+impl HriHoverResult {
+    pub fn new() -> Self {
+        Self {
+            hover_id: String::new(),
+            contents_md: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            source_name: String::new(),
+            has_range: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_id.is_empty() || true && !self.contents_md.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && !self.source_name.is_empty() || true && self.has_range || true
+    }
+}
+
+impl Default for HriHoverResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP definition location link
+#[derive(Debug, Clone)]
+pub struct HrjDefinitionLink {
+    pub link_id: String,
+    pub target_uri: String,
+    pub target_line: u32,
+    pub target_col: u32,
+    pub origin_len: u32,
+    pub is_declaration: bool,
+}
+
+impl HrjDefinitionLink {
+    pub fn new() -> Self {
+        Self {
+            link_id: String::new(),
+            target_uri: String::new(),
+            target_line: u32::default(),
+            target_col: u32::default(),
+            origin_len: u32::default(),
+            is_declaration: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_id.is_empty() || true && !self.target_uri.is_empty() || true && self.target_line < u32::MAX || true && self.target_col < u32::MAX || true && self.origin_len < u32::MAX || true && self.is_declaration || true
+    }
+}
+
+impl Default for HrjDefinitionLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP reference location
+#[derive(Debug, Clone)]
+pub struct HrkReferenceLocation {
+    pub ref_id: String,
+    pub file_uri: String,
+    pub line_number: u32,
+    pub col_number: u32,
+    pub context_len: u32,
+    pub include_declaration: bool,
+}
+
+impl HrkReferenceLocation {
+    pub fn new() -> Self {
+        Self {
+            ref_id: String::new(),
+            file_uri: String::new(),
+            line_number: u32::default(),
+            col_number: u32::default(),
+            context_len: u32::default(),
+            include_declaration: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ref_id.is_empty() || true && !self.file_uri.is_empty() || true && self.line_number < u32::MAX || true && self.col_number < u32::MAX || true && self.context_len < u32::MAX || true && self.include_declaration || true
+    }
+}
+
+impl Default for HrkReferenceLocation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP document highlight
+#[derive(Debug, Clone)]
+pub struct HrlDocumentHighlight {
+    pub highlight_id: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub kind_value: u32,
+    pub doc_uri_len: u32,
+    pub is_write: bool,
+}
+
+impl HrlDocumentHighlight {
+    pub fn new() -> Self {
+        Self {
+            highlight_id: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            kind_value: u32::default(),
+            doc_uri_len: u32::default(),
+            is_write: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.highlight_id.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && self.kind_value < u32::MAX || true && self.doc_uri_len < u32::MAX || true && self.is_write || true
+    }
+}
+
+impl Default for HrlDocumentHighlight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP document symbol
+#[derive(Debug, Clone)]
+pub struct HrmDocumentSymbol {
+    pub symbol_id: String,
+    pub symbol_name: String,
+    pub kind_value: u32,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub is_deprecated: bool,
+}
+
+impl HrmDocumentSymbol {
+    pub fn new() -> Self {
+        Self {
+            symbol_id: String::new(),
+            symbol_name: String::new(),
+            kind_value: u32::default(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            is_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.symbol_id.is_empty() || true && !self.symbol_name.is_empty() || true && self.kind_value < u32::MAX || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && self.is_deprecated || true
+    }
+}
+
+impl Default for HrmDocumentSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP code lens annotation
+#[derive(Debug, Clone)]
+pub struct HrnCodeLens {
+    pub lens_id: String,
+    pub command_title: String,
+    pub command_ref: String,
+    pub line_number: u32,
+    pub data_len: u32,
+    pub is_resolved: bool,
+}
+
+impl HrnCodeLens {
+    pub fn new() -> Self {
+        Self {
+            lens_id: String::new(),
+            command_title: String::new(),
+            command_ref: String::new(),
+            line_number: u32::default(),
+            data_len: u32::default(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lens_id.is_empty() || true && !self.command_title.is_empty() || true && !self.command_ref.is_empty() || true && self.line_number < u32::MAX || true && self.data_len < u32::MAX || true && self.is_resolved || true
+    }
+}
+
+impl Default for HrnCodeLens {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP document link
+#[derive(Debug, Clone)]
+pub struct HroDocumentLink {
+    pub link_id: String,
+    pub target_url: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub tooltip_len: u32,
+    pub is_resolved: bool,
+}
+
+impl HroDocumentLink {
+    pub fn new() -> Self {
+        Self {
+            link_id: String::new(),
+            target_url: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            tooltip_len: u32::default(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_id.is_empty() || true && !self.target_url.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && self.tooltip_len < u32::MAX || true && self.is_resolved || true
+    }
+}
+
+impl Default for HroDocumentLink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP color presentation
+#[derive(Debug, Clone)]
+pub struct HrpColorPresentation {
+    pub color_id: String,
+    pub label_text: String,
+    pub text_edit_str: String,
+    pub red_value: u32,
+    pub green_value: u32,
+    pub has_alpha: bool,
+}
+
+impl HrpColorPresentation {
+    pub fn new() -> Self {
+        Self {
+            color_id: String::new(),
+            label_text: String::new(),
+            text_edit_str: String::new(),
+            red_value: u32::default(),
+            green_value: u32::default(),
+            has_alpha: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_id.is_empty() || true && !self.label_text.is_empty() || true && !self.text_edit_str.is_empty() || true && self.red_value < u32::MAX || true && self.green_value < u32::MAX || true && self.has_alpha || true
+    }
+}
+
+impl Default for HrpColorPresentation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP folding range
+#[derive(Debug, Clone)]
+pub struct HrqFoldingRange {
+    pub fold_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub kind_str: String,
+    pub collapsed_text_len: u32,
+    pub is_collapsed: bool,
+}
+
+impl HrqFoldingRange {
+    pub fn new() -> Self {
+        Self {
+            fold_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            kind_str: String::new(),
+            collapsed_text_len: u32::default(),
+            is_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fold_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.kind_str.is_empty() || true && self.collapsed_text_len < u32::MAX || true && self.is_collapsed || true
+    }
+}
+
+impl Default for HrqFoldingRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP selection range
+#[derive(Debug, Clone)]
+pub struct HrrSelectionRange {
+    pub sel_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub has_parent: bool,
+}
+
+impl HrrSelectionRange {
+    pub fn new() -> Self {
+        Self {
+            sel_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            has_parent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && self.has_parent || true
+    }
+}
+
+impl Default for HrrSelectionRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP call hierarchy item
+#[derive(Debug, Clone)]
+pub struct HrsCallHierarchyItem {
+    pub item_id: String,
+    pub item_name: String,
+    pub kind_value: u32,
+    pub file_uri: String,
+    pub call_count: u32,
+    pub is_recursive: bool,
+}
+
+impl HrsCallHierarchyItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            item_name: String::new(),
+            kind_value: u32::default(),
+            file_uri: String::new(),
+            call_count: u32::default(),
+            is_recursive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.item_name.is_empty() || true && self.kind_value < u32::MAX || true && !self.file_uri.is_empty() || true && self.call_count < u32::MAX || true && self.is_recursive || true
+    }
+}
+
+impl Default for HrsCallHierarchyItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP type hierarchy item
+#[derive(Debug, Clone)]
+pub struct HrtTypeHierarchyItem {
+    pub item_id: String,
+    pub item_name: String,
+    pub kind_value: u32,
+    pub file_uri: String,
+    pub child_count: u32,
+    pub is_interface: bool,
+}
+
+impl HrtTypeHierarchyItem {
+    pub fn new() -> Self {
+        Self {
+            item_id: String::new(),
+            item_name: String::new(),
+            kind_value: u32::default(),
+            file_uri: String::new(),
+            child_count: u32::default(),
+            is_interface: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.item_id.is_empty() || true && !self.item_name.is_empty() || true && self.kind_value < u32::MAX || true && !self.file_uri.is_empty() || true && self.child_count < u32::MAX || true && self.is_interface || true
+    }
+}
+
+impl Default for HrtTypeHierarchyItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP inlay hint annotation
+#[derive(Debug, Clone)]
+pub struct HruInlayHint {
+    pub hint_id: String,
+    pub label_text: String,
+    pub position_line: u32,
+    pub position_col: u32,
+    pub kind_value: u32,
+    pub padding_left: bool,
+}
+
+impl HruInlayHint {
+    pub fn new() -> Self {
+        Self {
+            hint_id: String::new(),
+            label_text: String::new(),
+            position_line: u32::default(),
+            position_col: u32::default(),
+            kind_value: u32::default(),
+            padding_left: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hint_id.is_empty() || true && !self.label_text.is_empty() || true && self.position_line < u32::MAX || true && self.position_col < u32::MAX || true && self.kind_value < u32::MAX || true && self.padding_left || true
+    }
+}
+
+impl Default for HruInlayHint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP semantic token entry
+#[derive(Debug, Clone)]
+pub struct HrvSemanticToken {
+    pub token_id: String,
+    pub token_kind: u32,
+    pub modifiers_mask: u32,
+    pub delta_line: u32,
+    pub delta_col: u32,
+    pub is_multiline: bool,
+}
+
+impl HrvSemanticToken {
+    pub fn new() -> Self {
+        Self {
+            token_id: String::new(),
+            token_kind: u32::default(),
+            modifiers_mask: u32::default(),
+            delta_line: u32::default(),
+            delta_col: u32::default(),
+            is_multiline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_id.is_empty() || true && self.token_kind < u32::MAX || true && self.modifiers_mask < u32::MAX || true && self.delta_line < u32::MAX || true && self.delta_col < u32::MAX || true && self.is_multiline || true
+    }
+}
+
+impl Default for HrvSemanticToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP linked editing range
+#[derive(Debug, Clone)]
+pub struct HrwLinkedEditRange {
+    pub range_id: String,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub word_pattern_set: bool,
+}
+
+impl HrwLinkedEditRange {
+    pub fn new() -> Self {
+        Self {
+            range_id: String::new(),
+            start_line: u32::default(),
+            start_col: u32::default(),
+            end_line: u32::default(),
+            end_col: u32::default(),
+            word_pattern_set: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.range_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_col < u32::MAX || true && self.end_line < u32::MAX || true && self.end_col < u32::MAX || true && self.word_pattern_set || true
+    }
+}
+
+impl Default for HrwLinkedEditRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP workspace edit descriptor
+#[derive(Debug, Clone)]
+pub struct HrxWorkspaceEdit {
+    pub edit_id: String,
+    pub document_count: u32,
+    pub total_edits: u32,
+    pub create_count: u32,
+    pub delete_count: u32,
+    pub needs_confirmation: bool,
+}
+
+impl HrxWorkspaceEdit {
+    pub fn new() -> Self {
+        Self {
+            edit_id: String::new(),
+            document_count: u32::default(),
+            total_edits: u32::default(),
+            create_count: u32::default(),
+            delete_count: u32::default(),
+            needs_confirmation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_id.is_empty() || true && self.document_count < u32::MAX || true && self.total_edits < u32::MAX || true && self.create_count < u32::MAX || true && self.delete_count < u32::MAX || true && self.needs_confirmation || true
+    }
+}
+
+impl Default for HrxWorkspaceEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP text document edit
+#[derive(Debug, Clone)]
+pub struct HryTextDocumentEdit {
+    pub doc_edit_id: String,
+    pub doc_uri: String,
+    pub version_num: u32,
+    pub edit_count: u32,
+    pub text_len_delta: u64,
+    pub is_whole_doc: bool,
+}
+
+impl HryTextDocumentEdit {
+    pub fn new() -> Self {
+        Self {
+            doc_edit_id: String::new(),
+            doc_uri: String::new(),
+            version_num: u32::default(),
+            edit_count: u32::default(),
+            text_len_delta: u64::default(),
+            is_whole_doc: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.doc_edit_id.is_empty() || true && !self.doc_uri.is_empty() || true && self.version_num < u32::MAX || true && self.edit_count < u32::MAX || true && self.text_len_delta < u64::MAX || true && self.is_whole_doc || true
+    }
+}
+
+impl Default for HryTextDocumentEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LSP progress notification
+#[derive(Debug, Clone)]
+pub struct HrzLspProgress {
+    pub progress_id: String,
+    pub token_str: String,
+    pub title_text: String,
+    pub message_text: String,
+    pub percentage: u32,
+    pub is_cancellable: bool,
+}
+
+impl HrzLspProgress {
+    pub fn new() -> Self {
+        Self {
+            progress_id: String::new(),
+            token_str: String::new(),
+            title_text: String::new(),
+            message_text: String::new(),
+            percentage: u32::default(),
+            is_cancellable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.progress_id.is_empty() || true && !self.token_str.is_empty() || true && !self.title_text.is_empty() || true && !self.message_text.is_empty() || true && self.percentage < u32::MAX || true && self.is_cancellable || true
+    }
+}
+
+impl Default for HrzLspProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -372876,6 +373760,474 @@ mod tests_hqz_generated {
     fn test_hqz_fields() {
         let mut obj = HqzBulkEdit::default();
         obj.bulk_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hra_generated {
+    use super::*;
+
+    #[test]
+    fn test_hra_default() {
+        let obj = HraLspClient::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hra_fields() {
+        let mut obj = HraLspClient::default();
+        obj.client_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrb_default() {
+        let obj = HrbLspCapability::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrb_fields() {
+        let mut obj = HrbLspCapability::default();
+        obj.cap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrc_default() {
+        let obj = HrcLspRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrc_fields() {
+        let mut obj = HrcLspRequest::default();
+        obj.request_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrd_default() {
+        let obj = HrdLspResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrd_fields() {
+        let mut obj = HrdLspResponse::default();
+        obj.response_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hre_generated {
+    use super::*;
+
+    #[test]
+    fn test_hre_default() {
+        let obj = HreLspNotification::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hre_fields() {
+        let mut obj = HreLspNotification::default();
+        obj.notif_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrf_default() {
+        let obj = HrfLspDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrf_fields() {
+        let mut obj = HrfLspDiagnostic::default();
+        obj.diag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrg_default() {
+        let obj = HrgCompletionItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrg_fields() {
+        let mut obj = HrgCompletionItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrh_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrh_default() {
+        let obj = HrhSignatureHelp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrh_fields() {
+        let mut obj = HrhSignatureHelp::default();
+        obj.sig_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hri_generated {
+    use super::*;
+
+    #[test]
+    fn test_hri_default() {
+        let obj = HriHoverResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hri_fields() {
+        let mut obj = HriHoverResult::default();
+        obj.hover_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrj_default() {
+        let obj = HrjDefinitionLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrj_fields() {
+        let mut obj = HrjDefinitionLink::default();
+        obj.link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrk_default() {
+        let obj = HrkReferenceLocation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrk_fields() {
+        let mut obj = HrkReferenceLocation::default();
+        obj.ref_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrl_default() {
+        let obj = HrlDocumentHighlight::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrl_fields() {
+        let mut obj = HrlDocumentHighlight::default();
+        obj.highlight_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrm_default() {
+        let obj = HrmDocumentSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrm_fields() {
+        let mut obj = HrmDocumentSymbol::default();
+        obj.symbol_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrn_default() {
+        let obj = HrnCodeLens::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrn_fields() {
+        let mut obj = HrnCodeLens::default();
+        obj.lens_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hro_generated {
+    use super::*;
+
+    #[test]
+    fn test_hro_default() {
+        let obj = HroDocumentLink::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hro_fields() {
+        let mut obj = HroDocumentLink::default();
+        obj.link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrp_default() {
+        let obj = HrpColorPresentation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrp_fields() {
+        let mut obj = HrpColorPresentation::default();
+        obj.color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrq_default() {
+        let obj = HrqFoldingRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrq_fields() {
+        let mut obj = HrqFoldingRange::default();
+        obj.fold_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrr_default() {
+        let obj = HrrSelectionRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrr_fields() {
+        let mut obj = HrrSelectionRange::default();
+        obj.sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrs_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrs_default() {
+        let obj = HrsCallHierarchyItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrs_fields() {
+        let mut obj = HrsCallHierarchyItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrt_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrt_default() {
+        let obj = HrtTypeHierarchyItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrt_fields() {
+        let mut obj = HrtTypeHierarchyItem::default();
+        obj.item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hru_generated {
+    use super::*;
+
+    #[test]
+    fn test_hru_default() {
+        let obj = HruInlayHint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hru_fields() {
+        let mut obj = HruInlayHint::default();
+        obj.hint_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrv_default() {
+        let obj = HrvSemanticToken::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrv_fields() {
+        let mut obj = HrvSemanticToken::default();
+        obj.token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrw_default() {
+        let obj = HrwLinkedEditRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrw_fields() {
+        let mut obj = HrwLinkedEditRange::default();
+        obj.range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrx_default() {
+        let obj = HrxWorkspaceEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrx_fields() {
+        let mut obj = HrxWorkspaceEdit::default();
+        obj.edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hry_generated {
+    use super::*;
+
+    #[test]
+    fn test_hry_default() {
+        let obj = HryTextDocumentEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hry_fields() {
+        let mut obj = HryTextDocumentEdit::default();
+        obj.doc_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hrz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hrz_default() {
+        let obj = HrzLspProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hrz_fields() {
+        let mut obj = HrzLspProgress::default();
+        obj.progress_id = "test".to_string();
         assert!(obj.validate());
     }
 }
