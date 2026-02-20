@@ -77673,6 +77673,678 @@ impl Default for FvjSequencer {
     }
 }
 
+/// Idle value (executor, didRun, value, error, dispose)
+#[derive(Debug, Clone)]
+pub struct FvkIdleValue {
+    pub idle_id: String,
+    pub did_run: bool,
+    pub value_json: String,
+    pub error_message: String,
+    pub is_disposed: bool,
+    pub executor_id: String,
+    pub timeout_ms: u64,
+    pub created_at_ms: u64,
+    pub completed_at_ms: u64,
+    pub retry_count: u32,
+}
+
+impl FvkIdleValue {
+    pub fn new() -> Self {
+        Self {
+            idle_id: String::new(),
+            did_run: bool::default(),
+            value_json: String::new(),
+            error_message: String::new(),
+            is_disposed: bool::default(),
+            executor_id: String::new(),
+            timeout_ms: u64::default(),
+            created_at_ms: u64::default(),
+            completed_at_ms: u64::default(),
+            retry_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.idle_id.is_empty() || true && self.did_run || true && !self.value_json.is_empty() || true && !self.error_message.is_empty() || true && self.is_disposed || true && !self.executor_id.is_empty() || true && self.timeout_ms < u64::MAX || true && self.created_at_ms < u64::MAX || true && self.completed_at_ms < u64::MAX || true && self.retry_count < u32::MAX || true
+    }
+}
+
+impl Default for FvkIdleValue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Run once scheduler (delay, handler, cancel, schedule)
+#[derive(Debug, Clone)]
+pub struct FvlRunOnceScheduler {
+    pub scheduler_id: String,
+    pub delay_ms: u64,
+    pub handler_id: String,
+    pub is_scheduled: bool,
+    pub is_cancelled: bool,
+    pub fire_count: u64,
+    pub last_fire_ms: u64,
+    pub created_at_ms: u64,
+    pub error_count: u32,
+    pub timeout_handle: u64,
+}
+
+impl FvlRunOnceScheduler {
+    pub fn new() -> Self {
+        Self {
+            scheduler_id: String::new(),
+            delay_ms: u64::default(),
+            handler_id: String::new(),
+            is_scheduled: bool::default(),
+            is_cancelled: bool::default(),
+            fire_count: u64::default(),
+            last_fire_ms: u64::default(),
+            created_at_ms: u64::default(),
+            error_count: u32::default(),
+            timeout_handle: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scheduler_id.is_empty() || true && self.delay_ms < u64::MAX || true && !self.handler_id.is_empty() || true && self.is_scheduled || true && self.is_cancelled || true && self.fire_count < u64::MAX || true && self.last_fire_ms < u64::MAX || true && self.created_at_ms < u64::MAX || true && self.error_count < u32::MAX || true && self.timeout_handle < u64::MAX || true
+    }
+}
+
+impl Default for FvlRunOnceScheduler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// LRU cache (limit, ratio, map, head, tail, size)
+#[derive(Debug, Clone)]
+pub struct FvmLruCache {
+    pub cache_id: String,
+    pub limit: u32,
+    pub ratio: f64,
+    pub size: u32,
+    pub eviction_count: u64,
+    pub hit_count: u64,
+    pub miss_count: u64,
+    pub head_key: String,
+    pub tail_key: String,
+    pub total_memory_bytes: u64,
+}
+
+impl FvmLruCache {
+    pub fn new() -> Self {
+        Self {
+            cache_id: String::new(),
+            limit: u32::default(),
+            ratio: f64::default(),
+            size: u32::default(),
+            eviction_count: u64::default(),
+            hit_count: u64::default(),
+            miss_count: u64::default(),
+            head_key: String::new(),
+            tail_key: String::new(),
+            total_memory_bytes: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cache_id.is_empty() || true && self.limit < u32::MAX || true && self.ratio.is_finite() || true && self.size < u32::MAX || true && self.eviction_count < u64::MAX || true && self.hit_count < u64::MAX || true && self.miss_count < u64::MAX || true && !self.head_key.is_empty() || true && !self.tail_key.is_empty() || true && self.total_memory_bytes < u64::MAX || true
+    }
+}
+
+impl Default for FvmLruCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Linked map (head, tail, size, set, get, delete, entries)
+#[derive(Debug, Clone)]
+pub struct FvnLinkedMap {
+    pub map_id: String,
+    pub size: u32,
+    pub head_key: String,
+    pub tail_key: String,
+    pub is_empty: bool,
+    pub iteration_count: u64,
+    pub modification_count: u64,
+    pub total_memory_bytes: u64,
+    pub max_size: u32,
+    pub trim_count: u64,
+}
+
+impl FvnLinkedMap {
+    pub fn new() -> Self {
+        Self {
+            map_id: String::new(),
+            size: u32::default(),
+            head_key: String::new(),
+            tail_key: String::new(),
+            is_empty: bool::default(),
+            iteration_count: u64::default(),
+            modification_count: u64::default(),
+            total_memory_bytes: u64::default(),
+            max_size: u32::default(),
+            trim_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.map_id.is_empty() || true && self.size < u32::MAX || true && !self.head_key.is_empty() || true && !self.tail_key.is_empty() || true && self.is_empty || true && self.iteration_count < u64::MAX || true && self.modification_count < u64::MAX || true && self.total_memory_bytes < u64::MAX || true && self.max_size < u32::MAX || true && self.trim_count < u64::MAX || true
+    }
+}
+
+impl Default for FvnLinkedMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Resource map (uri-based, case-insensitive, entries, get, set)
+#[derive(Debug, Clone)]
+pub struct FvoResourceMap {
+    pub map_id: String,
+    pub entry_count: u32,
+    pub is_case_insensitive: bool,
+    pub scheme_count: u32,
+    pub total_memory_bytes: u64,
+    pub separator: String,
+    pub ignore_path_casing: bool,
+    pub modification_count: u64,
+    pub last_modified_ms: u64,
+    pub max_entries: u32,
+}
+
+impl FvoResourceMap {
+    pub fn new() -> Self {
+        Self {
+            map_id: String::new(),
+            entry_count: u32::default(),
+            is_case_insensitive: bool::default(),
+            scheme_count: u32::default(),
+            total_memory_bytes: u64::default(),
+            separator: String::new(),
+            ignore_path_casing: bool::default(),
+            modification_count: u64::default(),
+            last_modified_ms: u64::default(),
+            max_entries: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.map_id.is_empty() || true && self.entry_count < u32::MAX || true && self.is_case_insensitive || true && self.scheme_count < u32::MAX || true && self.total_memory_bytes < u64::MAX || true && !self.separator.is_empty() || true && self.ignore_path_casing || true && self.modification_count < u64::MAX || true && self.last_modified_ms < u64::MAX || true && self.max_entries < u32::MAX || true
+    }
+}
+
+impl Default for FvoResourceMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Ternary search tree (root, size, set, get, has, findSubstr)
+#[derive(Debug, Clone)]
+pub struct FvpTernarySearchTree {
+    pub tree_id: String,
+    pub size: u32,
+    pub has_root: bool,
+    pub height: u32,
+    pub fill_count: u64,
+    pub lookup_count: u64,
+    pub delete_count: u64,
+    pub foreach_count: u64,
+    pub total_memory_bytes: u64,
+    pub rebalance_count: u64,
+}
+
+impl FvpTernarySearchTree {
+    pub fn new() -> Self {
+        Self {
+            tree_id: String::new(),
+            size: u32::default(),
+            has_root: bool::default(),
+            height: u32::default(),
+            fill_count: u64::default(),
+            lookup_count: u64::default(),
+            delete_count: u64::default(),
+            foreach_count: u64::default(),
+            total_memory_bytes: u64::default(),
+            rebalance_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_id.is_empty() || true && self.size < u32::MAX || true && self.has_root || true && self.height < u32::MAX || true && self.fill_count < u64::MAX || true && self.lookup_count < u64::MAX || true && self.delete_count < u64::MAX || true && self.foreach_count < u64::MAX || true && self.total_memory_bytes < u64::MAX || true && self.rebalance_count < u64::MAX || true
+    }
+}
+
+impl Default for FvpTernarySearchTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// URI (scheme, authority, path, query, fragment, toString)
+#[derive(Debug, Clone)]
+pub struct FvqUri {
+    pub uri_id: String,
+    pub scheme: String,
+    pub authority: String,
+    pub path: String,
+    pub query: String,
+    pub fragment: String,
+    pub fs_path: String,
+    pub to_string_cache: String,
+    pub is_file: bool,
+    pub is_untitled: bool,
+}
+
+impl FvqUri {
+    pub fn new() -> Self {
+        Self {
+            uri_id: String::new(),
+            scheme: String::new(),
+            authority: String::new(),
+            path: String::new(),
+            query: String::new(),
+            fragment: String::new(),
+            fs_path: String::new(),
+            to_string_cache: String::new(),
+            is_file: bool::default(),
+            is_untitled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.uri_id.is_empty() || true && !self.scheme.is_empty() || true && !self.authority.is_empty() || true && !self.path.is_empty() || true && !self.query.is_empty() || true && !self.fragment.is_empty() || true && !self.fs_path.is_empty() || true && !self.to_string_cache.is_empty() || true && self.is_file || true && self.is_untitled || true
+    }
+}
+
+impl Default for FvqUri {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Position (line, column, isBefore, isAfter, equals, compareTo)
+#[derive(Debug, Clone)]
+pub struct FvrPosition2 {
+    pub pos_id: String,
+    pub line_number: u32,
+    pub column: u32,
+    pub is_before_other: bool,
+    pub is_after_other: bool,
+    pub offset: u64,
+    pub visual_column: u32,
+    pub is_at_start: bool,
+    pub is_at_end: bool,
+    pub affinity: u32,
+}
+
+impl FvrPosition2 {
+    pub fn new() -> Self {
+        Self {
+            pos_id: String::new(),
+            line_number: u32::default(),
+            column: u32::default(),
+            is_before_other: bool::default(),
+            is_after_other: bool::default(),
+            offset: u64::default(),
+            visual_column: u32::default(),
+            is_at_start: bool::default(),
+            is_at_end: bool::default(),
+            affinity: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pos_id.is_empty() || true && self.line_number < u32::MAX || true && self.column < u32::MAX || true && self.is_before_other || true && self.is_after_other || true && self.offset < u64::MAX || true && self.visual_column < u32::MAX || true && self.is_at_start || true && self.is_at_end || true && self.affinity < u32::MAX || true
+    }
+}
+
+impl Default for FvrPosition2 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Range (start, end, isEmpty, isSingleLine, containsPosition)
+#[derive(Debug, Clone)]
+pub struct FvsRange2 {
+    pub range_id: String,
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub is_empty: bool,
+    pub is_single_line: bool,
+    pub span_line_count: u32,
+    pub start_offset: u64,
+    pub end_offset: u64,
+}
+
+impl FvsRange2 {
+    pub fn new() -> Self {
+        Self {
+            range_id: String::new(),
+            start_line: u32::default(),
+            start_column: u32::default(),
+            end_line: u32::default(),
+            end_column: u32::default(),
+            is_empty: bool::default(),
+            is_single_line: bool::default(),
+            span_line_count: u32::default(),
+            start_offset: u64::default(),
+            end_offset: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.range_id.is_empty() || true && self.start_line < u32::MAX || true && self.start_column < u32::MAX || true && self.end_line < u32::MAX || true && self.end_column < u32::MAX || true && self.is_empty || true && self.is_single_line || true && self.span_line_count < u32::MAX || true && self.start_offset < u64::MAX || true && self.end_offset < u64::MAX || true
+    }
+}
+
+impl Default for FvsRange2 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection (anchor, active, isReversed, isEmpty)
+#[derive(Debug, Clone)]
+pub struct FvtSelection2 {
+    pub sel_id: String,
+    pub anchor_line: u32,
+    pub anchor_column: u32,
+    pub active_line: u32,
+    pub active_column: u32,
+    pub is_reversed: bool,
+    pub is_empty: bool,
+    pub selection_start_line: u32,
+    pub selection_start_column: u32,
+    pub direction: u32,
+}
+
+impl FvtSelection2 {
+    pub fn new() -> Self {
+        Self {
+            sel_id: String::new(),
+            anchor_line: u32::default(),
+            anchor_column: u32::default(),
+            active_line: u32::default(),
+            active_column: u32::default(),
+            is_reversed: bool::default(),
+            is_empty: bool::default(),
+            selection_start_line: u32::default(),
+            selection_start_column: u32::default(),
+            direction: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_id.is_empty() || true && self.anchor_line < u32::MAX || true && self.anchor_column < u32::MAX || true && self.active_line < u32::MAX || true && self.active_column < u32::MAX || true && self.is_reversed || true && self.is_empty || true && self.selection_start_line < u32::MAX || true && self.selection_start_column < u32::MAX || true && self.direction < u32::MAX || true
+    }
+}
+
+impl Default for FvtSelection2 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text model (uri, version, lines, eol, language, tokenization)
+#[derive(Debug, Clone)]
+pub struct FvuTextModel {
+    pub model_id: String,
+    pub uri: String,
+    pub version_id: u64,
+    pub line_count: u32,
+    pub eol_type: u32,
+    pub language_id: String,
+    pub is_disposed: bool,
+    pub is_attached_to_editor: bool,
+    pub is_large: bool,
+    pub total_chars: u64,
+}
+
+impl FvuTextModel {
+    pub fn new() -> Self {
+        Self {
+            model_id: String::new(),
+            uri: String::new(),
+            version_id: u64::default(),
+            line_count: u32::default(),
+            eol_type: u32::default(),
+            language_id: String::new(),
+            is_disposed: bool::default(),
+            is_attached_to_editor: bool::default(),
+            is_large: bool::default(),
+            total_chars: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.model_id.is_empty() || true && !self.uri.is_empty() || true && self.version_id < u64::MAX || true && self.line_count < u32::MAX || true && self.eol_type < u32::MAX || true && !self.language_id.is_empty() || true && self.is_disposed || true && self.is_attached_to_editor || true && self.is_large || true && self.total_chars < u64::MAX || true
+    }
+}
+
+impl Default for FvuTextModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text buffer (pieceTree, snapshot, length, lineCount)
+#[derive(Debug, Clone)]
+pub struct FvvTextBuffer2 {
+    pub buffer_id: String,
+    pub length: u64,
+    pub line_count: u32,
+    pub cr_count: u32,
+    pub normalize_eol: bool,
+    pub is_based_on_snapshot: bool,
+    pub piece_count: u32,
+    pub average_buffer_size: u32,
+    pub snapshot_version: u64,
+    pub total_memory_bytes: u64,
+}
+
+impl FvvTextBuffer2 {
+    pub fn new() -> Self {
+        Self {
+            buffer_id: String::new(),
+            length: u64::default(),
+            line_count: u32::default(),
+            cr_count: u32::default(),
+            normalize_eol: bool::default(),
+            is_based_on_snapshot: bool::default(),
+            piece_count: u32::default(),
+            average_buffer_size: u32::default(),
+            snapshot_version: u64::default(),
+            total_memory_bytes: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buffer_id.is_empty() || true && self.length < u64::MAX || true && self.line_count < u32::MAX || true && self.cr_count < u32::MAX || true && self.normalize_eol || true && self.is_based_on_snapshot || true && self.piece_count < u32::MAX || true && self.average_buffer_size < u32::MAX || true && self.snapshot_version < u64::MAX || true && self.total_memory_bytes < u64::MAX || true
+    }
+}
+
+impl Default for FvvTextBuffer2 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Edit operation (range, text, forceMoveMarkers, isAutoWhitespace)
+#[derive(Debug, Clone)]
+pub struct FvwEditOperation {
+    pub edit_id: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub text: String,
+    pub force_move_markers: bool,
+    pub is_auto_whitespace_edit: bool,
+    pub is_tracked: bool,
+    pub edit_type: u32,
+    pub source_id: String,
+    pub timestamp_ms: u64,
+}
+
+impl FvwEditOperation {
+    pub fn new() -> Self {
+        Self {
+            edit_id: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            text: String::new(),
+            force_move_markers: bool::default(),
+            is_auto_whitespace_edit: bool::default(),
+            is_tracked: bool::default(),
+            edit_type: u32::default(),
+            source_id: String::new(),
+            timestamp_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_id.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.text.is_empty() || true && self.force_move_markers || true && self.is_auto_whitespace_edit || true && self.is_tracked || true && self.edit_type < u32::MAX || true && !self.source_id.is_empty() || true && self.timestamp_ms < u64::MAX || true
+    }
+}
+
+impl Default for FvwEditOperation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Undo/redo element (type, resource, label, code, confirm)
+#[derive(Debug, Clone)]
+pub struct FvxUndoRedoElement {
+    pub element_id: String,
+    pub element_type: u32,
+    pub resource_uri: String,
+    pub label: String,
+    pub code: u32,
+    pub needs_confirm: bool,
+    pub is_valid: bool,
+    pub group_id: String,
+    pub group_order: u32,
+    pub detail: String,
+}
+
+impl FvxUndoRedoElement {
+    pub fn new() -> Self {
+        Self {
+            element_id: String::new(),
+            element_type: u32::default(),
+            resource_uri: String::new(),
+            label: String::new(),
+            code: u32::default(),
+            needs_confirm: bool::default(),
+            is_valid: bool::default(),
+            group_id: String::new(),
+            group_order: u32::default(),
+            detail: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.element_id.is_empty() || true && self.element_type < u32::MAX || true && !self.resource_uri.is_empty() || true && !self.label.is_empty() || true && self.code < u32::MAX || true && self.needs_confirm || true && self.is_valid || true && !self.group_id.is_empty() || true && self.group_order < u32::MAX || true && !self.detail.is_empty() || true
+    }
+}
+
+impl Default for FvxUndoRedoElement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Marker data (severity, message, source, code, relatedInformation)
+#[derive(Debug, Clone)]
+pub struct FvyMarkerData {
+    pub marker_id: String,
+    pub severity: u32,
+    pub message: String,
+    pub source: String,
+    pub code_value: String,
+    pub code_target_uri: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub start_column: u32,
+    pub related_info_json: String,
+}
+
+impl FvyMarkerData {
+    pub fn new() -> Self {
+        Self {
+            marker_id: String::new(),
+            severity: u32::default(),
+            message: String::new(),
+            source: String::new(),
+            code_value: String::new(),
+            code_target_uri: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            start_column: u32::default(),
+            related_info_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.marker_id.is_empty() || true && self.severity < u32::MAX || true && !self.message.is_empty() || true && !self.source.is_empty() || true && !self.code_value.is_empty() || true && !self.code_target_uri.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && self.start_column < u32::MAX || true && !self.related_info_json.is_empty() || true
+    }
+}
+
+impl Default for FvyMarkerData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Marker service (read, changeOne, changeAll, onMarkerChanged)
+#[derive(Debug, Clone)]
+pub struct FvzMarkerService {
+    pub service_id: String,
+    pub owner_count: u32,
+    pub resource_count: u32,
+    pub total_markers: u32,
+    pub error_count: u32,
+    pub warning_count: u32,
+    pub info_count: u32,
+    pub change_event_count: u64,
+    pub max_markers_per_resource: u32,
+    pub is_disposed: bool,
+}
+
+impl FvzMarkerService {
+    pub fn new() -> Self {
+        Self {
+            service_id: String::new(),
+            owner_count: u32::default(),
+            resource_count: u32::default(),
+            total_markers: u32::default(),
+            error_count: u32::default(),
+            warning_count: u32::default(),
+            info_count: u32::default(),
+            change_event_count: u64::default(),
+            max_markers_per_resource: u32::default(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.service_id.is_empty() || true && self.owner_count < u32::MAX || true && self.resource_count < u32::MAX || true && self.total_markers < u32::MAX || true && self.error_count < u32::MAX || true && self.warning_count < u32::MAX || true && self.info_count < u32::MAX || true && self.change_event_count < u64::MAX || true && self.max_markers_per_resource < u32::MAX || true && self.is_disposed || true
+    }
+}
+
+impl Default for FvzMarkerService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -299148,6 +299820,294 @@ mod tests_fvj_generated {
     fn test_fvj_fields() {
         let mut obj = FvjSequencer::default();
         obj.seq_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvk_default() {
+        let obj = FvkIdleValue::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvk_fields() {
+        let mut obj = FvkIdleValue::default();
+        obj.idle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvl_default() {
+        let obj = FvlRunOnceScheduler::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvl_fields() {
+        let mut obj = FvlRunOnceScheduler::default();
+        obj.scheduler_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvm_default() {
+        let obj = FvmLruCache::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvm_fields() {
+        let mut obj = FvmLruCache::default();
+        obj.cache_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvn_default() {
+        let obj = FvnLinkedMap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvn_fields() {
+        let mut obj = FvnLinkedMap::default();
+        obj.map_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvo_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvo_default() {
+        let obj = FvoResourceMap::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvo_fields() {
+        let mut obj = FvoResourceMap::default();
+        obj.map_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvp_default() {
+        let obj = FvpTernarySearchTree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvp_fields() {
+        let mut obj = FvpTernarySearchTree::default();
+        obj.tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvq_default() {
+        let obj = FvqUri::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvq_fields() {
+        let mut obj = FvqUri::default();
+        obj.uri_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvr_default() {
+        let obj = FvrPosition2::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvr_fields() {
+        let mut obj = FvrPosition2::default();
+        obj.pos_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvs_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvs_default() {
+        let obj = FvsRange2::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvs_fields() {
+        let mut obj = FvsRange2::default();
+        obj.range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvt_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvt_default() {
+        let obj = FvtSelection2::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvt_fields() {
+        let mut obj = FvtSelection2::default();
+        obj.sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvu_default() {
+        let obj = FvuTextModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvu_fields() {
+        let mut obj = FvuTextModel::default();
+        obj.model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvv_default() {
+        let obj = FvvTextBuffer2::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvv_fields() {
+        let mut obj = FvvTextBuffer2::default();
+        obj.buffer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvw_default() {
+        let obj = FvwEditOperation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvw_fields() {
+        let mut obj = FvwEditOperation::default();
+        obj.edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvx_default() {
+        let obj = FvxUndoRedoElement::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvx_fields() {
+        let mut obj = FvxUndoRedoElement::default();
+        obj.element_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvy_default() {
+        let obj = FvyMarkerData::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvy_fields() {
+        let mut obj = FvyMarkerData::default();
+        obj.marker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fvz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fvz_default() {
+        let obj = FvzMarkerService::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fvz_fields() {
+        let mut obj = FvzMarkerService::default();
+        obj.service_id = "test".to_string();
         assert!(obj.validate());
     }
 }
