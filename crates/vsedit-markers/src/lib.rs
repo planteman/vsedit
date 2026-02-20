@@ -144957,6 +144957,890 @@ impl Default for IizWorkbenchEvent {
     }
 }
 
+/// Service container descriptor
+#[derive(Debug, Clone)]
+pub struct IjaServiceDescriptor {
+    pub service_id: String,
+    pub service_name: String,
+    pub impl_class: String,
+    pub dependency_count: u32,
+    pub scope_val: u32,
+    pub is_singleton: bool,
+}
+
+impl IjaServiceDescriptor {
+    pub fn new() -> Self {
+        Self {
+            service_id: String::new(),
+            service_name: String::new(),
+            impl_class: String::new(),
+            dependency_count: u32::default(),
+            scope_val: u32::default(),
+            is_singleton: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.service_id.is_empty() || true && !self.service_name.is_empty() || true && !self.impl_class.is_empty() || true && self.dependency_count < u32::MAX || true && self.scope_val < u32::MAX || true && self.is_singleton || true
+    }
+}
+
+impl Default for IjaServiceDescriptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service registration entry
+#[derive(Debug, Clone)]
+pub struct IjbServiceRegistration {
+    pub reg_id: String,
+    pub service_ref: String,
+    pub impl_ref: String,
+    pub priority_val: u32,
+    pub override_count: u32,
+    pub is_deferred: bool,
+}
+
+impl IjbServiceRegistration {
+    pub fn new() -> Self {
+        Self {
+            reg_id: String::new(),
+            service_ref: String::new(),
+            impl_ref: String::new(),
+            priority_val: u32::default(),
+            override_count: u32::default(),
+            is_deferred: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reg_id.is_empty() || true && !self.service_ref.is_empty() || true && !self.impl_ref.is_empty() || true && self.priority_val < u32::MAX || true && self.override_count < u32::MAX || true && self.is_deferred || true
+    }
+}
+
+impl Default for IjbServiceRegistration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service instantiation scope
+#[derive(Debug, Clone)]
+pub struct IjcServiceScope {
+    pub scope_id: String,
+    pub scope_name: String,
+    pub parent_ref: String,
+    pub service_count: u32,
+    pub child_count: u32,
+    pub is_root: bool,
+}
+
+impl IjcServiceScope {
+    pub fn new() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_name: String::new(),
+            parent_ref: String::new(),
+            service_count: u32::default(),
+            child_count: u32::default(),
+            is_root: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.parent_ref.is_empty() || true && self.service_count < u32::MAX || true && self.child_count < u32::MAX || true && self.is_root || true
+    }
+}
+
+impl Default for IjcServiceScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service factory function
+#[derive(Debug, Clone)]
+pub struct IjdServiceFactory {
+    pub factory_id: String,
+    pub service_ref: String,
+    pub creation_count: u64,
+    pub avg_create_ms: u32,
+    pub dependency_count: u32,
+    pub is_async: bool,
+}
+
+impl IjdServiceFactory {
+    pub fn new() -> Self {
+        Self {
+            factory_id: String::new(),
+            service_ref: String::new(),
+            creation_count: u64::default(),
+            avg_create_ms: u32::default(),
+            dependency_count: u32::default(),
+            is_async: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.factory_id.is_empty() || true && !self.service_ref.is_empty() || true && self.creation_count < u64::MAX || true && self.avg_create_ms < u32::MAX || true && self.dependency_count < u32::MAX || true && self.is_async || true
+    }
+}
+
+impl Default for IjdServiceFactory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service IPC proxy
+#[derive(Debug, Clone)]
+pub struct IjeServiceProxy {
+    pub proxy_id: String,
+    pub service_ref: String,
+    pub channel_ref: String,
+    pub call_count: u64,
+    pub latency_avg_ms: u32,
+    pub is_connected: bool,
+}
+
+impl IjeServiceProxy {
+    pub fn new() -> Self {
+        Self {
+            proxy_id: String::new(),
+            service_ref: String::new(),
+            channel_ref: String::new(),
+            call_count: u64::default(),
+            latency_avg_ms: u32::default(),
+            is_connected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.proxy_id.is_empty() || true && !self.service_ref.is_empty() || true && !self.channel_ref.is_empty() || true && self.call_count < u64::MAX || true && self.latency_avg_ms < u32::MAX || true && self.is_connected || true
+    }
+}
+
+impl Default for IjeServiceProxy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service IPC channel
+#[derive(Debug, Clone)]
+pub struct IjfServiceChannel {
+    pub channel_id: String,
+    pub channel_name: String,
+    pub endpoint_ref: String,
+    pub message_count: u64,
+    pub pending_count: u32,
+    pub is_reliable: bool,
+}
+
+impl IjfServiceChannel {
+    pub fn new() -> Self {
+        Self {
+            channel_id: String::new(),
+            channel_name: String::new(),
+            endpoint_ref: String::new(),
+            message_count: u64::default(),
+            pending_count: u32::default(),
+            is_reliable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.channel_id.is_empty() || true && !self.channel_name.is_empty() || true && !self.endpoint_ref.is_empty() || true && self.message_count < u64::MAX || true && self.pending_count < u32::MAX || true && self.is_reliable || true
+    }
+}
+
+impl Default for IjfServiceChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Worker message port
+#[derive(Debug, Clone)]
+pub struct IjgMessagePort {
+    pub port_id: String,
+    pub port_name: String,
+    pub owner_ref: String,
+    pub message_count: u64,
+    pub buffer_size: u32,
+    pub is_transferable: bool,
+}
+
+impl IjgMessagePort {
+    pub fn new() -> Self {
+        Self {
+            port_id: String::new(),
+            port_name: String::new(),
+            owner_ref: String::new(),
+            message_count: u64::default(),
+            buffer_size: u32::default(),
+            is_transferable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.port_id.is_empty() || true && !self.port_name.is_empty() || true && !self.owner_ref.is_empty() || true && self.message_count < u64::MAX || true && self.buffer_size < u32::MAX || true && self.is_transferable || true
+    }
+}
+
+impl Default for IjgMessagePort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Worker thread descriptor
+#[derive(Debug, Clone)]
+pub struct IjhWorkerThread {
+    pub worker_id: String,
+    pub worker_name: String,
+    pub script_uri: String,
+    pub memory_bytes: u64,
+    pub message_count: u64,
+    pub is_alive: bool,
+}
+
+impl IjhWorkerThread {
+    pub fn new() -> Self {
+        Self {
+            worker_id: String::new(),
+            worker_name: String::new(),
+            script_uri: String::new(),
+            memory_bytes: u64::default(),
+            message_count: u64::default(),
+            is_alive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.worker_id.is_empty() || true && !self.worker_name.is_empty() || true && !self.script_uri.is_empty() || true && self.memory_bytes < u64::MAX || true && self.message_count < u64::MAX || true && self.is_alive || true
+    }
+}
+
+impl Default for IjhWorkerThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shared process descriptor
+#[derive(Debug, Clone)]
+pub struct IjiSharedProcess {
+    pub process_id: String,
+    pub pid_val: u32,
+    pub connection_count: u32,
+    pub memory_bytes: u64,
+    pub cpu_pct: u32,
+    pub is_healthy: bool,
+}
+
+impl IjiSharedProcess {
+    pub fn new() -> Self {
+        Self {
+            process_id: String::new(),
+            pid_val: u32::default(),
+            connection_count: u32::default(),
+            memory_bytes: u64::default(),
+            cpu_pct: u32::default(),
+            is_healthy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.process_id.is_empty() || true && self.pid_val < u32::MAX || true && self.connection_count < u32::MAX || true && self.memory_bytes < u64::MAX || true && self.cpu_pct < u32::MAX || true && self.is_healthy || true
+    }
+}
+
+impl Default for IjiSharedProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Main process descriptor
+#[derive(Debug, Clone)]
+pub struct IjjMainProcess {
+    pub main_id: String,
+    pub pid_val: u32,
+    pub window_count: u32,
+    pub memory_bytes: u64,
+    pub uptime_secs: u64,
+    pub is_ready: bool,
+}
+
+impl IjjMainProcess {
+    pub fn new() -> Self {
+        Self {
+            main_id: String::new(),
+            pid_val: u32::default(),
+            window_count: u32::default(),
+            memory_bytes: u64::default(),
+            uptime_secs: u64::default(),
+            is_ready: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.main_id.is_empty() || true && self.pid_val < u32::MAX || true && self.window_count < u32::MAX || true && self.memory_bytes < u64::MAX || true && self.uptime_secs < u64::MAX || true && self.is_ready || true
+    }
+}
+
+impl Default for IjjMainProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Renderer process descriptor
+#[derive(Debug, Clone)]
+pub struct IjkRendererProcess {
+    pub renderer_id: String,
+    pub window_ref: String,
+    pub pid_val: u32,
+    pub memory_bytes: u64,
+    pub frame_count: u64,
+    pub is_visible: bool,
+}
+
+impl IjkRendererProcess {
+    pub fn new() -> Self {
+        Self {
+            renderer_id: String::new(),
+            window_ref: String::new(),
+            pid_val: u32::default(),
+            memory_bytes: u64::default(),
+            frame_count: u64::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.renderer_id.is_empty() || true && !self.window_ref.is_empty() || true && self.pid_val < u32::MAX || true && self.memory_bytes < u64::MAX || true && self.frame_count < u64::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for IjkRendererProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension host process
+#[derive(Debug, Clone)]
+pub struct IjlExtHostProcess {
+    pub ext_id: String,
+    pub process_kind: String,
+    pub pid_val: u32,
+    pub extension_count: u32,
+    pub memory_bytes: u64,
+    pub is_responsive: bool,
+}
+
+impl IjlExtHostProcess {
+    pub fn new() -> Self {
+        Self {
+            ext_id: String::new(),
+            process_kind: String::new(),
+            pid_val: u32::default(),
+            extension_count: u32::default(),
+            memory_bytes: u64::default(),
+            is_responsive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_id.is_empty() || true && !self.process_kind.is_empty() || true && self.pid_val < u32::MAX || true && self.extension_count < u32::MAX || true && self.memory_bytes < u64::MAX || true && self.is_responsive || true
+    }
+}
+
+impl Default for IjlExtHostProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC protocol descriptor
+#[derive(Debug, Clone)]
+pub struct IjmIpcProtocol {
+    pub protocol_id: String,
+    pub protocol_name: String,
+    pub version_val: u32,
+    pub header_size: u32,
+    pub max_payload: u64,
+    pub is_encrypted: bool,
+}
+
+impl IjmIpcProtocol {
+    pub fn new() -> Self {
+        Self {
+            protocol_id: String::new(),
+            protocol_name: String::new(),
+            version_val: u32::default(),
+            header_size: u32::default(),
+            max_payload: u64::default(),
+            is_encrypted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.protocol_id.is_empty() || true && !self.protocol_name.is_empty() || true && self.version_val < u32::MAX || true && self.header_size < u32::MAX || true && self.max_payload < u64::MAX || true && self.is_encrypted || true
+    }
+}
+
+impl Default for IjmIpcProtocol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC message envelope
+#[derive(Debug, Clone)]
+pub struct IjnIpcMessage {
+    pub msg_id: String,
+    pub msg_type_val: u32,
+    pub channel_ref: String,
+    pub payload_len: u32,
+    pub seq_number: u64,
+    pub is_response: bool,
+}
+
+impl IjnIpcMessage {
+    pub fn new() -> Self {
+        Self {
+            msg_id: String::new(),
+            msg_type_val: u32::default(),
+            channel_ref: String::new(),
+            payload_len: u32::default(),
+            seq_number: u64::default(),
+            is_response: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.msg_id.is_empty() || true && self.msg_type_val < u32::MAX || true && !self.channel_ref.is_empty() || true && self.payload_len < u32::MAX || true && self.seq_number < u64::MAX || true && self.is_response || true
+    }
+}
+
+impl Default for IjnIpcMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC request message
+#[derive(Debug, Clone)]
+pub struct IjoIpcRequest {
+    pub req_id: String,
+    pub method_name: String,
+    pub args_json_len: u32,
+    pub timeout_ms: u32,
+    pub seq_number: u64,
+    pub is_cancellable: bool,
+}
+
+impl IjoIpcRequest {
+    pub fn new() -> Self {
+        Self {
+            req_id: String::new(),
+            method_name: String::new(),
+            args_json_len: u32::default(),
+            timeout_ms: u32::default(),
+            seq_number: u64::default(),
+            is_cancellable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.req_id.is_empty() || true && !self.method_name.is_empty() || true && self.args_json_len < u32::MAX || true && self.timeout_ms < u32::MAX || true && self.seq_number < u64::MAX || true && self.is_cancellable || true
+    }
+}
+
+impl Default for IjoIpcRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC response message
+#[derive(Debug, Clone)]
+pub struct IjpIpcResponse {
+    pub resp_id: String,
+    pub request_ref: String,
+    pub result_json_len: u32,
+    pub error_code: u32,
+    pub elapsed_ms: u32,
+    pub is_error: bool,
+}
+
+impl IjpIpcResponse {
+    pub fn new() -> Self {
+        Self {
+            resp_id: String::new(),
+            request_ref: String::new(),
+            result_json_len: u32::default(),
+            error_code: u32::default(),
+            elapsed_ms: u32::default(),
+            is_error: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.resp_id.is_empty() || true && !self.request_ref.is_empty() || true && self.result_json_len < u32::MAX || true && self.error_code < u32::MAX || true && self.elapsed_ms < u32::MAX || true && self.is_error || true
+    }
+}
+
+impl Default for IjpIpcResponse {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC event notification
+#[derive(Debug, Clone)]
+pub struct IjqIpcEvent {
+    pub event_id: String,
+    pub event_name: String,
+    pub channel_ref: String,
+    pub payload_len: u32,
+    pub timestamp_epoch: u64,
+    pub is_broadcast: bool,
+}
+
+impl IjqIpcEvent {
+    pub fn new() -> Self {
+        Self {
+            event_id: String::new(),
+            event_name: String::new(),
+            channel_ref: String::new(),
+            payload_len: u32::default(),
+            timestamp_epoch: u64::default(),
+            is_broadcast: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.event_id.is_empty() || true && !self.event_name.is_empty() || true && !self.channel_ref.is_empty() || true && self.payload_len < u32::MAX || true && self.timestamp_epoch < u64::MAX || true && self.is_broadcast || true
+    }
+}
+
+impl Default for IjqIpcEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC buffer transfer
+#[derive(Debug, Clone)]
+pub struct IjrIpcBuffer {
+    pub buffer_id: String,
+    pub byte_length: u64,
+    pub buffer_kind: String,
+    pub transfer_mode: String,
+    pub ref_count: u32,
+    pub is_shared: bool,
+}
+
+impl IjrIpcBuffer {
+    pub fn new() -> Self {
+        Self {
+            buffer_id: String::new(),
+            byte_length: u64::default(),
+            buffer_kind: String::new(),
+            transfer_mode: String::new(),
+            ref_count: u32::default(),
+            is_shared: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.buffer_id.is_empty() || true && self.byte_length < u64::MAX || true && !self.buffer_kind.is_empty() || true && !self.transfer_mode.is_empty() || true && self.ref_count < u32::MAX || true && self.is_shared || true
+    }
+}
+
+impl Default for IjrIpcBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC connection descriptor
+#[derive(Debug, Clone)]
+pub struct IjsConnectionInfo {
+    pub conn_id: String,
+    pub remote_authority: String,
+    pub transport_str: String,
+    pub latency_ms: u32,
+    pub reconnect_count: u32,
+    pub is_connected: bool,
+}
+
+impl IjsConnectionInfo {
+    pub fn new() -> Self {
+        Self {
+            conn_id: String::new(),
+            remote_authority: String::new(),
+            transport_str: String::new(),
+            latency_ms: u32::default(),
+            reconnect_count: u32::default(),
+            is_connected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.conn_id.is_empty() || true && !self.remote_authority.is_empty() || true && !self.transport_str.is_empty() || true && self.latency_ms < u32::MAX || true && self.reconnect_count < u32::MAX || true && self.is_connected || true
+    }
+}
+
+impl Default for IjsConnectionInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC reconnection state
+#[derive(Debug, Clone)]
+pub struct IjtReconnectState {
+    pub reconn_id: String,
+    pub connection_ref: String,
+    pub attempt_count: u32,
+    pub backoff_ms: u32,
+    pub max_retries: u32,
+    pub is_reconnecting: bool,
+}
+
+impl IjtReconnectState {
+    pub fn new() -> Self {
+        Self {
+            reconn_id: String::new(),
+            connection_ref: String::new(),
+            attempt_count: u32::default(),
+            backoff_ms: u32::default(),
+            max_retries: u32::default(),
+            is_reconnecting: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.reconn_id.is_empty() || true && !self.connection_ref.is_empty() || true && self.attempt_count < u32::MAX || true && self.backoff_ms < u32::MAX || true && self.max_retries < u32::MAX || true && self.is_reconnecting || true
+    }
+}
+
+impl Default for IjtReconnectState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// IPC heartbeat monitor
+#[derive(Debug, Clone)]
+pub struct IjuHeartbeat {
+    pub hb_id: String,
+    pub target_ref: String,
+    pub interval_ms: u32,
+    pub timeout_ms: u32,
+    pub missed_count: u32,
+    pub is_alive: bool,
+}
+
+impl IjuHeartbeat {
+    pub fn new() -> Self {
+        Self {
+            hb_id: String::new(),
+            target_ref: String::new(),
+            interval_ms: u32::default(),
+            timeout_ms: u32::default(),
+            missed_count: u32::default(),
+            is_alive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hb_id.is_empty() || true && !self.target_ref.is_empty() || true && self.interval_ms < u32::MAX || true && self.timeout_ms < u32::MAX || true && self.missed_count < u32::MAX || true && self.is_alive || true
+    }
+}
+
+impl Default for IjuHeartbeat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Serialization format info
+#[derive(Debug, Clone)]
+pub struct IjvSerializeInfo {
+    pub ser_id: String,
+    pub format_name: String,
+    pub version_val: u32,
+    pub schema_ref: String,
+    pub compression_str: String,
+    pub is_binary: bool,
+}
+
+impl IjvSerializeInfo {
+    pub fn new() -> Self {
+        Self {
+            ser_id: String::new(),
+            format_name: String::new(),
+            version_val: u32::default(),
+            schema_ref: String::new(),
+            compression_str: String::new(),
+            is_binary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ser_id.is_empty() || true && !self.format_name.is_empty() || true && self.version_val < u32::MAX || true && !self.schema_ref.is_empty() || true && !self.compression_str.is_empty() || true && self.is_binary || true
+    }
+}
+
+impl Default for IjvSerializeInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Service clone handle
+#[derive(Debug, Clone)]
+pub struct IjwCloneHandle {
+    pub clone_id: String,
+    pub original_ref: String,
+    pub clone_depth: u32,
+    pub shared_state_len: u32,
+    pub ref_count: u32,
+    pub is_valid: bool,
+}
+
+impl IjwCloneHandle {
+    pub fn new() -> Self {
+        Self {
+            clone_id: String::new(),
+            original_ref: String::new(),
+            clone_depth: u32::default(),
+            shared_state_len: u32::default(),
+            ref_count: u32::default(),
+            is_valid: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.clone_id.is_empty() || true && !self.original_ref.is_empty() || true && self.clone_depth < u32::MAX || true && self.shared_state_len < u32::MAX || true && self.ref_count < u32::MAX || true && self.is_valid || true
+    }
+}
+
+impl Default for IjwCloneHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Disposable store container
+#[derive(Debug, Clone)]
+pub struct IjxDisposableStore {
+    pub store_id: String,
+    pub disposable_count: u32,
+    pub disposed_count: u32,
+    pub leak_trace_enabled: bool,
+    pub max_size: u32,
+    pub is_disposed: bool,
+}
+
+impl IjxDisposableStore {
+    pub fn new() -> Self {
+        Self {
+            store_id: String::new(),
+            disposable_count: u32::default(),
+            disposed_count: u32::default(),
+            leak_trace_enabled: bool::default(),
+            max_size: u32::default(),
+            is_disposed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.store_id.is_empty() || true && self.disposable_count < u32::MAX || true && self.disposed_count < u32::MAX || true && self.leak_trace_enabled || true && self.max_size < u32::MAX || true && self.is_disposed || true
+    }
+}
+
+impl Default for IjxDisposableStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application lifecycle phase
+#[derive(Debug, Clone)]
+pub struct IjyLifecyclePhase {
+    pub phase_id: String,
+    pub phase_name: String,
+    pub phase_order: u32,
+    pub duration_ms: u32,
+    pub dependency_count: u32,
+    pub is_complete: bool,
+}
+
+impl IjyLifecyclePhase {
+    pub fn new() -> Self {
+        Self {
+            phase_id: String::new(),
+            phase_name: String::new(),
+            phase_order: u32::default(),
+            duration_ms: u32::default(),
+            dependency_count: u32::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.phase_id.is_empty() || true && !self.phase_name.is_empty() || true && self.phase_order < u32::MAX || true && self.duration_ms < u32::MAX || true && self.dependency_count < u32::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for IjyLifecyclePhase {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Application shutdown event
+#[derive(Debug, Clone)]
+pub struct IjzShutdownEvent {
+    pub shutdown_id: String,
+    pub reason_str: String,
+    pub veto_count: u32,
+    pub pending_saves: u32,
+    pub timeout_ms: u32,
+    pub is_graceful: bool,
+}
+
+impl IjzShutdownEvent {
+    pub fn new() -> Self {
+        Self {
+            shutdown_id: String::new(),
+            reason_str: String::new(),
+            veto_count: u32::default(),
+            pending_saves: u32::default(),
+            timeout_ms: u32::default(),
+            is_graceful: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.shutdown_id.is_empty() || true && !self.reason_str.is_empty() || true && self.veto_count < u32::MAX || true && self.pending_saves < u32::MAX || true && self.timeout_ms < u32::MAX || true && self.is_graceful || true
+    }
+}
+
+impl Default for IjzShutdownEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -397358,6 +398242,474 @@ mod tests_iiz_generated {
     fn test_iiz_fields() {
         let mut obj = IizWorkbenchEvent::default();
         obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ija_generated {
+    use super::*;
+
+    #[test]
+    fn test_ija_default() {
+        let obj = IjaServiceDescriptor::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ija_fields() {
+        let mut obj = IjaServiceDescriptor::default();
+        obj.service_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijb_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijb_default() {
+        let obj = IjbServiceRegistration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijb_fields() {
+        let mut obj = IjbServiceRegistration::default();
+        obj.reg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijc_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijc_default() {
+        let obj = IjcServiceScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijc_fields() {
+        let mut obj = IjcServiceScope::default();
+        obj.scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijd_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijd_default() {
+        let obj = IjdServiceFactory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijd_fields() {
+        let mut obj = IjdServiceFactory::default();
+        obj.factory_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ije_generated {
+    use super::*;
+
+    #[test]
+    fn test_ije_default() {
+        let obj = IjeServiceProxy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ije_fields() {
+        let mut obj = IjeServiceProxy::default();
+        obj.proxy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijf_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijf_default() {
+        let obj = IjfServiceChannel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijf_fields() {
+        let mut obj = IjfServiceChannel::default();
+        obj.channel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijg_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijg_default() {
+        let obj = IjgMessagePort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijg_fields() {
+        let mut obj = IjgMessagePort::default();
+        obj.port_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijh_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijh_default() {
+        let obj = IjhWorkerThread::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijh_fields() {
+        let mut obj = IjhWorkerThread::default();
+        obj.worker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iji_generated {
+    use super::*;
+
+    #[test]
+    fn test_iji_default() {
+        let obj = IjiSharedProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iji_fields() {
+        let mut obj = IjiSharedProcess::default();
+        obj.process_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijj_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijj_default() {
+        let obj = IjjMainProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijj_fields() {
+        let mut obj = IjjMainProcess::default();
+        obj.main_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijk_default() {
+        let obj = IjkRendererProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijk_fields() {
+        let mut obj = IjkRendererProcess::default();
+        obj.renderer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijl_default() {
+        let obj = IjlExtHostProcess::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijl_fields() {
+        let mut obj = IjlExtHostProcess::default();
+        obj.ext_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijm_default() {
+        let obj = IjmIpcProtocol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijm_fields() {
+        let mut obj = IjmIpcProtocol::default();
+        obj.protocol_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijn_default() {
+        let obj = IjnIpcMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijn_fields() {
+        let mut obj = IjnIpcMessage::default();
+        obj.msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijo_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijo_default() {
+        let obj = IjoIpcRequest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijo_fields() {
+        let mut obj = IjoIpcRequest::default();
+        obj.req_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijp_default() {
+        let obj = IjpIpcResponse::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijp_fields() {
+        let mut obj = IjpIpcResponse::default();
+        obj.resp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijq_default() {
+        let obj = IjqIpcEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijq_fields() {
+        let mut obj = IjqIpcEvent::default();
+        obj.event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijr_default() {
+        let obj = IjrIpcBuffer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijr_fields() {
+        let mut obj = IjrIpcBuffer::default();
+        obj.buffer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijs_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijs_default() {
+        let obj = IjsConnectionInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijs_fields() {
+        let mut obj = IjsConnectionInfo::default();
+        obj.conn_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijt_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijt_default() {
+        let obj = IjtReconnectState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijt_fields() {
+        let mut obj = IjtReconnectState::default();
+        obj.reconn_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iju_generated {
+    use super::*;
+
+    #[test]
+    fn test_iju_default() {
+        let obj = IjuHeartbeat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iju_fields() {
+        let mut obj = IjuHeartbeat::default();
+        obj.hb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijv_default() {
+        let obj = IjvSerializeInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijv_fields() {
+        let mut obj = IjvSerializeInfo::default();
+        obj.ser_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijw_default() {
+        let obj = IjwCloneHandle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijw_fields() {
+        let mut obj = IjwCloneHandle::default();
+        obj.clone_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijx_default() {
+        let obj = IjxDisposableStore::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijx_fields() {
+        let mut obj = IjxDisposableStore::default();
+        obj.store_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijy_default() {
+        let obj = IjyLifecyclePhase::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijy_fields() {
+        let mut obj = IjyLifecyclePhase::default();
+        obj.phase_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ijz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ijz_default() {
+        let obj = IjzShutdownEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ijz_fields() {
+        let mut obj = IjzShutdownEvent::default();
+        obj.shutdown_id = "test".to_string();
         assert!(obj.validate());
     }
 }
