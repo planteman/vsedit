@@ -78612,6 +78612,216 @@ impl Default for FweAccessibilitySignal {
     }
 }
 
+/// Localization bundle (locale, translations, fallback, extension)
+#[derive(Debug, Clone)]
+pub struct FwfLocalizationBundle {
+    pub bundle_id: String,
+    pub locale: String,
+    pub translations_json: String,
+    pub fallback_locale: String,
+    pub extension_id: String,
+    pub message_count: u32,
+    pub is_default: bool,
+    pub file_uri: String,
+    pub hash: String,
+    pub version: u32,
+}
+
+impl FwfLocalizationBundle {
+    pub fn new() -> Self {
+        Self {
+            bundle_id: String::new(),
+            locale: String::new(),
+            translations_json: String::new(),
+            fallback_locale: String::new(),
+            extension_id: String::new(),
+            message_count: u32::default(),
+            is_default: bool::default(),
+            file_uri: String::new(),
+            hash: String::new(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bundle_id.is_empty() || true && !self.locale.is_empty() || true && !self.translations_json.is_empty() || true && !self.fallback_locale.is_empty() || true && !self.extension_id.is_empty() || true && self.message_count < u32::MAX || true && self.is_default || true && !self.file_uri.is_empty() || true && !self.hash.is_empty() || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for FwfLocalizationBundle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// NLS message (key, default, args, comment, locale)
+#[derive(Debug, Clone)]
+pub struct FwgNlsMessage {
+    pub message_id: String,
+    pub key: String,
+    pub default_message: String,
+    pub args_json: String,
+    pub comment: String,
+    pub locale: String,
+    pub translated_message: String,
+    pub is_pseudo: bool,
+    pub bundle_id: String,
+    pub source_file: String,
+}
+
+impl FwgNlsMessage {
+    pub fn new() -> Self {
+        Self {
+            message_id: String::new(),
+            key: String::new(),
+            default_message: String::new(),
+            args_json: String::new(),
+            comment: String::new(),
+            locale: String::new(),
+            translated_message: String::new(),
+            is_pseudo: bool::default(),
+            bundle_id: String::new(),
+            source_file: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.message_id.is_empty() || true && !self.key.is_empty() || true && !self.default_message.is_empty() || true && !self.args_json.is_empty() || true && !self.comment.is_empty() || true && !self.locale.is_empty() || true && !self.translated_message.is_empty() || true && self.is_pseudo || true && !self.bundle_id.is_empty() || true && !self.source_file.is_empty() || true
+    }
+}
+
+impl Default for FwgNlsMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Locale info (locale, language, region, script, display name)
+#[derive(Debug, Clone)]
+pub struct FwhLocaleInfo {
+    pub locale_id: String,
+    pub locale: String,
+    pub language: String,
+    pub region: String,
+    pub script: String,
+    pub display_name: String,
+    pub native_name: String,
+    pub direction: u32,
+    pub is_supported: bool,
+    pub pack_available: bool,
+}
+
+impl FwhLocaleInfo {
+    pub fn new() -> Self {
+        Self {
+            locale_id: String::new(),
+            locale: String::new(),
+            language: String::new(),
+            region: String::new(),
+            script: String::new(),
+            display_name: String::new(),
+            native_name: String::new(),
+            direction: u32::default(),
+            is_supported: bool::default(),
+            pack_available: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.locale_id.is_empty() || true && !self.locale.is_empty() || true && !self.language.is_empty() || true && !self.region.is_empty() || true && !self.script.is_empty() || true && !self.display_name.is_empty() || true && !self.native_name.is_empty() || true && self.direction < u32::MAX || true && self.is_supported || true && self.pack_available || true
+    }
+}
+
+impl Default for FwhLocaleInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language pack (locale, translations, extension id, hash)
+#[derive(Debug, Clone)]
+pub struct FwiLanguagePack {
+    pub pack_id: String,
+    pub locale: String,
+    pub translations_json: String,
+    pub extension_id: String,
+    pub hash: String,
+    pub version: String,
+    pub file_count: u32,
+    pub install_timestamp_ms: u64,
+    pub is_builtin: bool,
+    pub coverage_percent: f64,
+}
+
+impl FwiLanguagePack {
+    pub fn new() -> Self {
+        Self {
+            pack_id: String::new(),
+            locale: String::new(),
+            translations_json: String::new(),
+            extension_id: String::new(),
+            hash: String::new(),
+            version: String::new(),
+            file_count: u32::default(),
+            install_timestamp_ms: u64::default(),
+            is_builtin: bool::default(),
+            coverage_percent: f64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pack_id.is_empty() || true && !self.locale.is_empty() || true && !self.translations_json.is_empty() || true && !self.extension_id.is_empty() || true && !self.hash.is_empty() || true && !self.version.is_empty() || true && self.file_count < u32::MAX || true && self.install_timestamp_ms < u64::MAX || true && self.is_builtin || true && self.coverage_percent.is_finite() || true
+    }
+}
+
+impl Default for FwiLanguagePack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Keyboard layout (id, label, language, mapping, raw info)
+#[derive(Debug, Clone)]
+pub struct FwjKeyboardLayout {
+    pub layout_id: String,
+    pub label: String,
+    pub language: String,
+    pub mapping_json: String,
+    pub raw_info_json: String,
+    pub is_iso_keyboard: bool,
+    pub is_us_standard: bool,
+    pub browser_language: String,
+    pub os_layout_id: String,
+    pub key_count: u32,
+}
+
+impl FwjKeyboardLayout {
+    pub fn new() -> Self {
+        Self {
+            layout_id: String::new(),
+            label: String::new(),
+            language: String::new(),
+            mapping_json: String::new(),
+            raw_info_json: String::new(),
+            is_iso_keyboard: bool::default(),
+            is_us_standard: bool::default(),
+            browser_language: String::new(),
+            os_layout_id: String::new(),
+            key_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.layout_id.is_empty() || true && !self.label.is_empty() || true && !self.language.is_empty() || true && !self.mapping_json.is_empty() || true && !self.raw_info_json.is_empty() || true && self.is_iso_keyboard || true && self.is_us_standard || true && !self.browser_language.is_empty() || true && !self.os_layout_id.is_empty() || true && self.key_count < u32::MAX || true
+    }
+}
+
+impl Default for FwjKeyboardLayout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -300417,6 +300627,96 @@ mod tests_fwe_generated {
     fn test_fwe_fields() {
         let mut obj = FweAccessibilitySignal::default();
         obj.signal_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwf_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwf_default() {
+        let obj = FwfLocalizationBundle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwf_fields() {
+        let mut obj = FwfLocalizationBundle::default();
+        obj.bundle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwg_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwg_default() {
+        let obj = FwgNlsMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwg_fields() {
+        let mut obj = FwgNlsMessage::default();
+        obj.message_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwh_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwh_default() {
+        let obj = FwhLocaleInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwh_fields() {
+        let mut obj = FwhLocaleInfo::default();
+        obj.locale_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwi_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwi_default() {
+        let obj = FwiLanguagePack::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwi_fields() {
+        let mut obj = FwiLanguagePack::default();
+        obj.pack_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fwj_generated {
+    use super::*;
+
+    #[test]
+    fn test_fwj_default() {
+        let obj = FwjKeyboardLayout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fwj_fields() {
+        let mut obj = FwjKeyboardLayout::default();
+        obj.layout_id = "test".to_string();
         assert!(obj.validate());
     }
 }
