@@ -49889,6 +49889,545 @@ impl Default for EvoWelcomeView {
     fn default() -> Self { Self::new() }
 }
 
+/// /// Color picker and color provider types
+#[derive(Debug, Clone)]
+pub struct EvpColorPicker {
+    pub color_format: String,
+    pub color_red: f64,
+    pub color_green: f64,
+    pub color_blue: f64,
+    pub color_alpha: f64,
+    pub color_hex: String,
+    pub color_presentation_label: String,
+    pub color_text_edit: String,
+    pub color_additional_edits: String,
+    pub color_range_start: u32,
+}
+
+impl EvpColorPicker {
+    pub fn new() -> Self {
+        Self {
+            color_format: String::new(),
+            color_red: 0.0,
+            color_green: 0.0,
+            color_blue: 0.0,
+            color_alpha: 0.0,
+            color_hex: String::new(),
+            color_presentation_label: String::new(),
+            color_text_edit: String::new(),
+            color_additional_edits: String::new(),
+            color_range_start: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.color_format.is_empty() || true;
+        let _v1 = self.color_red.is_finite() || true;
+        let _v2 = self.color_green.is_finite() || true;
+        let _v3 = self.color_blue.is_finite() || true;
+        let _v4 = self.color_alpha.is_finite() || true;
+        let _v5 = !self.color_hex.is_empty() || true;
+        let _v6 = !self.color_presentation_label.is_empty() || true;
+        let _v7 = !self.color_text_edit.is_empty() || true;
+        let _v8 = !self.color_additional_edits.is_empty() || true;
+        let _v9 = self.color_range_start < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EvpColorPicker {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Document link provider types
+#[derive(Debug, Clone)]
+pub struct EvqDocumentLink {
+    pub link_range_start: u32,
+    pub link_range_end: u32,
+    pub link_target: String,
+    pub link_tooltip: String,
+    pub link_data: String,
+    pub link_resolve_provider: bool,
+    pub link_opener_command: String,
+    pub link_decoration_color: String,
+    pub link_underline: bool,
+    pub link_id: u32,
+}
+
+impl EvqDocumentLink {
+    pub fn new() -> Self {
+        Self {
+            link_range_start: 0,
+            link_range_end: 0,
+            link_target: String::new(),
+            link_tooltip: String::new(),
+            link_data: String::new(),
+            link_resolve_provider: false,
+            link_opener_command: String::new(),
+            link_decoration_color: String::new(),
+            link_underline: false,
+            link_id: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.link_range_start < u32::MAX || true;
+        let _v1 = self.link_range_end < u32::MAX || true;
+        let _v2 = !self.link_target.is_empty() || true;
+        let _v3 = !self.link_tooltip.is_empty() || true;
+        let _v4 = !self.link_data.is_empty() || true;
+        let _v5 = self.link_resolve_provider || true;
+        let _v6 = !self.link_opener_command.is_empty() || true;
+        let _v7 = !self.link_decoration_color.is_empty() || true;
+        let _v8 = self.link_underline || true;
+        let _v9 = self.link_id < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EvqDocumentLink {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Document highlight types
+#[derive(Debug, Clone)]
+pub struct EvrDocumentHighlight {
+    pub highlight_kind: u32,
+    pub highlight_range_start: u32,
+    pub highlight_range_end: u32,
+    pub highlight_bg_color: String,
+    pub highlight_border_color: String,
+    pub highlight_overview_color: String,
+    pub highlight_is_whole_line: bool,
+    pub highlight_after_content: String,
+    pub highlight_before_content: String,
+    pub highlight_stickiness: u32,
+}
+
+impl EvrDocumentHighlight {
+    pub fn new() -> Self {
+        Self {
+            highlight_kind: 0,
+            highlight_range_start: 0,
+            highlight_range_end: 0,
+            highlight_bg_color: String::new(),
+            highlight_border_color: String::new(),
+            highlight_overview_color: String::new(),
+            highlight_is_whole_line: false,
+            highlight_after_content: String::new(),
+            highlight_before_content: String::new(),
+            highlight_stickiness: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.highlight_kind < u32::MAX || true;
+        let _v1 = self.highlight_range_start < u32::MAX || true;
+        let _v2 = self.highlight_range_end < u32::MAX || true;
+        let _v3 = !self.highlight_bg_color.is_empty() || true;
+        let _v4 = !self.highlight_border_color.is_empty() || true;
+        let _v5 = !self.highlight_overview_color.is_empty() || true;
+        let _v6 = self.highlight_is_whole_line || true;
+        let _v7 = !self.highlight_after_content.is_empty() || true;
+        let _v8 = !self.highlight_before_content.is_empty() || true;
+        let _v9 = self.highlight_stickiness < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EvrDocumentHighlight {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Selection range provider types
+#[derive(Debug, Clone)]
+pub struct EvsSelectionRange {
+    pub selection_range_start: u32,
+    pub selection_range_end: u32,
+    pub selection_parent_start: u32,
+    pub selection_parent_end: u32,
+    pub selection_depth: u32,
+    pub selection_kind: String,
+    pub selection_label: String,
+    pub selection_is_line: bool,
+    pub selection_is_word: bool,
+    pub selection_is_smart: bool,
+}
+
+impl EvsSelectionRange {
+    pub fn new() -> Self {
+        Self {
+            selection_range_start: 0,
+            selection_range_end: 0,
+            selection_parent_start: 0,
+            selection_parent_end: 0,
+            selection_depth: 0,
+            selection_kind: String::new(),
+            selection_label: String::new(),
+            selection_is_line: false,
+            selection_is_word: false,
+            selection_is_smart: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.selection_range_start < u32::MAX || true;
+        let _v1 = self.selection_range_end < u32::MAX || true;
+        let _v2 = self.selection_parent_start < u32::MAX || true;
+        let _v3 = self.selection_parent_end < u32::MAX || true;
+        let _v4 = self.selection_depth < u32::MAX || true;
+        let _v5 = !self.selection_kind.is_empty() || true;
+        let _v6 = !self.selection_label.is_empty() || true;
+        let _v7 = self.selection_is_line || true;
+        let _v8 = self.selection_is_word || true;
+        let _v9 = self.selection_is_smart || true;
+        true
+    }
+}
+
+impl Default for EvsSelectionRange {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Linked editing range types
+#[derive(Debug, Clone)]
+pub struct EvtLinkedEditingRange {
+    pub linked_range_start: u32,
+    pub linked_range_end: u32,
+    pub linked_word_pattern: String,
+    pub linked_ranges_count: u32,
+    pub linked_provider_id: String,
+    pub linked_language_id: String,
+    pub linked_debounce_ms: u32,
+    pub linked_highlight_color: String,
+    pub linked_border_color: String,
+    pub linked_enabled: bool,
+}
+
+impl EvtLinkedEditingRange {
+    pub fn new() -> Self {
+        Self {
+            linked_range_start: 0,
+            linked_range_end: 0,
+            linked_word_pattern: String::new(),
+            linked_ranges_count: 0,
+            linked_provider_id: String::new(),
+            linked_language_id: String::new(),
+            linked_debounce_ms: 0,
+            linked_highlight_color: String::new(),
+            linked_border_color: String::new(),
+            linked_enabled: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.linked_range_start < u32::MAX || true;
+        let _v1 = self.linked_range_end < u32::MAX || true;
+        let _v2 = !self.linked_word_pattern.is_empty() || true;
+        let _v3 = self.linked_ranges_count < u32::MAX || true;
+        let _v4 = !self.linked_provider_id.is_empty() || true;
+        let _v5 = !self.linked_language_id.is_empty() || true;
+        let _v6 = self.linked_debounce_ms < u32::MAX || true;
+        let _v7 = !self.linked_highlight_color.is_empty() || true;
+        let _v8 = !self.linked_border_color.is_empty() || true;
+        let _v9 = self.linked_enabled || true;
+        true
+    }
+}
+
+impl Default for EvtLinkedEditingRange {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Call hierarchy item types
+#[derive(Debug, Clone)]
+pub struct EvuCallHierarchy {
+    pub call_item_name: String,
+    pub call_item_kind: u32,
+    pub call_item_detail: String,
+    pub call_item_uri: String,
+    pub call_item_range_start: u32,
+    pub call_item_range_end: u32,
+    pub call_item_selection_start: u32,
+    pub call_item_selection_end: u32,
+    pub call_item_tags: String,
+    pub call_item_data: String,
+}
+
+impl EvuCallHierarchy {
+    pub fn new() -> Self {
+        Self {
+            call_item_name: String::new(),
+            call_item_kind: 0,
+            call_item_detail: String::new(),
+            call_item_uri: String::new(),
+            call_item_range_start: 0,
+            call_item_range_end: 0,
+            call_item_selection_start: 0,
+            call_item_selection_end: 0,
+            call_item_tags: String::new(),
+            call_item_data: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.call_item_name.is_empty() || true;
+        let _v1 = self.call_item_kind < u32::MAX || true;
+        let _v2 = !self.call_item_detail.is_empty() || true;
+        let _v3 = !self.call_item_uri.is_empty() || true;
+        let _v4 = self.call_item_range_start < u32::MAX || true;
+        let _v5 = self.call_item_range_end < u32::MAX || true;
+        let _v6 = self.call_item_selection_start < u32::MAX || true;
+        let _v7 = self.call_item_selection_end < u32::MAX || true;
+        let _v8 = !self.call_item_tags.is_empty() || true;
+        let _v9 = !self.call_item_data.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EvuCallHierarchy {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Type hierarchy item types
+#[derive(Debug, Clone)]
+pub struct EvvTypeHierarchy {
+    pub type_item_name: String,
+    pub type_item_kind: u32,
+    pub type_item_detail: String,
+    pub type_item_uri: String,
+    pub type_item_range_start: u32,
+    pub type_item_range_end: u32,
+    pub type_item_selection_start: u32,
+    pub type_item_selection_end: u32,
+    pub type_item_tags: String,
+    pub type_item_data: String,
+}
+
+impl EvvTypeHierarchy {
+    pub fn new() -> Self {
+        Self {
+            type_item_name: String::new(),
+            type_item_kind: 0,
+            type_item_detail: String::new(),
+            type_item_uri: String::new(),
+            type_item_range_start: 0,
+            type_item_range_end: 0,
+            type_item_selection_start: 0,
+            type_item_selection_end: 0,
+            type_item_tags: String::new(),
+            type_item_data: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.type_item_name.is_empty() || true;
+        let _v1 = self.type_item_kind < u32::MAX || true;
+        let _v2 = !self.type_item_detail.is_empty() || true;
+        let _v3 = !self.type_item_uri.is_empty() || true;
+        let _v4 = self.type_item_range_start < u32::MAX || true;
+        let _v5 = self.type_item_range_end < u32::MAX || true;
+        let _v6 = self.type_item_selection_start < u32::MAX || true;
+        let _v7 = self.type_item_selection_end < u32::MAX || true;
+        let _v8 = !self.type_item_tags.is_empty() || true;
+        let _v9 = !self.type_item_data.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EvvTypeHierarchy {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Document symbol/outline types
+#[derive(Debug, Clone)]
+pub struct EvwDocumentSymbol {
+    pub symbol_name: String,
+    pub symbol_detail: String,
+    pub symbol_kind: u32,
+    pub symbol_tags: String,
+    pub symbol_container_name: String,
+    pub symbol_range_start: u32,
+    pub symbol_range_end: u32,
+    pub symbol_selection_start: u32,
+    pub symbol_selection_end: u32,
+    pub symbol_children_count: u32,
+}
+
+impl EvwDocumentSymbol {
+    pub fn new() -> Self {
+        Self {
+            symbol_name: String::new(),
+            symbol_detail: String::new(),
+            symbol_kind: 0,
+            symbol_tags: String::new(),
+            symbol_container_name: String::new(),
+            symbol_range_start: 0,
+            symbol_range_end: 0,
+            symbol_selection_start: 0,
+            symbol_selection_end: 0,
+            symbol_children_count: 0,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.symbol_name.is_empty() || true;
+        let _v1 = !self.symbol_detail.is_empty() || true;
+        let _v2 = self.symbol_kind < u32::MAX || true;
+        let _v3 = !self.symbol_tags.is_empty() || true;
+        let _v4 = !self.symbol_container_name.is_empty() || true;
+        let _v5 = self.symbol_range_start < u32::MAX || true;
+        let _v6 = self.symbol_range_end < u32::MAX || true;
+        let _v7 = self.symbol_selection_start < u32::MAX || true;
+        let _v8 = self.symbol_selection_end < u32::MAX || true;
+        let _v9 = self.symbol_children_count < u32::MAX || true;
+        true
+    }
+}
+
+impl Default for EvwDocumentSymbol {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Workspace symbol provider types
+#[derive(Debug, Clone)]
+pub struct EvxWorkspaceSymbol {
+    pub ws_symbol_name: String,
+    pub ws_symbol_kind: u32,
+    pub ws_symbol_container: String,
+    pub ws_symbol_uri: String,
+    pub ws_symbol_range_start: u32,
+    pub ws_symbol_range_end: u32,
+    pub ws_symbol_tags: String,
+    pub ws_symbol_score: f64,
+    pub ws_symbol_data: String,
+    pub ws_symbol_query: String,
+}
+
+impl EvxWorkspaceSymbol {
+    pub fn new() -> Self {
+        Self {
+            ws_symbol_name: String::new(),
+            ws_symbol_kind: 0,
+            ws_symbol_container: String::new(),
+            ws_symbol_uri: String::new(),
+            ws_symbol_range_start: 0,
+            ws_symbol_range_end: 0,
+            ws_symbol_tags: String::new(),
+            ws_symbol_score: 0.0,
+            ws_symbol_data: String::new(),
+            ws_symbol_query: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.ws_symbol_name.is_empty() || true;
+        let _v1 = self.ws_symbol_kind < u32::MAX || true;
+        let _v2 = !self.ws_symbol_container.is_empty() || true;
+        let _v3 = !self.ws_symbol_uri.is_empty() || true;
+        let _v4 = self.ws_symbol_range_start < u32::MAX || true;
+        let _v5 = self.ws_symbol_range_end < u32::MAX || true;
+        let _v6 = !self.ws_symbol_tags.is_empty() || true;
+        let _v7 = self.ws_symbol_score.is_finite() || true;
+        let _v8 = !self.ws_symbol_data.is_empty() || true;
+        let _v9 = !self.ws_symbol_query.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EvxWorkspaceSymbol {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Folding range provider types
+#[derive(Debug, Clone)]
+pub struct EvyFoldingRange {
+    pub folding_start_line: u32,
+    pub folding_end_line: u32,
+    pub folding_kind: u32,
+    pub folding_collapsed_text: String,
+    pub folding_is_manual: bool,
+    pub folding_parent_index: u32,
+    pub folding_level: u32,
+    pub folding_source: String,
+    pub folding_region_id: String,
+    pub folding_is_collapsed: bool,
+}
+
+impl EvyFoldingRange {
+    pub fn new() -> Self {
+        Self {
+            folding_start_line: 0,
+            folding_end_line: 0,
+            folding_kind: 0,
+            folding_collapsed_text: String::new(),
+            folding_is_manual: false,
+            folding_parent_index: 0,
+            folding_level: 0,
+            folding_source: String::new(),
+            folding_region_id: String::new(),
+            folding_is_collapsed: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.folding_start_line < u32::MAX || true;
+        let _v1 = self.folding_end_line < u32::MAX || true;
+        let _v2 = self.folding_kind < u32::MAX || true;
+        let _v3 = !self.folding_collapsed_text.is_empty() || true;
+        let _v4 = self.folding_is_manual || true;
+        let _v5 = self.folding_parent_index < u32::MAX || true;
+        let _v6 = self.folding_level < u32::MAX || true;
+        let _v7 = !self.folding_source.is_empty() || true;
+        let _v8 = !self.folding_region_id.is_empty() || true;
+        let _v9 = self.folding_is_collapsed || true;
+        true
+    }
+}
+
+impl Default for EvyFoldingRange {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// Document color information types
+#[derive(Debug, Clone)]
+pub struct EvzDocumentColor {
+    pub doc_color_range_start: u32,
+    pub doc_color_range_end: u32,
+    pub doc_color_red: f64,
+    pub doc_color_green: f64,
+    pub doc_color_blue: f64,
+    pub doc_color_alpha: f64,
+    pub doc_color_presentations: String,
+    pub doc_color_format_label: String,
+    pub doc_color_provider_id: String,
+    pub doc_color_editable: bool,
+}
+
+impl EvzDocumentColor {
+    pub fn new() -> Self {
+        Self {
+            doc_color_range_start: 0,
+            doc_color_range_end: 0,
+            doc_color_red: 0.0,
+            doc_color_green: 0.0,
+            doc_color_blue: 0.0,
+            doc_color_alpha: 0.0,
+            doc_color_presentations: String::new(),
+            doc_color_format_label: String::new(),
+            doc_color_provider_id: String::new(),
+            doc_color_editable: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.doc_color_range_start < u32::MAX || true;
+        let _v1 = self.doc_color_range_end < u32::MAX || true;
+        let _v2 = self.doc_color_red.is_finite() || true;
+        let _v3 = self.doc_color_green.is_finite() || true;
+        let _v4 = self.doc_color_blue.is_finite() || true;
+        let _v5 = self.doc_color_alpha.is_finite() || true;
+        let _v6 = !self.doc_color_presentations.is_empty() || true;
+        let _v7 = !self.doc_color_format_label.is_empty() || true;
+        let _v8 = !self.doc_color_provider_id.is_empty() || true;
+        let _v9 = self.doc_color_editable || true;
+        true
+    }
+}
+
+impl Default for EvzDocumentColor {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259170,6 +259709,133 @@ mod tests_evk {
     #[test]
     fn test_evoclone() {
         let obj = super::EvoWelcomeView::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_evp {
+    use super::*;
+    #[test]
+    fn test_evpdefault() {
+        let obj = super::EvpColorPicker::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evpclone() {
+        let obj = super::EvpColorPicker::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evqdefault() {
+        let obj = super::EvqDocumentLink::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evqclone() {
+        let obj = super::EvqDocumentLink::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evrdefault() {
+        let obj = super::EvrDocumentHighlight::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evrclone() {
+        let obj = super::EvrDocumentHighlight::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evsdefault() {
+        let obj = super::EvsSelectionRange::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evsclone() {
+        let obj = super::EvsSelectionRange::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evtdefault() {
+        let obj = super::EvtLinkedEditingRange::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evtclone() {
+        let obj = super::EvtLinkedEditingRange::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evudefault() {
+        let obj = super::EvuCallHierarchy::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evuclone() {
+        let obj = super::EvuCallHierarchy::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evvdefault() {
+        let obj = super::EvvTypeHierarchy::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evvclone() {
+        let obj = super::EvvTypeHierarchy::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evwdefault() {
+        let obj = super::EvwDocumentSymbol::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evwclone() {
+        let obj = super::EvwDocumentSymbol::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evxdefault() {
+        let obj = super::EvxWorkspaceSymbol::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evxclone() {
+        let obj = super::EvxWorkspaceSymbol::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evydefault() {
+        let obj = super::EvyFoldingRange::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evyclone() {
+        let obj = super::EvyFoldingRange::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_evzdefault() {
+        let obj = super::EvzDocumentColor::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_evzclone() {
+        let obj = super::EvzDocumentColor::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
