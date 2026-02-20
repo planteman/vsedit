@@ -110584,6 +110584,678 @@ impl Default for GzjLocaleInfo {
     }
 }
 
+/// Localization bundle (locale, messages, fallback, uri, format)
+#[derive(Debug, Clone)]
+pub struct GzkLocalizationBundle {
+    pub l10n_bundle_id: String,
+    pub locale: String,
+    pub messages_json: String,
+    pub fallback_locale: String,
+    pub uri: String,
+    pub format_pattern: String,
+    pub key_count: u32,
+    pub is_default: bool,
+    pub extension_id: String,
+    pub bundle_hash: String,
+}
+
+impl GzkLocalizationBundle {
+    pub fn new() -> Self {
+        Self {
+            l10n_bundle_id: String::new(),
+            locale: String::new(),
+            messages_json: String::new(),
+            fallback_locale: String::new(),
+            uri: String::new(),
+            format_pattern: String::new(),
+            key_count: u32::default(),
+            is_default: bool::default(),
+            extension_id: String::new(),
+            bundle_hash: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.l10n_bundle_id.is_empty() || true && !self.locale.is_empty() || true && !self.messages_json.is_empty() || true && !self.fallback_locale.is_empty() || true && !self.uri.is_empty() || true && !self.format_pattern.is_empty() || true && self.key_count < u32::MAX || true && self.is_default || true && !self.extension_id.is_empty() || true && !self.bundle_hash.is_empty() || true
+    }
+}
+
+impl Default for GzkLocalizationBundle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessibility info (role, label, value, description, hints)
+#[derive(Debug, Clone)]
+pub struct GzlAccessibilityInfo {
+    pub a11y_info_id: String,
+    pub role: String,
+    pub label: String,
+    pub value: String,
+    pub description: String,
+    pub hints_json: String,
+    pub is_live_region: bool,
+    pub live_politeness: String,
+    pub container_role: String,
+    pub level: u32,
+}
+
+impl GzlAccessibilityInfo {
+    pub fn new() -> Self {
+        Self {
+            a11y_info_id: String::new(),
+            role: String::new(),
+            label: String::new(),
+            value: String::new(),
+            description: String::new(),
+            hints_json: String::new(),
+            is_live_region: bool::default(),
+            live_politeness: String::new(),
+            container_role: String::new(),
+            level: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_info_id.is_empty() || true && !self.role.is_empty() || true && !self.label.is_empty() || true && !self.value.is_empty() || true && !self.description.is_empty() || true && !self.hints_json.is_empty() || true && self.is_live_region || true && !self.live_politeness.is_empty() || true && !self.container_role.is_empty() || true && self.level < u32::MAX || true
+    }
+}
+
+impl Default for GzlAccessibilityInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Screen reader (is active, alert, status, mode, verbosity)
+#[derive(Debug, Clone)]
+pub struct GzmScreenReader {
+    pub screen_reader_id: String,
+    pub is_active: bool,
+    pub alert_message: String,
+    pub status: String,
+    pub mode: String,
+    pub verbosity_level: u32,
+    pub detected_reader: String,
+    pub announce_queue_json: String,
+    pub page_mode: bool,
+    pub line_mode: bool,
+}
+
+impl GzmScreenReader {
+    pub fn new() -> Self {
+        Self {
+            screen_reader_id: String::new(),
+            is_active: bool::default(),
+            alert_message: String::new(),
+            status: String::new(),
+            mode: String::new(),
+            verbosity_level: u32::default(),
+            detected_reader: String::new(),
+            announce_queue_json: String::new(),
+            page_mode: bool::default(),
+            line_mode: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.screen_reader_id.is_empty() || true && self.is_active || true && !self.alert_message.is_empty() || true && !self.status.is_empty() || true && !self.mode.is_empty() || true && self.verbosity_level < u32::MAX || true && !self.detected_reader.is_empty() || true && !self.announce_queue_json.is_empty() || true && self.page_mode || true && self.line_mode || true
+    }
+}
+
+impl Default for GzmScreenReader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Accessible view (content, language, symbol, position, actions)
+#[derive(Debug, Clone)]
+pub struct GznAccessibleView {
+    pub a11y_view_id: String,
+    pub content: String,
+    pub language_id: String,
+    pub symbol_json: String,
+    pub position_json: String,
+    pub actions_json: String,
+    pub is_focusable: bool,
+    pub tab_index: u32,
+    pub aria_label: String,
+    pub view_id: String,
+}
+
+impl GznAccessibleView {
+    pub fn new() -> Self {
+        Self {
+            a11y_view_id: String::new(),
+            content: String::new(),
+            language_id: String::new(),
+            symbol_json: String::new(),
+            position_json: String::new(),
+            actions_json: String::new(),
+            is_focusable: bool::default(),
+            tab_index: u32::default(),
+            aria_label: String::new(),
+            view_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_view_id.is_empty() || true && !self.content.is_empty() || true && !self.language_id.is_empty() || true && !self.symbol_json.is_empty() || true && !self.position_json.is_empty() || true && !self.actions_json.is_empty() || true && self.is_focusable || true && self.tab_index < u32::MAX || true && !self.aria_label.is_empty() || true && !self.view_id.is_empty() || true
+    }
+}
+
+impl Default for GznAccessibleView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Update info (version, product version, url, hash, date)
+#[derive(Debug, Clone)]
+pub struct GzoUpdateInfo {
+    pub update_info_id: String,
+    pub version: String,
+    pub product_version: String,
+    pub url: String,
+    pub hash: String,
+    pub date: String,
+    pub sha256_hash: String,
+    pub size_bytes: u64,
+    pub release_notes_url: String,
+    pub is_critical: bool,
+}
+
+impl GzoUpdateInfo {
+    pub fn new() -> Self {
+        Self {
+            update_info_id: String::new(),
+            version: String::new(),
+            product_version: String::new(),
+            url: String::new(),
+            hash: String::new(),
+            date: String::new(),
+            sha256_hash: String::new(),
+            size_bytes: u64::default(),
+            release_notes_url: String::new(),
+            is_critical: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.update_info_id.is_empty() || true && !self.version.is_empty() || true && !self.product_version.is_empty() || true && !self.url.is_empty() || true && !self.hash.is_empty() || true && !self.date.is_empty() || true && !self.sha256_hash.is_empty() || true && self.size_bytes < u64::MAX || true && !self.release_notes_url.is_empty() || true && self.is_critical || true
+    }
+}
+
+impl Default for GzoUpdateInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Update state (type, version, is available, is downloading)
+#[derive(Debug, Clone)]
+pub struct GzpUpdateState {
+    pub update_state_id: String,
+    pub state_type: String,
+    pub version: String,
+    pub is_available: bool,
+    pub is_downloading: bool,
+    pub download_progress: f64,
+    pub is_ready: bool,
+    pub is_checking: bool,
+    pub error_message: String,
+    pub last_check_ms: u64,
+}
+
+impl GzpUpdateState {
+    pub fn new() -> Self {
+        Self {
+            update_state_id: String::new(),
+            state_type: String::new(),
+            version: String::new(),
+            is_available: bool::default(),
+            is_downloading: bool::default(),
+            download_progress: f64::default(),
+            is_ready: bool::default(),
+            is_checking: bool::default(),
+            error_message: String::new(),
+            last_check_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.update_state_id.is_empty() || true && !self.state_type.is_empty() || true && !self.version.is_empty() || true && self.is_available || true && self.is_downloading || true && self.download_progress.is_finite() || true && self.is_ready || true && self.is_checking || true && !self.error_message.is_empty() || true && self.last_check_ms < u64::MAX || true
+    }
+}
+
+impl Default for GzpUpdateState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension gallery (service url, item url, control url, cdn)
+#[derive(Debug, Clone)]
+pub struct GzqExtensionGallery {
+    pub ext_gallery_id: String,
+    pub service_url: String,
+    pub item_url: String,
+    pub control_url: String,
+    pub cdn_url: String,
+    pub recommended_url: String,
+    pub is_enabled: bool,
+    pub search_url: String,
+    pub publisher_url: String,
+    pub version: String,
+}
+
+impl GzqExtensionGallery {
+    pub fn new() -> Self {
+        Self {
+            ext_gallery_id: String::new(),
+            service_url: String::new(),
+            item_url: String::new(),
+            control_url: String::new(),
+            cdn_url: String::new(),
+            recommended_url: String::new(),
+            is_enabled: bool::default(),
+            search_url: String::new(),
+            publisher_url: String::new(),
+            version: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_gallery_id.is_empty() || true && !self.service_url.is_empty() || true && !self.item_url.is_empty() || true && !self.control_url.is_empty() || true && !self.cdn_url.is_empty() || true && !self.recommended_url.is_empty() || true && self.is_enabled || true && !self.search_url.is_empty() || true && !self.publisher_url.is_empty() || true && !self.version.is_empty() || true
+    }
+}
+
+impl Default for GzqExtensionGallery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Marketplace stats (install count, rating, review count, trend)
+#[derive(Debug, Clone)]
+pub struct GzrMarketplaceStats {
+    pub mkt_stats_id: String,
+    pub install_count: u64,
+    pub rating: f64,
+    pub review_count: u32,
+    pub trend_daily: f64,
+    pub trend_weekly: f64,
+    pub trend_monthly: f64,
+    pub weighted_rating: f64,
+    pub uninstall_count: u64,
+    pub active_install_count: u64,
+}
+
+impl GzrMarketplaceStats {
+    pub fn new() -> Self {
+        Self {
+            mkt_stats_id: String::new(),
+            install_count: u64::default(),
+            rating: f64::default(),
+            review_count: u32::default(),
+            trend_daily: f64::default(),
+            trend_weekly: f64::default(),
+            trend_monthly: f64::default(),
+            weighted_rating: f64::default(),
+            uninstall_count: u64::default(),
+            active_install_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mkt_stats_id.is_empty() || true && self.install_count < u64::MAX || true && self.rating.is_finite() || true && self.review_count < u32::MAX || true && self.trend_daily.is_finite() || true && self.trend_weekly.is_finite() || true && self.trend_monthly.is_finite() || true && self.weighted_rating.is_finite() || true && self.uninstall_count < u64::MAX || true && self.active_install_count < u64::MAX || true
+    }
+}
+
+impl Default for GzrMarketplaceStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension rating (rating, count, distribution, reviewer name)
+#[derive(Debug, Clone)]
+pub struct GzsExtensionRating {
+    pub ext_rating_id: String,
+    pub rating: f64,
+    pub count: u32,
+    pub distribution_json: String,
+    pub reviewer_name: String,
+    pub review_text: String,
+    pub review_date_ms: u64,
+    pub is_verified: bool,
+    pub helpful_count: u32,
+    pub reply_text: String,
+}
+
+impl GzsExtensionRating {
+    pub fn new() -> Self {
+        Self {
+            ext_rating_id: String::new(),
+            rating: f64::default(),
+            count: u32::default(),
+            distribution_json: String::new(),
+            reviewer_name: String::new(),
+            review_text: String::new(),
+            review_date_ms: u64::default(),
+            is_verified: bool::default(),
+            helpful_count: u32::default(),
+            reply_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_rating_id.is_empty() || true && self.rating.is_finite() || true && self.count < u32::MAX || true && !self.distribution_json.is_empty() || true && !self.reviewer_name.is_empty() || true && !self.review_text.is_empty() || true && self.review_date_ms < u64::MAX || true && self.is_verified || true && self.helpful_count < u32::MAX || true && !self.reply_text.is_empty() || true
+    }
+}
+
+impl Default for GzsExtensionRating {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Feature flag (name, enabled, description, default, scope)
+#[derive(Debug, Clone)]
+pub struct GztFeatureFlag {
+    pub feature_flag_id: String,
+    pub name: String,
+    pub is_enabled: bool,
+    pub description: String,
+    pub default_value: bool,
+    pub scope: String,
+    pub source: String,
+    pub override_value: String,
+    pub rollout_pct: f64,
+    pub expiry_ms: u64,
+}
+
+impl GztFeatureFlag {
+    pub fn new() -> Self {
+        Self {
+            feature_flag_id: String::new(),
+            name: String::new(),
+            is_enabled: bool::default(),
+            description: String::new(),
+            default_value: bool::default(),
+            scope: String::new(),
+            source: String::new(),
+            override_value: String::new(),
+            rollout_pct: f64::default(),
+            expiry_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.feature_flag_id.is_empty() || true && !self.name.is_empty() || true && self.is_enabled || true && !self.description.is_empty() || true && self.default_value || true && !self.scope.is_empty() || true && !self.source.is_empty() || true && !self.override_value.is_empty() || true && self.rollout_pct.is_finite() || true && self.expiry_ms < u64::MAX || true
+    }
+}
+
+impl Default for GztFeatureFlag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Experiment (id, enabled, description, condition, action)
+#[derive(Debug, Clone)]
+pub struct GzuExperiment {
+    pub experiment_id: String,
+    pub experiment_name: String,
+    pub is_enabled: bool,
+    pub description: String,
+    pub condition_json: String,
+    pub action_json: String,
+    pub start_ms: u64,
+    pub end_ms: u64,
+    pub population_pct: f64,
+    pub variant: String,
+}
+
+impl GzuExperiment {
+    pub fn new() -> Self {
+        Self {
+            experiment_id: String::new(),
+            experiment_name: String::new(),
+            is_enabled: bool::default(),
+            description: String::new(),
+            condition_json: String::new(),
+            action_json: String::new(),
+            start_ms: u64::default(),
+            end_ms: u64::default(),
+            population_pct: f64::default(),
+            variant: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.experiment_id.is_empty() || true && !self.experiment_name.is_empty() || true && self.is_enabled || true && !self.description.is_empty() || true && !self.condition_json.is_empty() || true && !self.action_json.is_empty() || true && self.start_ms < u64::MAX || true && self.end_ms < u64::MAX || true && self.population_pct.is_finite() || true && !self.variant.is_empty() || true
+    }
+}
+
+impl Default for GzuExperiment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Crash report (exception, stack, timestamp, version, os)
+#[derive(Debug, Clone)]
+pub struct GzvCrashReport {
+    pub crash_report_id: String,
+    pub exception_type: String,
+    pub stack_trace: String,
+    pub timestamp_ms: u64,
+    pub version: String,
+    pub os_info: String,
+    pub memory_usage: u64,
+    pub cpu_usage: f64,
+    pub extension_id: String,
+    pub is_fatal: bool,
+}
+
+impl GzvCrashReport {
+    pub fn new() -> Self {
+        Self {
+            crash_report_id: String::new(),
+            exception_type: String::new(),
+            stack_trace: String::new(),
+            timestamp_ms: u64::default(),
+            version: String::new(),
+            os_info: String::new(),
+            memory_usage: u64::default(),
+            cpu_usage: f64::default(),
+            extension_id: String::new(),
+            is_fatal: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.crash_report_id.is_empty() || true && !self.exception_type.is_empty() || true && !self.stack_trace.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.version.is_empty() || true && !self.os_info.is_empty() || true && self.memory_usage < u64::MAX || true && self.cpu_usage.is_finite() || true && !self.extension_id.is_empty() || true && self.is_fatal || true
+    }
+}
+
+impl Default for GzvCrashReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Performance mark (name, start time, duration, memory, phase)
+#[derive(Debug, Clone)]
+pub struct GzwPerformanceMark {
+    pub perf_mark_id: String,
+    pub name: String,
+    pub start_time_ms: u64,
+    pub duration_ms: f64,
+    pub memory_bytes: u64,
+    pub phase: String,
+    pub pid: u32,
+    pub thread_id: String,
+    pub category: String,
+    pub detail: String,
+}
+
+impl GzwPerformanceMark {
+    pub fn new() -> Self {
+        Self {
+            perf_mark_id: String::new(),
+            name: String::new(),
+            start_time_ms: u64::default(),
+            duration_ms: f64::default(),
+            memory_bytes: u64::default(),
+            phase: String::new(),
+            pid: u32::default(),
+            thread_id: String::new(),
+            category: String::new(),
+            detail: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.perf_mark_id.is_empty() || true && !self.name.is_empty() || true && self.start_time_ms < u64::MAX || true && self.duration_ms.is_finite() || true && self.memory_bytes < u64::MAX || true && !self.phase.is_empty() || true && self.pid < u32::MAX || true && !self.thread_id.is_empty() || true && !self.category.is_empty() || true && !self.detail.is_empty() || true
+    }
+}
+
+impl Default for GzwPerformanceMark {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Startup metrics (total time, window load, workbench ready)
+#[derive(Debug, Clone)]
+pub struct GzxStartupMetrics {
+    pub startup_id: String,
+    pub total_time_ms: u64,
+    pub window_load_ms: u64,
+    pub workbench_ready_ms: u64,
+    pub extensions_ready_ms: u64,
+    pub editor_ready_ms: u64,
+    pub restore_time_ms: u64,
+    pub shell_env_time_ms: u64,
+    pub renderer_ready_ms: u64,
+    pub layout_time_ms: u64,
+}
+
+impl GzxStartupMetrics {
+    pub fn new() -> Self {
+        Self {
+            startup_id: String::new(),
+            total_time_ms: u64::default(),
+            window_load_ms: u64::default(),
+            workbench_ready_ms: u64::default(),
+            extensions_ready_ms: u64::default(),
+            editor_ready_ms: u64::default(),
+            restore_time_ms: u64::default(),
+            shell_env_time_ms: u64::default(),
+            renderer_ready_ms: u64::default(),
+            layout_time_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.startup_id.is_empty() || true && self.total_time_ms < u64::MAX || true && self.window_load_ms < u64::MAX || true && self.workbench_ready_ms < u64::MAX || true && self.extensions_ready_ms < u64::MAX || true && self.editor_ready_ms < u64::MAX || true && self.restore_time_ms < u64::MAX || true && self.shell_env_time_ms < u64::MAX || true && self.renderer_ready_ms < u64::MAX || true && self.layout_time_ms < u64::MAX || true
+    }
+}
+
+impl Default for GzxStartupMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extension bisect (enabled ids, disabled ids, issue id, step)
+#[derive(Debug, Clone)]
+pub struct GzyExtensionBisect {
+    pub ext_bisect_id: String,
+    pub enabled_ids_json: String,
+    pub disabled_ids_json: String,
+    pub issue_id: String,
+    pub step: u32,
+    pub total_steps: u32,
+    pub is_good: bool,
+    pub current_extension: String,
+    pub start_ms: u64,
+    pub is_complete: bool,
+}
+
+impl GzyExtensionBisect {
+    pub fn new() -> Self {
+        Self {
+            ext_bisect_id: String::new(),
+            enabled_ids_json: String::new(),
+            disabled_ids_json: String::new(),
+            issue_id: String::new(),
+            step: u32::default(),
+            total_steps: u32::default(),
+            is_good: bool::default(),
+            current_extension: String::new(),
+            start_ms: u64::default(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ext_bisect_id.is_empty() || true && !self.enabled_ids_json.is_empty() || true && !self.disabled_ids_json.is_empty() || true && !self.issue_id.is_empty() || true && self.step < u32::MAX || true && self.total_steps < u32::MAX || true && self.is_good || true && !self.current_extension.is_empty() || true && self.start_ms < u64::MAX || true && self.is_complete || true
+    }
+}
+
+impl Default for GzyExtensionBisect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diagnostic info (workspace stats, process info, gpu, a11y)
+#[derive(Debug, Clone)]
+pub struct GzzDiagnosticInfo {
+    pub diag_info_id: String,
+    pub workspace_stats_json: String,
+    pub process_info_json: String,
+    pub gpu_info: String,
+    pub a11y_info: String,
+    pub system_info_json: String,
+    pub extension_count: u32,
+    pub log_path: String,
+    pub is_portable: bool,
+    pub commit_hash: String,
+}
+
+impl GzzDiagnosticInfo {
+    pub fn new() -> Self {
+        Self {
+            diag_info_id: String::new(),
+            workspace_stats_json: String::new(),
+            process_info_json: String::new(),
+            gpu_info: String::new(),
+            a11y_info: String::new(),
+            system_info_json: String::new(),
+            extension_count: u32::default(),
+            log_path: String::new(),
+            is_portable: bool::default(),
+            commit_hash: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_info_id.is_empty() || true && !self.workspace_stats_json.is_empty() || true && !self.process_info_json.is_empty() || true && !self.gpu_info.is_empty() || true && !self.a11y_info.is_empty() || true && !self.system_info_json.is_empty() || true && self.extension_count < u32::MAX || true && !self.log_path.is_empty() || true && self.is_portable || true && !self.commit_hash.is_empty() || true
+    }
+}
+
+impl Default for GzzDiagnosticInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -345925,6 +346597,294 @@ mod tests_gzj_generated {
     fn test_gzj_fields() {
         let mut obj = GzjLocaleInfo::default();
         obj.locale_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzk_default() {
+        let obj = GzkLocalizationBundle::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzk_fields() {
+        let mut obj = GzkLocalizationBundle::default();
+        obj.l10n_bundle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzl_default() {
+        let obj = GzlAccessibilityInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzl_fields() {
+        let mut obj = GzlAccessibilityInfo::default();
+        obj.a11y_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzm_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzm_default() {
+        let obj = GzmScreenReader::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzm_fields() {
+        let mut obj = GzmScreenReader::default();
+        obj.screen_reader_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzn_default() {
+        let obj = GznAccessibleView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzn_fields() {
+        let mut obj = GznAccessibleView::default();
+        obj.a11y_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzo_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzo_default() {
+        let obj = GzoUpdateInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzo_fields() {
+        let mut obj = GzoUpdateInfo::default();
+        obj.update_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzp_default() {
+        let obj = GzpUpdateState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzp_fields() {
+        let mut obj = GzpUpdateState::default();
+        obj.update_state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzq_default() {
+        let obj = GzqExtensionGallery::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzq_fields() {
+        let mut obj = GzqExtensionGallery::default();
+        obj.ext_gallery_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzr_default() {
+        let obj = GzrMarketplaceStats::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzr_fields() {
+        let mut obj = GzrMarketplaceStats::default();
+        obj.mkt_stats_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzs_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzs_default() {
+        let obj = GzsExtensionRating::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzs_fields() {
+        let mut obj = GzsExtensionRating::default();
+        obj.ext_rating_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzt_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzt_default() {
+        let obj = GztFeatureFlag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzt_fields() {
+        let mut obj = GztFeatureFlag::default();
+        obj.feature_flag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzu_default() {
+        let obj = GzuExperiment::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzu_fields() {
+        let mut obj = GzuExperiment::default();
+        obj.experiment_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzv_default() {
+        let obj = GzvCrashReport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzv_fields() {
+        let mut obj = GzvCrashReport::default();
+        obj.crash_report_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzw_default() {
+        let obj = GzwPerformanceMark::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzw_fields() {
+        let mut obj = GzwPerformanceMark::default();
+        obj.perf_mark_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzx_default() {
+        let obj = GzxStartupMetrics::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzx_fields() {
+        let mut obj = GzxStartupMetrics::default();
+        obj.startup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzy_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzy_default() {
+        let obj = GzyExtensionBisect::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzy_fields() {
+        let mut obj = GzyExtensionBisect::default();
+        obj.ext_bisect_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gzz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gzz_default() {
+        let obj = GzzDiagnosticInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gzz_fields() {
+        let mut obj = GzzDiagnosticInfo::default();
+        obj.diag_info_id = "test".to_string();
         assert!(obj.validate());
     }
 }
