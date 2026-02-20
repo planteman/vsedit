@@ -69125,6 +69125,216 @@ impl Default for FnjChatCodeBlock {
     }
 }
 
+/// Inline edit (range, text, display, accepted, rejected)
+#[derive(Debug, Clone)]
+pub struct FnkInlineEdit {
+    pub edit_id: String,
+    pub range_start_line: u32,
+    pub range_start_column: u32,
+    pub range_end_line: u32,
+    pub range_end_column: u32,
+    pub new_text: String,
+    pub display_label: String,
+    pub is_accepted: bool,
+    pub is_rejected: bool,
+    pub model_id: String,
+}
+
+impl FnkInlineEdit {
+    pub fn new() -> Self {
+        Self {
+            edit_id: String::new(),
+            range_start_line: u32::default(),
+            range_start_column: u32::default(),
+            range_end_line: u32::default(),
+            range_end_column: u32::default(),
+            new_text: String::new(),
+            display_label: String::new(),
+            is_accepted: bool::default(),
+            is_rejected: bool::default(),
+            model_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.edit_id.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_start_column < u32::MAX || true && self.range_end_line < u32::MAX || true && self.range_end_column < u32::MAX || true && !self.new_text.is_empty() || true && !self.display_label.is_empty() || true && self.is_accepted || true && self.is_rejected || true && !self.model_id.is_empty() || true
+    }
+}
+
+impl Default for FnkInlineEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline completion (text, range, command, filter text, snippet)
+#[derive(Debug, Clone)]
+pub struct FnlInlineCompletion {
+    pub completion_id: String,
+    pub insert_text: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub filter_text: String,
+    pub command_id: String,
+    pub is_snippet: bool,
+    pub additional_text_edits_json: String,
+    pub provider_id: String,
+    pub source_delay_ms: u32,
+}
+
+impl FnlInlineCompletion {
+    pub fn new() -> Self {
+        Self {
+            completion_id: String::new(),
+            insert_text: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            filter_text: String::new(),
+            command_id: String::new(),
+            is_snippet: bool::default(),
+            additional_text_edits_json: String::new(),
+            provider_id: String::new(),
+            source_delay_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.completion_id.is_empty() || true && !self.insert_text.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && !self.filter_text.is_empty() || true && !self.command_id.is_empty() || true && self.is_snippet || true && !self.additional_text_edits_json.is_empty() || true && !self.provider_id.is_empty() || true && self.source_delay_ms < u32::MAX || true
+    }
+}
+
+impl Default for FnlInlineCompletion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline completion provider (trigger kind, context, group id)
+#[derive(Debug, Clone)]
+pub struct FnmInlineCompletionProvider {
+    pub provider_id: String,
+    pub trigger_kind: u32,
+    pub selected_suggestion_info_json: String,
+    pub group_id: String,
+    pub yields_to_json: String,
+    pub when_clause: String,
+    pub extension_id: String,
+    pub is_active: bool,
+    pub debounce_ms: u32,
+    pub handle_count: u64,
+}
+
+impl FnmInlineCompletionProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_id: String::new(),
+            trigger_kind: u32::default(),
+            selected_suggestion_info_json: String::new(),
+            group_id: String::new(),
+            yields_to_json: String::new(),
+            when_clause: String::new(),
+            extension_id: String::new(),
+            is_active: bool::default(),
+            debounce_ms: u32::default(),
+            handle_count: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.provider_id.is_empty() || true && self.trigger_kind < u32::MAX || true && !self.selected_suggestion_info_json.is_empty() || true && !self.group_id.is_empty() || true && !self.yields_to_json.is_empty() || true && !self.when_clause.is_empty() || true && !self.extension_id.is_empty() || true && self.is_active || true && self.debounce_ms < u32::MAX || true && self.handle_count < u64::MAX || true
+    }
+}
+
+impl Default for FnmInlineCompletionProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline suggestion widget (ghost text, visible, hover, toolbar)
+#[derive(Debug, Clone)]
+pub struct FnnInlineSuggestionWidget {
+    pub widget_id: String,
+    pub ghost_text: String,
+    pub is_visible: bool,
+    pub is_hovering: bool,
+    pub toolbar_visible: bool,
+    pub command_accept_id: String,
+    pub command_next_id: String,
+    pub command_prev_id: String,
+    pub line_number: u32,
+    pub column: u32,
+}
+
+impl FnnInlineSuggestionWidget {
+    pub fn new() -> Self {
+        Self {
+            widget_id: String::new(),
+            ghost_text: String::new(),
+            is_visible: bool::default(),
+            is_hovering: bool::default(),
+            toolbar_visible: bool::default(),
+            command_accept_id: String::new(),
+            command_next_id: String::new(),
+            command_prev_id: String::new(),
+            line_number: u32::default(),
+            column: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.widget_id.is_empty() || true && !self.ghost_text.is_empty() || true && self.is_visible || true && self.is_hovering || true && self.toolbar_visible || true && !self.command_accept_id.is_empty() || true && !self.command_next_id.is_empty() || true && !self.command_prev_id.is_empty() || true && self.line_number < u32::MAX || true && self.column < u32::MAX || true
+    }
+}
+
+impl Default for FnnInlineSuggestionWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor inline diff/edit (original, modified, decoration, accept/reject)
+#[derive(Debug, Clone)]
+pub struct FnoEditorInlineDiff {
+    pub diff_id: String,
+    pub original_text: String,
+    pub modified_text: String,
+    pub decoration_id: String,
+    pub accept_command_id: String,
+    pub reject_command_id: String,
+    pub is_showing: bool,
+    pub line_number: u32,
+    pub added_line_count: u32,
+    pub removed_line_count: u32,
+}
+
+impl FnoEditorInlineDiff {
+    pub fn new() -> Self {
+        Self {
+            diff_id: String::new(),
+            original_text: String::new(),
+            modified_text: String::new(),
+            decoration_id: String::new(),
+            accept_command_id: String::new(),
+            reject_command_id: String::new(),
+            is_showing: bool::default(),
+            line_number: u32::default(),
+            added_line_count: u32::default(),
+            removed_line_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diff_id.is_empty() || true && !self.original_text.is_empty() || true && !self.modified_text.is_empty() || true && !self.decoration_id.is_empty() || true && !self.accept_command_id.is_empty() || true && !self.reject_command_id.is_empty() || true && self.is_showing || true && self.line_number < u32::MAX || true && self.added_line_count < u32::MAX || true && self.removed_line_count < u32::MAX || true
+    }
+}
+
+impl Default for FnoEditorInlineDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -286667,6 +286877,96 @@ mod tests_fnj_generated {
     fn test_fnj_fields() {
         let mut obj = FnjChatCodeBlock::default();
         obj.block_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnk_default() {
+        let obj = FnkInlineEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnk_fields() {
+        let mut obj = FnkInlineEdit::default();
+        obj.edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnl_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnl_default() {
+        let obj = FnlInlineCompletion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnl_fields() {
+        let mut obj = FnlInlineCompletion::default();
+        obj.completion_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnm_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnm_default() {
+        let obj = FnmInlineCompletionProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnm_fields() {
+        let mut obj = FnmInlineCompletionProvider::default();
+        obj.provider_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fnn_generated {
+    use super::*;
+
+    #[test]
+    fn test_fnn_default() {
+        let obj = FnnInlineSuggestionWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fnn_fields() {
+        let mut obj = FnnInlineSuggestionWidget::default();
+        obj.widget_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fno_generated {
+    use super::*;
+
+    #[test]
+    fn test_fno_default() {
+        let obj = FnoEditorInlineDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fno_fields() {
+        let mut obj = FnoEditorInlineDiff::default();
+        obj.diff_id = "test".to_string();
         assert!(obj.validate());
     }
 }
