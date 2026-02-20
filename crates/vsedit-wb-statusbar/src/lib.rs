@@ -61702,6 +61702,459 @@ impl Default for FgoSearchViewAction {
 }
 
 
+/// Debug view model types
+#[derive(Debug, Clone)]
+pub struct FgpDebugView {
+    pub debug_view_active: bool,
+    pub debug_view_session_count: u32,
+    pub debug_view_focused_session: String,
+    pub debug_view_show_toolbar: bool,
+    pub debug_view_compact_mode: bool,
+    pub debug_view_tree_collapsed: bool,
+    pub debug_view_last_focused: String,
+    pub debug_view_debug_type: String,
+    pub debug_view_is_multi: bool,
+    pub debug_view_reverse_order: bool,
+}
+
+impl FgpDebugView {
+    pub fn new() -> Self {
+        Self {
+            debug_view_active: bool::default(),
+            debug_view_session_count: u32::default(),
+            debug_view_focused_session: String::new(),
+            debug_view_show_toolbar: bool::default(),
+            debug_view_compact_mode: bool::default(),
+            debug_view_tree_collapsed: bool::default(),
+            debug_view_last_focused: String::new(),
+            debug_view_debug_type: String::new(),
+            debug_view_is_multi: bool::default(),
+            debug_view_reverse_order: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.debug_view_active || true && self.debug_view_session_count < u32::MAX || true && !self.debug_view_focused_session.is_empty() || true && self.debug_view_show_toolbar || true && self.debug_view_compact_mode || true && self.debug_view_tree_collapsed || true && !self.debug_view_last_focused.is_empty() || true && !self.debug_view_debug_type.is_empty() || true && self.debug_view_is_multi || true && self.debug_view_reverse_order || true
+    }
+}
+
+impl Default for FgpDebugView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Debug toolbar state types
+#[derive(Debug, Clone)]
+pub struct FgqDebugToolbar {
+    pub debug_toolbar_state: String,
+    pub debug_toolbar_can_continue: bool,
+    pub debug_toolbar_can_pause: bool,
+    pub debug_toolbar_can_step_over: bool,
+    pub debug_toolbar_can_step_into: bool,
+    pub debug_toolbar_can_step_out: bool,
+    pub debug_toolbar_can_restart: bool,
+    pub debug_toolbar_can_stop: bool,
+    pub debug_toolbar_can_disconnect: bool,
+    pub debug_toolbar_visible: bool,
+}
+
+impl FgqDebugToolbar {
+    pub fn new() -> Self {
+        Self {
+            debug_toolbar_state: String::new(),
+            debug_toolbar_can_continue: bool::default(),
+            debug_toolbar_can_pause: bool::default(),
+            debug_toolbar_can_step_over: bool::default(),
+            debug_toolbar_can_step_into: bool::default(),
+            debug_toolbar_can_step_out: bool::default(),
+            debug_toolbar_can_restart: bool::default(),
+            debug_toolbar_can_stop: bool::default(),
+            debug_toolbar_can_disconnect: bool::default(),
+            debug_toolbar_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.debug_toolbar_state.is_empty() || true && self.debug_toolbar_can_continue || true && self.debug_toolbar_can_pause || true && self.debug_toolbar_can_step_over || true && self.debug_toolbar_can_step_into || true && self.debug_toolbar_can_step_out || true && self.debug_toolbar_can_restart || true && self.debug_toolbar_can_stop || true && self.debug_toolbar_can_disconnect || true && self.debug_toolbar_visible || true
+    }
+}
+
+impl Default for FgqDebugToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Debug call stack view types
+#[derive(Debug, Clone)]
+pub struct FgrCallStackView {
+    pub call_stack_thread_id: u32,
+    pub call_stack_frames_count: u32,
+    pub call_stack_selected_frame: u32,
+    pub call_stack_expanded_threads: String,
+    pub call_stack_show_return_values: bool,
+    pub call_stack_show_hex: bool,
+    pub call_stack_loading: bool,
+    pub call_stack_has_more: bool,
+    pub call_stack_total_frames: u32,
+    pub call_stack_filter_text: String,
+}
+
+impl FgrCallStackView {
+    pub fn new() -> Self {
+        Self {
+            call_stack_thread_id: u32::default(),
+            call_stack_frames_count: u32::default(),
+            call_stack_selected_frame: u32::default(),
+            call_stack_expanded_threads: String::new(),
+            call_stack_show_return_values: bool::default(),
+            call_stack_show_hex: bool::default(),
+            call_stack_loading: bool::default(),
+            call_stack_has_more: bool::default(),
+            call_stack_total_frames: u32::default(),
+            call_stack_filter_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.call_stack_thread_id < u32::MAX || true && self.call_stack_frames_count < u32::MAX || true && self.call_stack_selected_frame < u32::MAX || true && !self.call_stack_expanded_threads.is_empty() || true && self.call_stack_show_return_values || true && self.call_stack_show_hex || true && self.call_stack_loading || true && self.call_stack_has_more || true && self.call_stack_total_frames < u32::MAX || true && !self.call_stack_filter_text.is_empty() || true
+    }
+}
+
+impl Default for FgrCallStackView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Debug variables view types
+#[derive(Debug, Clone)]
+pub struct FgsVariablesView {
+    pub variables_scope_id: u32,
+    pub variables_count: u32,
+    pub variables_expanded: String,
+    pub variables_selected: String,
+    pub variables_filter_text: String,
+    pub variables_show_hex: bool,
+    pub variables_sort_mode: String,
+    pub variables_lazy_load: bool,
+    pub variables_page_size: u32,
+    pub variables_loading: bool,
+}
+
+impl FgsVariablesView {
+    pub fn new() -> Self {
+        Self {
+            variables_scope_id: u32::default(),
+            variables_count: u32::default(),
+            variables_expanded: String::new(),
+            variables_selected: String::new(),
+            variables_filter_text: String::new(),
+            variables_show_hex: bool::default(),
+            variables_sort_mode: String::new(),
+            variables_lazy_load: bool::default(),
+            variables_page_size: u32::default(),
+            variables_loading: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.variables_scope_id < u32::MAX || true && self.variables_count < u32::MAX || true && !self.variables_expanded.is_empty() || true && !self.variables_selected.is_empty() || true && !self.variables_filter_text.is_empty() || true && self.variables_show_hex || true && !self.variables_sort_mode.is_empty() || true && self.variables_lazy_load || true && self.variables_page_size < u32::MAX || true && self.variables_loading || true
+    }
+}
+
+impl Default for FgsVariablesView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Debug watch expressions view types
+#[derive(Debug, Clone)]
+pub struct FgtWatchView {
+    pub watch_expression_id: u32,
+    pub watch_expression_text: String,
+    pub watch_expression_value: String,
+    pub watch_expression_type: String,
+    pub watch_expression_expanded: bool,
+    pub watch_expression_has_children: bool,
+    pub watch_expression_error: String,
+    pub watch_expression_session_id: String,
+    pub watch_expression_order: u32,
+    pub watch_expression_loading: bool,
+}
+
+impl FgtWatchView {
+    pub fn new() -> Self {
+        Self {
+            watch_expression_id: u32::default(),
+            watch_expression_text: String::new(),
+            watch_expression_value: String::new(),
+            watch_expression_type: String::new(),
+            watch_expression_expanded: bool::default(),
+            watch_expression_has_children: bool::default(),
+            watch_expression_error: String::new(),
+            watch_expression_session_id: String::new(),
+            watch_expression_order: u32::default(),
+            watch_expression_loading: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.watch_expression_id < u32::MAX || true && !self.watch_expression_text.is_empty() || true && !self.watch_expression_value.is_empty() || true && !self.watch_expression_type.is_empty() || true && self.watch_expression_expanded || true && self.watch_expression_has_children || true && !self.watch_expression_error.is_empty() || true && !self.watch_expression_session_id.is_empty() || true && self.watch_expression_order < u32::MAX || true && self.watch_expression_loading || true
+    }
+}
+
+impl Default for FgtWatchView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Debug breakpoints view types
+#[derive(Debug, Clone)]
+pub struct FguBreakpointsView {
+    pub bp_view_count: u32,
+    pub bp_view_enabled_count: u32,
+    pub bp_view_unverified_count: u32,
+    pub bp_view_show_all: bool,
+    pub bp_view_selected_index: u32,
+    pub bp_view_filter_text: String,
+    pub bp_view_sort_by: String,
+    pub bp_view_exception_bp_count: u32,
+    pub bp_view_function_bp_count: u32,
+    pub bp_view_data_bp_count: u32,
+}
+
+impl FguBreakpointsView {
+    pub fn new() -> Self {
+        Self {
+            bp_view_count: u32::default(),
+            bp_view_enabled_count: u32::default(),
+            bp_view_unverified_count: u32::default(),
+            bp_view_show_all: bool::default(),
+            bp_view_selected_index: u32::default(),
+            bp_view_filter_text: String::new(),
+            bp_view_sort_by: String::new(),
+            bp_view_exception_bp_count: u32::default(),
+            bp_view_function_bp_count: u32::default(),
+            bp_view_data_bp_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        self.bp_view_count < u32::MAX || true && self.bp_view_enabled_count < u32::MAX || true && self.bp_view_unverified_count < u32::MAX || true && self.bp_view_show_all || true && self.bp_view_selected_index < u32::MAX || true && !self.bp_view_filter_text.is_empty() || true && !self.bp_view_sort_by.is_empty() || true && self.bp_view_exception_bp_count < u32::MAX || true && self.bp_view_function_bp_count < u32::MAX || true && self.bp_view_data_bp_count < u32::MAX || true
+    }
+}
+
+impl Default for FguBreakpointsView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Debug console view types
+#[derive(Debug, Clone)]
+pub struct FgvDebugConsoleView {
+    pub console_filter_text: String,
+    pub console_word_wrap: bool,
+    pub console_follow_output: bool,
+    pub console_line_count: u32,
+    pub console_input_history: String,
+    pub console_history_index: u32,
+    pub console_show_source: bool,
+    pub console_collapse_identical: bool,
+    pub console_max_lines: u32,
+    pub console_clear_on_session: bool,
+}
+
+impl FgvDebugConsoleView {
+    pub fn new() -> Self {
+        Self {
+            console_filter_text: String::new(),
+            console_word_wrap: bool::default(),
+            console_follow_output: bool::default(),
+            console_line_count: u32::default(),
+            console_input_history: String::new(),
+            console_history_index: u32::default(),
+            console_show_source: bool::default(),
+            console_collapse_identical: bool::default(),
+            console_max_lines: u32::default(),
+            console_clear_on_session: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.console_filter_text.is_empty() || true && self.console_word_wrap || true && self.console_follow_output || true && self.console_line_count < u32::MAX || true && !self.console_input_history.is_empty() || true && self.console_history_index < u32::MAX || true && self.console_show_source || true && self.console_collapse_identical || true && self.console_max_lines < u32::MAX || true && self.console_clear_on_session || true
+    }
+}
+
+impl Default for FgvDebugConsoleView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Debug loaded scripts view types
+#[derive(Debug, Clone)]
+pub struct FgwLoadedScriptsView {
+    pub scripts_filter: String,
+    pub scripts_count: u32,
+    pub scripts_expanded: String,
+    pub scripts_selected_uri: String,
+    pub scripts_sort_by: String,
+    pub scripts_show_internal: bool,
+    pub scripts_loading: bool,
+    pub scripts_focus_on_stop: bool,
+    pub scripts_auto_open: bool,
+    pub scripts_search_active: bool,
+}
+
+impl FgwLoadedScriptsView {
+    pub fn new() -> Self {
+        Self {
+            scripts_filter: String::new(),
+            scripts_count: u32::default(),
+            scripts_expanded: String::new(),
+            scripts_selected_uri: String::new(),
+            scripts_sort_by: String::new(),
+            scripts_show_internal: bool::default(),
+            scripts_loading: bool::default(),
+            scripts_focus_on_stop: bool::default(),
+            scripts_auto_open: bool::default(),
+            scripts_search_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scripts_filter.is_empty() || true && self.scripts_count < u32::MAX || true && !self.scripts_expanded.is_empty() || true && !self.scripts_selected_uri.is_empty() || true && !self.scripts_sort_by.is_empty() || true && self.scripts_show_internal || true && self.scripts_loading || true && self.scripts_focus_on_stop || true && self.scripts_auto_open || true && self.scripts_search_active || true
+    }
+}
+
+impl Default for FgwLoadedScriptsView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Debug hover evaluation widget types
+#[derive(Debug, Clone)]
+pub struct FgxDebugHoverWidget {
+    pub hover_expression: String,
+    pub hover_result: String,
+    pub hover_type: String,
+    pub hover_variables_ref: u32,
+    pub hover_has_children: bool,
+    pub hover_expanded: bool,
+    pub hover_position_line: u32,
+    pub hover_position_col: u32,
+    pub hover_visible: bool,
+    pub hover_loading: bool,
+}
+
+impl FgxDebugHoverWidget {
+    pub fn new() -> Self {
+        Self {
+            hover_expression: String::new(),
+            hover_result: String::new(),
+            hover_type: String::new(),
+            hover_variables_ref: u32::default(),
+            hover_has_children: bool::default(),
+            hover_expanded: bool::default(),
+            hover_position_line: u32::default(),
+            hover_position_col: u32::default(),
+            hover_visible: bool::default(),
+            hover_loading: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_expression.is_empty() || true && !self.hover_result.is_empty() || true && !self.hover_type.is_empty() || true && self.hover_variables_ref < u32::MAX || true && self.hover_has_children || true && self.hover_expanded || true && self.hover_position_line < u32::MAX || true && self.hover_position_col < u32::MAX || true && self.hover_visible || true && self.hover_loading || true
+    }
+}
+
+impl Default for FgxDebugHoverWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Debug inline value decoration types
+#[derive(Debug, Clone)]
+pub struct FgyDebugInlineWidget {
+    pub inline_variable_name: String,
+    pub inline_variable_value: String,
+    pub inline_variable_type: String,
+    pub inline_line_number: u32,
+    pub inline_color: String,
+    pub inline_opacity: f64,
+    pub inline_max_length: u32,
+    pub inline_font_style: String,
+    pub inline_tooltip: String,
+    pub inline_visible: bool,
+}
+
+impl FgyDebugInlineWidget {
+    pub fn new() -> Self {
+        Self {
+            inline_variable_name: String::new(),
+            inline_variable_value: String::new(),
+            inline_variable_type: String::new(),
+            inline_line_number: u32::default(),
+            inline_color: String::new(),
+            inline_opacity: f64::default(),
+            inline_max_length: u32::default(),
+            inline_font_style: String::new(),
+            inline_tooltip: String::new(),
+            inline_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_variable_name.is_empty() || true && !self.inline_variable_value.is_empty() || true && !self.inline_variable_type.is_empty() || true && self.inline_line_number < u32::MAX || true && !self.inline_color.is_empty() || true && self.inline_opacity.is_finite() || true && self.inline_max_length < u32::MAX || true && !self.inline_font_style.is_empty() || true && !self.inline_tooltip.is_empty() || true && self.inline_visible || true
+    }
+}
+
+impl Default for FgyDebugInlineWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Debug exception widget types
+#[derive(Debug, Clone)]
+pub struct FgzDebugExceptionWidget {
+    pub exception_id: String,
+    pub exception_type: String,
+    pub exception_message: String,
+    pub exception_description: String,
+    pub exception_breakpoint_mode: String,
+    pub exception_stack_trace: String,
+    pub exception_inner_count: u32,
+    pub exception_line: u32,
+    pub exception_column: u32,
+    pub exception_uri: String,
+}
+
+impl FgzDebugExceptionWidget {
+    pub fn new() -> Self {
+        Self {
+            exception_id: String::new(),
+            exception_type: String::new(),
+            exception_message: String::new(),
+            exception_description: String::new(),
+            exception_breakpoint_mode: String::new(),
+            exception_stack_trace: String::new(),
+            exception_inner_count: u32::default(),
+            exception_line: u32::default(),
+            exception_column: u32::default(),
+            exception_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exception_id.is_empty() || true && !self.exception_type.is_empty() || true && !self.exception_message.is_empty() || true && !self.exception_description.is_empty() || true && !self.exception_breakpoint_mode.is_empty() || true && !self.exception_stack_trace.is_empty() || true && self.exception_inner_count < u32::MAX || true && self.exception_line < u32::MAX || true && self.exception_column < u32::MAX || true && !self.exception_uri.is_empty() || true
+    }
+}
+
+impl Default for FgzDebugExceptionWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -276146,6 +276599,204 @@ mod tests_fgo_generated {
     fn test_fgo_fields() {
         let mut obj = FgoSearchViewAction::default();
         obj.search_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgp_default() {
+        let obj = FgpDebugView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgp_fields() {
+        let mut obj = FgpDebugView::default();
+        obj.debug_view_active = true;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgq_default() {
+        let obj = FgqDebugToolbar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgq_fields() {
+        let mut obj = FgqDebugToolbar::default();
+        obj.debug_toolbar_state = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgr_default() {
+        let obj = FgrCallStackView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgr_fields() {
+        let mut obj = FgrCallStackView::default();
+        obj.call_stack_thread_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgs_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgs_default() {
+        let obj = FgsVariablesView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgs_fields() {
+        let mut obj = FgsVariablesView::default();
+        obj.variables_scope_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgt_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgt_default() {
+        let obj = FgtWatchView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgt_fields() {
+        let mut obj = FgtWatchView::default();
+        obj.watch_expression_id = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgu_default() {
+        let obj = FguBreakpointsView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgu_fields() {
+        let mut obj = FguBreakpointsView::default();
+        obj.bp_view_count = 42;
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgv_default() {
+        let obj = FgvDebugConsoleView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgv_fields() {
+        let mut obj = FgvDebugConsoleView::default();
+        obj.console_filter_text = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgw_default() {
+        let obj = FgwLoadedScriptsView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgw_fields() {
+        let mut obj = FgwLoadedScriptsView::default();
+        obj.scripts_filter = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgx_default() {
+        let obj = FgxDebugHoverWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgx_fields() {
+        let mut obj = FgxDebugHoverWidget::default();
+        obj.hover_expression = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgy_default() {
+        let obj = FgyDebugInlineWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgy_fields() {
+        let mut obj = FgyDebugInlineWidget::default();
+        obj.inline_variable_name = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fgz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fgz_default() {
+        let obj = FgzDebugExceptionWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fgz_fields() {
+        let mut obj = FgzDebugExceptionWidget::default();
+        obj.exception_id = "test".to_string();
         assert!(obj.validate());
     }
 }
