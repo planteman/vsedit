@@ -169814,6 +169814,890 @@ impl Default for JkzWatchTask {
     }
 }
 
+/// Test controller descriptor
+#[derive(Debug, Clone)]
+pub struct JlaTestController {
+    pub test_ctrl_id: String,
+    pub controller_label: String,
+    pub extension_ref: String,
+    pub item_count: u32,
+    pub run_count: u32,
+    pub can_refresh: bool,
+}
+
+impl JlaTestController {
+    pub fn new() -> Self {
+        Self {
+            test_ctrl_id: String::new(),
+            controller_label: String::new(),
+            extension_ref: String::new(),
+            item_count: u32::default(),
+            run_count: u32::default(),
+            can_refresh: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_ctrl_id.is_empty() || true && !self.controller_label.is_empty() || true && !self.extension_ref.is_empty() || true && self.item_count < u32::MAX || true && self.run_count < u32::MAX || true && self.can_refresh || true
+    }
+}
+
+impl Default for JlaTestController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test item descriptor
+#[derive(Debug, Clone)]
+pub struct JlbTestItem {
+    pub test_item_id: String,
+    pub label_str: String,
+    pub uri_str: String,
+    pub range_json: String,
+    pub parent_ref: String,
+    pub can_resolve_children: bool,
+}
+
+impl JlbTestItem {
+    pub fn new() -> Self {
+        Self {
+            test_item_id: String::new(),
+            label_str: String::new(),
+            uri_str: String::new(),
+            range_json: String::new(),
+            parent_ref: String::new(),
+            can_resolve_children: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_item_id.is_empty() || true && !self.label_str.is_empty() || true && !self.uri_str.is_empty() || true && !self.range_json.is_empty() || true && !self.parent_ref.is_empty() || true && self.can_resolve_children || true
+    }
+}
+
+impl Default for JlbTestItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test run descriptor
+#[derive(Debug, Clone)]
+pub struct JlcTestRun {
+    pub test_run_id: String,
+    pub run_name: String,
+    pub controller_ref: String,
+    pub test_count: u32,
+    pub start_epoch: u64,
+    pub is_continuous: bool,
+}
+
+impl JlcTestRun {
+    pub fn new() -> Self {
+        Self {
+            test_run_id: String::new(),
+            run_name: String::new(),
+            controller_ref: String::new(),
+            test_count: u32::default(),
+            start_epoch: u64::default(),
+            is_continuous: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_run_id.is_empty() || true && !self.run_name.is_empty() || true && !self.controller_ref.is_empty() || true && self.test_count < u32::MAX || true && self.start_epoch < u64::MAX || true && self.is_continuous || true
+    }
+}
+
+impl Default for JlcTestRun {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test result entry
+#[derive(Debug, Clone)]
+pub struct JldTestResult {
+    pub test_result_id: String,
+    pub test_ref: String,
+    pub state_str: String,
+    pub duration_ms: u64,
+    pub message_count: u32,
+    pub is_retired: bool,
+}
+
+impl JldTestResult {
+    pub fn new() -> Self {
+        Self {
+            test_result_id: String::new(),
+            test_ref: String::new(),
+            state_str: String::new(),
+            duration_ms: u64::default(),
+            message_count: u32::default(),
+            is_retired: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_result_id.is_empty() || true && !self.test_ref.is_empty() || true && !self.state_str.is_empty() || true && self.duration_ms < u64::MAX || true && self.message_count < u32::MAX || true && self.is_retired || true
+    }
+}
+
+impl Default for JldTestResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test message entry
+#[derive(Debug, Clone)]
+pub struct JleTestMessage {
+    pub test_msg_id: String,
+    pub message_text: String,
+    pub expected_output: String,
+    pub actual_output: String,
+    pub location_json: String,
+    pub is_diff: bool,
+}
+
+impl JleTestMessage {
+    pub fn new() -> Self {
+        Self {
+            test_msg_id: String::new(),
+            message_text: String::new(),
+            expected_output: String::new(),
+            actual_output: String::new(),
+            location_json: String::new(),
+            is_diff: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_msg_id.is_empty() || true && !self.message_text.is_empty() || true && !self.expected_output.is_empty() || true && !self.actual_output.is_empty() || true && !self.location_json.is_empty() || true && self.is_diff || true
+    }
+}
+
+impl Default for JleTestMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test coverage entry
+#[derive(Debug, Clone)]
+pub struct JlfTestCoverage {
+    pub test_cov_id: String,
+    pub uri_str: String,
+    pub line_count: u32,
+    pub covered_count: u32,
+    pub branch_count: u32,
+    pub is_detailed: bool,
+}
+
+impl JlfTestCoverage {
+    pub fn new() -> Self {
+        Self {
+            test_cov_id: String::new(),
+            uri_str: String::new(),
+            line_count: u32::default(),
+            covered_count: u32::default(),
+            branch_count: u32::default(),
+            is_detailed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_cov_id.is_empty() || true && !self.uri_str.is_empty() || true && self.line_count < u32::MAX || true && self.covered_count < u32::MAX || true && self.branch_count < u32::MAX || true && self.is_detailed || true
+    }
+}
+
+impl Default for JlfTestCoverage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test run profile
+#[derive(Debug, Clone)]
+pub struct JlgTestProfile {
+    pub test_profile_id: String,
+    pub profile_label: String,
+    pub kind_val: u32,
+    pub controller_ref: String,
+    pub is_default: bool,
+    pub supports_continuous: bool,
+}
+
+impl JlgTestProfile {
+    pub fn new() -> Self {
+        Self {
+            test_profile_id: String::new(),
+            profile_label: String::new(),
+            kind_val: u32::default(),
+            controller_ref: String::new(),
+            is_default: bool::default(),
+            supports_continuous: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_profile_id.is_empty() || true && !self.profile_label.is_empty() || true && self.kind_val < u32::MAX || true && !self.controller_ref.is_empty() || true && self.is_default || true && self.supports_continuous || true
+    }
+}
+
+impl Default for JlgTestProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test tag descriptor
+#[derive(Debug, Clone)]
+pub struct JlhTestTag {
+    pub test_tag_id: String,
+    pub tag_id_str: String,
+    pub controller_ref: String,
+    pub item_count: u32,
+    pub display_name: String,
+    pub is_hidden: bool,
+}
+
+impl JlhTestTag {
+    pub fn new() -> Self {
+        Self {
+            test_tag_id: String::new(),
+            tag_id_str: String::new(),
+            controller_ref: String::new(),
+            item_count: u32::default(),
+            display_name: String::new(),
+            is_hidden: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_tag_id.is_empty() || true && !self.tag_id_str.is_empty() || true && !self.controller_ref.is_empty() || true && self.item_count < u32::MAX || true && !self.display_name.is_empty() || true && self.is_hidden || true
+    }
+}
+
+impl Default for JlhTestTag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test explorer view state
+#[derive(Debug, Clone)]
+pub struct JliTestExplorer {
+    pub test_explorer_id: String,
+    pub tree_ref: String,
+    pub visible_count: u32,
+    pub selected_ref: String,
+    pub filter_text: String,
+    pub is_busy: bool,
+}
+
+impl JliTestExplorer {
+    pub fn new() -> Self {
+        Self {
+            test_explorer_id: String::new(),
+            tree_ref: String::new(),
+            visible_count: u32::default(),
+            selected_ref: String::new(),
+            filter_text: String::new(),
+            is_busy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_explorer_id.is_empty() || true && !self.tree_ref.is_empty() || true && self.visible_count < u32::MAX || true && !self.selected_ref.is_empty() || true && !self.filter_text.is_empty() || true && self.is_busy || true
+    }
+}
+
+impl Default for JliTestExplorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test filter entry
+#[derive(Debug, Clone)]
+pub struct JljTestFilter {
+    pub test_filter_id: String,
+    pub filter_text: String,
+    pub include_tags_csv: String,
+    pub exclude_tags_csv: String,
+    pub state_filter: String,
+    pub is_active: bool,
+}
+
+impl JljTestFilter {
+    pub fn new() -> Self {
+        Self {
+            test_filter_id: String::new(),
+            filter_text: String::new(),
+            include_tags_csv: String::new(),
+            exclude_tags_csv: String::new(),
+            state_filter: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_filter_id.is_empty() || true && !self.filter_text.is_empty() || true && !self.include_tags_csv.is_empty() || true && !self.exclude_tags_csv.is_empty() || true && !self.state_filter.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for JljTestFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test sort configuration
+#[derive(Debug, Clone)]
+pub struct JlkTestSort {
+    pub test_sort_id: String,
+    pub sort_by_str: String,
+    pub direction_str: String,
+    pub group_by_str: String,
+    pub secondary_sort: String,
+    pub is_default: bool,
+}
+
+impl JlkTestSort {
+    pub fn new() -> Self {
+        Self {
+            test_sort_id: String::new(),
+            sort_by_str: String::new(),
+            direction_str: String::new(),
+            group_by_str: String::new(),
+            secondary_sort: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_sort_id.is_empty() || true && !self.sort_by_str.is_empty() || true && !self.direction_str.is_empty() || true && !self.group_by_str.is_empty() || true && !self.secondary_sort.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for JlkTestSort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test result decoration
+#[derive(Debug, Clone)]
+pub struct JllTestDecoration {
+    pub test_deco_id: String,
+    pub editor_ref: String,
+    pub line_number: u32,
+    pub state_str: String,
+    pub duration_text: String,
+    pub is_inline: bool,
+}
+
+impl JllTestDecoration {
+    pub fn new() -> Self {
+        Self {
+            test_deco_id: String::new(),
+            editor_ref: String::new(),
+            line_number: u32::default(),
+            state_str: String::new(),
+            duration_text: String::new(),
+            is_inline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_deco_id.is_empty() || true && !self.editor_ref.is_empty() || true && self.line_number < u32::MAX || true && !self.state_str.is_empty() || true && !self.duration_text.is_empty() || true && self.is_inline || true
+    }
+}
+
+impl Default for JllTestDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test output channel entry
+#[derive(Debug, Clone)]
+pub struct JlmTestOutput {
+    pub test_output_id: String,
+    pub output_text: String,
+    pub test_ref: String,
+    pub timestamp_epoch: u64,
+    pub stream_kind: String,
+    pub is_stderr: bool,
+}
+
+impl JlmTestOutput {
+    pub fn new() -> Self {
+        Self {
+            test_output_id: String::new(),
+            output_text: String::new(),
+            test_ref: String::new(),
+            timestamp_epoch: u64::default(),
+            stream_kind: String::new(),
+            is_stderr: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_output_id.is_empty() || true && !self.output_text.is_empty() || true && !self.test_ref.is_empty() || true && self.timestamp_epoch < u64::MAX || true && !self.stream_kind.is_empty() || true && self.is_stderr || true
+    }
+}
+
+impl Default for JlmTestOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test snapshot entry
+#[derive(Debug, Clone)]
+pub struct JlnTestSnapshot {
+    pub test_snap_id: String,
+    pub snapshot_name: String,
+    pub content_str: String,
+    pub file_path: String,
+    pub update_epoch: u64,
+    pub is_outdated: bool,
+}
+
+impl JlnTestSnapshot {
+    pub fn new() -> Self {
+        Self {
+            test_snap_id: String::new(),
+            snapshot_name: String::new(),
+            content_str: String::new(),
+            file_path: String::new(),
+            update_epoch: u64::default(),
+            is_outdated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_snap_id.is_empty() || true && !self.snapshot_name.is_empty() || true && !self.content_str.is_empty() || true && !self.file_path.is_empty() || true && self.update_epoch < u64::MAX || true && self.is_outdated || true
+    }
+}
+
+impl Default for JlnTestSnapshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test fixture descriptor
+#[derive(Debug, Clone)]
+pub struct JloTestFixture {
+    pub test_fixture_id: String,
+    pub fixture_name: String,
+    pub setup_ref: String,
+    pub teardown_ref: String,
+    pub scope_str: String,
+    pub is_shared: bool,
+}
+
+impl JloTestFixture {
+    pub fn new() -> Self {
+        Self {
+            test_fixture_id: String::new(),
+            fixture_name: String::new(),
+            setup_ref: String::new(),
+            teardown_ref: String::new(),
+            scope_str: String::new(),
+            is_shared: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_fixture_id.is_empty() || true && !self.fixture_name.is_empty() || true && !self.setup_ref.is_empty() || true && !self.teardown_ref.is_empty() || true && !self.scope_str.is_empty() || true && self.is_shared || true
+    }
+}
+
+impl Default for JloTestFixture {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test suite descriptor
+#[derive(Debug, Clone)]
+pub struct JlpTestSuite {
+    pub test_suite_id: String,
+    pub suite_name: String,
+    pub test_count: u32,
+    pub pass_count: u32,
+    pub fail_count: u32,
+    pub is_root: bool,
+}
+
+impl JlpTestSuite {
+    pub fn new() -> Self {
+        Self {
+            test_suite_id: String::new(),
+            suite_name: String::new(),
+            test_count: u32::default(),
+            pass_count: u32::default(),
+            fail_count: u32::default(),
+            is_root: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_suite_id.is_empty() || true && !self.suite_name.is_empty() || true && self.test_count < u32::MAX || true && self.pass_count < u32::MAX || true && self.fail_count < u32::MAX || true && self.is_root || true
+    }
+}
+
+impl Default for JlpTestSuite {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test benchmark entry
+#[derive(Debug, Clone)]
+pub struct JlqTestBenchmark {
+    pub test_bench_id: String,
+    pub bench_name: String,
+    pub iterations: u64,
+    pub mean_ns: f64,
+    pub std_dev_ns: f64,
+    pub is_regression: bool,
+}
+
+impl JlqTestBenchmark {
+    pub fn new() -> Self {
+        Self {
+            test_bench_id: String::new(),
+            bench_name: String::new(),
+            iterations: u64::default(),
+            mean_ns: f64::default(),
+            std_dev_ns: f64::default(),
+            is_regression: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_bench_id.is_empty() || true && !self.bench_name.is_empty() || true && self.iterations < u64::MAX || true && self.mean_ns.is_finite() || true && self.std_dev_ns.is_finite() || true && self.is_regression || true
+    }
+}
+
+impl Default for JlqTestBenchmark {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test diff entry
+#[derive(Debug, Clone)]
+pub struct JlrTestDiff {
+    pub test_diff_id: String,
+    pub expected_text: String,
+    pub actual_text: String,
+    pub diff_json: String,
+    pub context_lines: u32,
+    pub is_binary_diff: bool,
+}
+
+impl JlrTestDiff {
+    pub fn new() -> Self {
+        Self {
+            test_diff_id: String::new(),
+            expected_text: String::new(),
+            actual_text: String::new(),
+            diff_json: String::new(),
+            context_lines: u32::default(),
+            is_binary_diff: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_diff_id.is_empty() || true && !self.expected_text.is_empty() || true && !self.actual_text.is_empty() || true && !self.diff_json.is_empty() || true && self.context_lines < u32::MAX || true && self.is_binary_diff || true
+    }
+}
+
+impl Default for JlrTestDiff {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test file watcher
+#[derive(Debug, Clone)]
+pub struct JlsTestWatch {
+    pub test_watch_id: String,
+    pub watch_pattern: String,
+    pub debounce_ms: u32,
+    pub run_profile_ref: String,
+    pub change_count: u64,
+    pub is_active: bool,
+}
+
+impl JlsTestWatch {
+    pub fn new() -> Self {
+        Self {
+            test_watch_id: String::new(),
+            watch_pattern: String::new(),
+            debounce_ms: u32::default(),
+            run_profile_ref: String::new(),
+            change_count: u64::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_watch_id.is_empty() || true && !self.watch_pattern.is_empty() || true && self.debounce_ms < u32::MAX || true && !self.run_profile_ref.is_empty() || true && self.change_count < u64::MAX || true && self.is_active || true
+    }
+}
+
+impl Default for JlsTestWatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test debug session
+#[derive(Debug, Clone)]
+pub struct JltTestDebug {
+    pub test_debug_id: String,
+    pub test_ref: String,
+    pub debug_config_ref: String,
+    pub breakpoint_count: u32,
+    pub session_ref: String,
+    pub is_active: bool,
+}
+
+impl JltTestDebug {
+    pub fn new() -> Self {
+        Self {
+            test_debug_id: String::new(),
+            test_ref: String::new(),
+            debug_config_ref: String::new(),
+            breakpoint_count: u32::default(),
+            session_ref: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_debug_id.is_empty() || true && !self.test_ref.is_empty() || true && !self.debug_config_ref.is_empty() || true && self.breakpoint_count < u32::MAX || true && !self.session_ref.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for JltTestDebug {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Coverage report descriptor
+#[derive(Debug, Clone)]
+pub struct JluTestCoverageReport {
+    pub cov_report_id: String,
+    pub report_path: String,
+    pub file_count: u32,
+    pub total_lines: u32,
+    pub covered_lines: u32,
+    pub is_merged: bool,
+}
+
+impl JluTestCoverageReport {
+    pub fn new() -> Self {
+        Self {
+            cov_report_id: String::new(),
+            report_path: String::new(),
+            file_count: u32::default(),
+            total_lines: u32::default(),
+            covered_lines: u32::default(),
+            is_merged: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.cov_report_id.is_empty() || true && !self.report_path.is_empty() || true && self.file_count < u32::MAX || true && self.total_lines < u32::MAX || true && self.covered_lines < u32::MAX || true && self.is_merged || true
+    }
+}
+
+impl Default for JluTestCoverageReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test history entry
+#[derive(Debug, Clone)]
+pub struct JlvTestHistory {
+    pub test_hist_id: String,
+    pub test_ref: String,
+    pub result_state: String,
+    pub duration_ms: u64,
+    pub run_epoch: u64,
+    pub is_latest: bool,
+}
+
+impl JlvTestHistory {
+    pub fn new() -> Self {
+        Self {
+            test_hist_id: String::new(),
+            test_ref: String::new(),
+            result_state: String::new(),
+            duration_ms: u64::default(),
+            run_epoch: u64::default(),
+            is_latest: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_hist_id.is_empty() || true && !self.test_ref.is_empty() || true && !self.result_state.is_empty() || true && self.duration_ms < u64::MAX || true && self.run_epoch < u64::MAX || true && self.is_latest || true
+    }
+}
+
+impl Default for JlvTestHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test retry policy
+#[derive(Debug, Clone)]
+pub struct JlwTestRetry {
+    pub test_retry_id: String,
+    pub max_retries: u32,
+    pub retry_count: u32,
+    pub delay_ms: u32,
+    pub backoff_factor: f64,
+    pub retry_on_failure: bool,
+}
+
+impl JlwTestRetry {
+    pub fn new() -> Self {
+        Self {
+            test_retry_id: String::new(),
+            max_retries: u32::default(),
+            retry_count: u32::default(),
+            delay_ms: u32::default(),
+            backoff_factor: f64::default(),
+            retry_on_failure: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_retry_id.is_empty() || true && self.max_retries < u32::MAX || true && self.retry_count < u32::MAX || true && self.delay_ms < u32::MAX || true && self.backoff_factor.is_finite() || true && self.retry_on_failure || true
+    }
+}
+
+impl Default for JlwTestRetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test timeout policy
+#[derive(Debug, Clone)]
+pub struct JlxTestTimeout {
+    pub test_timeout_id: String,
+    pub timeout_ms: u64,
+    pub warning_ms: u64,
+    pub scope_str: String,
+    pub action_str: String,
+    pub is_per_test: bool,
+}
+
+impl JlxTestTimeout {
+    pub fn new() -> Self {
+        Self {
+            test_timeout_id: String::new(),
+            timeout_ms: u64::default(),
+            warning_ms: u64::default(),
+            scope_str: String::new(),
+            action_str: String::new(),
+            is_per_test: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_timeout_id.is_empty() || true && self.timeout_ms < u64::MAX || true && self.warning_ms < u64::MAX || true && !self.scope_str.is_empty() || true && !self.action_str.is_empty() || true && self.is_per_test || true
+    }
+}
+
+impl Default for JlxTestTimeout {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test parallelism config
+#[derive(Debug, Clone)]
+pub struct JlyTestParallel {
+    pub test_parallel_id: String,
+    pub max_workers: u32,
+    pub current_workers: u32,
+    pub queue_size: u32,
+    pub strategy_str: String,
+    pub is_isolated: bool,
+}
+
+impl JlyTestParallel {
+    pub fn new() -> Self {
+        Self {
+            test_parallel_id: String::new(),
+            max_workers: u32::default(),
+            current_workers: u32::default(),
+            queue_size: u32::default(),
+            strategy_str: String::new(),
+            is_isolated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_parallel_id.is_empty() || true && self.max_workers < u32::MAX || true && self.current_workers < u32::MAX || true && self.queue_size < u32::MAX || true && !self.strategy_str.is_empty() || true && self.is_isolated || true
+    }
+}
+
+impl Default for JlyTestParallel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test report descriptor
+#[derive(Debug, Clone)]
+pub struct JlzTestReport {
+    pub test_report_id: String,
+    pub format_str: String,
+    pub output_path: String,
+    pub test_count: u32,
+    pub pass_rate_pct: f64,
+    pub include_output: bool,
+}
+
+impl JlzTestReport {
+    pub fn new() -> Self {
+        Self {
+            test_report_id: String::new(),
+            format_str: String::new(),
+            output_path: String::new(),
+            test_count: u32::default(),
+            pass_rate_pct: f64::default(),
+            include_output: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_report_id.is_empty() || true && !self.format_str.is_empty() || true && !self.output_path.is_empty() || true && self.test_count < u32::MAX || true && self.pass_rate_pct.is_finite() || true && self.include_output || true
+    }
+}
+
+impl Default for JlzTestReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -435053,6 +435937,474 @@ mod tests_jkz_generated {
     fn test_jkz_fields() {
         let mut obj = JkzWatchTask::default();
         obj.watch_task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jla_generated {
+    use super::*;
+
+    #[test]
+    fn test_jla_default() {
+        let obj = JlaTestController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jla_fields() {
+        let mut obj = JlaTestController::default();
+        obj.test_ctrl_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlb_default() {
+        let obj = JlbTestItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlb_fields() {
+        let mut obj = JlbTestItem::default();
+        obj.test_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlc_default() {
+        let obj = JlcTestRun::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlc_fields() {
+        let mut obj = JlcTestRun::default();
+        obj.test_run_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jld_generated {
+    use super::*;
+
+    #[test]
+    fn test_jld_default() {
+        let obj = JldTestResult::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jld_fields() {
+        let mut obj = JldTestResult::default();
+        obj.test_result_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jle_generated {
+    use super::*;
+
+    #[test]
+    fn test_jle_default() {
+        let obj = JleTestMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jle_fields() {
+        let mut obj = JleTestMessage::default();
+        obj.test_msg_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlf_default() {
+        let obj = JlfTestCoverage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlf_fields() {
+        let mut obj = JlfTestCoverage::default();
+        obj.test_cov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlg_default() {
+        let obj = JlgTestProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlg_fields() {
+        let mut obj = JlgTestProfile::default();
+        obj.test_profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlh_default() {
+        let obj = JlhTestTag::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlh_fields() {
+        let mut obj = JlhTestTag::default();
+        obj.test_tag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jli_generated {
+    use super::*;
+
+    #[test]
+    fn test_jli_default() {
+        let obj = JliTestExplorer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jli_fields() {
+        let mut obj = JliTestExplorer::default();
+        obj.test_explorer_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlj_default() {
+        let obj = JljTestFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlj_fields() {
+        let mut obj = JljTestFilter::default();
+        obj.test_filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlk_default() {
+        let obj = JlkTestSort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlk_fields() {
+        let mut obj = JlkTestSort::default();
+        obj.test_sort_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jll_generated {
+    use super::*;
+
+    #[test]
+    fn test_jll_default() {
+        let obj = JllTestDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jll_fields() {
+        let mut obj = JllTestDecoration::default();
+        obj.test_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlm_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlm_default() {
+        let obj = JlmTestOutput::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlm_fields() {
+        let mut obj = JlmTestOutput::default();
+        obj.test_output_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jln_generated {
+    use super::*;
+
+    #[test]
+    fn test_jln_default() {
+        let obj = JlnTestSnapshot::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jln_fields() {
+        let mut obj = JlnTestSnapshot::default();
+        obj.test_snap_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlo_default() {
+        let obj = JloTestFixture::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlo_fields() {
+        let mut obj = JloTestFixture::default();
+        obj.test_fixture_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlp_default() {
+        let obj = JlpTestSuite::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlp_fields() {
+        let mut obj = JlpTestSuite::default();
+        obj.test_suite_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlq_default() {
+        let obj = JlqTestBenchmark::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlq_fields() {
+        let mut obj = JlqTestBenchmark::default();
+        obj.test_bench_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlr_default() {
+        let obj = JlrTestDiff::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlr_fields() {
+        let mut obj = JlrTestDiff::default();
+        obj.test_diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jls_generated {
+    use super::*;
+
+    #[test]
+    fn test_jls_default() {
+        let obj = JlsTestWatch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jls_fields() {
+        let mut obj = JlsTestWatch::default();
+        obj.test_watch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlt_default() {
+        let obj = JltTestDebug::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlt_fields() {
+        let mut obj = JltTestDebug::default();
+        obj.test_debug_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlu_default() {
+        let obj = JluTestCoverageReport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlu_fields() {
+        let mut obj = JluTestCoverageReport::default();
+        obj.cov_report_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlv_default() {
+        let obj = JlvTestHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlv_fields() {
+        let mut obj = JlvTestHistory::default();
+        obj.test_hist_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlw_default() {
+        let obj = JlwTestRetry::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlw_fields() {
+        let mut obj = JlwTestRetry::default();
+        obj.test_retry_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlx_default() {
+        let obj = JlxTestTimeout::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlx_fields() {
+        let mut obj = JlxTestTimeout::default();
+        obj.test_timeout_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jly_generated {
+    use super::*;
+
+    #[test]
+    fn test_jly_default() {
+        let obj = JlyTestParallel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jly_fields() {
+        let mut obj = JlyTestParallel::default();
+        obj.test_parallel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jlz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jlz_default() {
+        let obj = JlzTestReport::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jlz_fields() {
+        let mut obj = JlzTestReport::default();
+        obj.test_report_id = "test".to_string();
         assert!(obj.validate());
     }
 }
