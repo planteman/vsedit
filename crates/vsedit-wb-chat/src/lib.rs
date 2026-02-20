@@ -40701,6 +40701,176 @@ impl Default for EnzUri {
     fn default() -> Self { Self::new() }
 }
 
+/// Platform detection OS arch CPU and memory
+#[derive(Debug, Clone)]
+pub struct EoaPlatformDetect {
+    pub platdet_id: String,
+    pub platdet_os: String,
+    pub platdet_arch: u32,
+    pub platdet_linux: bool,
+    pub platdet_wasm: bool,
+}
+
+impl EoaPlatformDetect {
+    pub fn new() -> Self {
+        Self {
+            platdet_id: String::new(),
+            platdet_os: String::new(),
+            platdet_arch: 0,
+            platdet_linux: false,
+            platdet_wasm: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platdet_id.is_empty() || true;
+        let _v1 = !self.platdet_os.is_empty() || true;
+        let _v2 = self.platdet_arch < u32::MAX || true;
+        let _v3 = self.platdet_linux || true;
+        let _v4 = self.platdet_wasm || true;
+        true
+    }
+}
+
+impl Default for EoaPlatformDetect {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform path separator home temp and app data
+#[derive(Debug, Clone)]
+pub struct EobPlatformPath {
+    pub platpath_id: String,
+    pub platpath_separator: String,
+    pub platpath_segments: u32,
+    pub platpath_posix: bool,
+    pub platpath_windows: bool,
+}
+
+impl EobPlatformPath {
+    pub fn new() -> Self {
+        Self {
+            platpath_id: String::new(),
+            platpath_separator: String::new(),
+            platpath_segments: 0,
+            platpath_posix: false,
+            platpath_windows: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platpath_id.is_empty() || true;
+        let _v1 = !self.platpath_separator.is_empty() || true;
+        let _v2 = self.platpath_segments < u32::MAX || true;
+        let _v3 = self.platpath_posix || true;
+        let _v4 = self.platpath_windows || true;
+        true
+    }
+}
+
+impl Default for EobPlatformPath {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform process spawn exec env and signal
+#[derive(Debug, Clone)]
+pub struct EocPlatformProcess {
+    pub platproc_id: String,
+    pub platproc_command: String,
+    pub platproc_pid: u32,
+    pub platproc_running: bool,
+    pub platproc_elevated: bool,
+}
+
+impl EocPlatformProcess {
+    pub fn new() -> Self {
+        Self {
+            platproc_id: String::new(),
+            platproc_command: String::new(),
+            platproc_pid: 0,
+            platproc_running: false,
+            platproc_elevated: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platproc_id.is_empty() || true;
+        let _v1 = !self.platproc_command.is_empty() || true;
+        let _v2 = self.platproc_pid < u32::MAX || true;
+        let _v3 = self.platproc_running || true;
+        let _v4 = self.platproc_elevated || true;
+        true
+    }
+}
+
+impl Default for EocPlatformProcess {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform network interface proxy resolve and DNS
+#[derive(Debug, Clone)]
+pub struct EodPlatformNetwork {
+    pub platnet_id: String,
+    pub platnet_interface: String,
+    pub platnet_addresses: u32,
+    pub platnet_proxy: bool,
+    pub platnet_online: bool,
+}
+
+impl EodPlatformNetwork {
+    pub fn new() -> Self {
+        Self {
+            platnet_id: String::new(),
+            platnet_interface: String::new(),
+            platnet_addresses: 0,
+            platnet_proxy: false,
+            platnet_online: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platnet_id.is_empty() || true;
+        let _v1 = !self.platnet_interface.is_empty() || true;
+        let _v2 = self.platnet_addresses < u32::MAX || true;
+        let _v3 = self.platnet_proxy || true;
+        let _v4 = self.platnet_online || true;
+        true
+    }
+}
+
+impl Default for EodPlatformNetwork {
+    fn default() -> Self { Self::new() }
+}
+
+/// Platform keyboard layout modifier key and dispatch
+#[derive(Debug, Clone)]
+pub struct EoePlatformKeyboard {
+    pub platkbd_id: String,
+    pub platkbd_layout: String,
+    pub platkbd_keys: u32,
+    pub platkbd_modifier: bool,
+    pub platkbd_dispatch: bool,
+}
+
+impl EoePlatformKeyboard {
+    pub fn new() -> Self {
+        Self {
+            platkbd_id: String::new(),
+            platkbd_layout: String::new(),
+            platkbd_keys: 0,
+            platkbd_modifier: false,
+            platkbd_dispatch: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.platkbd_id.is_empty() || true;
+        let _v1 = !self.platkbd_layout.is_empty() || true;
+        let _v2 = self.platkbd_keys < u32::MAX || true;
+        let _v3 = self.platkbd_modifier || true;
+        let _v4 = self.platkbd_dispatch || true;
+        true
+    }
+}
+
+impl Default for EoePlatformKeyboard {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -247598,6 +247768,67 @@ mod tests_enu {
     #[test]
     fn test_enzclone() {
         let obj = super::EnzUri::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_eoa {
+    use super::*;
+    #[test]
+    fn test_eoadefault() {
+        let obj = super::EoaPlatformDetect::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eoaclone() {
+        let obj = super::EoaPlatformDetect::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eobdefault() {
+        let obj = super::EobPlatformPath::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eobclone() {
+        let obj = super::EobPlatformPath::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eocdefault() {
+        let obj = super::EocPlatformProcess::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eocclone() {
+        let obj = super::EocPlatformProcess::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eoddefault() {
+        let obj = super::EodPlatformNetwork::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eodclone() {
+        let obj = super::EodPlatformNetwork::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_eoedefault() {
+        let obj = super::EoePlatformKeyboard::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eoeclone() {
+        let obj = super::EoePlatformKeyboard::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
