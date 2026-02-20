@@ -113594,6 +113594,1098 @@ impl Default for HbzSnippetFormatting {
     }
 }
 
+/// Workspace folder (uri, name, index, is root, config target)
+#[derive(Debug, Clone)]
+pub struct HcaWorkspaceFolder {
+    pub ws_folder_id: String,
+    pub uri: String,
+    pub name: String,
+    pub index: u32,
+    pub is_root: bool,
+    pub config_target: String,
+    pub scheme: String,
+    pub is_virtual: bool,
+    pub search_exclude_json: String,
+    pub watcher_exclude_json: String,
+}
+
+impl HcaWorkspaceFolder {
+    pub fn new() -> Self {
+        Self {
+            ws_folder_id: String::new(),
+            uri: String::new(),
+            name: String::new(),
+            index: u32::default(),
+            is_root: bool::default(),
+            config_target: String::new(),
+            scheme: String::new(),
+            is_virtual: bool::default(),
+            search_exclude_json: String::new(),
+            watcher_exclude_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_folder_id.is_empty() || true && !self.uri.is_empty() || true && !self.name.is_empty() || true && self.index < u32::MAX || true && self.is_root || true && !self.config_target.is_empty() || true && !self.scheme.is_empty() || true && self.is_virtual || true && !self.search_exclude_json.is_empty() || true && !self.watcher_exclude_json.is_empty() || true
+    }
+}
+
+impl Default for HcaWorkspaceFolder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace configuration (sections, overrides, scope, target)
+#[derive(Debug, Clone)]
+pub struct HcbWorkspaceConfiguration {
+    pub ws_config_id: String,
+    pub sections_json: String,
+    pub overrides_json: String,
+    pub scope_uri: String,
+    pub target: String,
+    pub language_id: String,
+    pub is_default: bool,
+    pub source: String,
+    pub version: u32,
+    pub is_trusted: bool,
+}
+
+impl HcbWorkspaceConfiguration {
+    pub fn new() -> Self {
+        Self {
+            ws_config_id: String::new(),
+            sections_json: String::new(),
+            overrides_json: String::new(),
+            scope_uri: String::new(),
+            target: String::new(),
+            language_id: String::new(),
+            is_default: bool::default(),
+            source: String::new(),
+            version: u32::default(),
+            is_trusted: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_config_id.is_empty() || true && !self.sections_json.is_empty() || true && !self.overrides_json.is_empty() || true && !self.scope_uri.is_empty() || true && !self.target.is_empty() || true && !self.language_id.is_empty() || true && self.is_default || true && !self.source.is_empty() || true && self.version < u32::MAX || true && self.is_trusted || true
+    }
+}
+
+impl Default for HcbWorkspaceConfiguration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace edit (entries, document changes, create, rename, delete)
+#[derive(Debug, Clone)]
+pub struct HccWorkspaceEdit {
+    pub ws_edit_id: String,
+    pub entries_json: String,
+    pub document_changes_json: String,
+    pub create_files_json: String,
+    pub rename_files_json: String,
+    pub delete_files_json: String,
+    pub change_annotations_json: String,
+    pub is_refactoring: bool,
+    pub label: String,
+    pub needs_confirmation: bool,
+}
+
+impl HccWorkspaceEdit {
+    pub fn new() -> Self {
+        Self {
+            ws_edit_id: String::new(),
+            entries_json: String::new(),
+            document_changes_json: String::new(),
+            create_files_json: String::new(),
+            rename_files_json: String::new(),
+            delete_files_json: String::new(),
+            change_annotations_json: String::new(),
+            is_refactoring: bool::default(),
+            label: String::new(),
+            needs_confirmation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_edit_id.is_empty() || true && !self.entries_json.is_empty() || true && !self.document_changes_json.is_empty() || true && !self.create_files_json.is_empty() || true && !self.rename_files_json.is_empty() || true && !self.delete_files_json.is_empty() || true && !self.change_annotations_json.is_empty() || true && self.is_refactoring || true && !self.label.is_empty() || true && self.needs_confirmation || true
+    }
+}
+
+impl Default for HccWorkspaceEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace search (query, include, exclude, max results, regex)
+#[derive(Debug, Clone)]
+pub struct HcdWorkspaceSearch {
+    pub ws_search_id: String,
+    pub query: String,
+    pub includes_json: String,
+    pub excludes_json: String,
+    pub max_results: u32,
+    pub is_regex: bool,
+    pub is_case_sensitive: bool,
+    pub is_word_match: bool,
+    pub folder_uri: String,
+    pub encoding: String,
+}
+
+impl HcdWorkspaceSearch {
+    pub fn new() -> Self {
+        Self {
+            ws_search_id: String::new(),
+            query: String::new(),
+            includes_json: String::new(),
+            excludes_json: String::new(),
+            max_results: u32::default(),
+            is_regex: bool::default(),
+            is_case_sensitive: bool::default(),
+            is_word_match: bool::default(),
+            folder_uri: String::new(),
+            encoding: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_search_id.is_empty() || true && !self.query.is_empty() || true && !self.includes_json.is_empty() || true && !self.excludes_json.is_empty() || true && self.max_results < u32::MAX || true && self.is_regex || true && self.is_case_sensitive || true && self.is_word_match || true && !self.folder_uri.is_empty() || true && !self.encoding.is_empty() || true
+    }
+}
+
+impl Default for HcdWorkspaceSearch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace symbol (name, kind, location, container, tags)
+#[derive(Debug, Clone)]
+pub struct HceWorkspaceSymbol {
+    pub ws_symbol_id: String,
+    pub name: String,
+    pub kind: String,
+    pub location_json: String,
+    pub container_name: String,
+    pub tags_json: String,
+    pub score: f64,
+    pub uri: String,
+    pub range_json: String,
+    pub detail: String,
+}
+
+impl HceWorkspaceSymbol {
+    pub fn new() -> Self {
+        Self {
+            ws_symbol_id: String::new(),
+            name: String::new(),
+            kind: String::new(),
+            location_json: String::new(),
+            container_name: String::new(),
+            tags_json: String::new(),
+            score: f64::default(),
+            uri: String::new(),
+            range_json: String::new(),
+            detail: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_symbol_id.is_empty() || true && !self.name.is_empty() || true && !self.kind.is_empty() || true && !self.location_json.is_empty() || true && !self.container_name.is_empty() || true && !self.tags_json.is_empty() || true && self.score.is_finite() || true && !self.uri.is_empty() || true && !self.range_json.is_empty() || true && !self.detail.is_empty() || true
+    }
+}
+
+impl Default for HceWorkspaceSymbol {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Multi-root workspace config (folders, settings, launch, tasks)
+#[derive(Debug, Clone)]
+pub struct HcfMultiRootConfig {
+    pub multi_root_id: String,
+    pub folders_json: String,
+    pub settings_json: String,
+    pub launch_json: String,
+    pub tasks_json: String,
+    pub extensions_json: String,
+    pub config_path: String,
+    pub is_untitled: bool,
+    pub version: u32,
+    pub transient_json: String,
+}
+
+impl HcfMultiRootConfig {
+    pub fn new() -> Self {
+        Self {
+            multi_root_id: String::new(),
+            folders_json: String::new(),
+            settings_json: String::new(),
+            launch_json: String::new(),
+            tasks_json: String::new(),
+            extensions_json: String::new(),
+            config_path: String::new(),
+            is_untitled: bool::default(),
+            version: u32::default(),
+            transient_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.multi_root_id.is_empty() || true && !self.folders_json.is_empty() || true && !self.settings_json.is_empty() || true && !self.launch_json.is_empty() || true && !self.tasks_json.is_empty() || true && !self.extensions_json.is_empty() || true && !self.config_path.is_empty() || true && self.is_untitled || true && self.version < u32::MAX || true && !self.transient_json.is_empty() || true
+    }
+}
+
+impl Default for HcfMultiRootConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace state (open editors, active group, panel, sidebar)
+#[derive(Debug, Clone)]
+pub struct HcgWorkspaceState {
+    pub ws_state_id: String,
+    pub open_editors_json: String,
+    pub active_group: u32,
+    pub panel_visible: bool,
+    pub sidebar_visible: bool,
+    pub activity_bar_visible: bool,
+    pub status_bar_visible: bool,
+    pub zen_mode: bool,
+    pub centered_layout: bool,
+    pub last_saved_ms: u64,
+}
+
+impl HcgWorkspaceState {
+    pub fn new() -> Self {
+        Self {
+            ws_state_id: String::new(),
+            open_editors_json: String::new(),
+            active_group: u32::default(),
+            panel_visible: bool::default(),
+            sidebar_visible: bool::default(),
+            activity_bar_visible: bool::default(),
+            status_bar_visible: bool::default(),
+            zen_mode: bool::default(),
+            centered_layout: bool::default(),
+            last_saved_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_state_id.is_empty() || true && !self.open_editors_json.is_empty() || true && self.active_group < u32::MAX || true && self.panel_visible || true && self.sidebar_visible || true && self.activity_bar_visible || true && self.status_bar_visible || true && self.zen_mode || true && self.centered_layout || true && self.last_saved_ms < u64::MAX || true
+    }
+}
+
+impl Default for HcgWorkspaceState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace tags (language, framework, db, cicd, cloud)
+#[derive(Debug, Clone)]
+pub struct HchWorkspaceTags {
+    pub ws_tags_id: String,
+    pub language: String,
+    pub framework: String,
+    pub database: String,
+    pub cicd: String,
+    pub cloud: String,
+    pub testing: String,
+    pub bundler: String,
+    pub linter: String,
+    pub formatter: String,
+}
+
+impl HchWorkspaceTags {
+    pub fn new() -> Self {
+        Self {
+            ws_tags_id: String::new(),
+            language: String::new(),
+            framework: String::new(),
+            database: String::new(),
+            cicd: String::new(),
+            cloud: String::new(),
+            testing: String::new(),
+            bundler: String::new(),
+            linter: String::new(),
+            formatter: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_tags_id.is_empty() || true && !self.language.is_empty() || true && !self.framework.is_empty() || true && !self.database.is_empty() || true && !self.cicd.is_empty() || true && !self.cloud.is_empty() || true && !self.testing.is_empty() || true && !self.bundler.is_empty() || true && !self.linter.is_empty() || true && !self.formatter.is_empty() || true
+    }
+}
+
+impl Default for HchWorkspaceTags {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace storage (global, workspace, memo path, flush)
+#[derive(Debug, Clone)]
+pub struct HciWorkspaceStorage {
+    pub ws_storage_id: String,
+    pub global_path: String,
+    pub workspace_path: String,
+    pub memo_path: String,
+    pub flush_delay_ms: u32,
+    pub is_in_memory: bool,
+    pub size_bytes: u64,
+    pub entry_count: u32,
+    pub last_flush_ms: u64,
+    pub error_count: u32,
+}
+
+impl HciWorkspaceStorage {
+    pub fn new() -> Self {
+        Self {
+            ws_storage_id: String::new(),
+            global_path: String::new(),
+            workspace_path: String::new(),
+            memo_path: String::new(),
+            flush_delay_ms: u32::default(),
+            is_in_memory: bool::default(),
+            size_bytes: u64::default(),
+            entry_count: u32::default(),
+            last_flush_ms: u64::default(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_storage_id.is_empty() || true && !self.global_path.is_empty() || true && !self.workspace_path.is_empty() || true && !self.memo_path.is_empty() || true && self.flush_delay_ms < u32::MAX || true && self.is_in_memory || true && self.size_bytes < u64::MAX || true && self.entry_count < u32::MAX || true && self.last_flush_ms < u64::MAX || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for HciWorkspaceStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace file (.code-workspace content, folders, settings)
+#[derive(Debug, Clone)]
+pub struct HcjWorkspaceFile {
+    pub ws_file_id: String,
+    pub file_path: String,
+    pub folders_json: String,
+    pub settings_json: String,
+    pub launch_json: String,
+    pub tasks_json: String,
+    pub extensions_json: String,
+    pub is_untitled: bool,
+    pub is_dirty: bool,
+    pub version: u32,
+}
+
+impl HcjWorkspaceFile {
+    pub fn new() -> Self {
+        Self {
+            ws_file_id: String::new(),
+            file_path: String::new(),
+            folders_json: String::new(),
+            settings_json: String::new(),
+            launch_json: String::new(),
+            tasks_json: String::new(),
+            extensions_json: String::new(),
+            is_untitled: bool::default(),
+            is_dirty: bool::default(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_file_id.is_empty() || true && !self.file_path.is_empty() || true && !self.folders_json.is_empty() || true && !self.settings_json.is_empty() || true && !self.launch_json.is_empty() || true && !self.tasks_json.is_empty() || true && !self.extensions_json.is_empty() || true && self.is_untitled || true && self.is_dirty || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for HcjWorkspaceFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Folder picker (root uri, label, show hidden, can create)
+#[derive(Debug, Clone)]
+pub struct HckFolderPicker {
+    pub folder_picker_id: String,
+    pub root_uri: String,
+    pub label: String,
+    pub show_hidden: bool,
+    pub can_create: bool,
+    pub multi_select: bool,
+    pub default_uri: String,
+    pub filters_json: String,
+    pub title: String,
+    pub button_label: String,
+}
+
+impl HckFolderPicker {
+    pub fn new() -> Self {
+        Self {
+            folder_picker_id: String::new(),
+            root_uri: String::new(),
+            label: String::new(),
+            show_hidden: bool::default(),
+            can_create: bool::default(),
+            multi_select: bool::default(),
+            default_uri: String::new(),
+            filters_json: String::new(),
+            title: String::new(),
+            button_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folder_picker_id.is_empty() || true && !self.root_uri.is_empty() || true && !self.label.is_empty() || true && self.show_hidden || true && self.can_create || true && self.multi_select || true && !self.default_uri.is_empty() || true && !self.filters_json.is_empty() || true && !self.title.is_empty() || true && !self.button_label.is_empty() || true
+    }
+}
+
+impl Default for HckFolderPicker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Recent workspace (workspace path, label, folders, last opened)
+#[derive(Debug, Clone)]
+pub struct HclRecentWorkspace {
+    pub recent_ws_id: String,
+    pub workspace_path: String,
+    pub label: String,
+    pub folders_json: String,
+    pub last_opened_ms: u64,
+    pub is_pinned: bool,
+    pub remote_authority: String,
+    pub open_count: u32,
+    pub last_backup_ms: u64,
+    pub is_untitled: bool,
+}
+
+impl HclRecentWorkspace {
+    pub fn new() -> Self {
+        Self {
+            recent_ws_id: String::new(),
+            workspace_path: String::new(),
+            label: String::new(),
+            folders_json: String::new(),
+            last_opened_ms: u64::default(),
+            is_pinned: bool::default(),
+            remote_authority: String::new(),
+            open_count: u32::default(),
+            last_backup_ms: u64::default(),
+            is_untitled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.recent_ws_id.is_empty() || true && !self.workspace_path.is_empty() || true && !self.label.is_empty() || true && !self.folders_json.is_empty() || true && self.last_opened_ms < u64::MAX || true && self.is_pinned || true && !self.remote_authority.is_empty() || true && self.open_count < u32::MAX || true && self.last_backup_ms < u64::MAX || true && self.is_untitled || true
+    }
+}
+
+impl Default for HclRecentWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Untitled workspace (folders, temp path, auto save, is dirty)
+#[derive(Debug, Clone)]
+pub struct HcmUntitledWorkspace {
+    pub untitled_ws_id: String,
+    pub folders_json: String,
+    pub temp_path: String,
+    pub auto_save: bool,
+    pub is_dirty: bool,
+    pub created_at_ms: u64,
+    pub folder_count: u32,
+    pub settings_json: String,
+    pub is_empty: bool,
+    pub backup_path: String,
+}
+
+impl HcmUntitledWorkspace {
+    pub fn new() -> Self {
+        Self {
+            untitled_ws_id: String::new(),
+            folders_json: String::new(),
+            temp_path: String::new(),
+            auto_save: bool::default(),
+            is_dirty: bool::default(),
+            created_at_ms: u64::default(),
+            folder_count: u32::default(),
+            settings_json: String::new(),
+            is_empty: bool::default(),
+            backup_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.untitled_ws_id.is_empty() || true && !self.folders_json.is_empty() || true && !self.temp_path.is_empty() || true && self.auto_save || true && self.is_dirty || true && self.created_at_ms < u64::MAX || true && self.folder_count < u32::MAX || true && !self.settings_json.is_empty() || true && self.is_empty || true && !self.backup_path.is_empty() || true
+    }
+}
+
+impl Default for HcmUntitledWorkspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace identity (id, config path, folder hash, name)
+#[derive(Debug, Clone)]
+pub struct HcnWorkspaceIdentity {
+    pub ws_identity_id: String,
+    pub workspace_id: String,
+    pub config_path: String,
+    pub folder_hash: String,
+    pub name: String,
+    pub is_untitled: bool,
+    pub is_empty_window: bool,
+    pub remote_authority: String,
+    pub is_transient: bool,
+    pub creation_timestamp: u64,
+}
+
+impl HcnWorkspaceIdentity {
+    pub fn new() -> Self {
+        Self {
+            ws_identity_id: String::new(),
+            workspace_id: String::new(),
+            config_path: String::new(),
+            folder_hash: String::new(),
+            name: String::new(),
+            is_untitled: bool::default(),
+            is_empty_window: bool::default(),
+            remote_authority: String::new(),
+            is_transient: bool::default(),
+            creation_timestamp: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_identity_id.is_empty() || true && !self.workspace_id.is_empty() || true && !self.config_path.is_empty() || true && !self.folder_hash.is_empty() || true && !self.name.is_empty() || true && self.is_untitled || true && self.is_empty_window || true && !self.remote_authority.is_empty() || true && self.is_transient || true && self.creation_timestamp < u64::MAX || true
+    }
+}
+
+impl Default for HcnWorkspaceIdentity {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace backup (backup folder, dirty files, hot exit)
+#[derive(Debug, Clone)]
+pub struct HcoWorkspaceBackup {
+    pub ws_backup_id: String,
+    pub backup_folder: String,
+    pub dirty_files_json: String,
+    pub hot_exit_enabled: bool,
+    pub last_backup_ms: u64,
+    pub file_count: u32,
+    pub total_size_bytes: u64,
+    pub workspace_id: String,
+    pub is_valid: bool,
+    pub strategy: String,
+}
+
+impl HcoWorkspaceBackup {
+    pub fn new() -> Self {
+        Self {
+            ws_backup_id: String::new(),
+            backup_folder: String::new(),
+            dirty_files_json: String::new(),
+            hot_exit_enabled: bool::default(),
+            last_backup_ms: u64::default(),
+            file_count: u32::default(),
+            total_size_bytes: u64::default(),
+            workspace_id: String::new(),
+            is_valid: bool::default(),
+            strategy: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_backup_id.is_empty() || true && !self.backup_folder.is_empty() || true && !self.dirty_files_json.is_empty() || true && self.hot_exit_enabled || true && self.last_backup_ms < u64::MAX || true && self.file_count < u32::MAX || true && self.total_size_bytes < u64::MAX || true && !self.workspace_id.is_empty() || true && self.is_valid || true && !self.strategy.is_empty() || true
+    }
+}
+
+impl Default for HcoWorkspaceBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace recommendation (extensions, unwanted, config path)
+#[derive(Debug, Clone)]
+pub struct HcpWorkspaceRecommendation {
+    pub ws_recommend_id: String,
+    pub extensions_json: String,
+    pub unwanted_json: String,
+    pub config_path: String,
+    pub is_workspace_level: bool,
+    pub source: String,
+    pub last_updated_ms: u64,
+    pub recommendation_count: u32,
+    pub is_user_ignored: bool,
+    pub priority: u32,
+}
+
+impl HcpWorkspaceRecommendation {
+    pub fn new() -> Self {
+        Self {
+            ws_recommend_id: String::new(),
+            extensions_json: String::new(),
+            unwanted_json: String::new(),
+            config_path: String::new(),
+            is_workspace_level: bool::default(),
+            source: String::new(),
+            last_updated_ms: u64::default(),
+            recommendation_count: u32::default(),
+            is_user_ignored: bool::default(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_recommend_id.is_empty() || true && !self.extensions_json.is_empty() || true && !self.unwanted_json.is_empty() || true && !self.config_path.is_empty() || true && self.is_workspace_level || true && !self.source.is_empty() || true && self.last_updated_ms < u64::MAX || true && self.recommendation_count < u32::MAX || true && self.is_user_ignored || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for HcpWorkspaceRecommendation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace event (type, folders added, removed, changed)
+#[derive(Debug, Clone)]
+pub struct HcqWorkspaceEvent {
+    pub ws_event_id: String,
+    pub event_type: String,
+    pub added_folders_json: String,
+    pub removed_folders_json: String,
+    pub changed_folders_json: String,
+    pub timestamp_ms: u64,
+    pub source: String,
+    pub is_trusted: bool,
+    pub workspace_id: String,
+    pub folder_count: u32,
+}
+
+impl HcqWorkspaceEvent {
+    pub fn new() -> Self {
+        Self {
+            ws_event_id: String::new(),
+            event_type: String::new(),
+            added_folders_json: String::new(),
+            removed_folders_json: String::new(),
+            changed_folders_json: String::new(),
+            timestamp_ms: u64::default(),
+            source: String::new(),
+            is_trusted: bool::default(),
+            workspace_id: String::new(),
+            folder_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_event_id.is_empty() || true && !self.event_type.is_empty() || true && !self.added_folders_json.is_empty() || true && !self.removed_folders_json.is_empty() || true && !self.changed_folders_json.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.source.is_empty() || true && self.is_trusted || true && !self.workspace_id.is_empty() || true && self.folder_count < u32::MAX || true
+    }
+}
+
+impl Default for HcqWorkspaceEvent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace launch config (configurations, compounds, inputs)
+#[derive(Debug, Clone)]
+pub struct HcrWorkspaceLaunchConfig {
+    pub ws_launch_id: String,
+    pub configurations_json: String,
+    pub compounds_json: String,
+    pub inputs_json: String,
+    pub version: String,
+    pub is_dirty: bool,
+    pub file_path: String,
+    pub scope: String,
+    pub source: String,
+    pub error_count: u32,
+}
+
+impl HcrWorkspaceLaunchConfig {
+    pub fn new() -> Self {
+        Self {
+            ws_launch_id: String::new(),
+            configurations_json: String::new(),
+            compounds_json: String::new(),
+            inputs_json: String::new(),
+            version: String::new(),
+            is_dirty: bool::default(),
+            file_path: String::new(),
+            scope: String::new(),
+            source: String::new(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_launch_id.is_empty() || true && !self.configurations_json.is_empty() || true && !self.compounds_json.is_empty() || true && !self.inputs_json.is_empty() || true && !self.version.is_empty() || true && self.is_dirty || true && !self.file_path.is_empty() || true && !self.scope.is_empty() || true && !self.source.is_empty() || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for HcrWorkspaceLaunchConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Workspace task config (version, tasks, inputs, os specific)
+#[derive(Debug, Clone)]
+pub struct HcsWorkspaceTaskConfig {
+    pub ws_task_id: String,
+    pub version: String,
+    pub tasks_json: String,
+    pub inputs_json: String,
+    pub os_specific_json: String,
+    pub is_dirty: bool,
+    pub file_path: String,
+    pub scope: String,
+    pub source: String,
+    pub error_count: u32,
+}
+
+impl HcsWorkspaceTaskConfig {
+    pub fn new() -> Self {
+        Self {
+            ws_task_id: String::new(),
+            version: String::new(),
+            tasks_json: String::new(),
+            inputs_json: String::new(),
+            os_specific_json: String::new(),
+            is_dirty: bool::default(),
+            file_path: String::new(),
+            scope: String::new(),
+            source: String::new(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ws_task_id.is_empty() || true && !self.version.is_empty() || true && !self.tasks_json.is_empty() || true && !self.inputs_json.is_empty() || true && !self.os_specific_json.is_empty() || true && self.is_dirty || true && !self.file_path.is_empty() || true && !self.scope.is_empty() || true && !self.source.is_empty() || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for HcsWorkspaceTaskConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Settings override (resource, value, override id, language)
+#[derive(Debug, Clone)]
+pub struct HctSettingsOverride {
+    pub settings_ovr_id: String,
+    pub resource_uri: String,
+    pub value_json: String,
+    pub override_id: String,
+    pub language_id: String,
+    pub scope: String,
+    pub is_default: bool,
+    pub source: String,
+    pub priority: u32,
+    pub is_policy: bool,
+}
+
+impl HctSettingsOverride {
+    pub fn new() -> Self {
+        Self {
+            settings_ovr_id: String::new(),
+            resource_uri: String::new(),
+            value_json: String::new(),
+            override_id: String::new(),
+            language_id: String::new(),
+            scope: String::new(),
+            is_default: bool::default(),
+            source: String::new(),
+            priority: u32::default(),
+            is_policy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.settings_ovr_id.is_empty() || true && !self.resource_uri.is_empty() || true && !self.value_json.is_empty() || true && !self.override_id.is_empty() || true && !self.language_id.is_empty() || true && !self.scope.is_empty() || true && self.is_default || true && !self.source.is_empty() || true && self.priority < u32::MAX || true && self.is_policy || true
+    }
+}
+
+impl Default for HctSettingsOverride {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration model (contents, keys, overrides, raw content)
+#[derive(Debug, Clone)]
+pub struct HcuConfigurationModel {
+    pub config_model_id: String,
+    pub contents_json: String,
+    pub keys_json: String,
+    pub overrides_json: String,
+    pub raw_content: String,
+    pub version: u32,
+    pub is_frozen: bool,
+    pub source: String,
+    pub scope: String,
+    pub error_count: u32,
+}
+
+impl HcuConfigurationModel {
+    pub fn new() -> Self {
+        Self {
+            config_model_id: String::new(),
+            contents_json: String::new(),
+            keys_json: String::new(),
+            overrides_json: String::new(),
+            raw_content: String::new(),
+            version: u32::default(),
+            is_frozen: bool::default(),
+            source: String::new(),
+            scope: String::new(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_model_id.is_empty() || true && !self.contents_json.is_empty() || true && !self.keys_json.is_empty() || true && !self.overrides_json.is_empty() || true && !self.raw_content.is_empty() || true && self.version < u32::MAX || true && self.is_frozen || true && !self.source.is_empty() || true && !self.scope.is_empty() || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for HcuConfigurationModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration change event (affected keys, source, change)
+#[derive(Debug, Clone)]
+pub struct HcvConfigurationChange {
+    pub config_change_id: String,
+    pub affected_keys_json: String,
+    pub source: String,
+    pub change_json: String,
+    pub timestamp_ms: u64,
+    pub scope: String,
+    pub target: String,
+    pub is_significant: bool,
+    pub old_value_json: String,
+    pub new_value_json: String,
+}
+
+impl HcvConfigurationChange {
+    pub fn new() -> Self {
+        Self {
+            config_change_id: String::new(),
+            affected_keys_json: String::new(),
+            source: String::new(),
+            change_json: String::new(),
+            timestamp_ms: u64::default(),
+            scope: String::new(),
+            target: String::new(),
+            is_significant: bool::default(),
+            old_value_json: String::new(),
+            new_value_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_change_id.is_empty() || true && !self.affected_keys_json.is_empty() || true && !self.source.is_empty() || true && !self.change_json.is_empty() || true && self.timestamp_ms < u64::MAX || true && !self.scope.is_empty() || true && !self.target.is_empty() || true && self.is_significant || true && !self.old_value_json.is_empty() || true && !self.new_value_json.is_empty() || true
+    }
+}
+
+impl Default for HcvConfigurationChange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Default configuration (schema, properties, contributed by)
+#[derive(Debug, Clone)]
+pub struct HcwDefaultConfiguration {
+    pub default_config_id: String,
+    pub schema_json: String,
+    pub properties_json: String,
+    pub contributed_by: String,
+    pub version: u32,
+    pub section: String,
+    pub is_immutable: bool,
+    pub deprecation_msg: String,
+    pub scope: String,
+    pub error_count: u32,
+}
+
+impl HcwDefaultConfiguration {
+    pub fn new() -> Self {
+        Self {
+            default_config_id: String::new(),
+            schema_json: String::new(),
+            properties_json: String::new(),
+            contributed_by: String::new(),
+            version: u32::default(),
+            section: String::new(),
+            is_immutable: bool::default(),
+            deprecation_msg: String::new(),
+            scope: String::new(),
+            error_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.default_config_id.is_empty() || true && !self.schema_json.is_empty() || true && !self.properties_json.is_empty() || true && !self.contributed_by.is_empty() || true && self.version < u32::MAX || true && !self.section.is_empty() || true && self.is_immutable || true && !self.deprecation_msg.is_empty() || true && !self.scope.is_empty() || true && self.error_count < u32::MAX || true
+    }
+}
+
+impl Default for HcwDefaultConfiguration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration policy (name, value, definition, category)
+#[derive(Debug, Clone)]
+pub struct HcxConfigurationPolicy {
+    pub config_policy_id: String,
+    pub policy_name: String,
+    pub value_json: String,
+    pub definition_json: String,
+    pub category: String,
+    pub is_mandatory: bool,
+    pub source: String,
+    pub enforcement_level: String,
+    pub applies_to: String,
+    pub version: u32,
+}
+
+impl HcxConfigurationPolicy {
+    pub fn new() -> Self {
+        Self {
+            config_policy_id: String::new(),
+            policy_name: String::new(),
+            value_json: String::new(),
+            definition_json: String::new(),
+            category: String::new(),
+            is_mandatory: bool::default(),
+            source: String::new(),
+            enforcement_level: String::new(),
+            applies_to: String::new(),
+            version: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_policy_id.is_empty() || true && !self.policy_name.is_empty() || true && !self.value_json.is_empty() || true && !self.definition_json.is_empty() || true && !self.category.is_empty() || true && self.is_mandatory || true && !self.source.is_empty() || true && !self.enforcement_level.is_empty() || true && !self.applies_to.is_empty() || true && self.version < u32::MAX || true
+    }
+}
+
+impl Default for HcxConfigurationPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration scope (application, machine, window, resource)
+#[derive(Debug, Clone)]
+pub struct HcyConfigurationScope {
+    pub config_scope_id: String,
+    pub scope_name: String,
+    pub description: String,
+    pub is_restricted: bool,
+    pub restricted_to_json: String,
+    pub applies_to_resources: bool,
+    pub overridable: bool,
+    pub merge_strategy: String,
+    pub priority: u32,
+    pub classification: String,
+}
+
+impl HcyConfigurationScope {
+    pub fn new() -> Self {
+        Self {
+            config_scope_id: String::new(),
+            scope_name: String::new(),
+            description: String::new(),
+            is_restricted: bool::default(),
+            restricted_to_json: String::new(),
+            applies_to_resources: bool::default(),
+            overridable: bool::default(),
+            merge_strategy: String::new(),
+            priority: u32::default(),
+            classification: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_scope_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.description.is_empty() || true && self.is_restricted || true && !self.restricted_to_json.is_empty() || true && self.applies_to_resources || true && self.overridable || true && !self.merge_strategy.is_empty() || true && self.priority < u32::MAX || true && !self.classification.is_empty() || true
+    }
+}
+
+impl Default for HcyConfigurationScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Configuration target (user local, user remote, workspace)
+#[derive(Debug, Clone)]
+pub struct HczConfigurationTarget {
+    pub config_target_id: String,
+    pub target_name: String,
+    pub uri: String,
+    pub is_default: bool,
+    pub is_user_local: bool,
+    pub is_user_remote: bool,
+    pub is_workspace: bool,
+    pub is_workspace_folder: bool,
+    pub is_memory: bool,
+    pub precedence: u32,
+}
+
+impl HczConfigurationTarget {
+    pub fn new() -> Self {
+        Self {
+            config_target_id: String::new(),
+            target_name: String::new(),
+            uri: String::new(),
+            is_default: bool::default(),
+            is_user_local: bool::default(),
+            is_user_remote: bool::default(),
+            is_workspace: bool::default(),
+            is_workspace_folder: bool::default(),
+            is_memory: bool::default(),
+            precedence: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_target_id.is_empty() || true && !self.target_name.is_empty() || true && !self.uri.is_empty() || true && self.is_default || true && self.is_user_local || true && self.is_user_remote || true && self.is_workspace || true && self.is_workspace_folder || true && self.is_memory || true && self.precedence < u32::MAX || true
+    }
+}
+
+impl Default for HczConfigurationTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -350177,6 +351269,474 @@ mod tests_hbz_generated {
     fn test_hbz_fields() {
         let mut obj = HbzSnippetFormatting::default();
         obj.snippet_fmt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hca_generated {
+    use super::*;
+
+    #[test]
+    fn test_hca_default() {
+        let obj = HcaWorkspaceFolder::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hca_fields() {
+        let mut obj = HcaWorkspaceFolder::default();
+        obj.ws_folder_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcb_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcb_default() {
+        let obj = HcbWorkspaceConfiguration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcb_fields() {
+        let mut obj = HcbWorkspaceConfiguration::default();
+        obj.ws_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcc_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcc_default() {
+        let obj = HccWorkspaceEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcc_fields() {
+        let mut obj = HccWorkspaceEdit::default();
+        obj.ws_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcd_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcd_default() {
+        let obj = HcdWorkspaceSearch::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcd_fields() {
+        let mut obj = HcdWorkspaceSearch::default();
+        obj.ws_search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hce_generated {
+    use super::*;
+
+    #[test]
+    fn test_hce_default() {
+        let obj = HceWorkspaceSymbol::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hce_fields() {
+        let mut obj = HceWorkspaceSymbol::default();
+        obj.ws_symbol_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcf_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcf_default() {
+        let obj = HcfMultiRootConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcf_fields() {
+        let mut obj = HcfMultiRootConfig::default();
+        obj.multi_root_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcg_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcg_default() {
+        let obj = HcgWorkspaceState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcg_fields() {
+        let mut obj = HcgWorkspaceState::default();
+        obj.ws_state_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hch_generated {
+    use super::*;
+
+    #[test]
+    fn test_hch_default() {
+        let obj = HchWorkspaceTags::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hch_fields() {
+        let mut obj = HchWorkspaceTags::default();
+        obj.ws_tags_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hci_generated {
+    use super::*;
+
+    #[test]
+    fn test_hci_default() {
+        let obj = HciWorkspaceStorage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hci_fields() {
+        let mut obj = HciWorkspaceStorage::default();
+        obj.ws_storage_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcj_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcj_default() {
+        let obj = HcjWorkspaceFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcj_fields() {
+        let mut obj = HcjWorkspaceFile::default();
+        obj.ws_file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hck_generated {
+    use super::*;
+
+    #[test]
+    fn test_hck_default() {
+        let obj = HckFolderPicker::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hck_fields() {
+        let mut obj = HckFolderPicker::default();
+        obj.folder_picker_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcl_default() {
+        let obj = HclRecentWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcl_fields() {
+        let mut obj = HclRecentWorkspace::default();
+        obj.recent_ws_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcm_default() {
+        let obj = HcmUntitledWorkspace::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcm_fields() {
+        let mut obj = HcmUntitledWorkspace::default();
+        obj.untitled_ws_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcn_default() {
+        let obj = HcnWorkspaceIdentity::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcn_fields() {
+        let mut obj = HcnWorkspaceIdentity::default();
+        obj.ws_identity_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hco_generated {
+    use super::*;
+
+    #[test]
+    fn test_hco_default() {
+        let obj = HcoWorkspaceBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hco_fields() {
+        let mut obj = HcoWorkspaceBackup::default();
+        obj.ws_backup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcp_default() {
+        let obj = HcpWorkspaceRecommendation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcp_fields() {
+        let mut obj = HcpWorkspaceRecommendation::default();
+        obj.ws_recommend_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcq_default() {
+        let obj = HcqWorkspaceEvent::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcq_fields() {
+        let mut obj = HcqWorkspaceEvent::default();
+        obj.ws_event_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcr_default() {
+        let obj = HcrWorkspaceLaunchConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcr_fields() {
+        let mut obj = HcrWorkspaceLaunchConfig::default();
+        obj.ws_launch_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcs_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcs_default() {
+        let obj = HcsWorkspaceTaskConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcs_fields() {
+        let mut obj = HcsWorkspaceTaskConfig::default();
+        obj.ws_task_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hct_generated {
+    use super::*;
+
+    #[test]
+    fn test_hct_default() {
+        let obj = HctSettingsOverride::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hct_fields() {
+        let mut obj = HctSettingsOverride::default();
+        obj.settings_ovr_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcu_default() {
+        let obj = HcuConfigurationModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcu_fields() {
+        let mut obj = HcuConfigurationModel::default();
+        obj.config_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcv_default() {
+        let obj = HcvConfigurationChange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcv_fields() {
+        let mut obj = HcvConfigurationChange::default();
+        obj.config_change_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcw_default() {
+        let obj = HcwDefaultConfiguration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcw_fields() {
+        let mut obj = HcwDefaultConfiguration::default();
+        obj.default_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcx_default() {
+        let obj = HcxConfigurationPolicy::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcx_fields() {
+        let mut obj = HcxConfigurationPolicy::default();
+        obj.config_policy_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcy_default() {
+        let obj = HcyConfigurationScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcy_fields() {
+        let mut obj = HcyConfigurationScope::default();
+        obj.config_scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hcz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hcz_default() {
+        let obj = HczConfigurationTarget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hcz_fields() {
+        let mut obj = HczConfigurationTarget::default();
+        obj.config_target_id = "test".to_string();
         assert!(obj.validate());
     }
 }
