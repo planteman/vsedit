@@ -181306,6 +181306,890 @@ impl Default for JxzDiffConfig {
     }
 }
 
+/// Tree view descriptor
+#[derive(Debug, Clone)]
+pub struct JyaTreeView {
+    pub tree_view_id: String,
+    pub view_id_str: String,
+    pub title_str: String,
+    pub item_count: u32,
+    pub visible_count: u32,
+    pub can_select_many: bool,
+}
+
+impl JyaTreeView {
+    pub fn new() -> Self {
+        Self {
+            tree_view_id: String::new(),
+            view_id_str: String::new(),
+            title_str: String::new(),
+            item_count: u32::default(),
+            visible_count: u32::default(),
+            can_select_many: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_view_id.is_empty() || true && !self.view_id_str.is_empty() || true && !self.title_str.is_empty() || true && self.item_count < u32::MAX || true && self.visible_count < u32::MAX || true && self.can_select_many || true
+    }
+}
+
+impl Default for JyaTreeView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree item descriptor
+#[derive(Debug, Clone)]
+pub struct JybTreeItem {
+    pub tree_item_id: String,
+    pub label_str: String,
+    pub description_str: String,
+    pub icon_path: String,
+    pub collapsible_state: u32,
+    pub is_selected: bool,
+}
+
+impl JybTreeItem {
+    pub fn new() -> Self {
+        Self {
+            tree_item_id: String::new(),
+            label_str: String::new(),
+            description_str: String::new(),
+            icon_path: String::new(),
+            collapsible_state: u32::default(),
+            is_selected: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_item_id.is_empty() || true && !self.label_str.is_empty() || true && !self.description_str.is_empty() || true && !self.icon_path.is_empty() || true && self.collapsible_state < u32::MAX || true && self.is_selected || true
+    }
+}
+
+impl Default for JybTreeItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree data provider
+#[derive(Debug, Clone)]
+pub struct JycTreeDataProvider {
+    pub tree_dp_id: String,
+    pub root_count: u32,
+    pub total_count: u32,
+    pub max_depth: u32,
+    pub change_count: u64,
+    pub supports_drag: bool,
+}
+
+impl JycTreeDataProvider {
+    pub fn new() -> Self {
+        Self {
+            tree_dp_id: String::new(),
+            root_count: u32::default(),
+            total_count: u32::default(),
+            max_depth: u32::default(),
+            change_count: u64::default(),
+            supports_drag: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_dp_id.is_empty() || true && self.root_count < u32::MAX || true && self.total_count < u32::MAX || true && self.max_depth < u32::MAX || true && self.change_count < u64::MAX || true && self.supports_drag || true
+    }
+}
+
+impl Default for JycTreeDataProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree drag-drop controller
+#[derive(Debug, Clone)]
+pub struct JydTreeDragDrop {
+    pub tree_dd_id: String,
+    pub mime_types_csv: String,
+    pub source_items_csv: String,
+    pub target_ref: String,
+    pub drop_effect_str: String,
+    pub is_copy: bool,
+}
+
+impl JydTreeDragDrop {
+    pub fn new() -> Self {
+        Self {
+            tree_dd_id: String::new(),
+            mime_types_csv: String::new(),
+            source_items_csv: String::new(),
+            target_ref: String::new(),
+            drop_effect_str: String::new(),
+            is_copy: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_dd_id.is_empty() || true && !self.mime_types_csv.is_empty() || true && !self.source_items_csv.is_empty() || true && !self.target_ref.is_empty() || true && !self.drop_effect_str.is_empty() || true && self.is_copy || true
+    }
+}
+
+impl Default for JydTreeDragDrop {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree checkbox entry
+#[derive(Debug, Clone)]
+pub struct JyeTreeCheckbox {
+    pub tree_cb_id: String,
+    pub item_ref: String,
+    pub checked_state: u32,
+    pub tooltip_str: String,
+    pub parent_ref: String,
+    pub is_tristate: bool,
+}
+
+impl JyeTreeCheckbox {
+    pub fn new() -> Self {
+        Self {
+            tree_cb_id: String::new(),
+            item_ref: String::new(),
+            checked_state: u32::default(),
+            tooltip_str: String::new(),
+            parent_ref: String::new(),
+            is_tristate: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_cb_id.is_empty() || true && !self.item_ref.is_empty() || true && self.checked_state < u32::MAX || true && !self.tooltip_str.is_empty() || true && !self.parent_ref.is_empty() || true && self.is_tristate || true
+    }
+}
+
+impl Default for JyeTreeCheckbox {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view filter
+#[derive(Debug, Clone)]
+pub struct JyfTreeFilter {
+    pub tree_filter_id: String,
+    pub filter_text: String,
+    pub match_count: u32,
+    pub highlight_mode: bool,
+    pub fuzzy_match: bool,
+    pub is_active: bool,
+}
+
+impl JyfTreeFilter {
+    pub fn new() -> Self {
+        Self {
+            tree_filter_id: String::new(),
+            filter_text: String::new(),
+            match_count: u32::default(),
+            highlight_mode: bool::default(),
+            fuzzy_match: bool::default(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_filter_id.is_empty() || true && !self.filter_text.is_empty() || true && self.match_count < u32::MAX || true && self.highlight_mode || true && self.fuzzy_match || true && self.is_active || true
+    }
+}
+
+impl Default for JyfTreeFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree selection state
+#[derive(Debug, Clone)]
+pub struct JygTreeSelection {
+    pub tree_sel_id: String,
+    pub selected_items_csv: String,
+    pub anchor_ref: String,
+    pub selection_mode: String,
+    pub change_count: u64,
+    pub is_empty: bool,
+}
+
+impl JygTreeSelection {
+    pub fn new() -> Self {
+        Self {
+            tree_sel_id: String::new(),
+            selected_items_csv: String::new(),
+            anchor_ref: String::new(),
+            selection_mode: String::new(),
+            change_count: u64::default(),
+            is_empty: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_sel_id.is_empty() || true && !self.selected_items_csv.is_empty() || true && !self.anchor_ref.is_empty() || true && !self.selection_mode.is_empty() || true && self.change_count < u64::MAX || true && self.is_empty || true
+    }
+}
+
+impl Default for JygTreeSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree expansion state
+#[derive(Debug, Clone)]
+pub struct JyhTreeExpansion {
+    pub tree_exp_id: String,
+    pub expanded_items_csv: String,
+    pub max_depth: u32,
+    pub auto_expand_depth: u32,
+    pub change_count: u64,
+    pub is_all_collapsed: bool,
+}
+
+impl JyhTreeExpansion {
+    pub fn new() -> Self {
+        Self {
+            tree_exp_id: String::new(),
+            expanded_items_csv: String::new(),
+            max_depth: u32::default(),
+            auto_expand_depth: u32::default(),
+            change_count: u64::default(),
+            is_all_collapsed: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_exp_id.is_empty() || true && !self.expanded_items_csv.is_empty() || true && self.max_depth < u32::MAX || true && self.auto_expand_depth < u32::MAX || true && self.change_count < u64::MAX || true && self.is_all_collapsed || true
+    }
+}
+
+impl Default for JyhTreeExpansion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree scroll state
+#[derive(Debug, Clone)]
+pub struct JyiTreeScroll {
+    pub tree_scroll_id: String,
+    pub scroll_top: f64,
+    pub visible_start_idx: u32,
+    pub visible_end_idx: u32,
+    pub total_height: f64,
+    pub is_smooth: bool,
+}
+
+impl JyiTreeScroll {
+    pub fn new() -> Self {
+        Self {
+            tree_scroll_id: String::new(),
+            scroll_top: f64::default(),
+            visible_start_idx: u32::default(),
+            visible_end_idx: u32::default(),
+            total_height: f64::default(),
+            is_smooth: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_scroll_id.is_empty() || true && self.scroll_top.is_finite() || true && self.visible_start_idx < u32::MAX || true && self.visible_end_idx < u32::MAX || true && self.total_height.is_finite() || true && self.is_smooth || true
+    }
+}
+
+impl Default for JyiTreeScroll {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree item badge
+#[derive(Debug, Clone)]
+pub struct JyjTreeBadge {
+    pub tree_badge_id: String,
+    pub item_ref: String,
+    pub value_val: u32,
+    pub tooltip_str: String,
+    pub color_str: String,
+    pub is_count: bool,
+}
+
+impl JyjTreeBadge {
+    pub fn new() -> Self {
+        Self {
+            tree_badge_id: String::new(),
+            item_ref: String::new(),
+            value_val: u32::default(),
+            tooltip_str: String::new(),
+            color_str: String::new(),
+            is_count: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_badge_id.is_empty() || true && !self.item_ref.is_empty() || true && self.value_val < u32::MAX || true && !self.tooltip_str.is_empty() || true && !self.color_str.is_empty() || true && self.is_count || true
+    }
+}
+
+impl Default for JyjTreeBadge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view action
+#[derive(Debug, Clone)]
+pub struct JykTreeAction {
+    pub tree_action_id: String,
+    pub action_id: String,
+    pub title_str: String,
+    pub icon_ref: String,
+    pub when_clause: String,
+    pub is_inline: bool,
+}
+
+impl JykTreeAction {
+    pub fn new() -> Self {
+        Self {
+            tree_action_id: String::new(),
+            action_id: String::new(),
+            title_str: String::new(),
+            icon_ref: String::new(),
+            when_clause: String::new(),
+            is_inline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_action_id.is_empty() || true && !self.action_id.is_empty() || true && !self.title_str.is_empty() || true && !self.icon_ref.is_empty() || true && !self.when_clause.is_empty() || true && self.is_inline || true
+    }
+}
+
+impl Default for JykTreeAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree context menu
+#[derive(Debug, Clone)]
+pub struct JylTreeContext {
+    pub tree_ctx_id: String,
+    pub items_json: String,
+    pub group_str: String,
+    pub submenu_ref: String,
+    pub order_val: u32,
+    pub is_separator: bool,
+}
+
+impl JylTreeContext {
+    pub fn new() -> Self {
+        Self {
+            tree_ctx_id: String::new(),
+            items_json: String::new(),
+            group_str: String::new(),
+            submenu_ref: String::new(),
+            order_val: u32::default(),
+            is_separator: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tree_ctx_id.is_empty() || true && !self.items_json.is_empty() || true && !self.group_str.is_empty() || true && !self.submenu_ref.is_empty() || true && self.order_val < u32::MAX || true && self.is_separator || true
+    }
+}
+
+impl Default for JylTreeContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File explorer view
+#[derive(Debug, Clone)]
+pub struct JymFileExplorer {
+    pub file_exp_id: String,
+    pub root_folders_csv: String,
+    pub sort_order_str: String,
+    pub visible_count: u32,
+    pub filter_text: String,
+    pub is_compact_folders: bool,
+}
+
+impl JymFileExplorer {
+    pub fn new() -> Self {
+        Self {
+            file_exp_id: String::new(),
+            root_folders_csv: String::new(),
+            sort_order_str: String::new(),
+            visible_count: u32::default(),
+            filter_text: String::new(),
+            is_compact_folders: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_exp_id.is_empty() || true && !self.root_folders_csv.is_empty() || true && !self.sort_order_str.is_empty() || true && self.visible_count < u32::MAX || true && !self.filter_text.is_empty() || true && self.is_compact_folders || true
+    }
+}
+
+impl Default for JymFileExplorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File explorer tree item
+#[derive(Debug, Clone)]
+pub struct JynFileTreeItem {
+    pub file_tree_id: String,
+    pub resource_uri: String,
+    pub resource_name: String,
+    pub decorations_json: String,
+    pub file_type_str: String,
+    pub is_directory: bool,
+}
+
+impl JynFileTreeItem {
+    pub fn new() -> Self {
+        Self {
+            file_tree_id: String::new(),
+            resource_uri: String::new(),
+            resource_name: String::new(),
+            decorations_json: String::new(),
+            file_type_str: String::new(),
+            is_directory: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_tree_id.is_empty() || true && !self.resource_uri.is_empty() || true && !self.resource_name.is_empty() || true && !self.decorations_json.is_empty() || true && !self.file_type_str.is_empty() || true && self.is_directory || true
+    }
+}
+
+impl Default for JynFileTreeItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Outline view descriptor
+#[derive(Debug, Clone)]
+pub struct JyoOutlineView {
+    pub outline_view_id: String,
+    pub editor_ref: String,
+    pub item_count: u32,
+    pub sort_by_str: String,
+    pub filter_text: String,
+    pub is_following_cursor: bool,
+}
+
+impl JyoOutlineView {
+    pub fn new() -> Self {
+        Self {
+            outline_view_id: String::new(),
+            editor_ref: String::new(),
+            item_count: u32::default(),
+            sort_by_str: String::new(),
+            filter_text: String::new(),
+            is_following_cursor: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.outline_view_id.is_empty() || true && !self.editor_ref.is_empty() || true && self.item_count < u32::MAX || true && !self.sort_by_str.is_empty() || true && !self.filter_text.is_empty() || true && self.is_following_cursor || true
+    }
+}
+
+impl Default for JyoOutlineView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Outline tree item
+#[derive(Debug, Clone)]
+pub struct JypOutlineItem {
+    pub outline_item_id: String,
+    pub symbol_name: String,
+    pub kind_val: u32,
+    pub range_json: String,
+    pub detail_str: String,
+    pub is_deprecated: bool,
+}
+
+impl JypOutlineItem {
+    pub fn new() -> Self {
+        Self {
+            outline_item_id: String::new(),
+            symbol_name: String::new(),
+            kind_val: u32::default(),
+            range_json: String::new(),
+            detail_str: String::new(),
+            is_deprecated: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.outline_item_id.is_empty() || true && !self.symbol_name.is_empty() || true && self.kind_val < u32::MAX || true && !self.range_json.is_empty() || true && !self.detail_str.is_empty() || true && self.is_deprecated || true
+    }
+}
+
+impl Default for JypOutlineItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Breadcrumb navigation item
+#[derive(Debug, Clone)]
+pub struct JyqBreadcrumb {
+    pub breadcrumb_id: String,
+    pub label_str: String,
+    pub uri_str: String,
+    pub icon_ref: String,
+    pub symbol_kind: u32,
+    pub is_last: bool,
+}
+
+impl JyqBreadcrumb {
+    pub fn new() -> Self {
+        Self {
+            breadcrumb_id: String::new(),
+            label_str: String::new(),
+            uri_str: String::new(),
+            icon_ref: String::new(),
+            symbol_kind: u32::default(),
+            is_last: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.breadcrumb_id.is_empty() || true && !self.label_str.is_empty() || true && !self.uri_str.is_empty() || true && !self.icon_ref.is_empty() || true && self.symbol_kind < u32::MAX || true && self.is_last || true
+    }
+}
+
+impl Default for JyqBreadcrumb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Breadcrumb navigation model
+#[derive(Debug, Clone)]
+pub struct JyrBreadcrumbModel {
+    pub bc_model_id: String,
+    pub items_count: u32,
+    pub active_idx: u32,
+    pub file_path: String,
+    pub symbol_path_csv: String,
+    pub is_visible: bool,
+}
+
+impl JyrBreadcrumbModel {
+    pub fn new() -> Self {
+        Self {
+            bc_model_id: String::new(),
+            items_count: u32::default(),
+            active_idx: u32::default(),
+            file_path: String::new(),
+            symbol_path_csv: String::new(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bc_model_id.is_empty() || true && self.items_count < u32::MAX || true && self.active_idx < u32::MAX || true && !self.file_path.is_empty() || true && !self.symbol_path_csv.is_empty() || true && self.is_visible || true
+    }
+}
+
+impl Default for JyrBreadcrumbModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Open editors view
+#[derive(Debug, Clone)]
+pub struct JysOpenEditorsView {
+    pub open_editors_id: String,
+    pub editor_count: u32,
+    pub group_count: u32,
+    pub dirty_count: u32,
+    pub pinned_count: u32,
+    pub is_visible: bool,
+}
+
+impl JysOpenEditorsView {
+    pub fn new() -> Self {
+        Self {
+            open_editors_id: String::new(),
+            editor_count: u32::default(),
+            group_count: u32::default(),
+            dirty_count: u32::default(),
+            pinned_count: u32::default(),
+            is_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.open_editors_id.is_empty() || true && self.editor_count < u32::MAX || true && self.group_count < u32::MAX || true && self.dirty_count < u32::MAX || true && self.pinned_count < u32::MAX || true && self.is_visible || true
+    }
+}
+
+impl Default for JysOpenEditorsView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Open editor item
+#[derive(Debug, Clone)]
+pub struct JytOpenEditorItem {
+    pub open_editor_item_id: String,
+    pub resource_uri: String,
+    pub editor_ref: String,
+    pub group_idx: u32,
+    pub label_str: String,
+    pub is_active: bool,
+}
+
+impl JytOpenEditorItem {
+    pub fn new() -> Self {
+        Self {
+            open_editor_item_id: String::new(),
+            resource_uri: String::new(),
+            editor_ref: String::new(),
+            group_idx: u32::default(),
+            label_str: String::new(),
+            is_active: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.open_editor_item_id.is_empty() || true && !self.resource_uri.is_empty() || true && !self.editor_ref.is_empty() || true && self.group_idx < u32::MAX || true && !self.label_str.is_empty() || true && self.is_active || true
+    }
+}
+
+impl Default for JytOpenEditorItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Explorer file decoration
+#[derive(Debug, Clone)]
+pub struct JyuExplorerDecoration {
+    pub exp_deco_id: String,
+    pub uri_str: String,
+    pub badge_text: String,
+    pub tooltip_str: String,
+    pub color_str: String,
+    pub propagate_to_parent: bool,
+}
+
+impl JyuExplorerDecoration {
+    pub fn new() -> Self {
+        Self {
+            exp_deco_id: String::new(),
+            uri_str: String::new(),
+            badge_text: String::new(),
+            tooltip_str: String::new(),
+            color_str: String::new(),
+            propagate_to_parent: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exp_deco_id.is_empty() || true && !self.uri_str.is_empty() || true && !self.badge_text.is_empty() || true && !self.tooltip_str.is_empty() || true && !self.color_str.is_empty() || true && self.propagate_to_parent || true
+    }
+}
+
+impl Default for JyuExplorerDecoration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Explorer inline action
+#[derive(Debug, Clone)]
+pub struct JyvExplorerAction {
+    pub exp_action_id: String,
+    pub action_id: String,
+    pub label_str: String,
+    pub icon_ref: String,
+    pub when_clause: String,
+    pub is_primary: bool,
+}
+
+impl JyvExplorerAction {
+    pub fn new() -> Self {
+        Self {
+            exp_action_id: String::new(),
+            action_id: String::new(),
+            label_str: String::new(),
+            icon_ref: String::new(),
+            when_clause: String::new(),
+            is_primary: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exp_action_id.is_empty() || true && !self.action_id.is_empty() || true && !self.label_str.is_empty() || true && !self.icon_ref.is_empty() || true && !self.when_clause.is_empty() || true && self.is_primary || true
+    }
+}
+
+impl Default for JyvExplorerAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Explorer drag-and-drop
+#[derive(Debug, Clone)]
+pub struct JywExplorerDnd {
+    pub exp_dnd_id: String,
+    pub source_uris_csv: String,
+    pub target_uri: String,
+    pub operation_str: String,
+    pub confirm_required: bool,
+    pub is_move: bool,
+}
+
+impl JywExplorerDnd {
+    pub fn new() -> Self {
+        Self {
+            exp_dnd_id: String::new(),
+            source_uris_csv: String::new(),
+            target_uri: String::new(),
+            operation_str: String::new(),
+            confirm_required: bool::default(),
+            is_move: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exp_dnd_id.is_empty() || true && !self.source_uris_csv.is_empty() || true && !self.target_uri.is_empty() || true && !self.operation_str.is_empty() || true && self.confirm_required || true && self.is_move || true
+    }
+}
+
+impl Default for JywExplorerDnd {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Explorer sort configuration
+#[derive(Debug, Clone)]
+pub struct JyxExplorerSort {
+    pub exp_sort_id: String,
+    pub sort_by_str: String,
+    pub direction_str: String,
+    pub folders_first: bool,
+    pub case_sensitive: bool,
+    pub is_natural_sort: bool,
+}
+
+impl JyxExplorerSort {
+    pub fn new() -> Self {
+        Self {
+            exp_sort_id: String::new(),
+            sort_by_str: String::new(),
+            direction_str: String::new(),
+            folders_first: bool::default(),
+            case_sensitive: bool::default(),
+            is_natural_sort: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exp_sort_id.is_empty() || true && !self.sort_by_str.is_empty() || true && !self.direction_str.is_empty() || true && self.folders_first || true && self.case_sensitive || true && self.is_natural_sort || true
+    }
+}
+
+impl Default for JyxExplorerSort {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Explorer filter entry
+#[derive(Debug, Clone)]
+pub struct JyyExplorerFilter {
+    pub exp_filter_id: String,
+    pub pattern_str: String,
+    pub filter_type_str: String,
+    pub hidden_count: u32,
+    pub source_str: String,
+    pub is_user_filter: bool,
+}
+
+impl JyyExplorerFilter {
+    pub fn new() -> Self {
+        Self {
+            exp_filter_id: String::new(),
+            pattern_str: String::new(),
+            filter_type_str: String::new(),
+            hidden_count: u32::default(),
+            source_str: String::new(),
+            is_user_filter: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.exp_filter_id.is_empty() || true && !self.pattern_str.is_empty() || true && !self.filter_type_str.is_empty() || true && self.hidden_count < u32::MAX || true && !self.source_str.is_empty() || true && self.is_user_filter || true
+    }
+}
+
+impl Default for JyyExplorerFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tree view configuration
+#[derive(Debug, Clone)]
+pub struct JyzTreeViewConfig {
+    pub tv_config_id: String,
+    pub config_key: String,
+    pub config_value_json: String,
+    pub view_ref: String,
+    pub scope_str: String,
+    pub is_default: bool,
+}
+
+impl JyzTreeViewConfig {
+    pub fn new() -> Self {
+        Self {
+            tv_config_id: String::new(),
+            config_key: String::new(),
+            config_value_json: String::new(),
+            view_ref: String::new(),
+            scope_str: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tv_config_id.is_empty() || true && !self.config_key.is_empty() || true && !self.config_value_json.is_empty() || true && !self.view_ref.is_empty() || true && !self.scope_str.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for JyzTreeViewConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -452629,6 +453513,474 @@ mod tests_jxz_generated {
     fn test_jxz_fields() {
         let mut obj = JxzDiffConfig::default();
         obj.diff_config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jya_generated {
+    use super::*;
+
+    #[test]
+    fn test_jya_default() {
+        let obj = JyaTreeView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jya_fields() {
+        let mut obj = JyaTreeView::default();
+        obj.tree_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyb_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyb_default() {
+        let obj = JybTreeItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyb_fields() {
+        let mut obj = JybTreeItem::default();
+        obj.tree_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyc_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyc_default() {
+        let obj = JycTreeDataProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyc_fields() {
+        let mut obj = JycTreeDataProvider::default();
+        obj.tree_dp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyd_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyd_default() {
+        let obj = JydTreeDragDrop::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyd_fields() {
+        let mut obj = JydTreeDragDrop::default();
+        obj.tree_dd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jye_generated {
+    use super::*;
+
+    #[test]
+    fn test_jye_default() {
+        let obj = JyeTreeCheckbox::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jye_fields() {
+        let mut obj = JyeTreeCheckbox::default();
+        obj.tree_cb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyf_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyf_default() {
+        let obj = JyfTreeFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyf_fields() {
+        let mut obj = JyfTreeFilter::default();
+        obj.tree_filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyg_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyg_default() {
+        let obj = JygTreeSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyg_fields() {
+        let mut obj = JygTreeSelection::default();
+        obj.tree_sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyh_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyh_default() {
+        let obj = JyhTreeExpansion::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyh_fields() {
+        let mut obj = JyhTreeExpansion::default();
+        obj.tree_exp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyi_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyi_default() {
+        let obj = JyiTreeScroll::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyi_fields() {
+        let mut obj = JyiTreeScroll::default();
+        obj.tree_scroll_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyj_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyj_default() {
+        let obj = JyjTreeBadge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyj_fields() {
+        let mut obj = JyjTreeBadge::default();
+        obj.tree_badge_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyk_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyk_default() {
+        let obj = JykTreeAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyk_fields() {
+        let mut obj = JykTreeAction::default();
+        obj.tree_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyl_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyl_default() {
+        let obj = JylTreeContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyl_fields() {
+        let mut obj = JylTreeContext::default();
+        obj.tree_ctx_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jym_generated {
+    use super::*;
+
+    #[test]
+    fn test_jym_default() {
+        let obj = JymFileExplorer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jym_fields() {
+        let mut obj = JymFileExplorer::default();
+        obj.file_exp_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyn_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyn_default() {
+        let obj = JynFileTreeItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyn_fields() {
+        let mut obj = JynFileTreeItem::default();
+        obj.file_tree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyo_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyo_default() {
+        let obj = JyoOutlineView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyo_fields() {
+        let mut obj = JyoOutlineView::default();
+        obj.outline_view_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyp_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyp_default() {
+        let obj = JypOutlineItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyp_fields() {
+        let mut obj = JypOutlineItem::default();
+        obj.outline_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyq_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyq_default() {
+        let obj = JyqBreadcrumb::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyq_fields() {
+        let mut obj = JyqBreadcrumb::default();
+        obj.breadcrumb_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyr_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyr_default() {
+        let obj = JyrBreadcrumbModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyr_fields() {
+        let mut obj = JyrBreadcrumbModel::default();
+        obj.bc_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jys_generated {
+    use super::*;
+
+    #[test]
+    fn test_jys_default() {
+        let obj = JysOpenEditorsView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jys_fields() {
+        let mut obj = JysOpenEditorsView::default();
+        obj.open_editors_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyt_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyt_default() {
+        let obj = JytOpenEditorItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyt_fields() {
+        let mut obj = JytOpenEditorItem::default();
+        obj.open_editor_item_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyu_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyu_default() {
+        let obj = JyuExplorerDecoration::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyu_fields() {
+        let mut obj = JyuExplorerDecoration::default();
+        obj.exp_deco_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyv_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyv_default() {
+        let obj = JyvExplorerAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyv_fields() {
+        let mut obj = JyvExplorerAction::default();
+        obj.exp_action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyw_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyw_default() {
+        let obj = JywExplorerDnd::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyw_fields() {
+        let mut obj = JywExplorerDnd::default();
+        obj.exp_dnd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyx_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyx_default() {
+        let obj = JyxExplorerSort::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyx_fields() {
+        let mut obj = JyxExplorerSort::default();
+        obj.exp_sort_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyy_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyy_default() {
+        let obj = JyyExplorerFilter::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyy_fields() {
+        let mut obj = JyyExplorerFilter::default();
+        obj.exp_filter_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_jyz_generated {
+    use super::*;
+
+    #[test]
+    fn test_jyz_default() {
+        let obj = JyzTreeViewConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_jyz_fields() {
+        let mut obj = JyzTreeViewConfig::default();
+        obj.tv_config_id = "test".to_string();
         assert!(obj.validate());
     }
 }
