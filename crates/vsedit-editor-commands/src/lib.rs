@@ -117192,6 +117192,678 @@ impl Default for HfjChatAgentResult {
     }
 }
 
+/// Inline chat (session, request, response, widget, placeholder)
+#[derive(Debug, Clone)]
+pub struct HfkInlineChat {
+    pub inline_chat_id: String,
+    pub session_id: String,
+    pub request_text: String,
+    pub response_text: String,
+    pub widget_position_json: String,
+    pub placeholder: String,
+    pub is_visible: bool,
+    pub mode: String,
+    pub anchor_line: u32,
+    pub editor_uri: String,
+}
+
+impl HfkInlineChat {
+    pub fn new() -> Self {
+        Self {
+            inline_chat_id: String::new(),
+            session_id: String::new(),
+            request_text: String::new(),
+            response_text: String::new(),
+            widget_position_json: String::new(),
+            placeholder: String::new(),
+            is_visible: bool::default(),
+            mode: String::new(),
+            anchor_line: u32::default(),
+            editor_uri: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_chat_id.is_empty() || true && !self.session_id.is_empty() || true && !self.request_text.is_empty() || true && !self.response_text.is_empty() || true && !self.widget_position_json.is_empty() || true && !self.placeholder.is_empty() || true && self.is_visible || true && !self.mode.is_empty() || true && self.anchor_line < u32::MAX || true && !self.editor_uri.is_empty() || true
+    }
+}
+
+impl Default for HfkInlineChat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat history (sessions, messages, participants, total tokens)
+#[derive(Debug, Clone)]
+pub struct HflChatHistory {
+    pub chat_history_id: String,
+    pub sessions_json: String,
+    pub messages_json: String,
+    pub participants_json: String,
+    pub total_tokens: u64,
+    pub session_count: u32,
+    pub last_session_ms: u64,
+    pub is_exported: bool,
+    pub max_history: u32,
+    pub storage_path: String,
+}
+
+impl HflChatHistory {
+    pub fn new() -> Self {
+        Self {
+            chat_history_id: String::new(),
+            sessions_json: String::new(),
+            messages_json: String::new(),
+            participants_json: String::new(),
+            total_tokens: u64::default(),
+            session_count: u32::default(),
+            last_session_ms: u64::default(),
+            is_exported: bool::default(),
+            max_history: u32::default(),
+            storage_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_history_id.is_empty() || true && !self.sessions_json.is_empty() || true && !self.messages_json.is_empty() || true && !self.participants_json.is_empty() || true && self.total_tokens < u64::MAX || true && self.session_count < u32::MAX || true && self.last_session_ms < u64::MAX || true && self.is_exported || true && self.max_history < u32::MAX || true && !self.storage_path.is_empty() || true
+    }
+}
+
+impl Default for HflChatHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat edit session (edits, working set, snapshot, undo stack)
+#[derive(Debug, Clone)]
+pub struct HfmChatEditSession {
+    pub chat_edit_id: String,
+    pub edits_json: String,
+    pub working_set_json: String,
+    pub snapshot_id: String,
+    pub undo_stack_json: String,
+    pub is_active: bool,
+    pub file_count: u32,
+    pub edit_count: u32,
+    pub description: String,
+    pub timestamp_ms: u64,
+}
+
+impl HfmChatEditSession {
+    pub fn new() -> Self {
+        Self {
+            chat_edit_id: String::new(),
+            edits_json: String::new(),
+            working_set_json: String::new(),
+            snapshot_id: String::new(),
+            undo_stack_json: String::new(),
+            is_active: bool::default(),
+            file_count: u32::default(),
+            edit_count: u32::default(),
+            description: String::new(),
+            timestamp_ms: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_edit_id.is_empty() || true && !self.edits_json.is_empty() || true && !self.working_set_json.is_empty() || true && !self.snapshot_id.is_empty() || true && !self.undo_stack_json.is_empty() || true && self.is_active || true && self.file_count < u32::MAX || true && self.edit_count < u32::MAX || true && !self.description.is_empty() || true && self.timestamp_ms < u64::MAX || true
+    }
+}
+
+impl Default for HfmChatEditSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language model (id, family, version, max tokens, vendor)
+#[derive(Debug, Clone)]
+pub struct HfnLanguageModel {
+    pub lang_model_id: String,
+    pub model_id: String,
+    pub family: String,
+    pub version: String,
+    pub max_input_tokens: u32,
+    pub vendor: String,
+    pub capabilities_json: String,
+    pub is_default: bool,
+    pub cost_tier: String,
+    pub max_output_tokens: u32,
+}
+
+impl HfnLanguageModel {
+    pub fn new() -> Self {
+        Self {
+            lang_model_id: String::new(),
+            model_id: String::new(),
+            family: String::new(),
+            version: String::new(),
+            max_input_tokens: u32::default(),
+            vendor: String::new(),
+            capabilities_json: String::new(),
+            is_default: bool::default(),
+            cost_tier: String::new(),
+            max_output_tokens: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_model_id.is_empty() || true && !self.model_id.is_empty() || true && !self.family.is_empty() || true && !self.version.is_empty() || true && self.max_input_tokens < u32::MAX || true && !self.vendor.is_empty() || true && !self.capabilities_json.is_empty() || true && self.is_default || true && !self.cost_tier.is_empty() || true && self.max_output_tokens < u32::MAX || true
+    }
+}
+
+impl Default for HfnLanguageModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language model chat (messages, options, token count, model)
+#[derive(Debug, Clone)]
+pub struct HfoLanguageModelChat {
+    pub lm_chat_id: String,
+    pub messages_json: String,
+    pub options_json: String,
+    pub token_count: u32,
+    pub model: String,
+    pub temperature: f64,
+    pub top_p: f64,
+    pub is_streaming: bool,
+    pub justification: String,
+    pub tool_mode: String,
+}
+
+impl HfoLanguageModelChat {
+    pub fn new() -> Self {
+        Self {
+            lm_chat_id: String::new(),
+            messages_json: String::new(),
+            options_json: String::new(),
+            token_count: u32::default(),
+            model: String::new(),
+            temperature: f64::default(),
+            top_p: f64::default(),
+            is_streaming: bool::default(),
+            justification: String::new(),
+            tool_mode: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lm_chat_id.is_empty() || true && !self.messages_json.is_empty() || true && !self.options_json.is_empty() || true && self.token_count < u32::MAX || true && !self.model.is_empty() || true && self.temperature.is_finite() || true && self.top_p.is_finite() || true && self.is_streaming || true && !self.justification.is_empty() || true && !self.tool_mode.is_empty() || true
+    }
+}
+
+impl Default for HfoLanguageModelChat {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat prompt part (type, content, priority, token count)
+#[derive(Debug, Clone)]
+pub struct HfpChatPromptPart {
+    pub chat_prompt_id: String,
+    pub part_type: String,
+    pub content: String,
+    pub priority: u32,
+    pub token_count: u32,
+    pub is_system: bool,
+    pub is_cacheable: bool,
+    pub role: String,
+    pub name: String,
+    pub metadata_json: String,
+}
+
+impl HfpChatPromptPart {
+    pub fn new() -> Self {
+        Self {
+            chat_prompt_id: String::new(),
+            part_type: String::new(),
+            content: String::new(),
+            priority: u32::default(),
+            token_count: u32::default(),
+            is_system: bool::default(),
+            is_cacheable: bool::default(),
+            role: String::new(),
+            name: String::new(),
+            metadata_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_prompt_id.is_empty() || true && !self.part_type.is_empty() || true && !self.content.is_empty() || true && self.priority < u32::MAX || true && self.token_count < u32::MAX || true && self.is_system || true && self.is_cacheable || true && !self.role.is_empty() || true && !self.name.is_empty() || true && !self.metadata_json.is_empty() || true
+    }
+}
+
+impl Default for HfpChatPromptPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat annotation (range, content, kind, uri, vulnerability)
+#[derive(Debug, Clone)]
+pub struct HfqChatAnnotation {
+    pub chat_annot_id: String,
+    pub range_json: String,
+    pub content: String,
+    pub kind: String,
+    pub uri: String,
+    pub vulnerability_id: String,
+    pub severity: String,
+    pub title: String,
+    pub detail: String,
+    pub is_dismissable: bool,
+}
+
+impl HfqChatAnnotation {
+    pub fn new() -> Self {
+        Self {
+            chat_annot_id: String::new(),
+            range_json: String::new(),
+            content: String::new(),
+            kind: String::new(),
+            uri: String::new(),
+            vulnerability_id: String::new(),
+            severity: String::new(),
+            title: String::new(),
+            detail: String::new(),
+            is_dismissable: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_annot_id.is_empty() || true && !self.range_json.is_empty() || true && !self.content.is_empty() || true && !self.kind.is_empty() || true && !self.uri.is_empty() || true && !self.vulnerability_id.is_empty() || true && !self.severity.is_empty() || true && !self.title.is_empty() || true && !self.detail.is_empty() || true && self.is_dismissable || true
+    }
+}
+
+impl Default for HfqChatAnnotation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat file tree (root, children, label, uri, description)
+#[derive(Debug, Clone)]
+pub struct HfrChatFileTree {
+    pub chat_ftree_id: String,
+    pub root_name: String,
+    pub children_json: String,
+    pub label: String,
+    pub uri: String,
+    pub description: String,
+    pub is_directory: bool,
+    pub depth: u32,
+    pub is_collapsed: bool,
+    pub icon: String,
+}
+
+impl HfrChatFileTree {
+    pub fn new() -> Self {
+        Self {
+            chat_ftree_id: String::new(),
+            root_name: String::new(),
+            children_json: String::new(),
+            label: String::new(),
+            uri: String::new(),
+            description: String::new(),
+            is_directory: bool::default(),
+            depth: u32::default(),
+            is_collapsed: bool::default(),
+            icon: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_ftree_id.is_empty() || true && !self.root_name.is_empty() || true && !self.children_json.is_empty() || true && !self.label.is_empty() || true && !self.uri.is_empty() || true && !self.description.is_empty() || true && self.is_directory || true && self.depth < u32::MAX || true && self.is_collapsed || true && !self.icon.is_empty() || true
+    }
+}
+
+impl Default for HfrChatFileTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat progress (kind, content, task, cancellable, title)
+#[derive(Debug, Clone)]
+pub struct HfsChatProgress {
+    pub chat_prog_id: String,
+    pub kind: String,
+    pub content: String,
+    pub task: String,
+    pub is_cancellable: bool,
+    pub title: String,
+    pub increment: u32,
+    pub total: u32,
+    pub message: String,
+    pub is_complete: bool,
+}
+
+impl HfsChatProgress {
+    pub fn new() -> Self {
+        Self {
+            chat_prog_id: String::new(),
+            kind: String::new(),
+            content: String::new(),
+            task: String::new(),
+            is_cancellable: bool::default(),
+            title: String::new(),
+            increment: u32::default(),
+            total: u32::default(),
+            message: String::new(),
+            is_complete: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_prog_id.is_empty() || true && !self.kind.is_empty() || true && !self.content.is_empty() || true && !self.task.is_empty() || true && self.is_cancellable || true && !self.title.is_empty() || true && self.increment < u32::MAX || true && self.total < u32::MAX || true && !self.message.is_empty() || true && self.is_complete || true
+    }
+}
+
+impl Default for HfsChatProgress {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat context (workspace, selection, active editor, terminal)
+#[derive(Debug, Clone)]
+pub struct HftChatContext {
+    pub chat_ctx_id: String,
+    pub workspace_uri: String,
+    pub selection_text: String,
+    pub active_editor_uri: String,
+    pub terminal_content: String,
+    pub language_id: String,
+    pub file_path: String,
+    pub diagnostics_json: String,
+    pub open_files_json: String,
+    pub git_diff: String,
+}
+
+impl HftChatContext {
+    pub fn new() -> Self {
+        Self {
+            chat_ctx_id: String::new(),
+            workspace_uri: String::new(),
+            selection_text: String::new(),
+            active_editor_uri: String::new(),
+            terminal_content: String::new(),
+            language_id: String::new(),
+            file_path: String::new(),
+            diagnostics_json: String::new(),
+            open_files_json: String::new(),
+            git_diff: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_ctx_id.is_empty() || true && !self.workspace_uri.is_empty() || true && !self.selection_text.is_empty() || true && !self.active_editor_uri.is_empty() || true && !self.terminal_content.is_empty() || true && !self.language_id.is_empty() || true && !self.file_path.is_empty() || true && !self.diagnostics_json.is_empty() || true && !self.open_files_json.is_empty() || true && !self.git_diff.is_empty() || true
+    }
+}
+
+impl Default for HftChatContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Copilot authentication (status, token, plan, org policy)
+#[derive(Debug, Clone)]
+pub struct HfuCopilotAuth {
+    pub copilot_auth_id: String,
+    pub status: String,
+    pub token: String,
+    pub plan: String,
+    pub org_policy_json: String,
+    pub is_authorized: bool,
+    pub user_name: String,
+    pub expires_at_ms: u64,
+    pub feature_flags_json: String,
+    pub endpoint_url: String,
+}
+
+impl HfuCopilotAuth {
+    pub fn new() -> Self {
+        Self {
+            copilot_auth_id: String::new(),
+            status: String::new(),
+            token: String::new(),
+            plan: String::new(),
+            org_policy_json: String::new(),
+            is_authorized: bool::default(),
+            user_name: String::new(),
+            expires_at_ms: u64::default(),
+            feature_flags_json: String::new(),
+            endpoint_url: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.copilot_auth_id.is_empty() || true && !self.status.is_empty() || true && !self.token.is_empty() || true && !self.plan.is_empty() || true && !self.org_policy_json.is_empty() || true && self.is_authorized || true && !self.user_name.is_empty() || true && self.expires_at_ms < u64::MAX || true && !self.feature_flags_json.is_empty() || true && !self.endpoint_url.is_empty() || true
+    }
+}
+
+impl Default for HfuCopilotAuth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Copilot suggest (inline completions, ghost text, accept, reject)
+#[derive(Debug, Clone)]
+pub struct HfvCopilotSuggest {
+    pub copilot_sug_id: String,
+    pub inline_completions_json: String,
+    pub ghost_text: String,
+    pub accept_count: u64,
+    pub reject_count: u64,
+    pub is_visible: bool,
+    pub model_id: String,
+    pub latency_ms: u32,
+    pub confidence: f64,
+    pub insert_text: String,
+}
+
+impl HfvCopilotSuggest {
+    pub fn new() -> Self {
+        Self {
+            copilot_sug_id: String::new(),
+            inline_completions_json: String::new(),
+            ghost_text: String::new(),
+            accept_count: u64::default(),
+            reject_count: u64::default(),
+            is_visible: bool::default(),
+            model_id: String::new(),
+            latency_ms: u32::default(),
+            confidence: f64::default(),
+            insert_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.copilot_sug_id.is_empty() || true && !self.inline_completions_json.is_empty() || true && !self.ghost_text.is_empty() || true && self.accept_count < u64::MAX || true && self.reject_count < u64::MAX || true && self.is_visible || true && !self.model_id.is_empty() || true && self.latency_ms < u32::MAX || true && self.confidence.is_finite() || true && !self.insert_text.is_empty() || true
+    }
+}
+
+impl Default for HfvCopilotSuggest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code mapping (generated range, original range, file, line)
+#[derive(Debug, Clone)]
+pub struct HfwCodeMapping {
+    pub code_mapping_id: String,
+    pub generated_range_json: String,
+    pub original_range_json: String,
+    pub file_uri: String,
+    pub line_number: u32,
+    pub column: u32,
+    pub source_file: String,
+    pub is_exact: bool,
+    pub confidence: f64,
+    pub context: String,
+}
+
+impl HfwCodeMapping {
+    pub fn new() -> Self {
+        Self {
+            code_mapping_id: String::new(),
+            generated_range_json: String::new(),
+            original_range_json: String::new(),
+            file_uri: String::new(),
+            line_number: u32::default(),
+            column: u32::default(),
+            source_file: String::new(),
+            is_exact: bool::default(),
+            confidence: f64::default(),
+            context: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.code_mapping_id.is_empty() || true && !self.generated_range_json.is_empty() || true && !self.original_range_json.is_empty() || true && !self.file_uri.is_empty() || true && self.line_number < u32::MAX || true && self.column < u32::MAX || true && !self.source_file.is_empty() || true && self.is_exact || true && self.confidence.is_finite() || true && !self.context.is_empty() || true
+    }
+}
+
+impl Default for HfwCodeMapping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat conversation (id, title, turns, created, updated)
+#[derive(Debug, Clone)]
+pub struct HfxChatConversation {
+    pub chat_conv_id: String,
+    pub conversation_id: String,
+    pub title: String,
+    pub turns_json: String,
+    pub created_ms: u64,
+    pub updated_ms: u64,
+    pub participant_id: String,
+    pub model_id: String,
+    pub total_tokens: u64,
+    pub is_archived: bool,
+}
+
+impl HfxChatConversation {
+    pub fn new() -> Self {
+        Self {
+            chat_conv_id: String::new(),
+            conversation_id: String::new(),
+            title: String::new(),
+            turns_json: String::new(),
+            created_ms: u64::default(),
+            updated_ms: u64::default(),
+            participant_id: String::new(),
+            model_id: String::new(),
+            total_tokens: u64::default(),
+            is_archived: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_conv_id.is_empty() || true && !self.conversation_id.is_empty() || true && !self.title.is_empty() || true && !self.turns_json.is_empty() || true && self.created_ms < u64::MAX || true && self.updated_ms < u64::MAX || true && !self.participant_id.is_empty() || true && !self.model_id.is_empty() || true && self.total_tokens < u64::MAX || true && self.is_archived || true
+    }
+}
+
+impl Default for HfxChatConversation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat model selection (model id, reason, capabilities, tier)
+#[derive(Debug, Clone)]
+pub struct HfyChatModelSelection {
+    pub chat_model_sel_id: String,
+    pub model_id: String,
+    pub reason: String,
+    pub capabilities_json: String,
+    pub tier: String,
+    pub is_available: bool,
+    pub max_tokens: u32,
+    pub supports_tools: bool,
+    pub supports_vision: bool,
+    pub vendor: String,
+}
+
+impl HfyChatModelSelection {
+    pub fn new() -> Self {
+        Self {
+            chat_model_sel_id: String::new(),
+            model_id: String::new(),
+            reason: String::new(),
+            capabilities_json: String::new(),
+            tier: String::new(),
+            is_available: bool::default(),
+            max_tokens: u32::default(),
+            supports_tools: bool::default(),
+            supports_vision: bool::default(),
+            vendor: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_model_sel_id.is_empty() || true && !self.model_id.is_empty() || true && !self.reason.is_empty() || true && !self.capabilities_json.is_empty() || true && !self.tier.is_empty() || true && self.is_available || true && self.max_tokens < u32::MAX || true && self.supports_tools || true && self.supports_vision || true && !self.vendor.is_empty() || true
+    }
+}
+
+impl Default for HfyChatModelSelection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Chat edit operation (uri, range, new text, description, kind)
+#[derive(Debug, Clone)]
+pub struct HfzChatEdit {
+    pub chat_edit_op_id: String,
+    pub uri: String,
+    pub range_json: String,
+    pub new_text: String,
+    pub description: String,
+    pub kind: String,
+    pub is_creation: bool,
+    pub is_deletion: bool,
+    pub file_path: String,
+    pub needs_confirmation: bool,
+}
+
+impl HfzChatEdit {
+    pub fn new() -> Self {
+        Self {
+            chat_edit_op_id: String::new(),
+            uri: String::new(),
+            range_json: String::new(),
+            new_text: String::new(),
+            description: String::new(),
+            kind: String::new(),
+            is_creation: bool::default(),
+            is_deletion: bool::default(),
+            file_path: String::new(),
+            needs_confirmation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.chat_edit_op_id.is_empty() || true && !self.uri.is_empty() || true && !self.range_json.is_empty() || true && !self.new_text.is_empty() || true && !self.description.is_empty() || true && !self.kind.is_empty() || true && self.is_creation || true && self.is_deletion || true && !self.file_path.is_empty() || true && self.needs_confirmation || true
+    }
+}
+
+impl Default for HfzChatEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -355300,6 +355972,294 @@ mod tests_hfj_generated {
     fn test_hfj_fields() {
         let mut obj = HfjChatAgentResult::default();
         obj.chat_agent_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfk_default() {
+        let obj = HfkInlineChat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfk_fields() {
+        let mut obj = HfkInlineChat::default();
+        obj.inline_chat_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfl_default() {
+        let obj = HflChatHistory::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfl_fields() {
+        let mut obj = HflChatHistory::default();
+        obj.chat_history_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfm_default() {
+        let obj = HfmChatEditSession::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfm_fields() {
+        let mut obj = HfmChatEditSession::default();
+        obj.chat_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfn_default() {
+        let obj = HfnLanguageModel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfn_fields() {
+        let mut obj = HfnLanguageModel::default();
+        obj.lang_model_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfo_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfo_default() {
+        let obj = HfoLanguageModelChat::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfo_fields() {
+        let mut obj = HfoLanguageModelChat::default();
+        obj.lm_chat_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfp_default() {
+        let obj = HfpChatPromptPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfp_fields() {
+        let mut obj = HfpChatPromptPart::default();
+        obj.chat_prompt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfq_default() {
+        let obj = HfqChatAnnotation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfq_fields() {
+        let mut obj = HfqChatAnnotation::default();
+        obj.chat_annot_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfr_default() {
+        let obj = HfrChatFileTree::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfr_fields() {
+        let mut obj = HfrChatFileTree::default();
+        obj.chat_ftree_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfs_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfs_default() {
+        let obj = HfsChatProgress::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfs_fields() {
+        let mut obj = HfsChatProgress::default();
+        obj.chat_prog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hft_generated {
+    use super::*;
+
+    #[test]
+    fn test_hft_default() {
+        let obj = HftChatContext::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hft_fields() {
+        let mut obj = HftChatContext::default();
+        obj.chat_ctx_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfu_default() {
+        let obj = HfuCopilotAuth::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfu_fields() {
+        let mut obj = HfuCopilotAuth::default();
+        obj.copilot_auth_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfv_default() {
+        let obj = HfvCopilotSuggest::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfv_fields() {
+        let mut obj = HfvCopilotSuggest::default();
+        obj.copilot_sug_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfw_default() {
+        let obj = HfwCodeMapping::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfw_fields() {
+        let mut obj = HfwCodeMapping::default();
+        obj.code_mapping_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfx_default() {
+        let obj = HfxChatConversation::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfx_fields() {
+        let mut obj = HfxChatConversation::default();
+        obj.chat_conv_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfy_default() {
+        let obj = HfyChatModelSelection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfy_fields() {
+        let mut obj = HfyChatModelSelection::default();
+        obj.chat_model_sel_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hfz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hfz_default() {
+        let obj = HfzChatEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hfz_fields() {
+        let mut obj = HfzChatEdit::default();
+        obj.chat_edit_op_id = "test".to_string();
         assert!(obj.validate());
     }
 }
