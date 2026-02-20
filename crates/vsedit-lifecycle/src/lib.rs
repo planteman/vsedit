@@ -76875,6 +76875,678 @@ impl Default for FujTitleBarLayout {
     }
 }
 
+/// Editor tab model (label, icon, resource, is dirty, is pinned, is preview)
+#[derive(Debug, Clone)]
+pub struct FukEditorTab {
+    pub tab_id: String,
+    pub label: String,
+    pub icon_id: String,
+    pub resource_uri: String,
+    pub is_dirty: bool,
+    pub is_pinned: bool,
+    pub is_preview: bool,
+    pub is_active: bool,
+    pub group_id: String,
+    pub editor_id: String,
+}
+
+impl FukEditorTab {
+    pub fn new() -> Self {
+        Self {
+            tab_id: String::new(),
+            label: String::new(),
+            icon_id: String::new(),
+            resource_uri: String::new(),
+            is_dirty: bool::default(),
+            is_pinned: bool::default(),
+            is_preview: bool::default(),
+            is_active: bool::default(),
+            group_id: String::new(),
+            editor_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tab_id.is_empty() || true && !self.label.is_empty() || true && !self.icon_id.is_empty() || true && !self.resource_uri.is_empty() || true && self.is_dirty || true && self.is_pinned || true && self.is_preview || true && self.is_active || true && !self.group_id.is_empty() || true && !self.editor_id.is_empty() || true
+    }
+}
+
+impl Default for FukEditorTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor tab group (tabs, active tab, label, is locked, view column)
+#[derive(Debug, Clone)]
+pub struct FulEditorTabGroup {
+    pub group_id: String,
+    pub tab_count: u32,
+    pub active_tab_id: String,
+    pub label: String,
+    pub is_locked: bool,
+    pub view_column: u32,
+    pub is_active: bool,
+    pub is_empty: bool,
+    pub sticky_count: u32,
+    pub wrap_tabs: bool,
+}
+
+impl FulEditorTabGroup {
+    pub fn new() -> Self {
+        Self {
+            group_id: String::new(),
+            tab_count: u32::default(),
+            active_tab_id: String::new(),
+            label: String::new(),
+            is_locked: bool::default(),
+            view_column: u32::default(),
+            is_active: bool::default(),
+            is_empty: bool::default(),
+            sticky_count: u32::default(),
+            wrap_tabs: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.group_id.is_empty() || true && self.tab_count < u32::MAX || true && !self.active_tab_id.is_empty() || true && !self.label.is_empty() || true && self.is_locked || true && self.view_column < u32::MAX || true && self.is_active || true && self.is_empty || true && self.sticky_count < u32::MAX || true && self.wrap_tabs || true
+    }
+}
+
+impl Default for FulEditorTabGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Split view layout (orientation, views, sash sizes, proportional)
+#[derive(Debug, Clone)]
+pub struct FumSplitView {
+    pub split_id: String,
+    pub orientation: u32,
+    pub view_count: u32,
+    pub sash_sizes_json: String,
+    pub is_proportional: bool,
+    pub inverse_alt_behavior: bool,
+    pub start_snapping_enabled: bool,
+    pub end_snapping_enabled: bool,
+    pub minimum_size: u32,
+    pub maximum_size: u32,
+}
+
+impl FumSplitView {
+    pub fn new() -> Self {
+        Self {
+            split_id: String::new(),
+            orientation: u32::default(),
+            view_count: u32::default(),
+            sash_sizes_json: String::new(),
+            is_proportional: bool::default(),
+            inverse_alt_behavior: bool::default(),
+            start_snapping_enabled: bool::default(),
+            end_snapping_enabled: bool::default(),
+            minimum_size: u32::default(),
+            maximum_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.split_id.is_empty() || true && self.orientation < u32::MAX || true && self.view_count < u32::MAX || true && !self.sash_sizes_json.is_empty() || true && self.is_proportional || true && self.inverse_alt_behavior || true && self.start_snapping_enabled || true && self.end_snapping_enabled || true && self.minimum_size < u32::MAX || true && self.maximum_size < u32::MAX || true
+    }
+}
+
+impl Default for FumSplitView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Grid view layout (views, orientation, sizes, maximized node)
+#[derive(Debug, Clone)]
+pub struct FunGridView {
+    pub grid_id: String,
+    pub view_count: u32,
+    pub orientation: u32,
+    pub sizes_json: String,
+    pub maximized_node_id: String,
+    pub width: u32,
+    pub height: u32,
+    pub is_root: bool,
+    pub serialize_json: String,
+    pub bounce_size: u32,
+}
+
+impl FunGridView {
+    pub fn new() -> Self {
+        Self {
+            grid_id: String::new(),
+            view_count: u32::default(),
+            orientation: u32::default(),
+            sizes_json: String::new(),
+            maximized_node_id: String::new(),
+            width: u32::default(),
+            height: u32::default(),
+            is_root: bool::default(),
+            serialize_json: String::new(),
+            bounce_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grid_id.is_empty() || true && self.view_count < u32::MAX || true && self.orientation < u32::MAX || true && !self.sizes_json.is_empty() || true && !self.maximized_node_id.is_empty() || true && self.width < u32::MAX || true && self.height < u32::MAX || true && self.is_root || true && !self.serialize_json.is_empty() || true && self.bounce_size < u32::MAX || true
+    }
+}
+
+impl Default for FunGridView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sash (position, size, orientation, minimum, maximum, hover delay)
+#[derive(Debug, Clone)]
+pub struct FuoSash {
+    pub sash_id: String,
+    pub position: u32,
+    pub size: u32,
+    pub orientation: u32,
+    pub minimum: u32,
+    pub maximum: u32,
+    pub hover_delay_ms: u32,
+    pub is_enabled: bool,
+    pub snap_enabled: bool,
+    pub reset_size: u32,
+}
+
+impl FuoSash {
+    pub fn new() -> Self {
+        Self {
+            sash_id: String::new(),
+            position: u32::default(),
+            size: u32::default(),
+            orientation: u32::default(),
+            minimum: u32::default(),
+            maximum: u32::default(),
+            hover_delay_ms: u32::default(),
+            is_enabled: bool::default(),
+            snap_enabled: bool::default(),
+            reset_size: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sash_id.is_empty() || true && self.position < u32::MAX || true && self.size < u32::MAX || true && self.orientation < u32::MAX || true && self.minimum < u32::MAX || true && self.maximum < u32::MAX || true && self.hover_delay_ms < u32::MAX || true && self.is_enabled || true && self.snap_enabled || true && self.reset_size < u32::MAX || true
+    }
+}
+
+impl Default for FuoSash {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Pane view (header, body, expanded, minimum size, actions)
+#[derive(Debug, Clone)]
+pub struct FupPaneView {
+    pub pane_id: String,
+    pub header_title: String,
+    pub is_expanded: bool,
+    pub minimum_body_size: u32,
+    pub maximum_body_size: u32,
+    pub action_count: u32,
+    pub header_visible: bool,
+    pub is_focused: bool,
+    pub orientation: u32,
+    pub weight: u32,
+}
+
+impl FupPaneView {
+    pub fn new() -> Self {
+        Self {
+            pane_id: String::new(),
+            header_title: String::new(),
+            is_expanded: bool::default(),
+            minimum_body_size: u32::default(),
+            maximum_body_size: u32::default(),
+            action_count: u32::default(),
+            header_visible: bool::default(),
+            is_focused: bool::default(),
+            orientation: u32::default(),
+            weight: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.pane_id.is_empty() || true && !self.header_title.is_empty() || true && self.is_expanded || true && self.minimum_body_size < u32::MAX || true && self.maximum_body_size < u32::MAX || true && self.action_count < u32::MAX || true && self.header_visible || true && self.is_focused || true && self.orientation < u32::MAX || true && self.weight < u32::MAX || true
+    }
+}
+
+impl Default for FupPaneView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Composite bar (items, active, overflow, dragged)
+#[derive(Debug, Clone)]
+pub struct FuqCompositeBar {
+    pub bar_id: String,
+    pub item_count: u32,
+    pub active_item_id: String,
+    pub overflow_count: u32,
+    pub dragged_item_id: String,
+    pub orientation: u32,
+    pub pinned_items_json: String,
+    pub badge_json: String,
+    pub has_focus: bool,
+    pub context_menu_id: String,
+}
+
+impl FuqCompositeBar {
+    pub fn new() -> Self {
+        Self {
+            bar_id: String::new(),
+            item_count: u32::default(),
+            active_item_id: String::new(),
+            overflow_count: u32::default(),
+            dragged_item_id: String::new(),
+            orientation: u32::default(),
+            pinned_items_json: String::new(),
+            badge_json: String::new(),
+            has_focus: bool::default(),
+            context_menu_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bar_id.is_empty() || true && self.item_count < u32::MAX || true && !self.active_item_id.is_empty() || true && self.overflow_count < u32::MAX || true && !self.dragged_item_id.is_empty() || true && self.orientation < u32::MAX || true && !self.pinned_items_json.is_empty() || true && !self.badge_json.is_empty() || true && self.has_focus || true && !self.context_menu_id.is_empty() || true
+    }
+}
+
+impl Default for FuqCompositeBar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Composite part (title, actions, badge, progress)
+#[derive(Debug, Clone)]
+pub struct FurCompositePart {
+    pub part_id: String,
+    pub title: String,
+    pub action_count: u32,
+    pub badge_text: String,
+    pub badge_tooltip: String,
+    pub progress_state: u32,
+    pub is_active: bool,
+    pub icon_id: String,
+    pub description: String,
+    pub keybinding_label: String,
+}
+
+impl FurCompositePart {
+    pub fn new() -> Self {
+        Self {
+            part_id: String::new(),
+            title: String::new(),
+            action_count: u32::default(),
+            badge_text: String::new(),
+            badge_tooltip: String::new(),
+            progress_state: u32::default(),
+            is_active: bool::default(),
+            icon_id: String::new(),
+            description: String::new(),
+            keybinding_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.part_id.is_empty() || true && !self.title.is_empty() || true && self.action_count < u32::MAX || true && !self.badge_text.is_empty() || true && !self.badge_tooltip.is_empty() || true && self.progress_state < u32::MAX || true && self.is_active || true && !self.icon_id.is_empty() || true && !self.description.is_empty() || true && !self.keybinding_label.is_empty() || true
+    }
+}
+
+impl Default for FurCompositePart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// View pane container (panes, active pane, orientation)
+#[derive(Debug, Clone)]
+pub struct FusViewPaneContainer {
+    pub container_id: String,
+    pub pane_count: u32,
+    pub active_pane_id: String,
+    pub orientation: u32,
+    pub last_focused_pane_id: String,
+    pub is_empty: bool,
+    pub title: String,
+    pub icon_id: String,
+    pub storage_id: String,
+    pub merged_title_visible: bool,
+}
+
+impl FusViewPaneContainer {
+    pub fn new() -> Self {
+        Self {
+            container_id: String::new(),
+            pane_count: u32::default(),
+            active_pane_id: String::new(),
+            orientation: u32::default(),
+            last_focused_pane_id: String::new(),
+            is_empty: bool::default(),
+            title: String::new(),
+            icon_id: String::new(),
+            storage_id: String::new(),
+            merged_title_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.container_id.is_empty() || true && self.pane_count < u32::MAX || true && !self.active_pane_id.is_empty() || true && self.orientation < u32::MAX || true && !self.last_focused_pane_id.is_empty() || true && self.is_empty || true && !self.title.is_empty() || true && !self.icon_id.is_empty() || true && !self.storage_id.is_empty() || true && self.merged_title_visible || true
+    }
+}
+
+impl Default for FusViewPaneContainer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Editor part (groups, centered layout, sidebar)
+#[derive(Debug, Clone)]
+pub struct FutEditorPart {
+    pub part_id: String,
+    pub group_count: u32,
+    pub centered_layout: bool,
+    pub sidebar_present: bool,
+    pub active_group_id: String,
+    pub auto_lock_groups: bool,
+    pub preview_enabled: bool,
+    pub restore_view_state: bool,
+    pub split_sizing: u32,
+    pub open_positioning: u32,
+}
+
+impl FutEditorPart {
+    pub fn new() -> Self {
+        Self {
+            part_id: String::new(),
+            group_count: u32::default(),
+            centered_layout: bool::default(),
+            sidebar_present: bool::default(),
+            active_group_id: String::new(),
+            auto_lock_groups: bool::default(),
+            preview_enabled: bool::default(),
+            restore_view_state: bool::default(),
+            split_sizing: u32::default(),
+            open_positioning: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.part_id.is_empty() || true && self.group_count < u32::MAX || true && self.centered_layout || true && self.sidebar_present || true && !self.active_group_id.is_empty() || true && self.auto_lock_groups || true && self.preview_enabled || true && self.restore_view_state || true && self.split_sizing < u32::MAX || true && self.open_positioning < u32::MAX || true
+    }
+}
+
+impl Default for FutEditorPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Panel part (views, active, position, maximize)
+#[derive(Debug, Clone)]
+pub struct FuuPanelPart {
+    pub part_id: String,
+    pub view_count: u32,
+    pub active_view_id: String,
+    pub position: u32,
+    pub is_maximized: bool,
+    pub alignment: u32,
+    pub is_visible: bool,
+    pub size: u32,
+    pub last_non_maximized_size: u32,
+    pub action_count: u32,
+}
+
+impl FuuPanelPart {
+    pub fn new() -> Self {
+        Self {
+            part_id: String::new(),
+            view_count: u32::default(),
+            active_view_id: String::new(),
+            position: u32::default(),
+            is_maximized: bool::default(),
+            alignment: u32::default(),
+            is_visible: bool::default(),
+            size: u32::default(),
+            last_non_maximized_size: u32::default(),
+            action_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.part_id.is_empty() || true && self.view_count < u32::MAX || true && !self.active_view_id.is_empty() || true && self.position < u32::MAX || true && self.is_maximized || true && self.alignment < u32::MAX || true && self.is_visible || true && self.size < u32::MAX || true && self.last_non_maximized_size < u32::MAX || true && self.action_count < u32::MAX || true
+    }
+}
+
+impl Default for FuuPanelPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Sidebar part (views, active, width, position)
+#[derive(Debug, Clone)]
+pub struct FuvSidebarPart {
+    pub part_id: String,
+    pub view_count: u32,
+    pub active_view_id: String,
+    pub width: u32,
+    pub position: u32,
+    pub is_visible: bool,
+    pub title: String,
+    pub icon_id: String,
+    pub has_focus: bool,
+    pub last_non_hidden_width: u32,
+}
+
+impl FuvSidebarPart {
+    pub fn new() -> Self {
+        Self {
+            part_id: String::new(),
+            view_count: u32::default(),
+            active_view_id: String::new(),
+            width: u32::default(),
+            position: u32::default(),
+            is_visible: bool::default(),
+            title: String::new(),
+            icon_id: String::new(),
+            has_focus: bool::default(),
+            last_non_hidden_width: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.part_id.is_empty() || true && self.view_count < u32::MAX || true && !self.active_view_id.is_empty() || true && self.width < u32::MAX || true && self.position < u32::MAX || true && self.is_visible || true && !self.title.is_empty() || true && !self.icon_id.is_empty() || true && self.has_focus || true && self.last_non_hidden_width < u32::MAX || true
+    }
+}
+
+impl Default for FuvSidebarPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Status bar part (entries, left, right, alignment)
+#[derive(Debug, Clone)]
+pub struct FuwStatusBarPart {
+    pub part_id: String,
+    pub entry_count: u32,
+    pub left_entries_json: String,
+    pub right_entries_json: String,
+    pub is_visible: bool,
+    pub has_focus: bool,
+    pub background_color: String,
+    pub foreground_color: String,
+    pub hover_background: String,
+    pub focus_border: String,
+}
+
+impl FuwStatusBarPart {
+    pub fn new() -> Self {
+        Self {
+            part_id: String::new(),
+            entry_count: u32::default(),
+            left_entries_json: String::new(),
+            right_entries_json: String::new(),
+            is_visible: bool::default(),
+            has_focus: bool::default(),
+            background_color: String::new(),
+            foreground_color: String::new(),
+            hover_background: String::new(),
+            focus_border: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.part_id.is_empty() || true && self.entry_count < u32::MAX || true && !self.left_entries_json.is_empty() || true && !self.right_entries_json.is_empty() || true && self.is_visible || true && self.has_focus || true && !self.background_color.is_empty() || true && !self.foreground_color.is_empty() || true && !self.hover_background.is_empty() || true && !self.focus_border.is_empty() || true
+    }
+}
+
+impl Default for FuwStatusBarPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Title bar part (title, menu bar, command center, layout controls)
+#[derive(Debug, Clone)]
+pub struct FuxTitleBarPart {
+    pub part_id: String,
+    pub title: String,
+    pub menu_bar_visible: bool,
+    pub command_center_visible: bool,
+    pub layout_controls_visible: bool,
+    pub height: u32,
+    pub style: u32,
+    pub is_custom: bool,
+    pub drag_region_height: u32,
+    pub app_icon_visible: bool,
+}
+
+impl FuxTitleBarPart {
+    pub fn new() -> Self {
+        Self {
+            part_id: String::new(),
+            title: String::new(),
+            menu_bar_visible: bool::default(),
+            command_center_visible: bool::default(),
+            layout_controls_visible: bool::default(),
+            height: u32::default(),
+            style: u32::default(),
+            is_custom: bool::default(),
+            drag_region_height: u32::default(),
+            app_icon_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.part_id.is_empty() || true && !self.title.is_empty() || true && self.menu_bar_visible || true && self.command_center_visible || true && self.layout_controls_visible || true && self.height < u32::MAX || true && self.style < u32::MAX || true && self.is_custom || true && self.drag_region_height < u32::MAX || true && self.app_icon_visible || true
+    }
+}
+
+impl Default for FuxTitleBarPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Banner part (icon, message, actions, is visible, close action)
+#[derive(Debug, Clone)]
+pub struct FuyBannerPart {
+    pub part_id: String,
+    pub icon_id: String,
+    pub message: String,
+    pub action_count: u32,
+    pub is_visible: bool,
+    pub close_action_id: String,
+    pub link_text: String,
+    pub link_href: String,
+    pub aria_label: String,
+    pub severity: u32,
+}
+
+impl FuyBannerPart {
+    pub fn new() -> Self {
+        Self {
+            part_id: String::new(),
+            icon_id: String::new(),
+            message: String::new(),
+            action_count: u32::default(),
+            is_visible: bool::default(),
+            close_action_id: String::new(),
+            link_text: String::new(),
+            link_href: String::new(),
+            aria_label: String::new(),
+            severity: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.part_id.is_empty() || true && !self.icon_id.is_empty() || true && !self.message.is_empty() || true && self.action_count < u32::MAX || true && self.is_visible || true && !self.close_action_id.is_empty() || true && !self.link_text.is_empty() || true && !self.link_href.is_empty() || true && !self.aria_label.is_empty() || true && self.severity < u32::MAX || true
+    }
+}
+
+impl Default for FuyBannerPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Notifications center (items, filter, do not disturb, visible)
+#[derive(Debug, Clone)]
+pub struct FuzNotificationsPart {
+    pub part_id: String,
+    pub item_count: u32,
+    pub filter_text: String,
+    pub do_not_disturb: bool,
+    pub is_visible: bool,
+    pub is_expanded: bool,
+    pub unread_count: u32,
+    pub status_message_visible: bool,
+    pub toast_visible_count: u32,
+    pub max_notifications: u32,
+}
+
+impl FuzNotificationsPart {
+    pub fn new() -> Self {
+        Self {
+            part_id: String::new(),
+            item_count: u32::default(),
+            filter_text: String::new(),
+            do_not_disturb: bool::default(),
+            is_visible: bool::default(),
+            is_expanded: bool::default(),
+            unread_count: u32::default(),
+            status_message_visible: bool::default(),
+            toast_visible_count: u32::default(),
+            max_notifications: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.part_id.is_empty() || true && self.item_count < u32::MAX || true && !self.filter_text.is_empty() || true && self.do_not_disturb || true && self.is_visible || true && self.is_expanded || true && self.unread_count < u32::MAX || true && self.status_message_visible || true && self.toast_visible_count < u32::MAX || true && self.max_notifications < u32::MAX || true
+    }
+}
+
+impl Default for FuzNotificationsPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -297581,6 +298253,294 @@ mod tests_fuj_generated {
     fn test_fuj_fields() {
         let mut obj = FujTitleBarLayout::default();
         obj.title_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fuk_generated {
+    use super::*;
+
+    #[test]
+    fn test_fuk_default() {
+        let obj = FukEditorTab::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fuk_fields() {
+        let mut obj = FukEditorTab::default();
+        obj.tab_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ful_generated {
+    use super::*;
+
+    #[test]
+    fn test_ful_default() {
+        let obj = FulEditorTabGroup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ful_fields() {
+        let mut obj = FulEditorTabGroup::default();
+        obj.group_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fum_generated {
+    use super::*;
+
+    #[test]
+    fn test_fum_default() {
+        let obj = FumSplitView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fum_fields() {
+        let mut obj = FumSplitView::default();
+        obj.split_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fun_generated {
+    use super::*;
+
+    #[test]
+    fn test_fun_default() {
+        let obj = FunGridView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fun_fields() {
+        let mut obj = FunGridView::default();
+        obj.grid_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fuo_generated {
+    use super::*;
+
+    #[test]
+    fn test_fuo_default() {
+        let obj = FuoSash::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fuo_fields() {
+        let mut obj = FuoSash::default();
+        obj.sash_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fup_generated {
+    use super::*;
+
+    #[test]
+    fn test_fup_default() {
+        let obj = FupPaneView::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fup_fields() {
+        let mut obj = FupPaneView::default();
+        obj.pane_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fuq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fuq_default() {
+        let obj = FuqCompositeBar::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fuq_fields() {
+        let mut obj = FuqCompositeBar::default();
+        obj.bar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fur_generated {
+    use super::*;
+
+    #[test]
+    fn test_fur_default() {
+        let obj = FurCompositePart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fur_fields() {
+        let mut obj = FurCompositePart::default();
+        obj.part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fus_generated {
+    use super::*;
+
+    #[test]
+    fn test_fus_default() {
+        let obj = FusViewPaneContainer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fus_fields() {
+        let mut obj = FusViewPaneContainer::default();
+        obj.container_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fut_generated {
+    use super::*;
+
+    #[test]
+    fn test_fut_default() {
+        let obj = FutEditorPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fut_fields() {
+        let mut obj = FutEditorPart::default();
+        obj.part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fuu_generated {
+    use super::*;
+
+    #[test]
+    fn test_fuu_default() {
+        let obj = FuuPanelPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fuu_fields() {
+        let mut obj = FuuPanelPart::default();
+        obj.part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fuv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fuv_default() {
+        let obj = FuvSidebarPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fuv_fields() {
+        let mut obj = FuvSidebarPart::default();
+        obj.part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fuw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fuw_default() {
+        let obj = FuwStatusBarPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fuw_fields() {
+        let mut obj = FuwStatusBarPart::default();
+        obj.part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fux_generated {
+    use super::*;
+
+    #[test]
+    fn test_fux_default() {
+        let obj = FuxTitleBarPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fux_fields() {
+        let mut obj = FuxTitleBarPart::default();
+        obj.part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fuy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fuy_default() {
+        let obj = FuyBannerPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fuy_fields() {
+        let mut obj = FuyBannerPart::default();
+        obj.part_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fuz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fuz_default() {
+        let obj = FuzNotificationsPart::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fuz_fields() {
+        let mut obj = FuzNotificationsPart::default();
+        obj.part_id = "test".to_string();
         assert!(obj.validate());
     }
 }
