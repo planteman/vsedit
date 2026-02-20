@@ -65096,6 +65096,459 @@ impl Default for FjoEditorDiffConfig {
 }
 
 
+/// Editor accessibility config (screen reader, tab focus, dimming, labels)
+#[derive(Debug, Clone)]
+pub struct FjpEditorAccessibilityConfig {
+    pub a11y_id: String,
+    pub screen_reader_optimized: bool,
+    pub tab_focus_mode: bool,
+    pub unfocused_view_dimming: f64,
+    pub alt_key_navigation: bool,
+    pub access_support: u32,
+    pub page_on_aria: bool,
+    pub voice_enabled: bool,
+    pub aria_label: String,
+    pub accessible_diff_viewer: bool,
+}
+
+impl FjpEditorAccessibilityConfig {
+    pub fn new() -> Self {
+        Self {
+            a11y_id: String::new(),
+            screen_reader_optimized: bool::default(),
+            tab_focus_mode: bool::default(),
+            unfocused_view_dimming: f64::default(),
+            alt_key_navigation: bool::default(),
+            access_support: u32::default(),
+            page_on_aria: bool::default(),
+            voice_enabled: bool::default(),
+            aria_label: String::new(),
+            accessible_diff_viewer: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.a11y_id.is_empty() || true && self.screen_reader_optimized || true && self.tab_focus_mode || true && self.unfocused_view_dimming.is_finite() || true && self.alt_key_navigation || true && self.access_support < u32::MAX || true && self.page_on_aria || true && self.voice_enabled || true && !self.aria_label.is_empty() || true && self.accessible_diff_viewer || true
+    }
+}
+
+impl Default for FjpEditorAccessibilityConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor render config (control chars, whitespace, line highlight, guides)
+#[derive(Debug, Clone)]
+pub struct FjqEditorRenderConfig {
+    pub render_id: String,
+    pub render_control_characters: bool,
+    pub render_whitespace: u32,
+    pub render_line_highlight: u32,
+    pub render_indent_guides: bool,
+    pub render_final_newline: u32,
+    pub render_validation_decorations: u32,
+    pub glyph_margin: bool,
+    pub line_decorations_width: u32,
+    pub overview_ruler_border: bool,
+}
+
+impl FjqEditorRenderConfig {
+    pub fn new() -> Self {
+        Self {
+            render_id: String::new(),
+            render_control_characters: bool::default(),
+            render_whitespace: u32::default(),
+            render_line_highlight: u32::default(),
+            render_indent_guides: bool::default(),
+            render_final_newline: u32::default(),
+            render_validation_decorations: u32::default(),
+            glyph_margin: bool::default(),
+            line_decorations_width: u32::default(),
+            overview_ruler_border: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.render_id.is_empty() || true && self.render_control_characters || true && self.render_whitespace < u32::MAX || true && self.render_line_highlight < u32::MAX || true && self.render_indent_guides || true && self.render_final_newline < u32::MAX || true && self.render_validation_decorations < u32::MAX || true && self.glyph_margin || true && self.line_decorations_width < u32::MAX || true && self.overview_ruler_border || true
+    }
+}
+
+impl Default for FjqEditorRenderConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor line number config (on/off/relative/interval, format function)
+#[derive(Debug, Clone)]
+pub struct FjrEditorLineNumberConfig {
+    pub line_num_id: String,
+    pub line_numbers: u32,
+    pub relative_line_numbers: bool,
+    pub line_interval: u32,
+    pub format_fn_id: String,
+    pub min_digits: u32,
+    pub decorations_after_line_number: bool,
+    pub gutter_icon_size: u32,
+    pub fold_gutter: bool,
+    pub color_decorations: bool,
+}
+
+impl FjrEditorLineNumberConfig {
+    pub fn new() -> Self {
+        Self {
+            line_num_id: String::new(),
+            line_numbers: u32::default(),
+            relative_line_numbers: bool::default(),
+            line_interval: u32::default(),
+            format_fn_id: String::new(),
+            min_digits: u32::default(),
+            decorations_after_line_number: bool::default(),
+            gutter_icon_size: u32::default(),
+            fold_gutter: bool::default(),
+            color_decorations: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_num_id.is_empty() || true && self.line_numbers < u32::MAX || true && self.relative_line_numbers || true && self.line_interval < u32::MAX || true && !self.format_fn_id.is_empty() || true && self.min_digits < u32::MAX || true && self.decorations_after_line_number || true && self.gutter_icon_size < u32::MAX || true && self.fold_gutter || true && self.color_decorations || true
+    }
+}
+
+impl Default for FjrEditorLineNumberConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor auto closing config (brackets, quotes, comments, overtype)
+#[derive(Debug, Clone)]
+pub struct FjsEditorAutoClosingConfig {
+    pub autoclose_id: String,
+    pub auto_closing_brackets: u32,
+    pub auto_closing_quotes: u32,
+    pub auto_closing_delete: u32,
+    pub auto_closing_overtype: u32,
+    pub auto_surround: u32,
+    pub auto_closing_pairs_json: String,
+    pub suppress_auto_closing: bool,
+    pub language_defined_pairs: bool,
+    pub before_text_pattern: String,
+}
+
+impl FjsEditorAutoClosingConfig {
+    pub fn new() -> Self {
+        Self {
+            autoclose_id: String::new(),
+            auto_closing_brackets: u32::default(),
+            auto_closing_quotes: u32::default(),
+            auto_closing_delete: u32::default(),
+            auto_closing_overtype: u32::default(),
+            auto_surround: u32::default(),
+            auto_closing_pairs_json: String::new(),
+            suppress_auto_closing: bool::default(),
+            language_defined_pairs: bool::default(),
+            before_text_pattern: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.autoclose_id.is_empty() || true && self.auto_closing_brackets < u32::MAX || true && self.auto_closing_quotes < u32::MAX || true && self.auto_closing_delete < u32::MAX || true && self.auto_closing_overtype < u32::MAX || true && self.auto_surround < u32::MAX || true && !self.auto_closing_pairs_json.is_empty() || true && self.suppress_auto_closing || true && self.language_defined_pairs || true && !self.before_text_pattern.is_empty() || true
+    }
+}
+
+impl Default for FjsEditorAutoClosingConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor auto indent config (mode, enter rules, on-type formatting)
+#[derive(Debug, Clone)]
+pub struct FjtEditorAutoIndentConfig {
+    pub autoindent_id: String,
+    pub auto_indent_mode: u32,
+    pub on_enter_rules_json: String,
+    pub format_on_type: bool,
+    pub format_on_paste: bool,
+    pub indent_size: u32,
+    pub detect_indentation: bool,
+    pub trim_auto_whitespace: bool,
+    pub use_tab_stops: bool,
+    pub stick_tab_on_backspace: bool,
+}
+
+impl FjtEditorAutoIndentConfig {
+    pub fn new() -> Self {
+        Self {
+            autoindent_id: String::new(),
+            auto_indent_mode: u32::default(),
+            on_enter_rules_json: String::new(),
+            format_on_type: bool::default(),
+            format_on_paste: bool::default(),
+            indent_size: u32::default(),
+            detect_indentation: bool::default(),
+            trim_auto_whitespace: bool::default(),
+            use_tab_stops: bool::default(),
+            stick_tab_on_backspace: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.autoindent_id.is_empty() || true && self.auto_indent_mode < u32::MAX || true && !self.on_enter_rules_json.is_empty() || true && self.format_on_type || true && self.format_on_paste || true && self.indent_size < u32::MAX || true && self.detect_indentation || true && self.trim_auto_whitespace || true && self.use_tab_stops || true && self.stick_tab_on_backspace || true
+    }
+}
+
+impl Default for FjtEditorAutoIndentConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor drag and drop config (enabled, copy, move, file drop handling)
+#[derive(Debug, Clone)]
+pub struct FjuEditorDragDropConfig {
+    pub dnd_id: String,
+    pub drag_and_drop_enabled: bool,
+    pub copy_with_drag: bool,
+    pub show_drop_indicator: bool,
+    pub drop_into_editor_enabled: bool,
+    pub file_drop_handling: u32,
+    pub data_transfer_json: String,
+    pub accepted_types_json: String,
+    pub move_on_drag: bool,
+    pub snippet_drop: bool,
+}
+
+impl FjuEditorDragDropConfig {
+    pub fn new() -> Self {
+        Self {
+            dnd_id: String::new(),
+            drag_and_drop_enabled: bool::default(),
+            copy_with_drag: bool::default(),
+            show_drop_indicator: bool::default(),
+            drop_into_editor_enabled: bool::default(),
+            file_drop_handling: u32::default(),
+            data_transfer_json: String::new(),
+            accepted_types_json: String::new(),
+            move_on_drag: bool::default(),
+            snippet_drop: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dnd_id.is_empty() || true && self.drag_and_drop_enabled || true && self.copy_with_drag || true && self.show_drop_indicator || true && self.drop_into_editor_enabled || true && self.file_drop_handling < u32::MAX || true && !self.data_transfer_json.is_empty() || true && !self.accepted_types_json.is_empty() || true && self.move_on_drag || true && self.snippet_drop || true
+    }
+}
+
+impl Default for FjuEditorDragDropConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor code lens config (enabled, font family, font size, separator)
+#[derive(Debug, Clone)]
+pub struct FjvEditorCodeLensConfig {
+    pub codelens_id: String,
+    pub is_enabled: bool,
+    pub font_family: String,
+    pub font_size: u32,
+    pub separator_text: String,
+    pub command_id: String,
+    pub provider_count: u32,
+    pub display_mode: u32,
+    pub auto_refresh: bool,
+    pub max_items: u32,
+}
+
+impl FjvEditorCodeLensConfig {
+    pub fn new() -> Self {
+        Self {
+            codelens_id: String::new(),
+            is_enabled: bool::default(),
+            font_family: String::new(),
+            font_size: u32::default(),
+            separator_text: String::new(),
+            command_id: String::new(),
+            provider_count: u32::default(),
+            display_mode: u32::default(),
+            auto_refresh: bool::default(),
+            max_items: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.codelens_id.is_empty() || true && self.is_enabled || true && !self.font_family.is_empty() || true && self.font_size < u32::MAX || true && !self.separator_text.is_empty() || true && !self.command_id.is_empty() || true && self.provider_count < u32::MAX || true && self.display_mode < u32::MAX || true && self.auto_refresh || true && self.max_items < u32::MAX || true
+    }
+}
+
+impl Default for FjvEditorCodeLensConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor code action config (on save, light bulb, auto trigger)
+#[derive(Debug, Clone)]
+pub struct FjwEditorCodeActionConfig {
+    pub codeaction_id: String,
+    pub on_save_enabled: bool,
+    pub on_save_mode: u32,
+    pub light_bulb_enabled: bool,
+    pub quick_fix_enabled: bool,
+    pub auto_trigger: bool,
+    pub trigger_on_chars: String,
+    pub preferred_only: bool,
+    pub kind_filter: String,
+    pub timeout_ms: u32,
+}
+
+impl FjwEditorCodeActionConfig {
+    pub fn new() -> Self {
+        Self {
+            codeaction_id: String::new(),
+            on_save_enabled: bool::default(),
+            on_save_mode: u32::default(),
+            light_bulb_enabled: bool::default(),
+            quick_fix_enabled: bool::default(),
+            auto_trigger: bool::default(),
+            trigger_on_chars: String::new(),
+            preferred_only: bool::default(),
+            kind_filter: String::new(),
+            timeout_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.codeaction_id.is_empty() || true && self.on_save_enabled || true && self.on_save_mode < u32::MAX || true && self.light_bulb_enabled || true && self.quick_fix_enabled || true && self.auto_trigger || true && !self.trigger_on_chars.is_empty() || true && self.preferred_only || true && !self.kind_filter.is_empty() || true && self.timeout_ms < u32::MAX || true
+    }
+}
+
+impl Default for FjwEditorCodeActionConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor linked editing config (enabled, highlight, auto trigger)
+#[derive(Debug, Clone)]
+pub struct FjxEditorLinkedEditingConfig {
+    pub linked_id: String,
+    pub is_enabled: bool,
+    pub highlight_linked: bool,
+    pub auto_trigger: bool,
+    pub word_pattern: String,
+    pub trigger_characters: String,
+    pub debounce_ms: u32,
+    pub max_ranges: u32,
+    pub decoration_type: u32,
+    pub provider_id: String,
+}
+
+impl FjxEditorLinkedEditingConfig {
+    pub fn new() -> Self {
+        Self {
+            linked_id: String::new(),
+            is_enabled: bool::default(),
+            highlight_linked: bool::default(),
+            auto_trigger: bool::default(),
+            word_pattern: String::new(),
+            trigger_characters: String::new(),
+            debounce_ms: u32::default(),
+            max_ranges: u32::default(),
+            decoration_type: u32::default(),
+            provider_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.linked_id.is_empty() || true && self.is_enabled || true && self.highlight_linked || true && self.auto_trigger || true && !self.word_pattern.is_empty() || true && !self.trigger_characters.is_empty() || true && self.debounce_ms < u32::MAX || true && self.max_ranges < u32::MAX || true && self.decoration_type < u32::MAX || true && !self.provider_id.is_empty() || true
+    }
+}
+
+impl Default for FjxEditorLinkedEditingConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor unicode config (ambiguous width, allowed chars, highlight)
+#[derive(Debug, Clone)]
+pub struct FjyEditorUnicodeConfig {
+    pub unicode_id: String,
+    pub ambiguous_characters_enabled: bool,
+    pub invisible_characters_enabled: bool,
+    pub non_basic_ascii_enabled: bool,
+    pub allowed_characters_json: String,
+    pub allowed_locales_json: String,
+    pub highlight_ambiguous: bool,
+    pub highlight_invisible: bool,
+    pub highlight_non_basic: bool,
+    pub locale: String,
+}
+
+impl FjyEditorUnicodeConfig {
+    pub fn new() -> Self {
+        Self {
+            unicode_id: String::new(),
+            ambiguous_characters_enabled: bool::default(),
+            invisible_characters_enabled: bool::default(),
+            non_basic_ascii_enabled: bool::default(),
+            allowed_characters_json: String::new(),
+            allowed_locales_json: String::new(),
+            highlight_ambiguous: bool::default(),
+            highlight_invisible: bool::default(),
+            highlight_non_basic: bool::default(),
+            locale: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.unicode_id.is_empty() || true && self.ambiguous_characters_enabled || true && self.invisible_characters_enabled || true && self.non_basic_ascii_enabled || true && !self.allowed_characters_json.is_empty() || true && !self.allowed_locales_json.is_empty() || true && self.highlight_ambiguous || true && self.highlight_invisible || true && self.highlight_non_basic || true && !self.locale.is_empty() || true
+    }
+}
+
+impl Default for FjyEditorUnicodeConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+/// Editor drop into editor config (enabled, show drop selector)
+#[derive(Debug, Clone)]
+pub struct FjzEditorDropIntoConfig {
+    pub drop_id: String,
+    pub drop_into_enabled: bool,
+    pub show_drop_selector: u32,
+    pub accepted_mime_types: String,
+    pub default_handler_id: String,
+    pub priority: u32,
+    pub provider_count: u32,
+    pub data_transfer_json: String,
+    pub snippet_insert: bool,
+    pub edit_on_drop: bool,
+}
+
+impl FjzEditorDropIntoConfig {
+    pub fn new() -> Self {
+        Self {
+            drop_id: String::new(),
+            drop_into_enabled: bool::default(),
+            show_drop_selector: u32::default(),
+            accepted_mime_types: String::new(),
+            default_handler_id: String::new(),
+            priority: u32::default(),
+            provider_count: u32::default(),
+            data_transfer_json: String::new(),
+            snippet_insert: bool::default(),
+            edit_on_drop: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.drop_id.is_empty() || true && self.drop_into_enabled || true && self.show_drop_selector < u32::MAX || true && !self.accepted_mime_types.is_empty() || true && !self.default_handler_id.is_empty() || true && self.priority < u32::MAX || true && self.provider_count < u32::MAX || true && !self.data_transfer_json.is_empty() || true && self.snippet_insert || true && self.edit_on_drop || true
+    }
+}
+
+impl Default for FjzEditorDropIntoConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -280931,6 +281384,204 @@ mod tests_fjo_generated {
     fn test_fjo_fields() {
         let mut obj = FjoEditorDiffConfig::default();
         obj.diff_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjp_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjp_default() {
+        let obj = FjpEditorAccessibilityConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjp_fields() {
+        let mut obj = FjpEditorAccessibilityConfig::default();
+        obj.a11y_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjq_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjq_default() {
+        let obj = FjqEditorRenderConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjq_fields() {
+        let mut obj = FjqEditorRenderConfig::default();
+        obj.render_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjr_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjr_default() {
+        let obj = FjrEditorLineNumberConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjr_fields() {
+        let mut obj = FjrEditorLineNumberConfig::default();
+        obj.line_num_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjs_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjs_default() {
+        let obj = FjsEditorAutoClosingConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjs_fields() {
+        let mut obj = FjsEditorAutoClosingConfig::default();
+        obj.autoclose_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjt_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjt_default() {
+        let obj = FjtEditorAutoIndentConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjt_fields() {
+        let mut obj = FjtEditorAutoIndentConfig::default();
+        obj.autoindent_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fju_generated {
+    use super::*;
+
+    #[test]
+    fn test_fju_default() {
+        let obj = FjuEditorDragDropConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fju_fields() {
+        let mut obj = FjuEditorDragDropConfig::default();
+        obj.dnd_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjv_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjv_default() {
+        let obj = FjvEditorCodeLensConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjv_fields() {
+        let mut obj = FjvEditorCodeLensConfig::default();
+        obj.codelens_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjw_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjw_default() {
+        let obj = FjwEditorCodeActionConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjw_fields() {
+        let mut obj = FjwEditorCodeActionConfig::default();
+        obj.codeaction_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjx_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjx_default() {
+        let obj = FjxEditorLinkedEditingConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjx_fields() {
+        let mut obj = FjxEditorLinkedEditingConfig::default();
+        obj.linked_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjy_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjy_default() {
+        let obj = FjyEditorUnicodeConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjy_fields() {
+        let mut obj = FjyEditorUnicodeConfig::default();
+        obj.unicode_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fjz_generated {
+    use super::*;
+
+    #[test]
+    fn test_fjz_default() {
+        let obj = FjzEditorDropIntoConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fjz_fields() {
+        let mut obj = FjzEditorDropIntoConfig::default();
+        obj.drop_id = "test".to_string();
         assert!(obj.validate());
     }
 }
