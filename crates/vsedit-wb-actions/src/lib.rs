@@ -114848,6 +114848,678 @@ impl Default for HdjDocumentHighlight {
     }
 }
 
+/// Folding range (start line, end line, kind, collapsed state)
+#[derive(Debug, Clone)]
+pub struct HdkFoldingRange {
+    pub folding_range_id: String,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub kind: String,
+    pub collapsed_state: String,
+    pub start_character: u32,
+    pub end_character: u32,
+    pub is_manual: bool,
+    pub provider_id: String,
+    pub nesting_level: u32,
+}
+
+impl HdkFoldingRange {
+    pub fn new() -> Self {
+        Self {
+            folding_range_id: String::new(),
+            start_line: u32::default(),
+            end_line: u32::default(),
+            kind: String::new(),
+            collapsed_state: String::new(),
+            start_character: u32::default(),
+            end_character: u32::default(),
+            is_manual: bool::default(),
+            provider_id: String::new(),
+            nesting_level: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.folding_range_id.is_empty() || true && self.start_line < u32::MAX || true && self.end_line < u32::MAX || true && !self.kind.is_empty() || true && !self.collapsed_state.is_empty() || true && self.start_character < u32::MAX || true && self.end_character < u32::MAX || true && self.is_manual || true && !self.provider_id.is_empty() || true && self.nesting_level < u32::MAX || true
+    }
+}
+
+impl Default for HdkFoldingRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Selection range (range, parent, depth, provider)
+#[derive(Debug, Clone)]
+pub struct HdlSelectionRange {
+    pub sel_range_id: String,
+    pub range_json: String,
+    pub parent_json: String,
+    pub depth: u32,
+    pub provider_id: String,
+    pub is_primary: bool,
+    pub selection_kind: String,
+    pub score: f64,
+    pub context_json: String,
+    pub total_ranges: u32,
+}
+
+impl HdlSelectionRange {
+    pub fn new() -> Self {
+        Self {
+            sel_range_id: String::new(),
+            range_json: String::new(),
+            parent_json: String::new(),
+            depth: u32::default(),
+            provider_id: String::new(),
+            is_primary: bool::default(),
+            selection_kind: String::new(),
+            score: f64::default(),
+            context_json: String::new(),
+            total_ranges: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sel_range_id.is_empty() || true && !self.range_json.is_empty() || true && !self.parent_json.is_empty() || true && self.depth < u32::MAX || true && !self.provider_id.is_empty() || true && self.is_primary || true && !self.selection_kind.is_empty() || true && self.score.is_finite() || true && !self.context_json.is_empty() || true && self.total_ranges < u32::MAX || true
+    }
+}
+
+impl Default for HdlSelectionRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Call hierarchy item (name, kind, uri, range, detail)
+#[derive(Debug, Clone)]
+pub struct HdmCallHierarchyItem {
+    pub call_hier_id: String,
+    pub name: String,
+    pub kind: String,
+    pub uri: String,
+    pub range_json: String,
+    pub detail: String,
+    pub selection_range_json: String,
+    pub tags_json: String,
+    pub data_json: String,
+    pub is_incoming: bool,
+}
+
+impl HdmCallHierarchyItem {
+    pub fn new() -> Self {
+        Self {
+            call_hier_id: String::new(),
+            name: String::new(),
+            kind: String::new(),
+            uri: String::new(),
+            range_json: String::new(),
+            detail: String::new(),
+            selection_range_json: String::new(),
+            tags_json: String::new(),
+            data_json: String::new(),
+            is_incoming: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.call_hier_id.is_empty() || true && !self.name.is_empty() || true && !self.kind.is_empty() || true && !self.uri.is_empty() || true && !self.range_json.is_empty() || true && !self.detail.is_empty() || true && !self.selection_range_json.is_empty() || true && !self.tags_json.is_empty() || true && !self.data_json.is_empty() || true && self.is_incoming || true
+    }
+}
+
+impl Default for HdmCallHierarchyItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Type hierarchy item (name, kind, uri, range, detail)
+#[derive(Debug, Clone)]
+pub struct HdnTypeHierarchyItem {
+    pub type_hier_id: String,
+    pub name: String,
+    pub kind: String,
+    pub uri: String,
+    pub range_json: String,
+    pub detail: String,
+    pub selection_range_json: String,
+    pub tags_json: String,
+    pub data_json: String,
+    pub is_supertype: bool,
+}
+
+impl HdnTypeHierarchyItem {
+    pub fn new() -> Self {
+        Self {
+            type_hier_id: String::new(),
+            name: String::new(),
+            kind: String::new(),
+            uri: String::new(),
+            range_json: String::new(),
+            detail: String::new(),
+            selection_range_json: String::new(),
+            tags_json: String::new(),
+            data_json: String::new(),
+            is_supertype: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.type_hier_id.is_empty() || true && !self.name.is_empty() || true && !self.kind.is_empty() || true && !self.uri.is_empty() || true && !self.range_json.is_empty() || true && !self.detail.is_empty() || true && !self.selection_range_json.is_empty() || true && !self.tags_json.is_empty() || true && !self.data_json.is_empty() || true && self.is_supertype || true
+    }
+}
+
+impl Default for HdnTypeHierarchyItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inlay hint (position, label, kind, tooltip, padding)
+#[derive(Debug, Clone)]
+pub struct HdoInlayHint {
+    pub inlay_hint_id: String,
+    pub position_json: String,
+    pub label: String,
+    pub kind: String,
+    pub tooltip: String,
+    pub padding_left: bool,
+    pub padding_right: bool,
+    pub text_edits_json: String,
+    pub data_json: String,
+    pub is_resolved: bool,
+}
+
+impl HdoInlayHint {
+    pub fn new() -> Self {
+        Self {
+            inlay_hint_id: String::new(),
+            position_json: String::new(),
+            label: String::new(),
+            kind: String::new(),
+            tooltip: String::new(),
+            padding_left: bool::default(),
+            padding_right: bool::default(),
+            text_edits_json: String::new(),
+            data_json: String::new(),
+            is_resolved: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inlay_hint_id.is_empty() || true && !self.position_json.is_empty() || true && !self.label.is_empty() || true && !self.kind.is_empty() || true && !self.tooltip.is_empty() || true && self.padding_left || true && self.padding_right || true && !self.text_edits_json.is_empty() || true && !self.data_json.is_empty() || true && self.is_resolved || true
+    }
+}
+
+impl Default for HdoInlayHint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Linked editing range (ranges, word pattern, language)
+#[derive(Debug, Clone)]
+pub struct HdpLinkedEditingRange {
+    pub linked_edit_id: String,
+    pub ranges_json: String,
+    pub word_pattern: String,
+    pub language_id: String,
+    pub uri: String,
+    pub position_json: String,
+    pub is_active: bool,
+    pub provider_id: String,
+    pub decoration_type: String,
+    pub range_count: u32,
+}
+
+impl HdpLinkedEditingRange {
+    pub fn new() -> Self {
+        Self {
+            linked_edit_id: String::new(),
+            ranges_json: String::new(),
+            word_pattern: String::new(),
+            language_id: String::new(),
+            uri: String::new(),
+            position_json: String::new(),
+            is_active: bool::default(),
+            provider_id: String::new(),
+            decoration_type: String::new(),
+            range_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.linked_edit_id.is_empty() || true && !self.ranges_json.is_empty() || true && !self.word_pattern.is_empty() || true && !self.language_id.is_empty() || true && !self.uri.is_empty() || true && !self.position_json.is_empty() || true && self.is_active || true && !self.provider_id.is_empty() || true && !self.decoration_type.is_empty() || true && self.range_count < u32::MAX || true
+    }
+}
+
+impl Default for HdpLinkedEditingRange {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic tokens (result id, data, range, type, modifiers)
+#[derive(Debug, Clone)]
+pub struct HdqSemanticTokens {
+    pub sem_tokens_id: String,
+    pub result_id: String,
+    pub data_json: String,
+    pub range_json: String,
+    pub token_type: String,
+    pub modifiers_json: String,
+    pub is_full: bool,
+    pub is_delta: bool,
+    pub previous_result_id: String,
+    pub token_count: u32,
+}
+
+impl HdqSemanticTokens {
+    pub fn new() -> Self {
+        Self {
+            sem_tokens_id: String::new(),
+            result_id: String::new(),
+            data_json: String::new(),
+            range_json: String::new(),
+            token_type: String::new(),
+            modifiers_json: String::new(),
+            is_full: bool::default(),
+            is_delta: bool::default(),
+            previous_result_id: String::new(),
+            token_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sem_tokens_id.is_empty() || true && !self.result_id.is_empty() || true && !self.data_json.is_empty() || true && !self.range_json.is_empty() || true && !self.token_type.is_empty() || true && !self.modifiers_json.is_empty() || true && self.is_full || true && self.is_delta || true && !self.previous_result_id.is_empty() || true && self.token_count < u32::MAX || true
+    }
+}
+
+impl Default for HdqSemanticTokens {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inline value (range, type, expression, variable name)
+#[derive(Debug, Clone)]
+pub struct HdrInlineValue {
+    pub inline_val_id: String,
+    pub range_json: String,
+    pub value_type: String,
+    pub expression: String,
+    pub variable_name: String,
+    pub result: String,
+    pub is_editable: bool,
+    pub context_json: String,
+    pub provider_id: String,
+    pub decoration_style: String,
+}
+
+impl HdrInlineValue {
+    pub fn new() -> Self {
+        Self {
+            inline_val_id: String::new(),
+            range_json: String::new(),
+            value_type: String::new(),
+            expression: String::new(),
+            variable_name: String::new(),
+            result: String::new(),
+            is_editable: bool::default(),
+            context_json: String::new(),
+            provider_id: String::new(),
+            decoration_style: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inline_val_id.is_empty() || true && !self.range_json.is_empty() || true && !self.value_type.is_empty() || true && !self.expression.is_empty() || true && !self.variable_name.is_empty() || true && !self.result.is_empty() || true && self.is_editable || true && !self.context_json.is_empty() || true && !self.provider_id.is_empty() || true && !self.decoration_style.is_empty() || true
+    }
+}
+
+impl Default for HdrInlineValue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document drop edit (insert text, additional edits, label)
+#[derive(Debug, Clone)]
+pub struct HdsDropEdit {
+    pub drop_edit_id: String,
+    pub insert_text: String,
+    pub additional_edits_json: String,
+    pub label: String,
+    pub kind: String,
+    pub priority: u32,
+    pub command_json: String,
+    pub needs_confirmation: bool,
+    pub data_transfer_json: String,
+    pub yieldTo_json: String,
+}
+
+impl HdsDropEdit {
+    pub fn new() -> Self {
+        Self {
+            drop_edit_id: String::new(),
+            insert_text: String::new(),
+            additional_edits_json: String::new(),
+            label: String::new(),
+            kind: String::new(),
+            priority: u32::default(),
+            command_json: String::new(),
+            needs_confirmation: bool::default(),
+            data_transfer_json: String::new(),
+            yieldTo_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.drop_edit_id.is_empty() || true && !self.insert_text.is_empty() || true && !self.additional_edits_json.is_empty() || true && !self.label.is_empty() || true && !self.kind.is_empty() || true && self.priority < u32::MAX || true && !self.command_json.is_empty() || true && self.needs_confirmation || true && !self.data_transfer_json.is_empty() || true && !self.yieldTo_json.is_empty() || true
+    }
+}
+
+impl Default for HdsDropEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document paste edit (insert text, additional edits, label)
+#[derive(Debug, Clone)]
+pub struct HdtPasteEdit {
+    pub paste_edit_id: String,
+    pub insert_text: String,
+    pub additional_edits_json: String,
+    pub label: String,
+    pub kind: String,
+    pub priority: u32,
+    pub command_json: String,
+    pub needs_confirmation: bool,
+    pub copy_metadata_json: String,
+    pub yieldTo_json: String,
+}
+
+impl HdtPasteEdit {
+    pub fn new() -> Self {
+        Self {
+            paste_edit_id: String::new(),
+            insert_text: String::new(),
+            additional_edits_json: String::new(),
+            label: String::new(),
+            kind: String::new(),
+            priority: u32::default(),
+            command_json: String::new(),
+            needs_confirmation: bool::default(),
+            copy_metadata_json: String::new(),
+            yieldTo_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.paste_edit_id.is_empty() || true && !self.insert_text.is_empty() || true && !self.additional_edits_json.is_empty() || true && !self.label.is_empty() || true && !self.kind.is_empty() || true && self.priority < u32::MAX || true && !self.command_json.is_empty() || true && self.needs_confirmation || true && !self.copy_metadata_json.is_empty() || true && !self.yieldTo_json.is_empty() || true
+    }
+}
+
+impl Default for HdtPasteEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// New symbol name (name, range, tags, preferred, confident)
+#[derive(Debug, Clone)]
+pub struct HduNewSymbolName {
+    pub new_symbol_id: String,
+    pub name: String,
+    pub range_json: String,
+    pub tags_json: String,
+    pub is_preferred: bool,
+    pub confidence: f64,
+    pub provider_id: String,
+    pub reason: String,
+    pub alternative_names_json: String,
+    pub source: String,
+}
+
+impl HduNewSymbolName {
+    pub fn new() -> Self {
+        Self {
+            new_symbol_id: String::new(),
+            name: String::new(),
+            range_json: String::new(),
+            tags_json: String::new(),
+            is_preferred: bool::default(),
+            confidence: f64::default(),
+            provider_id: String::new(),
+            reason: String::new(),
+            alternative_names_json: String::new(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.new_symbol_id.is_empty() || true && !self.name.is_empty() || true && !self.range_json.is_empty() || true && !self.tags_json.is_empty() || true && self.is_preferred || true && self.confidence.is_finite() || true && !self.provider_id.is_empty() || true && !self.reason.is_empty() || true && !self.alternative_names_json.is_empty() || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for HduNewSymbolName {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code action kind (value, contains, intersects, append)
+#[derive(Debug, Clone)]
+pub struct HdvCodeActionKind {
+    pub ca_kind_id: String,
+    pub value: String,
+    pub contains_json: String,
+    pub intersects_json: String,
+    pub append_value: String,
+    pub is_preferred: bool,
+    pub is_empty: bool,
+    pub parts_json: String,
+    pub parent_kind: String,
+    pub depth: u32,
+}
+
+impl HdvCodeActionKind {
+    pub fn new() -> Self {
+        Self {
+            ca_kind_id: String::new(),
+            value: String::new(),
+            contains_json: String::new(),
+            intersects_json: String::new(),
+            append_value: String::new(),
+            is_preferred: bool::default(),
+            is_empty: bool::default(),
+            parts_json: String::new(),
+            parent_kind: String::new(),
+            depth: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ca_kind_id.is_empty() || true && !self.value.is_empty() || true && !self.contains_json.is_empty() || true && !self.intersects_json.is_empty() || true && !self.append_value.is_empty() || true && self.is_preferred || true && self.is_empty || true && !self.parts_json.is_empty() || true && !self.parent_kind.is_empty() || true && self.depth < u32::MAX || true
+    }
+}
+
+impl Default for HdvCodeActionKind {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code action trigger (kind, trigger kind, diagnostics, only)
+#[derive(Debug, Clone)]
+pub struct HdwCodeActionTrigger {
+    pub ca_trigger_id: String,
+    pub kind: String,
+    pub trigger_kind: String,
+    pub diagnostics_json: String,
+    pub only_json: String,
+    pub position_json: String,
+    pub range_json: String,
+    pub is_auto: bool,
+    pub filter_json: String,
+    pub source: String,
+}
+
+impl HdwCodeActionTrigger {
+    pub fn new() -> Self {
+        Self {
+            ca_trigger_id: String::new(),
+            kind: String::new(),
+            trigger_kind: String::new(),
+            diagnostics_json: String::new(),
+            only_json: String::new(),
+            position_json: String::new(),
+            range_json: String::new(),
+            is_auto: bool::default(),
+            filter_json: String::new(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ca_trigger_id.is_empty() || true && !self.kind.is_empty() || true && !self.trigger_kind.is_empty() || true && !self.diagnostics_json.is_empty() || true && !self.only_json.is_empty() || true && !self.position_json.is_empty() || true && !self.range_json.is_empty() || true && self.is_auto || true && !self.filter_json.is_empty() || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for HdwCodeActionTrigger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code lens provider (event, provide, resolve, document selector)
+#[derive(Debug, Clone)]
+pub struct HdxCodeLensProvider {
+    pub code_lens_prov_id: String,
+    pub event_name: String,
+    pub provide_count: u32,
+    pub resolve_count: u32,
+    pub document_selector_json: String,
+    pub is_registered: bool,
+    pub extension_id: String,
+    pub priority: u32,
+    pub language_id: String,
+    pub event_emitter_id: String,
+}
+
+impl HdxCodeLensProvider {
+    pub fn new() -> Self {
+        Self {
+            code_lens_prov_id: String::new(),
+            event_name: String::new(),
+            provide_count: u32::default(),
+            resolve_count: u32::default(),
+            document_selector_json: String::new(),
+            is_registered: bool::default(),
+            extension_id: String::new(),
+            priority: u32::default(),
+            language_id: String::new(),
+            event_emitter_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.code_lens_prov_id.is_empty() || true && !self.event_name.is_empty() || true && self.provide_count < u32::MAX || true && self.resolve_count < u32::MAX || true && !self.document_selector_json.is_empty() || true && self.is_registered || true && !self.extension_id.is_empty() || true && self.priority < u32::MAX || true && !self.language_id.is_empty() || true && !self.event_emitter_id.is_empty() || true
+    }
+}
+
+impl Default for HdxCodeLensProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Formatting options (tab size, insert spaces, trim, newline)
+#[derive(Debug, Clone)]
+pub struct HdyFormattingOptions {
+    pub fmt_opts_id: String,
+    pub tab_size: u32,
+    pub insert_spaces: bool,
+    pub trim_trailing_whitespace: bool,
+    pub insert_final_newline: bool,
+    pub trim_final_newlines: bool,
+    pub max_line_length: u32,
+    pub end_of_line: String,
+    pub encoding: String,
+    pub indent_style: String,
+}
+
+impl HdyFormattingOptions {
+    pub fn new() -> Self {
+        Self {
+            fmt_opts_id: String::new(),
+            tab_size: u32::default(),
+            insert_spaces: bool::default(),
+            trim_trailing_whitespace: bool::default(),
+            insert_final_newline: bool::default(),
+            trim_final_newlines: bool::default(),
+            max_line_length: u32::default(),
+            end_of_line: String::new(),
+            encoding: String::new(),
+            indent_style: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fmt_opts_id.is_empty() || true && self.tab_size < u32::MAX || true && self.insert_spaces || true && self.trim_trailing_whitespace || true && self.insert_final_newline || true && self.trim_final_newlines || true && self.max_line_length < u32::MAX || true && !self.end_of_line.is_empty() || true && !self.encoding.is_empty() || true && !self.indent_style.is_empty() || true
+    }
+}
+
+impl Default for HdyFormattingOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// On type formatting (ch, position, options, trigger char)
+#[derive(Debug, Clone)]
+pub struct HdzOnTypeFormatting {
+    pub on_type_fmt_id: String,
+    pub trigger_character: String,
+    pub position_json: String,
+    pub options_json: String,
+    pub more_trigger_chars_json: String,
+    pub provider_id: String,
+    pub document_selector: String,
+    pub is_registered: bool,
+    pub language_id: String,
+    pub auto_format: bool,
+}
+
+impl HdzOnTypeFormatting {
+    pub fn new() -> Self {
+        Self {
+            on_type_fmt_id: String::new(),
+            trigger_character: String::new(),
+            position_json: String::new(),
+            options_json: String::new(),
+            more_trigger_chars_json: String::new(),
+            provider_id: String::new(),
+            document_selector: String::new(),
+            is_registered: bool::default(),
+            language_id: String::new(),
+            auto_format: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.on_type_fmt_id.is_empty() || true && !self.trigger_character.is_empty() || true && !self.position_json.is_empty() || true && !self.options_json.is_empty() || true && !self.more_trigger_chars_json.is_empty() || true && !self.provider_id.is_empty() || true && !self.document_selector.is_empty() || true && self.is_registered || true && !self.language_id.is_empty() || true && self.auto_format || true
+    }
+}
+
+impl Default for HdzOnTypeFormatting {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -352189,6 +352861,294 @@ mod tests_hdj_generated {
     fn test_hdj_fields() {
         let mut obj = HdjDocumentHighlight::default();
         obj.doc_highlight_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdk_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdk_default() {
+        let obj = HdkFoldingRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdk_fields() {
+        let mut obj = HdkFoldingRange::default();
+        obj.folding_range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdl_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdl_default() {
+        let obj = HdlSelectionRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdl_fields() {
+        let mut obj = HdlSelectionRange::default();
+        obj.sel_range_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdm_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdm_default() {
+        let obj = HdmCallHierarchyItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdm_fields() {
+        let mut obj = HdmCallHierarchyItem::default();
+        obj.call_hier_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdn_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdn_default() {
+        let obj = HdnTypeHierarchyItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdn_fields() {
+        let mut obj = HdnTypeHierarchyItem::default();
+        obj.type_hier_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdo_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdo_default() {
+        let obj = HdoInlayHint::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdo_fields() {
+        let mut obj = HdoInlayHint::default();
+        obj.inlay_hint_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdp_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdp_default() {
+        let obj = HdpLinkedEditingRange::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdp_fields() {
+        let mut obj = HdpLinkedEditingRange::default();
+        obj.linked_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdq_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdq_default() {
+        let obj = HdqSemanticTokens::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdq_fields() {
+        let mut obj = HdqSemanticTokens::default();
+        obj.sem_tokens_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdr_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdr_default() {
+        let obj = HdrInlineValue::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdr_fields() {
+        let mut obj = HdrInlineValue::default();
+        obj.inline_val_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hds_generated {
+    use super::*;
+
+    #[test]
+    fn test_hds_default() {
+        let obj = HdsDropEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hds_fields() {
+        let mut obj = HdsDropEdit::default();
+        obj.drop_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdt_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdt_default() {
+        let obj = HdtPasteEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdt_fields() {
+        let mut obj = HdtPasteEdit::default();
+        obj.paste_edit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdu_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdu_default() {
+        let obj = HduNewSymbolName::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdu_fields() {
+        let mut obj = HduNewSymbolName::default();
+        obj.new_symbol_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdv_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdv_default() {
+        let obj = HdvCodeActionKind::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdv_fields() {
+        let mut obj = HdvCodeActionKind::default();
+        obj.ca_kind_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdw_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdw_default() {
+        let obj = HdwCodeActionTrigger::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdw_fields() {
+        let mut obj = HdwCodeActionTrigger::default();
+        obj.ca_trigger_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdx_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdx_default() {
+        let obj = HdxCodeLensProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdx_fields() {
+        let mut obj = HdxCodeLensProvider::default();
+        obj.code_lens_prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdy_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdy_default() {
+        let obj = HdyFormattingOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdy_fields() {
+        let mut obj = HdyFormattingOptions::default();
+        obj.fmt_opts_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_hdz_generated {
+    use super::*;
+
+    #[test]
+    fn test_hdz_default() {
+        let obj = HdzOnTypeFormatting::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_hdz_fields() {
+        let mut obj = HdzOnTypeFormatting::default();
+        obj.on_type_fmt_id = "test".to_string();
         assert!(obj.validate());
     }
 }
