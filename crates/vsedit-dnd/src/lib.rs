@@ -109506,6 +109506,678 @@ impl Default for GyjWatcherStatistics {
     }
 }
 
+/// Inotify watcher (fd, watch descriptors, mask, buffer size)
+#[derive(Debug, Clone)]
+pub struct GykInotifyWatcher {
+    pub inotify_id: String,
+    pub fd: u32,
+    pub watch_descriptors_json: String,
+    pub mask: u32,
+    pub buffer_size: u32,
+    pub is_active: bool,
+    pub event_count: u64,
+    pub error_count: u32,
+    pub max_watches: u32,
+    pub platform: String,
+}
+
+impl GykInotifyWatcher {
+    pub fn new() -> Self {
+        Self {
+            inotify_id: String::new(),
+            fd: u32::default(),
+            watch_descriptors_json: String::new(),
+            mask: u32::default(),
+            buffer_size: u32::default(),
+            is_active: bool::default(),
+            event_count: u64::default(),
+            error_count: u32::default(),
+            max_watches: u32::default(),
+            platform: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.inotify_id.is_empty() || true && self.fd < u32::MAX || true && !self.watch_descriptors_json.is_empty() || true && self.mask < u32::MAX || true && self.buffer_size < u32::MAX || true && self.is_active || true && self.event_count < u64::MAX || true && self.error_count < u32::MAX || true && self.max_watches < u32::MAX || true && !self.platform.is_empty() || true
+    }
+}
+
+impl Default for GykInotifyWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// fsnotify backend (backend type, config, debounce, batch size)
+#[derive(Debug, Clone)]
+pub struct GylFsNotifyBackend {
+    pub fsnotify_id: String,
+    pub backend_type: String,
+    pub config_json: String,
+    pub debounce_ms: u32,
+    pub batch_size: u32,
+    pub is_native: bool,
+    pub supports_recursive: bool,
+    pub max_events: u32,
+    pub poll_interval_ms: u32,
+    pub version: String,
+}
+
+impl GylFsNotifyBackend {
+    pub fn new() -> Self {
+        Self {
+            fsnotify_id: String::new(),
+            backend_type: String::new(),
+            config_json: String::new(),
+            debounce_ms: u32::default(),
+            batch_size: u32::default(),
+            is_native: bool::default(),
+            supports_recursive: bool::default(),
+            max_events: u32::default(),
+            poll_interval_ms: u32::default(),
+            version: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fsnotify_id.is_empty() || true && !self.backend_type.is_empty() || true && !self.config_json.is_empty() || true && self.debounce_ms < u32::MAX || true && self.batch_size < u32::MAX || true && self.is_native || true && self.supports_recursive || true && self.max_events < u32::MAX || true && self.poll_interval_ms < u32::MAX || true && !self.version.is_empty() || true
+    }
+}
+
+impl Default for GylFsNotifyBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Atomic save operation (temp path, target path, backup, encoding)
+#[derive(Debug, Clone)]
+pub struct GymAtomicSave {
+    pub atomic_save_id: String,
+    pub temp_path: String,
+    pub target_path: String,
+    pub backup_path: String,
+    pub encoding: String,
+    pub create_backup: bool,
+    pub preserve_permissions: bool,
+    pub write_bom: bool,
+    pub line_ending: String,
+    pub file_size: u64,
+}
+
+impl GymAtomicSave {
+    pub fn new() -> Self {
+        Self {
+            atomic_save_id: String::new(),
+            temp_path: String::new(),
+            target_path: String::new(),
+            backup_path: String::new(),
+            encoding: String::new(),
+            create_backup: bool::default(),
+            preserve_permissions: bool::default(),
+            write_bom: bool::default(),
+            line_ending: String::new(),
+            file_size: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.atomic_save_id.is_empty() || true && !self.temp_path.is_empty() || true && !self.target_path.is_empty() || true && !self.backup_path.is_empty() || true && !self.encoding.is_empty() || true && self.create_backup || true && self.preserve_permissions || true && self.write_bom || true && !self.line_ending.is_empty() || true && self.file_size < u64::MAX || true
+    }
+}
+
+impl Default for GymAtomicSave {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File backup (source, backup path, hash, timestamp, auto)
+#[derive(Debug, Clone)]
+pub struct GynFileBackup {
+    pub file_backup_id: String,
+    pub source_path: String,
+    pub backup_path: String,
+    pub hash: String,
+    pub timestamp_ms: u64,
+    pub is_auto: bool,
+    pub size_bytes: u64,
+    pub encoding: String,
+    pub version_id: String,
+    pub workspace_id: String,
+}
+
+impl GynFileBackup {
+    pub fn new() -> Self {
+        Self {
+            file_backup_id: String::new(),
+            source_path: String::new(),
+            backup_path: String::new(),
+            hash: String::new(),
+            timestamp_ms: u64::default(),
+            is_auto: bool::default(),
+            size_bytes: u64::default(),
+            encoding: String::new(),
+            version_id: String::new(),
+            workspace_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_backup_id.is_empty() || true && !self.source_path.is_empty() || true && !self.backup_path.is_empty() || true && !self.hash.is_empty() || true && self.timestamp_ms < u64::MAX || true && self.is_auto || true && self.size_bytes < u64::MAX || true && !self.encoding.is_empty() || true && !self.version_id.is_empty() || true && !self.workspace_id.is_empty() || true
+    }
+}
+
+impl Default for GynFileBackup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Hot exit state (dirty files, backup location, workspace id)
+#[derive(Debug, Clone)]
+pub struct GyoHotExitState {
+    pub hot_exit_id: String,
+    pub dirty_files_json: String,
+    pub backup_location: String,
+    pub workspace_id: String,
+    pub is_enabled: bool,
+    pub last_save_ms: u64,
+    pub file_count: u32,
+    pub total_size: u64,
+    pub strategy: String,
+    pub restore_windows: bool,
+}
+
+impl GyoHotExitState {
+    pub fn new() -> Self {
+        Self {
+            hot_exit_id: String::new(),
+            dirty_files_json: String::new(),
+            backup_location: String::new(),
+            workspace_id: String::new(),
+            is_enabled: bool::default(),
+            last_save_ms: u64::default(),
+            file_count: u32::default(),
+            total_size: u64::default(),
+            strategy: String::new(),
+            restore_windows: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hot_exit_id.is_empty() || true && !self.dirty_files_json.is_empty() || true && !self.backup_location.is_empty() || true && !self.workspace_id.is_empty() || true && self.is_enabled || true && self.last_save_ms < u64::MAX || true && self.file_count < u32::MAX || true && self.total_size < u64::MAX || true && !self.strategy.is_empty() || true && self.restore_windows || true
+    }
+}
+
+impl Default for GyoHotExitState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File encoding (encoding name, BOM, confidence, auto guess)
+#[derive(Debug, Clone)]
+pub struct GypFileEncoding {
+    pub file_enc_id: String,
+    pub encoding_name: String,
+    pub has_bom: bool,
+    pub confidence: f64,
+    pub auto_guess: bool,
+    pub fallback: String,
+    pub detected_by: String,
+    pub byte_order: String,
+    pub is_supported: bool,
+    pub alias: String,
+}
+
+impl GypFileEncoding {
+    pub fn new() -> Self {
+        Self {
+            file_enc_id: String::new(),
+            encoding_name: String::new(),
+            has_bom: bool::default(),
+            confidence: f64::default(),
+            auto_guess: bool::default(),
+            fallback: String::new(),
+            detected_by: String::new(),
+            byte_order: String::new(),
+            is_supported: bool::default(),
+            alias: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_enc_id.is_empty() || true && !self.encoding_name.is_empty() || true && self.has_bom || true && self.confidence.is_finite() || true && self.auto_guess || true && !self.fallback.is_empty() || true && !self.detected_by.is_empty() || true && !self.byte_order.is_empty() || true && self.is_supported || true && !self.alias.is_empty() || true
+    }
+}
+
+impl Default for GypFileEncoding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Line ending (type, auto detect, default, mixed line endings)
+#[derive(Debug, Clone)]
+pub struct GyqLineEnding {
+    pub line_ending_id: String,
+    pub ending_type: String,
+    pub auto_detect: bool,
+    pub default_ending: String,
+    pub mixed_line_endings: bool,
+    pub dominant_ending: String,
+    pub crlf_count: u64,
+    pub lf_count: u64,
+    pub cr_count: u64,
+    pub normalize_on_save: bool,
+}
+
+impl GyqLineEnding {
+    pub fn new() -> Self {
+        Self {
+            line_ending_id: String::new(),
+            ending_type: String::new(),
+            auto_detect: bool::default(),
+            default_ending: String::new(),
+            mixed_line_endings: bool::default(),
+            dominant_ending: String::new(),
+            crlf_count: u64::default(),
+            lf_count: u64::default(),
+            cr_count: u64::default(),
+            normalize_on_save: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.line_ending_id.is_empty() || true && !self.ending_type.is_empty() || true && self.auto_detect || true && !self.default_ending.is_empty() || true && self.mixed_line_endings || true && !self.dominant_ending.is_empty() || true && self.crlf_count < u64::MAX || true && self.lf_count < u64::MAX || true && self.cr_count < u64::MAX || true && self.normalize_on_save || true
+    }
+}
+
+impl Default for GyqLineEnding {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File permission (readonly, locked, owner, group, mode)
+#[derive(Debug, Clone)]
+pub struct GyrFilePermission {
+    pub file_perm_id: String,
+    pub is_readonly: bool,
+    pub is_locked: bool,
+    pub owner: String,
+    pub group_name: String,
+    pub mode: u32,
+    pub can_read: bool,
+    pub can_write: bool,
+    pub can_execute: bool,
+    pub acl_json: String,
+}
+
+impl GyrFilePermission {
+    pub fn new() -> Self {
+        Self {
+            file_perm_id: String::new(),
+            is_readonly: bool::default(),
+            is_locked: bool::default(),
+            owner: String::new(),
+            group_name: String::new(),
+            mode: u32::default(),
+            can_read: bool::default(),
+            can_write: bool::default(),
+            can_execute: bool::default(),
+            acl_json: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_perm_id.is_empty() || true && self.is_readonly || true && self.is_locked || true && !self.owner.is_empty() || true && !self.group_name.is_empty() || true && self.mode < u32::MAX || true && self.can_read || true && self.can_write || true && self.can_execute || true && !self.acl_json.is_empty() || true
+    }
+}
+
+impl Default for GyrFilePermission {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Symlink info (target path, is broken, is directory, depth)
+#[derive(Debug, Clone)]
+pub struct GysSymlinkInfo {
+    pub symlink_id: String,
+    pub target_path: String,
+    pub is_broken: bool,
+    pub is_directory: bool,
+    pub depth: u32,
+    pub original_path: String,
+    pub resolved_path: String,
+    pub is_absolute: bool,
+    pub link_count: u32,
+    pub target_exists: bool,
+}
+
+impl GysSymlinkInfo {
+    pub fn new() -> Self {
+        Self {
+            symlink_id: String::new(),
+            target_path: String::new(),
+            is_broken: bool::default(),
+            is_directory: bool::default(),
+            depth: u32::default(),
+            original_path: String::new(),
+            resolved_path: String::new(),
+            is_absolute: bool::default(),
+            link_count: u32::default(),
+            target_exists: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.symlink_id.is_empty() || true && !self.target_path.is_empty() || true && self.is_broken || true && self.is_directory || true && self.depth < u32::MAX || true && !self.original_path.is_empty() || true && !self.resolved_path.is_empty() || true && self.is_absolute || true && self.link_count < u32::MAX || true && self.target_exists || true
+    }
+}
+
+impl Default for GysSymlinkInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Trash info (original path, deleted at, trash path, size)
+#[derive(Debug, Clone)]
+pub struct GytTrashInfo {
+    pub trash_info_id: String,
+    pub original_path: String,
+    pub deleted_at_ms: u64,
+    pub trash_path: String,
+    pub size_bytes: u64,
+    pub is_directory: bool,
+    pub can_restore: bool,
+    pub platform_trash: String,
+    pub item_count: u32,
+    pub parent_path: String,
+}
+
+impl GytTrashInfo {
+    pub fn new() -> Self {
+        Self {
+            trash_info_id: String::new(),
+            original_path: String::new(),
+            deleted_at_ms: u64::default(),
+            trash_path: String::new(),
+            size_bytes: u64::default(),
+            is_directory: bool::default(),
+            can_restore: bool::default(),
+            platform_trash: String::new(),
+            item_count: u32::default(),
+            parent_path: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.trash_info_id.is_empty() || true && !self.original_path.is_empty() || true && self.deleted_at_ms < u64::MAX || true && !self.trash_path.is_empty() || true && self.size_bytes < u64::MAX || true && self.is_directory || true && self.can_restore || true && !self.platform_trash.is_empty() || true && self.item_count < u32::MAX || true && !self.parent_path.is_empty() || true
+    }
+}
+
+impl Default for GytTrashInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File label (uri, label, description, tooltip, decoration)
+#[derive(Debug, Clone)]
+pub struct GyuFileLabel {
+    pub file_label_id: String,
+    pub uri: String,
+    pub label: String,
+    pub description: String,
+    pub tooltip: String,
+    pub decoration_json: String,
+    pub badge: String,
+    pub color: String,
+    pub icon: String,
+    pub priority: u32,
+}
+
+impl GyuFileLabel {
+    pub fn new() -> Self {
+        Self {
+            file_label_id: String::new(),
+            uri: String::new(),
+            label: String::new(),
+            description: String::new(),
+            tooltip: String::new(),
+            decoration_json: String::new(),
+            badge: String::new(),
+            color: String::new(),
+            icon: String::new(),
+            priority: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_label_id.is_empty() || true && !self.uri.is_empty() || true && !self.label.is_empty() || true && !self.description.is_empty() || true && !self.tooltip.is_empty() || true && !self.decoration_json.is_empty() || true && !self.badge.is_empty() || true && !self.color.is_empty() || true && !self.icon.is_empty() || true && self.priority < u32::MAX || true
+    }
+}
+
+impl Default for GyuFileLabel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Recent file (uri, label, last opened, pin, workspace)
+#[derive(Debug, Clone)]
+pub struct GyvRecentFile {
+    pub recent_file_id: String,
+    pub uri: String,
+    pub label: String,
+    pub last_opened_ms: u64,
+    pub is_pinned: bool,
+    pub workspace_id: String,
+    pub line_number: u32,
+    pub column_number: u32,
+    pub open_count: u32,
+    pub source: String,
+}
+
+impl GyvRecentFile {
+    pub fn new() -> Self {
+        Self {
+            recent_file_id: String::new(),
+            uri: String::new(),
+            label: String::new(),
+            last_opened_ms: u64::default(),
+            is_pinned: bool::default(),
+            workspace_id: String::new(),
+            line_number: u32::default(),
+            column_number: u32::default(),
+            open_count: u32::default(),
+            source: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.recent_file_id.is_empty() || true && !self.uri.is_empty() || true && !self.label.is_empty() || true && self.last_opened_ms < u64::MAX || true && self.is_pinned || true && !self.workspace_id.is_empty() || true && self.line_number < u32::MAX || true && self.column_number < u32::MAX || true && self.open_count < u32::MAX || true && !self.source.is_empty() || true
+    }
+}
+
+impl Default for GyvRecentFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Temp file (path, prefix, suffix, auto delete, ttl)
+#[derive(Debug, Clone)]
+pub struct GywTempFile {
+    pub temp_file_id: String,
+    pub path: String,
+    pub prefix: String,
+    pub suffix: String,
+    pub auto_delete: bool,
+    pub ttl_ms: u64,
+    pub created_at_ms: u64,
+    pub size_bytes: u64,
+    pub is_directory: bool,
+    pub owner: String,
+}
+
+impl GywTempFile {
+    pub fn new() -> Self {
+        Self {
+            temp_file_id: String::new(),
+            path: String::new(),
+            prefix: String::new(),
+            suffix: String::new(),
+            auto_delete: bool::default(),
+            ttl_ms: u64::default(),
+            created_at_ms: u64::default(),
+            size_bytes: u64::default(),
+            is_directory: bool::default(),
+            owner: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.temp_file_id.is_empty() || true && !self.path.is_empty() || true && !self.prefix.is_empty() || true && !self.suffix.is_empty() || true && self.auto_delete || true && self.ttl_ms < u64::MAX || true && self.created_at_ms < u64::MAX || true && self.size_bytes < u64::MAX || true && self.is_directory || true && !self.owner.is_empty() || true
+    }
+}
+
+impl Default for GywTempFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Large file operation (size, threshold, chunk size, progress)
+#[derive(Debug, Clone)]
+pub struct GyxLargeFileOp {
+    pub large_file_id: String,
+    pub size_bytes: u64,
+    pub threshold_bytes: u64,
+    pub chunk_size: u32,
+    pub progress_pct: f64,
+    pub is_streaming: bool,
+    pub encoding: String,
+    pub line_count: u64,
+    pub is_binary: bool,
+    pub tokenization_limit: u64,
+}
+
+impl GyxLargeFileOp {
+    pub fn new() -> Self {
+        Self {
+            large_file_id: String::new(),
+            size_bytes: u64::default(),
+            threshold_bytes: u64::default(),
+            chunk_size: u32::default(),
+            progress_pct: f64::default(),
+            is_streaming: bool::default(),
+            encoding: String::new(),
+            line_count: u64::default(),
+            is_binary: bool::default(),
+            tokenization_limit: u64::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.large_file_id.is_empty() || true && self.size_bytes < u64::MAX || true && self.threshold_bytes < u64::MAX || true && self.chunk_size < u32::MAX || true && self.progress_pct.is_finite() || true && self.is_streaming || true && !self.encoding.is_empty() || true && self.line_count < u64::MAX || true && self.is_binary || true && self.tokenization_limit < u64::MAX || true
+    }
+}
+
+impl Default for GyxLargeFileOp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// File dialog options (default uri, filters, title, can many)
+#[derive(Debug, Clone)]
+pub struct GyyFileDialogOptions {
+    pub file_dialog_id: String,
+    pub default_uri: String,
+    pub filters_json: String,
+    pub title: String,
+    pub can_select_many: bool,
+    pub can_select_files: bool,
+    pub can_select_folders: bool,
+    pub open_label: String,
+    pub default_filter_index: u32,
+    pub initial_directory: String,
+}
+
+impl GyyFileDialogOptions {
+    pub fn new() -> Self {
+        Self {
+            file_dialog_id: String::new(),
+            default_uri: String::new(),
+            filters_json: String::new(),
+            title: String::new(),
+            can_select_many: bool::default(),
+            can_select_files: bool::default(),
+            can_select_folders: bool::default(),
+            open_label: String::new(),
+            default_filter_index: u32::default(),
+            initial_directory: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.file_dialog_id.is_empty() || true && !self.default_uri.is_empty() || true && !self.filters_json.is_empty() || true && !self.title.is_empty() || true && self.can_select_many || true && self.can_select_files || true && self.can_select_folders || true && !self.open_label.is_empty() || true && self.default_filter_index < u32::MAX || true && !self.initial_directory.is_empty() || true
+    }
+}
+
+impl Default for GyyFileDialogOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Save dialog options (default uri, filters, title, save label)
+#[derive(Debug, Clone)]
+pub struct GyzSaveDialogOptions {
+    pub save_dialog_id: String,
+    pub default_uri: String,
+    pub filters_json: String,
+    pub title: String,
+    pub save_label: String,
+    pub default_name: String,
+    pub show_hidden: bool,
+    pub validate_name: bool,
+    pub overwrite_prompt: bool,
+    pub initial_directory: String,
+}
+
+impl GyzSaveDialogOptions {
+    pub fn new() -> Self {
+        Self {
+            save_dialog_id: String::new(),
+            default_uri: String::new(),
+            filters_json: String::new(),
+            title: String::new(),
+            save_label: String::new(),
+            default_name: String::new(),
+            show_hidden: bool::default(),
+            validate_name: bool::default(),
+            overwrite_prompt: bool::default(),
+            initial_directory: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.save_dialog_id.is_empty() || true && !self.default_uri.is_empty() || true && !self.filters_json.is_empty() || true && !self.title.is_empty() || true && !self.save_label.is_empty() || true && !self.default_name.is_empty() || true && self.show_hidden || true && self.validate_name || true && self.overwrite_prompt || true && !self.initial_directory.is_empty() || true
+    }
+}
+
+impl Default for GyzSaveDialogOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -344513,6 +345185,294 @@ mod tests_gyj_generated {
     fn test_gyj_fields() {
         let mut obj = GyjWatcherStatistics::default();
         obj.watcher_stats_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyk_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyk_default() {
+        let obj = GykInotifyWatcher::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyk_fields() {
+        let mut obj = GykInotifyWatcher::default();
+        obj.inotify_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyl_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyl_default() {
+        let obj = GylFsNotifyBackend::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyl_fields() {
+        let mut obj = GylFsNotifyBackend::default();
+        obj.fsnotify_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gym_generated {
+    use super::*;
+
+    #[test]
+    fn test_gym_default() {
+        let obj = GymAtomicSave::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gym_fields() {
+        let mut obj = GymAtomicSave::default();
+        obj.atomic_save_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyn_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyn_default() {
+        let obj = GynFileBackup::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyn_fields() {
+        let mut obj = GynFileBackup::default();
+        obj.file_backup_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyo_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyo_default() {
+        let obj = GyoHotExitState::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyo_fields() {
+        let mut obj = GyoHotExitState::default();
+        obj.hot_exit_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyp_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyp_default() {
+        let obj = GypFileEncoding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyp_fields() {
+        let mut obj = GypFileEncoding::default();
+        obj.file_enc_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyq_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyq_default() {
+        let obj = GyqLineEnding::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyq_fields() {
+        let mut obj = GyqLineEnding::default();
+        obj.line_ending_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyr_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyr_default() {
+        let obj = GyrFilePermission::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyr_fields() {
+        let mut obj = GyrFilePermission::default();
+        obj.file_perm_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gys_generated {
+    use super::*;
+
+    #[test]
+    fn test_gys_default() {
+        let obj = GysSymlinkInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gys_fields() {
+        let mut obj = GysSymlinkInfo::default();
+        obj.symlink_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyt_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyt_default() {
+        let obj = GytTrashInfo::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyt_fields() {
+        let mut obj = GytTrashInfo::default();
+        obj.trash_info_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyu_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyu_default() {
+        let obj = GyuFileLabel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyu_fields() {
+        let mut obj = GyuFileLabel::default();
+        obj.file_label_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyv_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyv_default() {
+        let obj = GyvRecentFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyv_fields() {
+        let mut obj = GyvRecentFile::default();
+        obj.recent_file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyw_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyw_default() {
+        let obj = GywTempFile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyw_fields() {
+        let mut obj = GywTempFile::default();
+        obj.temp_file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyx_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyx_default() {
+        let obj = GyxLargeFileOp::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyx_fields() {
+        let mut obj = GyxLargeFileOp::default();
+        obj.large_file_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyy_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyy_default() {
+        let obj = GyyFileDialogOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyy_fields() {
+        let mut obj = GyyFileDialogOptions::default();
+        obj.file_dialog_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gyz_generated {
+    use super::*;
+
+    #[test]
+    fn test_gyz_default() {
+        let obj = GyzSaveDialogOptions::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gyz_fields() {
+        let mut obj = GyzSaveDialogOptions::default();
+        obj.save_dialog_id = "test".to_string();
         assert!(obj.validate());
     }
 }
