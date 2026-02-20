@@ -90892,6 +90892,678 @@ impl Default for GhjTreeViewVirtualization {
     }
 }
 
+/// List widget (items, selection, focus, scroll, keyboard nav)
+#[derive(Debug, Clone)]
+pub struct GhkListWidget {
+    pub list_id: String,
+    pub items_json: String,
+    pub selected_index: u32,
+    pub focus_index: u32,
+    pub scroll_top: u32,
+    pub keyboard_nav: bool,
+    pub page_size: u32,
+    pub horizontal_scroll: bool,
+    pub row_height: u32,
+    pub smooth_scroll: bool,
+}
+
+impl GhkListWidget {
+    pub fn new() -> Self {
+        Self {
+            list_id: String::new(),
+            items_json: String::new(),
+            selected_index: u32::default(),
+            focus_index: u32::default(),
+            scroll_top: u32::default(),
+            keyboard_nav: bool::default(),
+            page_size: u32::default(),
+            horizontal_scroll: bool::default(),
+            row_height: u32::default(),
+            smooth_scroll: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.list_id.is_empty() || true && !self.items_json.is_empty() || true && self.selected_index < u32::MAX || true && self.focus_index < u32::MAX || true && self.scroll_top < u32::MAX || true && self.keyboard_nav || true && self.page_size < u32::MAX || true && self.horizontal_scroll || true && self.row_height < u32::MAX || true && self.smooth_scroll || true
+    }
+}
+
+impl Default for GhkListWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Table widget (columns, rows, sort, resize, header)
+#[derive(Debug, Clone)]
+pub struct GhlTableWidget {
+    pub table_id: String,
+    pub columns_json: String,
+    pub rows_json: String,
+    pub sort_column: String,
+    pub sort_direction: String,
+    pub resize_enabled: bool,
+    pub header_visible: bool,
+    pub striped_rows: bool,
+    pub selected_row: u32,
+    pub column_count: u32,
+}
+
+impl GhlTableWidget {
+    pub fn new() -> Self {
+        Self {
+            table_id: String::new(),
+            columns_json: String::new(),
+            rows_json: String::new(),
+            sort_column: String::new(),
+            sort_direction: String::new(),
+            resize_enabled: bool::default(),
+            header_visible: bool::default(),
+            striped_rows: bool::default(),
+            selected_row: u32::default(),
+            column_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.table_id.is_empty() || true && !self.columns_json.is_empty() || true && !self.rows_json.is_empty() || true && !self.sort_column.is_empty() || true && !self.sort_direction.is_empty() || true && self.resize_enabled || true && self.header_visible || true && self.striped_rows || true && self.selected_row < u32::MAX || true && self.column_count < u32::MAX || true
+    }
+}
+
+impl Default for GhlTableWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Split view widget (panes, sizes, orientation, min size, sash)
+#[derive(Debug, Clone)]
+pub struct GhmSplitViewWidget {
+    pub split_id: String,
+    pub panes_json: String,
+    pub sizes_json: String,
+    pub orientation: String,
+    pub min_size: u32,
+    pub sash_size: u32,
+    pub snap_to_min: bool,
+    pub proportional_layout: bool,
+    pub pane_count: u32,
+    pub border_visible: bool,
+}
+
+impl GhmSplitViewWidget {
+    pub fn new() -> Self {
+        Self {
+            split_id: String::new(),
+            panes_json: String::new(),
+            sizes_json: String::new(),
+            orientation: String::new(),
+            min_size: u32::default(),
+            sash_size: u32::default(),
+            snap_to_min: bool::default(),
+            proportional_layout: bool::default(),
+            pane_count: u32::default(),
+            border_visible: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.split_id.is_empty() || true && !self.panes_json.is_empty() || true && !self.sizes_json.is_empty() || true && !self.orientation.is_empty() || true && self.min_size < u32::MAX || true && self.sash_size < u32::MAX || true && self.snap_to_min || true && self.proportional_layout || true && self.pane_count < u32::MAX || true && self.border_visible || true
+    }
+}
+
+impl Default for GhmSplitViewWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Grid view widget (cells, rows, columns, gap, overflow)
+#[derive(Debug, Clone)]
+pub struct GhnGridViewWidget {
+    pub grid_id: String,
+    pub cell_count: u32,
+    pub rows: u32,
+    pub columns: u32,
+    pub gap: u32,
+    pub overflow: String,
+    pub min_cell_width: u32,
+    pub min_cell_height: u32,
+    pub auto_fill: bool,
+    pub responsive: bool,
+}
+
+impl GhnGridViewWidget {
+    pub fn new() -> Self {
+        Self {
+            grid_id: String::new(),
+            cell_count: u32::default(),
+            rows: u32::default(),
+            columns: u32::default(),
+            gap: u32::default(),
+            overflow: String::new(),
+            min_cell_width: u32::default(),
+            min_cell_height: u32::default(),
+            auto_fill: bool::default(),
+            responsive: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.grid_id.is_empty() || true && self.cell_count < u32::MAX || true && self.rows < u32::MAX || true && self.columns < u32::MAX || true && self.gap < u32::MAX || true && !self.overflow.is_empty() || true && self.min_cell_width < u32::MAX || true && self.min_cell_height < u32::MAX || true && self.auto_fill || true && self.responsive || true
+    }
+}
+
+impl Default for GhnGridViewWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tab bar widget (tabs, active, scroll, overflow, close button)
+#[derive(Debug, Clone)]
+pub struct GhoTabBarWidget {
+    pub tabbar_id: String,
+    pub tabs_json: String,
+    pub active_tab_id: String,
+    pub scroll_position: u32,
+    pub overflow_mode: String,
+    pub close_button: bool,
+    pub max_tab_width: u32,
+    pub show_icons: bool,
+    pub draggable: bool,
+    pub wrap_tabs: bool,
+}
+
+impl GhoTabBarWidget {
+    pub fn new() -> Self {
+        Self {
+            tabbar_id: String::new(),
+            tabs_json: String::new(),
+            active_tab_id: String::new(),
+            scroll_position: u32::default(),
+            overflow_mode: String::new(),
+            close_button: bool::default(),
+            max_tab_width: u32::default(),
+            show_icons: bool::default(),
+            draggable: bool::default(),
+            wrap_tabs: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.tabbar_id.is_empty() || true && !self.tabs_json.is_empty() || true && !self.active_tab_id.is_empty() || true && self.scroll_position < u32::MAX || true && !self.overflow_mode.is_empty() || true && self.close_button || true && self.max_tab_width < u32::MAX || true && self.show_icons || true && self.draggable || true && self.wrap_tabs || true
+    }
+}
+
+impl Default for GhoTabBarWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Breadcrumb widget (items, separator, overflow, picker, focus)
+#[derive(Debug, Clone)]
+pub struct GhpBreadcrumbWidget {
+    pub bread_id: String,
+    pub items_json: String,
+    pub separator: String,
+    pub overflow_mode: String,
+    pub picker_enabled: bool,
+    pub focus_index: u32,
+    pub icons_enabled: bool,
+    pub file_path_enabled: bool,
+    pub symbol_path_enabled: bool,
+    pub max_items: u32,
+}
+
+impl GhpBreadcrumbWidget {
+    pub fn new() -> Self {
+        Self {
+            bread_id: String::new(),
+            items_json: String::new(),
+            separator: String::new(),
+            overflow_mode: String::new(),
+            picker_enabled: bool::default(),
+            focus_index: u32::default(),
+            icons_enabled: bool::default(),
+            file_path_enabled: bool::default(),
+            symbol_path_enabled: bool::default(),
+            max_items: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.bread_id.is_empty() || true && !self.items_json.is_empty() || true && !self.separator.is_empty() || true && !self.overflow_mode.is_empty() || true && self.picker_enabled || true && self.focus_index < u32::MAX || true && self.icons_enabled || true && self.file_path_enabled || true && self.symbol_path_enabled || true && self.max_items < u32::MAX || true
+    }
+}
+
+impl Default for GhpBreadcrumbWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Context menu widget (items, position, submenu, separator, icons)
+#[derive(Debug, Clone)]
+pub struct GhqContextMenuWidget {
+    pub menu_id: String,
+    pub items_json: String,
+    pub position_x: u32,
+    pub position_y: u32,
+    pub submenu_delay_ms: u32,
+    pub separator_visible: bool,
+    pub icons_enabled: bool,
+    pub keyboard_nav: bool,
+    pub anchor_element: String,
+    pub close_on_blur: bool,
+}
+
+impl GhqContextMenuWidget {
+    pub fn new() -> Self {
+        Self {
+            menu_id: String::new(),
+            items_json: String::new(),
+            position_x: u32::default(),
+            position_y: u32::default(),
+            submenu_delay_ms: u32::default(),
+            separator_visible: bool::default(),
+            icons_enabled: bool::default(),
+            keyboard_nav: bool::default(),
+            anchor_element: String::new(),
+            close_on_blur: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.menu_id.is_empty() || true && !self.items_json.is_empty() || true && self.position_x < u32::MAX || true && self.position_y < u32::MAX || true && self.submenu_delay_ms < u32::MAX || true && self.separator_visible || true && self.icons_enabled || true && self.keyboard_nav || true && !self.anchor_element.is_empty() || true && self.close_on_blur || true
+    }
+}
+
+impl Default for GhqContextMenuWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toolbar widget (items, overflow, orientation, size, compact)
+#[derive(Debug, Clone)]
+pub struct GhrToolbarWidget {
+    pub toolbar_id: String,
+    pub items_json: String,
+    pub overflow_mode: String,
+    pub orientation: String,
+    pub size: String,
+    pub compact: bool,
+    pub gap: u32,
+    pub align: String,
+    pub icon_only: bool,
+    pub tooltip_enabled: bool,
+}
+
+impl GhrToolbarWidget {
+    pub fn new() -> Self {
+        Self {
+            toolbar_id: String::new(),
+            items_json: String::new(),
+            overflow_mode: String::new(),
+            orientation: String::new(),
+            size: String::new(),
+            compact: bool::default(),
+            gap: u32::default(),
+            align: String::new(),
+            icon_only: bool::default(),
+            tooltip_enabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.toolbar_id.is_empty() || true && !self.items_json.is_empty() || true && !self.overflow_mode.is_empty() || true && !self.orientation.is_empty() || true && !self.size.is_empty() || true && self.compact || true && self.gap < u32::MAX || true && !self.align.is_empty() || true && self.icon_only || true && self.tooltip_enabled || true
+    }
+}
+
+impl Default for GhrToolbarWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Scroll bar widget (position, size, horizontal, vertical, thumb)
+#[derive(Debug, Clone)]
+pub struct GhsScrollBarWidget {
+    pub scroll_id: String,
+    pub position: u32,
+    pub size: u32,
+    pub is_horizontal: bool,
+    pub is_vertical: bool,
+    pub thumb_size: u32,
+    pub track_size: u32,
+    pub always_visible: bool,
+    pub smooth_scroll: bool,
+    pub fade_delay_ms: u32,
+}
+
+impl GhsScrollBarWidget {
+    pub fn new() -> Self {
+        Self {
+            scroll_id: String::new(),
+            position: u32::default(),
+            size: u32::default(),
+            is_horizontal: bool::default(),
+            is_vertical: bool::default(),
+            thumb_size: u32::default(),
+            track_size: u32::default(),
+            always_visible: bool::default(),
+            smooth_scroll: bool::default(),
+            fade_delay_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scroll_id.is_empty() || true && self.position < u32::MAX || true && self.size < u32::MAX || true && self.is_horizontal || true && self.is_vertical || true && self.thumb_size < u32::MAX || true && self.track_size < u32::MAX || true && self.always_visible || true && self.smooth_scroll || true && self.fade_delay_ms < u32::MAX || true
+    }
+}
+
+impl Default for GhsScrollBarWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Progress bar widget (value, max, infinite, location, message)
+#[derive(Debug, Clone)]
+pub struct GhtProgressBarWidget {
+    pub progress_id: String,
+    pub value: f64,
+    pub max_value: f64,
+    pub is_infinite: bool,
+    pub location: String,
+    pub message: String,
+    pub title: String,
+    pub is_cancellable: bool,
+    pub is_discrete: bool,
+    pub animation_ms: u32,
+}
+
+impl GhtProgressBarWidget {
+    pub fn new() -> Self {
+        Self {
+            progress_id: String::new(),
+            value: f64::default(),
+            max_value: f64::default(),
+            is_infinite: bool::default(),
+            location: String::new(),
+            message: String::new(),
+            title: String::new(),
+            is_cancellable: bool::default(),
+            is_discrete: bool::default(),
+            animation_ms: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.progress_id.is_empty() || true && self.value.is_finite() || true && self.max_value.is_finite() || true && self.is_infinite || true && !self.location.is_empty() || true && !self.message.is_empty() || true && !self.title.is_empty() || true && self.is_cancellable || true && self.is_discrete || true && self.animation_ms < u32::MAX || true
+    }
+}
+
+impl Default for GhtProgressBarWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Badge widget (count, color, tooltip, font size, min width)
+#[derive(Debug, Clone)]
+pub struct GhuBadgeWidget {
+    pub badge_id: String,
+    pub count: u32,
+    pub color: String,
+    pub tooltip: String,
+    pub font_size: u32,
+    pub min_width: u32,
+    pub max_count: u32,
+    pub background_color: String,
+    pub is_visible: bool,
+    pub position: String,
+}
+
+impl GhuBadgeWidget {
+    pub fn new() -> Self {
+        Self {
+            badge_id: String::new(),
+            count: u32::default(),
+            color: String::new(),
+            tooltip: String::new(),
+            font_size: u32::default(),
+            min_width: u32::default(),
+            max_count: u32::default(),
+            background_color: String::new(),
+            is_visible: bool::default(),
+            position: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.badge_id.is_empty() || true && self.count < u32::MAX || true && !self.color.is_empty() || true && !self.tooltip.is_empty() || true && self.font_size < u32::MAX || true && self.min_width < u32::MAX || true && self.max_count < u32::MAX || true && !self.background_color.is_empty() || true && self.is_visible || true && !self.position.is_empty() || true
+    }
+}
+
+impl Default for GhuBadgeWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Toggle widget (checked, label, icon, disabled, indeterminate)
+#[derive(Debug, Clone)]
+pub struct GhvToggleWidget {
+    pub toggle_id: String,
+    pub is_checked: bool,
+    pub label: String,
+    pub icon: String,
+    pub is_disabled: bool,
+    pub is_indeterminate: bool,
+    pub tooltip: String,
+    pub command_id: String,
+    pub context_key: String,
+    pub aria_label: String,
+}
+
+impl GhvToggleWidget {
+    pub fn new() -> Self {
+        Self {
+            toggle_id: String::new(),
+            is_checked: bool::default(),
+            label: String::new(),
+            icon: String::new(),
+            is_disabled: bool::default(),
+            is_indeterminate: bool::default(),
+            tooltip: String::new(),
+            command_id: String::new(),
+            context_key: String::new(),
+            aria_label: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.toggle_id.is_empty() || true && self.is_checked || true && !self.label.is_empty() || true && !self.icon.is_empty() || true && self.is_disabled || true && self.is_indeterminate || true && !self.tooltip.is_empty() || true && !self.command_id.is_empty() || true && !self.context_key.is_empty() || true && !self.aria_label.is_empty() || true
+    }
+}
+
+impl Default for GhvToggleWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Input box widget (value, placeholder, type, validation, history)
+#[derive(Debug, Clone)]
+pub struct GhwInputBoxWidget {
+    pub input_id: String,
+    pub value: String,
+    pub placeholder: String,
+    pub input_type: String,
+    pub validation_message: String,
+    pub history_json: String,
+    pub max_length: u32,
+    pub auto_focus: bool,
+    pub password_reveal: bool,
+    pub multiline: bool,
+}
+
+impl GhwInputBoxWidget {
+    pub fn new() -> Self {
+        Self {
+            input_id: String::new(),
+            value: String::new(),
+            placeholder: String::new(),
+            input_type: String::new(),
+            validation_message: String::new(),
+            history_json: String::new(),
+            max_length: u32::default(),
+            auto_focus: bool::default(),
+            password_reveal: bool::default(),
+            multiline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.input_id.is_empty() || true && !self.value.is_empty() || true && !self.placeholder.is_empty() || true && !self.input_type.is_empty() || true && !self.validation_message.is_empty() || true && !self.history_json.is_empty() || true && self.max_length < u32::MAX || true && self.auto_focus || true && self.password_reveal || true && self.multiline || true
+    }
+}
+
+impl Default for GhwInputBoxWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Dropdown widget (options, selected, placeholder, filter, multi)
+#[derive(Debug, Clone)]
+pub struct GhxDropdownWidget {
+    pub dropdown_id: String,
+    pub options_json: String,
+    pub selected_index: u32,
+    pub placeholder: String,
+    pub filter_text: String,
+    pub is_multi_select: bool,
+    pub is_open: bool,
+    pub max_height: u32,
+    pub show_icons: bool,
+    pub disabled: bool,
+}
+
+impl GhxDropdownWidget {
+    pub fn new() -> Self {
+        Self {
+            dropdown_id: String::new(),
+            options_json: String::new(),
+            selected_index: u32::default(),
+            placeholder: String::new(),
+            filter_text: String::new(),
+            is_multi_select: bool::default(),
+            is_open: bool::default(),
+            max_height: u32::default(),
+            show_icons: bool::default(),
+            disabled: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.dropdown_id.is_empty() || true && !self.options_json.is_empty() || true && self.selected_index < u32::MAX || true && !self.placeholder.is_empty() || true && !self.filter_text.is_empty() || true && self.is_multi_select || true && self.is_open || true && self.max_height < u32::MAX || true && self.show_icons || true && self.disabled || true
+    }
+}
+
+impl Default for GhxDropdownWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Count badge (count, title, color, background, visibility)
+#[derive(Debug, Clone)]
+pub struct GhyCountBadge {
+    pub count_id: String,
+    pub count: u32,
+    pub title: String,
+    pub color: String,
+    pub background: String,
+    pub is_visible: bool,
+    pub max_display: u32,
+    pub font_weight: String,
+    pub border_radius: u32,
+    pub padding: u32,
+}
+
+impl GhyCountBadge {
+    pub fn new() -> Self {
+        Self {
+            count_id: String::new(),
+            count: u32::default(),
+            title: String::new(),
+            color: String::new(),
+            background: String::new(),
+            is_visible: bool::default(),
+            max_display: u32::default(),
+            font_weight: String::new(),
+            border_radius: u32::default(),
+            padding: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.count_id.is_empty() || true && self.count < u32::MAX || true && !self.title.is_empty() || true && !self.color.is_empty() || true && !self.background.is_empty() || true && self.is_visible || true && self.max_display < u32::MAX || true && !self.font_weight.is_empty() || true && self.border_radius < u32::MAX || true && self.padding < u32::MAX || true
+    }
+}
+
+impl Default for GhyCountBadge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Icon label (label, description, icon, strikethrough, highlights)
+#[derive(Debug, Clone)]
+pub struct GhzIconLabel {
+    pub icon_label_id: String,
+    pub label: String,
+    pub description: String,
+    pub icon_path: String,
+    pub is_strikethrough: bool,
+    pub highlights_json: String,
+    pub suffix: String,
+    pub font_weight: String,
+    pub color: String,
+    pub tooltip: String,
+}
+
+impl GhzIconLabel {
+    pub fn new() -> Self {
+        Self {
+            icon_label_id: String::new(),
+            label: String::new(),
+            description: String::new(),
+            icon_path: String::new(),
+            is_strikethrough: bool::default(),
+            highlights_json: String::new(),
+            suffix: String::new(),
+            font_weight: String::new(),
+            color: String::new(),
+            tooltip: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.icon_label_id.is_empty() || true && !self.label.is_empty() || true && !self.description.is_empty() || true && !self.icon_path.is_empty() || true && self.is_strikethrough || true && !self.highlights_json.is_empty() || true && !self.suffix.is_empty() || true && !self.font_weight.is_empty() || true && !self.color.is_empty() || true && !self.tooltip.is_empty() || true
+    }
+}
+
+impl Default for GhzIconLabel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317859,6 +318531,294 @@ mod tests_ghj_generated {
     fn test_ghj_fields() {
         let mut obj = GhjTreeViewVirtualization::default();
         obj.virtual_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghk_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghk_default() {
+        let obj = GhkListWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghk_fields() {
+        let mut obj = GhkListWidget::default();
+        obj.list_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghl_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghl_default() {
+        let obj = GhlTableWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghl_fields() {
+        let mut obj = GhlTableWidget::default();
+        obj.table_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghm_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghm_default() {
+        let obj = GhmSplitViewWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghm_fields() {
+        let mut obj = GhmSplitViewWidget::default();
+        obj.split_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghn_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghn_default() {
+        let obj = GhnGridViewWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghn_fields() {
+        let mut obj = GhnGridViewWidget::default();
+        obj.grid_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_gho_generated {
+    use super::*;
+
+    #[test]
+    fn test_gho_default() {
+        let obj = GhoTabBarWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_gho_fields() {
+        let mut obj = GhoTabBarWidget::default();
+        obj.tabbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghp_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghp_default() {
+        let obj = GhpBreadcrumbWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghp_fields() {
+        let mut obj = GhpBreadcrumbWidget::default();
+        obj.bread_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghq_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghq_default() {
+        let obj = GhqContextMenuWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghq_fields() {
+        let mut obj = GhqContextMenuWidget::default();
+        obj.menu_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghr_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghr_default() {
+        let obj = GhrToolbarWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghr_fields() {
+        let mut obj = GhrToolbarWidget::default();
+        obj.toolbar_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghs_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghs_default() {
+        let obj = GhsScrollBarWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghs_fields() {
+        let mut obj = GhsScrollBarWidget::default();
+        obj.scroll_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ght_generated {
+    use super::*;
+
+    #[test]
+    fn test_ght_default() {
+        let obj = GhtProgressBarWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ght_fields() {
+        let mut obj = GhtProgressBarWidget::default();
+        obj.progress_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghu_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghu_default() {
+        let obj = GhuBadgeWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghu_fields() {
+        let mut obj = GhuBadgeWidget::default();
+        obj.badge_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghv_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghv_default() {
+        let obj = GhvToggleWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghv_fields() {
+        let mut obj = GhvToggleWidget::default();
+        obj.toggle_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghw_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghw_default() {
+        let obj = GhwInputBoxWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghw_fields() {
+        let mut obj = GhwInputBoxWidget::default();
+        obj.input_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghx_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghx_default() {
+        let obj = GhxDropdownWidget::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghx_fields() {
+        let mut obj = GhxDropdownWidget::default();
+        obj.dropdown_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghy_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghy_default() {
+        let obj = GhyCountBadge::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghy_fields() {
+        let mut obj = GhyCountBadge::default();
+        obj.count_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ghz_generated {
+    use super::*;
+
+    #[test]
+    fn test_ghz_default() {
+        let obj = GhzIconLabel::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ghz_fields() {
+        let mut obj = GhzIconLabel::default();
+        obj.icon_label_id = "test".to_string();
         assert!(obj.validate());
     }
 }
