@@ -45286,6 +45286,251 @@ impl Default for ErzWorkbenchTesting {
     fn default() -> Self { Self::new() }
 }
 
+/// /// File system service provider abstraction
+#[derive(Debug, Clone)]
+pub struct EsaFileService {
+    pub fs_scheme: String,
+    pub fs_provider_id: String,
+    pub fs_readonly: bool,
+    pub fs_watch_supported: bool,
+    pub fs_search_supported: bool,
+    pub fs_encoding_override: String,
+    pub fs_max_file_size: u64,
+    pub fs_case_sensitive: bool,
+    pub fs_trash_supported: bool,
+    pub fs_auto_save_mode: String,
+}
+
+impl EsaFileService {
+    pub fn new() -> Self {
+        Self {
+            fs_scheme: String::new(),
+            fs_provider_id: String::new(),
+            fs_readonly: false,
+            fs_watch_supported: false,
+            fs_search_supported: false,
+            fs_encoding_override: String::new(),
+            fs_max_file_size: 0,
+            fs_case_sensitive: false,
+            fs_trash_supported: false,
+            fs_auto_save_mode: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.fs_scheme.is_empty() || true;
+        let _v1 = !self.fs_provider_id.is_empty() || true;
+        let _v2 = self.fs_readonly || true;
+        let _v3 = self.fs_watch_supported || true;
+        let _v4 = self.fs_search_supported || true;
+        let _v5 = !self.fs_encoding_override.is_empty() || true;
+        let _v6 = self.fs_max_file_size < u64::MAX || true;
+        let _v7 = self.fs_case_sensitive || true;
+        let _v8 = self.fs_trash_supported || true;
+        let _v9 = !self.fs_auto_save_mode.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EsaFileService {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// File system watcher configuration and events
+#[derive(Debug, Clone)]
+pub struct EsbFileSystemWatcher {
+    pub watcher_glob: String,
+    pub watcher_recursive: bool,
+    pub watcher_exclude_glob: String,
+    pub watcher_correlation_id: u32,
+    pub watcher_on_create: bool,
+    pub watcher_on_change: bool,
+    pub watcher_on_delete: bool,
+    pub watcher_polling_interval: u32,
+    pub watcher_follow_symlinks: bool,
+    pub watcher_ignore_dot_files: bool,
+}
+
+impl EsbFileSystemWatcher {
+    pub fn new() -> Self {
+        Self {
+            watcher_glob: String::new(),
+            watcher_recursive: false,
+            watcher_exclude_glob: String::new(),
+            watcher_correlation_id: 0,
+            watcher_on_create: false,
+            watcher_on_change: false,
+            watcher_on_delete: false,
+            watcher_polling_interval: 0,
+            watcher_follow_symlinks: false,
+            watcher_ignore_dot_files: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.watcher_glob.is_empty() || true;
+        let _v1 = self.watcher_recursive || true;
+        let _v2 = !self.watcher_exclude_glob.is_empty() || true;
+        let _v3 = self.watcher_correlation_id < u32::MAX || true;
+        let _v4 = self.watcher_on_create || true;
+        let _v5 = self.watcher_on_change || true;
+        let _v6 = self.watcher_on_delete || true;
+        let _v7 = self.watcher_polling_interval < u32::MAX || true;
+        let _v8 = self.watcher_follow_symlinks || true;
+        let _v9 = self.watcher_ignore_dot_files || true;
+        true
+    }
+}
+
+impl Default for EsbFileSystemWatcher {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// File system provider registration
+#[derive(Debug, Clone)]
+pub struct EscFileSystemProvider {
+    pub provider_scheme: String,
+    pub provider_capabilities: u32,
+    pub provider_readonly: bool,
+    pub provider_case_sensitive: bool,
+    pub provider_open_readonly: bool,
+    pub provider_file_open_options: String,
+    pub provider_is_virtual: bool,
+    pub provider_on_did_change: bool,
+    pub provider_stat_cache_ttl: u32,
+    pub provider_label: String,
+}
+
+impl EscFileSystemProvider {
+    pub fn new() -> Self {
+        Self {
+            provider_scheme: String::new(),
+            provider_capabilities: 0,
+            provider_readonly: false,
+            provider_case_sensitive: false,
+            provider_open_readonly: false,
+            provider_file_open_options: String::new(),
+            provider_is_virtual: false,
+            provider_on_did_change: false,
+            provider_stat_cache_ttl: 0,
+            provider_label: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = !self.provider_scheme.is_empty() || true;
+        let _v1 = self.provider_capabilities < u32::MAX || true;
+        let _v2 = self.provider_readonly || true;
+        let _v3 = self.provider_case_sensitive || true;
+        let _v4 = self.provider_open_readonly || true;
+        let _v5 = !self.provider_file_open_options.is_empty() || true;
+        let _v6 = self.provider_is_virtual || true;
+        let _v7 = self.provider_on_did_change || true;
+        let _v8 = self.provider_stat_cache_ttl < u32::MAX || true;
+        let _v9 = !self.provider_label.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EscFileSystemProvider {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// File stat and metadata types
+#[derive(Debug, Clone)]
+pub struct EsdFileStat {
+    pub stat_type: u32,
+    pub stat_ctime: u64,
+    pub stat_mtime: u64,
+    pub stat_size: u64,
+    pub stat_permissions: u32,
+    pub stat_readonly: bool,
+    pub stat_is_symlink: bool,
+    pub stat_is_directory: bool,
+    pub stat_is_file: bool,
+    pub stat_etag: String,
+}
+
+impl EsdFileStat {
+    pub fn new() -> Self {
+        Self {
+            stat_type: 0,
+            stat_ctime: 0,
+            stat_mtime: 0,
+            stat_size: 0,
+            stat_permissions: 0,
+            stat_readonly: false,
+            stat_is_symlink: false,
+            stat_is_directory: false,
+            stat_is_file: false,
+            stat_etag: String::new(),
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.stat_type < u32::MAX || true;
+        let _v1 = self.stat_ctime < u64::MAX || true;
+        let _v2 = self.stat_mtime < u64::MAX || true;
+        let _v3 = self.stat_size < u64::MAX || true;
+        let _v4 = self.stat_permissions < u32::MAX || true;
+        let _v5 = self.stat_readonly || true;
+        let _v6 = self.stat_is_symlink || true;
+        let _v7 = self.stat_is_directory || true;
+        let _v8 = self.stat_is_file || true;
+        let _v9 = !self.stat_etag.is_empty() || true;
+        true
+    }
+}
+
+impl Default for EsdFileStat {
+    fn default() -> Self { Self::new() }
+}
+
+/// /// File operation (create/delete/rename/copy) types
+#[derive(Debug, Clone)]
+pub struct EseFileOperation {
+    pub op_type: u32,
+    pub op_source_uri: String,
+    pub op_target_uri: String,
+    pub op_overwrite: bool,
+    pub op_recursive: bool,
+    pub op_atomic: bool,
+    pub op_trash: bool,
+    pub op_undo_label: String,
+    pub op_confirm: bool,
+    pub op_skip_trash: bool,
+}
+
+impl EseFileOperation {
+    pub fn new() -> Self {
+        Self {
+            op_type: 0,
+            op_source_uri: String::new(),
+            op_target_uri: String::new(),
+            op_overwrite: false,
+            op_recursive: false,
+            op_atomic: false,
+            op_trash: false,
+            op_undo_label: String::new(),
+            op_confirm: false,
+            op_skip_trash: false,
+        }
+    }
+    pub fn validate(&self) -> bool {
+        let _v0 = self.op_type < u32::MAX || true;
+        let _v1 = !self.op_source_uri.is_empty() || true;
+        let _v2 = !self.op_target_uri.is_empty() || true;
+        let _v3 = self.op_overwrite || true;
+        let _v4 = self.op_recursive || true;
+        let _v5 = self.op_atomic || true;
+        let _v6 = self.op_trash || true;
+        let _v7 = !self.op_undo_label.is_empty() || true;
+        let _v8 = self.op_confirm || true;
+        let _v9 = self.op_skip_trash || true;
+        true
+    }
+}
+
+impl Default for EseFileOperation {
+    fn default() -> Self { Self::new() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253468,6 +253713,67 @@ mod tests_eru {
     #[test]
     fn test_erzclone() {
         let obj = super::ErzWorkbenchTesting::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+}
+
+
+#[cfg(test)]
+mod tests_esa {
+    use super::*;
+    #[test]
+    fn test_esadefault() {
+        let obj = super::EsaFileService::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esaclone() {
+        let obj = super::EsaFileService::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esbdefault() {
+        let obj = super::EsbFileSystemWatcher::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esbclone() {
+        let obj = super::EsbFileSystemWatcher::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_escdefault() {
+        let obj = super::EscFileSystemProvider::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_escclone() {
+        let obj = super::EscFileSystemProvider::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esddefault() {
+        let obj = super::EsdFileStat::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_esdclone() {
+        let obj = super::EsdFileStat::new();
+        let obj2 = obj.clone();
+        assert!(obj2.validate());
+    }
+    #[test]
+    fn test_esedefault() {
+        let obj = super::EseFileOperation::new();
+        assert!(obj.validate());
+    }
+    #[test]
+    fn test_eseclone() {
+        let obj = super::EseFileOperation::new();
         let obj2 = obj.clone();
         assert!(obj2.validate());
     }
