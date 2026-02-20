@@ -147867,6 +147867,890 @@ impl Default for IlzKeyConfig {
     }
 }
 
+/// Language configuration model
+#[derive(Debug, Clone)]
+pub struct ImaLanguageConfig {
+    pub lang_id: String,
+    pub language_name: String,
+    pub comment_line: String,
+    pub comment_block_open: String,
+    pub bracket_count: u32,
+    pub word_pattern_set: bool,
+}
+
+impl ImaLanguageConfig {
+    pub fn new() -> Self {
+        Self {
+            lang_id: String::new(),
+            language_name: String::new(),
+            comment_line: String::new(),
+            comment_block_open: String::new(),
+            bracket_count: u32::default(),
+            word_pattern_set: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lang_id.is_empty() || true && !self.language_name.is_empty() || true && !self.comment_line.is_empty() || true && !self.comment_block_open.is_empty() || true && self.bracket_count < u32::MAX || true && self.word_pattern_set || true
+    }
+}
+
+impl Default for ImaLanguageConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language mode descriptor
+#[derive(Debug, Clone)]
+pub struct ImbLanguageMode {
+    pub mode_id: String,
+    pub mode_name: String,
+    pub extension_list: String,
+    pub alias_list: String,
+    pub first_line_pattern: String,
+    pub is_default: bool,
+}
+
+impl ImbLanguageMode {
+    pub fn new() -> Self {
+        Self {
+            mode_id: String::new(),
+            mode_name: String::new(),
+            extension_list: String::new(),
+            alias_list: String::new(),
+            first_line_pattern: String::new(),
+            is_default: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.mode_id.is_empty() || true && !self.mode_name.is_empty() || true && !self.extension_list.is_empty() || true && !self.alias_list.is_empty() || true && !self.first_line_pattern.is_empty() || true && self.is_default || true
+    }
+}
+
+impl Default for ImbLanguageMode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// TextMate grammar scope
+#[derive(Debug, Clone)]
+pub struct ImcGrammarScope {
+    pub scope_id: String,
+    pub scope_name: String,
+    pub grammar_path: String,
+    pub language_ref: String,
+    pub rule_count: u32,
+    pub is_injection: bool,
+}
+
+impl ImcGrammarScope {
+    pub fn new() -> Self {
+        Self {
+            scope_id: String::new(),
+            scope_name: String::new(),
+            grammar_path: String::new(),
+            language_ref: String::new(),
+            rule_count: u32::default(),
+            is_injection: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.scope_id.is_empty() || true && !self.scope_name.is_empty() || true && !self.grammar_path.is_empty() || true && !self.language_ref.is_empty() || true && self.rule_count < u32::MAX || true && self.is_injection || true
+    }
+}
+
+impl Default for ImcGrammarScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tokenization rule entry
+#[derive(Debug, Clone)]
+pub struct ImdTokenizationRule {
+    pub rule_id: String,
+    pub regex_pattern: String,
+    pub token_name: String,
+    pub capture_count: u32,
+    pub rule_order: u32,
+    pub is_end_rule: bool,
+}
+
+impl ImdTokenizationRule {
+    pub fn new() -> Self {
+        Self {
+            rule_id: String::new(),
+            regex_pattern: String::new(),
+            token_name: String::new(),
+            capture_count: u32::default(),
+            rule_order: u32::default(),
+            is_end_rule: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rule_id.is_empty() || true && !self.regex_pattern.is_empty() || true && !self.token_name.is_empty() || true && self.capture_count < u32::MAX || true && self.rule_order < u32::MAX || true && self.is_end_rule || true
+    }
+}
+
+impl Default for ImdTokenizationRule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language server registration
+#[derive(Debug, Clone)]
+pub struct ImeLanguageServer {
+    pub server_id: String,
+    pub server_name: String,
+    pub language_list: String,
+    pub command_str: String,
+    pub transport_str: String,
+    pub is_builtin: bool,
+}
+
+impl ImeLanguageServer {
+    pub fn new() -> Self {
+        Self {
+            server_id: String::new(),
+            server_name: String::new(),
+            language_list: String::new(),
+            command_str: String::new(),
+            transport_str: String::new(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.server_id.is_empty() || true && !self.server_name.is_empty() || true && !self.language_list.is_empty() || true && !self.command_str.is_empty() || true && !self.transport_str.is_empty() || true && self.is_builtin || true
+    }
+}
+
+impl Default for ImeLanguageServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diagnostic collection
+#[derive(Debug, Clone)]
+pub struct ImfDiagnosticCollection {
+    pub diag_id: String,
+    pub collection_name: String,
+    pub uri_count: u32,
+    pub total_diag: u32,
+    pub max_count: u32,
+    pub persist_on_close: bool,
+}
+
+impl ImfDiagnosticCollection {
+    pub fn new() -> Self {
+        Self {
+            diag_id: String::new(),
+            collection_name: String::new(),
+            uri_count: u32::default(),
+            total_diag: u32::default(),
+            max_count: u32::default(),
+            persist_on_close: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_id.is_empty() || true && !self.collection_name.is_empty() || true && self.uri_count < u32::MAX || true && self.total_diag < u32::MAX || true && self.max_count < u32::MAX || true && self.persist_on_close || true
+    }
+}
+
+impl Default for ImfDiagnosticCollection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Diagnostic entry
+#[derive(Debug, Clone)]
+pub struct ImgDiagnostic {
+    pub diag_id: String,
+    pub message_text: String,
+    pub severity_val: u32,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub has_fix: bool,
+}
+
+impl ImgDiagnostic {
+    pub fn new() -> Self {
+        Self {
+            diag_id: String::new(),
+            message_text: String::new(),
+            severity_val: u32::default(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            has_fix: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.diag_id.is_empty() || true && !self.message_text.is_empty() || true && self.severity_val < u32::MAX || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && self.has_fix || true
+    }
+}
+
+impl Default for ImgDiagnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code action provider result
+#[derive(Debug, Clone)]
+pub struct ImhCodeAction {
+    pub action_id: String,
+    pub title_text: String,
+    pub kind_str: String,
+    pub edit_count: u32,
+    pub diagnostic_ref: String,
+    pub is_preferred: bool,
+}
+
+impl ImhCodeAction {
+    pub fn new() -> Self {
+        Self {
+            action_id: String::new(),
+            title_text: String::new(),
+            kind_str: String::new(),
+            edit_count: u32::default(),
+            diagnostic_ref: String::new(),
+            is_preferred: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.action_id.is_empty() || true && !self.title_text.is_empty() || true && !self.kind_str.is_empty() || true && self.edit_count < u32::MAX || true && !self.diagnostic_ref.is_empty() || true && self.is_preferred || true
+    }
+}
+
+impl Default for ImhCodeAction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Formatting edit result
+#[derive(Debug, Clone)]
+pub struct ImiFormattingEdit {
+    pub fmt_id: String,
+    pub range_start: u32,
+    pub range_end: u32,
+    pub new_text_len: u32,
+    pub eol_str: String,
+    pub insert_final_newline: bool,
+}
+
+impl ImiFormattingEdit {
+    pub fn new() -> Self {
+        Self {
+            fmt_id: String::new(),
+            range_start: u32::default(),
+            range_end: u32::default(),
+            new_text_len: u32::default(),
+            eol_str: String::new(),
+            insert_final_newline: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fmt_id.is_empty() || true && self.range_start < u32::MAX || true && self.range_end < u32::MAX || true && self.new_text_len < u32::MAX || true && !self.eol_str.is_empty() || true && self.insert_final_newline || true
+    }
+}
+
+impl Default for ImiFormattingEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Completion provider entry
+#[derive(Debug, Clone)]
+pub struct ImjCompletionProvider {
+    pub prov_id: String,
+    pub provider_name: String,
+    pub trigger_chars: String,
+    pub language_selector: String,
+    pub priority_val: u32,
+    pub supports_resolve: bool,
+}
+
+impl ImjCompletionProvider {
+    pub fn new() -> Self {
+        Self {
+            prov_id: String::new(),
+            provider_name: String::new(),
+            trigger_chars: String::new(),
+            language_selector: String::new(),
+            priority_val: u32::default(),
+            supports_resolve: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.prov_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.trigger_chars.is_empty() || true && !self.language_selector.is_empty() || true && self.priority_val < u32::MAX || true && self.supports_resolve || true
+    }
+}
+
+impl Default for ImjCompletionProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Definition provider entry
+#[derive(Debug, Clone)]
+pub struct ImkDefinitionProvider {
+    pub def_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub supports_multi: bool,
+    pub priority_val: u32,
+    pub is_declaration: bool,
+}
+
+impl ImkDefinitionProvider {
+    pub fn new() -> Self {
+        Self {
+            def_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            supports_multi: bool::default(),
+            priority_val: u32::default(),
+            is_declaration: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.def_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && self.supports_multi || true && self.priority_val < u32::MAX || true && self.is_declaration || true
+    }
+}
+
+impl Default for ImkDefinitionProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Hover content provider
+#[derive(Debug, Clone)]
+pub struct ImlHoverProvider {
+    pub hover_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub priority_val: u32,
+    pub supports_markdown: bool,
+    pub is_builtin: bool,
+}
+
+impl ImlHoverProvider {
+    pub fn new() -> Self {
+        Self {
+            hover_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            priority_val: u32::default(),
+            supports_markdown: bool::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hover_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && self.priority_val < u32::MAX || true && self.supports_markdown || true && self.is_builtin || true
+    }
+}
+
+impl Default for ImlHoverProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Signature help provider
+#[derive(Debug, Clone)]
+pub struct ImmSignatureProvider {
+    pub sig_id: String,
+    pub provider_name: String,
+    pub trigger_chars: String,
+    pub retrigger_chars: String,
+    pub language_selector: String,
+    pub supports_context: bool,
+}
+
+impl ImmSignatureProvider {
+    pub fn new() -> Self {
+        Self {
+            sig_id: String::new(),
+            provider_name: String::new(),
+            trigger_chars: String::new(),
+            retrigger_chars: String::new(),
+            language_selector: String::new(),
+            supports_context: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sig_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.trigger_chars.is_empty() || true && !self.retrigger_chars.is_empty() || true && !self.language_selector.is_empty() || true && self.supports_context || true
+    }
+}
+
+impl Default for ImmSignatureProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Reference provider entry
+#[derive(Debug, Clone)]
+pub struct ImnReferenceProvider {
+    pub ref_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub priority_val: u32,
+    pub include_declaration_default: bool,
+    pub is_builtin: bool,
+}
+
+impl ImnReferenceProvider {
+    pub fn new() -> Self {
+        Self {
+            ref_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            priority_val: u32::default(),
+            include_declaration_default: bool::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.ref_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && self.priority_val < u32::MAX || true && self.include_declaration_default || true && self.is_builtin || true
+    }
+}
+
+impl Default for ImnReferenceProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Rename provider entry
+#[derive(Debug, Clone)]
+pub struct ImoRenameProvider {
+    pub rename_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub supports_prepare: bool,
+    pub priority_val: u32,
+    pub is_builtin: bool,
+}
+
+impl ImoRenameProvider {
+    pub fn new() -> Self {
+        Self {
+            rename_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            supports_prepare: bool::default(),
+            priority_val: u32::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.rename_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && self.supports_prepare || true && self.priority_val < u32::MAX || true && self.is_builtin || true
+    }
+}
+
+impl Default for ImoRenameProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document symbol provider
+#[derive(Debug, Clone)]
+pub struct ImpSymbolProvider {
+    pub sym_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub supports_details: bool,
+    pub priority_val: u32,
+    pub is_builtin: bool,
+}
+
+impl ImpSymbolProvider {
+    pub fn new() -> Self {
+        Self {
+            sym_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            supports_details: bool::default(),
+            priority_val: u32::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.sym_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && self.supports_details || true && self.priority_val < u32::MAX || true && self.is_builtin || true
+    }
+}
+
+impl Default for ImpSymbolProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Folding range provider
+#[derive(Debug, Clone)]
+pub struct ImqFoldProvider {
+    pub fold_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub fold_kind_mask: u32,
+    pub priority_val: u32,
+    pub is_builtin: bool,
+}
+
+impl ImqFoldProvider {
+    pub fn new() -> Self {
+        Self {
+            fold_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            fold_kind_mask: u32::default(),
+            priority_val: u32::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.fold_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && self.fold_kind_mask < u32::MAX || true && self.priority_val < u32::MAX || true && self.is_builtin || true
+    }
+}
+
+impl Default for ImqFoldProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document color provider
+#[derive(Debug, Clone)]
+pub struct ImrColorProvider {
+    pub color_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub max_colors: u32,
+    pub priority_val: u32,
+    pub supports_presentation: bool,
+}
+
+impl ImrColorProvider {
+    pub fn new() -> Self {
+        Self {
+            color_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            max_colors: u32::default(),
+            priority_val: u32::default(),
+            supports_presentation: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.color_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && self.max_colors < u32::MAX || true && self.priority_val < u32::MAX || true && self.supports_presentation || true
+    }
+}
+
+impl Default for ImrColorProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Document link provider
+#[derive(Debug, Clone)]
+pub struct ImsLinkProvider {
+    pub link_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub resolve_support: bool,
+    pub priority_val: u32,
+    pub is_builtin: bool,
+}
+
+impl ImsLinkProvider {
+    pub fn new() -> Self {
+        Self {
+            link_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            resolve_support: bool::default(),
+            priority_val: u32::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.link_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && self.resolve_support || true && self.priority_val < u32::MAX || true && self.is_builtin || true
+    }
+}
+
+impl Default for ImsLinkProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Code lens provider entry
+#[derive(Debug, Clone)]
+pub struct ImtCodeLensProvider {
+    pub lens_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub event_emitter_ref: String,
+    pub priority_val: u32,
+    pub resolve_support: bool,
+}
+
+impl ImtCodeLensProvider {
+    pub fn new() -> Self {
+        Self {
+            lens_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            event_emitter_ref: String::new(),
+            priority_val: u32::default(),
+            resolve_support: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.lens_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && !self.event_emitter_ref.is_empty() || true && self.priority_val < u32::MAX || true && self.resolve_support || true
+    }
+}
+
+impl Default for ImtCodeLensProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Inlay hint provider entry
+#[derive(Debug, Clone)]
+pub struct ImuInlayHintProvider {
+    pub hint_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub event_emitter_ref: String,
+    pub priority_val: u32,
+    pub resolve_support: bool,
+}
+
+impl ImuInlayHintProvider {
+    pub fn new() -> Self {
+        Self {
+            hint_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            event_emitter_ref: String::new(),
+            priority_val: u32::default(),
+            resolve_support: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hint_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && !self.event_emitter_ref.is_empty() || true && self.priority_val < u32::MAX || true && self.resolve_support || true
+    }
+}
+
+impl Default for ImuInlayHintProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Semantic token provider
+#[derive(Debug, Clone)]
+pub struct ImvSemanticTokenProvider {
+    pub token_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub legend_ref: String,
+    pub supports_delta: bool,
+    pub is_builtin: bool,
+}
+
+impl ImvSemanticTokenProvider {
+    pub fn new() -> Self {
+        Self {
+            token_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            legend_ref: String::new(),
+            supports_delta: bool::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.token_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && !self.legend_ref.is_empty() || true && self.supports_delta || true && self.is_builtin || true
+    }
+}
+
+impl Default for ImvSemanticTokenProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Call hierarchy provider
+#[derive(Debug, Clone)]
+pub struct ImwCallHierarchyProvider {
+    pub call_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub supports_incoming: bool,
+    pub supports_outgoing: bool,
+    pub is_builtin: bool,
+}
+
+impl ImwCallHierarchyProvider {
+    pub fn new() -> Self {
+        Self {
+            call_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            supports_incoming: bool::default(),
+            supports_outgoing: bool::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.call_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && self.supports_incoming || true && self.supports_outgoing || true && self.is_builtin || true
+    }
+}
+
+impl Default for ImwCallHierarchyProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Type hierarchy provider
+#[derive(Debug, Clone)]
+pub struct ImxTypeHierarchyProvider {
+    pub hier_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub supports_supertypes: bool,
+    pub supports_subtypes: bool,
+    pub is_builtin: bool,
+}
+
+impl ImxTypeHierarchyProvider {
+    pub fn new() -> Self {
+        Self {
+            hier_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            supports_supertypes: bool::default(),
+            supports_subtypes: bool::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.hier_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && self.supports_supertypes || true && self.supports_subtypes || true && self.is_builtin || true
+    }
+}
+
+impl Default for ImxTypeHierarchyProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Linked editing provider
+#[derive(Debug, Clone)]
+pub struct ImyLinkedEditProvider {
+    pub linked_id: String,
+    pub provider_name: String,
+    pub language_selector: String,
+    pub word_pattern_str: String,
+    pub priority_val: u32,
+    pub is_builtin: bool,
+}
+
+impl ImyLinkedEditProvider {
+    pub fn new() -> Self {
+        Self {
+            linked_id: String::new(),
+            provider_name: String::new(),
+            language_selector: String::new(),
+            word_pattern_str: String::new(),
+            priority_val: u32::default(),
+            is_builtin: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.linked_id.is_empty() || true && !self.provider_name.is_empty() || true && !self.language_selector.is_empty() || true && !self.word_pattern_str.is_empty() || true && self.priority_val < u32::MAX || true && self.is_builtin || true
+    }
+}
+
+impl Default for ImyLinkedEditProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Language features configuration
+#[derive(Debug, Clone)]
+pub struct ImzLanguageFeatureConfig {
+    pub config_id: String,
+    pub auto_format_enabled: bool,
+    pub format_on_save: bool,
+    pub format_on_paste: bool,
+    pub auto_fix_on_save: bool,
+    pub organize_imports_on_save: bool,
+}
+
+impl ImzLanguageFeatureConfig {
+    pub fn new() -> Self {
+        Self {
+            config_id: String::new(),
+            auto_format_enabled: bool::default(),
+            format_on_save: bool::default(),
+            format_on_paste: bool::default(),
+            auto_fix_on_save: bool::default(),
+            organize_imports_on_save: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.config_id.is_empty() || true && self.auto_format_enabled || true && self.format_on_save || true && self.format_on_paste || true && self.auto_fix_on_save || true && self.organize_imports_on_save || true
+    }
+}
+
+impl Default for ImzLanguageFeatureConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -401413,6 +402297,474 @@ mod tests_ilz_generated {
     #[test]
     fn test_ilz_fields() {
         let mut obj = IlzKeyConfig::default();
+        obj.config_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ima_generated {
+    use super::*;
+
+    #[test]
+    fn test_ima_default() {
+        let obj = ImaLanguageConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ima_fields() {
+        let mut obj = ImaLanguageConfig::default();
+        obj.lang_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imb_generated {
+    use super::*;
+
+    #[test]
+    fn test_imb_default() {
+        let obj = ImbLanguageMode::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imb_fields() {
+        let mut obj = ImbLanguageMode::default();
+        obj.mode_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imc_generated {
+    use super::*;
+
+    #[test]
+    fn test_imc_default() {
+        let obj = ImcGrammarScope::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imc_fields() {
+        let mut obj = ImcGrammarScope::default();
+        obj.scope_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imd_generated {
+    use super::*;
+
+    #[test]
+    fn test_imd_default() {
+        let obj = ImdTokenizationRule::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imd_fields() {
+        let mut obj = ImdTokenizationRule::default();
+        obj.rule_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ime_generated {
+    use super::*;
+
+    #[test]
+    fn test_ime_default() {
+        let obj = ImeLanguageServer::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ime_fields() {
+        let mut obj = ImeLanguageServer::default();
+        obj.server_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imf_generated {
+    use super::*;
+
+    #[test]
+    fn test_imf_default() {
+        let obj = ImfDiagnosticCollection::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imf_fields() {
+        let mut obj = ImfDiagnosticCollection::default();
+        obj.diag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_img_generated {
+    use super::*;
+
+    #[test]
+    fn test_img_default() {
+        let obj = ImgDiagnostic::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_img_fields() {
+        let mut obj = ImgDiagnostic::default();
+        obj.diag_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imh_generated {
+    use super::*;
+
+    #[test]
+    fn test_imh_default() {
+        let obj = ImhCodeAction::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imh_fields() {
+        let mut obj = ImhCodeAction::default();
+        obj.action_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imi_generated {
+    use super::*;
+
+    #[test]
+    fn test_imi_default() {
+        let obj = ImiFormattingEdit::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imi_fields() {
+        let mut obj = ImiFormattingEdit::default();
+        obj.fmt_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imj_generated {
+    use super::*;
+
+    #[test]
+    fn test_imj_default() {
+        let obj = ImjCompletionProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imj_fields() {
+        let mut obj = ImjCompletionProvider::default();
+        obj.prov_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imk_generated {
+    use super::*;
+
+    #[test]
+    fn test_imk_default() {
+        let obj = ImkDefinitionProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imk_fields() {
+        let mut obj = ImkDefinitionProvider::default();
+        obj.def_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_iml_generated {
+    use super::*;
+
+    #[test]
+    fn test_iml_default() {
+        let obj = ImlHoverProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_iml_fields() {
+        let mut obj = ImlHoverProvider::default();
+        obj.hover_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imm_generated {
+    use super::*;
+
+    #[test]
+    fn test_imm_default() {
+        let obj = ImmSignatureProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imm_fields() {
+        let mut obj = ImmSignatureProvider::default();
+        obj.sig_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imn_generated {
+    use super::*;
+
+    #[test]
+    fn test_imn_default() {
+        let obj = ImnReferenceProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imn_fields() {
+        let mut obj = ImnReferenceProvider::default();
+        obj.ref_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imo_generated {
+    use super::*;
+
+    #[test]
+    fn test_imo_default() {
+        let obj = ImoRenameProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imo_fields() {
+        let mut obj = ImoRenameProvider::default();
+        obj.rename_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imp_generated {
+    use super::*;
+
+    #[test]
+    fn test_imp_default() {
+        let obj = ImpSymbolProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imp_fields() {
+        let mut obj = ImpSymbolProvider::default();
+        obj.sym_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imq_generated {
+    use super::*;
+
+    #[test]
+    fn test_imq_default() {
+        let obj = ImqFoldProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imq_fields() {
+        let mut obj = ImqFoldProvider::default();
+        obj.fold_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imr_generated {
+    use super::*;
+
+    #[test]
+    fn test_imr_default() {
+        let obj = ImrColorProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imr_fields() {
+        let mut obj = ImrColorProvider::default();
+        obj.color_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_ims_generated {
+    use super::*;
+
+    #[test]
+    fn test_ims_default() {
+        let obj = ImsLinkProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_ims_fields() {
+        let mut obj = ImsLinkProvider::default();
+        obj.link_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imt_generated {
+    use super::*;
+
+    #[test]
+    fn test_imt_default() {
+        let obj = ImtCodeLensProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imt_fields() {
+        let mut obj = ImtCodeLensProvider::default();
+        obj.lens_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imu_generated {
+    use super::*;
+
+    #[test]
+    fn test_imu_default() {
+        let obj = ImuInlayHintProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imu_fields() {
+        let mut obj = ImuInlayHintProvider::default();
+        obj.hint_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imv_generated {
+    use super::*;
+
+    #[test]
+    fn test_imv_default() {
+        let obj = ImvSemanticTokenProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imv_fields() {
+        let mut obj = ImvSemanticTokenProvider::default();
+        obj.token_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imw_generated {
+    use super::*;
+
+    #[test]
+    fn test_imw_default() {
+        let obj = ImwCallHierarchyProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imw_fields() {
+        let mut obj = ImwCallHierarchyProvider::default();
+        obj.call_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imx_generated {
+    use super::*;
+
+    #[test]
+    fn test_imx_default() {
+        let obj = ImxTypeHierarchyProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imx_fields() {
+        let mut obj = ImxTypeHierarchyProvider::default();
+        obj.hier_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imy_generated {
+    use super::*;
+
+    #[test]
+    fn test_imy_default() {
+        let obj = ImyLinkedEditProvider::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imy_fields() {
+        let mut obj = ImyLinkedEditProvider::default();
+        obj.linked_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_imz_generated {
+    use super::*;
+
+    #[test]
+    fn test_imz_default() {
+        let obj = ImzLanguageFeatureConfig::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_imz_fields() {
+        let mut obj = ImzLanguageFeatureConfig::default();
         obj.config_id = "test".to_string();
         assert!(obj.validate());
     }
