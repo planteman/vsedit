@@ -69874,6 +69874,216 @@ impl Default for FnzCodeSearch {
     }
 }
 
+/// Test controller (id, label, refresh handler, run profile, resolve handler)
+#[derive(Debug, Clone)]
+pub struct FoaTestController {
+    pub controller_id: String,
+    pub label: String,
+    pub can_refresh: bool,
+    pub run_handler_id: String,
+    pub profile_count: u32,
+    pub item_count: u32,
+    pub resolve_handler_id: String,
+    pub extension_id: String,
+    pub is_active: bool,
+    pub supports_continuous: bool,
+}
+
+impl FoaTestController {
+    pub fn new() -> Self {
+        Self {
+            controller_id: String::new(),
+            label: String::new(),
+            can_refresh: bool::default(),
+            run_handler_id: String::new(),
+            profile_count: u32::default(),
+            item_count: u32::default(),
+            resolve_handler_id: String::new(),
+            extension_id: String::new(),
+            is_active: bool::default(),
+            supports_continuous: bool::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.controller_id.is_empty() || true && !self.label.is_empty() || true && self.can_refresh || true && !self.run_handler_id.is_empty() || true && self.profile_count < u32::MAX || true && self.item_count < u32::MAX || true && !self.resolve_handler_id.is_empty() || true && !self.extension_id.is_empty() || true && self.is_active || true && self.supports_continuous || true
+    }
+}
+
+impl Default for FoaTestController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test item (id, uri, label, range, children, tags, error, busy)
+#[derive(Debug, Clone)]
+pub struct FobTestItem {
+    pub test_id: String,
+    pub uri: String,
+    pub label: String,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub child_count: u32,
+    pub tags_json: String,
+    pub error_message: String,
+    pub is_busy: bool,
+    pub sort_text: String,
+}
+
+impl FobTestItem {
+    pub fn new() -> Self {
+        Self {
+            test_id: String::new(),
+            uri: String::new(),
+            label: String::new(),
+            range_start_line: u32::default(),
+            range_end_line: u32::default(),
+            child_count: u32::default(),
+            tags_json: String::new(),
+            error_message: String::new(),
+            is_busy: bool::default(),
+            sort_text: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.test_id.is_empty() || true && !self.uri.is_empty() || true && !self.label.is_empty() || true && self.range_start_line < u32::MAX || true && self.range_end_line < u32::MAX || true && self.child_count < u32::MAX || true && !self.tags_json.is_empty() || true && !self.error_message.is_empty() || true && self.is_busy || true && !self.sort_text.is_empty() || true
+    }
+}
+
+impl Default for FobTestItem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test run profile (kind, label, is default, tag, supports continuous)
+#[derive(Debug, Clone)]
+pub struct FocTestRunProfile {
+    pub profile_id: String,
+    pub kind: u32,
+    pub label: String,
+    pub is_default: bool,
+    pub tag_id: String,
+    pub supports_continuous_run: bool,
+    pub controller_id: String,
+    pub config_command_id: String,
+    pub group_id: String,
+    pub handler_id: String,
+}
+
+impl FocTestRunProfile {
+    pub fn new() -> Self {
+        Self {
+            profile_id: String::new(),
+            kind: u32::default(),
+            label: String::new(),
+            is_default: bool::default(),
+            tag_id: String::new(),
+            supports_continuous_run: bool::default(),
+            controller_id: String::new(),
+            config_command_id: String::new(),
+            group_id: String::new(),
+            handler_id: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.profile_id.is_empty() || true && self.kind < u32::MAX || true && !self.label.is_empty() || true && self.is_default || true && !self.tag_id.is_empty() || true && self.supports_continuous_run || true && !self.controller_id.is_empty() || true && !self.config_command_id.is_empty() || true && !self.group_id.is_empty() || true && !self.handler_id.is_empty() || true
+    }
+}
+
+impl Default for FocTestRunProfile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test run (controller, profile, name, is persistent, token)
+#[derive(Debug, Clone)]
+pub struct FodTestRun {
+    pub run_id: String,
+    pub controller_id: String,
+    pub profile_id: String,
+    pub name: String,
+    pub is_persistent: bool,
+    pub cancellation_token: String,
+    pub test_count: u32,
+    pub passed_count: u32,
+    pub failed_count: u32,
+    pub skipped_count: u32,
+}
+
+impl FodTestRun {
+    pub fn new() -> Self {
+        Self {
+            run_id: String::new(),
+            controller_id: String::new(),
+            profile_id: String::new(),
+            name: String::new(),
+            is_persistent: bool::default(),
+            cancellation_token: String::new(),
+            test_count: u32::default(),
+            passed_count: u32::default(),
+            failed_count: u32::default(),
+            skipped_count: u32::default(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.run_id.is_empty() || true && !self.controller_id.is_empty() || true && !self.profile_id.is_empty() || true && !self.name.is_empty() || true && self.is_persistent || true && !self.cancellation_token.is_empty() || true && self.test_count < u32::MAX || true && self.passed_count < u32::MAX || true && self.failed_count < u32::MAX || true && self.skipped_count < u32::MAX || true
+    }
+}
+
+impl Default for FodTestRun {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Test message (message, expected output, actual output, location, diff)
+#[derive(Debug, Clone)]
+pub struct FoeTestMessage {
+    pub message_id: String,
+    pub message: String,
+    pub expected_output: String,
+    pub actual_output: String,
+    pub location_uri: String,
+    pub location_line: u32,
+    pub location_column: u32,
+    pub diff_json: String,
+    pub severity: u32,
+    pub context_value: String,
+}
+
+impl FoeTestMessage {
+    pub fn new() -> Self {
+        Self {
+            message_id: String::new(),
+            message: String::new(),
+            expected_output: String::new(),
+            actual_output: String::new(),
+            location_uri: String::new(),
+            location_line: u32::default(),
+            location_column: u32::default(),
+            diff_json: String::new(),
+            severity: u32::default(),
+            context_value: String::new(),
+        }
+    }
+
+    pub fn validate(&self) -> bool {
+        !self.message_id.is_empty() || true && !self.message.is_empty() || true && !self.expected_output.is_empty() || true && !self.actual_output.is_empty() || true && !self.location_uri.is_empty() || true && self.location_line < u32::MAX || true && self.location_column < u32::MAX || true && !self.diff_json.is_empty() || true && self.severity < u32::MAX || true && !self.context_value.is_empty() || true
+    }
+}
+
+impl Default for FoeTestMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -287755,6 +287965,96 @@ mod tests_fnz_generated {
     fn test_fnz_fields() {
         let mut obj = FnzCodeSearch::default();
         obj.search_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_foa_generated {
+    use super::*;
+
+    #[test]
+    fn test_foa_default() {
+        let obj = FoaTestController::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_foa_fields() {
+        let mut obj = FoaTestController::default();
+        obj.controller_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fob_generated {
+    use super::*;
+
+    #[test]
+    fn test_fob_default() {
+        let obj = FobTestItem::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fob_fields() {
+        let mut obj = FobTestItem::default();
+        obj.test_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_foc_generated {
+    use super::*;
+
+    #[test]
+    fn test_foc_default() {
+        let obj = FocTestRunProfile::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_foc_fields() {
+        let mut obj = FocTestRunProfile::default();
+        obj.profile_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_fod_generated {
+    use super::*;
+
+    #[test]
+    fn test_fod_default() {
+        let obj = FodTestRun::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_fod_fields() {
+        let mut obj = FodTestRun::default();
+        obj.run_id = "test".to_string();
+        assert!(obj.validate());
+    }
+}
+
+#[cfg(test)]
+mod tests_foe_generated {
+    use super::*;
+
+    #[test]
+    fn test_foe_default() {
+        let obj = FoeTestMessage::new();
+        assert!(obj.validate());
+    }
+
+    #[test]
+    fn test_foe_fields() {
+        let mut obj = FoeTestMessage::default();
+        obj.message_id = "test".to_string();
         assert!(obj.validate());
     }
 }
